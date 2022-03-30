@@ -266,24 +266,3 @@ var errnoToString = [...]string{
 	ErrnoXdev:           "EXDEV",
 	ErrnoNotcapable:     "ENOTCAPABLE",
 }
-
-// ExitCode is an arbitrary uint32 number returned by proc_exit.
-// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
-//
-// In wazero, if ProcExit is called, the calling function returns immediately, returning the given exit code as the error.
-// You can get the exit code by casting the error as follows.
-//
-//   wasmFunction := m.ExportedFunction(/* omitted */)  // Some function which may call proc_exit
-//   err := wasmFunction()
-//   var exitCode wasi.ExitCode
-//   if errors.As(err, &exitCode) {
-//   	// The function is terminated by proc_exit.
-//   }
-//
-// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#exitcode
-// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-type ExitCode uint32
-
-func (err ExitCode) Error() string {
-	return fmt.Sprintf("terminated by proc_exit(%d)", uint32(err))
-}

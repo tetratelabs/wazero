@@ -14,6 +14,7 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 type (
@@ -37,8 +38,8 @@ type (
 		compiledFunctions []*compiledFunction
 
 		// parentEngine holds *engine from which this module engine is created from.
-		parentEngine           *engine
-		importedFunctionCounts int
+		parentEngine          *engine
+		importedFunctionCount uint32
 
 		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
 		//
@@ -356,12 +357,12 @@ func releaseCompiledFunction(compiledFn *compiledFunction) {
 
 // NewModuleEngine implements the same method as documented on internalwasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
-	imported := len(importedFunctions)
+	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
-		name:                   name,
-		compiledFunctions:      make([]*compiledFunction, 0, imported+len(moduleFunctions)),
-		parentEngine:           e,
-		importedFunctionCounts: imported,
+		name:                  name,
+		compiledFunctions:     make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
+		parentEngine:          e,
+		importedFunctionCount: imported,
 	}
 
 	for idx, f := range importedFunctions {
@@ -427,7 +428,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 //    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
 func (me *moduleEngine) doClose() {
 	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
 		// NOTE: we still rely on the finalizer of cf until the notes on this function are addressed.
 		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
@@ -459,9 +460,13 @@ func (me *moduleEngine) Name() string {
 
 // Call implements the same method as documented on internalwasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
+	// compiledFunctions on close aren't locked, neither is this read.
 	compiled := me.compiledFunctions[f.Index]
-	if compiled == nil {
-		err = fmt.Errorf("function not compiled")
+	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
+		if err = failIfClosed(me); err == nil {
+			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
+		}
 		return
 	}
 
@@ -478,6 +483,12 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
+		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
+		if err == nil {
+			err = failIfClosed(me)
+		}
+		// TODO: ^^ Will not fail if the function was imported from a closed module.
+
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
@@ -522,13 +533,22 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	return
 }
 
-// Close implements the same method as documented on internalwasm.ModuleEngine.
-func (me *moduleEngine) Close() error {
-	if !atomic.CompareAndSwapUint64(&me.closed, 0, 1) {
-		return nil
+// failIfClosed returns a sys.ExitError if moduleEngine.CloseWithExitCode was called.
+func failIfClosed(me *moduleEngine) error {
+	if closed := atomic.LoadUint64(&me.closed); closed != 0 {
+		return sys.NewExitError(me.name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
+	}
+	return nil
+}
+
+// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
+	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
+	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {
+		return false, nil
 	}
 	me.doClose()
-	return nil
+	return true, nil
 }
 
 func NewEngine() wasm.Engine {

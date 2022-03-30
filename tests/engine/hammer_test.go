@@ -1,15 +1,14 @@
 package adhoc
 
 import (
-	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
+	"github.com/tetratelabs/wazero/sys"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -31,12 +30,12 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 }
 
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
-	closeModuleWhileInUse(t, r, func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+	closeModuleWhileInUse(t, r, func(imported, importing wasm.Module) (wasm.Module, wasm.Module) {
 		// Close the importing module, despite calls being in-flight.
 		require.NoError(t, importing.Close())
 
 		// Prove a module can be redefined even with in-flight calls.
-		source := callImportAfterAddSource(imported.Name(), importing.Name())
+		source := callReturnImportSource(imported.Name(), importing.Name())
 		importing, err := r.InstantiateModuleFromSource(source)
 		require.NoError(t, err)
 		return imported, importing
@@ -44,26 +43,19 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 }
 
 func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
-	closeModuleWhileInUse(t, r, func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module) {
-		// Close the underlying host function, which causes future calls to it to fail.
-		atomic.StoreUint32(hostFunctionClosed, 1)
-
-		// Validate new calls to the imported function fail, since it was closed.
-		_, err := imported.ExportedFunction("return_input").Call(nil, 1)
-		require.Contains(t, err.Error(), "wasm runtime error: function closed")
-
-		// Close both the importing and the imported module, despite calls being in-flight
-		require.NoError(t, imported.Close())
+	closeModuleWhileInUse(t, r, func(imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+		// Close the importing and imported module, despite calls being in-flight.
 		require.NoError(t, importing.Close())
+		require.NoError(t, imported.Close())
 
 		// Redefine the imported module, with a function that no longer blocks.
-		imported, err = r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
+		imported, err := r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
 			return x
 		}).Instantiate()
 		require.NoError(t, err)
 
 		// Redefine the importing module, which should link to the redefined host module.
-		source := callImportAfterAddSource(imported.Name(), importing.Name())
+		source := callReturnImportSource(imported.Name(), importing.Name())
 		importing, err = r.InstantiateModuleFromSource(source)
 		require.NoError(t, err)
 
@@ -71,23 +63,16 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 	})
 }
 
-func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module)) {
-	args := []uint64{1, 123}
-	exp := args[0] + args[1]
-
+func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported, importing wasm.Module) (wasm.Module, wasm.Module)) {
 	P := 8               // max count of goroutines
 	if testing.Short() { // Adjust down if `-test.short`
 		P = 4
 	}
 
-	var hostFunctionClosed uint32
 	// To know return path works on a closed module, we need to block calls.
 	var calls sync.WaitGroup
 	calls.Add(P)
 	blockAndReturn := func(x uint32) uint32 {
-		if atomic.LoadUint32(&hostFunctionClosed) == 1 { // Not require.False as we don't want to fail the test.
-			panic(errors.New("function closed"))
-		}
 		calls.Wait()
 		return x
 	}
@@ -99,16 +84,18 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(hostFunc
 	defer imported.Close()
 
 	// Import that module.
-	source := callImportAfterAddSource(imported.Name(), t.Name()+"-importing")
+	source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
 	importing, err := r.InstantiateModuleFromSource(source)
 	require.NoError(t, err)
 	defer importing.Close()
 
 	// As this is a blocking function call, only run 1 per goroutine.
+	i := importing // pin the module used inside goroutines
 	hammer.NewHammer(t, P, 1).Run(func(name string) {
-		requireFunctionCall(t, importing.ExportedFunction("call_import_after_add"), args, exp)
+		// In all cases, the importing module is closed, so the error should have that as its module name.
+		requireFunctionCallExits(t, i.Name(), i.ExportedFunction("call_return_import"))
 	}, func() { // When all functions are in-flight, re-assign the modules.
-		imported, importing = closeFn(&hostFunctionClosed, imported, importing)
+		imported, importing = closeFn(imported, importing)
 		// Unblock all the calls
 		calls.Add(-P)
 	})
@@ -120,12 +107,16 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(hostFunc
 	}
 
 	// If unloading worked properly, a new function call should route to the newly instantiated module.
-	requireFunctionCall(t, importing.ExportedFunction("call_import_after_add"), args, exp)
+	requireFunctionCall(t, importing.ExportedFunction("call_return_import"))
 }
 
-func requireFunctionCall(t *testing.T, fn wasm.Function, args []uint64, exp uint64) {
-	res, err := fn.Call(nil, args...)
-	// We don't expect an error because there's currently no functionality to detect or fail on a closed module.
+func requireFunctionCall(t *testing.T, fn wasm.Function) {
+	res, err := fn.Call(nil, 3)
 	require.NoError(t, err)
-	require.Equal(t, exp, res[0])
+	require.Equal(t, uint64(3), res[0])
+}
+
+func requireFunctionCallExits(t *testing.T, moduleName string, fn wasm.Function) {
+	_, err := fn.Call(nil, 3)
+	require.Equal(t, sys.NewExitError(moduleName, 0), err)
 }

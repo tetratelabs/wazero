@@ -11,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
@@ -41,6 +42,8 @@ var configContext = context.WithValue(context.Background(), configContextKey("wa
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config *wazero.RuntimeConfig) {
 	for name, testf := range tests {
+		name := name   // pin
+		testf := testf // pin
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testf(t, wazero.NewRuntimeWithConfig(config.WithContext(configContext)))
@@ -252,37 +255,34 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	}
 }
 
-func callImportAfterAddSource(importedModule, importingModule string) []byte {
+func callReturnImportSource(importedModule, importingModule string) []byte {
 	return []byte(fmt.Sprintf(`(module $%[1]s
-	(import "%[2]s" "return_input" (func $block (param i32) (result i32)))
-	(func $call_import_after_add (param i32) (param i32) (result i32)
-		local.get 0
-		local.get 1
-		i32.add
-		call $block
-	)
-	(export "call_import_after_add" (func $call_import_after_add))
+	;; test an imported function by re-exporting it
+	(import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
+	(export "return_input" (func $return_input))
+
+	;; test wasm, by calling an imported function
+	(func $call_return_import (param i32) (result i32) local.get 0 call $return_input)
+	(export "call_return_import" (func $call_return_import))
 )`, importingModule, importedModule))
 }
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 	tests := []struct {
-		name           string
-		closeImporting bool
-		closeImported  bool
+		name, function                string
+		closeImporting, closeImported uint32
 	}{
-		{
-			name:           "importing", // Ex. WASI proc_exit or AssemblyScript abort handler.
-			closeImporting: true,
+		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+			name:           "importing",
+			function:       "call_return_import",
+			closeImporting: 1,
 		},
-		{
-			name:          "imported",
-			closeImported: true,
-		},
-		{
-			name:           "both", // Ex. A function that stops the runtime.
-			closeImporting: true,
-			closeImported:  true,
+		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
+		{ // Ex. A function that stops the runtime.
+			name:           "both",
+			function:       "call_return_import",
+			closeImporting: 1,
+			closeImported:  2,
 		},
 	}
 	for _, tt := range tests {
@@ -292,11 +292,11 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			var imported, importing publicwasm.Module
 			var err error
 			closeAndReturn := func(x uint32) uint32 {
-				if tc.closeImporting {
-					require.NoError(t, importing.Close())
+				if tc.closeImporting != 0 {
+					require.NoError(t, importing.CloseWithExitCode(tc.closeImporting))
 				}
-				if tc.closeImported {
-					require.NoError(t, importing.Close())
+				if tc.closeImported != 0 {
+					require.NoError(t, imported.CloseWithExitCode(tc.closeImported))
 				}
 				return x
 			}
@@ -308,14 +308,26 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			defer imported.Close()
 
 			// Import that module.
-			source := callImportAfterAddSource(imported.Name(), t.Name()+"-importing")
+			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
 			importing, err = r.InstantiateModuleFromSource(source)
 			require.NoError(t, err)
 			defer importing.Close()
 
-			// Expect no error, because there's currently no logic to fail on the return path after close.
-			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
-			require.NoError(t, err)
+			var expectedErr error
+			if tc.closeImported != 0 && tc.closeImporting != 0 {
+				// When both modules are closed, importing is the better one to choose in the error message.
+				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+			} else if tc.closeImported != 0 {
+				expectedErr = sys.NewExitError(imported.Name(), tc.closeImported)
+			} else if tc.closeImporting != 0 {
+				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+			} else {
+				t.Fatal("invalid test case")
+			}
+
+			// Functions that return after being closed should have an exit error.
+			_, err = importing.ExportedFunction(tc.function).Call(nil, 5)
+			require.Equal(t, expectedErr, err)
 		})
 	}
 }

@@ -141,13 +141,13 @@ func TestModuleContext_String(t *testing.T) {
 func TestModuleContext_Close(t *testing.T) {
 	s := newStore()
 
-	t.Run("calls store.CloseModule(module.name)", func(t *testing.T) {
+	t.Run("calls store.CloseWithExitCode(module.name)", func(t *testing.T) {
 		moduleName := t.Name()
 		m, err := s.Instantiate(context.Background(), &Module{}, moduleName, nil)
 		require.NoError(t, err)
 
-		// We use side effects to determine if Close in fact called store.CloseModule (without repeating store_test.go).
-		// One side effect of store.CloseModule is that the moduleName can no longer be looked up. Verify our base case.
+		// We use side effects to determine if Close in fact called store.CloseWithExitCode (without repeating store_test.go).
+		// One side effect of store.CloseWithExitCode is that the moduleName can no longer be looked up. Verify our base case.
 		require.Equal(t, s.Module(moduleName), m)
 
 		// Closing should not err.

@@ -332,14 +332,16 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	return m.Ctx, nil
 }
 
-// CloseModule deallocates resources if a module with the given name exists.
-func (s *Store) CloseModule(moduleName string) (err error) {
-	m := s.module(moduleName)
-	if m != nil {
-		err = m.Engine.Close()
+// CloseModuleWithExitCode deallocates resources if a module with the given name exists.
+func (s *Store) CloseModuleWithExitCode(moduleName string, exitCode uint32) error {
+	if m := s.module(moduleName); m == nil {
+		return nil
+	} else if ok, err := m.Engine.CloseWithExitCode(exitCode); err != nil {
+		return err
+	} else if ok {
 		s.deleteModule(moduleName)
 	}
-	return
+	return nil
 }
 
 // deleteModule makes the moduleName available for instantiation again.

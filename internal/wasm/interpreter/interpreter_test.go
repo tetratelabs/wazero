@@ -76,7 +76,7 @@ func TestModuleEngine_Call(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
-func TestTestModuleEngine_Call_HostFn(t *testing.T) {
+func TestModuleEngine_Call_HostFn(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
@@ -285,7 +285,8 @@ func TestClose(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			err = me.Close()
+			closed, err := me.CloseWithExitCode(0)
+			require.True(t, closed)
 			require.NoError(t, err)
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
