@@ -483,16 +483,11 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
-		// If a module closed during the call, and the call didn't err for another reason, set an ExitError.
-		// This is not recursive: While this checks if the current module, or the imported module is closed, it does not
-		// check an imported module itself imports a module that was closed.
-
-		if err == nil { // Check if the current module is closed.
+		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
+		if err == nil {
 			err = failIfClosed(me)
 		}
-		if err == nil && f.Index < me.importedFunctionCount { // Check if the imported module is closed.
-			err = failIfClosed(compiled.source.Module.Engine.(*moduleEngine))
-		}
+		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
