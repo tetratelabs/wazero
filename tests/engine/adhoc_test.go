@@ -42,6 +42,8 @@ var configContext = context.WithValue(context.Background(), configContextKey("wa
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config *wazero.RuntimeConfig) {
 	for name, testf := range tests {
+		name := name // pin
+		testf := testf // pin
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			testf(t, wazero.NewRuntimeWithConfig(config.WithContext(configContext)))
