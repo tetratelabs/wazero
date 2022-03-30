@@ -53,6 +53,10 @@ var (
 )
 
 func init() {
+	// TODO: what if these address exceed 32-bit address space?  Even though AMD says 2GB memory space
+	// should be enough for everyone, we might end up in these circum stances. We access these variables
+	// via 32-bit displacement which cannot accomodate 64-bit addresses.
+	// https://stackoverflow.com/questions/31853189/x86-64-assembly-why-displacement-not-64-bits
 	zero64BitAddress = uintptr(unsafe.Pointer(&zero64Bit))
 	minimum32BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum32BitSignedInt))
 	minimum64BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum64BitSignedInt))

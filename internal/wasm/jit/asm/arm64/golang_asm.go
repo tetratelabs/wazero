@@ -17,7 +17,7 @@ type assemblerGoAsmImpl struct {
 }
 
 func newGolangAsmAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
-	g, err := asm.NewGolangAsmBaseAssembler()
+	g, err := asm.NewGolangAsmBaseAssembler("arm64")
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 

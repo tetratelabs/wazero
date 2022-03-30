@@ -10,16 +10,16 @@ import (
 // Note: When possible, add code here instead of in architecture-specific files to reduce drift:
 // As this is internal, exporting symbols only to reduce duplication is ok.
 type BaseAssemblerImpl struct {
-	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
+	// SetBranchTargetOnNextNodes holds branch kind instructions (BR, conditional BR, etc)
 	// where we want to set the next coming instruction as the destination of these BR instructions.
-	setBranchTargetOnNextNodes []Node
+	SetBranchTargetOnNextNodes []Node
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
 	OnGenerateCallbacks []func(code []byte) error
 }
 
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
 func (a *BaseAssemblerImpl) SetJumpTargetOnNext(nodes ...Node) {
-	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
+	a.SetBranchTargetOnNextNodes = append(a.SetBranchTargetOnNextNodes, nodes...)
 }
 
 // AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack

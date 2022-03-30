@@ -3,44 +3,43 @@ package asm
 import (
 	"encoding/binary"
 	"fmt"
-	"runtime"
 
 	goasm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 )
 
 // golangAsmNode implements Node for golang-asm library.
-type golangAsmNode struct {
+type GolangAsmNode struct {
 	prog *obj.Prog
 }
 
 func NewGolangAsmNode(p *obj.Prog) Node {
-	return &golangAsmNode{prog: p}
+	return &GolangAsmNode{prog: p}
 }
 
 // String implements fmt.Stringer.
-func (n *golangAsmNode) String() string {
+func (n *GolangAsmNode) String() string {
 	return n.prog.String()
 }
 
 // OffsetInBinary implements Node.OffsetInBinary.
-func (n *golangAsmNode) OffsetInBinary() NodeOffsetInBinary {
+func (n *GolangAsmNode) OffsetInBinary() NodeOffsetInBinary {
 	return NodeOffsetInBinary(n.prog.Pc)
 }
 
 // AssignJumpTarget implements Node.AssignJumpTarget.
-func (n *golangAsmNode) AssignJumpTarget(target Node) {
-	b := target.(*golangAsmNode)
+func (n *GolangAsmNode) AssignJumpTarget(target Node) {
+	b := target.(*GolangAsmNode)
 	n.prog.To.SetTarget(b.prog)
 }
 
 // AssignDestinationConstant implements Node.AssignDestinationConstant.
-func (n *golangAsmNode) AssignDestinationConstant(value ConstantValue) {
+func (n *GolangAsmNode) AssignDestinationConstant(value ConstantValue) {
 	n.prog.To.Offset = value
 }
 
 // AssignSourceConstant implements Node.AssignSourceConstant.
-func (n *golangAsmNode) AssignSourceConstant(value ConstantValue) {
+func (n *GolangAsmNode) AssignSourceConstant(value ConstantValue) {
 	n.prog.From.Offset = value
 }
 
@@ -54,8 +53,8 @@ type GolangAsmBaseAssembler struct {
 	onGenerateCallbacks []func(code []byte) error
 }
 
-func NewGolangAsmBaseAssembler() (*GolangAsmBaseAssembler, error) {
-	b, err := goasm.NewBuilder(runtime.GOARCH, 1024)
+func NewGolangAsmBaseAssembler(arch string) (*GolangAsmBaseAssembler, error) {
+	b, err := goasm.NewBuilder(arch, 1024)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
@@ -103,7 +102,7 @@ func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstru
 func (a *GolangAsmBaseAssembler) AddInstruction(next *obj.Prog) {
 	a.b.AddInstruction(next)
 	for _, node := range a.setBranchTargetOnNextNodes {
-		n := node.(*golangAsmNode)
+		n := node.(*GolangAsmNode)
 		n.prog.To.SetTarget(next)
 	}
 	a.setBranchTargetOnNextNodes = nil

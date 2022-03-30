@@ -16,7 +16,7 @@ type assemblerGoAsmImpl struct {
 }
 
 func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
-	g, err := asm.NewGolangAsmBaseAssembler()
+	g, err := asm.NewGolangAsmBaseAssembler("amd64")
 	return &assemblerGoAsmImpl{g}, err
 }
 
@@ -301,22 +301,6 @@ var castAsGolangAsmRegister = [...]int16{
 	REG_X13: x86.REG_X13,
 	REG_X14: x86.REG_X14,
 	REG_X15: x86.REG_X15,
-	REG_X16: x86.REG_X16,
-	REG_X17: x86.REG_X17,
-	REG_X18: x86.REG_X18,
-	REG_X19: x86.REG_X19,
-	REG_X20: x86.REG_X20,
-	REG_X21: x86.REG_X21,
-	REG_X22: x86.REG_X22,
-	REG_X23: x86.REG_X23,
-	REG_X24: x86.REG_X24,
-	REG_X25: x86.REG_X25,
-	REG_X26: x86.REG_X26,
-	REG_X27: x86.REG_X27,
-	REG_X28: x86.REG_X28,
-	REG_X29: x86.REG_X29,
-	REG_X30: x86.REG_X30,
-	REG_X31: x86.REG_X31,
 }
 
 // castAsGolangAsmRegister maps the instructions to golang-asm specific instruction values.
