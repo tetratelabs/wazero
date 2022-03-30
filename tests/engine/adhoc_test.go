@@ -15,14 +15,13 @@ import (
 )
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
-	"huge stack":                                 testHugeStack,
-	"unreachable":                                testUnreachable,
-	"recursive entry":                            testRecursiveEntry,
-	"imported-and-exported func":                 testImportedAndExportedFunc,
-	"host function with context parameter":       testHostFunctionContextParameter,
-	"host function with numeric parameter":       testHostFunctionNumericParameter,
-	"close module with in-flight calls":          testCloseInFlight,
-	"close imported module with in-flight calls": testCloseImportedInFlight,
+	"huge stack":                           testHugeStack,
+	"unreachable":                          testUnreachable,
+	"recursive entry":                      testRecursiveEntry,
+	"imported-and-exported func":           testImportedAndExportedFunc,
+	"host function with context parameter": testHostFunctionContextParameter,
+	"host function with numeric parameter": testHostFunctionNumericParameter,
+	"close module with in-flight calls":    testCloseInFlight,
 }
 
 func TestEngineJIT(t *testing.T) {
@@ -253,58 +252,70 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	}
 }
 
-func testCloseInFlight(t *testing.T, r wazero.Runtime) {
-	var moduleCloser func() error
-	_, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-		"close_module": func() { _ = moduleCloser() }, // Closing while executing itself.
-	}).Instantiate()
-	require.NoError(t, err)
-
-	m, err := r.InstantiateModuleFromSource([]byte(`(module $test
-	(import "host" "close_module" (func $close_module ))
-
-	(func $close_while_execution
-		call $close_module
+func callImportAfterAddSource(importedModule, importingModule string) []byte {
+	return []byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "return_input" (func $block (param i32) (result i32)))
+	(func $call_import_after_add (param i32) (param i32) (result i32)
+		local.get 0
+		local.get 1
+		i32.add
+		call $block
 	)
-	(export "close_while_execution" (func $close_while_execution))
-)`))
-	require.NoError(t, err)
-
-	moduleCloser = m.Close
-
-	_, err = m.ExportedFunction("close_while_execution").Call(nil)
-	require.NoError(t, err)
-
+	(export "call_import_after_add" (func $call_import_after_add))
+)`, importingModule, importedModule))
 }
 
-func testCloseImportedInFlight(t *testing.T, r wazero.Runtime) {
-	importedModule, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-		"already_closed": func() {},
-	}).Instantiate()
-	require.NoError(t, err)
-
-	m, err := r.InstantiateModuleFromSource([]byte(`(module $test
-		(import "host" "already_closed" (func $already_closed ))
-
-		(func $close_parent_before_execution
-			call $already_closed
-		)
-		(export "close_parent_before_execution" (func $close_parent_before_execution))
-	)`))
-	require.NoError(t, err)
-
-	// Closing the imported module before making call should also safe.
-	require.NoError(t, importedModule.Close())
-
-	// Even we can re-enstantiate the module for the same name.
-	importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-		"already_closed": func() {
-			panic("unreachable") // The new module's function must not be called.
+func testCloseInFlight(t *testing.T, r wazero.Runtime) {
+	tests := []struct {
+		name           string
+		closeImporting bool
+		closeImported  bool
+	}{
+		{
+			name:           "importing", // Ex. WASI proc_exit or AssemblyScript abort handler.
+			closeImporting: true,
 		},
-	}).Instantiate()
-	require.NoError(t, err)
-	defer importedModuleNew.Close() // nolint
+		{
+			name:          "imported",
+			closeImported: true,
+		},
+		{
+			name:           "both", // Ex. A function that stops the runtime.
+			closeImporting: true,
+			closeImported:  true,
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
 
-	_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
-	require.NoError(t, err)
+		t.Run(tc.name, func(t *testing.T) {
+			var imported, importing publicwasm.Module
+			var err error
+			closeAndReturn := func(x uint32) uint32 {
+				if tc.closeImporting {
+					require.NoError(t, importing.Close())
+				}
+				if tc.closeImported {
+					require.NoError(t, importing.Close())
+				}
+				return x
+			}
+
+			// Create the host module, which exports the function that closes the importing module.
+			imported, err = r.NewModuleBuilder(t.Name()+"-imported").
+				ExportFunction("return_input", closeAndReturn).Instantiate()
+			require.NoError(t, err)
+			defer imported.Close()
+
+			// Import that module.
+			source := callImportAfterAddSource(imported.Name(), t.Name()+"-importing")
+			importing, err = r.InstantiateModuleFromSource(source)
+			require.NoError(t, err)
+			defer importing.Close()
+
+			// Expect no error, because there's currently no logic to fail on the return path after close.
+			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
+			require.NoError(t, err)
+		})
+	}
 }

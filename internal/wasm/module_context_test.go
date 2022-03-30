@@ -133,7 +133,7 @@ func TestModuleContext_String(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
-			require.Equal(t, tc.expected, s.Module(m.module.Name).String())
+			require.Equal(t, tc.expected, s.Module(m.Name()).String())
 		})
 	}
 }

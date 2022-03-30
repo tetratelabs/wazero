@@ -63,6 +63,9 @@ func ValueTypeName(t ValueType) string {
 type Module interface {
 	fmt.Stringer
 
+	// Name is the name this module was instantiated with. Exported functions can be imported with this name.
+	Name() string
+
 	// Closer (Close) releases resources allocated for this Module. Using this while having outstanding function calls
 	// is safe. After calling this function, re-instantiating a module for the same name is allowed.
 	io.Closer

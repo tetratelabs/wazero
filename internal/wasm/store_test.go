@@ -184,7 +184,7 @@ func TestStore_hammer(t *testing.T) {
 	imported, err := s.Instantiate(context.Background(), m, importedModuleName, nil)
 	require.NoError(t, err)
 
-	_, ok := s.modules[imported.module.Name]
+	_, ok := s.modules[imported.Name()]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -217,7 +217,7 @@ func TestStore_hammer(t *testing.T) {
 	}
 
 	// Close the imported module.
-	require.NoError(t, s.CloseModule(imported.module.Name))
+	require.NoError(t, s.CloseModule(imported.Name()))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
@@ -386,7 +386,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{{
 					Type:     ExternTypeFunc,
-					Module:   hm.module.Name,
+					Module:   hm.Name(),
 					Name:     functionName,
 					DescFunc: 0,
 				}},
