@@ -21,27 +21,27 @@ func TestMemoryType(t *testing.T) {
 	}{
 		{
 			name:     "min 0",
-			input:    &wasm.Memory{},
-			expected: []byte{0x0, 0},
+			input:    &wasm.Memory{Max: wasm.MemoryMaxPages},
+			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
 			name:     "min 0, max 0",
-			input:    &wasm.Memory{Max: &zero},
+			input:    &wasm.Memory{Max: zero},
 			expected: []byte{0x1, 0, 0},
 		},
 		{
-			name:     "min largest",
-			input:    &wasm.Memory{Min: max},
-			expected: []byte{0x0, 0x80, 0x80, 0x4},
+			name:     "min=max",
+			input:    &wasm.Memory{Min: 1, Max: 1},
+			expected: []byte{0x1, 1, 1},
 		},
 		{
 			name:     "min 0, max largest",
-			input:    &wasm.Memory{Max: &max},
+			input:    &wasm.Memory{Max: max},
 			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
 			name:     "min largest max largest",
-			input:    &wasm.Memory{Min: max, Max: &max},
+			input:    &wasm.Memory{Min: max, Max: max},
 			expected: []byte{0x1, 0x80, 0x80, 0x4, 0x80, 0x80, 0x4},
 		},
 	}
@@ -55,7 +55,7 @@ func TestMemoryType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			decoded, err := decodeMemory(bytes.NewReader(b))
+			decoded, err := decodeMemory(bytes.NewReader(b), max)
 			require.NoError(t, err)
 			require.Equal(t, decoded, tc.input)
 		})
@@ -64,31 +64,37 @@ func TestMemoryType(t *testing.T) {
 
 func TestDecodeMemoryType_Errors(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       []byte
-		expectedErr string
+		name           string
+		input          []byte
+		memoryMaxPages uint32
+		expectedErr    string
 	}{
 		{
 			name:        "max < min",
 			input:       []byte{0x1, 0x80, 0x80, 0x4, 0},
-			expectedErr: "memory size minimum must not be greater than maximum",
+			expectedErr: "min 65536 pages (4 Gi) > max 0 pages (0 Ki)",
 		},
 		{
 			name:        "min > limit",
 			input:       []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
-			expectedErr: "memory min must be at most 65536 pages (4GiB)",
+			expectedErr: "min 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max > limit",
 			input:       []byte{0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
-			expectedErr: "memory max must be at most 65536 pages (4GiB)",
+			expectedErr: "max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
+
+		if tc.memoryMaxPages == 0 {
+			tc.memoryMaxPages = wasm.MemoryMaxPages
+		}
+
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input))
+			_, err := decodeMemory(bytes.NewReader(tc.input), tc.memoryMaxPages)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

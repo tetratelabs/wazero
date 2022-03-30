@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	"io"
 	"math"
 	"testing"
@@ -11,7 +12,72 @@ import (
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func TestRuntimeConfig_Features(t *testing.T) {
+func TestRuntimeConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		with     func(*RuntimeConfig) *RuntimeConfig
+		expected *RuntimeConfig
+	}{
+		{
+			name: "WithContext",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithContext(context.TODO())
+			},
+			expected: &RuntimeConfig{
+				ctx: context.TODO(),
+			},
+		},
+		{
+			name: "WithContext - nil",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithContext(nil) //nolint
+			},
+			expected: &RuntimeConfig{
+				ctx: context.Background(),
+			},
+		},
+		{
+			name: "WithMemoryMaxPages",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithMemoryMaxPages(1)
+			},
+			expected: &RuntimeConfig{
+				memoryMaxPages: 1,
+			},
+		},
+		{
+			name: "mutable-global",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureMutableGlobal(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: internalwasm.FeatureMutableGlobal,
+			},
+		},
+		{
+			name: "sign-extension-ops",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureSignExtensionOps(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: internalwasm.FeatureSignExtensionOps,
+			},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			input := &RuntimeConfig{}
+			rc := tc.with(input)
+			require.Equal(t, tc.expected, rc)
+			// The source wasn't modified
+			require.Equal(t, &RuntimeConfig{}, input)
+		})
+	}
+}
+
+func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 	tests := []struct {
 		name          string
 		feature       internalwasm.Features

@@ -77,7 +77,7 @@ func TestMemorySection(t *testing.T) {
 				0x01,             // 1 memory
 				0x01, 0x02, 0x03, // (memory 2 3)
 			},
-			expected: &wasm.Memory{Min: 2, Max: &three},
+			expected: &wasm.Memory{Min: 2, Max: three},
 		},
 	}
 
@@ -85,7 +85,7 @@ func TestMemorySection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			memories, err := decodeMemorySection(bytes.NewReader(tc.input))
+			memories, err := decodeMemorySection(bytes.NewReader(tc.input), wasm.MemoryMaxPages)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, memories)
 		})
@@ -94,9 +94,10 @@ func TestMemorySection(t *testing.T) {
 
 func TestMemorySection_Errors(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       []byte
-		expectedErr string
+		name           string
+		input          []byte
+		memoryMaxPages uint32
+		expectedErr    string
 	}{
 		{
 			name: "min and min with max",
@@ -112,8 +113,12 @@ func TestMemorySection_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
+		if tc.memoryMaxPages == 0 {
+			tc.memoryMaxPages = wasm.MemoryMaxPages
+		}
+
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemorySection(bytes.NewReader(tc.input))
+			_, err := decodeMemorySection(bytes.NewReader(tc.input), tc.memoryMaxPages)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

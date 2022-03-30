@@ -2198,7 +2198,7 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
   (memory 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasiFunction, wasiImport)), enabledFeatures)
+)`, wasiFunction, wasiImport)), enabledFeatures, wasm.MemoryMaxPages)
 	require.NoError(t, err)
 
 	mod, err := store.Instantiate(ctx, m, moduleName, sysCtx)

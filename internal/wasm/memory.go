@@ -2,6 +2,7 @@ package internalwasm
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 )
 
@@ -12,7 +13,7 @@ const (
 	MemoryPageSize = uint32(65536)
 	// MemoryMaxPages is maximum number of pages defined (2^16).
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-	MemoryMaxPages = MemoryPageSize
+	MemoryMaxPages = uint32(65536)
 	// MemoryPageSizeInBits satisfies the relation: "1 << MemoryPageSizeInBits == MemoryPageSize".
 	MemoryPageSizeInBits = 16
 )
@@ -23,9 +24,8 @@ const (
 // wasm.Store Memories index zero: `store.Memories[0]`
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type MemoryInstance struct {
-	Buffer []byte
-	Min    uint32
-	Max    *uint32
+	Buffer   []byte
+	Min, Max uint32
 }
 
 // Size implements wasm.Memory Size
@@ -152,14 +152,9 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 
-	maxPages := MemoryMaxPages
-	if m.Max != nil {
-		maxPages = *m.Max
-	}
-
 	// If exceeds the max of memory size, we push -1 according to the spec.
-	if currentPages+newPages > maxPages {
-		return 0xffffffff // = -1 in signed 32 bit integer.
+	if currentPages+newPages > m.Max {
+		return 0xffffffff // = -1 in signed 32-bit integer.
 	} else {
 		// Otherwise, grow the memory.
 		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(newPages))...)
@@ -170,4 +165,23 @@ func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 // PageSize returns the current memory buffer size in pages.
 func (m *MemoryInstance) PageSize() (result uint32) {
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
+}
+
+// PagesToUnitOfBytes converts the pages to a human-readable form similar to what's specified. Ex. 1 -> "64Ki"
+//
+// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0
+func PagesToUnitOfBytes(pages uint32) string {
+	k := pages * 64
+	if k < 1024 {
+		return fmt.Sprintf("%d Ki", k)
+	}
+	m := k / 1024
+	if m < 1024 {
+		return fmt.Sprintf("%d Mi", m)
+	}
+	g := m / 1024
+	if g < 1024 {
+		return fmt.Sprintf("%d Gi", g)
+	}
+	return fmt.Sprintf("%d Ti", g/1024)
 }
