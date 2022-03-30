@@ -46,14 +46,13 @@ func NewHammer(t *testing.T, P, N int) Hammer {
 	return &hammer{t: t, P: P, N: N}
 }
 
-// compile-time check to ensure hammer implements Hammer
-var _ Hammer = &hammer{}
-
+// hammer implements Hammer
 type hammer struct {
+	// t is the calling test
 	t *testing.T
-	// max count of goroutines
+	// P is the max count of goroutines
 	P int
-	// work per goroutine
+	// N is the work per goroutine
 	N int
 }
 
