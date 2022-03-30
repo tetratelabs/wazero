@@ -61,8 +61,8 @@ type moduleEngine struct {
 	compiledFunctions []*compiledFunction
 
 	// parentEngine holds *engine from which this module engine is created from.
-	parentEngine           *engine
-	importedFunctionCounts uint32
+	parentEngine          *engine
+	importedFunctionCount uint32
 
 	// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
 	//
@@ -164,10 +164,10 @@ type interpreterOp struct {
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
-		name:                   name,
-		compiledFunctions:      make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
-		parentEngine:           e,
-		importedFunctionCounts: imported,
+		name:                  name,
+		compiledFunctions:     make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
+		parentEngine:          e,
+		importedFunctionCount: imported,
 	}
 
 	for idx, f := range importedFunctions {
@@ -213,7 +213,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 // Release implements internalwasm.Engine Release
 func (me *moduleEngine) Release() error {
 	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
 		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
 	return nil
@@ -525,7 +525,7 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 		if err == nil { // Check if the current module is closed.
 			err = failIfClosed(me)
 		}
-		if err == nil && f.Index < me.importedFunctionCounts { // Check if the imported module is closed.
+		if err == nil && f.Index < me.importedFunctionCount { // Check if the imported module is closed.
 			err = failIfClosed(compiled.funcInstance.Module.Engine.(*moduleEngine))
 		}
 
@@ -1612,7 +1612,7 @@ func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
 
 // doClose releases all the function instances declared in this module.
 func (me *moduleEngine) doClose() {
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
 		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
 }

@@ -296,7 +296,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 					require.NoError(t, importing.CloseWithExitCode(tc.closeImporting))
 				}
 				if tc.closeImported != 0 {
-					require.NoError(t, importing.CloseWithExitCode(tc.closeImported))
+					require.NoError(t, imported.CloseWithExitCode(tc.closeImported))
 				}
 				return x
 			}
