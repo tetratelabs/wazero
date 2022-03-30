@@ -28,6 +28,11 @@ type ModuleContext struct {
 	sys *SysContext
 }
 
+// Name implements the same method as documented on wasm.Module
+func (m *ModuleContext) Name() string {
+	return m.module.Name
+}
+
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
@@ -36,12 +41,12 @@ func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	return m
 }
 
-// String implements fmt.Stringer
+// String implements the same method as documented on wasm.Module
 func (m *ModuleContext) String() string {
-	return fmt.Sprintf("Module[%s]", m.module.Name)
+	return fmt.Sprintf("Module[%s]", m.Name())
 }
 
-// Context implements wasm.Module Context
+// Context implements the same method as documented on wasm.Module
 func (m *ModuleContext) Context() context.Context {
 	return m.ctx
 }
@@ -51,7 +56,7 @@ func (m *ModuleContext) Sys() *SysContext {
 	return m.sys
 }
 
-// WithContext implements wasm.Module WithContext
+// WithContext implements the same method as documented on wasm.Module
 func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
 		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, sys: m.sys}
@@ -59,10 +64,10 @@ func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	return m
 }
 
-// Close implements io.Closer
+// Close implements the same method as documented on wasm.Module
 // Note: When there are multiple errors, the error returned is the last one.
 func (m *ModuleContext) Close() (err error) {
-	err = m.store.CloseModule(m.module.Name)
+	err = m.store.CloseModule(m.Name())
 	if sys := m.sys; sys == nil { // ex from ModuleBuilder
 		return
 	} else if err2 := m.sys.Close(); err2 != nil {

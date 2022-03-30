@@ -2,7 +2,6 @@ package adhoc
 
 import (
 	"errors"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -30,183 +30,97 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 	runAllTests(t, hammers, wazero.NewRuntimeConfigInterpreter())
 }
 
-type blocker struct {
-	running chan bool
-	// unblocked uses a WaitGroup as it allows releasing all goroutines at the same time.
-	unblocked sync.WaitGroup
-	// closed should panic if fn is called when the value is 1.
-	//
-	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
-	// See /RATIONALE.md
-	closed uint32
-}
-
-func (b *blocker) close() {
-	atomic.StoreUint32(&b.closed, 1)
-}
-
-// fn sends into the running channel, then blocks until it can receive from unblocked one.
-func (b *blocker) fn(input uint32) uint32 {
-	if atomic.LoadUint32(&b.closed) == 1 {
-		panic(errors.New("closed"))
-	}
-	b.running <- true  // Signal the goroutine is running
-	b.unblocked.Wait() // Await until unblocked
-	return input
-}
-
-var blockAfterAddSource = []byte(`(module
-	(import "host" "block" (func $block (param i32) (result i32)))
-	(func $block_after_add (param i32) (param i32) (result i32)
-		local.get 0
-		local.get 1
-		i32.add
-		call $block
-	)
-	(export "block_after_add" (func $block_after_add))
-)`)
-
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
-	args := []uint64{1, 123}
-	exp := args[0] + args[1]
+	closeModuleWhileInUse(t, r, func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+		// Close the importing module, despite calls being in-flight.
+		require.NoError(t, importing.Close())
 
-	P := 8               // P+1 == max count of goroutines/in-flight function calls
-	if testing.Short() { // Adjust down if `-test.short`
-		P = 4
-	}
-	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P / 2)) // Ensure goroutines have to switch cores.
-
-	running := make(chan bool)
-	b := &blocker{running: running}
-	b.unblocked.Add(P)
-
-	imported, err := r.NewModuleBuilder("host").ExportFunction("block", b.fn).Instantiate()
-	require.NoError(t, err)
-	defer imported.Close()
-
-	importing, err := r.InstantiateModuleFromSource(blockAfterAddSource)
-	require.NoError(t, err)
-	defer importing.Close()
-
-	// Add channel that tracks P goroutines.
-	done := make(chan int)
-	for p := 0; p < P; p++ {
-		go func() { // Launch goroutine 'p'
-			defer completeGoroutine(t, done)
-
-			// As this is a blocking function, we can only run 1 function per goroutine.
-			requireFunctionCall(t, importing.ExportedFunction("block_after_add"), args, exp)
-		}()
-	}
-
-	// Wait until all functions are in-flight.
-	for i := 0; i < P; i++ {
-		<-running
-	}
-
-	// Close the module that exported blockAfterAdd (noting calls to this are in-flight).
-	require.NoError(t, importing.Close())
-
-	// Prove a module can be redefined even with in-flight calls.
-	importing, err = r.InstantiateModuleFromSource(blockAfterAddSource)
-	require.NoError(t, err)
-	defer importing.Close()
-
-	// If unloading worked properly, a new function call should route to the newly instantiated module.
-	b.unblocked.Add(1)
-	go func() {
-		defer completeGoroutine(t, done)
-
-		requireFunctionCall(t, importing.ExportedFunction("block_after_add"), args, exp)
-	}()
-	<-running // Wait for the above function to be in-flight
-	P++
-
-	// Unblock the functions to ensure they don't err on the return path of a closed module.
-	b.unblocked.Add(-P)
-
-	// Wait for all goroutines to complete
-	for i := 0; i < P; i++ {
-		<-done
-	}
+		// Prove a module can be redefined even with in-flight calls.
+		source := callImportAfterAddSource(imported.Name(), importing.Name())
+		importing, err := r.InstantiateModuleFromSource(source)
+		require.NoError(t, err)
+		return imported, importing
+	})
 }
 
 func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
+	closeModuleWhileInUse(t, r, func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+		// Close the underlying host function, which causes future calls to it to fail.
+		atomic.StoreUint32(hostFunctionClosed, 1)
+
+		// Validate new calls to the imported function fail, since it was closed.
+		_, err := imported.ExportedFunction("return_input").Call(nil, 1)
+		require.Contains(t, err.Error(), "wasm runtime error: function closed")
+
+		// Close both the importing and the imported module, despite calls being in-flight
+		require.NoError(t, imported.Close())
+		require.NoError(t, importing.Close())
+
+		// Redefine the imported module, with a function that no longer blocks.
+		imported, err = r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
+			return x
+		}).Instantiate()
+		require.NoError(t, err)
+
+		// Redefine the importing module, which should link to the redefined host module.
+		source := callImportAfterAddSource(imported.Name(), importing.Name())
+		importing, err = r.InstantiateModuleFromSource(source)
+		require.NoError(t, err)
+
+		return imported, importing
+	})
+}
+
+func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(hostFunctionClosed *uint32, imported, importing wasm.Module) (wasm.Module, wasm.Module)) {
 	args := []uint64{1, 123}
 	exp := args[0] + args[1]
 
-	P := 8               // P+1 == max count of goroutines/in-flight function calls
+	P := 8               // max count of goroutines
 	if testing.Short() { // Adjust down if `-test.short`
 		P = 4
 	}
-	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P / 2)) // Ensure goroutines have to switch cores.
 
-	running := make(chan bool)
-	b := &blocker{running: running}
-	b.unblocked.Add(P)
+	var hostFunctionClosed uint32
+	// To know return path works on a closed module, we need to block calls.
+	var calls sync.WaitGroup
+	calls.Add(P)
+	blockAndReturn := func(x uint32) uint32 {
+		if atomic.LoadUint32(&hostFunctionClosed) == 1 { // Not require.False as we don't want to fail the test.
+			panic(errors.New("function closed"))
+		}
+		calls.Wait()
+		return x
+	}
 
-	imported, err := r.NewModuleBuilder("host").ExportFunction("block", b.fn).Instantiate()
+	// Create the host module, which exports the blocking function.
+	imported, err := r.NewModuleBuilder(t.Name()+"-imported").
+		ExportFunction("return_input", blockAndReturn).Instantiate()
 	require.NoError(t, err)
 	defer imported.Close()
 
-	importing, err := r.InstantiateModuleFromSource(blockAfterAddSource)
+	// Import that module.
+	source := callImportAfterAddSource(imported.Name(), t.Name()+"-importing")
+	importing, err := r.InstantiateModuleFromSource(source)
 	require.NoError(t, err)
 	defer importing.Close()
 
-	// Add channel that tracks P goroutines.
-	done := make(chan int)
-	for p := 0; p < P; p++ {
-		go func() { // Launch goroutine 'p'
-			defer completeGoroutine(t, done)
-
-			// As this is a blocking function, we can only run 1 function per goroutine.
-			requireFunctionCall(t, importing.ExportedFunction("block_after_add"), args, exp)
-		}()
-	}
-
-	// Wait until all functions are in-flight.
-	for i := 0; i < P; i++ {
-		<-running
-	}
-
-	// Close the module that exported the host function (noting calls to this are in-flight).
-	require.NoError(t, imported.Close())
-	// Close the underlying host function, which causes future calls to it to fail.
-	b.close()
-	require.Panics(t, func() {
-		b.fn(1) // validate it would fail if accidentally called
+	// As this is a blocking function call, only run 1 per goroutine.
+	hammer.NewHammer(t, P, 1).Run(func(name string) {
+		requireFunctionCall(t, importing.ExportedFunction("call_import_after_add"), args, exp)
+	}, func() { // When all functions are in-flight, re-assign the modules.
+		imported, importing = closeFn(&hostFunctionClosed, imported, importing)
+		// Unblock all the calls
+		calls.Add(-P)
 	})
-	// Close the importing module
-	require.NoError(t, importing.Close())
-
-	// Prove a host module can be redefined even with in-flight calls.
-	b1 := &blocker{running: running} // New instance, so not yet closed!
-	imported, err = r.NewModuleBuilder("host").ExportFunction("block", b1.fn).Instantiate()
-	require.NoError(t, err)
+	// As references may have changed, ensure we close both.
 	defer imported.Close()
-
-	// Redefine the importing module, which should link to the redefined host module.
-	importing, err = r.InstantiateModuleFromSource(blockAfterAddSource)
-	require.NoError(t, err)
 	defer importing.Close()
+	if t.Failed() {
+		return // At least one test failed, so return now.
+	}
 
 	// If unloading worked properly, a new function call should route to the newly instantiated module.
-	b1.unblocked.Add(1)
-	go func() {
-		defer completeGoroutine(t, done)
-
-		requireFunctionCall(t, importing.ExportedFunction("block_after_add"), args, exp)
-	}()
-	<-running // Wait for the above function to be in-flight
-
-	// Unblock the functions to ensure they don't err on the return path of a closed module.
-	b.unblocked.Add(-P)
-	b1.unblocked.Add(-1)
-
-	// Wait for all goroutines to complete
-	for i := 0; i < P+1; i++ {
-		<-done
-	}
+	requireFunctionCall(t, importing.ExportedFunction("call_import_after_add"), args, exp)
 }
 
 func requireFunctionCall(t *testing.T, fn wasm.Function, args []uint64, exp uint64) {
@@ -214,12 +128,4 @@ func requireFunctionCall(t *testing.T, fn wasm.Function, args []uint64, exp uint
 	// We don't expect an error because there's currently no functionality to detect or fail on a closed module.
 	require.NoError(t, err)
 	require.Equal(t, exp, res[0])
-}
-
-func completeGoroutine(t *testing.T, c chan int) {
-	// Ensure each require.XX failure is visible on hammer test fail.
-	if recovered := recover(); recovered != nil {
-		t.Error(recovered.(string))
-	}
-	c <- 1
 }
