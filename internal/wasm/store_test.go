@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"runtime"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -201,12 +201,17 @@ func TestStore_hammer(t *testing.T) {
 
 	// Concurrent instantiate, close should test if locks work on the store. If they don't, we should see leaked modules
 	// after all of these complete, or an error raised.
-	hammer(t, func(p, n int) {
-		moduleName := fmt.Sprintf("%s:%d-%d", t.Name(), p, n)
-		_, instantiateErr := s.Instantiate(context.Background(), importingModule, moduleName, DefaultSysContext())
+	P := 8               // max count of goroutines
+	N := 1000            // work per goroutine
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+		N = 100
+	}
+	hammer.NewHammer(t, P, N).Run(func(name string) {
+		_, instantiateErr := s.Instantiate(context.Background(), importingModule, name, DefaultSysContext())
 		require.NoError(t, instantiateErr)
-		require.NoError(t, s.CloseModule(moduleName))
-	})
+		require.NoError(t, s.CloseModule(name))
+	}, nil)
 	if t.Failed() {
 		return // At least one test failed, so return now.
 	}
@@ -738,39 +743,4 @@ func TestModuleInstance_applyData(t *testing.T) {
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x8}}, Init: []byte{0x1, 0x5}},
 	})
 	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
-}
-
-// hammer is a concurrency test described in /RATIONALE.md.
-func hammer(t *testing.T, test func(p, n int)) {
-	P := 8               // max count of goroutines
-	N := 1000            // work per goroutine
-	if testing.Short() { // Adjust down if `-test.short`
-		P = 4
-		N = 100
-	}
-	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P / 2)) // Ensure goroutines have to switch cores.
-
-	// Add channel that tracks P goroutines.
-	c := make(chan int)
-	for p := 0; p < P; p++ {
-		p := p // pin p, so it is stable inside the goroutine.
-
-		go func() { // Launch goroutine 'p'
-			defer func() { // Ensure each require.XX failure is visible on hammer test fail.
-				if recovered := recover(); recovered != nil {
-					t.Error(recovered.(string))
-				}
-				c <- 1
-			}()
-
-			for n := 0; n < N; n++ { // Invoke one test
-				test(p, n)
-			}
-		}()
-	}
-
-	// Block until P goroutines finish.
-	for i := 0; i < P; i++ {
-		<-c
-	}
 }

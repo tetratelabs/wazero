@@ -211,49 +211,19 @@ Here is an annotated description of the key pieces of a hammer test:
    * When in doubt, try 1000 or 100 if `testing.Short`
    * Remember, there are multiple hammer tests and CI nodes are slow. Slower tests hurt feedback loops.
 3. `defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P/2))` makes goroutines switch cores, testing visibility of shared data.
-4. Track goroutines progress via `c := make(chan int)` where each goroutine in `P` defers `c <- 1`.
-   1. Tests use `require.XXX`, so `recover()` into `t.Fail` in a `defer` function before `c <- 1`.
+4. To ensure goroutines execute at the same time, block them with `sync.WaitGroup`, initialized to `Add(P)`.
+   * `sync.WaitGroup` internally uses `runtime_Semacquire` not available in any other library.
+   * `sync.WaitGroup.Add` with a negative value can unblock many goroutines at the same time, e.g. without a for loop.
+5. Track goroutines progress via `finished := make(chan int)` where each goroutine in `P` defers `finished <- 1`.
+   1. Tests use `require.XXX`, so `recover()` into `t.Fail` in a `defer` function before `finished <- 1`.
       * This makes it easier to spot larger concurrency problems as you see each failure, not just the first.
-   2. After the `defer` function run the stateful function `N` times in a normal loop.
+   2. After the `defer` function, await unblocked, then run the stateful function `N` times in a normal loop.
       * This loop should trigger shared state problems as locks or atomics are contended by `P` goroutines.
-5. After all `P` goroutines launch, block the runner by blocking on the channel (`<-c`) for each `P`.
-6. When all goroutines complete, `return` if `t.Failed()`, otherwise perform follow-up state checks.
+6. After all `P` goroutines launch, atomically release all of them with `WaitGroup.Add(-P)`.
+7. Block the runner on goroutine completion, by (`<-finished`) for each `P`.
+8. When all goroutines complete, `return` if `t.Failed()`, otherwise perform follow-up state checks.
 
-Here's an example:
-```go
-P := 8 // 1. count of goroutines
-N := 1000 // 2. count of work per goroutine
-if testing.Short() {
-    P = 4 // 1. count of goroutines if `-test.short`
-    N = 100  // 2. count of work per goroutine if `-test.short`
-}
-defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P/2)) // 3. Ensure goroutines switch cores
-
-c := make(chan int) // 4. tracking channel
-for p := 0; p < P; p++ {
-    p := p // pin p, so it is stable inside the goroutine.
-
-    go func() { // Launch goroutine 'p'
-        defer func() {
-            if recovered := recover(); recovered != nil {
-                t.Error(recovered.(string)) // 4.1. Accumulate error instead of failing on first.
-            }
-            c <- 1 // 4.1 count down regardless of error
-        }()
-
-        for n := 0; n < N; n++ { // 4.2 loop the test N times
-            test(p, n)
-        }
-    }()
-}
-
-for i := 0; i < P; i++ { // 5. Block until all goroutines finish
-    <-c
-}
-if t.Failed() { // 6. Return early if there are concurrency errors.
-    return
-}
-```
+This is implemented in wazero in [hammer.go](internal/testing/hammer/hammer.go)
 
 ### Lock-free, cross-goroutine observations of updates
 
