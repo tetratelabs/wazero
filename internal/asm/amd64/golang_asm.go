@@ -8,15 +8,16 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
 // assemblerGoAsmImpl implements Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
-	*asm.GolangAsmBaseAssembler
+	*golang_asm.GolangAsmBaseAssembler
 }
 
 func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
-	g, err := asm.NewGolangAsmBaseAssembler("amd64")
+	g, err := golang_asm.NewGolangAsmBaseAssembler("amd64")
 	return &assemblerGoAsmImpl{g}, err
 }
 
@@ -25,7 +26,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(inst asm.Instruction) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
@@ -89,7 +90,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(inst asm.Instruction, constV
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[destinationRegister]
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileRegisterToConst implements Assembler.CompileRegisterToConst.
@@ -101,7 +102,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToConst(inst asm.Instruction, srcReg
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[srcRegister]
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileRegisterToNone implements Assembler.CompileRegisterToNone.
@@ -145,7 +146,7 @@ func (a *assemblerGoAsmImpl) CompileConstToMemory(inst asm.Instruction, constVal
 	p.To.Reg = castAsGolangAsmRegister[baseReg]
 	p.To.Offset = offset
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
@@ -170,7 +171,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryToConst(inst asm.Instruction, baseReg 
 	p.From.Reg = castAsGolangAsmRegister[baseReg]
 	p.From.Offset = offset
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileJump implements Assembler.CompileJump.
@@ -179,7 +180,7 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 	p.As = castAsGolangAsmInstruction[jmpInstruction]
 	p.To.Type = obj.TYPE_BRANCH
 	a.AddInstruction(p)
-	return asm.NewGolangAsmNode(p)
+	return golang_asm.NewGolangAsmNode(p)
 }
 
 // CompileJumpToRegister implements Assembler.CompileJumpToRegister.

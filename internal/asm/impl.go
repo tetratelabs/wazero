@@ -33,7 +33,7 @@ func (a *BaseAssemblerImpl) BuildJumpTable(table []byte, labelInitialInstruction
 		// Build the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
-			if uint64(nop.OffsetInBinary())-uint64(base) >= jumpTableMaximumOffset {
+			if uint64(nop.OffsetInBinary())-uint64(base) >= JumpTableMaximumOffset {
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.

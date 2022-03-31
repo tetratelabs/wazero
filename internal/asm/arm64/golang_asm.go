@@ -8,11 +8,12 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
 // assemblerGoAsmImpl implements Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
-	*asm.GolangAsmBaseAssembler
+	*golang_asm.GolangAsmBaseAssembler
 	temporaryRegister asm.Register
 }
 
@@ -34,7 +35,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 	inst.To.Type = obj.TYPE_REG
 	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
 	a.AddInstruction(inst)
-	return asm.NewGolangAsmNode(inst)
+	return golang_asm.NewGolangAsmNode(inst)
 }
 
 // CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
@@ -171,7 +172,7 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 	br.As = castAsGolangAsmInstruction[jmpInstruction]
 	br.To.Type = obj.TYPE_BRANCH
 	a.AddInstruction(br)
-	return asm.NewGolangAsmNode(br)
+	return golang_asm.NewGolangAsmNode(br)
 }
 
 // CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
@@ -198,7 +199,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.
 	prog := a.NewProg()
 	prog.As = castAsGolangAsmInstruction[instruction]
 	a.AddInstruction(prog)
-	return asm.NewGolangAsmNode(prog)
+	return golang_asm.NewGolangAsmNode(prog)
 }
 
 // CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister.

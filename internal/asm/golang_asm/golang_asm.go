@@ -1,4 +1,4 @@
-package asm
+package golang_asm
 
 import (
 	"encoding/binary"
@@ -6,6 +6,8 @@ import (
 
 	goasm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
+
+	"github.com/tetratelabs/wazero/internal/asm"
 )
 
 // GolangAsmNode implements Node for golang-asm library.
@@ -13,7 +15,7 @@ type GolangAsmNode struct {
 	prog *obj.Prog
 }
 
-func NewGolangAsmNode(p *obj.Prog) Node {
+func NewGolangAsmNode(p *obj.Prog) asm.Node {
 	return &GolangAsmNode{prog: p}
 }
 
@@ -23,23 +25,23 @@ func (n *GolangAsmNode) String() string {
 }
 
 // OffsetInBinary implements Node.OffsetInBinary.
-func (n *GolangAsmNode) OffsetInBinary() NodeOffsetInBinary {
-	return NodeOffsetInBinary(n.prog.Pc)
+func (n *GolangAsmNode) OffsetInBinary() asm.NodeOffsetInBinary {
+	return asm.NodeOffsetInBinary(n.prog.Pc)
 }
 
 // AssignJumpTarget implements Node.AssignJumpTarget.
-func (n *GolangAsmNode) AssignJumpTarget(target Node) {
+func (n *GolangAsmNode) AssignJumpTarget(target asm.Node) {
 	b := target.(*GolangAsmNode)
 	n.prog.To.SetTarget(b.prog)
 }
 
 // AssignDestinationConstant implements Node.AssignDestinationConstant.
-func (n *GolangAsmNode) AssignDestinationConstant(value ConstantValue) {
+func (n *GolangAsmNode) AssignDestinationConstant(value asm.ConstantValue) {
 	n.prog.To.Offset = value
 }
 
 // AssignSourceConstant implements Node.AssignSourceConstant.
-func (n *GolangAsmNode) AssignSourceConstant(value ConstantValue) {
+func (n *GolangAsmNode) AssignSourceConstant(value asm.ConstantValue) {
 	n.prog.From.Offset = value
 }
 
@@ -48,7 +50,7 @@ type GolangAsmBaseAssembler struct {
 	b *goasm.Builder
 	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
 	// where we want to set the next coming instruction as the destination of these BR instructions.
-	setBranchTargetOnNextNodes []Node
+	setBranchTargetOnNextNodes []asm.Node
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
 	onGenerateCallbacks []func(code []byte) error
 }
@@ -73,7 +75,7 @@ func (a *GolangAsmBaseAssembler) Assemble() ([]byte, error) {
 }
 
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
-func (a *GolangAsmBaseAssembler) SetJumpTargetOnNext(nodes ...Node) {
+func (a *GolangAsmBaseAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
 }
 
@@ -83,12 +85,12 @@ func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 }
 
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
-func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []Node) {
+func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []asm.Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Build the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
-			if uint64(nop.OffsetInBinary())-uint64(base) >= jumpTableMaximumOffset {
+			if uint64(nop.OffsetInBinary())-uint64(base) >= asm.JumpTableMaximumOffset {
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.

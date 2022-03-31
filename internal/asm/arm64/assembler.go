@@ -2,12 +2,13 @@ package asm_arm64
 
 import (
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
 // NewAssembler implements asm.NewAssembler and is used by default.
 // This returns an implementation of Assembler interface via our homemade assembler implementation.
 func NewAssembler(temporaryRegister asm.Register) (Assembler, error) {
-	g, err := asm.NewGolangAsmBaseAssembler("arm64")
+	g, err := golang_asm.NewGolangAsmBaseAssembler("arm64")
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 
