@@ -4,6 +4,7 @@ package jit
 
 import (
 	"fmt"
+	"runtime"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -12,8 +13,7 @@ import (
 // archContext is empty on an unsupported architecture.
 type archContext struct{}
 
-// newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// Note: ir param can be nil for host functions.
+// newCompiler returns an unsupported error.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	return nil, fmt.Errorf("unsupported GOARCH %s", arch)
+	return nil, fmt.Errorf("unsupported GOARCH %s", runtime.GOARCH)
 }
