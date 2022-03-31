@@ -290,23 +290,24 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								require.NoError(t, err)
 
 								// Emit consts operands.
+								var x1Location *valueLocation
 								switch unsignedInt {
 								case wazeroir.UnsignedInt32:
 									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(x1)})
 									require.NoError(t, err)
-									if !x1OnRegister {
-										compiler.compileReleaseRegisterToStack(compiler.valueLocationStack().peek())
-									}
+									x1Location = compiler.valueLocationStack().peek()
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
 									require.NoError(t, err)
 								case wazeroir.UnsignedInt64:
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1})
 									require.NoError(t, err)
-									if !x1OnRegister {
-										compiler.compileReleaseRegisterToStack(compiler.valueLocationStack().peek())
-									}
+									x1Location = compiler.valueLocationStack().peek()
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
 									require.NoError(t, err)
+								}
+
+								if !x1OnRegister {
+									compiler.compileReleaseRegisterToStack(x1Location)
 								}
 
 								// At this point, two values exist.
