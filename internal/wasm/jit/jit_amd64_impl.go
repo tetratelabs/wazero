@@ -125,13 +125,9 @@ type amd64Compiler struct {
 }
 
 func newAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	b, err := newAmd64Assembler(asm.NilRegister /* temporaryRegister unused on amd64 */)
-	if err != nil {
-		return nil, err
-	}
 	c := &amd64Compiler{
 		f:             f,
-		assembler:     b.(amd64.Assembler),
+		assembler:     amd64.NewAssemblerImpl(),
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,

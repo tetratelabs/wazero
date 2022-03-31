@@ -18,7 +18,10 @@ import (
 // Note: this will be removed after golang-asm removal.
 // Note: this is intentionally exported in order to suppress bunch of "unused" lint errors on this function, testAssembler and testNode.
 func NewDebugAssembler() (asm_amd64.Assembler, error) {
-	goasm, _ := newGolangAsmAssembler()
+	goasm, err := newGolangAsmAssembler()
+	if err != nil {
+		return nil, err
+	}
 	a := asm_amd64.NewAssemblerImpl()
 
 	// If nop padding is enabled, it is really difficult to match the logics of golang-asm since it's so complex
