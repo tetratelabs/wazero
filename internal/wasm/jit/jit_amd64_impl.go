@@ -13,9 +13,9 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
