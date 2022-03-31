@@ -1,4 +1,4 @@
-package asm_amd64
+package amd64_debug
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/objabi"
 
 	"github.com/tetratelabs/wazero/internal/asm"
+	asm_amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
@@ -16,15 +17,15 @@ import (
 //
 // Note: this will be removed after golang-asm removal.
 // Note: this is intentionally exported in order to suppress bunch of "unused" lint errors on this function, testAssembler and testNode.
-func NewDebugAssembler() (Assembler, error) {
+func NewDebugAssembler() (asm_amd64.Assembler, error) {
 	goasm, _ := newGolangAsmAssembler()
-	a := newAssemblerImpl()
+	a := asm_amd64.NewAssemblerImpl()
 
 	// If nop padding is enabled, it is really difficult to match the logics of golang-asm since it's so complex
 	// and not well-documented. Given that NOP padding is just padding NOPs literally, and it doesn't affect
 	// the semantics of program, we should be fine to debug without padding enabled.
 	objabi.GOAMD64 = "disable"
-	a.enablePadding = false
+	a.EnablePadding = false
 	return &testAssembler{a: a, goasm: goasm}, nil
 }
 
@@ -35,14 +36,14 @@ func NewDebugAssembler() (Assembler, error) {
 // Note: this will be removed after golang-asm removal.
 type testAssembler struct {
 	goasm *assemblerGoAsmImpl
-	a     *assemblerImpl
+	a     *asm_amd64.AssemblerImpl
 }
 
 // testNode implements asm.Node for the usage with testAssembler.
 //
 // Note: this will be removed after golang-asm removal.
 type testNode struct {
-	n     *nodeImpl
+	n     *asm_amd64.NodeImpl
 	goasm *golang_asm.GolangAsmNode
 }
 
@@ -114,14 +115,14 @@ func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.
 func (ta *testAssembler) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileStandAlone(instruction)
 	ret2 := ta.a.CompileStandAlone(instruction)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
 // CompileConstToRegister implements Assembler.CompileConstToRegister.
 func (ta *testAssembler) CompileConstToRegister(instruction asm.Instruction, value asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	ret := ta.goasm.CompileConstToRegister(instruction, value, destinationReg)
 	ret2 := ta.a.CompileConstToRegister(instruction, value, destinationReg)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
 // CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
@@ -146,7 +147,7 @@ func (ta *testAssembler) CompileRegisterToMemory(instruction asm.Instruction, so
 func (ta *testAssembler) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileJump(jmpInstruction)
 	ret2 := ta.a.CompileJump(jmpInstruction)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
 // CompileJumpToMemory implements Assembler.CompileJumpToMemory.
@@ -168,7 +169,7 @@ func (ta *testAssembler) CompileReadInstructionAddress(destinationRegister asm.R
 }
 
 // CompileRegisterToRegisterWithMode implements Assembler.CompileRegisterToRegisterWithMode.
-func (ta *testAssembler) CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode Mode) {
+func (ta *testAssembler) CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode asm_amd64.Mode) {
 	ta.goasm.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
 	ta.a.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
 }
@@ -189,7 +190,7 @@ func (ta *testAssembler) CompileRegisterToMemoryWithIndex(instruction asm.Instru
 func (ta *testAssembler) CompileRegisterToConst(instruction asm.Instruction, srcRegister asm.Register, value int64) asm.Node {
 	ret := ta.goasm.CompileRegisterToConst(instruction, srcRegister, value)
 	ret2 := ta.a.CompileRegisterToConst(instruction, srcRegister, value)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
 // CompileRegisterToNone implements Assembler.CompileRegisterToNone.
@@ -214,12 +215,12 @@ func (ta *testAssembler) CompileNoneToMemory(instruction asm.Instruction, baseRe
 func (ta *testAssembler) CompileConstToMemory(instruction asm.Instruction, value int64, dstbaseReg asm.Register, dstOffset int64) asm.Node {
 	ret := ta.goasm.CompileConstToMemory(instruction, value, dstbaseReg, dstOffset)
 	ret2 := ta.a.CompileConstToMemory(instruction, value, dstbaseReg, dstOffset)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
 // CompileMemoryToConst implements Assembler.CompileMemoryToConst.
 func (ta *testAssembler) CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node {
 	ret := ta.goasm.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
 	ret2 := ta.a.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*nodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }

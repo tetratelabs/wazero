@@ -159,7 +159,7 @@ const (
 	UD2
 )
 
-func instructionName(instruction asm.Instruction) string {
+func InstructionName(instruction asm.Instruction) string {
 	switch instruction {
 	case ADDL:
 		return "ADDL"
@@ -465,7 +465,7 @@ const (
 	REG_X15
 )
 
-func registerName(reg asm.Register) string {
+func RegisterName(reg asm.Register) string {
 	switch reg {
 	case REG_AX:
 		return "AX"
