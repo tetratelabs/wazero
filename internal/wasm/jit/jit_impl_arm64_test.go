@@ -9,26 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
-	return c.locationStack
-}
-
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
-// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
-func (c *arm64Compiler) setStackPointerCeil(v uint64) {
-	c.stackPointerCeil = v
-}
-
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
-	c.locationStack = s
-}
-
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
@@ -108,4 +88,24 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
+}
+
+// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
+	return c.locationStack
+}
+
+// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
+func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
+	return c.onStackPointerCeilDeterminedCallBack
+}
+
+// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+func (c *arm64Compiler) setStackPointerCeil(v uint64) {
+	c.stackPointerCeil = v
+}
+
+// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
+	c.locationStack = s
 }
