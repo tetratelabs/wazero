@@ -29,7 +29,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 						v := v
 						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 							env := newJITEnvironment()
-							compiler := env.requireNewCompiler(t, nil)
+							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
@@ -107,7 +107,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 				v := v
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -183,7 +183,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -305,7 +305,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 			} {
 				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -382,7 +382,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -428,7 +428,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 

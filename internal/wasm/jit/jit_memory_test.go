@@ -15,7 +15,7 @@ import (
 
 func TestCompiler_compileMemoryGrow(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := env.requireNewCompiler(t, nil)
+	compiler := env.requireNewCompiler(t, newCompiler, nil)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
@@ -49,7 +49,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 
 func TestCompiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := env.requireNewCompiler(t, nil)
+	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -368,7 +368,7 @@ func TestCompiler_compileStore(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 				targetSizeInByte := targetSizeInByte
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)

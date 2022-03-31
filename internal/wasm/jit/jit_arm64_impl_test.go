@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/asm/arm64"
+	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -16,7 +16,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	}
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("too large offset", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -61,7 +61,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)

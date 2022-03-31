@@ -8,7 +8,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 )
 
-// golangAsmNode implements Node for golang-asm library.
+// GolangAsmNode implements Node for golang-asm library.
 type GolangAsmNode struct {
 	prog *obj.Prog
 }

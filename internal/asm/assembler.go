@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+type NewAssembler func(temporaryRegister Register) (AssemblerBase, error)
+
 // Register represents architecture-specific registers.
 type Register byte
 
@@ -19,7 +21,7 @@ type Instruction byte
 // register's states.
 type ConditionalRegisterState byte
 
-// NilRegister is the only architecture-independent conditinal state, and
+// ConditionalRegisterStateUnset is the only architecture-independent conditinal state, and
 // can be used to indicate that no conditional state is specificed.
 const ConditionalRegisterStateUnset ConditionalRegisterState = 0
 
@@ -68,7 +70,7 @@ type AssemblerBase interface {
 	CompileStandAlone(instruction Instruction) Node
 	// CompileConstToRegister adds an instruction where source operand is `value` as constant and destination is `destinationReg` register.
 	CompileConstToRegister(instruction Instruction, value ConstantValue, destinationReg Register) Node
-	// CompileConstToRegister adds an instruction where source and destination operands are registers.
+	// CompileRegisterToRegister adds an instruction where source and destination operands are registers.
 	CompileRegisterToRegister(instruction Instruction, from, to Register)
 	// CompileMemoryToRegister adds an instruction where source operands is the memory address specified by `sourceBaseReg+sourceOffsetConst`
 	// and the destination is `destinationReg` register.
@@ -81,7 +83,7 @@ type AssemblerBase interface {
 	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,
 	// and returns the corresponding Node in the assembled linked list.
 	CompileJumpToMemory(jmpInstruction Instruction, baseReg Register, offset ConstantValue)
-	// CompileJumpToMemory adds jump-type instruction whose destination is the memory address specified by `reg` register.
+	// CompileJumpToRegister adds jump-type instruction whose destination is the memory address specified by `reg` register.
 	CompileJumpToRegister(jmpInstruction Instruction, reg Register)
 	// CompileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
 	// into destinationRegister. "target instruction" is specified by beforeTargetInst argument and

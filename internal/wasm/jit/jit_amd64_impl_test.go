@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/asm/amd64"
+	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -81,7 +81,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const x2Value uint32 = 51
 						const dxValue uint64 = 111111
 
-						compiler := env.requireNewCompiler(t, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -203,7 +203,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const dxValue uint64 = 111111
 
 						env := newJITEnvironment()
-						compiler := env.requireNewCompiler(t, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -284,7 +284,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 	t.Run("invalid", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -300,7 +300,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)

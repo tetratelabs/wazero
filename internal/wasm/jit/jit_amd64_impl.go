@@ -13,7 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/asm/amd64"
+	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -125,13 +125,13 @@ type amd64Compiler struct {
 }
 
 func newAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	b, err := amd64.NewAssembler()
+	b, err := amd64.NewAssembler(asm.NilRegister /* temporaryRegister unused on amd64 */)
 	if err != nil {
 		return nil, err
 	}
 	c := &amd64Compiler{
 		f:             f,
-		assembler:     b,
+		assembler:     b.(amd64.Assembler),
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,

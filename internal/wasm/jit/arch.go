@@ -1,13 +1,5 @@
 package jit
 
-import (
-	"fmt"
-	"runtime"
-
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
-)
-
 var (
 	// newArchContext returns a new archContext which is architecture-specific type to be embedded in callEngine.
 	// This must be initialized in init() function in architecture-specific arch_*.go file which is guarded by build tag.
@@ -20,28 +12,3 @@ var (
 //
 // Note: this is implemented in per-arch Go assembler file. For example, arch_amd64.s implements this for amd64.
 func jitcall(codeSegment, ce uintptr)
-
-func init() {
-	switch runtime.GOARCH {
-	case "arm64":
-		unreservedGeneralPurposeIntRegisters = arm64UnreservedGeneralPurposeIntRegisters
-		unreservedGeneralPurposeFloatRegisters = arm64UnreservedGeneralPurposeFloatRegisters
-	case "amd64":
-		unreservedGeneralPurposeIntRegisters = amd64UnreservedGeneralPurposeIntRegisters
-		unreservedGeneralPurposeFloatRegisters = amd64UnreservedGeneralPurposeFloatRegisters
-	}
-}
-
-// newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, err error) {
-	switch arch := runtime.GOARCH; arch {
-	case "arm64":
-		c, err = newArm64Compiler(f, ir)
-	case "amd64":
-		c, err = newAmd64Compiler(f, ir)
-	default:
-		err = fmt.Errorf("unsupported GOARCH %s", arch)
-	}
-	return
-}

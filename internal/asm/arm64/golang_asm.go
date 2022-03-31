@@ -1,4 +1,4 @@
-package arm64
+package asm_arm64
 
 import (
 	"fmt"
@@ -16,12 +16,7 @@ type assemblerGoAsmImpl struct {
 	temporaryRegister asm.Register
 }
 
-func newGolangAsmAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
-	g, err := asm.NewGolangAsmBaseAssembler("arm64")
-	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
-}
-
-// CompileConstToRegisterInstruction implements Assembler.CompileConstToRegisterInstruction.
+// CompileConstToRegister implements Assembler.CompileConstToRegisterInstruction.
 func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -189,7 +184,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(br)
 }
 
-// CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
+// CompileJumpToRegister implements AssemblerBase.CompileJumpToRegister.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ret := a.NewProg()
 	ret.As = castAsGolangAsmInstruction[jmpInstruction]

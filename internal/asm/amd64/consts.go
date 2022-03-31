@@ -1,4 +1,4 @@
-package amd64
+package asm_amd64
 
 import "github.com/tetratelabs/wazero/internal/asm"
 

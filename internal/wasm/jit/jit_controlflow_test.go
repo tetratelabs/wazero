@@ -13,7 +13,7 @@ import (
 
 func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := env.requireNewCompiler(t, nil)
+	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 	// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 	// TODO: delete after #233
@@ -45,7 +45,7 @@ func TestCompiler_compileLabel(t *testing.T) {
 		expectSkip := expectSkip
 		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			if expectSkip {
 				// If the initial stack is not set, compileLabel must return skip=true.
@@ -230,7 +230,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				shouldGoToElse := shouldGoToElse
 				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -423,7 +423,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -458,7 +458,7 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compiler
 func TestCompiler_compileBr(t *testing.T) {
 	t.Run("return", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -476,7 +476,7 @@ func TestCompiler_compileBr(t *testing.T) {
 	})
 	t.Run("back-and-forth br", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -529,7 +529,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
 		env.setTable(make([]interface{}, 10))
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -557,7 +557,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("uninitialized", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -591,7 +591,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("type not match", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
@@ -655,7 +655,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 					// the mutex lock and must release on the cleanup of each subtest.
 					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
-						compiler := env.requireNewCompiler(t, nil)
+						compiler := env.requireNewCompiler(t, newCompiler, nil)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
@@ -685,7 +685,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							env.setCallFrameStackPointerLen(1)
 						}
 
-						compiler := env.requireNewCompiler(t, nil)
+						compiler := env.requireNewCompiler(t, newCompiler, nil)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -759,7 +759,7 @@ func TestCompiler_compileCall(t *testing.T) {
 				// the mutex lock and must release on the cleanup of each subtest.
 				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
-					compiler := env.requireNewCompiler(t, targetFunctionType)
+					compiler := env.requireNewCompiler(t, newCompiler, targetFunctionType)
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -785,7 +785,7 @@ func TestCompiler_compileCall(t *testing.T) {
 			}
 
 			// Now we start building the caller's code.
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -835,7 +835,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 		env := newJITEnvironment()
 
 		// Build code.
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		err = compiler.compileReturnFunction()
@@ -865,7 +865,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 			t.Run(fmt.Sprintf("compiling existing callframe %d", funcIndex), func(t *testing.T) {
 				// Each function pushes its funcaddr and soon returns.
-				compiler := env.requireNewCompiler(t, nil)
+				compiler := env.requireNewCompiler(t, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 

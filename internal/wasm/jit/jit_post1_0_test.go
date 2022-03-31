@@ -40,7 +40,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t, nil)
+				compiler := env.requireNewCompiler(t, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t, nil)
+				compiler := env.requireNewCompiler(t, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 

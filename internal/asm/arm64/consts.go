@@ -1,4 +1,4 @@
-package arm64
+package asm_arm64
 
 import (
 	"github.com/tetratelabs/wazero/internal/asm"
