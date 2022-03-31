@@ -1299,6 +1299,22 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		modRM |= 0b00_101_000
 		opcode = []byte{0xd3}
 		isShiftInstruction = true
+	case ROLL:
+		opcode = []byte{0xd3}
+		isShiftInstruction = true
+	case ROLQ:
+		RexPrefix |= RexPrefixW
+		opcode = []byte{0xd3}
+		isShiftInstruction = true
+	case RORL:
+		isShiftInstruction = true
+		modRM |= 0b00_001_000
+		opcode = []byte{0xd3}
+	case RORQ:
+		RexPrefix |= RexPrefixW
+		opcode = []byte{0xd3}
+		modRM |= 0b00_001_000
+		isShiftInstruction = true
 	default:
 		return errorEncodingUnsupported(n)
 	}
