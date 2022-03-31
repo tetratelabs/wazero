@@ -59,7 +59,7 @@ func newExample() *wasm.Module {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeI64Extend16S, wasm.OpcodeEnd}},
 		},
-		MemorySection: &wasm.Memory{Min: 1, Max: &three},
+		MemorySection: &wasm.Memory{Min: 1, Max: three},
 		ExportSection: map[string]*wasm.Export{
 			"AddInt": {Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
 			"":       {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
@@ -93,13 +93,13 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleBinary, enabledFeatures)
+		m, err := binary.DecodeModule(exampleBinary, enabledFeatures, wasm.MemoryMaxPages)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("text.DecodeModule", func(t *testing.T) {
-		m, err := text.DecodeModule(exampleText, enabledFeatures)
+		m, err := text.DecodeModule(exampleText, enabledFeatures, wasm.MemoryMaxPages)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
@@ -126,7 +126,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary, enabledFeatures); err != nil {
+			if _, err := binary.DecodeModule(exampleBinary, enabledFeatures, wasm.MemoryMaxPages); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -140,7 +140,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("text.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := text.DecodeModule(exampleText, enabledFeatures); err != nil {
+			if _, err := text.DecodeModule(exampleText, enabledFeatures, wasm.MemoryMaxPages); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -148,7 +148,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("wat2wasm via text.DecodeModule->binary.EncodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText, enabledFeatures); err != nil {
+			if m, err := text.DecodeModule(exampleText, enabledFeatures, wasm.MemoryMaxPages); err != nil {
 				b.Fatal(err)
 			} else {
 				_ = binary.EncodeModule(m)

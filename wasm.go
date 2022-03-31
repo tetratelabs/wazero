@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -81,8 +82,9 @@ func NewRuntime() Runtime {
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
 		ctx:             config.ctx,
-		store:           internalwasm.NewStore(config.engine, config.enabledFeatures),
+		store:           internalwasm.NewStore(config.newEngine(), config.enabledFeatures),
 		enabledFeatures: config.enabledFeatures,
+		memoryMaxPages:  config.memoryMaxPages,
 	}
 }
 
@@ -91,6 +93,7 @@ type runtime struct {
 	ctx             context.Context
 	store           *internalwasm.Store
 	enabledFeatures internalwasm.Features
+	memoryMaxPages  uint32
 }
 
 // Module implements Runtime.Module
@@ -116,7 +119,13 @@ func (r *runtime) CompileModule(source []byte) (*Module, error) {
 		decoder = text.DecodeModule
 	}
 
-	internal, err := decoder(source, r.enabledFeatures)
+	if r.memoryMaxPages > internalwasm.MemoryMaxPages {
+		return nil, fmt.Errorf("memoryMaxPages %d (%s) > specification max %d (%s)",
+			r.memoryMaxPages, internalwasm.PagesToUnitOfBytes(r.memoryMaxPages),
+			internalwasm.MemoryMaxPages, internalwasm.PagesToUnitOfBytes(internalwasm.MemoryMaxPages))
+	}
+
+	internal, err := decoder(source, r.enabledFeatures, r.memoryMaxPages)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {

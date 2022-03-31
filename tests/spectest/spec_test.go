@@ -245,7 +245,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 			},
 		},
 		MemorySection: &wasm.Memory{
-			Min: 1, Max: &memoryLimitMax,
+			Min: 1, Max: memoryLimitMax,
 		},
 		TableSection: &wasm.Table{
 			Min: 10, Max: &tableLimitMax,
@@ -319,8 +319,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 					case "module":
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-
-						mod, err := binary.DecodeModule(buf, wasm.Features20191205)
+						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(wasm.Features20191205))
 
@@ -448,7 +447,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg string) {
-	mod, err := binary.DecodeModule(buf, store.EnabledFeatures)
+	mod, err := binary.DecodeModule(buf, store.EnabledFeatures, wasm.MemoryMaxPages)
 	if err != nil {
 		return
 	}

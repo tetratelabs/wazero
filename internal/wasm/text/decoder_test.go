@@ -1170,14 +1170,14 @@ func TestDecodeModule(t *testing.T) {
 			name:  "memory",
 			input: "(module (memory 1))",
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1},
+				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
 			},
 		},
 		{
 			name:  "memory ID",
 			input: "(module (memory $mem 1))",
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1},
+				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
 			},
 		},
 		{
@@ -1364,7 +1364,7 @@ func TestDecodeModule(t *testing.T) {
 	(export "foo" (memory 0))
 )`,
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 0},
+				MemorySection: &wasm.Memory{Min: 0, Max: wasm.MemoryMaxPages},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1377,7 +1377,7 @@ func TestDecodeModule(t *testing.T) {
 	(memory 0)
 )`,
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 0},
+				MemorySection: &wasm.Memory{Min: 0, Max: wasm.MemoryMaxPages},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1409,7 +1409,7 @@ func TestDecodeModule(t *testing.T) {
     (export "memory" (memory $mem))
 )`,
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1},
+				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
 				ExportSection: map[string]*wasm.Export{
 					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1511,7 +1511,7 @@ func TestDecodeModule(t *testing.T) {
 			if tc.enabledFeatures == 0 {
 				tc.enabledFeatures = wasm.Features20191205
 			}
-			m, err := DecodeModule([]byte(tc.input), tc.enabledFeatures)
+			m, err := DecodeModule([]byte(tc.input), tc.enabledFeatures, wasm.MemoryMaxPages)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -1522,6 +1522,7 @@ func TestParseModule_Errors(t *testing.T) {
 	tests := []struct {
 		name, input     string
 		enabledFeatures wasm.Features
+		memoryMaxPages  uint32
 		expectedErr     string
 	}{
 		{
@@ -1968,6 +1969,12 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "2:47: i64.extend16_s invalid as feature sign-extension-ops is disabled in module.func[0]",
 		},
 		{
+			name:           "memory over max",
+			input:          "(module (memory 1 4))",
+			memoryMaxPages: 3,
+			expectedErr:    "1:19: max 4 pages (256 Ki) outside range of 3 pages (192 Ki) in module.memory[0]",
+		},
+		{
 			name:        "second memory",
 			input:       "(module (memory 1) (memory 1))",
 			expectedErr: "1:21: at most one memory allowed in module",
@@ -2112,14 +2119,17 @@ func TestParseModule_Errors(t *testing.T) {
 			if tc.enabledFeatures == 0 {
 				tc.enabledFeatures = wasm.Features20191205
 			}
-			_, err := DecodeModule([]byte(tc.input), tc.enabledFeatures)
+			if tc.memoryMaxPages == 0 {
+				tc.memoryMaxPages = wasm.MemoryMaxPages
+			}
+			_, err := DecodeModule([]byte(tc.input), tc.enabledFeatures, tc.memoryMaxPages)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
 
 func TestModuleParser_ErrorContext(t *testing.T) {
-	p := newModuleParser(&wasm.Module{}, 0)
+	p := newModuleParser(&wasm.Module{}, 0, 0)
 	tests := []struct {
 		input    string
 		pos      parserPosition

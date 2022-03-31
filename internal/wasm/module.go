@@ -20,7 +20,7 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte, enabledFeatures Features) (result *Module, err error)
+type DecodeModule func(source []byte, enabledFeatures Features, memoryMaxPages uint32) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -586,7 +586,9 @@ type limitsType struct {
 }
 
 // Memory describes the limits of pages (64KB) in a memory.
-type Memory = limitsType
+type Memory struct {
+	Min, Max uint32
+}
 
 type GlobalType struct {
 	ValType ValueType

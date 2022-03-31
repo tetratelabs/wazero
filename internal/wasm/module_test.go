@@ -141,9 +141,9 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Memories.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &limitsType{Min: 1}}},
+				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &Memory{Min: 1, Max: 10}}},
 			},
-			expectedMemory: &Memory{Min: 1},
+			expectedMemory: &Memory{Min: 1, Max: 10},
 		},
 		{
 			module: &Module{
@@ -643,7 +643,7 @@ func TestModule_validateExports(t *testing.T) {
 			name:            "memory out of range",
 			enabledFeatures: Features20191205,
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 0}},
-			table:           &Memory{},
+			table:           &limitsType{},
 			expectedErr:     `memory for export["e1"] out of range`,
 		},
 	} {
@@ -720,9 +720,9 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
-		m := Module{MemorySection: &Memory{Min: min, Max: &max}}
+		m := Module{MemorySection: &Memory{Min: min, Max: max}}
 		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
-		require.Equal(t, max, *mem.Max)
+		require.Equal(t, max, mem.Max)
 	})
 }

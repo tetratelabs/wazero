@@ -102,17 +102,17 @@ type moduleParser struct {
 
 // DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
-func DecodeModule(source []byte, enabledFeatures wasm.Features) (result *wasm.Module, err error) {
+func DecodeModule(source []byte, enabledFeatures wasm.Features, memoryMaxPages uint32) (result *wasm.Module, err error) {
 	// TODO: when globals are supported, err on global vars if disabled
 
 	// names are the wasm.Module NameSection
 	//
 	// * ModuleName: ex. "test" if (module $test)
-	// * FunctionNames: nil od no imported or module-defined function had a name
-	// * LocalNames: nil when no imported or module-defined function had named (param) fields.
+	// * FunctionNames: nil when neither imported nor module-defined functions had a name
+	// * LocalNames: nil when neither imported nor module-defined functions had named (param) fields.
 	names := &wasm.NameSection{}
 	module := &wasm.Module{NameSection: names}
-	p := newModuleParser(module, enabledFeatures)
+	p := newModuleParser(module, enabledFeatures, memoryMaxPages)
 	p.source = source
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
@@ -141,7 +141,7 @@ func DecodeModule(source []byte, enabledFeatures wasm.Features) (result *wasm.Mo
 	return module, nil
 }
 
-func newModuleParser(module *wasm.Module, enabledFeatures wasm.Features) *moduleParser {
+func newModuleParser(module *wasm.Module, enabledFeatures wasm.Features, memoryMaxPages uint32) *moduleParser {
 	p := moduleParser{module: module, enabledFeatures: enabledFeatures,
 		typeNamespace:   newIndexNamespace(module.SectionElementCount),
 		funcNamespace:   newIndexNamespace(module.SectionElementCount),
@@ -150,7 +150,7 @@ func newModuleParser(module *wasm.Module, enabledFeatures wasm.Features) *module
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
 	p.funcParser = newFuncParser(enabledFeatures, p.typeUseParser, p.funcNamespace, p.endFunc)
-	p.memoryParser = newMemoryParser(p.memoryNamespace, p.endMemory)
+	p.memoryParser = newMemoryParser(uint32(memoryMaxPages), p.memoryNamespace, p.endMemory)
 	return &p
 }
 
@@ -449,7 +449,7 @@ func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, name string,
 
 // endMemory adds the limits for the current memory, and increments memoryNamespace as it is shared across imported and
 // module-defined memories. Finally, this returns parseModule to prepare for the next field.
-func (p *moduleParser) endMemory(min uint32, max *uint32) tokenParser {
+func (p *moduleParser) endMemory(min, max uint32) tokenParser {
 	p.module.MemorySection = &wasm.Memory{Min: min, Max: max}
 	p.pos = positionModule
 	return p.parseModule

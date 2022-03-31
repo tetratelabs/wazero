@@ -20,38 +20,38 @@ func TestMemoryParser(t *testing.T) {
 		{
 			name:     "min 0",
 			input:    "(memory 0)",
-			expected: &wasm.Memory{},
+			expected: &wasm.Memory{Max: max},
 		},
 		{
 			name:     "min 0, max 0",
 			input:    "(memory 0 0)",
-			expected: &wasm.Memory{Max: &zero},
+			expected: &wasm.Memory{Max: zero},
 		},
 		{
 			name:     "min largest",
 			input:    "(memory 65536)",
-			expected: &wasm.Memory{Min: max},
+			expected: &wasm.Memory{Min: max, Max: max},
 		},
 		{
 			name:       "min largest - ID",
 			input:      "(memory $mem 65536)",
-			expected:   &wasm.Memory{Min: max},
+			expected:   &wasm.Memory{Min: max, Max: max},
 			expectedID: "mem",
 		},
 		{
 			name:     "min 0, max largest",
 			input:    "(memory 0 65536)",
-			expected: &wasm.Memory{Max: &max},
+			expected: &wasm.Memory{Max: max},
 		},
 		{
 			name:     "min largest max largest",
 			input:    "(memory 65536 65536)",
-			expected: &wasm.Memory{Min: max, Max: &max},
+			expected: &wasm.Memory{Min: max, Max: max},
 		},
 		{
 			name:       "min largest max largest - ID",
 			input:      "(memory $mem 65536 65536)",
-			expected:   &wasm.Memory{Min: max, Max: &max},
+			expected:   &wasm.Memory{Min: max, Max: max},
 			expectedID: "mem",
 		},
 	}
@@ -118,17 +118,17 @@ func TestMemoryParser_Errors(t *testing.T) {
 		{
 			name:        "max < min",
 			input:       "(memory 1 0)",
-			expectedErr: "max 0 < min 1",
+			expectedErr: "min 1 pages (64 Ki) > max 0 pages (0 Ki)",
 		},
 		{
 			name:        "min > limit",
 			input:       "(memory 4294967295)",
-			expectedErr: "min outside range of 65536: 4294967295",
+			expectedErr: "min 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max > limit",
 			input:       "(memory 0 4294967295)",
-			expectedErr: "min outside range of 65536: 4294967295",
+			expectedErr: "max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
 		},
 	}
 
@@ -163,11 +163,11 @@ func TestMemoryParser_Errors(t *testing.T) {
 
 func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.Memory, *memoryParser, error) {
 	var parsed *wasm.Memory
-	var setFunc onMemory = func(min uint32, max *uint32) tokenParser {
+	var setFunc onMemory = func(min, max uint32) tokenParser {
 		parsed = &wasm.Memory{Min: min, Max: max}
 		return parseErr
 	}
-	tp := newMemoryParser(memoryNamespace, setFunc)
+	tp := newMemoryParser(wasm.MemoryMaxPages, memoryNamespace, setFunc)
 	// memoryParser starts after the '(memory', so we need to eat it first!
 	_, _, err := lex(skipTokens(2, tp.begin), []byte(input))
 	return parsed, tp, err

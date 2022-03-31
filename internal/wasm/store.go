@@ -41,9 +41,9 @@ type (
 		// do type-checks on indirect function calls.
 		typeIDs map[string]FunctionTypeID
 
-		//  maximumFunctionTypes represents the limit on the number of function types in a store.
+		// functionMaxTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
-		maximumFunctionTypes int
+		functionMaxTypes uint32
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.RWMutex
@@ -244,12 +244,12 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 
 func NewStore(engine Engine, enabledFeatures Features) *Store {
 	return &Store{
-		engine:               engine,
-		EnabledFeatures:      enabledFeatures,
-		moduleNames:          map[string]struct{}{},
-		modules:              map[string]*ModuleInstance{},
-		typeIDs:              map[string]FunctionTypeID{},
-		maximumFunctionTypes: maximumFunctionTypes,
+		engine:           engine,
+		EnabledFeatures:  enabledFeatures,
+		moduleNames:      map[string]struct{}{},
+		modules:          map[string]*ModuleInstance{},
+		typeIDs:          map[string]FunctionTypeID{},
+		functionMaxTypes: maximumFunctionTypes,
 	}
 }
 
@@ -453,15 +453,9 @@ func (s *Store) resolveImports(module *Module) (
 				return
 			}
 
-			if expected.Max != nil {
-				expectedMax := *expected.Max
-				if importedMemory.Max == nil {
-					err = errorNoMax(i, idx, expectedMax)
-					return
-				} else if expectedMax < *importedMemory.Max {
-					err = errorMaxSizeMismatch(i, idx, expectedMax, *importedMemory.Max)
-					return
-				}
+			if expected.Max < importedMemory.Max {
+				err = errorMaxSizeMismatch(i, idx, expected.Max, importedMemory.Max)
+				return
 			}
 		case ExternTypeGlobal:
 			expected := i.DescGlobal
@@ -549,8 +543,8 @@ func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 	key := t.String()
 	id, ok := s.typeIDs[key]
 	if !ok {
-		l := len(s.typeIDs)
-		if l >= s.maximumFunctionTypes {
+		l := uint32(len(s.typeIDs))
+		if l >= s.functionMaxTypes {
 			return nil, fmt.Errorf("too many function types in a store")
 		}
 		id = FunctionTypeID(len(s.typeIDs))

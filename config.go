@@ -13,32 +13,46 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
 )
 
+// RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
+type RuntimeConfig struct {
+	newEngine       func() internalwasm.Engine
+	ctx             context.Context
+	enabledFeatures internalwasm.Features
+	memoryMaxPages  uint32
+}
+
+// engineLessConfig helps avoid copy/pasting the wrong defaults.
+var engineLessConfig = &RuntimeConfig{
+	ctx:             context.Background(),
+	enabledFeatures: internalwasm.Features20191205,
+	memoryMaxPages:  internalwasm.MemoryMaxPages,
+}
+
+// clone ensures all fields are coped even if nil.
+func (c *RuntimeConfig) clone() *RuntimeConfig {
+	return &RuntimeConfig{
+		newEngine:       c.newEngine,
+		ctx:             c.ctx,
+		enabledFeatures: c.enabledFeatures,
+		memoryMaxPages:  c.memoryMaxPages,
+	}
+}
+
 // NewRuntimeConfigJIT compiles WebAssembly modules into runtime.GOARCH-specific assembly for optimal performance.
 //
 // Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not support JIT. Use NewRuntimeConfig to safely
 // detect and fallback to NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigJIT() *RuntimeConfig {
-	return &RuntimeConfig{
-		engine:          jit.NewEngine(),
-		ctx:             context.Background(),
-		enabledFeatures: internalwasm.Features20191205,
-	}
+	ret := engineLessConfig.clone()
+	ret.newEngine = jit.NewEngine
+	return ret
 }
 
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() *RuntimeConfig {
-	return &RuntimeConfig{
-		engine:          interpreter.NewEngine(),
-		ctx:             context.Background(),
-		enabledFeatures: internalwasm.Features20191205,
-	}
-}
-
-// RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
-type RuntimeConfig struct {
-	engine          internalwasm.Engine
-	ctx             context.Context
-	enabledFeatures internalwasm.Features
+	ret := engineLessConfig.clone()
+	ret.newEngine = interpreter.NewEngine
+	return ret
 }
 
 // WithContext sets the default context used to initialize the module. Defaults to context.Background if nil.
@@ -49,11 +63,29 @@ type RuntimeConfig struct {
 // * This is the default context of wasm.Function when callers pass nil.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-function%E2%91%A0
-func (r *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
+func (c *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return &RuntimeConfig{engine: r.engine, ctx: ctx, enabledFeatures: r.enabledFeatures}
+	ret := c.clone()
+	ret.ctx = ctx
+	return ret
+}
+
+// WithMemoryMaxPages reduces the maximum number of pages a module can define from 65536 pages (4GiB) to a lower value.
+//
+// Notes:
+// * If a module defines no memory max limit, Runtime.CompileModule sets max to this value.
+// * If a module defines a memory max larger than this amount, it will fail to compile (Runtime.CompileModule).
+// * Any "memory.grow" instruction that results in a larger value than this results in an error at runtime.
+// * Zero is a valid value and results in a crash if any module uses memory.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+// See https://www.w3.org/TR/wasm-core-1/#memory-types%E2%91%A0
+func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig {
+	ret := c.clone()
+	ret.memoryMaxPages = memoryMaxPages
+	return ret
 }
 
 // WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
@@ -61,19 +93,20 @@ func (r *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
 //
 // When false, a wasm.Global can never be cast to a wasm.MutableGlobal, and any source that includes global vars
 // will fail to parse.
-//
-func (r *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
-	enabledFeatures := r.enabledFeatures.Set(internalwasm.FeatureMutableGlobal, enabled)
-	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
+func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureMutableGlobal, enabled)
+	return ret
 }
 
 // WithFeatureSignExtensionOps enables sign-extend operations. This defaults to false as the feature was not finished in
 // WebAssembly 1.0 (20191205).
 //
 // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-func (r *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
-	enabledFeatures := r.enabledFeatures.Set(internalwasm.FeatureSignExtensionOps, enabled)
-	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
+func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureSignExtensionOps, enabled)
+	return ret
 }
 
 // Module is a WebAssembly 1.0 (20191205) module to instantiate.

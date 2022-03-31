@@ -456,7 +456,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := newStore()
 		const max = 10
-		s.maximumFunctionTypes = max
+		s.functionMaxTypes = max
 		s.typeIDs = make(map[string]FunctionTypeID)
 		for i := 0; i < max; i++ {
 			s.typeIDs[strconv.Itoa(i)] = 0
@@ -662,12 +662,12 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
-			memoryInst := &MemoryInstance{Max: &max}
+			memoryInst := &MemoryInstance{Max: max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: memoryInst,
 			}}, Name: moduleName}
-			_, _, _, memory, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: &max}}}})
+			_, _, _, memory, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: max}}}})
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
 		})
@@ -684,13 +684,13 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("maximum size mismatch", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
-			importMemoryType := &Memory{Max: &max}
+			importMemoryType := &Memory{Max: max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{},
+				Memory: &MemoryInstance{Max: MemoryMaxPages},
 			}}, Name: moduleName}
 			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
-			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10, but actual has no max")
+			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")
 		})
 	})
 }

@@ -62,6 +62,7 @@ func TestRuntime_DecodeModule(t *testing.T) {
 func TestRuntime_DecodeModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
+		runtime     Runtime
 		source      []byte
 		expectedErr string
 	}{
@@ -79,14 +80,36 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 			source:      []byte(`(modular)`),
 			expectedErr: "1:2: unexpected field: modular",
 		},
+		{
+			name:        "RuntimeConfig.memoryMaxPage too large",
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(math.MaxUint32)),
+			source:      []byte(`(module)`),
+			expectedErr: "memoryMaxPages 4294967295 (3 Ti) > specification max 65536 (4 Gi)",
+		},
+		{
+			name:        "memory has too many pages - text",
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
+			source:      []byte(`(module (memory 3))`),
+			expectedErr: "1:17: min 3 pages (192 Ki) outside range of 2 pages (128 Ki) in module.memory[0]",
+		},
+		{
+			name:        "memory has too many pages - binary",
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
+			source:      binary.EncodeModule(&internalwasm.Module{MemorySection: &internalwasm.Memory{Min: 2, Max: 3}}),
+			expectedErr: "section memory: max 3 pages (192 Ki) outside range of 2 pages (128 Ki)",
+		},
 	}
 
 	r := NewRuntime()
 	for _, tt := range tests {
 		tc := tt
 
+		if tc.runtime == nil {
+			tc.runtime = r
+		}
+
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := r.CompileModule(tc.source)
+			_, err := tc.runtime.CompileModule(tc.source)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
