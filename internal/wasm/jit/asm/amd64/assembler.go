@@ -10,17 +10,22 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
-var NewAssembler func() (Assembler, error) = NewAssemblerForTesting
+// NewAssembler returns an Assembler instance from the enabled Assembler implementation.
+// This is set to newAssembler by default.
+var NewAssembler func() (Assembler, error) = newAssembler
 
-// NewAssemblerImpl implements NewAssembler and is used by default.
-// This returns an implementation Assembler interface via our homamde assembler implementation.
-func NewAssemblerImpl() (Assembler, error) {
+// newAssembler implements NewAssembler and is used by default.
+// This returns an implementation of Assembler interface via our homamde assembler implementation.
+func newAssembler() (Assembler, error) {
 	a := newAssemblerImpl()
 	return a, nil
 }
 
 // NewAssemblerForTesting can be used for ensuring that our assembler produces exactly the same binary as Go.
 // Disabled by default, but assigning this to NewAssembler allows us to debug assembler's bug.
+//
+// Note: this will be removed after golang-asm removal.
+// Note: this is intentionally exported in order to suppress bunch of "unused" lint errors on this function, testAssembler and testNode.
 func NewAssemblerForTesting() (Assembler, error) {
 	goasm, _ := newGolangAsmAssembler()
 	a := newAssemblerImpl()

@@ -124,7 +124,6 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 	require.Equal(t, a.root, root)
 	require.Equal(t, a.current, next)
 	require.Equal(t, next, root.next)
-	require.Equal(t, root, next.prev)
 	require.Nil(t, next.next)
 }
 
@@ -203,7 +202,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 			jmp.AssignJumpTarget(assembler.CompileStandAlone(dummyInstruction))
 		}
 
-		a.prepareNodesForAssemble()
+		a.initializeNodesForEncoding()
 
 		// For the first encoding, we must be forced to reassemble.
 		err = a.encode()
@@ -843,8 +842,8 @@ func TestAssemblerImpl_resolveForwardRelativeJumps(t *testing.T) {
 	t.Run("long jump", func(t *testing.T) {
 		t.Run("error", func(t *testing.T) {
 			originOffset, targetOffset := uint64(0), uint64(math.MaxInt64)
-			origin := &nodeImpl{instruction: JMP, offsetInBinary: &originOffset}
-			target := &nodeImpl{offsetInBinary: &targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+			origin := &nodeImpl{instruction: JMP, offsetInBinary: originOffset}
+			target := &nodeImpl{offsetInBinary: targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 			a := newAssemblerImpl()
 			err := a.resolveForwardRelativeJumps(target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
@@ -868,8 +867,8 @@ func TestAssemblerImpl_resolveForwardRelativeJumps(t *testing.T) {
 					expectedOffsetFromEIP:      1234 - 6, // the instruction length of long relative JCC
 				},
 			} {
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: &originOffset}
-				target := &nodeImpl{offsetInBinary: &tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 				a := newAssemblerImpl()
 
 				// Grow the capacity of buffer so that we could put the offset.
@@ -909,8 +908,8 @@ func TestAssemblerImpl_resolveForwardRelativeJumps(t *testing.T) {
 					targetOffset: 130,
 				},
 			} {
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: &originOffset, jumpFlag: jumpFlagShortForward}
-				target := &nodeImpl{offsetInBinary: &tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 				origin.jumpTarget = target
 
 				a := newAssemblerImpl()
@@ -918,7 +917,7 @@ func TestAssemblerImpl_resolveForwardRelativeJumps(t *testing.T) {
 				require.NoError(t, err)
 
 				require.True(t, a.forceReAssemble)
-				require.True(t, origin.jumpFlag&jumpFlagShortForward == 0)
+				require.True(t, origin.flag&nodeFlagShortForwardJump == 0)
 			}
 		})
 		t.Run("ok", func(t *testing.T) {
@@ -937,8 +936,8 @@ func TestAssemblerImpl_resolveForwardRelativeJumps(t *testing.T) {
 					expectedOffsetFromEIP: 129 - 2, // short jumps are of 2 bytes.
 				},
 			} {
-				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: &originOffset, jumpFlag: jumpFlagShortForward}
-				target := &nodeImpl{offsetInBinary: &tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
+				origin := &nodeImpl{instruction: tc.instruction, offsetInBinary: originOffset, flag: nodeFlagShortForwardJump}
+				target := &nodeImpl{offsetInBinary: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 				origin.jumpTarget = target
 
 				a := newAssemblerImpl()
@@ -982,10 +981,10 @@ func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 			offsetInBinary := uint64(math.MaxInt32)
 			node := &nodeImpl{instruction: JMP,
 				jumpTarget: &nodeImpl{
-					offsetInBinary: &targetOffsetInBinary, jumpOrigins: map[*nodeImpl]struct{}{},
+					offsetInBinary: targetOffsetInBinary, jumpOrigins: map[*nodeImpl]struct{}{},
 				},
-				jumpFlag:       jumpFlagBackward,
-				offsetInBinary: &offsetInBinary}
+				flag:           nodeFlagBackwardJump,
+				offsetInBinary: offsetInBinary}
 			err := a.encodeRelativeJump(node)
 			require.Error(t, err)
 		})
@@ -1556,7 +1555,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		a.CompileStandAlone(CDQ)
 
 		for n := a.root; n != nil; n = n.next {
-			n.setOffsetInBinary(uint64(a.buf.Len()))
+			n.offsetInBinary = (uint64(a.buf.Len()))
 
 			err := a.encodeNode(n)
 			require.NoError(t, err)
@@ -1566,7 +1565,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		cb := a.OnGenerateCallbacks[0]
 
 		targetNode := a.current
-		targetNode.setOffsetInBinary(uint64(math.MaxInt64))
+		targetNode.offsetInBinary = (uint64(math.MaxInt64))
 
 		err := cb(nil)
 		require.EqualError(t, err, "BUG: too large offset for LEAQ instruction")

@@ -14,12 +14,10 @@ import (
 type nodeImpl struct {
 	instruction asm.Instruction
 
-	offsetInBinary *asm.NodeOffsetInBinary
+	offsetInBinary asm.NodeOffsetInBinary
 	// jumpTarget holds the target node in the linked for the jump-kind instruction.
 	jumpTarget *nodeImpl
-	jumpFlag   jumpFlag
-	// prev holds the previous node to this node in the assembled linked list.
-	prev *nodeImpl
+	flag       nodeFlag
 	// next holds the next node from this node in the assembled linked list.
 	next *nodeImpl
 
@@ -31,37 +29,45 @@ type nodeImpl struct {
 
 	mode byte
 
+	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
+	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
 	readInstructionAddressBeforeTargetInstruction asm.Instruction
 
 	// jumpOrigins hold all the nodes trying to jump into this node. In other workds, all the nodes with .jumpTarget == this.
 	jumpOrigins map[*nodeImpl]struct{}
 }
 
-type jumpFlag byte
+type nodeFlag byte
 
 const (
-	jumpFlagNone jumpFlag = (1 << iota)
-	jumpFlagBackward
+	// nodeFlagInitializedForEncoding is always set to indicate that node is already initialized. Notably, this is used to judge
+	// whether a jump is backward or forward before encoding.
+	nodeFlagInitializedForEncoding nodeFlag = (1 << iota)
+	nodeFlagBackwardJump
 	// forceLongJump is set to false by default and only used by forward branch jumps, which means .jumpTarget != nil and
 	// the target node is encoded afoter this node. False by default means that that we encode all the jumps with jumpTarget
 	// as short jump (i.e. relative signed 8-bit integer offset jump) and try to encode as small as possible.
-	jumpFlagShortForward
+	nodeFlagShortForwardJump
 )
+
+func (n *nodeImpl) isInitializedForEncoding() bool {
+	return n.flag&nodeFlagInitializedForEncoding != 0
+}
 
 func (n *nodeImpl) isJumpNode() bool {
 	return n.jumpTarget != nil
 }
 
 func (n *nodeImpl) isBackwardJump() bool {
-	return n.isJumpNode() && (n.jumpFlag&jumpFlagBackward != 0)
+	return n.isJumpNode() && (n.flag&nodeFlagBackwardJump != 0)
 }
 
 func (n *nodeImpl) isForwardJump() bool {
-	return n.isJumpNode() && (n.jumpFlag&jumpFlagBackward == 0)
+	return n.isJumpNode() && (n.flag&nodeFlagBackwardJump == 0)
 }
 
 func (n *nodeImpl) isForwardShortJump() bool {
-	return n.isForwardJump() && n.jumpFlag&jumpFlagShortForward != 0
+	return n.isForwardJump() && n.flag&nodeFlagShortForwardJump != 0
 }
 
 // AssignJumpTarget implements asm.Node.AssignJumpTarget.
@@ -81,11 +87,7 @@ func (n *nodeImpl) AssignSourceConstant(value asm.ConstantValue) {
 
 // OffsetInBinary implements asm.Node.OffsetInBinary.
 func (n *nodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
-	return *n.offsetInBinary
-}
-
-func (n *nodeImpl) setOffsetInBinary(v asm.NodeOffsetInBinary) {
-	n.offsetInBinary = &v
+	return n.offsetInBinary
 }
 
 // String implements fmt.Stringer.
@@ -202,14 +204,10 @@ func (o operandTypes) String() string {
 
 // assemblerImpl implements Assembler.
 type assemblerImpl struct {
-	enablePadding bool
-
 	asm.BaseAssemblerImpl
-
-	root, current *nodeImpl
-
-	buf *bytes.Buffer
-
+	enablePadding   bool
+	root, current   *nodeImpl
+	buf             *bytes.Buffer
 	forceReAssemble bool
 }
 
@@ -221,7 +219,6 @@ func newAssemblerImpl() *assemblerImpl {
 func (a *assemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
 	n := &nodeImpl{
 		instruction: instruction,
-		prev:        nil,
 		next:        nil,
 		types:       types,
 		jumpOrigins: map[*nodeImpl]struct{}{},
@@ -239,7 +236,6 @@ func (a *assemblerImpl) addNode(node *nodeImpl) {
 	} else {
 		parent := a.current
 		parent.next = node
-		node.prev = parent
 		a.current = node
 	}
 
@@ -286,8 +282,10 @@ func (a *assemblerImpl) encodeNode(n *nodeImpl) (err error) {
 
 // Assemble implements asm.AssemblerBase
 func (a *assemblerImpl) Assemble() ([]byte, error) {
-	a.prepareNodesForAssemble()
+	a.initializeNodesForEncoding()
 
+	// Continue encoding until we are not forced to re-assemble which happens when
+	// an short relative jump ends up the offset larger than 8-bit length.
 	for {
 		err := a.encode()
 		if err != nil {
@@ -297,7 +295,10 @@ func (a *assemblerImpl) Assemble() ([]byte, error) {
 		if !a.forceReAssemble {
 			break
 		} else {
+			// We reset the length of buffer but don't delete the underlying slice since
+			// the binary size will roughly the same after reassemble.
 			a.buf.Reset()
+			// Reset the re-assemble flag in order to avoid the infinite loop!
 			a.forceReAssemble = false
 		}
 	}
@@ -311,48 +312,59 @@ func (a *assemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-func (a *assemblerImpl) prepareNodesForAssemble() {
+// initializeNodesForEncoding initializes nodeImpl.Flag and determine all the jumps
+// are forward or backward jump.
+func (a *assemblerImpl) initializeNodesForEncoding() {
 	var count int
 	for n := a.root; n != nil; n = n.next {
 		count++
-		n.jumpFlag |= jumpFlagNone
+		n.flag |= nodeFlagInitializedForEncoding
 		if target := n.jumpTarget; target != nil {
-			if target.jumpFlag != 0 {
+			if target.isInitializedForEncoding() {
 				// This means the target exists behind.
-				n.jumpFlag |= jumpFlagBackward
+				n.flag |= nodeFlagBackwardJump
 			} else {
-				n.jumpFlag |= jumpFlagShortForward
+				// Otherwise, this is forward jump.
+				// We start with assuming that the jump can be short (8-bit displacement).
+				// If it doens't fit, we change this flag in resolveRelativeForwardJump.
+				n.flag |= nodeFlagShortForwardJump
 			}
 		}
 	}
+
+	// Roughly allocate the buffer by assuming an instruction has 5-bytes length on average.
 	a.buf.Grow(count * 5)
 }
 
-func (a *assemblerImpl) encode() error {
+func (a *assemblerImpl) encode() (err error) {
 	for n := a.root; n != nil; n = n.next {
 		// If an instruction needs NOP padding, we do so before encoding it.
 		// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
 		if a.enablePadding {
-			if err := a.maybeNOPPadding(n); err != nil {
-				return err
+			if err = a.maybeNOPPadding(n); err != nil {
+				return
 			}
 		}
 
 		// After the padding, we can finalize the offset of this instruction in the binary.
-		n.setOffsetInBinary(uint64(a.buf.Len()))
+		n.offsetInBinary = (uint64(a.buf.Len()))
 
 		if err := a.encodeNode(n); err != nil {
 			return fmt.Errorf("%w: %v", err, n)
 		}
 
-		err := a.resolveForwardRelativeJumps(n)
+		err = a.resolveForwardRelativeJumps(n)
 		if err != nil {
-			return fmt.Errorf("invalid relative forward jumps: %w", err)
+			err = fmt.Errorf("invalid relative forward jumps: %w", err)
+			break
 		}
 	}
-	return nil
+	return
 }
 
+// maybeNOPpadding maybe appends NOP instructions before the node `n`.
+// This is necessary to avoid Intel's jump erratum:
+// https://www.intel.com/content/dam/support/us/en/documents/processors/mitigations-jump-conditional-code-erratum.pdf
 func (a *assemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	var instructionLen int32
 
@@ -366,7 +378,7 @@ func (a *assemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 		a.buf = bytes.NewBuffer(nil)
 
 		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		n.setOffsetInBinary(uint64(saved.Len()))
+		n.offsetInBinary = uint64(saved.Len())
 
 		// Encode the node and get the instruction length.
 		if err = a.encodeNode(n); err != nil {
@@ -401,6 +413,9 @@ func (a *assemblerImpl) maybeNOPPadding(n *nodeImpl) (err error) {
 	return
 }
 
+// fusedInstructionLength returns the length of "macro fused instruction" if the
+// instruction sequence starting from `n` can be fused by processor. Otherwise,
+// returns zero.
 func (a *assemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err error) {
 	// Find the next non-NOP instruction.
 	next := n.next
@@ -458,7 +473,7 @@ func (a *assemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 
 	for _, fused := range []*nodeImpl{n, next} {
 		// Assign the temporary offset which may or may not be correct depending on the padding decision.
-		fused.setOffsetInBinary(savedLen + uint64(a.buf.Len()))
+		fused.offsetInBinary = savedLen + uint64(a.buf.Len())
 
 		// Encode the node into the temporary buffer.
 		err = a.encodeNode(fused)
@@ -820,7 +835,7 @@ func (a *assemblerImpl) resolveForwardRelativeJumps(target *nodeImpl) (err error
 				// From the next reAssemble phases, this forward jump will be encoded long jump and
 				// allocate 32-bit offset bytes by default. This means that this `origin` node
 				// will always enter the "long jump offset encoding" block below
-				origin.jumpFlag ^= jumpFlagShortForward
+				origin.flag ^= nodeFlagShortForwardJump
 			} else {
 				a.buf.Bytes()[origin.OffsetInBinary()+uint64(instructionLen)-1] = byte(offset)
 			}
@@ -1387,7 +1402,7 @@ func (a *assemblerImpl) encodeReadInstructionAddress(n *nodeImpl) error {
 			return errors.New("BUG: too large offset for LEAQ instruction")
 		}
 
-		binary.LittleEndian.PutUint32(code[*n.offsetInBinary+3:], uint32(int32(offset)))
+		binary.LittleEndian.PutUint32(code[n.OffsetInBinary()+3:], uint32(int32(offset)))
 		return nil
 	})
 
