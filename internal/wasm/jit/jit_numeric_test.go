@@ -279,107 +279,120 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 						{1 << 63, 1}, {1, 1 << 63}, {1 << 63, 1 << 63},
 					} {
 						x1, x2 := values[0], values[1]
-						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
-							env := newJITEnvironment()
-							compiler := env.requireNewCompiler(t, newCompiler, nil)
-							err := compiler.compilePreamble()
-							require.NoError(t, err)
+						for _, x1OnRegister := range []bool{
+							true, false,
+						} {
+							x1OnRegister := x1OnRegister
+							t.Run(fmt.Sprintf("x1=0x%x(on_register=%v),x2=0x%x", x1, x1OnRegister, x2), func(t *testing.T) {
+								env := newJITEnvironment()
+								compiler := env.requireNewCompiler(t, newCompiler, nil)
+								err := compiler.compilePreamble()
+								require.NoError(t, err)
 
-							// Emit consts operands.
-							for _, v := range []uint64{x1, x2} {
+								// Emit consts operands.
+								var x1Location *valueLocation
 								switch unsignedInt {
 								case wazeroir.UnsignedInt32:
-									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(x1)})
+									require.NoError(t, err)
+									x1Location = compiler.valueLocationStack().peek()
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
+									require.NoError(t, err)
 								case wazeroir.UnsignedInt64:
-									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1})
+									require.NoError(t, err)
+									x1Location = compiler.valueLocationStack().peek()
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
+									require.NoError(t, err)
+								}
+
+								if !x1OnRegister {
+									compiler.compileReleaseRegisterToStack(x1Location)
+								}
+
+								// At this point, two values exist.
+								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+
+								// Emit the operation.
+								switch kind {
+								case wazeroir.OperationKindAnd:
+									err = compiler.compileAnd(&wazeroir.OperationAnd{Type: unsignedInt})
+								case wazeroir.OperationKindOr:
+									err = compiler.compileOr(&wazeroir.OperationOr{Type: unsignedInt})
+								case wazeroir.OperationKindXor:
+									err = compiler.compileXor(&wazeroir.OperationXor{Type: unsignedInt})
+								case wazeroir.OperationKindShl:
+									err = compiler.compileShl(&wazeroir.OperationShl{Type: unsignedInt})
+								case wazeroir.OperationKindRotl:
+									err = compiler.compileRotl(&wazeroir.OperationRotl{Type: unsignedInt})
+								case wazeroir.OperationKindRotr:
+									err = compiler.compileRotr(&wazeroir.OperationRotr{Type: unsignedInt})
 								}
 								require.NoError(t, err)
-							}
 
-							// At this point, two values exist.
-							require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								// We consumed two values, but push the result back.
+								require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
+								resultLocation := compiler.valueLocationStack().peek()
+								// Also, the result must have an appropriate register type.
+								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 
-							// Emit the operation.
-							switch kind {
-							case wazeroir.OperationKindAnd:
-								err = compiler.compileAnd(&wazeroir.OperationAnd{Type: unsignedInt})
-							case wazeroir.OperationKindOr:
-								err = compiler.compileOr(&wazeroir.OperationOr{Type: unsignedInt})
-							case wazeroir.OperationKindXor:
-								err = compiler.compileXor(&wazeroir.OperationXor{Type: unsignedInt})
-							case wazeroir.OperationKindShl:
-								err = compiler.compileShl(&wazeroir.OperationShl{Type: unsignedInt})
-							case wazeroir.OperationKindRotl:
-								err = compiler.compileRotl(&wazeroir.OperationRotl{Type: unsignedInt})
-							case wazeroir.OperationKindRotr:
-								err = compiler.compileRotr(&wazeroir.OperationRotr{Type: unsignedInt})
-							}
-							require.NoError(t, err)
+								err = compiler.compileReturnFunction()
+								require.NoError(t, err)
 
-							// We consumed two values, but push the result back.
-							require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-							resultLocation := compiler.valueLocationStack().peek()
-							// Plus the result must be located on a register.
-							require.True(t, resultLocation.onRegister())
-							// Also, the result must have an appropriate register type.
-							require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+								// Compile and execute the code under test.
+								code, _, _, err := compiler.compile()
+								require.NoError(t, err)
+								env.exec(code)
 
-							err = compiler.compileReturnFunction()
-							require.NoError(t, err)
+								// Check the stack.
+								require.Equal(t, uint64(1), env.stackPointer())
 
-							// Compile and execute the code under test.
-							code, _, _, err := compiler.compile()
-							require.NoError(t, err)
-							env.exec(code)
-
-							// Check the stack.
-							require.Equal(t, uint64(1), env.stackPointer())
-
-							switch kind {
-							case wazeroir.OperationKindAnd:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, uint32(x1)&uint32(x2), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, x1&x2, env.stackTopAsUint64())
+								switch kind {
+								case wazeroir.OperationKindAnd:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, uint32(x1)&uint32(x2), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, x1&x2, env.stackTopAsUint64())
+									}
+								case wazeroir.OperationKindOr:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, uint32(x1)|uint32(x2), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, x1|x2, env.stackTopAsUint64())
+									}
+								case wazeroir.OperationKindXor:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, uint32(x1)^uint32(x2), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, x1^x2, env.stackTopAsUint64())
+									}
+								case wazeroir.OperationKindShl:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, uint32(x1)<<uint32(x2%32), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, x1<<(x2%64), env.stackTopAsUint64())
+									}
+								case wazeroir.OperationKindRotl:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, bits.RotateLeft32(uint32(x1), int(x2)), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, bits.RotateLeft64(x1, int(x2)), env.stackTopAsUint64())
+									}
+								case wazeroir.OperationKindRotr:
+									switch unsignedInt {
+									case wazeroir.UnsignedInt32:
+										require.Equal(t, bits.RotateLeft32(uint32(x1), -int(x2)), env.stackTopAsUint32())
+									case wazeroir.UnsignedInt64:
+										require.Equal(t, bits.RotateLeft64(x1, -int(x2)), env.stackTopAsUint64())
+									}
 								}
-							case wazeroir.OperationKindOr:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, uint32(x1)|uint32(x2), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, x1|x2, env.stackTopAsUint64())
-								}
-							case wazeroir.OperationKindXor:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, uint32(x1)^uint32(x2), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, x1^x2, env.stackTopAsUint64())
-								}
-							case wazeroir.OperationKindShl:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, uint32(x1)<<uint32(x2%32), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, x1<<(x2%64), env.stackTopAsUint64())
-								}
-							case wazeroir.OperationKindRotl:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, bits.RotateLeft32(uint32(x1), int(x2)), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, bits.RotateLeft64(x1, int(x2)), env.stackTopAsUint64())
-								}
-							case wazeroir.OperationKindRotr:
-								switch unsignedInt {
-								case wazeroir.UnsignedInt32:
-									require.Equal(t, bits.RotateLeft32(uint32(x1), -int(x2)), env.stackTopAsUint32())
-								case wazeroir.UnsignedInt64:
-									require.Equal(t, bits.RotateLeft64(x1, -int(x2)), env.stackTopAsUint64())
-								}
-							}
-						})
+							})
+						}
 					}
 				})
 			}

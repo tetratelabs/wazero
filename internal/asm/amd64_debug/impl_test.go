@@ -1036,7 +1036,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("shift", func(t *testing.T) {
 		regs := []asm.Register{amd64.REG_AX, amd64.REG_R8}
 		scales := []byte{1, 4}
-		for _, instruction := range []asm.Instruction{amd64.SARL, amd64.SARQ, amd64.SHLL, amd64.SHLQ, amd64.SHRL, amd64.SHRQ} {
+		for _, instruction := range []asm.Instruction{
+			amd64.SARL, amd64.SARQ, amd64.SHLL, amd64.SHLQ, amd64.SHRL, amd64.SHRQ,
+			amd64.ROLL, amd64.ROLQ, amd64.RORL, amd64.RORQ,
+		} {
 			for _, DstReg := range regs {
 				DstReg := DstReg
 				for _, offset := range []int64{
