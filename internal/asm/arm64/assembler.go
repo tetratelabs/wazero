@@ -1,11 +1,15 @@
-package arm64
+package asm_arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
+// NewAssembler implements asm.NewAssembler and is used by default.
+// This returns an implementation of Assembler interface via our homemade assembler implementation.
 func NewAssembler(temporaryRegister asm.Register) (Assembler, error) {
-	return newGolangAsmAssembler(temporaryRegister) // TODO: replace with our homemade assembler #233
+	g, err := golang_asm.NewGolangAsmBaseAssembler("arm64")
+	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 
 // Assembler is the interface for arm64 specific assembler.
@@ -20,13 +24,13 @@ type Assembler interface {
 	// CompileTwoRegistersToRegister adds an instruction where source operands consists of two registers `src1` and `src2`,
 	// and the destination is the register `dst`.
 	CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, dst asm.Register)
-	// CompileTwoRegistersToRegister adds an instruction where source operands consist of two registers `src1` and `src2`,
+	// CompileTwoRegisters adds an instruction where source operands consist of two registers `src1` and `src2`,
 	// and destination operands consist of `dst1` and `dst2` registers.
 	CompileTwoRegisters(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register)
-	// CompileTwoRegistersToRegister adds an instruction where source operands consist of two registers `src1` and `src2`,
+	// CompileTwoRegistersToNone adds an instruction where source operands consist of two registers `src1` and `src2`,
 	// and destination operand is unspecified.
 	CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register)
-	// CompileTwoRegistersToRegister adds an instruction where source operands consist of one register `src` and
+	// CompileRegisterAndConstSourceToNone adds an instruction where source operands consist of one register `src` and
 	// constant `srcConst`, and destination operand is unspecified.
 	CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue)
 	// CompileLeftShiftedRegisterToRegister adds an instruction where source operand is the "left shifted register"

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -28,7 +28,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			env := newJITEnvironment()
 
 			// Build code.
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -90,7 +90,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			env := newJITEnvironment()
 
 			// Build code.
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestCompiler_compilePick(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -256,7 +256,7 @@ func TestCompiler_compilePick(t *testing.T) {
 func TestCompiler_compileDrop(t *testing.T) {
 	t.Run("range nil", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -289,7 +289,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		liveNum := 5
 
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		env := newJITEnvironment()
 		ce := env.callEngine()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -442,7 +442,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 				x1Value, x2Value := vals[0], vals[1]
 				t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", vals[0], vals[1]), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t, nil)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
@@ -533,7 +533,7 @@ func TestCompiler_compileSwap(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 

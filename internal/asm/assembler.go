@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+type NewAssembler func(temporaryRegister Register) (AssemblerBase, error)
+
 // Register represents architecture-specific registers.
 type Register byte
 
@@ -19,7 +21,7 @@ type Instruction byte
 // register's states.
 type ConditionalRegisterState byte
 
-// NilRegister is the only architecture-independent conditinal state, and
+// ConditionalRegisterStateUnset is the only architecture-independent conditinal state, and
 // can be used to indicate that no conditional state is specificed.
 const ConditionalRegisterStateUnset ConditionalRegisterState = 0
 
@@ -50,6 +52,8 @@ type ConstantValue = int64
 // Note: some of them can be implemented in a arch-independent way, but not all can be
 // implemented as such. However, we intentionally put such arch-dependant methods here
 // in order to provide the common documentation interface.
+// Note: this interface is coupled and heavily influenced by golang-asm's API (i.e. Go's official assembler).
+// Therefore, we will do the refactoring after golang-asm removal.
 type AssemblerBase interface {
 	// Assemble produces the final binary for the assembled operations.
 	Assemble() ([]byte, error)
@@ -66,7 +70,7 @@ type AssemblerBase interface {
 	CompileStandAlone(instruction Instruction) Node
 	// CompileConstToRegister adds an instruction where source operand is `value` as constant and destination is `destinationReg` register.
 	CompileConstToRegister(instruction Instruction, value ConstantValue, destinationReg Register) Node
-	// CompileConstToRegister adds an instruction where source and destination operands are registers.
+	// CompileRegisterToRegister adds an instruction where source and destination operands are registers.
 	CompileRegisterToRegister(instruction Instruction, from, to Register)
 	// CompileMemoryToRegister adds an instruction where source operands is the memory address specified by `sourceBaseReg+sourceOffsetConst`
 	// and the destination is `destinationReg` register.
@@ -79,7 +83,7 @@ type AssemblerBase interface {
 	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,
 	// and returns the corresponding Node in the assembled linked list.
 	CompileJumpToMemory(jmpInstruction Instruction, baseReg Register, offset ConstantValue)
-	// CompileJumpToMemory adds jump-type instruction whose destination is the memory address specified by `reg` register.
+	// CompileJumpToRegister adds jump-type instruction whose destination is the memory address specified by `reg` register.
 	CompileJumpToRegister(jmpInstruction Instruction, reg Register)
 	// CompileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
 	// into destinationRegister. "target instruction" is specified by beforeTargetInst argument and
@@ -91,10 +95,10 @@ type AssemblerBase interface {
 	CompileReadInstructionAddress(destinationRegister Register, beforeAcquisitionTargetInstruction Instruction)
 }
 
-// binaryOffsetMaximum represents the limit on the size of jump table in bytes.
+// JumpTableMaximumOffset represents the limit on the size of jump table in bytes.
 // When users try loading an extremely large webassembly binary which contains a br_table
 // statement with approximately 4294967296 (2^32) targets. Realistically speaking, that kind of binary
 // could result in more than ten giga bytes of native JITed code where we have to care about
 // huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
 // current implementation.
-const jumpTableMaximumOffset = math.MaxUint32
+const JumpTableMaximumOffset = math.MaxUint32

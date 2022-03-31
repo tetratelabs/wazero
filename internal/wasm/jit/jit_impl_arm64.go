@@ -14,9 +14,9 @@ import (
 	"math"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
+	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -54,7 +54,7 @@ func newArm64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) 
 }
 
 var (
-	arm64UnreservedGeneralPurposeFloatRegisters = []asm.Register{
+	arm64UnreservedGeneralPurposeFloatRegisters = []asm.Register{ // nolint
 		arm64.REG_F0, arm64.REG_F1, arm64.REG_F2, arm64.REG_F3,
 		arm64.REG_F4, arm64.REG_F5, arm64.REG_F6, arm64.REG_F7, arm64.REG_F8,
 		arm64.REG_F9, arm64.REG_F10, arm64.REG_F11, arm64.REG_F12, arm64.REG_F13,
@@ -67,7 +67,7 @@ var (
 	// Note (see arm64 section in https://go.dev/doc/asm):
 	// * REG_R18 is reserved as a platform register, and we don't use it in JIT.
 	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in JIT.
-	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{
+	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
 		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
 		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R19,

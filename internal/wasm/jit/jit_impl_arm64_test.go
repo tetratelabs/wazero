@@ -1,22 +1,18 @@
 package jit
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
+	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
-	if runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -34,7 +30,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("too large offset", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -61,7 +57,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
+		compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -92,4 +88,24 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
+}
+
+// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
+	return c.locationStack
+}
+
+// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
+func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
+	return c.onStackPointerCeilDeterminedCallBack
+}
+
+// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+func (c *arm64Compiler) setStackPointerCeil(v uint64) {
+	c.stackPointerCeil = v
+}
+
+// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
+	c.locationStack = s
 }

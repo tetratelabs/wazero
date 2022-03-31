@@ -1,7 +1,7 @@
-package arm64
+package asm_arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/asm"
 )
 
 // Arm64-specific register states.

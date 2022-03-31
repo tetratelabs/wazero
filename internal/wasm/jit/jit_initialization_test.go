@@ -69,7 +69,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			env.moduleInstance = tc.moduleInstance
 			ce := env.callEngine()
 
-			compiler := env.requireNewCompiler(t, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
 			tc.moduleInstance.Engine = me
 
@@ -122,7 +122,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		for _, baseOffset := range []uint64{5, 10, 20} {
 			t.Run(fmt.Sprintf("%d", baseOffset), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t, nil)
+				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 				// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 				// TODO: delete after #233
@@ -153,7 +153,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 	})
 	t.Run("grow", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 		// TODO: delete after #233

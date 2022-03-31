@@ -12,10 +12,10 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/asm"
+	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -53,6 +53,10 @@ var (
 )
 
 func init() {
+	// TODO: what if these address exceed 32-bit address space?  Even though AMD says 2GB memory space
+	// should be enough for everyone, we might end up in these circum stances. We access these variables
+	// via 32-bit displacement which cannot accomodate 64-bit addresses.
+	// https://stackoverflow.com/questions/31853189/x86-64-assembly-why-displacement-not-64-bits
 	zero64BitAddress = uintptr(unsafe.Pointer(&zero64Bit))
 	minimum32BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum32BitSignedInt))
 	minimum64BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum64BitSignedInt))
@@ -80,7 +84,7 @@ var (
 )
 
 var (
-	amd64UnreservedGeneralPurposeFloatRegisters = []asm.Register{
+	amd64UnreservedGeneralPurposeFloatRegisters = []asm.Register{ // nolint
 		amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3,
 		amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
 		amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11,
@@ -91,7 +95,7 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.
-	amd64UnreservedGeneralPurposeIntRegisters = []asm.Register{
+	amd64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
 		amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX,
 		amd64.REG_SI, amd64.REG_DI, amd64.REG_R8, amd64.REG_R9,
 		amd64.REG_R10, amd64.REG_R11, amd64.REG_R12,
@@ -121,13 +125,9 @@ type amd64Compiler struct {
 }
 
 func newAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	b, err := amd64.NewAssembler()
-	if err != nil {
-		return nil, err
-	}
 	c := &amd64Compiler{
 		f:             f,
-		assembler:     b,
+		assembler:     amd64.NewAssemblerImpl(),
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,
@@ -232,7 +232,7 @@ func (c *amd64Compiler) pushFunctionParams() {
 	}
 }
 
-// compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
+// compileUnreachable implements compiler.compileUnreachable for the amd64 architecture.
 func (c *amd64Compiler) compileUnreachable() error {
 	c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 	return nil

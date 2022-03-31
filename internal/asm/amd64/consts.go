@@ -1,6 +1,6 @@
-package amd64
+package asm_amd64
 
-import "github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+import "github.com/tetratelabs/wazero/internal/asm"
 
 // AMD64-specific conditional register states.
 // https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
@@ -26,7 +26,8 @@ const (
 // Note: here we do not define all of amd64 instructions, and we only define the ones used by wazero's JIT compiler.
 // Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
-	ADDL asm.Instruction = iota
+	NONE asm.Instruction = iota
+	ADDL
 	ADDQ
 	ADDSD
 	ADDSS
@@ -158,7 +159,7 @@ const (
 	UD2
 )
 
-func instructionName(instruction asm.Instruction) string {
+func InstructionName(instruction asm.Instruction) string {
 	switch instruction {
 	case ADDL:
 		return "ADDL"
@@ -462,25 +463,9 @@ const (
 	REG_X13
 	REG_X14
 	REG_X15
-	REG_X16
-	REG_X17
-	REG_X18
-	REG_X19
-	REG_X20
-	REG_X21
-	REG_X22
-	REG_X23
-	REG_X24
-	REG_X25
-	REG_X26
-	REG_X27
-	REG_X28
-	REG_X29
-	REG_X30
-	REG_X31
 )
 
-func registerName(reg asm.Register) string {
+func RegisterName(reg asm.Register) string {
 	switch reg {
 	case REG_AX:
 		return "AX"
@@ -546,38 +531,7 @@ func registerName(reg asm.Register) string {
 		return "X14"
 	case REG_X15:
 		return "X15"
-	case REG_X16:
-		return "X16"
-	case REG_X17:
-		return "X17"
-	case REG_X18:
-		return "X18"
-	case REG_X19:
-		return "X19"
-	case REG_X20:
-		return "X20"
-	case REG_X21:
-		return "X21"
-	case REG_X22:
-		return "X22"
-	case REG_X23:
-		return "X23"
-	case REG_X24:
-		return "X24"
-	case REG_X25:
-		return "X25"
-	case REG_X26:
-		return "X26"
-	case REG_X27:
-		return "X27"
-	case REG_X28:
-		return "X28"
-	case REG_X29:
-		return "X29"
-	case REG_X30:
-		return "X30"
-	case REG_X31:
-		return "X31"
+	default:
+		return "nil"
 	}
-	return "Unknown"
 }
