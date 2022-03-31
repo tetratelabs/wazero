@@ -84,7 +84,7 @@ var (
 )
 
 var (
-	amd64UnreservedGeneralPurposeFloatRegisters = []asm.Register{
+	amd64UnreservedGeneralPurposeFloatRegisters = []asm.Register{ // nolint
 		amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3,
 		amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
 		amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11,
@@ -95,7 +95,7 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.
-	amd64UnreservedGeneralPurposeIntRegisters = []asm.Register{
+	amd64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
 		amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX,
 		amd64.REG_SI, amd64.REG_DI, amd64.REG_R8, amd64.REG_R9,
 		amd64.REG_R10, amd64.REG_R11, amd64.REG_R12,

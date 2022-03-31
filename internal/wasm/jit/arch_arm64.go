@@ -3,9 +3,6 @@ package jit
 import (
 	"math"
 
-	"github.com/twitchyliquid64/golang-asm/obj/arm64"
-
-	"github.com/tetratelabs/wazero/internal/asm"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -44,29 +41,6 @@ func newArchContextImpl() archContext {
 		minimum64BitSignedInt: math.MinInt64,
 	}
 }
-
-var (
-	arm64UnreservedGeneralPurposeFloatRegisters = []asm.Register{
-		arm64.REG_F0, arm64.REG_F1, arm64.REG_F2, arm64.REG_F3,
-		arm64.REG_F4, arm64.REG_F5, arm64.REG_F6, arm64.REG_F7, arm64.REG_F8,
-		arm64.REG_F9, arm64.REG_F10, arm64.REG_F11, arm64.REG_F12, arm64.REG_F13,
-		arm64.REG_F14, arm64.REG_F15, arm64.REG_F16, arm64.REG_F17, arm64.REG_F18,
-		arm64.REG_F19, arm64.REG_F20, arm64.REG_F21, arm64.REG_F22, arm64.REG_F23,
-		arm64.REG_F24, arm64.REG_F25, arm64.REG_F26, arm64.REG_F27, arm64.REG_F28,
-		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
-	}
-
-	// Note (see arm64 section in https://go.dev/doc/asm):
-	// * REG_R18 is reserved as a platform register, and we don't use it in JIT.
-	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in JIT.
-	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{
-		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
-		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
-		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R19,
-		arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23, arm64.REG_R24,
-		arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R29, arm64.REG_R30,
-	}
-)
 
 func init() {
 	unreservedGeneralPurposeIntRegisters = arm64UnreservedGeneralPurposeIntRegisters
