@@ -1,7 +1,7 @@
 package arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/asm"
 )
 
 func NewAssembler(temporaryRegister asm.Register) (Assembler, error) {

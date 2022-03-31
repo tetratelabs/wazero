@@ -7,7 +7,7 @@ import (
 
 	"github.com/twitchyliquid64/golang-asm/objabi"
 
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/asm"
 )
 
 // NewAssembler returns an Assembler instance from the enabled Assembler implementation.

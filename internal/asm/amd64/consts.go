@@ -1,6 +1,6 @@
 package amd64
 
-import "github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+import "github.com/tetratelabs/wazero/internal/asm"
 
 // AMD64-specific conditional register states.
 // https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
