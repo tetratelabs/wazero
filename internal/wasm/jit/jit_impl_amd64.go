@@ -232,7 +232,7 @@ func (c *amd64Compiler) pushFunctionParams() {
 	}
 }
 
-// compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
+// compileUnreachable implements compiler.compileUnreachable for the amd64 architecture.
 func (c *amd64Compiler) compileUnreachable() error {
 	c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 	return nil
