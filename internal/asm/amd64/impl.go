@@ -1300,17 +1300,21 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		opcode = []byte{0xd3}
 		isShiftInstruction = true
 	case ROLL:
+		// https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 		opcode = []byte{0xd3}
 		isShiftInstruction = true
 	case ROLQ:
+		// https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 		RexPrefix |= RexPrefixW
 		opcode = []byte{0xd3}
 		isShiftInstruction = true
 	case RORL:
-		isShiftInstruction = true
+		// https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 		modRM |= 0b00_001_000
 		opcode = []byte{0xd3}
+		isShiftInstruction = true
 	case RORQ:
+		// https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 		RexPrefix |= RexPrefixW
 		opcode = []byte{0xd3}
 		modRM |= 0b00_001_000
