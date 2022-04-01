@@ -25,7 +25,7 @@ spectest_testdata_dir := tests/spectest/testdata
 spec_version := wg-1.0
 
 .PHONY: build.spectest
-build.spectest:
+build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags might drift as they include more. See WebAssembly/wabt#1878
 	@rm -rf $(spectest_testdata_dir) && mkdir -p $(spectest_testdata_dir)
 	@cd $(spectest_testdata_dir) \
 		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core?ref=$(spec_version)' | jq -r '.[]| .download_url' | grep -E ".wast"| xargs wget -q
@@ -35,7 +35,14 @@ build.spectest:
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\s\([a-z0-9.\s+-:]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
-		wast2json --debug-names $$f; \
+		wast2json \
+			--disable-saturating-float-to-int \
+			--disable-sign-extension \
+			--disable-simd \
+			--disable-multi-value \
+			--disable-bulk-memory \
+			--disable-reference-types \
+			--debug-names $$f; \
 	done
 
 .PHONY: test

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 )
 
@@ -8,7 +9,8 @@ import (
 func main() {
 	// Start at arg[1] because args[0] is the program name.
 	for i := 1; i < len(os.Args); i++ {
-		bytes, err := os.ReadFile(os.Args[i])
+		// Intentionally use ioutil.ReadFile instead of os.ReadFile for TinyGo.
+		bytes, err := ioutil.ReadFile(os.Args[i])
 		if err != nil {
 			os.Exit(1)
 		}
