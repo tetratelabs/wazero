@@ -6,19 +6,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // wasiAPI simulates the real WASI api
 type wasiAPI struct {
 }
 
-func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
+func (a *wasiAPI) ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) api.Errno {
 	return 0
 }
 
-func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+func (a *wasiAPI) FdWrite(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) api.Errno {
 	return 0
 }
 
@@ -47,7 +46,7 @@ func TestNewHostModule(t *testing.T) {
 		},
 		{
 			name:       "two struct funcs",
-			moduleName: wasi.ModuleSnapshotPreview1,
+			moduleName: "wasi_snapshot_preview1",
 			goFuncs: map[string]interface{}{
 				functionArgsSizesGet: a.ArgsSizesGet,
 				functionFdWrite:      a.FdWrite,
@@ -64,7 +63,7 @@ func TestNewHostModule(t *testing.T) {
 					"fd_write":       {Name: "fd_write", Type: ExternTypeFunc, Index: 1},
 				},
 				NameSection: &NameSection{
-					ModuleName: wasi.ModuleSnapshotPreview1,
+					ModuleName: "wasi_snapshot_preview1",
 					FunctionNames: NameMap{
 						{Index: 0, Name: "args_sizes_get"},
 						{Index: 1, Name: "fd_write"},
@@ -116,7 +115,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 
 func TestModule_validateHostFunctions(t *testing.T) {
 	notFn := reflect.ValueOf(t)
-	fn := reflect.ValueOf(func(wasm.Module) {})
+	fn := reflect.ValueOf(func(api.Module) {})
 
 	t.Run("ok", func(t *testing.T) {
 		m := Module{

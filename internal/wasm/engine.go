@@ -23,7 +23,7 @@ type ModuleEngine interface {
 
 	// Call invokes a function instance f with given parameters.
 	// Returns the results from the function.
-	// The ctx's context.Context will be the outer-most ancestor of the argument to wasm.Function.
+	// The ctx's context.Context will be the outer-most ancestor of the argument to api.Function.
 	Call(ctx *ModuleContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
 
 	// CloseWithExitCode releases the resources allocated by functions in this ModuleEngine and ensures new calls (Call)

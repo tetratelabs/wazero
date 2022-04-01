@@ -1,14 +1,7 @@
-// Package wasi includes constants and interfaces used by both public and internal APIs.
-package wasi
+package api
 
 import (
 	"fmt"
-)
-
-const (
-	// ModuleSnapshotPreview1 is the module name WASI functions are exported into
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-	ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 )
 
 // Errno are the error codes returned by WASI functions.

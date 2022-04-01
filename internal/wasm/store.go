@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"sync"
 
+	publicwasm "github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type (

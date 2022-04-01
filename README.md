@@ -49,8 +49,8 @@ For example, here's how you can allow WebAssembly modules to read
 wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 defer wasi.Close()
 
-sysConfig := wazero.NewSysConfig().WithFS(os.DirFS("/work/home"))
-module, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
+config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
+module, err := r.InstantiateModule(binary, config)
 defer module.Close()
 ...
 ```

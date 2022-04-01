@@ -6,13 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // TestNewModuleBuilder_Build only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
 func TestNewModuleBuilder_Build(t *testing.T) {
-	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
+	i32, i64 := api.ValueTypeI32, api.ValueTypeI64
 
 	uint32_uint32 := func(uint32) uint32 {
 		return 0
@@ -49,7 +49,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &internalwasm.Module{
 				TypeSection: []*internalwasm.FunctionType{
-					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection:     []internalwasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
@@ -68,7 +68,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &internalwasm.Module{
 				TypeSection: []*internalwasm.FunctionType{
-					{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection:     []internalwasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
@@ -88,8 +88,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &internalwasm.Module{
 				TypeSection: []*internalwasm.FunctionType{
-					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection:     []internalwasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
@@ -112,8 +112,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &internalwasm.Module{
 				TypeSection: []*internalwasm.FunctionType{
-					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection:     []internalwasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
@@ -137,8 +137,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &internalwasm.Module{
 				TypeSection: []*internalwasm.FunctionType{
-					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection:     []internalwasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},

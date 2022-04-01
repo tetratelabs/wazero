@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/api"
 )
 
 type errno uint32
@@ -157,7 +157,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 		{
 			name:        "multiple wasm.Module",
 			input:       func(publicwasm.Module, uint64, publicwasm.Module) error { return nil },
-			expectedErr: "param[2] is a wasm.Module, which may be defined only once as param[0]",
+			expectedErr: "param[2] is a api.Module, which may be defined only once as param[0]",
 		},
 	}
 

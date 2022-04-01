@@ -222,7 +222,7 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (
 	}
 }
 
-// parseResult parses the wasm.ValueType in the "result" field and returns onType to finish the type.
+// parseResult parses the api.ValueType in the "result" field and returns onType to finish the type.
 func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenKeyword: // Ex. i32

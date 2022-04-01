@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	publicwasm "github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
@@ -795,7 +795,7 @@ func SectionIDName(sectionID SectionID) string {
 	return "unknown"
 }
 
-// ValueType is an alias of wasm.ValueType defined to simplify imports.
+// ValueType is an alias of api.ValueType defined to simplify imports.
 type ValueType = publicwasm.ValueType
 
 const (
@@ -805,7 +805,7 @@ const (
 	ValueTypeF64 = publicwasm.ValueTypeF64
 )
 
-// ValueTypeName is an alias of wasm.ValueTypeName defined to simplify imports.
+// ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
 	return publicwasm.ValueTypeName(t)
 }

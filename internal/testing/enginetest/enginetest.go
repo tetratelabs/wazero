@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	publicwasm "github.com/tetratelabs/wazero/api"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type EngineTester interface {

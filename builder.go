@@ -1,8 +1,8 @@
 package wazero
 
 import (
+	"github.com/tetratelabs/wazero/api"
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // ModuleBuilder is a way to define a WebAssembly 1.0 (20191205) in Go.
@@ -25,7 +25,7 @@ import (
 // Note: Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
 type ModuleBuilder interface {
 
-	// ExportFunction adds a function written in Go, which a WebAssembly Module can import.
+	// ExportFunction adds a function written in Go, which a WebAssembly Binary can import.
 	//
 	// * name - the name to export. Ex "random_get"
 	// * goFunc - the `func` to export.
@@ -39,7 +39,7 @@ type ModuleBuilder interface {
 	//		return x + y
 	//	}
 	//
-	// Host functions may also have an initial parameter (param[0]) of type context.Context or wasm.Module.
+	// Host functions may also have an initial parameter (param[0]) of type context.Context or api.Module.
 	//
 	// Ex. This uses a Go Context:
 	//
@@ -48,13 +48,13 @@ type ModuleBuilder interface {
 	//		return x + y + ctx.Value(extraKey).(uint32)
 	//	}
 	//
-	// The most sophisticated context is wasm.Module, which allows access to the Go context, but also
+	// The most sophisticated context is api.Module, which allows access to the Go context, but also
 	// allows writing to memory. This is important because there are only numeric types in Wasm. The only way to share other
 	// data is via writing memory and sharing offsets.
 	//
 	// Ex. This reads the parameters from!
 	//
-	//	addInts := func(ctx wasm.Module, offset uint32) uint32 {
+	//	addInts := func(ctx api.Module, offset uint32) uint32 {
 	//		x, _ := ctx.Memory().ReadUint32Le(offset)
 	//		y, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
 	//		return x + y
@@ -67,13 +67,13 @@ type ModuleBuilder interface {
 	// ExportFunctions is a convenience that calls ExportFunction for each key/value in the provided map.
 	ExportFunctions(nameToGoFunc map[string]interface{}) ModuleBuilder
 
-	// Build returns a Module to instantiate, or returns an error if any of the configuration is invalid.
-	Build() (*Module, error)
+	// Build returns a Binary to instantiate, or returns an error if any of the configuration is invalid.
+	Build() (*Binary, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
-	Instantiate() (wasm.Module, error)
+	Instantiate() (api.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder
@@ -107,20 +107,20 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 }
 
 // Build implements ModuleBuilder.Build
-func (b *moduleBuilder) Build() (*Module, error) {
+func (b *moduleBuilder) Build() (*Binary, error) {
 	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
 	if module, err := internalwasm.NewHostModule(b.moduleName, b.nameToGoFunc); err != nil {
 		return nil, err
 	} else {
-		return &Module{name: b.moduleName, module: module}, nil
+		return &Binary{module: module}, nil
 	}
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
-func (b *moduleBuilder) Instantiate() (wasm.Module, error) {
+func (b *moduleBuilder) Instantiate() (api.Module, error) {
 	if module, err := b.Build(); err != nil {
 		return nil, err
 	} else {
-		return b.r.InstantiateModule(module)
+		return b.r.InstantiateModuleWithConfig(module, NewModuleConfig().WithName(b.moduleName))
 	}
 }

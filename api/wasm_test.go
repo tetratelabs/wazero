@@ -1,4 +1,4 @@
-package wasm
+package api
 
 import (
 	"fmt"
@@ -40,11 +40,11 @@ func TestEncodeDecodeF32(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			encoded := EncodeF32(v)
-			decoded := DecodeF32(encoded)
-			if math.IsNaN(float64(decoded)) { // NaN cannot be compared with themselves, so we have to use IsNaN
-				require.True(t, math.IsNaN(float64(decoded)))
+			binary := DecodeF32(encoded)
+			if math.IsNaN(float64(binary)) { // NaN cannot be compared with themselves, so we have to use IsNaN
+				require.True(t, math.IsNaN(float64(binary)))
 			} else {
-				require.Equal(t, v, decoded)
+				require.Equal(t, v, binary)
 			}
 		})
 	}
@@ -64,11 +64,11 @@ func TestEncodeDecodeF64(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			encoded := EncodeF64(v)
-			decoded := DecodeF64(encoded)
-			if math.IsNaN(decoded) { // cannot use require.Equal as NaN by definition doesn't equal itself
-				require.True(t, math.IsNaN(decoded))
+			binary := DecodeF64(encoded)
+			if math.IsNaN(binary) { // cannot use require.Equal as NaN by definition doesn't equal itself
+				require.True(t, math.IsNaN(binary))
 			} else {
-				require.Equal(t, v, decoded)
+				require.Equal(t, v, binary)
 			}
 		})
 	}

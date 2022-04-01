@@ -3,27 +3,27 @@ package internalwasm
 import (
 	"fmt"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/api"
 )
 
 type mutableGlobal struct {
 	g *GlobalInstance
 }
 
-// compile-time check to ensure mutableGlobal is a wasm.Global
+// compile-time check to ensure mutableGlobal is a api.Global
 var _ publicwasm.Global = &mutableGlobal{}
 
-// Type implements wasm.Global Type
+// Type implements api.Global Type
 func (g *mutableGlobal) Type() publicwasm.ValueType {
 	return g.g.Type.ValType
 }
 
-// Get implements wasm.Global Get
+// Get implements api.Global Get
 func (g *mutableGlobal) Get() uint64 {
 	return g.g.Val
 }
 
-// Set implements wasm.MutableGlobal Set
+// Set implements api.MutableGlobal Set
 func (g *mutableGlobal) Set(v uint64) {
 	g.g.Val = v
 }
@@ -44,15 +44,15 @@ func (g *mutableGlobal) String() string {
 
 type globalI32 uint64
 
-// compile-time check to ensure globalI32 is a wasm.Global
+// compile-time check to ensure globalI32 is a api.Global
 var _ publicwasm.Global = globalI32(0)
 
-// Type implements wasm.Global Type
+// Type implements api.Global Type
 func (g globalI32) Type() publicwasm.ValueType {
 	return ValueTypeI32
 }
 
-// Get implements wasm.Global Get
+// Get implements api.Global Get
 func (g globalI32) Get() uint64 {
 	return uint64(g)
 }
@@ -67,12 +67,12 @@ type globalI64 uint64
 // compile-time check to ensure globalI64 is a publicwasm.Global
 var _ publicwasm.Global = globalI64(0)
 
-// Type implements wasm.Global Type
+// Type implements api.Global Type
 func (g globalI64) Type() publicwasm.ValueType {
 	return ValueTypeI64
 }
 
-// Get implements wasm.Global Get
+// Get implements api.Global Get
 func (g globalI64) Get() uint64 {
 	return uint64(g)
 }
@@ -87,12 +87,12 @@ type globalF32 uint64
 // compile-time check to ensure globalF32 is a publicwasm.Global
 var _ publicwasm.Global = globalF32(0)
 
-// Type implements wasm.Global Type
+// Type implements api.Global Type
 func (g globalF32) Type() publicwasm.ValueType {
 	return ValueTypeF32
 }
 
-// Get implements wasm.Global Get
+// Get implements api.Global Get
 func (g globalF32) Get() uint64 {
 	return uint64(g)
 }
@@ -107,12 +107,12 @@ type globalF64 uint64
 // compile-time check to ensure globalF64 is a publicwasm.Global
 var _ publicwasm.Global = globalF64(0)
 
-// Type implements wasm.Global Type
+// Type implements api.Global Type
 func (g globalF64) Type() publicwasm.ValueType {
 	return ValueTypeF64
 }
 
-// Get implements wasm.Global Get
+// Get implements api.Global Get
 func (g globalF64) Get() uint64 {
 	return uint64(g)
 }

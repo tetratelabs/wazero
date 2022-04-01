@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/api"
 )
 
 func TestGlobalTypes(t *testing.T) {

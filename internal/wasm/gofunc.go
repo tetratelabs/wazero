@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/api"
 )
 
 // FunctionKind identifies the type of function that can be called.

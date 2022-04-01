@@ -38,7 +38,7 @@ const (
 	callbackPositionEndField
 )
 
-// moduleParser parses a single wasm.Module from WebAssembly 1.0 (20191205) Text format.
+// moduleParser parses a single api.Module from WebAssembly 1.0 (20191205) Text format.
 //
 // Note: The indexNamespace of wasm.SectionIDMemory and wasm.SectionIDTable allow up-to-one item. For example, you
 // cannot define both one import and one module-defined memory, rather one or the other (or none). Even if these rules

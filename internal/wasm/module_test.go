@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 func TestFunctionType_String(t *testing.T) {
@@ -272,7 +272,7 @@ func TestValidateConstExpression(t *testing.T) {
 
 func TestModule_Validate_Errors(t *testing.T) {
 	zero := Index(0)
-	fn := reflect.ValueOf(func(wasm.Module) {})
+	fn := reflect.ValueOf(func(api.Module) {})
 
 	tests := []struct {
 		name        string

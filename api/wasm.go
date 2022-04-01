@@ -1,5 +1,5 @@
-// Package wasm includes constants and interfaces used by both public and internal APIs.
-package wasm
+// Package api includes constants and interfaces used by both end-users and internal implementations.
+package api
 
 import (
 	"context"
@@ -23,8 +23,8 @@ import (
 //
 // Ex. Given a Text Format type use (param f64) (result f64), conversion is necessary.
 //
-//	results, _ := fn(ctx, wasm.EncodeF64(input))
-//	result := wasm.DecodeF64(result[0])
+//	results, _ := fn(ctx, api.EncodeF64(input))
+//	result := api.DecodeF64(result[0])
 //
 // Note: This is a type alias as it is easier to encode and decode in the binary format.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-valtype
@@ -133,7 +133,7 @@ type Function interface {
 	//	--snip--
 	//
 	// To ensure context propagation in a host function body, pass the `ctx` parameter:
-	//	hostFunction := func(m wasm.Module, offset, byteCount uint32) uint32 {
+	//	hostFunction := func(m api.Module, offset, byteCount uint32) uint32 {
 	//		fn = m.ExportedFunction("__read")
 	//		results, err := fn(m, offset, byteCount)
 	//	--snip--
@@ -154,7 +154,7 @@ type Function interface {
 // safe cast to find out if the value can change. Ex.
 //
 //	offset := module.ExportedGlobal("memory.offset")
-//	if _, ok := offset.(wasm.MutableGlobal); ok {
+//	if _, ok := offset.(api.MutableGlobal); ok {
 //		// value can change
 //	} else {
 //		// value is constant

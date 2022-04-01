@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	publicwasm "github.com/tetratelabs/wazero/api"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
@@ -112,7 +112,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 }
 
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
-// Notably, this uses memory, which ensures wasm.Module is valid in both interpreter and JIT engines.
+// Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(nil publicwasm.Module, offset uint32, val uint64) uint32 {

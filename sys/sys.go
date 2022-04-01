@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ExitError is returned to a caller of wasm.Function still running when wasm.Module CloseWithExitCode was invoked.
+// ExitError is returned to a caller of api.Function still running when api.Module CloseWithExitCode was invoked.
 // ExitCode zero value means success, while any other value is an error.
 //
 // Here's an example of how to get the exit code:
@@ -16,7 +16,7 @@ import (
 //		}
 //	--snip--
 //
-// Note: While possible the reason of this was "proc_exit" from wasi.ModuleSnapshotPreview1, it could be from other host
+// Note: While possible the reason of this was "proc_exit" from "wasi_snapshot_preview1", it could be from other host
 // functions, for example an AssemblyScript's abort handler, or any arbitrary caller of CloseWithExitCode.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 // See https://www.assemblyscript.org/concepts.html#special-imports
@@ -29,7 +29,7 @@ func NewExitError(moduleName string, exitCode uint32) *ExitError {
 	return &ExitError{moduleName: moduleName, exitCode: exitCode}
 }
 
-// ModuleName is the wasm.Module that was closed.
+// ModuleName is the api.Module that was closed.
 func (e *ExitError) ModuleName() string {
 	return e.moduleName
 }

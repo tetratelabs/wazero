@@ -31,6 +31,7 @@ const (
 // Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	// Integer registers.
+
 	REG_R0 asm.Register = asm.NilRegister + 1 + iota
 	REG_R1
 	REG_R2
@@ -65,6 +66,7 @@ const (
 	REGZERO
 
 	// Scalar floating point registers.
+
 	REG_F0
 	REG_F1
 	REG_F2
@@ -99,6 +101,7 @@ const (
 	REG_F31
 
 	// Floating point status register.
+
 	REG_FPSR
 )
 

@@ -124,18 +124,18 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 	}
 }
 
-func TestSysConfig_toSysContext(t *testing.T) {
+func TestModuleConfig_toSysContext(t *testing.T) {
 	testFS := fstest.MapFS{}
 	testFS2 := fstest.MapFS{}
 
 	tests := []struct {
 		name     string
-		input    *SysConfig
+		input    *ModuleConfig
 		expected *internalwasm.SysContext
 	}{
 		{
 			name:  "empty",
-			input: NewSysConfig(),
+			input: NewModuleConfig(),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -148,7 +148,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithArgs",
-			input: NewSysConfig().WithArgs("a", "bc"),
+			input: NewModuleConfig().WithArgs("a", "bc"),
 			expected: requireSysContext(t,
 				math.MaxUint32,      // max
 				[]string{"a", "bc"}, // args
@@ -161,7 +161,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithArgs - empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
-			input: NewSysConfig().WithArgs("", "bc"),
+			input: NewModuleConfig().WithArgs("", "bc"),
 			expected: requireSysContext(t,
 				math.MaxUint32,     // max
 				[]string{"", "bc"}, // args
@@ -174,7 +174,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithArgs - second call overwrites",
-			input: NewSysConfig().WithArgs("a", "bc").WithArgs("bc", "a"),
+			input: NewModuleConfig().WithArgs("a", "bc").WithArgs("bc", "a"),
 			expected: requireSysContext(t,
 				math.MaxUint32,      // max
 				[]string{"bc", "a"}, // args
@@ -187,7 +187,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithEnv",
-			input: NewSysConfig().WithEnv("a", "b"),
+			input: NewModuleConfig().WithEnv("a", "b"),
 			expected: requireSysContext(t,
 				math.MaxUint32,  // max
 				nil,             // args
@@ -200,7 +200,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithEnv - empty value",
-			input: NewSysConfig().WithEnv("a", ""),
+			input: NewModuleConfig().WithEnv("a", ""),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -213,7 +213,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithEnv twice",
-			input: NewSysConfig().WithEnv("a", "b").WithEnv("c", "de"),
+			input: NewModuleConfig().WithEnv("a", "b").WithEnv("c", "de"),
 			expected: requireSysContext(t,
 				math.MaxUint32,          // max
 				nil,                     // args
@@ -226,7 +226,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithEnv overwrites",
-			input: NewSysConfig().WithEnv("a", "bc").WithEnv("c", "de").WithEnv("a", "de"),
+			input: NewModuleConfig().WithEnv("a", "bc").WithEnv("c", "de").WithEnv("a", "de"),
 			expected: requireSysContext(t,
 				math.MaxUint32,           // max
 				nil,                      // args
@@ -240,7 +240,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 
 		{
 			name:  "WithEnv twice",
-			input: NewSysConfig().WithEnv("a", "b").WithEnv("c", "de"),
+			input: NewModuleConfig().WithEnv("a", "b").WithEnv("c", "de"),
 			expected: requireSysContext(t,
 				math.MaxUint32,          // max
 				nil,                     // args
@@ -253,7 +253,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithFS",
-			input: NewSysConfig().WithFS(testFS),
+			input: NewModuleConfig().WithFS(testFS),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -269,7 +269,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithFS - overwrites",
-			input: NewSysConfig().WithFS(testFS).WithFS(testFS2),
+			input: NewModuleConfig().WithFS(testFS).WithFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -285,7 +285,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithWorkDirFS",
-			input: NewSysConfig().WithWorkDirFS(testFS),
+			input: NewModuleConfig().WithWorkDirFS(testFS),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -300,7 +300,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithFS and WithWorkDirFS",
-			input: NewSysConfig().WithFS(testFS).WithWorkDirFS(testFS2),
+			input: NewModuleConfig().WithFS(testFS).WithWorkDirFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -316,7 +316,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithWorkDirFS and WithFS",
-			input: NewSysConfig().WithWorkDirFS(testFS).WithFS(testFS2),
+			input: NewModuleConfig().WithWorkDirFS(testFS).WithFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -342,45 +342,45 @@ func TestSysConfig_toSysContext(t *testing.T) {
 	}
 }
 
-func TestSysConfig_toSysContext_Errors(t *testing.T) {
+func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       *SysConfig
+		input       *ModuleConfig
 		expectedErr string
 	}{
 		{
 			name:        "WithArgs - arg contains NUL",
-			input:       NewSysConfig().WithArgs("", string([]byte{'a', 0})),
+			input:       NewModuleConfig().WithArgs("", string([]byte{'a', 0})),
 			expectedErr: "args invalid: contains NUL character",
 		},
 		{
 			name:        "WithEnv - key contains NUL",
-			input:       NewSysConfig().WithEnv(string([]byte{'a', 0}), "a"),
+			input:       NewModuleConfig().WithEnv(string([]byte{'a', 0}), "a"),
 			expectedErr: "environ invalid: contains NUL character",
 		},
 		{
 			name:        "WithEnv - value contains NUL",
-			input:       NewSysConfig().WithEnv("a", string([]byte{'a', 0})),
+			input:       NewModuleConfig().WithEnv("a", string([]byte{'a', 0})),
 			expectedErr: "environ invalid: contains NUL character",
 		},
 		{
 			name:        "WithEnv - key contains equals",
-			input:       NewSysConfig().WithEnv("a=", "a"),
+			input:       NewModuleConfig().WithEnv("a=", "a"),
 			expectedErr: "environ invalid: key contains '=' character",
 		},
 		{
 			name:        "WithEnv - empty key",
-			input:       NewSysConfig().WithEnv("", "a"),
+			input:       NewModuleConfig().WithEnv("", "a"),
 			expectedErr: "environ invalid: empty key",
 		},
 		{
 			name:        "WithFS - nil",
-			input:       NewSysConfig().WithFS(nil),
+			input:       NewModuleConfig().WithFS(nil),
 			expectedErr: "FS for / is nil",
 		},
 		{
 			name:        "WithWorkDirFS - nil",
-			input:       NewSysConfig().WithWorkDirFS(nil),
+			input:       NewModuleConfig().WithWorkDirFS(nil),
 			expectedErr: "FS for . is nil",
 		},
 	}

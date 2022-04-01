@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasi"
 )
 
 var testMem = &wasm.MemoryInstance{
@@ -33,7 +33,7 @@ func Test_EnvironGet(t *testing.T) {
 	testCtx := newCtx(make([]byte, 20), sys)
 	environGet := internalwasi.NewAPI().EnvironGet
 
-	require.Equal(t, wasi.ErrnoSuccess, environGet(testCtx, 11, 1))
+	require.Equal(t, api.ErrnoSuccess, environGet(testCtx, 11, 1))
 	require.Equal(t, testCtx.Memory(), testMem)
 }
 
@@ -56,7 +56,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 	environGet := internalwasi.NewAPI().EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if environGet(testCtx, 0, 4) != wasi.ErrnoSuccess {
+			if environGet(testCtx, 0, 4) != api.ErrnoSuccess {
 				b.Fatal()
 			}
 		}

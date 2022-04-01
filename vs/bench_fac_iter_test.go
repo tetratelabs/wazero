@@ -5,7 +5,6 @@
 package vs
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -17,7 +16,7 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // ensureJITFastest is overridable via ldflags. Ex.
@@ -156,7 +155,6 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	})
 }
 
-var ctx = context.Background()
 var facIterArgumentU64 = uint64(30)
 var facIterArgumentI64 = int64(facIterArgumentU64)
 
@@ -298,7 +296,7 @@ func goWasm3FacIterInvoke(b *testing.B) {
 	env.Destroy()
 }
 
-func newWazeroFacIterBench(config *wazero.RuntimeConfig) (wasm.Module, wasm.Function, error) {
+func newWazeroFacIterBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
 	r := wazero.NewRuntimeWithConfig(config)
 
 	m, err := r.InstantiateModuleFromSource(facWasm)

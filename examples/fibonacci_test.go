@@ -21,7 +21,7 @@ func Test_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	defer wasi.Close()
 
-	module, err := wazero.StartWASICommandFromSource(r, fibWasm)
+	module, err := r.InstantiateModuleFromSource(fibWasm)
 	require.NoError(t, err)
 	defer module.Close()
 

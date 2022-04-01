@@ -1,16 +1,18 @@
 package wazero
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestRuntime_DecodeModule(t *testing.T) {
@@ -52,9 +54,11 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			decoded, err := r.CompileModule(tc.source)
+			binary, err := r.CompileModule(tc.source)
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedName, decoded.name)
+			if tc.expectedName != "" {
+				require.Equal(t, tc.expectedName, binary.module.NameSection.ModuleName)
+			}
 		})
 	}
 }
@@ -115,28 +119,6 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 	}
 }
 
-// TestDecodedModule_WithName tests that we can pre-validate (cache) a module and instantiate it under different
-// names. This pattern is used in wapc-go.
-func TestDecodedModule_WithName(t *testing.T) {
-	r := NewRuntime()
-	base, err := r.CompileModule([]byte(`(module $0 (memory 1))`))
-	require.NoError(t, err)
-
-	require.Equal(t, "0", base.name)
-
-	// Use the same runtime to instantiate multiple modules
-	internal := r.(*runtime).store
-	m1, err := r.InstantiateModule(base.WithName("1"))
-	require.NoError(t, err)
-	require.Nil(t, internal.Module("0"))
-	require.Equal(t, internal.Module("1"), m1)
-
-	m2, err := r.InstantiateModule(base.WithName("2"))
-	require.NoError(t, err)
-	require.Nil(t, internal.Module("0"))
-	require.Equal(t, internal.Module("2"), m2)
-}
-
 // TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
 func TestModule_Memory(t *testing.T) {
 	tests := []struct {
@@ -161,11 +143,11 @@ func TestModule_Memory(t *testing.T) {
 
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
-			decoded, err := r.CompileModule([]byte(tc.wat))
+			binary, err := r.CompileModule([]byte(tc.wat))
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModule(decoded)
+			module, err := r.InstantiateModule(binary)
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -239,7 +221,7 @@ func TestModule_Global(t *testing.T) {
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above global
-			module, err := r.InstantiateModule(&Module{module: tc.module})
+			module, err := r.InstantiateModule(&Binary{module: tc.module})
 			require.NoError(t, err)
 
 			global := module.ExportedGlobal("global")
@@ -249,7 +231,7 @@ func TestModule_Global(t *testing.T) {
 			}
 			require.Equal(t, uint64(1), global.Get())
 
-			mutable, ok := global.(wasm.MutableGlobal)
+			mutable, ok := global.(api.MutableGlobal)
 			require.Equal(t, tc.expectedMutable, ok)
 			if ok {
 				mutable.Set(2)
@@ -292,18 +274,20 @@ func TestFunction_Context(t *testing.T) {
 			// Define a host function so that we can catch the context propagated from a module function call
 			functionName := "fn"
 			expectedResult := uint64(math.MaxUint64)
-			hostFn := func(ctx wasm.Module) uint64 {
+			hostFn := func(ctx api.Module) uint64 {
 				require.Equal(t, tc.expected, ctx.Context())
 				return expectedResult
 			}
-			source := requireImportAndExportFunction(t, r, hostFn, functionName)
+			source, closer := requireImportAndExportFunction(t, r, hostFn, functionName)
+			defer closer() // nolint
 
 			// Instantiate the module and get the export of the above hostFn
-			decoded, err := r.CompileModule(source)
+			binary, err := r.CompileModule(source)
 			require.NoError(t, err)
 
-			module, err := r.InstantiateModule(decoded)
+			module, err := r.InstantiateModuleWithConfig(binary, NewModuleConfig().WithName(t.Name()))
 			require.NoError(t, err)
+			defer module.Close()
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
 			results, err := module.ExportedFunction(functionName).Call(module.WithContext(tc.ctx))
@@ -321,7 +305,7 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 
 	// Define a function that will be set as the start function
 	var calledStart bool
-	start := func(ctx wasm.Module) {
+	start := func(ctx api.Module) {
 		calledStart = true
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
@@ -329,24 +313,126 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
-	decoded, err := r.CompileModule([]byte(`(module $runtime_test.go
+	binary, err := r.CompileModule([]byte(`(module $runtime_test.go
 	(import "env" "start" (func $start))
 	(start $start)
 )`))
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = r.InstantiateModule(decoded)
+	_, err = r.InstantiateModule(binary)
 	require.NoError(t, err)
 	require.True(t, calledStart)
 }
 
+// TestInstantiateModuleFromSource_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't export "_start".
+func TestInstantiateModuleFromSource_DoesntEnforce_Start(t *testing.T) {
+	r := NewRuntime()
+
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
+	require.NoError(t, err)
+	defer wasi.Close()
+
+	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi_test.go
+	(memory 1)
+	(export "memory" (memory 0))
+)`))
+	require.NoError(t, err)
+	require.NoError(t, mod.Close())
+}
+
+func TestInstantiateModuleFromSource_UsesRuntimeContext(t *testing.T) {
+	type key string
+	config := NewRuntimeConfig().WithContext(context.WithValue(context.Background(), key("wa"), "zero"))
+	r := NewRuntimeWithConfig(config)
+
+	// Define a function that will be re-exported as the WASI function: _start
+	var calledStart bool
+	start := func(ctx api.Module) {
+		calledStart = true
+		require.Equal(t, config.ctx, ctx.Context())
+	}
+
+	host, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
+	require.NoError(t, err)
+	defer host.Close()
+
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
+	require.NoError(t, err)
+	defer wasi.Close()
+
+	// Start the module as a WASI command. This will fail if the context wasn't as intended.
+	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi_test.go
+	(import "" "start" (func $start))
+	(memory 1)
+	(export "_start" (func $start))
+	(export "memory" (memory 0))
+)`))
+	require.NoError(t, err)
+	defer mod.Close()
+
+	require.True(t, calledStart)
+}
+
+// TestInstantiateModuleWithConfig_WithName tests that we can pre-validate (cache) a module and instantiate it under
+// different names. This pattern is used in wapc-go.
+func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
+	r := NewRuntime()
+	base, err := r.CompileModule([]byte(`(module $0 (memory 1))`))
+	require.NoError(t, err)
+
+	require.Equal(t, "0", base.module.NameSection.ModuleName)
+
+	// Use the same runtime to instantiate multiple modules
+	internal := r.(*runtime).store
+	m1, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("1"))
+	require.NoError(t, err)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("1"), m1)
+
+	m2, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("2"))
+	require.NoError(t, err)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("2"), m2)
+}
+
+// wasiArg was compiled from examples/testdata/wasi_arg.wat
+//go:embed examples/testdata/wasi_arg.wasm
+var wasiArg []byte
+
+func TestInstantiateModuleWithConfig(t *testing.T) {
+	r := NewRuntime()
+
+	stdout := bytes.NewBuffer(nil)
+
+	// Configure WASI to write stdout to a buffer, so that we can verify it later.
+	sys := NewModuleConfig().WithStdout(stdout)
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
+	require.NoError(t, err)
+	defer wasi.Close()
+
+	binary, err := r.CompileModule(wasiArg)
+	require.NoError(t, err)
+
+	// Re-use the same module many times.
+	for _, tc := range []string{"a", "b", "c"} {
+		mod, err := r.InstantiateModuleWithConfig(binary, sys.WithArgs(tc).WithName(tc))
+		require.NoError(t, err)
+
+		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).
+		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
+
+		stdout.Reset()
+		require.NoError(t, mod.Close())
+	}
+}
+
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.Module) uint64, functionName string) []byte {
-	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate()
+func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx api.Module) uint64, functionName string) ([]byte, func() error) {
+	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate()
 	require.NoError(t, err)
 
 	return []byte(fmt.Sprintf(
 		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
-	))
+	)), mod.Close
 }
