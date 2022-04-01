@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeUseParser {
@@ -21,7 +21,7 @@ func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeU
 // that is not a "result": pos clarifies this.
 type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
 
-// typeUseParser parses an inlined type from a field such internalwasm.ExternTypeFuncName and calls onTypeUse.
+// typeUseParser parses an inlined type from a field such wasm.ExternTypeFuncName and calls onTypeUse.
 //
 // Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
 //                           starts here --^           ^
@@ -63,7 +63,7 @@ type typeUseParser struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-uses%E2%91%A0
 	currentTypeIndex wasm.Index
 
-	// currentTypeIndexUnresolved is set when the currentTypeIndex was not in the wasm.Module TypeSection
+	// currentTypeIndexUnresolved is set when the currentTypeIndex was not in the api.Module TypeSection
 	currentTypeIndexUnresolved *lineCol
 
 	// currentInlinedType is reset on begin and complete onTypeUse
@@ -308,7 +308,7 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 	}
 }
 
-// parseResult parses the wasm.ValueType in the "result" field and returns onType to finish the type.
+// parseResult parses the api.ValueType in the "result" field and returns onType to finish the type.
 func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenKeyword: // Ex. i32

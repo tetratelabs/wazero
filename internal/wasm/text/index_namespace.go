@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// newIndexNamespace sectionElementCount parameter should be internalwasm.Module SectionElementCount unless testing.
+// newIndexNamespace sectionElementCount parameter should be wasm.Module SectionElementCount unless testing.
 func newIndexNamespace(sectionElementCount func(wasm.SectionID) uint32) *indexNamespace {
 	return &indexNamespace{sectionElementCount: sectionElementCount, idToIdx: map[string]wasm.Index{}}
 }
@@ -111,7 +111,7 @@ func (i *indexNamespace) recordOutOfRange(section wasm.SectionID, bodyOffset uin
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#indices%E2%91%A4
 type unresolvedIndex struct {
-	// section is the primary index of what's targeting this index (in the wasm.Module)
+	// section is the primary index of what's targeting this index (in the api.Module)
 	section wasm.SectionID
 
 	// idx is slice position in the section

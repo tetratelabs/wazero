@@ -78,7 +78,7 @@ func (n *NodeImpl) AssignJumpTarget(target asm.Node) {
 	n.JumpTarget = target.(*NodeImpl)
 }
 
-// AssignSourceConstant implements asm.Node.AssignSourceConstant.
+// AssignDestinationConstant implements asm.Node.AssignDestinationConstant.
 func (n *NodeImpl) AssignDestinationConstant(value asm.ConstantValue) {
 	n.DstConst = value
 }

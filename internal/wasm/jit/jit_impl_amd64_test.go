@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/asm"
 	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/asm/amd64_debug"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 

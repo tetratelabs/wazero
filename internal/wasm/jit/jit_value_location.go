@@ -113,15 +113,15 @@ func (v *valueLocationStack) String() string {
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
-func (s *valueLocationStack) clone() *valueLocationStack {
+func (v *valueLocationStack) clone() *valueLocationStack {
 	ret := &valueLocationStack{}
-	ret.sp = s.sp
+	ret.sp = v.sp
 	ret.usedRegisters = make(map[asm.Register]struct{}, len(ret.usedRegisters))
-	for r := range s.usedRegisters {
+	for r := range v.usedRegisters {
 		ret.markRegisterUsed(r)
 	}
-	ret.stack = make([]*valueLocation, len(s.stack))
-	for i, v := range s.stack {
+	ret.stack = make([]*valueLocation, len(v.stack))
+	for i, v := range v.stack {
 		ret.stack[i] = &valueLocation{
 			regType:             v.regType,
 			conditionalRegister: v.conditionalRegister,
@@ -129,13 +129,13 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 			register:            v.register,
 		}
 	}
-	ret.stackPointerCeil = s.stackPointerCeil
+	ret.stackPointerCeil = v.stackPointerCeil
 	return ret
 }
 
 // pushValueLocationOnRegister creates a new valueLocation with a given register and pushes onto
 // the location stack.
-func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc *valueLocation) {
+func (v *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
 
 	if isIntRegister(reg) {
@@ -143,67 +143,67 @@ func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc 
 	} else if isFloatRegister(reg) {
 		loc.setRegisterType(generalPurposeRegisterTypeFloat)
 	}
-	s.push(loc)
+	v.push(loc)
 	return
 }
 
 // pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
-func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
+func (v *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
 	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
-	s.push(loc)
+	v.push(loc)
 	return
 }
 
 // pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
 // and pushes onto the location stack.
-func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *valueLocation) {
+func (v *valueLocationStack) pushValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *valueLocation) {
 	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: state}
-	s.push(loc)
+	v.push(loc)
 	return
 }
 
 // push pushes to a given valueLocation onto the stack.
-func (s *valueLocationStack) push(loc *valueLocation) {
-	loc.stackPointer = s.sp
-	if s.sp >= uint64(len(s.stack)) {
+func (v *valueLocationStack) push(loc *valueLocation) {
+	loc.stackPointer = v.sp
+	if v.sp >= uint64(len(v.stack)) {
 		// This case we need to grow the stack capacity by appending the item,
 		// rather than indexing.
-		s.stack = append(s.stack, loc)
+		v.stack = append(v.stack, loc)
 	} else {
-		s.stack[s.sp] = loc
+		v.stack[v.sp] = loc
 	}
-	if s.sp > s.stackPointerCeil {
-		s.stackPointerCeil = s.sp
+	if v.sp > v.stackPointerCeil {
+		v.stackPointerCeil = v.sp
 	}
-	s.sp++
+	v.sp++
 }
 
-func (s *valueLocationStack) pop() (loc *valueLocation) {
-	s.sp--
-	loc = s.stack[s.sp]
+func (v *valueLocationStack) pop() (loc *valueLocation) {
+	v.sp--
+	loc = v.stack[v.sp]
 	return
 }
 
-func (s *valueLocationStack) peek() (loc *valueLocation) {
-	loc = s.stack[s.sp-1]
+func (v *valueLocationStack) peek() (loc *valueLocation) {
+	loc = v.stack[v.sp-1]
 	return
 }
 
-func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
-	s.markRegisterUnused(loc.register)
+func (v *valueLocationStack) releaseRegister(loc *valueLocation) {
+	v.markRegisterUnused(loc.register)
 	loc.register = asm.NilRegister
 	loc.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
-func (s *valueLocationStack) markRegisterUnused(regs ...asm.Register) {
+func (v *valueLocationStack) markRegisterUnused(regs ...asm.Register) {
 	for _, reg := range regs {
-		delete(s.usedRegisters, reg)
+		delete(v.usedRegisters, reg)
 	}
 }
 
-func (s *valueLocationStack) markRegisterUsed(regs ...asm.Register) {
+func (v *valueLocationStack) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
-		s.usedRegisters[reg] = struct{}{}
+		v.usedRegisters[reg] = struct{}{}
 	}
 }
 
@@ -225,7 +225,7 @@ func (tp generalPurposeRegisterType) String() (ret string) {
 }
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
-func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg asm.Register, found bool) {
+func (v *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
@@ -234,7 +234,7 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 	for _, candidate := range targetRegs {
-		if _, ok := s.usedRegisters[candidate]; ok {
+		if _, ok := v.usedRegisters[candidate]; ok {
 			continue
 		}
 		return candidate, true
@@ -242,7 +242,7 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	return 0, false
 }
 
-func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []asm.Register, found bool) {
+func (v *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
@@ -253,7 +253,7 @@ func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 
 	regs = make([]asm.Register, 0, num)
 	for _, candidate := range targetRegs {
-		if _, ok := s.usedRegisters[candidate]; ok {
+		if _, ok := v.usedRegisters[candidate]; ok {
 			continue
 		}
 		regs = append(regs, candidate)
@@ -267,9 +267,9 @@ func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
-	for i := uint64(0); i < s.sp; i++ {
-		loc := s.stack[i]
+func (v *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
+	for i := uint64(0); i < v.sp; i++ {
+		loc := v.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case generalPurposeRegisterTypeFloat:

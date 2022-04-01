@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"reflect"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 func TestModule_ImportFuncCount(t *testing.T) {
@@ -204,7 +204,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 	i32, f32 := ValueTypeI32, ValueTypeF32
 	zero := uint32(0)
 	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x00}}
-	fn := reflect.ValueOf(func(wasm.Module) {})
+	fn := reflect.ValueOf(func(api.Module) {})
 
 	tests := []struct {
 		name     string

@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
@@ -61,7 +61,7 @@ var (
 )
 
 func testHugeStack(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromSource(hugestackWasm)
+	module, err := r.InstantiateModuleFromCode(hugestackWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -73,14 +73,14 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {
-	callUnreachable := func(nil publicwasm.Module) {
+	callUnreachable := func(nil api.Module) {
 		panic("panic in host function")
 	}
 
 	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource(unreachableWasm)
+	module, err := r.InstantiateModuleFromCode(unreachableWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -95,7 +95,7 @@ wasm backtrace:
 }
 
 func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
-	hostfunc := func(mod publicwasm.Module) {
+	hostfunc := func(mod api.Module) {
 		_, err := mod.ExportedFunction("called_by_host_func").Call(nil)
 		require.NoError(t, err)
 	}
@@ -103,7 +103,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource(recursiveWasm)
+	module, err := r.InstantiateModuleFromCode(recursiveWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -112,10 +112,10 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 }
 
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
-// Notably, this uses memory, which ensures wasm.Module is valid in both interpreter and JIT engines.
+// Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
-	storeInt := func(nil publicwasm.Module, offset uint32, val uint64) uint32 {
+	storeInt := func(nil api.Module, offset uint32, val uint64) uint32 {
 		if !nil.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
@@ -127,7 +127,7 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource([]byte(`(module $test
+	module, err := r.InstantiateModuleFromCode([]byte(`(module $test
 		(import "" "store_int"
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
@@ -152,7 +152,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	importedName := t.Name() + "-imported"
 	importingName := t.Name() + "-importing"
 
-	var importing publicwasm.Module
+	var importing api.Module
 	fns := map[string]interface{}{
 		"no_context": func(p uint32) uint32 {
 			return p + 1
@@ -161,7 +161,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 			require.Equal(t, configContext, ctx)
 			return p + 1
 		},
-		"module_context": func(module publicwasm.Module, p uint32) uint32 {
+		"module_context": func(module api.Module, p uint32) uint32 {
 			require.Equal(t, importing, module)
 			return p + 1
 		},
@@ -174,7 +174,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err = r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+			importing, err = r.InstantiateModuleFromCode([]byte(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
 	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -229,18 +229,18 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		},
 		{
 			name:     "f32",
-			input:    publicwasm.EncodeF32(math.MaxFloat32 - 1),
-			expected: publicwasm.EncodeF32(math.MaxFloat32),
+			input:    api.EncodeF32(math.MaxFloat32 - 1),
+			expected: api.EncodeF32(math.MaxFloat32),
 		},
 		{
 			name:     "f64",
-			input:    publicwasm.EncodeF64(math.MaxFloat64 - 1),
-			expected: publicwasm.EncodeF64(math.MaxFloat64),
+			input:    api.EncodeF64(math.MaxFloat64 - 1),
+			expected: api.EncodeF64(math.MaxFloat64),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err := r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+			importing, err := r.InstantiateModuleFromCode([]byte(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
 	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -289,7 +289,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			var imported, importing publicwasm.Module
+			var imported, importing api.Module
 			var err error
 			closeAndReturn := func(x uint32) uint32 {
 				if tc.closeImporting != 0 {
@@ -309,7 +309,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			// Import that module.
 			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-			importing, err = r.InstantiateModuleFromSource(source)
+			importing, err = r.InstantiateModuleFromCode(source)
 			require.NoError(t, err)
 			defer importing.Close()
 

@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/internal/moremath"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"github.com/tetratelabs/wazero/sys"
@@ -20,7 +20,7 @@ import (
 
 var callStackCeiling = buildoptions.CallStackCeiling
 
-// engine is an interpreter implementation of internalwasm.Engine
+// engine is an interpreter implementation of wasm.Engine
 type engine struct {
 	compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 	mux               sync.RWMutex
@@ -51,7 +51,7 @@ func (e *engine) addCompiledFunction(f *wasm.FunctionInstance, cf *compiledFunct
 	e.compiledFunctions[f] = cf
 }
 
-// moduleEngine implements internalwasm.ModuleEngine
+// moduleEngine implements wasm.ModuleEngine
 type moduleEngine struct {
 	// name is the name the module was instantiated with used for error handling.
 	name string
@@ -160,7 +160,7 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
-// NewModuleEngine implements the same method as documented on internalwasm.Engine.
+// NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
@@ -210,7 +210,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	return me, nil
 }
 
-// Release implements internalwasm.Engine Release
+// Release implements wasm.Engine Release
 func (me *moduleEngine) Release() error {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
@@ -493,12 +493,12 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-// Name implements the same method as documented on internalwasm.ModuleEngine.
+// Name implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Name() string {
 	return me.name
 }
 
-// Call implements the same method as documented on internalwasm.ModuleEngine.
+// Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// compiledFunctions on close aren't locked, neither is this read.
@@ -1595,7 +1595,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	ce.popFrame()
 }
 
-// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {

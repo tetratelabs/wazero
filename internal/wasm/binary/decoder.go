@@ -6,10 +6,10 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
+// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
 func DecodeModule(binary []byte, _ wasm.Features, memoryMaxPages uint32) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)

@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"encoding/binary"
@@ -18,7 +18,7 @@ const (
 	MemoryPageSizeInBits = 16
 )
 
-// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
+// MemoryInstance represents a memory instance in a store, and implements api.Memory.
 //
 // Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
 // wasm.Store Memories index zero: `store.Memories[0]`
@@ -28,7 +28,7 @@ type MemoryInstance struct {
 	Min, Max uint32
 }
 
-// Size implements wasm.Memory Size
+// Size implements api.Memory Size
 func (m *MemoryInstance) Size() uint32 {
 	return uint32(len(m.Buffer))
 }
@@ -38,7 +38,7 @@ func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
 	return uint64(offset)+uint64(sizeInBytes) <= uint64(m.Size()) // uint64 prevents overflow on add
 }
 
-// ReadByte implements wasm.Memory ReadByte
+// ReadByte implements api.Memory ReadByte
 func (m *MemoryInstance) ReadByte(offset uint32) (byte, bool) {
 	if offset >= m.Size() {
 		return 0, false
@@ -46,7 +46,7 @@ func (m *MemoryInstance) ReadByte(offset uint32) (byte, bool) {
 	return m.Buffer[offset], true
 }
 
-// ReadUint32Le implements wasm.Memory ReadUint32Le
+// ReadUint32Le implements api.Memory ReadUint32Le
 func (m *MemoryInstance) ReadUint32Le(offset uint32) (uint32, bool) {
 	if !m.hasSize(offset, 4) {
 		return 0, false
@@ -54,7 +54,7 @@ func (m *MemoryInstance) ReadUint32Le(offset uint32) (uint32, bool) {
 	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
 }
 
-// ReadFloat32Le implements wasm.Memory ReadFloat32Le
+// ReadFloat32Le implements api.Memory ReadFloat32Le
 func (m *MemoryInstance) ReadFloat32Le(offset uint32) (float32, bool) {
 	v, ok := m.ReadUint32Le(offset)
 	if !ok {
@@ -63,7 +63,7 @@ func (m *MemoryInstance) ReadFloat32Le(offset uint32) (float32, bool) {
 	return math.Float32frombits(v), true
 }
 
-// ReadUint64Le implements wasm.Memory ReadUint64Le
+// ReadUint64Le implements api.Memory ReadUint64Le
 func (m *MemoryInstance) ReadUint64Le(offset uint32) (uint64, bool) {
 	if !m.hasSize(offset, 8) {
 		return 0, false
@@ -71,7 +71,7 @@ func (m *MemoryInstance) ReadUint64Le(offset uint32) (uint64, bool) {
 	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
 }
 
-// ReadFloat64Le implements wasm.Memory ReadFloat64Le
+// ReadFloat64Le implements api.Memory ReadFloat64Le
 func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
 	v, ok := m.ReadUint64Le(offset)
 	if !ok {
@@ -80,7 +80,7 @@ func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
 	return math.Float64frombits(v), true
 }
 
-// Read implements wasm.Memory Read
+// Read implements api.Memory Read
 func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 	if !m.hasSize(offset, byteCount) {
 		return nil, false
@@ -88,7 +88,7 @@ func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 	return m.Buffer[offset : offset+byteCount], true
 }
 
-// WriteByte implements wasm.Memory WriteByte
+// WriteByte implements api.Memory WriteByte
 func (m *MemoryInstance) WriteByte(offset uint32, v byte) bool {
 	if offset >= m.Size() {
 		return false
@@ -97,7 +97,7 @@ func (m *MemoryInstance) WriteByte(offset uint32, v byte) bool {
 	return true
 }
 
-// WriteUint32Le implements wasm.Memory WriteUint32Le
+// WriteUint32Le implements api.Memory WriteUint32Le
 func (m *MemoryInstance) WriteUint32Le(offset, v uint32) bool {
 	if !m.hasSize(offset, 4) {
 		return false
@@ -106,12 +106,12 @@ func (m *MemoryInstance) WriteUint32Le(offset, v uint32) bool {
 	return true
 }
 
-// WriteFloat32Le implements wasm.Memory WriteFloat32Le
+// WriteFloat32Le implements api.Memory WriteFloat32Le
 func (m *MemoryInstance) WriteFloat32Le(offset uint32, v float32) bool {
 	return m.WriteUint32Le(offset, math.Float32bits(v))
 }
 
-// WriteUint64Le implements wasm.Memory WriteUint64Le
+// WriteUint64Le implements api.Memory WriteUint64Le
 func (m *MemoryInstance) WriteUint64Le(offset uint32, v uint64) bool {
 	if !m.hasSize(offset, 8) {
 		return false
@@ -120,12 +120,12 @@ func (m *MemoryInstance) WriteUint64Le(offset uint32, v uint64) bool {
 	return true
 }
 
-// WriteFloat64Le implements wasm.Memory WriteFloat64Le
+// WriteFloat64Le implements api.Memory WriteFloat64Le
 func (m *MemoryInstance) WriteFloat64Le(offset uint32, v float64) bool {
 	return m.WriteUint64Le(offset, math.Float64bits(v))
 }
 
-// Write implements wasm.Memory Write
+// Write implements api.Memory Write
 func (m *MemoryInstance) Write(offset uint32, val []byte) bool {
 	if !m.hasSize(offset, uint32(len(val))) {
 		return false

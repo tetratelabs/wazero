@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // FunctionKind identifies the type of function that can be called.
@@ -27,7 +27,7 @@ const (
 
 // Below are reflection code to get the interface type used to parse functions and set values.
 
-var moduleType = reflect.TypeOf((*publicwasm.Module)(nil)).Elem()
+var moduleType = reflect.TypeOf((*api.Module)(nil)).Elem()
 var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 

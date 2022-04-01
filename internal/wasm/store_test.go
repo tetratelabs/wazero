@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestModuleInstance_Memory(t *testing.T) {
@@ -90,7 +90,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
-	m, err := NewHostModule("", map[string]interface{}{"fn": func(wasm.Module) {}})
+	m, err := NewHostModule("", map[string]interface{}{"fn": func(api.Module) {}})
 	require.NoError(t, err)
 
 	type key string
@@ -120,7 +120,7 @@ func TestStore_CloseModule(t *testing.T) {
 		{
 			name: "Module imports HostModule",
 			initializer: func(t *testing.T, s *Store) {
-				m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+				m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}})
 				require.NoError(t, err)
 				_, err = s.Instantiate(context.Background(), m, importedModuleName, nil)
 				require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestStore_CloseModule(t *testing.T) {
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}})
 	require.NoError(t, err)
 
 	s := newStore()
@@ -227,7 +227,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}})
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
@@ -312,7 +312,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
-	m, err := NewHostModule("host", map[string]interface{}{"host_fn": func(wasm.Module) {}})
+	m, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}})
 	require.NoError(t, err)
 
 	s := newStore()
@@ -350,7 +350,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 	// Add the host module
 	functionName := "fn"
 	m, err := NewHostModule("host",
-		map[string]interface{}{functionName: func(wasm.Module) {}},
+		map[string]interface{}{functionName: func(api.Module) {}},
 	)
 	require.NoError(t, err)
 
@@ -424,7 +424,7 @@ func newStore() *Store {
 	return NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 }
 
-// NewModuleEngine implements the same method as documented on internalwasm.Engine.
+// NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
@@ -432,12 +432,12 @@ func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *Tabl
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-// Name implements the same method as documented on internalwasm.ModuleEngine.
+// Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {
 	return e.name
 }
 
-// Call implements the same method as documented on internalwasm.ModuleEngine.
+// Call implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		err = errors.New("call failed")
@@ -447,8 +447,8 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
-func (me *mockModuleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
+// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
 	return true, nil
 }
 
@@ -561,11 +561,11 @@ func TestExecuteConstExpression(t *testing.T) {
 				case ValueTypeF32:
 					actual, ok := val.(float32)
 					require.True(t, ok)
-					require.Equal(t, wasm.DecodeF32(tc.val), actual)
+					require.Equal(t, api.DecodeF32(tc.val), actual)
 				case ValueTypeF64:
 					actual, ok := val.(float64)
 					require.True(t, ok)
-					require.Equal(t, wasm.DecodeF64(tc.val), actual)
+					require.Equal(t, api.DecodeF64(tc.val), actual)
 				}
 			})
 		}

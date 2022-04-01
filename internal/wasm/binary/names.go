@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 const (
@@ -150,7 +150,7 @@ func decodeFunctionCount(r *bytes.Reader, subsectionID uint8) (uint32, error) {
 	return functionCount, nil
 }
 
-// encodeNameSectionData serializes the data for the "name" key in internalwasm.SectionIDCustom according to the
+// encodeNameSectionData serializes the data for the "name" key in wasm.SectionIDCustom according to the
 // standard:
 //
 // Note: The result can be nil because this does not encode empty subsections

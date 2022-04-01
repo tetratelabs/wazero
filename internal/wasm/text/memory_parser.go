@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func newMemoryParser(memoryMaxPages uint32, memoryNamespace *indexNamespace, onMemory onMemory) *memoryParser {
@@ -13,7 +13,7 @@ func newMemoryParser(memoryMaxPages uint32, memoryNamespace *indexNamespace, onM
 
 type onMemory func(min, max uint32) tokenParser
 
-// memoryParser parses a wasm.Memory from and dispatches to onMemory.
+// memoryParser parses a api.Memory from and dispatches to onMemory.
 //
 // Ex. `(module (memory 0 1024))`
 //        starts here --^     ^
@@ -22,7 +22,7 @@ type onMemory func(min, max uint32) tokenParser
 // Note: memoryParser is reusable. The caller resets via begin.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
 type memoryParser struct {
-	// memoryMaxPages is the limit of pages (not bytes) for each internalwasm.Memory.
+	// memoryMaxPages is the limit of pages (not bytes) for each wasm.Memory.
 	memoryMaxPages uint32
 
 	memoryNamespace *indexNamespace
@@ -36,7 +36,7 @@ type memoryParser struct {
 	currentMax uint32
 }
 
-// begin should be called after reaching the internalwasm.ExternTypeMemoryName keyword in a module field. Parsing
+// begin should be called after reaching the wasm.ExternTypeMemoryName keyword in a module field. Parsing
 // continues until onMemory or error.
 //
 // This stage records the ID of the current memory, if present, and resumes with beginMin.

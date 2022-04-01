@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func newFuncParser(enabledFeatures wasm.Features, typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
@@ -47,7 +47,7 @@ type funcParser struct {
 var end = []byte{wasm.OpcodeEnd}
 var codeEnd = &wasm.Code{Body: end}
 
-// begin should be called after reaching the internalwasm.ExternTypeFuncName keyword in a module field. Parsing
+// begin should be called after reaching the wasm.ExternTypeFuncName keyword in a module field. Parsing
 // continues until onFunc or error.
 //
 // This stage records the ID of the current function, if present, and resumes with onFunc.

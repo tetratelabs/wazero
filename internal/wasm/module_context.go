@@ -1,34 +1,34 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
 	"fmt"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
-// compile time check to ensure ModuleContext implements wasm.Module
-var _ publicwasm.Module = &ModuleContext{}
+// compile time check to ensure ModuleContext implements api.Module
+var _ api.Module = &ModuleContext{}
 
 func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, sys *SysContext) *ModuleContext {
 	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, sys: sys}
 }
 
-// ModuleContext implements wasm.Module
+// ModuleContext implements api.Module
 type ModuleContext struct {
 	// ctx is returned by Context and overridden WithContext
 	ctx    context.Context
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
-	memory publicwasm.Memory
+	memory api.Memory
 	store  *Store
 
-	// sys is not exposed publicly. This is currently only used by internalwasi.
+	// sys is not exposed publicly. This is currently only used by wasi.
 	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
 	sys *SysContext
 }
 
-// Name implements the same method as documented on wasm.Module
+// Name implements the same method as documented on api.Module
 func (m *ModuleContext) Name() string {
 	return m.module.Name
 }
@@ -41,12 +41,12 @@ func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	return m
 }
 
-// String implements the same method as documented on wasm.Module
+// String implements the same method as documented on api.Module
 func (m *ModuleContext) String() string {
 	return fmt.Sprintf("Module[%s]", m.Name())
 }
 
-// Context implements the same method as documented on wasm.Module
+// Context implements the same method as documented on api.Module
 func (m *ModuleContext) Context() context.Context {
 	return m.ctx
 }
@@ -56,20 +56,20 @@ func (m *ModuleContext) Sys() *SysContext {
 	return m.sys
 }
 
-// WithContext implements the same method as documented on wasm.Module
-func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
+// WithContext implements the same method as documented on api.Module
+func (m *ModuleContext) WithContext(ctx context.Context) api.Module {
 	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
 		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, sys: m.sys}
 	}
 	return m
 }
 
-// Close implements the same method as documented on wasm.Module.
+// Close implements the same method as documented on api.Module.
 func (m *ModuleContext) Close() (err error) {
 	return m.CloseWithExitCode(0)
 }
 
-// CloseWithExitCode implements the same method as documented on wasm.Module.
+// CloseWithExitCode implements the same method as documented on api.Module.
 func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
 	if err = m.store.CloseModuleWithExitCode(m.module.Name, exitCode); err != nil {
 		return err
@@ -79,13 +79,13 @@ func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
 	return
 }
 
-// Memory implements wasm.Module Memory
-func (m *ModuleContext) Memory() publicwasm.Memory {
+// Memory implements api.Module Memory
+func (m *ModuleContext) Memory() api.Memory {
 	return m.module.Memory
 }
 
-// ExportedMemory implements wasm.Module ExportedMemory
-func (m *ModuleContext) ExportedMemory(name string) publicwasm.Memory {
+// ExportedMemory implements api.Module ExportedMemory
+func (m *ModuleContext) ExportedMemory(name string) api.Memory {
 	exp, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
@@ -93,8 +93,8 @@ func (m *ModuleContext) ExportedMemory(name string) publicwasm.Memory {
 	return exp.Memory
 }
 
-// ExportedFunction implements wasm.Module ExportedFunction
-func (m *ModuleContext) ExportedFunction(name string) publicwasm.Function {
+// ExportedFunction implements api.Module ExportedFunction
+func (m *ModuleContext) ExportedFunction(name string) api.Function {
 	exp, err := m.module.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
@@ -102,18 +102,18 @@ func (m *ModuleContext) ExportedFunction(name string) publicwasm.Function {
 	return exp.Function
 }
 
-// ParamTypes implements wasm.Function ParamTypes
-func (f *FunctionInstance) ParamTypes() []publicwasm.ValueType {
+// ParamTypes implements api.Function ParamTypes
+func (f *FunctionInstance) ParamTypes() []api.ValueType {
 	return f.Type.Params
 }
 
-// ResultTypes implements wasm.Function ResultTypes
-func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
+// ResultTypes implements api.Function ResultTypes
+func (f *FunctionInstance) ResultTypes() []api.ValueType {
 	return f.Type.Results
 }
 
-// Call implements wasm.Function Call
-func (f *FunctionInstance) Call(m publicwasm.Module, params ...uint64) (ret []uint64, err error) {
+// Call implements api.Function Call
+func (f *FunctionInstance) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
 	mod := f.Module
 	modCtx, ok := m.(*ModuleContext)
 	if ok {
@@ -124,8 +124,8 @@ func (f *FunctionInstance) Call(m publicwasm.Module, params ...uint64) (ret []ui
 	return mod.Engine.Call(modCtx, f, params...)
 }
 
-// ExportedGlobal implements wasm.Module ExportedGlobal
-func (m *ModuleContext) ExportedGlobal(name string) publicwasm.Global {
+// ExportedGlobal implements api.Module ExportedGlobal
+func (m *ModuleContext) ExportedGlobal(name string) api.Global {
 	exp, err := m.module.getExport(name, ExternTypeGlobal)
 	if err != nil {
 		return nil

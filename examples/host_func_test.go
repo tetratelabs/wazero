@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 type testKey struct{}
@@ -24,14 +25,14 @@ var hostFuncWasm []byte
 func Test_hostFunc(t *testing.T) {
 	// The function for allocating the in-Wasm memory region.
 	// We resolve this function after main module instantiation.
-	allocateInWasmBuffer := func(wasm.Module, uint32) uint32 {
+	allocateInWasmBuffer := func(api.Module, uint32) uint32 {
 		panic("unimplemented")
 	}
 
 	var expectedBase64String string
 
 	// Host-side implementation of get_random_string on Wasm import.
-	getRandomBytes := func(ctx wasm.Module, retBufPtr uint32, retBufSize uint32) {
+	getRandomBytes := func(ctx api.Module, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
 		contextValue := ctx.Context().Value(testKey{}).(int64)
 		require.Equal(t, int64(12345), contextValue)
@@ -60,34 +61,34 @@ func Test_hostFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	// Compile the `hostFunc` module.
-	compiled, err := r.CompileModule(hostFuncWasm)
+	code, err := r.CompileModule(hostFuncWasm)
 	require.NoError(t, err)
 
 	// Configure stdout (console) to write to a buffer.
 	stdout := bytes.NewBuffer(nil)
-	config := wazero.NewSysConfig().WithStdout(stdout)
+	config := wazero.NewModuleConfig().WithStdout(stdout)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
-	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
-	module, err := wazero.StartWASICommandWithConfig(r, compiled, config)
+	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
+	module, err := r.InstantiateModuleWithConfig(code, config)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
 	allocateInWasmBufferFn := module.ExportedFunction("allocate_buffer")
 	require.NotNil(t, allocateInWasmBuffer)
 
 	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
-	allocateInWasmBuffer = func(ctx wasm.Module, size uint32) uint32 {
+	allocateInWasmBuffer = func(ctx api.Module, size uint32) uint32 {
 		res, err := allocateInWasmBufferFn.Call(ctx, uint64(size))
 		require.NoError(t, err)
 		return uint32(res[0])
 	}
 
-	// Set a context variable that should be available in wasm.Module.
+	// Set a context variable that should be available in a wasm.Function.
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import

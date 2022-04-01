@@ -20,7 +20,7 @@ func main() {
 	source, _ := os.ReadFile("./tests/bench/testdata/fac.wasm")
 
 	// Instantiate the module and return its exported functions
-	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
+	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(source)
 	defer module.Close()
 
 	// Discover 7! is 5040
@@ -46,11 +46,11 @@ how WebAssembly programs interact with the host embedding them.
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
-wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
-defer wasi.Close()
+wm, err := wasi.InstantiateSnapshotPreview1(r)
+defer wm.Close()
 
-sysConfig := wazero.NewSysConfig().WithFS(os.DirFS("/work/home"))
-module, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
+config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
+module, err := r.InstantiateModule(binary, config)
 defer module.Close()
 ...
 ```

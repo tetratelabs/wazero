@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
@@ -148,19 +148,19 @@ func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
 	return args, exps
 }
 
-func (v commandActionVal) toUint64() uint64 {
-	if strings.Contains(v.Value, "nan") {
-		if v.ValType == "f32" {
+func (c commandActionVal) toUint64() uint64 {
+	if strings.Contains(c.Value, "nan") {
+		if c.ValType == "f32" {
 			return uint64(math.Float32bits(float32(math.NaN())))
 		}
 		return math.Float64bits(math.NaN())
 	}
 
-	if strings.Contains(v.ValType, "32") {
-		ret, _ := strconv.ParseUint(v.Value, 10, 32)
+	if strings.Contains(c.ValType, "32") {
+		ret, _ := strconv.ParseUint(c.Value, 10, 32)
 		return ret
 	} else {
-		ret, _ := strconv.ParseUint(v.Value, 10, 64)
+		ret, _ := strconv.ParseUint(c.Value, 10, 64)
 		return ret
 	}
 }

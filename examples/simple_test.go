@@ -26,7 +26,7 @@ func Test_Simple(t *testing.T) {
 
 	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "hello" was called!
-	mod, err := r.InstantiateModuleFromSource([]byte(`(module $test
+	mod, err := r.InstantiateModuleFromCode([]byte(`(module $test
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`))

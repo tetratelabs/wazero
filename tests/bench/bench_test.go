@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // caseWasm was compiled from TinyGo testdata/case.go
@@ -30,7 +31,7 @@ func BenchmarkEngines(b *testing.B) {
 	}
 }
 
-func runAllBenches(b *testing.B, m wasm.Module) {
+func runAllBenches(b *testing.B, m api.Module) {
 	runBase64Benches(b, m)
 	runFibBenches(b, m)
 	runStringManipulationBenches(b, m)
@@ -38,7 +39,7 @@ func runAllBenches(b *testing.B, m wasm.Module) {
 	runRandomMatMul(b, m)
 }
 
-func runBase64Benches(b *testing.B, m wasm.Module) {
+func runBase64Benches(b *testing.B, m api.Module) {
 	base64 := m.ExportedFunction("base64")
 
 	for _, numPerExec := range []int{5, 100, 10000} {
@@ -52,7 +53,7 @@ func runBase64Benches(b *testing.B, m wasm.Module) {
 	}
 }
 
-func runFibBenches(b *testing.B, m wasm.Module) {
+func runFibBenches(b *testing.B, m api.Module) {
 	fibonacci := m.ExportedFunction("fibonacci")
 
 	for _, num := range []int{5, 10, 20, 30} {
@@ -68,7 +69,7 @@ func runFibBenches(b *testing.B, m wasm.Module) {
 	}
 }
 
-func runStringManipulationBenches(b *testing.B, m wasm.Module) {
+func runStringManipulationBenches(b *testing.B, m api.Module) {
 	stringManipulation := m.ExportedFunction("string_manipulation")
 
 	for _, initialSize := range []int{50, 100, 1000} {
@@ -84,7 +85,7 @@ func runStringManipulationBenches(b *testing.B, m wasm.Module) {
 	}
 }
 
-func runReverseArrayBenches(b *testing.B, m wasm.Module) {
+func runReverseArrayBenches(b *testing.B, m api.Module) {
 	reverseArray := m.ExportedFunction("reverse_array")
 
 	for _, arraySize := range []int{500, 1000, 10000} {
@@ -100,7 +101,7 @@ func runReverseArrayBenches(b *testing.B, m wasm.Module) {
 	}
 }
 
-func runRandomMatMul(b *testing.B, m wasm.Module) {
+func runRandomMatMul(b *testing.B, m api.Module) {
 	randomMatMul := m.ExportedFunction("random_mat_mul")
 
 	for _, matrixSize := range []int{5, 10, 20} {
@@ -116,8 +117,8 @@ func runRandomMatMul(b *testing.B, m wasm.Module) {
 	}
 }
 
-func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.RuntimeConfig) wasm.Module {
-	getRandomString := func(ctx wasm.Module, retBufPtr uint32, retBufSize uint32) {
+func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.RuntimeConfig) api.Module {
+	getRandomString := func(ctx api.Module, retBufPtr uint32, retBufSize uint32) {
 		results, err := ctx.ExportedFunction("allocate_buffer").Call(ctx, 10)
 		if err != nil {
 			b.Fatal(err)
@@ -140,12 +141,13 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = r.InstantiateModule(wazero.WASISnapshotPreview1())
+	_, err = wasi.InstantiateSnapshotPreview1(r)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	m, err := wazero.StartWASICommandFromSource(r, caseWasm)
+	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
+	m, err := r.InstantiateModuleFromCode(caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -13,10 +13,10 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
-	wasi "github.com/tetratelabs/wazero/internal/wasi"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -43,11 +43,11 @@ func newExample() *wasm.Module {
 		},
 		ImportSection: []*wasm.Import{
 			{
-				Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+				Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 				Type:     wasm.ExternTypeFunc,
 				DescFunc: 0,
 			}, {
-				Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+				Module: "wasi_snapshot_preview1", Name: "fd_write",
 				Type:     wasm.ExternTypeFunc,
 				DescFunc: 2,
 			},
@@ -108,12 +108,14 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureSignExtensionOps(true))
 
 		// Add WASI to satisfy import tests
-		_, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+		wm, err := wasi.InstantiateSnapshotPreview1(r)
 		require.NoError(t, err)
+		defer wm.Close()
 
 		// Decode and instantiate the module
-		module, err := r.InstantiateModuleFromSource(exampleBinary)
+		module, err := r.InstantiateModuleFromCode(exampleBinary)
 		require.NoError(t, err)
+		defer module.Close()
 
 		// Call the add function as a smoke test
 		results, err := module.ExportedFunction("AddInt").Call(nil, 1, 2)

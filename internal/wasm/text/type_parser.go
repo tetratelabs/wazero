@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func newTypeParser(typeNamespace *indexNamespace, onType onType) *typeParser {
@@ -118,7 +118,7 @@ func (p *typeParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 	}
 }
 
-// parseFuncEnd completes the internalwasm.ExternTypeFuncName field and returns end
+// parseFuncEnd completes the wasm.ExternTypeFuncName field and returns end
 func (p *typeParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenRParen {
 		return nil, unexpectedToken(tok, tokenBytes)
@@ -222,7 +222,7 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (
 	}
 }
 
-// parseResult parses the wasm.ValueType in the "result" field and returns onType to finish the type.
+// parseResult parses the api.ValueType in the "result" field and returns onType to finish the type.
 func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenKeyword: // Ex. i32

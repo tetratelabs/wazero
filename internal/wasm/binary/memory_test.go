@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestMemoryType(t *testing.T) {
@@ -55,9 +55,9 @@ func TestMemoryType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			decoded, err := decodeMemory(bytes.NewReader(b), max)
+			binary, err := decodeMemory(bytes.NewReader(b), max)
 			require.NoError(t, err)
-			require.Equal(t, decoded, tc.input)
+			require.Equal(t, binary, tc.input)
 		})
 	}
 }

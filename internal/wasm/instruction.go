@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 // Opcode is the binary Opcode of an instruction. See also InstructionName
 type Opcode = byte

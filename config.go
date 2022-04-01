@@ -8,24 +8,24 @@ import (
 	"io/fs"
 	"math"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	newEngine       func() internalwasm.Engine
+	newEngine       func() wasm.Engine
 	ctx             context.Context
-	enabledFeatures internalwasm.Features
+	enabledFeatures wasm.Features
 	memoryMaxPages  uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
 	ctx:             context.Background(),
-	enabledFeatures: internalwasm.Features20191205,
-	memoryMaxPages:  internalwasm.MemoryMaxPages,
+	enabledFeatures: wasm.Features20191205,
+	memoryMaxPages:  wasm.MemoryMaxPages,
 }
 
 // clone ensures all fields are coped even if nil.
@@ -59,8 +59,8 @@ func NewRuntimeConfigInterpreter() *RuntimeConfig {
 //
 // Notes:
 // * If the Module defines a start function, this is used to invoke it.
-// * This is the outer-most ancestor of wasm.Module Context() during wasm.Function invocations.
-// * This is the default context of wasm.Function when callers pass nil.
+// * This is the outer-most ancestor of api.Module Context() during api.Function invocations.
+// * This is the default context of api.Function when callers pass nil.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-function%E2%91%A0
 func (c *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
@@ -91,11 +91,11 @@ func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig
 // WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
 // WebAssembly 1.0 (20191205).
 //
-// When false, a wasm.Global can never be cast to a wasm.MutableGlobal, and any source that includes global vars
+// When false, a api.Global can never be cast to a api.MutableGlobal, and any source that includes global vars
 // will fail to parse.
 func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureMutableGlobal, enabled)
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
 	return ret
 }
 
@@ -105,14 +105,54 @@ func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureSignExtensionOps, enabled)
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
 	return ret
 }
 
-// Module is a WebAssembly 1.0 (20191205) module to instantiate.
-type Module struct {
-	name   string
-	module *internalwasm.Module
+// CompiledCode is a WebAssembly 1.0 (20191205) module ready to be instantiated (Runtime.InstantiateModule) as an\
+// api.Module.
+//
+// Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
+// the name "Module" for both before and after instantiation as the name conflation has caused confusion.
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
+type CompiledCode struct {
+	module *wasm.Module
+}
+
+// ModuleConfig configures resources needed by functions that have low-level interactions with the host operating system.
+// Using this, resources such as STDIN can be isolated (ex via StartWASICommandWithConfig), so that the same module can
+// be safely instantiated multiple times.
+//
+// Note: While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
+// See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
+type ModuleConfig struct {
+	name           string
+	startFunctions []string
+	stdin          io.Reader
+	stdout         io.Writer
+	stderr         io.Writer
+	args           []string
+	// environ is pair-indexed to retain order similar to os.Environ.
+	environ []string
+	// environKeys allow overwriting of existing values.
+	environKeys map[string]int
+
+	// preopenFD has the next FD number to use
+	preopenFD uint32
+	// preopens are keyed on file descriptor and only include the Path and FS fields.
+	preopens map[uint32]*wasm.FileEntry
+	// preopenPaths allow overwriting of existing paths.
+	preopenPaths map[string]uint32
+}
+
+func NewModuleConfig() *ModuleConfig {
+	return &ModuleConfig{
+		startFunctions: []string{"_start"},
+		environKeys:    map[string]int{},
+		preopenFD:      uint32(3), // after stdin/stdout/stderr
+		preopens:       map[uint32]*wasm.FileEntry{},
+		preopenPaths:   map[string]uint32{},
+	}
 }
 
 // WithName configures the module name. Defaults to what was decoded from the module source.
@@ -125,79 +165,54 @@ type Module struct {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%91%A2
-func (m *Module) WithName(name string) *Module {
-	m.name = name
-	return m
+func (c *ModuleConfig) WithName(name string) *ModuleConfig {
+	c.name = name
+	return c
 }
 
-// SysConfig configures resources needed by functions that have low-level interactions with the host operating system.
-// Using this, resources such as STDIN can be isolated (ex via StartWASICommandWithConfig), so that the same module can
-// be safely instantiated multiple times.
+// WithStartFunctions configures the functions to call after the module is instantiated. Defaults to "_start".
 //
-// Note: While wazero supports Windows as a platform, host functions using SysConfig follow a UNIX dialect.
-// See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
-type SysConfig struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-	args   []string
-	// environ is pair-indexed to retain order similar to os.Environ.
-	environ []string
-	// environKeys allow overwriting of existing values.
-	environKeys map[string]int
-
-	// preopenFD has the next FD number to use
-	preopenFD uint32
-	// preopens are keyed on file descriptor and only include the Path and FS fields.
-	preopens map[uint32]*internalwasm.FileEntry
-	// preopenPaths allow overwriting of existing paths.
-	preopenPaths map[string]uint32
-}
-
-func NewSysConfig() *SysConfig {
-	return &SysConfig{
-		environKeys:  map[string]int{},
-		preopenFD:    uint32(3), // after stdin/stdout/stderr
-		preopens:     map[uint32]*internalwasm.FileEntry{},
-		preopenPaths: map[string]uint32{},
-	}
+// Note: If any function doesn't exist, it is skipped. However, all functions that do exist are called in order.
+func (c *ModuleConfig) WithStartFunctions(startFunctions ...string) *ModuleConfig {
+	c.startFunctions = startFunctions
+	return c
 }
 
 // WithStdin configures where standard input (file descriptor 0) is read. Defaults to return io.EOF.
 //
-// This reader is most commonly used by the functions like "fd_read" in wasi.ModuleSnapshotPreview1 although it could be
+// This reader is most commonly used by the functions like "fd_read" in "wasi_snapshot_preview1" although it could be
 // used by functions imported from other modules.
 //
-// Note: The caller is responsible to close any io.Reader they supply: It is not closed on wasm.Module Close.
+// Note: The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
 // Note: This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
 // See https://linux.die.net/man/3/stdin
-func (c *SysConfig) WithStdin(stdin io.Reader) *SysConfig {
+func (c *ModuleConfig) WithStdin(stdin io.Reader) *ModuleConfig {
 	c.stdin = stdin
 	return c
 }
 
 // WithStdout configures where standard output (file descriptor 1) is written. Defaults to io.Discard.
 //
-// This writer is most commonly used by the functions like "fd_write" in wasi.ModuleSnapshotPreview1 although it could
+// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 // be used by functions imported from other modules.
 //
-// Note: The caller is responsible to close any io.Writer they supply: It is not closed on wasm.Module Close.
+// Note: The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
 // Note: This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
 // See https://linux.die.net/man/3/stdout
-func (c *SysConfig) WithStdout(stdout io.Writer) *SysConfig {
+func (c *ModuleConfig) WithStdout(stdout io.Writer) *ModuleConfig {
 	c.stdout = stdout
 	return c
 }
 
 // WithStderr configures where standard error (file descriptor 2) is written. Defaults to io.Discard.
 //
-// This writer is most commonly used by the functions like "fd_write" in wasi.ModuleSnapshotPreview1 although it could
+// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 // be used by functions imported from other modules.
 //
-// Note: The caller is responsible to close any io.Writer they supply: It is not closed on wasm.Module Close.
+// Note: The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
 // Note: This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
 // See https://linux.die.net/man/3/stderr
-func (c *SysConfig) WithStderr(stderr io.Writer) *SysConfig {
+func (c *ModuleConfig) WithStderr(stderr io.Writer) *ModuleConfig {
 	c.stderr = stderr
 	return c
 }
@@ -205,7 +220,7 @@ func (c *SysConfig) WithStderr(stderr io.Writer) *SysConfig {
 // WithArgs assigns command-line arguments visible to an imported function that reads an arg vector (argv). Defaults to
 // none.
 //
-// These values are commonly read by the functions like "args_get" in wasi.ModuleSnapshotPreview1 although they could be
+// These values are commonly read by the functions like "args_get" in "wasi_snapshot_preview1" although they could be
 // read by functions imported from other modules.
 //
 // Similar to os.Args and exec.Cmd Env, many implementations would expect a program name to be argv[0]. However, neither
@@ -216,7 +231,7 @@ func (c *SysConfig) WithStderr(stderr io.Writer) *SysConfig {
 // Note: Runtime.InstantiateModule errs if any value is empty.
 // See https://linux.die.net/man/3/argv
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (c *SysConfig) WithArgs(args ...string) *SysConfig {
+func (c *ModuleConfig) WithArgs(args ...string) *ModuleConfig {
 	c.args = args
 	return c
 }
@@ -226,7 +241,7 @@ func (c *SysConfig) WithArgs(args ...string) *SysConfig {
 // Validation is the same as os.Setenv on Linux and replaces any existing value. Unlike exec.Cmd Env, this does not
 // default to the current process environment as that would violate sandboxing. This also does not preserve order.
 //
-// Environment variables are commonly read by the functions like "environ_get" in wasi.ModuleSnapshotPreview1 although
+// Environment variables are commonly read by the functions like "environ_get" in "wasi_snapshot_preview1" although
 // they could be read by functions imported from other modules.
 //
 // While similar to process configuration, there are no assumptions that can be made about anything OS-specific. For
@@ -236,7 +251,7 @@ func (c *SysConfig) WithArgs(args ...string) *SysConfig {
 // Note: Runtime.InstantiateModule errs if the key is empty or contains a NULL(0) or equals("") character.
 // See https://linux.die.net/man/3/environ
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (c *SysConfig) WithEnv(key, value string) *SysConfig {
+func (c *ModuleConfig) WithEnv(key, value string) *ModuleConfig {
 	// Check to see if this key already exists and update it.
 	if i, ok := c.environKeys[key]; ok {
 		c.environ[i+1] = value // environ is pair-indexed, so the value is 1 after the key.
@@ -258,10 +273,10 @@ func (c *SysConfig) WithEnv(key, value string) *SysConfig {
 //	require.NoError(t, err)
 //
 //	// "index.html" is accessible as both "/index.html" and "./index.html" because we didn't use WithWorkDirFS.
-//	sysConfig := wazero.NewSysConfig().WithFS(rooted)
+//	config := wazero.NewModuleConfig().WithFS(rooted)
 //
 // Note: This sets WithWorkDirFS to the same file-system unless already set.
-func (c *SysConfig) WithFS(fs fs.FS) *SysConfig {
+func (c *ModuleConfig) WithFS(fs fs.FS) *ModuleConfig {
 	c.setFS("/", fs)
 	return c
 }
@@ -274,19 +289,19 @@ func (c *SysConfig) WithFS(fs fs.FS) *SysConfig {
 //	var rootFS embed.FS
 //
 //	// Files relative to this source under appA are available under "/" and files relative to "/work/appA" under ".".
-//	sysConfig := wazero.NewSysConfig().WithFS(rootFS).WithWorkDirFS(os.DirFS("/work/appA"))
+//	config := wazero.NewModuleConfig().WithFS(rootFS).WithWorkDirFS(os.DirFS("/work/appA"))
 //
 // Note: os.DirFS documentation includes important notes about isolation, which also applies to fs.Sub. As of Go 1.18,
 // the built-in file-systems are not jailed (chroot). See https://github.com/golang/go/issues/42322
-func (c *SysConfig) WithWorkDirFS(fs fs.FS) *SysConfig {
+func (c *ModuleConfig) WithWorkDirFS(fs fs.FS) *ModuleConfig {
 	c.setFS(".", fs)
 	return c
 }
 
 // setFS maps a path to a file-system. This is only used for base paths: "/" and ".".
-func (c *SysConfig) setFS(path string, fs fs.FS) {
+func (c *ModuleConfig) setFS(path string, fs fs.FS) {
 	// Check to see if this key already exists and update it.
-	entry := &internalwasm.FileEntry{Path: path, FS: fs}
+	entry := &wasm.FileEntry{Path: path, FS: fs}
 	if fd, ok := c.preopenPaths[path]; ok {
 		c.preopens[fd] = entry
 	} else {
@@ -296,8 +311,8 @@ func (c *SysConfig) setFS(path string, fs fs.FS) {
 	}
 }
 
-// toSysContext creates a baseline internalwasm.SysContext configured by SysConfig.
-func (c *SysConfig) toSysContext() (sys *internalwasm.SysContext, err error) {
+// toSysContext creates a baseline wasm.SysContext configured by ModuleConfig.
+func (c *ModuleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
 	for i := 0; i < len(c.environ); i += 2 {
@@ -332,8 +347,8 @@ func (c *SysConfig) toSysContext() (sys *internalwasm.SysContext, err error) {
 
 	// Default the working directory to the root FS if it exists.
 	if rootFD != 0 && !setWorkDirFS {
-		preopens[c.preopenFD] = &internalwasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
+		preopens[c.preopenFD] = &wasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
 	}
 
-	return internalwasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
+	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
 }

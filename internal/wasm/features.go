@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ const (
 	// See https://github.com/WebAssembly/mutable-global
 	FeatureMutableGlobal Features = 1 << iota
 
-	// FeatureSignExtensionOps decides if parsing should succeed on internalwasm.GlobalType Mutable
+	// FeatureSignExtensionOps decides if parsing should succeed on wasm.GlobalType Mutable
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	FeatureSignExtensionOps
 )

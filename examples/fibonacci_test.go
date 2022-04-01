@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // fibWasm was compiled from TinyGo testdata/fibonacci.go
@@ -17,11 +18,11 @@ func Test_fibonacci(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Note: fibonacci.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
-	module, err := wazero.StartWASICommandFromSource(r, fibWasm)
+	module, err := r.InstantiateModuleFromCode(fibWasm)
 	require.NoError(t, err)
 	defer module.Close()
 

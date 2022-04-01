@@ -3,7 +3,7 @@ package bench
 import (
 	"testing"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func BenchmarkMemory(b *testing.B) {

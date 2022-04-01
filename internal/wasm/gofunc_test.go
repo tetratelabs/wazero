@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	publicwasm "github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 type errno uint32
@@ -68,7 +68,7 @@ func TestGetFunctionType(t *testing.T) {
 		},
 		{
 			name:         "wasm.Module void return",
-			inputFunc:    func(publicwasm.Module) {},
+			inputFunc:    func(api.Module) {},
 			expectedKind: FunctionKindGoModule,
 			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
 		},
@@ -86,7 +86,7 @@ func TestGetFunctionType(t *testing.T) {
 		},
 		{
 			name:         "all supported params and i32 result - wasm.Module",
-			inputFunc:    func(publicwasm.Module, uint32, uint64, float32, float64) uint32 { return 0 },
+			inputFunc:    func(api.Module, uint32, uint64, float32, float64) uint32 { return 0 },
 			expectedKind: FunctionKindGoModule,
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
 		},
@@ -146,7 +146,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 		},
 		{
 			name:        "multiple context types",
-			input:       func(publicwasm.Module, context.Context) error { return nil },
+			input:       func(api.Module, context.Context) error { return nil },
 			expectedErr: "param[1] is a context.Context, which may be defined only once as param[0]",
 		},
 		{
@@ -156,8 +156,8 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 		},
 		{
 			name:        "multiple wasm.Module",
-			input:       func(publicwasm.Module, uint64, publicwasm.Module) error { return nil },
-			expectedErr: "param[2] is a wasm.Module, which may be defined only once as param[0]",
+			input:       func(api.Module, uint64, api.Module) error { return nil },
+			expectedErr: "param[2] is a api.Module, which may be defined only once as param[0]",
 		},
 	}
 

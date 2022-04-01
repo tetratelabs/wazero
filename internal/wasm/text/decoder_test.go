@@ -6,8 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasi "github.com/tetratelabs/wazero/internal/wasi"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestDecodeModule(t *testing.T) {
@@ -52,7 +51,7 @@ func TestDecodeModule(t *testing.T) {
 					i32i32i32i32_i32,
 				},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 1,
 				}},
@@ -162,7 +161,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -179,7 +178,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -228,7 +227,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -245,7 +244,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32_v},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionProcExit,
+					Module: "wasi_snapshot_preview1", Name: "proc_exit",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -270,7 +269,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
+					Module: "wasi_snapshot_preview1", Name: "path_open",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -287,7 +286,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
+					Module: "wasi_snapshot_preview1", Name: "path_open",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
@@ -305,11 +304,11 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+					Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}, {
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 1,
 				}},
@@ -338,11 +337,11 @@ func TestDecodeModule(t *testing.T) {
 				},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 2,
 					},
@@ -368,11 +367,11 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 2,
 					},
@@ -396,11 +395,11 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -425,11 +424,11 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -454,11 +453,11 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -545,11 +544,11 @@ func TestDecodeModule(t *testing.T) {
 				},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
+						Module: "wasi_snapshot_preview1", Name: "path_open",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 2,
 					},
@@ -930,7 +929,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
+						Module: "wasi_snapshot_preview1", Name: "args_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -957,7 +956,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
+						Module: "wasi_snapshot_preview1", Name: "args_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -984,7 +983,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
+						Module: "wasi_snapshot_preview1", Name: "args_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -1011,7 +1010,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
+						Module: "wasi_snapshot_preview1", Name: "args_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},
@@ -1038,7 +1037,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
+						Module: "wasi_snapshot_preview1", Name: "args_get",
 						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					},

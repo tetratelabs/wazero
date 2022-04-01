@@ -4,7 +4,7 @@
 wazero uses internal packages extensively to balance API compatability desires for end users with the need to safely
 share internals between compilers.
 
-The end-user API includes the packages `wazero` `wasm` `wasi` with `Config` structs. Everything else is internal.
+End-user packages include `wazero`,with `Config` structs, and `api`, with shared types. Everything else is internal.
 
 ### Internal packages
 Most code in wazero is internal, and it is acknowledged that this prevents external implementation of facets such as
@@ -12,7 +12,7 @@ compilers or decoding. It also prevents splitting this code into separate reposi
 This also adds work as more code needs to be centrally reviewed.
 
 However, the alternative is neither secure nor viable. To allow external implementation would require exporting symbols
-public, such as the `CodeSection`, which can easily create bugs. Moreover there's a high drift risk for any attempt at
+public, such as the `CodeSection`, which can easily create bugs. Moreover, there's a high drift risk for any attempt at
 external implementations, compounded not just by wazero's code organization, but also the fast moving Wasm and WASI
 specifications.
 
@@ -29,19 +29,18 @@ codebase productive.
 
 ### Avoiding cyclic dependencies
 wazero shares constants and interfaces with internal code by a sharing pattern described below:
-* shared interfaces and constants go in a package under root.
-  * Ex. package `wasi` -> `/wasi/*.go`
-* user code that refer to that package go into the flat root package `wazero`.
-  * Ex. `StartWASICommand` -> `/wasi.go`
-* implementation code begin in a corresponding package under `/internal`.
-  * Ex  package `internalwasi` -> `/internal/wasi/*.go`
+* shared interfaces and constants go in one package under root: `api`.
+* user APIs and structs depend on `api` and go into the root package `wazero`.
+  * Ex. `InstantiateModule` -> `/wasm.go` depends on the type `api.Module`.
+* implementation code can also depend on `api` in a corresponding package under `/internal`.
+  * Ex  package `wasm` -> `/internal/wasm/*.go` and can depend on the type `api.Module`.
 
 The above guarantees no cyclic dependencies at the cost of having to re-define symbols that exist in both packages.
-For example, if `Store` is a type the user needs access to, it is narrowed by a cover type in the `wazero` package:
+For example, if `wasm.Store` is a type the user needs access to, it is narrowed by a cover type in the `wazero`:
 
 ```go
-type Store struct {
-	s *internalwasm.Store
+type Runtime struct {
+	s *wasm.Store
 }
 ```
 
@@ -51,16 +50,23 @@ limited to only a few functions.
 ### Avoiding security bugs
 
 In order to avoid security flaws such as code insertion, nothing in the public API is permitted to write directly to any
-mutable symbol in the internal package. For example, the packages `wasi` and `wasm` are shared internally. To ensure
-immutability, these are not allowed to contain any mutable public symbol, such as a slice or a struct with an exported
+mutable symbol in the internal package. For example, the package `api` is shared with internal code. To ensure
+immutability, the `api` package cannot contain any mutable public symbol, such as a slice or a struct with an exported
 field.
 
 In practice, this means shared functionality like memory mutation need to be implemented by interfaces.
 
-Ex. `wasm.Memory` protects access by exposing functions like `WriteFloat64Le` instead of exporting a buffer (`[]byte`).
+Ex. `api.Memory` protects access by exposing functions like `WriteFloat64Le` instead of exporting a buffer (`[]byte`).
 Ex. There is no exported symbol for the `[]byte` representing the `CodeSection`
 
 Besides security, this practice prevents other bugs and allows centralization of validation logic such as decoding Wasm.
+
+## Why does InstantiateModule call "_start" by default?
+We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
+However, this caused confusion because both many languages compiled a WASI dependency, and many did so inconsistently.
+
+That said, if "_start" isn't called, it causes issues in TinyGo, as it needs this in order to implement panic. To deal
+with this a different way, we have a configuration to call any start functions that exist, which defaults to "_start".
 
 ## Runtime == Engine+Store
 wazero defines a single user-type which combines the specification concept of `Store` with the unspecified `Engine`
@@ -93,7 +99,7 @@ Unfortunately, (WASI Snapshot Preview 1)[https://github.com/WebAssembly/WASI/blo
 This section describes how Wazero interprets and implements the semantics of several WASI APIs that may be interpreted differently by different wasm runtimes.
 Those APIs may affect the portability of a WASI application.
 
-### Why aren't all WASI rules enforced?
+### Why aren't WASI rules enforced?
 
 The [snapshot-01](https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md) version of WASI has a
 number of rules for a "command module", but only the memory export rule is enforced. If a "_start" function exists, it
@@ -106,7 +112,7 @@ The reason for the exceptions are that implementations aren't following the rule
 loaded by wapc-go don't always define a "_start" function. Since "snapshot-01" is not a proper version, and certainly
 not a W3C recommendation, there's no sense in breaking users over matters like this.
 
-### Why is `SysConfig` decoupled from WASI?
+### Why is I/O configuration not coupled to WASI?
 
 WebAssembly System Interfaces (WASI) is a formalization of a practice that can be done anyway: Define a host function to
 access a system interface, such as writing to STDOUT. WASI stalled at snapshot-01 and as of early 2022, is being
@@ -117,11 +123,11 @@ decoupling. For example, if code uses two different functions to call `fd_write`
 centralized and decoupled. Otherwise, calls using the same file descriptor number will end up writing to different
 places.
 
-In short, wazero defined system configuration in `SysConfig`, not a WASI type. This allows end-users to switch from
+In short, wazero defined system configuration in `ModuleConfig`, not a WASI type. This allows end-users to switch from
 one spec to another with minimal impact. This has other helpful benefits, as centralized resources are simpler to close
 coherently (ex via `Module.Close`).
 
-### Background on `SysConfig` design
+### Background on `ModuleConfig` design
 WebAssembly 1.0 (20191205) specifies some aspects to control isolation between modules ([sandboxing](https://en.wikipedia.org/wiki/Sandbox_(computer_security))).
 For example, `wasm.Memory` has size constraints and each instance of it is isolated from each other. While `wasm.Memory`
 can be shared, by exporting it, it is not exported by default. In fact a WebAssembly Module (Wasm) has no memory by
@@ -148,10 +154,10 @@ WASI has reached a stage near W3C recommendation. Even if it did, module authors
 write to console, as they can define their own host functions, such as they did before WASI existed.
 
 wazero aims to serve Go developers as a primary function, and help them transition between WASI specifications. In
-order to do this, we have to allow top-level configuration. To ensure isolation by default, `SysConfig` has WithXXX
-that override defaults to no-op or empty. One `SysConfig` instance is used regardless of how many times the same WASI
+order to do this, we have to allow top-level configuration. To ensure isolation by default, `ModuleConfig` has WithXXX
+that override defaults to no-op or empty. One `ModuleConfig` instance is used regardless of how many times the same WASI
 functions are imported. The nil defaults allow safe concurrency in these situations, as well lower the cost when they
-are never used. Finally, a one-to-one mapping with `Module` allows the module to close the `SysConfig` instead of
+are never used. Finally, a one-to-one mapping with `Module` allows the module to close the `ModuleConfig` instead of
 confusing users with another API to close.
 
 Naming, defaults and validation rules of aspects like `STDIN` and `Environ` are intentionally similar to other Go
@@ -161,7 +167,7 @@ working with real system calls are neither relevant nor safe to inherit: For exa
 from a real file descriptor ("/dev/null"). Defaulting to this, vs reading `io.EOF`, would be unsafe as it can exhaust
 file descriptors if resources aren't managed properly. In other words, blind copying of defaults isn't wise as it can
 violate isolation or endanger the embedding process. In summary, we try to be similar to normal Go code, but often need
-act differently and document `SysConfig` is more about emulating, not necessarily performing real system calls.
+act differently and document `ModuleConfig` is more about emulating, not necessarily performing real system calls.
 
 ### FdPrestatDirName
 

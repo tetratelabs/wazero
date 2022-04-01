@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/sys"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 var hammers = map[string]func(t *testing.T, r wazero.Runtime){
@@ -30,20 +30,20 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 }
 
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
-	closeModuleWhileInUse(t, r, func(imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+	closeModuleWhileInUse(t, r, func(imported, importing api.Module) (api.Module, api.Module) {
 		// Close the importing module, despite calls being in-flight.
 		require.NoError(t, importing.Close())
 
 		// Prove a module can be redefined even with in-flight calls.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err := r.InstantiateModuleFromSource(source)
+		importing, err := r.InstantiateModuleFromCode(source)
 		require.NoError(t, err)
 		return imported, importing
 	})
 }
 
 func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
-	closeModuleWhileInUse(t, r, func(imported, importing wasm.Module) (wasm.Module, wasm.Module) {
+	closeModuleWhileInUse(t, r, func(imported, importing api.Module) (api.Module, api.Module) {
 		// Close the importing and imported module, despite calls being in-flight.
 		require.NoError(t, importing.Close())
 		require.NoError(t, imported.Close())
@@ -56,14 +56,14 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Redefine the importing module, which should link to the redefined host module.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err = r.InstantiateModuleFromSource(source)
+		importing, err = r.InstantiateModuleFromCode(source)
 		require.NoError(t, err)
 
 		return imported, importing
 	})
 }
 
-func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported, importing wasm.Module) (wasm.Module, wasm.Module)) {
+func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported, importing api.Module) (api.Module, api.Module)) {
 	P := 8               // max count of goroutines
 	if testing.Short() { // Adjust down if `-test.short`
 		P = 4
@@ -85,7 +85,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// Import that module.
 	source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-	importing, err := r.InstantiateModuleFromSource(source)
+	importing, err := r.InstantiateModuleFromCode(source)
 	require.NoError(t, err)
 	defer importing.Close()
 
@@ -110,13 +110,13 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	requireFunctionCall(t, importing.ExportedFunction("call_return_import"))
 }
 
-func requireFunctionCall(t *testing.T, fn wasm.Function) {
+func requireFunctionCall(t *testing.T, fn api.Function) {
 	res, err := fn.Call(nil, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), res[0])
 }
 
-func requireFunctionCallExits(t *testing.T, moduleName string, fn wasm.Function) {
+func requireFunctionCallExits(t *testing.T, moduleName string, fn api.Function) {
 	_, err := fn.Call(nil, 3)
 	require.Equal(t, sys.NewExitError(moduleName, 0), err)
 }
