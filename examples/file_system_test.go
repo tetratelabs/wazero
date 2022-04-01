@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // catFS is an embedded filesystem limited to cat.go
@@ -46,9 +47,9 @@ func Test_Cat(t *testing.T) {
 	require.NoError(t, err)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
 	// InstantiateModuleWithConfig by default runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "cat" and add args to write "cat.go" to stdout twice.

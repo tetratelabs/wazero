@@ -13,10 +13,10 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
-	wasi "github.com/tetratelabs/wazero/internal/wasi"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
+	wasi "github.com/tetratelabs/wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -108,7 +108,7 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureSignExtensionOps(true))
 
 		// Add WASI to satisfy import tests
-		_, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+		_, err := r.InstantiateModule(wasi.InstantiateSnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module

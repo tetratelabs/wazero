@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 type testKey struct{}
@@ -68,14 +69,14 @@ func Test_hostFunc(t *testing.T) {
 	config := wazero.NewModuleConfig().WithStdout(stdout)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
 	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
 	module, err := r.InstantiateModuleWithConfig(code, config)
 	require.NoError(t, err)
-	defer wasi.Close()
+	defer wm.Close()
 
 	allocateInWasmBufferFn := module.ExportedFunction("allocate_buffer")
 	require.NotNil(t, allocateInWasmBuffer)

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 )
 

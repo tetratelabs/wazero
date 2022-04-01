@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
@@ -7,14 +7,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	publicwasm "github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/api"
 )
 
 func TestGlobalTypes(t *testing.T) {
 	tests := []struct {
 		name            string
-		global          publicwasm.Global
-		expectedType    publicwasm.ValueType
+		global          api.Global
+		expectedType    api.ValueType
 		expectedVal     uint64
 		expectedString  string
 		expectedMutable bool
@@ -35,16 +35,16 @@ func TestGlobalTypes(t *testing.T) {
 		},
 		{
 			name:           "f32 - immutable",
-			global:         globalF32(publicwasm.EncodeF32(1.0)),
+			global:         globalF32(api.EncodeF32(1.0)),
 			expectedType:   ValueTypeF32,
-			expectedVal:    publicwasm.EncodeF32(1.0),
+			expectedVal:    api.EncodeF32(1.0),
 			expectedString: "global(1.000000)",
 		},
 		{
 			name:           "f64 - immutable",
-			global:         globalF64(publicwasm.EncodeF64(1.0)),
+			global:         globalF64(api.EncodeF64(1.0)),
 			expectedType:   ValueTypeF64,
-			expectedVal:    publicwasm.EncodeF64(1.0),
+			expectedVal:    api.EncodeF64(1.0),
 			expectedString: "global(1.000000)",
 		},
 		{
@@ -73,10 +73,10 @@ func TestGlobalTypes(t *testing.T) {
 			name: "f32 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
 				Type: &GlobalType{ValType: ValueTypeF32, Mutable: true},
-				Val:  publicwasm.EncodeF32(1.0),
+				Val:  api.EncodeF32(1.0),
 			}},
 			expectedType:    ValueTypeF32,
-			expectedVal:     publicwasm.EncodeF32(1.0),
+			expectedVal:     api.EncodeF32(1.0),
 			expectedString:  "global(1.000000)",
 			expectedMutable: true,
 		},
@@ -84,10 +84,10 @@ func TestGlobalTypes(t *testing.T) {
 			name: "f64 - mutable",
 			global: &mutableGlobal{g: &GlobalInstance{
 				Type: &GlobalType{ValType: ValueTypeF64, Mutable: true},
-				Val:  publicwasm.EncodeF64(1.0),
+				Val:  api.EncodeF64(1.0),
 			}},
 			expectedType:    ValueTypeF64,
-			expectedVal:     publicwasm.EncodeF64(1.0),
+			expectedVal:     api.EncodeF64(1.0),
 			expectedString:  "global(1.000000)",
 			expectedMutable: true,
 		},
@@ -101,7 +101,7 @@ func TestGlobalTypes(t *testing.T) {
 			require.Equal(t, tc.expectedVal, tc.global.Get())
 			require.Equal(t, tc.expectedString, tc.global.String())
 
-			mutable, ok := tc.global.(publicwasm.MutableGlobal)
+			mutable, ok := tc.global.(api.MutableGlobal)
 			require.Equal(t, tc.expectedMutable, ok)
 			if ok {
 				mutable.Set(2)
@@ -115,7 +115,7 @@ func TestPublicModule_Global(t *testing.T) {
 	tests := []struct {
 		name     string
 		module   *Module // module as wat doesn't yet support globals
-		expected publicwasm.Global
+		expected api.Global
 	}{
 		{
 			name:   "no global",
@@ -165,13 +165,13 @@ func TestPublicModule_Global(t *testing.T) {
 					{
 						Type: &GlobalType{ValType: ValueTypeF32},
 						Init: &ConstantExpression{Opcode: OpcodeF32Const,
-							Data: uint64Le(publicwasm.EncodeF32(1.0)),
+							Data: uint64Le(api.EncodeF32(1.0)),
 						},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalF32(publicwasm.EncodeF32(1.0)),
+			expected: globalF32(api.EncodeF32(1.0)),
 		},
 		{
 			name: "global exported - immutable F64",
@@ -180,13 +180,13 @@ func TestPublicModule_Global(t *testing.T) {
 					{
 						Type: &GlobalType{ValType: ValueTypeF64},
 						Init: &ConstantExpression{Opcode: OpcodeF64Const,
-							Data: uint64Le(publicwasm.EncodeF64(1.0)),
+							Data: uint64Le(api.EncodeF64(1.0)),
 						},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
-			expected: globalF64(publicwasm.EncodeF64(1.0)),
+			expected: globalF64(api.EncodeF64(1.0)),
 		},
 		{
 			name: "global exported - mutable I32",
@@ -225,14 +225,14 @@ func TestPublicModule_Global(t *testing.T) {
 					{
 						Type: &GlobalType{ValType: ValueTypeF32, Mutable: true},
 						Init: &ConstantExpression{Opcode: OpcodeF32Const,
-							Data: uint64Le(publicwasm.EncodeF32(1.0)),
+							Data: uint64Le(api.EncodeF32(1.0)),
 						},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: publicwasm.EncodeF32(1.0)},
+				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF32, Mutable: true}, Val: api.EncodeF32(1.0)},
 			},
 		},
 		{
@@ -242,14 +242,14 @@ func TestPublicModule_Global(t *testing.T) {
 					{
 						Type: &GlobalType{ValType: ValueTypeF64, Mutable: true},
 						Init: &ConstantExpression{Opcode: OpcodeF64Const,
-							Data: uint64Le(publicwasm.EncodeF64(1.0)),
+							Data: uint64Le(api.EncodeF64(1.0)),
 						},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
 			},
 			expected: &mutableGlobal{
-				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: publicwasm.EncodeF64(1.0)},
+				g: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(1.0)},
 			},
 		},
 	}

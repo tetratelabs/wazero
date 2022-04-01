@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"context"
@@ -424,7 +424,7 @@ func newStore() *Store {
 	return NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 }
 
-// NewModuleEngine implements the same method as documented on internalwasm.Engine.
+// NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
@@ -432,12 +432,12 @@ func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *Tabl
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-// Name implements the same method as documented on internalwasm.ModuleEngine.
+// Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {
 	return e.name
 }
 
-// Call implements the same method as documented on internalwasm.ModuleEngine.
+// Call implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		err = errors.New("call failed")
@@ -447,7 +447,7 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
 	return true, nil
 }

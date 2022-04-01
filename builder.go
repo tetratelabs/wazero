@@ -2,7 +2,7 @@ package wazero
 
 import (
 	"github.com/tetratelabs/wazero/api"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // ModuleBuilder is a way to define a WebAssembly 1.0 (20191205) in Go.
@@ -109,7 +109,7 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 // Build implements ModuleBuilder.Build
 func (b *moduleBuilder) Build() (*CompiledCode, error) {
 	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
-	if module, err := internalwasm.NewHostModule(b.moduleName, b.nameToGoFunc); err != nil {
+	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc); err != nil {
 		return nil, err
 	} else {
 		return &CompiledCode{module: module}, nil

@@ -1,4 +1,4 @@
-package api
+package wasi
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 // Note: Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16
 // See https://linux.die.net/man/3/errno
-type Errno = uint32 // alias for parity with internalwasm.ValueType
+type Errno = uint32 // alias for parity with wasm.ValueType
 
 // ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
 func ErrnoName(errno Errno) string {
@@ -128,7 +128,7 @@ const (
 	ErrnoNoprotoopt
 	// ErrnoNospc No space left on device.
 	ErrnoNospc
-	// ErrnoNosys ExportedFunction not supported.
+	// ErrnoNosys function not supported.
 	ErrnoNosys
 	// ErrnoNotconn The socket is not connected.
 	ErrnoNotconn

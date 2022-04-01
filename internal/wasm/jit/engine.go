@@ -11,14 +11,14 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 type (
-	// engine is an JIT implementation of internalwasm.Engine
+	// engine is an JIT implementation of wasm.Engine
 	engine struct {
 		compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 		mux               sync.RWMutex
@@ -26,7 +26,7 @@ type (
 		setFinalizer func(obj interface{}, finalizer interface{})
 	}
 
-	// moduleEngine implements internalwasm.ModuleEngine
+	// moduleEngine implements wasm.ModuleEngine
 	moduleEngine struct {
 		// name is the name the module was instantiated with used for error handling.
 		name string
@@ -242,24 +242,24 @@ const (
 	compiledFunctionStackPointerCeilOffset   = 8
 	compiledFunctionSourceOffset             = 16
 
-	// Offsets for internalwasm.ModuleInstance.
+	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset = 48
 	moduleInstanceMemoryOffset  = 72
 	moduleInstanceTableOffset   = 80
 	moduleInstanceEngineOffset  = 120
 
-	// Offsets for internalwasm.TableInstance.
+	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
 	tableInstanceTableLenOffset = 8
 
-	// Offsets for internalwasm.FunctionInstance.
+	// Offsets for wasm.FunctionInstance.
 	functionInstanceTypeIDOffset = 96
 
-	// Offsets for internalwasm.MemoryInstance.
+	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
 	memoryInstanceBufferLenOffset = 8
 
-	// Offsets for internalwasm.GlobalInstance.
+	// Offsets for wasm.GlobalInstance.
 	globalInstanceValueOffset = 8
 
 	// Offsets for Go's interface.
@@ -355,7 +355,7 @@ func releaseCompiledFunction(compiledFn *compiledFunction) {
 	}
 }
 
-// NewModuleEngine implements the same method as documented on internalwasm.Engine.
+// NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
@@ -453,12 +453,12 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	return
 }
 
-// Name implements the same method as documented on internalwasm.ModuleEngine.
+// Name implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Name() string {
 	return me.name
 }
 
-// Call implements the same method as documented on internalwasm.ModuleEngine.
+// Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// compiledFunctions on close aren't locked, neither is this read.
@@ -541,7 +541,7 @@ func failIfClosed(me *moduleEngine) error {
 	return nil
 }
 
-// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {

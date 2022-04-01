@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"reflect"
@@ -13,11 +13,11 @@ import (
 type wasiAPI struct {
 }
 
-func (a *wasiAPI) ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) api.Errno {
+func (a *wasiAPI) ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
 	return 0
 }
 
-func (a *wasiAPI) FdWrite(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) api.Errno {
+func (a *wasiAPI) FdWrite(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) uint32 {
 	return 0
 }
 

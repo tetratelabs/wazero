@@ -8,25 +8,24 @@ import (
 	"io/fs"
 	"math"
 
-	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	newEngine       func() internalwasm.Engine
+	newEngine       func() wasm.Engine
 	ctx             context.Context
-	enabledFeatures internalwasm.Features
+	enabledFeatures wasm.Features
 	memoryMaxPages  uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
 	ctx:             context.Background(),
-	enabledFeatures: internalwasm.Features20191205,
-	memoryMaxPages:  internalwasm.MemoryMaxPages,
+	enabledFeatures: wasm.Features20191205,
+	memoryMaxPages:  wasm.MemoryMaxPages,
 }
 
 // clone ensures all fields are coped even if nil.
@@ -96,7 +95,7 @@ func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig
 // will fail to parse.
 func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureMutableGlobal, enabled)
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
 	return ret
 }
 
@@ -106,7 +105,7 @@ func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(internalwasm.FeatureSignExtensionOps, enabled)
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
 	return ret
 }
 
@@ -117,7 +116,7 @@ func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
 type CompiledCode struct {
-	module *internalwasm.Module
+	module *wasm.Module
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating system.
@@ -141,17 +140,17 @@ type ModuleConfig struct {
 	// preopenFD has the next FD number to use
 	preopenFD uint32
 	// preopens are keyed on file descriptor and only include the Path and FS fields.
-	preopens map[uint32]*internalwasm.FileEntry
+	preopens map[uint32]*wasm.FileEntry
 	// preopenPaths allow overwriting of existing paths.
 	preopenPaths map[string]uint32
 }
 
 func NewModuleConfig() *ModuleConfig {
 	return &ModuleConfig{
-		startFunctions: []string{internalwasi.FunctionStart},
+		startFunctions: []string{"_start"},
 		environKeys:    map[string]int{},
 		preopenFD:      uint32(3), // after stdin/stdout/stderr
-		preopens:       map[uint32]*internalwasm.FileEntry{},
+		preopens:       map[uint32]*wasm.FileEntry{},
 		preopenPaths:   map[string]uint32{},
 	}
 }
@@ -302,7 +301,7 @@ func (c *ModuleConfig) WithWorkDirFS(fs fs.FS) *ModuleConfig {
 // setFS maps a path to a file-system. This is only used for base paths: "/" and ".".
 func (c *ModuleConfig) setFS(path string, fs fs.FS) {
 	// Check to see if this key already exists and update it.
-	entry := &internalwasm.FileEntry{Path: path, FS: fs}
+	entry := &wasm.FileEntry{Path: path, FS: fs}
 	if fd, ok := c.preopenPaths[path]; ok {
 		c.preopens[fd] = entry
 	} else {
@@ -312,8 +311,8 @@ func (c *ModuleConfig) setFS(path string, fs fs.FS) {
 	}
 }
 
-// toSysContext creates a baseline internalwasm.SysContext configured by ModuleConfig.
-func (c *ModuleConfig) toSysContext() (sys *internalwasm.SysContext, err error) {
+// toSysContext creates a baseline wasm.SysContext configured by ModuleConfig.
+func (c *ModuleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
 	for i := 0; i < len(c.environ); i += 2 {
@@ -348,8 +347,8 @@ func (c *ModuleConfig) toSysContext() (sys *internalwasm.SysContext, err error) 
 
 	// Default the working directory to the root FS if it exists.
 	if rootFD != 0 && !setWorkDirFS {
-		preopens[c.preopenFD] = &internalwasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
+		preopens[c.preopenFD] = &wasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
 	}
 
-	return internalwasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
+	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
 }

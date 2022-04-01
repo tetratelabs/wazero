@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func decodeTypeSection(r *bytes.Reader) ([]*wasm.FunctionType, error) {
@@ -209,7 +209,7 @@ func encodeSection(sectionID wasm.SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
-// encodeTypeSection encodes a internalwasm.SectionIDType for the given imports in WebAssembly 1.0 (20191205) Binary
+// encodeTypeSection encodes a wasm.SectionIDType for the given imports in WebAssembly 1.0 (20191205) Binary
 // Format.
 //
 // See encodeFunctionType
@@ -222,7 +222,7 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	return encodeSection(wasm.SectionIDType, contents)
 }
 
-// encodeImportSection encodes a internalwasm.SectionIDImport for the given imports in WebAssembly 1.0 (20191205) Binary
+// encodeImportSection encodes a wasm.SectionIDImport for the given imports in WebAssembly 1.0 (20191205) Binary
 // Format.
 //
 // See encodeImport
@@ -235,7 +235,7 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	return encodeSection(wasm.SectionIDImport, contents)
 }
 
-// encodeFunctionSection encodes a internalwasm.SectionIDFunction for the type indices associated with module-defined
+// encodeFunctionSection encodes a wasm.SectionIDFunction for the type indices associated with module-defined
 // functions in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-section%E2%91%A0
@@ -247,7 +247,7 @@ func encodeFunctionSection(typeIndices []wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDFunction, contents)
 }
 
-// encodeCodeSection encodes a internalwasm.SectionIDCode for the module-defined function in WebAssembly 1.0 (20191205)
+// encodeCodeSection encodes a wasm.SectionIDCode for the module-defined function in WebAssembly 1.0 (20191205)
 // Binary Format.
 //
 // See encodeCode
@@ -260,7 +260,7 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	return encodeSection(wasm.SectionIDCode, contents)
 }
 
-// encodeTableSection encodes a internalwasm.SectionIDTable for the module-defined function in WebAssembly 1.0
+// encodeTableSection encodes a wasm.SectionIDTable for the module-defined function in WebAssembly 1.0
 // (20191205) Binary Format.
 //
 // See encodeTable
@@ -270,7 +270,7 @@ func encodeTableSection(table *wasm.Table) []byte {
 	return encodeSection(wasm.SectionIDTable, contents)
 }
 
-// encodeMemorySection encodes a internalwasm.SectionIDMemory for the module-defined function in WebAssembly 1.0
+// encodeMemorySection encodes a wasm.SectionIDMemory for the module-defined function in WebAssembly 1.0
 // (20191205) Binary Format.
 //
 // See encodeMemory
@@ -280,7 +280,7 @@ func encodeMemorySection(memory *wasm.Memory) []byte {
 	return encodeSection(wasm.SectionIDMemory, contents)
 }
 
-// encodeGlobalSection encodes a internalwasm.SectionIDGlobal for the given globals in WebAssembly 1.0 (20191205) Binary
+// encodeGlobalSection encodes a wasm.SectionIDGlobal for the given globals in WebAssembly 1.0 (20191205) Binary
 // Format.
 //
 // See encodeGlobal
@@ -293,7 +293,7 @@ func encodeGlobalSection(globals []*wasm.Global) []byte {
 	return encodeSection(wasm.SectionIDGlobal, contents)
 }
 
-// encodeExportSection encodes a internalwasm.SectionIDExport for the given exports in WebAssembly 1.0 (20191205) Binary
+// encodeExportSection encodes a wasm.SectionIDExport for the given exports in WebAssembly 1.0 (20191205) Binary
 // Format.
 //
 // See encodeExport
@@ -306,7 +306,7 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	return encodeSection(wasm.SectionIDExport, contents)
 }
 
-// encodeStartSection encodes a internalwasm.SectionIDStart for the given function index in WebAssembly 1.0 (20191205)
+// encodeStartSection encodes a wasm.SectionIDStart for the given function index in WebAssembly 1.0 (20191205)
 // Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-section%E2%91%A0

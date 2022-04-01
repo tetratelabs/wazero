@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // decodeGlobal returns the api.Global decoded with the WebAssembly 1.0 (20191205) Binary Format.
@@ -52,7 +52,7 @@ func decodeGlobalType(r *bytes.Reader) (*wasm.GlobalType, error) {
 	return ret, nil
 }
 
-// encodeGlobal returns the internalwasm.Global encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeGlobal returns the wasm.Global encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-section%E2%91%A0
 func encodeGlobal(g *wasm.Global) []byte {

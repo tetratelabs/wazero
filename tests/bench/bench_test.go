@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // caseWasm was compiled from TinyGo testdata/case.go
@@ -140,7 +141,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = r.InstantiateModule(wazero.WASISnapshotPreview1())
+	_, err = wasi.InstantiateSnapshotPreview1(r)
 	if err != nil {
 		b.Fatal(err)
 	}

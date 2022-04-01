@@ -46,8 +46,8 @@ how WebAssembly programs interact with the host embedding them.
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
-wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
-defer wasi.Close()
+wm, err := wasi.InstantiateSnapshotPreview1(r)
+defer wm.Close()
 
 config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
 module, err := r.InstantiateModule(binary, config)

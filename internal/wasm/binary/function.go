@@ -1,12 +1,12 @@
 package binary
 
 import (
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var nullary = []byte{0x60, 0, 0}
 
-// encodedOneParam is a cache of internalwasm.FunctionType values for param length 1 and result length 0
+// encodedOneParam is a cache of wasm.FunctionType values for param length 1 and result length 0
 var encodedOneParam = map[wasm.ValueType][]byte{
 	wasm.ValueTypeI32: {0x60, 1, wasm.ValueTypeI32, 0},
 	wasm.ValueTypeI64: {0x60, 1, wasm.ValueTypeI64, 0},
@@ -14,7 +14,7 @@ var encodedOneParam = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64: {0x60, 1, wasm.ValueTypeF64, 0},
 }
 
-// encodedOneResult is a cache of internalwasm.FunctionType values for param length 0 and result length 1
+// encodedOneResult is a cache of wasm.FunctionType values for param length 0 and result length 1
 var encodedOneResult = map[wasm.ValueType][]byte{
 	wasm.ValueTypeI32: {0x60, 0, 1, wasm.ValueTypeI32},
 	wasm.ValueTypeI64: {0x60, 0, 1, wasm.ValueTypeI64},
@@ -22,7 +22,7 @@ var encodedOneResult = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64: {0x60, 0, 1, wasm.ValueTypeF64},
 }
 
-// encodeFunctionType returns the internalwasm.FunctionType encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-types%E2%91%A4

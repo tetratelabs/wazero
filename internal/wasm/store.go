@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sync"
 
-	publicwasm "github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
@@ -372,7 +372,7 @@ func (s *Store) addModule(m *ModuleInstance) {
 }
 
 // Module implements wazero.Runtime Module
-func (s *Store) Module(moduleName string) publicwasm.Module {
+func (s *Store) Module(moduleName string) api.Module {
 	if m := s.module(moduleName); m != nil {
 		return m.Ctx
 	} else {
@@ -516,9 +516,9 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		case ValueTypeI64:
 			v = int64(g.Val)
 		case ValueTypeF32:
-			v = publicwasm.DecodeF32(g.Val)
+			v = api.DecodeF32(g.Val)
 		case ValueTypeF64:
-			v = publicwasm.DecodeF64(g.Val)
+			v = api.DecodeF64(g.Val)
 		}
 	}
 	return

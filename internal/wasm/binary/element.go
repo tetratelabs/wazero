@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {

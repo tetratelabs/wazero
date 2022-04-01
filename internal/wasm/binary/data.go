@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func decodeDataSegment(r *bytes.Reader) (*wasm.DataSegment, error) {

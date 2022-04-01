@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"encoding/binary"

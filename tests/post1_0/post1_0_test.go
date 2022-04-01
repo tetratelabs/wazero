@@ -21,7 +21,7 @@ func TestInterpreter(t *testing.T) {
 	runOptionalFeatureTests(t, wazero.NewRuntimeConfigInterpreter)
 }
 
-// runOptionalFeatureTests tests features enabled by feature flags (internalwasm.Features) as they were unfinished when
+// runOptionalFeatureTests tests features enabled by feature flags (wasm.Features) as they were unfinished when
 // WebAssembly 1.0 (20191205) was released.
 //
 // See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md

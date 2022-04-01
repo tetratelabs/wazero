@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	publicwasm "github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
@@ -169,7 +169,7 @@ const (
 	MaximumFunctionIndex = uint32(1 << 27)
 )
 
-// TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
+// TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
 // TODO: Returning nil should be impossible when decode results are validated. Validate decode before back-filling tests.
 func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
@@ -447,9 +447,9 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 		case int64:
 			gv = uint64(v)
 		case float32:
-			gv = publicwasm.EncodeF32(v)
+			gv = api.EncodeF32(v)
 		case float64:
-			gv = publicwasm.EncodeF64(v)
+			gv = api.EncodeF64(v)
 		}
 		globals = append(globals, &GlobalInstance{Type: gs.Type, Val: gv})
 	}
@@ -796,18 +796,18 @@ func SectionIDName(sectionID SectionID) string {
 }
 
 // ValueType is an alias of api.ValueType defined to simplify imports.
-type ValueType = publicwasm.ValueType
+type ValueType = api.ValueType
 
 const (
-	ValueTypeI32 = publicwasm.ValueTypeI32
-	ValueTypeI64 = publicwasm.ValueTypeI64
-	ValueTypeF32 = publicwasm.ValueTypeF32
-	ValueTypeF64 = publicwasm.ValueTypeF64
+	ValueTypeI32 = api.ValueTypeI32
+	ValueTypeI64 = api.ValueTypeI64
+	ValueTypeF32 = api.ValueTypeF32
+	ValueTypeF64 = api.ValueTypeF64
 )
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
-	return publicwasm.ValueTypeName(t)
+	return api.ValueTypeName(t)
 }
 
 // ElemType is fixed to ElemTypeFuncref until post 20191205 reference type is implemented.

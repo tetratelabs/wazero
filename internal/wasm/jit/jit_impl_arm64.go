@@ -16,7 +16,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 

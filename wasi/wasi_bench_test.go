@@ -1,16 +1,12 @@
-package bench
+package wasi
 
 import (
-	"bytes"
 	"context"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
-	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var testMem = &wasm.MemoryInstance{
@@ -31,9 +27,9 @@ func Test_EnvironGet(t *testing.T) {
 	require.NoError(t, err)
 
 	testCtx := newCtx(make([]byte, 20), sys)
-	environGet := internalwasi.NewAPI().EnvironGet
+	environGet := newAPI().EnvironGet
 
-	require.Equal(t, api.ErrnoSuccess, environGet(testCtx, 11, 1))
+	require.Equal(t, ErrnoSuccess, environGet(testCtx, 11, 1))
 	require.Equal(t, testCtx.Memory(), testMem)
 }
 
@@ -53,10 +49,10 @@ func Benchmark_EnvironGet(b *testing.B) {
 		0,
 	}, sys)
 
-	environGet := internalwasi.NewAPI().EnvironGet
+	environGet := newAPI().EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if environGet(testCtx, 0, 4) != api.ErrnoSuccess {
+			if environGet(testCtx, 0, 4) != ErrnoSuccess {
 				b.Fatal()
 			}
 		}
@@ -67,8 +63,4 @@ func newCtx(buf []byte, sys *wasm.SysContext) *wasm.ModuleContext {
 	return wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)
-}
-
-func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
-	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
 }

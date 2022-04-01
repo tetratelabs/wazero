@@ -9,11 +9,12 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 func Test_WASI(t *testing.T) {
 	// built-in WASI function to write a random value to memory
-	randomGet := func(ctx api.Module, buf, bufLen uint32) api.Errno {
+	randomGet := func(ctx api.Module, buf, bufLen uint32) wasi.Errno {
 		panic("unimplemented")
 	}
 
@@ -21,7 +22,7 @@ func Test_WASI(t *testing.T) {
 	random := func(ctx api.Module) {
 		// Write 8 random bytes to memory using WASI.
 		errno := randomGet(ctx, 0, 8)
-		require.Equal(t, api.ErrnoSuccess, errno)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
 
 		// Read them back and print it in hex!
 		random, ok := ctx.Memory().ReadUint64Le(0)
@@ -37,17 +38,17 @@ func Test_WASI(t *testing.T) {
 	defer host.Close()
 
 	// Configure WASI and implement the function to use it
-	we, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
-	defer we.Close()
+	defer wm.Close()
 
-	randomGetFn := we.ExportedFunction("random_get")
+	randomGetFn := wm.ExportedFunction("random_get")
 
 	// Implement the function pointer. This mainly shows how you can decouple a host function dependency.
-	randomGet = func(ctx api.Module, buf, bufLen uint32) api.Errno {
+	randomGet = func(ctx api.Module, buf, bufLen uint32) wasi.Errno {
 		res, err := randomGetFn.Call(ctx, uint64(buf), uint64(bufLen))
 		require.NoError(t, err)
-		return api.Errno(res[0])
+		return wasi.Errno(res[0])
 	}
 
 	// The "random" function was imported as $random in Wasm. Since it was marked as the start

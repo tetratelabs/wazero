@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestRuntimeConfig(t *testing.T) {
@@ -51,7 +51,7 @@ func TestRuntimeConfig(t *testing.T) {
 				return c.WithFeatureMutableGlobal(true)
 			},
 			expected: &RuntimeConfig{
-				enabledFeatures: internalwasm.FeatureMutableGlobal,
+				enabledFeatures: wasm.FeatureMutableGlobal,
 			},
 		},
 		{
@@ -60,7 +60,7 @@ func TestRuntimeConfig(t *testing.T) {
 				return c.WithFeatureSignExtensionOps(true)
 			},
 			expected: &RuntimeConfig{
-				enabledFeatures: internalwasm.FeatureSignExtensionOps,
+				enabledFeatures: wasm.FeatureSignExtensionOps,
 			},
 		},
 	}
@@ -80,13 +80,13 @@ func TestRuntimeConfig(t *testing.T) {
 func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 	tests := []struct {
 		name          string
-		feature       internalwasm.Features
+		feature       wasm.Features
 		expectDefault bool
 		setFeature    func(*RuntimeConfig, bool) *RuntimeConfig
 	}{
 		{
 			name:          "mutable-global",
-			feature:       internalwasm.FeatureMutableGlobal,
+			feature:       wasm.FeatureMutableGlobal,
 			expectDefault: true,
 			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
 				return c.WithFeatureMutableGlobal(v)
@@ -94,7 +94,7 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 		},
 		{
 			name:          "sign-extension-ops",
-			feature:       internalwasm.FeatureSignExtensionOps,
+			feature:       wasm.FeatureSignExtensionOps,
 			expectDefault: false,
 			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
 				return c.WithFeatureSignExtensionOps(v)
@@ -131,7 +131,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    *ModuleConfig
-		expected *internalwasm.SysContext
+		expected *wasm.SysContext
 	}{
 		{
 			name:  "empty",
@@ -261,7 +261,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
-				map[uint32]*internalwasm.FileEntry{ // openedFiles
+				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS},
 				},
@@ -277,7 +277,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
-				map[uint32]*internalwasm.FileEntry{ // openedFiles
+				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS2},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -293,7 +293,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
-				map[uint32]*internalwasm.FileEntry{ // openedFiles
+				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 				},
 			),
@@ -308,7 +308,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
-				map[uint32]*internalwasm.FileEntry{ // openedFiles
+				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -324,7 +324,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
-				map[uint32]*internalwasm.FileEntry{ // openedFiles
+				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 					4: {Path: "/", FS: testFS2},
 				},
@@ -394,9 +394,9 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	}
 }
 
-// requireSysContext ensures internalwasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
-func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*internalwasm.FileEntry) *internalwasm.SysContext {
-	sys, err := internalwasm.NewSysContext(max, args, environ, stdin, stdout, stderr, openedFiles)
+// requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
+func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*wasm.FileEntry) *wasm.SysContext {
+	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, openedFiles)
 	require.NoError(t, err)
 	return sys
 }

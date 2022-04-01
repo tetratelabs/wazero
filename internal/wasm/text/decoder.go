@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // parserPosition holds the positional state of a parser. Values are also useful as they allow you to do a reference
@@ -72,8 +72,8 @@ type moduleParser struct {
 	// functions.
 	typeUseParser *typeUseParser
 
-	// funcNamespace represents the function index namespace, which begins with any internalwasm.ExternTypeFunc in the
-	// internalwasm.SectionIDImport followed by the internalwasm.SectionIDFunction.
+	// funcNamespace represents the function index namespace, which begins with any wasm.ExternTypeFunc in the
+	// wasm.SectionIDImport followed by the wasm.SectionIDFunction.
 	//
 	// Non-abbreviated imported and module-defined functions can declare symbolic IDs, such as "$main", which are
 	// resolved here (without the '$' prefix).
@@ -82,8 +82,8 @@ type moduleParser struct {
 	// funcParser parses the CodeSection for a given module-defined function.
 	funcParser *funcParser
 
-	// memoryNamespace represents the memory index namespace, which begins with any internalwasm.ExternTypeMemory in
-	// the internalwasm.SectionIDImport followed by the internalwasm.SectionIDMemory.
+	// memoryNamespace represents the memory index namespace, which begins with any wasm.ExternTypeMemory in
+	// the wasm.SectionIDImport followed by the wasm.SectionIDMemory.
 	//
 	// Non-abbreviated imported and module-defined memories can declare symbolic IDs, such as "$mem", which are resolved
 	// here (without the '$' prefix).
@@ -100,7 +100,7 @@ type moduleParser struct {
 	fieldCountFunc uint32
 }
 
-// DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
+// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
 func DecodeModule(source []byte, enabledFeatures wasm.Features, memoryMaxPages uint32) (result *wasm.Module, err error) {
 	// TODO: when globals are supported, err on global vars if disabled

@@ -1,4 +1,4 @@
-package internalwasm
+package wasm
 
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or JIT compiler.
@@ -11,7 +11,7 @@ type Engine interface {
 	// * table: a possibly shared table used by this module. When nil tableInit will be nil.
 	// * tableInit: a mapping of TableInstance.Table index to the function index it should point to.
 	//
-	// Note: Input parameters must be pre-validated with internalwasm.Module Validate, to ensure no fields are invalid
+	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
 	NewModuleEngine(name string, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
 }

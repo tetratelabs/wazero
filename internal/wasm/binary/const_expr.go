@@ -6,7 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error) {

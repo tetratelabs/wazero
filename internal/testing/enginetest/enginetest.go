@@ -1,4 +1,4 @@
-// Package enginetest contains tests common to any internalwasm.Engine implementation. Defining these as top-level
+// Package enginetest contains tests common to any wasm.Engine implementation. Defining these as top-level
 // functions is less burden than copy/pasting the implementations, while still allowing test caching to operate.
 //
 // Ex. In simplest case, dispatch:
@@ -12,8 +12,8 @@
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
 //
-// Note: These tests intentionally avoid using internalwasm.Store as it is important to know both the dependencies and
-// the capabilities at the internalwasm.Engine abstraction.
+// Note: These tests intentionally avoid using wasm.Store as it is important to know both the dependencies and
+// the capabilities at the wasm.Engine abstraction.
 package enginetest
 
 import (
@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	publicwasm "github.com/tetratelabs/wazero/api"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 type EngineTester interface {
@@ -179,8 +179,8 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	memory := &wasm.MemoryInstance{}
-	var ctxMemory publicwasm.Memory
-	hostFn := reflect.ValueOf(func(ctx publicwasm.Module, v uint64) uint64 {
+	var ctxMemory api.Memory
+	hostFn := reflect.ValueOf(func(ctx api.Module, v uint64) uint64 {
 		ctxMemory = ctx.Memory()
 		return v
 	})
@@ -231,12 +231,12 @@ func addFunction(module *wasm.ModuleInstance, fn *wasm.FunctionInstance) {
 	fn.Module = module
 }
 
-// newModuleContext creates an internalwasm.ModuleContext for unit tests.
+// newModuleContext creates an wasm.ModuleContext for unit tests.
 //
 // Note: This sets fields that are not needed in the interpreter, but are required by code compiled by JIT. If a new
 // test here passes in the interpreter and segmentation faults in JIT, check for a new field offset or a change in JIT
 // (ex. jit.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
-// internalwasm.Store: store isn't used here for unit test precision.
+// wasm.Store: store isn't used here for unit test precision.
 func newModuleContext(module *wasm.ModuleInstance, engine wasm.ModuleEngine) *wasm.ModuleContext {
 	// moduleInstanceEngineOffset
 	module.Engine = engine

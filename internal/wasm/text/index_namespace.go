@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// newIndexNamespace sectionElementCount parameter should be internalwasm.Module SectionElementCount unless testing.
+// newIndexNamespace sectionElementCount parameter should be wasm.Module SectionElementCount unless testing.
 func newIndexNamespace(sectionElementCount func(wasm.SectionID) uint32) *indexNamespace {
 	return &indexNamespace{sectionElementCount: sectionElementCount, idToIdx: map[string]wasm.Index{}}
 }

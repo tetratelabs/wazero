@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 )
@@ -100,7 +100,7 @@ func NewRuntime() Runtime {
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
 		ctx:             config.ctx,
-		store:           internalwasm.NewStore(config.newEngine(), config.enabledFeatures),
+		store:           wasm.NewStore(config.newEngine(), config.enabledFeatures),
 		enabledFeatures: config.enabledFeatures,
 		memoryMaxPages:  config.memoryMaxPages,
 	}
@@ -109,8 +109,8 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
 	ctx             context.Context
-	store           *internalwasm.Store
-	enabledFeatures internalwasm.Features
+	store           *wasm.Store
+	enabledFeatures wasm.Features
 	memoryMaxPages  uint32
 }
 
@@ -130,17 +130,17 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 	}
 
 	// Peek to see if this is a binary or text format
-	var decoder internalwasm.DecodeModule
+	var decoder wasm.DecodeModule
 	if bytes.Equal(source[0:4], binary.Magic) {
 		decoder = binary.DecodeModule
 	} else {
 		decoder = text.DecodeModule
 	}
 
-	if r.memoryMaxPages > internalwasm.MemoryMaxPages {
+	if r.memoryMaxPages > wasm.MemoryMaxPages {
 		return nil, fmt.Errorf("memoryMaxPages %d (%s) > specification max %d (%s)",
-			r.memoryMaxPages, internalwasm.PagesToUnitOfBytes(r.memoryMaxPages),
-			internalwasm.MemoryMaxPages, internalwasm.PagesToUnitOfBytes(internalwasm.MemoryMaxPages))
+			r.memoryMaxPages, wasm.PagesToUnitOfBytes(r.memoryMaxPages),
+			wasm.MemoryMaxPages, wasm.PagesToUnitOfBytes(wasm.MemoryMaxPages))
 	}
 
 	internal, err := decoder(source, r.enabledFeatures, r.memoryMaxPages)
@@ -171,7 +171,7 @@ func (r *runtime) InstantiateModule(code *CompiledCode) (mod api.Module, err err
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
 func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
-	var sys *internalwasm.SysContext
+	var sys *wasm.SysContext
 	if sys, err = config.toSysContext(); err != nil {
 		return
 	}

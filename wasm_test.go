@@ -1,7 +1,6 @@
 package wazero
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
@@ -36,15 +35,15 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		},
 		{
 			name:   "binary - no name section",
-			source: binary.EncodeModule(&internalwasm.Module{}),
+			source: binary.EncodeModule(&wasm.Module{}),
 		},
 		{
 			name:   "binary - empty NameSection.ModuleName",
-			source: binary.EncodeModule(&internalwasm.Module{NameSection: &internalwasm.NameSection{}}),
+			source: binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
 		},
 		{
 			name:         "binary - NameSection.ModuleName",
-			source:       binary.EncodeModule(&internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}}),
+			source:       binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
 			expectedName: "test",
 		},
 	}
@@ -99,7 +98,7 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 		{
 			name:        "memory has too many pages - binary",
 			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
-			source:      binary.EncodeModule(&internalwasm.Module{MemorySection: &internalwasm.Memory{Min: 2, Max: 3}}),
+			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Max: 3}}),
 			expectedErr: "section memory: max 3 pages (192 Ki) outside range of 2 pages (128 Ki)",
 		},
 	}
@@ -164,50 +163,50 @@ func TestModule_Memory(t *testing.T) {
 func TestModule_Global(t *testing.T) {
 	tests := []struct {
 		name                      string
-		module                    *internalwasm.Module // module as wat doesn't yet support globals
+		module                    *wasm.Module // module as wat doesn't yet support globals
 		expected, expectedMutable bool
 	}{
 		{
 			name:   "no global",
-			module: &internalwasm.Module{},
+			module: &wasm.Module{},
 		},
 		{
 			name: "global not exported",
-			module: &internalwasm.Module{
-				GlobalSection: []*internalwasm.Global{
+			module: &wasm.Module{
+				GlobalSection: []*wasm.Global{
 					{
-						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
-						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
 					},
 				},
 			},
 		},
 		{
 			name: "global exported",
-			module: &internalwasm.Module{
-				GlobalSection: []*internalwasm.Global{
+			module: &wasm.Module{
+				GlobalSection: []*wasm.Global{
 					{
-						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64},
-						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
 					},
 				},
-				ExportSection: map[string]*internalwasm.Export{
-					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				ExportSection: map[string]*wasm.Export{
+					"global": {Type: wasm.ExternTypeGlobal, Name: "global"},
 				},
 			},
 			expected: true,
 		},
 		{
 			name: "global exported and mutable",
-			module: &internalwasm.Module{
-				GlobalSection: []*internalwasm.Global{
+			module: &wasm.Module{
+				GlobalSection: []*wasm.Global{
 					{
-						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
-						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
 					},
 				},
-				ExportSection: map[string]*internalwasm.Export{
-					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				ExportSection: map[string]*wasm.Export{
+					"global": {Type: wasm.ExternTypeGlobal, Name: "global"},
 				},
 			},
 			expected:        true,
@@ -329,10 +328,6 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 func TestInstantiateModuleFromCode_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime()
 
-	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
-	require.NoError(t, err)
-	defer wasi.Close()
-
 	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi_test.go
 	(memory 1)
 	(export "memory" (memory 0))
@@ -357,12 +352,8 @@ func TestInstantiateModuleFromCode_UsesRuntimeContext(t *testing.T) {
 	require.NoError(t, err)
 	defer host.Close()
 
-	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
-	require.NoError(t, err)
-	defer wasi.Close()
-
 	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi_test.go
+	mod, err := r.InstantiateModuleFromCode([]byte(`(module $start
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))
@@ -394,37 +385,6 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
-}
-
-// wasiArg was compiled from examples/testdata/wasi_arg.wat
-//go:embed examples/testdata/wasi_arg.wasm
-var wasiArg []byte
-
-func TestInstantiateModuleWithConfig(t *testing.T) {
-	r := NewRuntime()
-
-	stdout := bytes.NewBuffer(nil)
-
-	// Configure WASI to write stdout to a buffer, so that we can verify it later.
-	sys := NewModuleConfig().WithStdout(stdout)
-	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
-	require.NoError(t, err)
-	defer wasi.Close()
-
-	code, err := r.CompileModule(wasiArg)
-	require.NoError(t, err)
-
-	// Re-use the same module many times.
-	for _, tc := range []string{"a", "b", "c"} {
-		mod, err := r.InstantiateModuleWithConfig(code, sys.WithArgs(tc).WithName(tc))
-		require.NoError(t, err)
-
-		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).
-		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
-
-		stdout.Reset()
-		require.NoError(t, mod.Close())
-	}
 }
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.

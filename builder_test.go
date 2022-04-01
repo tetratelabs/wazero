@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // TestNewModuleBuilder_Build only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
@@ -26,38 +26,38 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    func(Runtime) ModuleBuilder
-		expected *internalwasm.Module
+		expected *wasm.Module
 	}{
 		{
 			name: "empty",
 			input: func(r Runtime) ModuleBuilder {
 				return r.NewModuleBuilder("")
 			},
-			expected: &internalwasm.Module{},
+			expected: &wasm.Module{},
 		},
 		{
 			name: "only name",
 			input: func(r Runtime) ModuleBuilder {
 				return r.NewModuleBuilder("env")
 			},
-			expected: &internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "env"}},
+			expected: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "env"}},
 		},
 		{
 			name: "ExportFunction",
 			input: func(r Runtime) ModuleBuilder {
 				return r.NewModuleBuilder("").ExportFunction("1", uint32_uint32)
 			},
-			expected: &internalwasm.Module{
-				TypeSection: []*internalwasm.FunctionType{
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []internalwasm.Index{0},
+				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
-				ExportSection: map[string]*internalwasm.Export{
-					"1": {Name: "1", Type: internalwasm.ExternTypeFunc, Index: 0},
+				ExportSection: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
-				NameSection: &internalwasm.NameSection{
-					FunctionNames: internalwasm.NameMap{{Index: 0, Name: "1"}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
 				},
 			},
 		},
@@ -66,17 +66,17 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			input: func(r Runtime) ModuleBuilder {
 				return r.NewModuleBuilder("").ExportFunction("1", uint32_uint32).ExportFunction("1", uint64_uint32)
 			},
-			expected: &internalwasm.Module{
-				TypeSection: []*internalwasm.FunctionType{
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []internalwasm.Index{0},
+				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
-				ExportSection: map[string]*internalwasm.Export{
-					"1": {Name: "1", Type: internalwasm.ExternTypeFunc, Index: 0},
+				ExportSection: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
-				NameSection: &internalwasm.NameSection{
-					FunctionNames: internalwasm.NameMap{{Index: 0, Name: "1"}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
 				},
 			},
 		},
@@ -86,19 +86,19 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				// Intentionally out of order
 				return r.NewModuleBuilder("").ExportFunction("2", uint64_uint32).ExportFunction("1", uint32_uint32)
 			},
-			expected: &internalwasm.Module{
-				TypeSection: []*internalwasm.FunctionType{
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []internalwasm.Index{0, 1},
+				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*internalwasm.Export{
-					"1": {Name: "1", Type: internalwasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: internalwasm.ExternTypeFunc, Index: 1},
+				ExportSection: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
-				NameSection: &internalwasm.NameSection{
-					FunctionNames: internalwasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
 				},
 			},
 		},
@@ -110,19 +110,19 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 					"2": uint64_uint32,
 				})
 			},
-			expected: &internalwasm.Module{
-				TypeSection: []*internalwasm.FunctionType{
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []internalwasm.Index{0, 1},
+				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*internalwasm.Export{
-					"1": {Name: "1", Type: internalwasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: internalwasm.ExternTypeFunc, Index: 1},
+				ExportSection: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
-				NameSection: &internalwasm.NameSection{
-					FunctionNames: internalwasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
 				},
 			},
 		},
@@ -135,19 +135,19 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 					"2": uint64_uint32,
 				})
 			},
-			expected: &internalwasm.Module{
-				TypeSection: []*internalwasm.FunctionType{
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []internalwasm.Index{0, 1},
+				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*internalwasm.Export{
-					"1": {Name: "1", Type: internalwasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: internalwasm.ExternTypeFunc, Index: 1},
+				ExportSection: map[string]*wasm.Export{
+					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
-				NameSection: &internalwasm.NameSection{
-					FunctionNames: internalwasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
 				},
 			},
 		},
@@ -185,7 +185,7 @@ func TestNewModuleBuilder_InstantiateModule_Errors(t *testing.T) {
 }
 
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.
-func requireHostModuleEquals(t *testing.T, expected, actual *internalwasm.Module) {
+func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
 	require.Equal(t, expected.TypeSection, actual.TypeSection)
 	require.Equal(t, expected.ImportSection, actual.ImportSection)

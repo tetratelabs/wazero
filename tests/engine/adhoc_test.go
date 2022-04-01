@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	publicwasm "github.com/tetratelabs/wazero/api"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -73,7 +73,7 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {
-	callUnreachable := func(nil publicwasm.Module) {
+	callUnreachable := func(nil api.Module) {
 		panic("panic in host function")
 	}
 
@@ -95,7 +95,7 @@ wasm backtrace:
 }
 
 func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
-	hostfunc := func(mod publicwasm.Module) {
+	hostfunc := func(mod api.Module) {
 		_, err := mod.ExportedFunction("called_by_host_func").Call(nil)
 		require.NoError(t, err)
 	}
@@ -115,7 +115,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 // Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
-	storeInt := func(nil publicwasm.Module, offset uint32, val uint64) uint32 {
+	storeInt := func(nil api.Module, offset uint32, val uint64) uint32 {
 		if !nil.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
@@ -152,7 +152,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	importedName := t.Name() + "-imported"
 	importingName := t.Name() + "-importing"
 
-	var importing publicwasm.Module
+	var importing api.Module
 	fns := map[string]interface{}{
 		"no_context": func(p uint32) uint32 {
 			return p + 1
@@ -161,7 +161,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 			require.Equal(t, configContext, ctx)
 			return p + 1
 		},
-		"module_context": func(module publicwasm.Module, p uint32) uint32 {
+		"module_context": func(module api.Module, p uint32) uint32 {
 			require.Equal(t, importing, module)
 			return p + 1
 		},
@@ -229,13 +229,13 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		},
 		{
 			name:     "f32",
-			input:    publicwasm.EncodeF32(math.MaxFloat32 - 1),
-			expected: publicwasm.EncodeF32(math.MaxFloat32),
+			input:    api.EncodeF32(math.MaxFloat32 - 1),
+			expected: api.EncodeF32(math.MaxFloat32),
 		},
 		{
 			name:     "f64",
-			input:    publicwasm.EncodeF64(math.MaxFloat64 - 1),
-			expected: publicwasm.EncodeF64(math.MaxFloat64),
+			input:    api.EncodeF64(math.MaxFloat64 - 1),
+			expected: api.EncodeF64(math.MaxFloat64),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -289,7 +289,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			var imported, importing publicwasm.Module
+			var imported, importing api.Module
 			var err error
 			closeAndReturn := func(x uint32) uint32 {
 				if tc.closeImporting != 0 {

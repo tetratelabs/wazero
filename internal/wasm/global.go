@@ -1,9 +1,9 @@
-package internalwasm
+package wasm
 
 import (
 	"fmt"
 
-	publicwasm "github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/api"
 )
 
 type mutableGlobal struct {
@@ -11,10 +11,10 @@ type mutableGlobal struct {
 }
 
 // compile-time check to ensure mutableGlobal is a api.Global
-var _ publicwasm.Global = &mutableGlobal{}
+var _ api.Global = &mutableGlobal{}
 
 // Type implements api.Global Type
-func (g *mutableGlobal) Type() publicwasm.ValueType {
+func (g *mutableGlobal) Type() api.ValueType {
 	return g.g.Type.ValType
 }
 
@@ -34,9 +34,9 @@ func (g *mutableGlobal) String() string {
 	case ValueTypeI32, ValueTypeI64:
 		return fmt.Sprintf("global(%d)", g.Get())
 	case ValueTypeF32:
-		return fmt.Sprintf("global(%f)", publicwasm.DecodeF32(g.Get()))
+		return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get()))
 	case ValueTypeF64:
-		return fmt.Sprintf("global(%f)", publicwasm.DecodeF64(g.Get()))
+		return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get()))
 	default:
 		panic(fmt.Errorf("BUG: unknown value type %X", g.Type()))
 	}
@@ -45,10 +45,10 @@ func (g *mutableGlobal) String() string {
 type globalI32 uint64
 
 // compile-time check to ensure globalI32 is a api.Global
-var _ publicwasm.Global = globalI32(0)
+var _ api.Global = globalI32(0)
 
 // Type implements api.Global Type
-func (g globalI32) Type() publicwasm.ValueType {
+func (g globalI32) Type() api.ValueType {
 	return ValueTypeI32
 }
 
@@ -64,11 +64,11 @@ func (g globalI32) String() string {
 
 type globalI64 uint64
 
-// compile-time check to ensure globalI64 is a publicwasm.Global
-var _ publicwasm.Global = globalI64(0)
+// compile-time check to ensure globalI64 is a api.Global
+var _ api.Global = globalI64(0)
 
 // Type implements api.Global Type
-func (g globalI64) Type() publicwasm.ValueType {
+func (g globalI64) Type() api.ValueType {
 	return ValueTypeI64
 }
 
@@ -84,11 +84,11 @@ func (g globalI64) String() string {
 
 type globalF32 uint64
 
-// compile-time check to ensure globalF32 is a publicwasm.Global
-var _ publicwasm.Global = globalF32(0)
+// compile-time check to ensure globalF32 is a api.Global
+var _ api.Global = globalF32(0)
 
 // Type implements api.Global Type
-func (g globalF32) Type() publicwasm.ValueType {
+func (g globalF32) Type() api.ValueType {
 	return ValueTypeF32
 }
 
@@ -99,16 +99,16 @@ func (g globalF32) Get() uint64 {
 
 // String implements fmt.Stringer
 func (g globalF32) String() string {
-	return fmt.Sprintf("global(%f)", publicwasm.DecodeF32(g.Get()))
+	return fmt.Sprintf("global(%f)", api.DecodeF32(g.Get()))
 }
 
 type globalF64 uint64
 
-// compile-time check to ensure globalF64 is a publicwasm.Global
-var _ publicwasm.Global = globalF64(0)
+// compile-time check to ensure globalF64 is a api.Global
+var _ api.Global = globalF64(0)
 
 // Type implements api.Global Type
-func (g globalF64) Type() publicwasm.ValueType {
+func (g globalF64) Type() api.ValueType {
 	return ValueTypeF64
 }
 
@@ -119,5 +119,5 @@ func (g globalF64) Get() uint64 {
 
 // String implements fmt.Stringer
 func (g globalF64) String() string {
-	return fmt.Sprintf("global(%f)", publicwasm.DecodeF64(g.Get()))
+	return fmt.Sprintf("global(%f)", api.DecodeF64(g.Get()))
 }
