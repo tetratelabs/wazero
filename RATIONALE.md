@@ -30,18 +30,17 @@ codebase productive.
 ### Avoiding cyclic dependencies
 wazero shares constants and interfaces with internal code by a sharing pattern described below:
 * shared interfaces and constants go in one package under root: `api`.
-  * This is simpler to understand, and less confusing, than multiple packages (ex. `wasm` and `wasi`).
 * user APIs and structs depend on `api` and go into the root package `wazero`.
   * Ex. `InstantiateModule` -> `/wasm.go` depends on the type `api.Module`.
 * implementation code can also depend on `api` in a corresponding package under `/internal`.
-  * Ex  package `internalwasm` -> `/internal/wasm/*.go` and can depend on the type `api.Module`.
+  * Ex  package `wasm` -> `/internal/wasm/*.go` and can depend on the type `api.Module`.
 
 The above guarantees no cyclic dependencies at the cost of having to re-define symbols that exist in both packages.
-For example, if `internalwasm.Store` is a type the user needs access to, it is narrowed by a cover type in the `wazero`:
+For example, if `wasm.Store` is a type the user needs access to, it is narrowed by a cover type in the `wazero`:
 
 ```go
 type Runtime struct {
-	s *internalwasm.Store
+	s *wasm.Store
 }
 ```
 
@@ -65,13 +64,9 @@ Besides security, this practice prevents other bugs and allows centralization of
 ## Why does InstantiateModule call "_start" by default?
 We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
 However, this caused confusion because both many languages compiled a WASI dependency, and many did so inconsistently.
-The only thing we could enforce was a "memory" export, but that could be enforced anyway.
 
-* Not all wasm that import WASI export a "_start" function.
-* Not all wam that import WASI export a "__indirect_function_table" table
-
-If "_start" isn't called, it causes issues in TinyGo, as it needs this in order to implement panic. To deal with this a
-different way, we have a configuration to call any start functions that exist, and that defaults to "_start".
+That said, if "_start" isn't called, it causes issues in TinyGo, as it needs this in order to implement panic. To deal
+with this a different way, we have a configuration to call any start functions that exist, which defaults to "_start".
 
 ## Runtime == Engine+Store
 wazero defines a single user-type which combines the specification concept of `Store` with the unspecified `Engine`
@@ -104,7 +99,7 @@ Unfortunately, (WASI Snapshot Preview 1)[https://github.com/WebAssembly/WASI/blo
 This section describes how Wazero interprets and implements the semantics of several WASI APIs that may be interpreted differently by different wasm runtimes.
 Those APIs may affect the portability of a WASI application.
 
-### Why aren't all WASI rules enforced?
+### Why aren't WASI rules enforced?
 
 The [snapshot-01](https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md) version of WASI has a
 number of rules for a "command module", but only the memory export rule is enforced. If a "_start" function exists, it
