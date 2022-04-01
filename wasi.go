@@ -14,11 +14,11 @@ const (
 )
 
 // WASISnapshotPreview1 are functions importable as the module name WASIModuleSnapshotPreview1
-func WASISnapshotPreview1() *Binary {
+func WASISnapshotPreview1() *CompiledCode {
 	_, fns := internalwasi.SnapshotPreview1Functions()
 	m, err := internalwasm.NewHostModule(WASIModuleSnapshotPreview1, fns)
 	if err != nil {
 		panic(fmt.Errorf("BUG: %w", err))
 	}
-	return &Binary{module: m}
+	return &CompiledCode{module: m}
 }

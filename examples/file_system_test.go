@@ -20,7 +20,7 @@ var catFS embed.FS
 //go:embed testdata/cat.go
 var catGo []byte
 
-// catWasm was binary from catGo
+// catWasm was compiled from catGo
 //go:embed testdata/cat.wasm
 var catWasm []byte
 
@@ -42,7 +42,7 @@ func Test_Cat(t *testing.T) {
 	config := wazero.NewModuleConfig().WithStdout(stdoutBuf).WithFS(rooted)
 
 	// Compile the `cat` module.
-	binary, err := r.CompileModule(catWasm)
+	code, err := r.CompileModule(catWasm)
 	require.NoError(t, err)
 
 	// Instantiate WASI, which implements system I/O such as console output.
@@ -53,7 +53,7 @@ func Test_Cat(t *testing.T) {
 	// InstantiateModuleWithConfig by default runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "cat" and add args to write "cat.go" to stdout twice.
 	// * We use both "/cat.go" and "./cat.go" because WithFS by default maps the workdir "." to "/".
-	cat, err := r.InstantiateModuleWithConfig(binary, config.WithArgs("cat", "/cat.go", "./cat.go"))
+	cat, err := r.InstantiateModuleWithConfig(code, config.WithArgs("cat", "/cat.go", "./cat.go"))
 	require.NoError(t, err)
 	defer cat.Close()
 

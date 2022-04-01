@@ -17,7 +17,7 @@ import (
 
 type testKey struct{}
 
-// hostFuncWasm was binary from TinyGo testdata/host_func.go
+// hostFuncWasm was compiled from TinyGo testdata/host_func.go
 //go:embed testdata/host_func.wasm
 var hostFuncWasm []byte
 
@@ -60,7 +60,7 @@ func Test_hostFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	// Compile the `hostFunc` module.
-	binary, err := r.CompileModule(hostFuncWasm)
+	code, err := r.CompileModule(hostFuncWasm)
 	require.NoError(t, err)
 
 	// Configure stdout (console) to write to a buffer.
@@ -73,7 +73,7 @@ func Test_hostFunc(t *testing.T) {
 	defer wasi.Close()
 
 	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
-	module, err := r.InstantiateModuleWithConfig(binary, config)
+	module, err := r.InstantiateModuleWithConfig(code, config)
 	require.NoError(t, err)
 	defer wasi.Close()
 
@@ -87,7 +87,7 @@ func Test_hostFunc(t *testing.T) {
 		return uint32(res[0])
 	}
 
-	// Set a context variable that should be available in wasm.Binary.
+	// Set a context variable that should be available in a wasm.Function.
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import

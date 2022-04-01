@@ -54,10 +54,10 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			binary, err := r.CompileModule(tc.source)
+			code, err := r.CompileModule(tc.source)
 			require.NoError(t, err)
 			if tc.expectedName != "" {
-				require.Equal(t, tc.expectedName, binary.module.NameSection.ModuleName)
+				require.Equal(t, tc.expectedName, code.module.NameSection.ModuleName)
 			}
 		})
 	}
@@ -143,11 +143,11 @@ func TestModule_Memory(t *testing.T) {
 
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
-			binary, err := r.CompileModule([]byte(tc.wat))
+			code, err := r.CompileModule([]byte(tc.wat))
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModule(binary)
+			module, err := r.InstantiateModule(code)
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -221,7 +221,7 @@ func TestModule_Global(t *testing.T) {
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above global
-			module, err := r.InstantiateModule(&Binary{module: tc.module})
+			module, err := r.InstantiateModule(&CompiledCode{module: tc.module})
 			require.NoError(t, err)
 
 			global := module.ExportedGlobal("global")
@@ -282,10 +282,10 @@ func TestFunction_Context(t *testing.T) {
 			defer closer() // nolint
 
 			// Instantiate the module and get the export of the above hostFn
-			binary, err := r.CompileModule(source)
+			code, err := r.CompileModule(source)
 			require.NoError(t, err)
 
-			module, err := r.InstantiateModuleWithConfig(binary, NewModuleConfig().WithName(t.Name()))
+			module, err := r.InstantiateModuleWithConfig(code, NewModuleConfig().WithName(t.Name()))
 			require.NoError(t, err)
 			defer module.Close()
 
@@ -313,14 +313,14 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
-	binary, err := r.CompileModule([]byte(`(module $runtime_test.go
+	code, err := r.CompileModule([]byte(`(module $runtime_test.go
 	(import "env" "start" (func $start))
 	(start $start)
 )`))
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = r.InstantiateModule(binary)
+	_, err = r.InstantiateModule(code)
 	require.NoError(t, err)
 	require.True(t, calledStart)
 }
@@ -411,12 +411,12 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 	require.NoError(t, err)
 	defer wasi.Close()
 
-	binary, err := r.CompileModule(wasiArg)
+	code, err := r.CompileModule(wasiArg)
 	require.NoError(t, err)
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {
-		mod, err := r.InstantiateModuleWithConfig(binary, sys.WithArgs(tc).WithName(tc))
+		mod, err := r.InstantiateModuleWithConfig(code, sys.WithArgs(tc).WithName(tc))
 		require.NoError(t, err)
 
 		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).

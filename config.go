@@ -110,12 +110,13 @@ func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig
 	return ret
 }
 
-// Binary is a WebAssembly 1.0 (20191205) module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
+// CompiledCode is a WebAssembly 1.0 (20191205) module ready to be instantiated (Runtime.InstantiateModule) as an\
+// api.Module.
 //
 // Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
-type Binary struct {
+type CompiledCode struct {
 	module *internalwasm.Module
 }
 

@@ -16,8 +16,8 @@ import (
 //
 // Ex.
 //	r := wazero.NewRuntime()
-//	binary, _ := r.CompileModule(source)
-//	module, _ := r.InstantiateModule(binary)
+//	code, _ := r.CompileModule(source)
+//	module, _ := r.InstantiateModule(code)
 //	defer module.Close()
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
@@ -44,7 +44,7 @@ type Runtime interface {
 	//
 	// Note: The resulting module name defaults to what was binary from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(source []byte) (*Binary, error)
+	CompileModule(source []byte) (*CompiledCode, error)
 
 	// InstantiateModuleFromCode instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
 	// errs if invalid.
@@ -61,17 +61,17 @@ type Runtime interface {
 	//
 	// Ex.
 	//	r := wazero.NewRuntime()
-	//	binary, _ := r.CompileModule(source)
-	//	module, _ := r.InstantiateModule(binary)
+	//	code, _ := r.CompileModule(source)
+	//	module, _ := r.InstantiateModule(code)
 	//	defer module.Close()
 	//
-	// While a Binary is pre-validated, there are a few situations which can cause an error:
-	//  * The Binary name is already in use.
-	//  * The Binary has a table element initializer that resolves to an index outside the Table minimum size.
-	//  * The Binary has a start function, and it failed to execute.
+	// While CompiledCode is pre-validated, there are a few situations which can cause an error:
+	//  * The module name is already in use.
+	//  * The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//  * The module has a start function, and it failed to execute.
 	//
 	// Note: The last value of RuntimeConfig.WithContext is used for any start function.
-	InstantiateModule(binary *Binary) (api.Module, error)
+	InstantiateModule(code *CompiledCode) (api.Module, error)
 
 	// InstantiateModuleWithConfig is like InstantiateModule, except you can override configuration such as the module
 	// name or ENV variables.
@@ -80,16 +80,16 @@ type Runtime interface {
 	//
 	//	r := wazero.NewRuntime()
 	//	wasi, _ := r.InstantiateModule(wazero.WASISnapshotPreview1())
-	//	binary, _ := r.CompileModule(source)
+	//	code, _ := r.CompileModule(source)
 	//
 	//	// Initialize base configuration:
 	//	config := wazero.NewModuleConfig().WithStdout(buf)
 	//
 	//	// Assign different configuration on each instantiation
-	//	module, _ := r.InstantiateModuleWithConfig(binary, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
+	//	module, _ := r.InstantiateModuleWithConfig(code, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 	//
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
-	InstantiateModuleWithConfig(binary *Binary, config *ModuleConfig) (mod api.Module, err error)
+	InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error)
 }
 
 func NewRuntime() Runtime {
@@ -120,7 +120,7 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(source []byte) (*Binary, error) {
+func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 	if source == nil {
 		return nil, errors.New("source == nil")
 	}
@@ -152,36 +152,36 @@ func (r *runtime) CompileModule(source []byte) (*Binary, error) {
 		return nil, err
 	}
 
-	return &Binary{module: internal}, nil
+	return &CompiledCode{module: internal}, nil
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
 func (r *runtime) InstantiateModuleFromCode(source []byte) (api.Module, error) {
-	if binary, err := r.CompileModule(source); err != nil {
+	if code, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {
-		return r.InstantiateModule(binary)
+		return r.InstantiateModule(code)
 	}
 }
 
 // InstantiateModule implements Runtime.InstantiateModule
-func (r *runtime) InstantiateModule(binary *Binary) (mod api.Module, err error) {
-	return r.InstantiateModuleWithConfig(binary, NewModuleConfig())
+func (r *runtime) InstantiateModule(code *CompiledCode) (mod api.Module, err error) {
+	return r.InstantiateModuleWithConfig(code, NewModuleConfig())
 }
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
-func (r *runtime) InstantiateModuleWithConfig(binary *Binary, config *ModuleConfig) (mod api.Module, err error) {
+func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
 	var sys *internalwasm.SysContext
 	if sys, err = config.toSysContext(); err != nil {
 		return
 	}
 
 	name := config.name
-	if name == "" && binary.module.NameSection != nil && binary.module.NameSection.ModuleName != "" {
-		name = binary.module.NameSection.ModuleName
+	if name == "" && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
+		name = code.module.NameSection.ModuleName
 	}
 
-	mod, err = r.store.Instantiate(r.ctx, binary.module, name, sys)
+	mod, err = r.store.Instantiate(r.ctx, code.module, name, sys)
 	if err != nil {
 		return
 	}

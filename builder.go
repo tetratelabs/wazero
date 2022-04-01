@@ -25,7 +25,7 @@ import (
 // Note: Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
 type ModuleBuilder interface {
 
-	// ExportFunction adds a function written in Go, which a WebAssembly Binary can import.
+	// ExportFunction adds a function written in Go, which a WebAssembly module can import.
 	//
 	// * name - the name to export. Ex "random_get"
 	// * goFunc - the `func` to export.
@@ -43,9 +43,9 @@ type ModuleBuilder interface {
 	//
 	// Ex. This uses a Go Context:
 	//
-	//	addInts := func(ctx context.Context, x uint32, uint32) uint32 {
+	//	addInts := func(m context.Context, x uint32, uint32) uint32 {
 	//		// add a little extra if we put some in the context!
-	//		return x + y + ctx.Value(extraKey).(uint32)
+	//		return x + y + m.Value(extraKey).(uint32)
 	//	}
 	//
 	// The most sophisticated context is api.Module, which allows access to the Go context, but also
@@ -54,9 +54,9 @@ type ModuleBuilder interface {
 	//
 	// Ex. This reads the parameters from!
 	//
-	//	addInts := func(ctx api.Module, offset uint32) uint32 {
-	//		x, _ := ctx.Memory().ReadUint32Le(offset)
-	//		y, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
+	//	addInts := func(m api.Module, offset uint32) uint32 {
+	//		x, _ := m.Memory().ReadUint32Le(offset)
+	//		y, _ := m.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
 	//		return x + y
 	//	}
 	//
@@ -67,8 +67,8 @@ type ModuleBuilder interface {
 	// ExportFunctions is a convenience that calls ExportFunction for each key/value in the provided map.
 	ExportFunctions(nameToGoFunc map[string]interface{}) ModuleBuilder
 
-	// Build returns a Binary to instantiate, or returns an error if any of the configuration is invalid.
-	Build() (*Binary, error)
+	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
+	Build() (*CompiledCode, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
@@ -107,12 +107,12 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 }
 
 // Build implements ModuleBuilder.Build
-func (b *moduleBuilder) Build() (*Binary, error) {
+func (b *moduleBuilder) Build() (*CompiledCode, error) {
 	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
 	if module, err := internalwasm.NewHostModule(b.moduleName, b.nameToGoFunc); err != nil {
 		return nil, err
 	} else {
-		return &Binary{module: module}, nil
+		return &CompiledCode{module: module}, nil
 	}
 }
 

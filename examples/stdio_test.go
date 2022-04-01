@@ -11,7 +11,7 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-// stdioWasm was binary from TinyGo testdata/stdio.go
+// stdioWasm was compiled from TinyGo testdata/stdio.go
 //go:embed testdata/stdio.wasm
 var stdioWasm []byte
 
@@ -19,7 +19,7 @@ func Test_stdio(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Compile the `stdioWasm` module.
-	binary, err := r.CompileModule(stdioWasm)
+	code, err := r.CompileModule(stdioWasm)
 	require.NoError(t, err)
 
 	// Configure standard I/O (ex stdout) to write to buffers instead of no-op.
@@ -34,7 +34,7 @@ func Test_stdio(t *testing.T) {
 	defer wasi.Close()
 
 	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
-	module, err := r.InstantiateModuleWithConfig(binary, config)
+	module, err := r.InstantiateModuleWithConfig(code, config)
 	require.NoError(t, err)
 	defer module.Close()
 
