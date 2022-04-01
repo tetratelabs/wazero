@@ -145,8 +145,8 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 		b.Fatal(err)
 	}
 
-	// InstantiateModuleFromSource runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromSource(caseWasm)
+	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
+	m, err := r.InstantiateModuleFromCode(caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -299,7 +299,7 @@ func goWasm3FacIterInvoke(b *testing.B) {
 func newWazeroFacIterBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
 	r := wazero.NewRuntimeWithConfig(config)
 
-	m, err := r.InstantiateModuleFromSource(facWasm)
+	m, err := r.InstantiateModuleFromCode(facWasm)
 	if err != nil {
 		return nil, nil, err
 	}

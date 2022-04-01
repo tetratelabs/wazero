@@ -36,7 +36,7 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Prove a module can be redefined even with in-flight calls.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err := r.InstantiateModuleFromSource(source)
+		importing, err := r.InstantiateModuleFromCode(source)
 		require.NoError(t, err)
 		return imported, importing
 	})
@@ -56,7 +56,7 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Redefine the importing module, which should link to the redefined host module.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err = r.InstantiateModuleFromSource(source)
+		importing, err = r.InstantiateModuleFromCode(source)
 		require.NoError(t, err)
 
 		return imported, importing
@@ -85,7 +85,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// Import that module.
 	source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-	importing, err := r.InstantiateModuleFromSource(source)
+	importing, err := r.InstantiateModuleFromCode(source)
 	require.NoError(t, err)
 	defer importing.Close()
 

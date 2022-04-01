@@ -11,7 +11,7 @@ import (
 // Test_AddInt shows how you can define a function in text format and have it compiled inline.
 // See https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
 func Test_AddInt(t *testing.T) {
-	module, err := wazero.NewRuntime().InstantiateModuleFromSource([]byte(`(module $test
+	module, err := wazero.NewRuntime().InstantiateModuleFromCode([]byte(`(module $test
     (func $addInt ;; TODO: function module (export "AddInt")
         (param $value_1 i32) (param $value_2 i32)
         (result i32)

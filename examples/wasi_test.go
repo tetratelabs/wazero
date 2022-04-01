@@ -52,7 +52,7 @@ func Test_WASI(t *testing.T) {
 
 	// The "random" function was imported as $random in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "random" was called!
-	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi
+	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi
 	(import "wasi_snapshot_preview1" "random_get"
 		(func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))
 	(import "" "random" (func $random))

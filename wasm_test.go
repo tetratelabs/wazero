@@ -325,15 +325,15 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	require.True(t, calledStart)
 }
 
-// TestInstantiateModuleFromSource_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't export "_start".
-func TestInstantiateModuleFromSource_DoesntEnforce_Start(t *testing.T) {
+// TestInstantiateModuleFromCode_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't export "_start".
+func TestInstantiateModuleFromCode_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime()
 
 	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
 	defer wasi.Close()
 
-	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi_test.go
+	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi_test.go
 	(memory 1)
 	(export "memory" (memory 0))
 )`))
@@ -341,7 +341,7 @@ func TestInstantiateModuleFromSource_DoesntEnforce_Start(t *testing.T) {
 	require.NoError(t, mod.Close())
 }
 
-func TestInstantiateModuleFromSource_UsesRuntimeContext(t *testing.T) {
+func TestInstantiateModuleFromCode_UsesRuntimeContext(t *testing.T) {
 	type key string
 	config := NewRuntimeConfig().WithContext(context.WithValue(context.Background(), key("wa"), "zero"))
 	r := NewRuntimeWithConfig(config)
@@ -362,7 +362,7 @@ func TestInstantiateModuleFromSource_UsesRuntimeContext(t *testing.T) {
 	defer wasi.Close()
 
 	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi_test.go
+	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi_test.go
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))

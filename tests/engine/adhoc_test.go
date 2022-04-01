@@ -61,7 +61,7 @@ var (
 )
 
 func testHugeStack(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromSource(hugestackWasm)
+	module, err := r.InstantiateModuleFromCode(hugestackWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -80,7 +80,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource(unreachableWasm)
+	module, err := r.InstantiateModuleFromCode(unreachableWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -103,7 +103,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource(recursiveWasm)
+	module, err := r.InstantiateModuleFromCode(recursiveWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -127,7 +127,7 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromSource([]byte(`(module $test
+	module, err := r.InstantiateModuleFromCode([]byte(`(module $test
 		(import "" "store_int"
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
@@ -174,7 +174,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err = r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+			importing, err = r.InstantiateModuleFromCode([]byte(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
 	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -240,7 +240,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err := r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+			importing, err := r.InstantiateModuleFromCode([]byte(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
 	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -309,7 +309,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			// Import that module.
 			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-			importing, err = r.InstantiateModuleFromSource(source)
+			importing, err = r.InstantiateModuleFromCode(source)
 			require.NoError(t, err)
 			defer importing.Close()
 

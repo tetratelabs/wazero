@@ -38,7 +38,7 @@ type Runtime interface {
 	// CompileModule decodes the WebAssembly 1.0 (20191205) text or binary source or errs if invalid.
 	// Any pre-compilation done after decoding the source is dependent on the RuntimeConfig.
 	//
-	// There are two main reasons to use CompileModule instead of InstantiateModuleFromSource:
+	// There are two main reasons to use CompileModule instead of InstantiateModuleFromCode:
 	//  * Improve performance when the same module is instantiated multiple times under different names
 	//  * Reduce the amount of errors that can occur during InstantiateModule.
 	//
@@ -46,16 +46,16 @@ type Runtime interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(source []byte) (*Binary, error)
 
-	// InstantiateModuleFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
+	// InstantiateModuleFromCode instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
 	// errs if invalid.
 	//
 	// Ex.
-	//	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
+	//	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(source)
 	//	defer module.Close()
 	//
 	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
-	InstantiateModuleFromSource(source []byte) (api.Module, error)
+	InstantiateModuleFromCode(source []byte) (api.Module, error)
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
@@ -155,8 +155,8 @@ func (r *runtime) CompileModule(source []byte) (*Binary, error) {
 	return &Binary{module: internal}, nil
 }
 
-// InstantiateModuleFromSource implements Runtime.InstantiateModuleFromSource
-func (r *runtime) InstantiateModuleFromSource(source []byte) (api.Module, error) {
+// InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
+func (r *runtime) InstantiateModuleFromCode(source []byte) (api.Module, error) {
 	if binary, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {

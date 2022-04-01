@@ -112,7 +112,7 @@ func TestExampleUpToDate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		module, err := r.InstantiateModuleFromSource(exampleBinary)
+		module, err := r.InstantiateModuleFromCode(exampleBinary)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
