@@ -35,7 +35,14 @@ build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags m
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\s\([a-z0-9.\s+-:]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
-		wast2json --debug-names --disable-bulk-memory $$f; \
+		wast2json \
+			--disable-saturating-float-to-int \
+			--disable-sign-extension \
+			--disable-simd \
+			--disable-multi-value \
+			--disable-bulk-memory \
+			--disable-reference-types \
+			--debug-names $$f; \
 	done
 
 .PHONY: test
