@@ -18,6 +18,8 @@ package enginetest
 
 import (
 	"context"
+	"errors"
+	"math"
 	"reflect"
 	"testing"
 
@@ -49,7 +51,6 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	i64 := wasm.ValueTypeI64
 	fn := &wasm.FunctionInstance{
-		Name: "fn",
 		Kind: wasm.FunctionKindWasm,
 		Type: &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
 		Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd},
@@ -57,18 +58,16 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// To use the function, we first need to add it to a module.
 	module := &wasm.ModuleInstance{Name: t.Name()}
-	addFunction(module, fn)
+	addFunction(module, "fn", fn)
 
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
 	defer closeModuleEngineWithExitCode(t, me, 0)
-
-	// Create a call context which links the module to the module-engine compiled from it.
-	ctx := newModuleContext(module, me)
+	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
-	results, err := me.Call(ctx, fn, 3)
+	results, err := me.Call(module.Ctx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
@@ -105,10 +104,10 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
 		var importedFunctions []*wasm.FunctionInstance
 		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 		tableInit := map[wasm.Index]wasm.Index{0: 2}
 
@@ -124,10 +123,10 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	t.Run("imported function", func(t *testing.T) {
 		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
 		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 		var moduleFunctions []*wasm.FunctionInstance
 		tableInit := map[wasm.Index]wasm.Index{0: 2}
@@ -149,16 +148,16 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	t.Run("mixed functions", func(t *testing.T) {
 		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
 		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 		tableInit := map[wasm.Index]wasm.Index{0: 0, 1: 4}
 
@@ -177,7 +176,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	})
 }
 
-func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
+func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester) {
 	memory := &wasm.MemoryInstance{}
 	var ctxMemory api.Memory
 	hostFn := reflect.ValueOf(func(ctx api.Module, v uint64) uint64 {
@@ -204,6 +203,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 
 	me, err := e.NewModuleEngine(t.Name(), nil, module.Functions, nil, nil)
 	require.NoError(t, err)
+	defer closeModuleEngineWithExitCode(t, me, 0)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
@@ -212,36 +212,232 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, ctxMemory)
 	})
-
-	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := me.Call(modCtx, f)
-		require.EqualError(t, err, "expected 1 params, but passed 0")
-	})
-
-	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := me.Call(modCtx, f, 1, 2)
-		require.EqualError(t, err, "expected 1 params, but passed 2")
-	})
 }
 
-// addFunction assigns and adds a function to the module.
-func addFunction(module *wasm.ModuleInstance, fn *wasm.FunctionInstance) {
-	module.Functions = append(module.Functions, fn)
-	// This link is essential for all engines. For example, functions call other functions defined in the same module.
-	fn.Module = module
+func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
+	runTestModuleEngine_Call_HostFn_ModuleContext(t, et) // TODO: refactor to use the same test interface.
+
+	e := et.NewEngine()
+
+	imported, importedMe := setupCallTests(t, e)
+	defer closeModuleEngineWithExitCode(t, importedMe, 0)
+
+	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
+	tests := []struct {
+		name string
+		me   wasm.ModuleEngine
+		fn   *wasm.FunctionInstance
+	}{
+		{
+			name: wasmFnName,
+			me:   importedMe,
+			fn:   imported.Exports[wasmFnName].Function,
+		},
+		{
+			name: hostFnName,
+			me:   importedMe,
+			fn:   imported.Exports[hostFnName].Function,
+		},
+		{
+			name: callHostFnName,
+			me:   importedMe,
+			fn:   imported.Exports[callHostFnName].Function,
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			f := tc.fn
+			m := f.Module
+			results, err := m.Engine.Call(m.Ctx, f, 1)
+			require.NoError(t, err)
+			require.Equal(t, uint64(1), results[0])
+		})
+	}
 }
 
-// newModuleContext creates an wasm.ModuleContext for unit tests.
+func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
+	e := et.NewEngine()
+
+	imported, importedMe := setupCallTests(t, e)
+	defer closeModuleEngineWithExitCode(t, importedMe, 0)
+
+	tests := []struct {
+		name        string
+		me          wasm.ModuleEngine
+		fn          *wasm.FunctionInstance
+		input       []uint64
+		expectedErr string
+	}{
+		{
+			name:        "host function not enough parameters",
+			input:       []uint64{},
+			me:          importedMe,
+			fn:          imported.Exports[hostFnName].Function,
+			expectedErr: `expected 1 params, but passed 0`,
+		},
+		{
+			name:        "host function too many parameters",
+			input:       []uint64{1, 2},
+			me:          importedMe,
+			fn:          imported.Exports[hostFnName].Function,
+			expectedErr: `expected 1 params, but passed 2`,
+		},
+		{
+			name:        "wasm function not enough parameters",
+			input:       []uint64{},
+			me:          importedMe,
+			fn:          imported.Exports[wasmFnName].Function,
+			expectedErr: `expected 1 params, but passed 0`,
+		},
+		{
+			name:        "wasm function too many parameters",
+			input:       []uint64{1, 2},
+			me:          importedMe,
+			fn:          imported.Exports[wasmFnName].Function,
+			expectedErr: `expected 1 params, but passed 2`,
+		},
+		{
+			name:  "wasm function panics with wasmruntime.Error",
+			input: []uint64{0},
+			me:    importedMe,
+			fn:    imported.Exports[wasmFnName].Function,
+			expectedErr: `wasm runtime error: integer divide by zero
+wasm backtrace:
+	0: wasm_div_by`,
+		},
+		{
+			name:  "host function that panics",
+			input: []uint64{math.MaxUint32},
+			me:    importedMe,
+			fn:    imported.Exports[hostFnName].Function,
+			expectedErr: `wasm runtime error: host-function panic
+wasm backtrace:
+	0: host_div_by`,
+		},
+		{
+			name:  "host function panics with runtime.Error",
+			input: []uint64{0},
+			me:    importedMe,
+			fn:    imported.Exports[hostFnName].Function, // TODO: This should be a normal runtime error
+			expectedErr: `wasm runtime error: runtime error: integer divide by zero
+wasm backtrace:
+	0: host_div_by`,
+		},
+		{
+			name:  "wasm calls host function that panics",
+			input: []uint64{math.MaxUint32},
+			me:    importedMe,
+			fn:    imported.Exports[callHostFnName].Function,
+			expectedErr: `wasm runtime error: host-function panic
+wasm backtrace:
+	0: host_div_by
+	1: call->host_div_by`,
+		},
+		{
+			name:  "wasm calls imported wasm that calls host function panics with runtime.Error",
+			input: []uint64{0},
+			me:    importedMe,
+			fn:    imported.Exports[callHostFnName].Function,
+			expectedErr: `wasm runtime error: runtime error: integer divide by zero
+wasm backtrace:
+	0: host_div_by
+	1: call->host_div_by`,
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			f := tc.fn
+			m := f.Module
+			_, err := m.Engine.Call(m.Ctx, f, tc.input...)
+			require.EqualError(t, err, tc.expectedErr)
+
+			// Ensure the module still works
+			ret, err := m.Engine.Call(m.Ctx, f, 1)
+			require.NoError(t, err)
+			require.Equal(t, uint64(1), ret[0])
+		})
+	}
+}
+
+const (
+	wasmFnName     = "wasm_div_by"
+	hostFnName     = "host_div_by"
+	callHostFnName = "call->" + hostFnName
+)
+
+// (func (export "wasm_div_by") (param i32) (result i32) (i32.div_u (i32.const 1) (local.get 0)))
+var wasmFnBody = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeI32DivU, wasm.OpcodeEnd}
+
+func divBy(d uint32) uint32 {
+	if d == math.MaxUint32 {
+		panic(errors.New("host-function panic"))
+	}
+	return 1 / d // go panics if d == 0
+}
+
+func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.ModuleEngine) {
+	i32 := wasm.ValueTypeI32
+	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	wasmFn := &wasm.FunctionInstance{
+		Kind:  wasm.FunctionKindWasm,
+		Type:  ft,
+		Body:  wasmFnBody,
+		Index: 0,
+	}
+	hostFnVal := reflect.ValueOf(divBy)
+	hostFn := &wasm.FunctionInstance{
+		Kind:   wasm.FunctionKindGoNoContext,
+		Type:   ft,
+		GoFunc: &hostFnVal,
+		Index:  1,
+	}
+	callHostFn := &wasm.FunctionInstance{
+		Kind:  wasm.FunctionKindWasm,
+		Type:  ft,
+		Body:  []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, byte(hostFn.Index), wasm.OpcodeEnd},
+		Index: 2,
+	}
+
+	// To use the function, we first need to add it to a module.
+	imported := &wasm.ModuleInstance{Name: t.Name()}
+	addFunction(imported, wasmFnName, wasmFn)
+	addFunction(imported, hostFnName, hostFn)
+	addFunction(imported, callHostFnName, callHostFn)
+
+	// Compile the imported module
+	importedMe, err := e.NewModuleEngine(imported.Name, nil, imported.Functions, nil, nil)
+	require.NoError(t, err)
+	linkModuleToEngine(imported, importedMe)
+
+	return imported, importedMe
+}
+
+// linkModuleToEngine assigns fields that wasm.Store would on instantiation. These includes fields both interpreter and
+// JIT needs as well as fields only needed by JIT.
 //
 // Note: This sets fields that are not needed in the interpreter, but are required by code compiled by JIT. If a new
 // test here passes in the interpreter and segmentation faults in JIT, check for a new field offset or a change in JIT
 // (ex. jit.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
 // wasm.Store: store isn't used here for unit test precision.
-func newModuleContext(module *wasm.ModuleInstance, engine wasm.ModuleEngine) *wasm.ModuleContext {
-	// moduleInstanceEngineOffset
-	module.Engine = engine
+func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
+	module.Engine = me // for JIT, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 	// callEngineModuleContextModuleInstanceAddressOffset
-	return wasm.NewModuleContext(context.Background(), nil, module, nil)
+	module.Ctx = wasm.NewModuleContext(context.Background(), nil, module, nil)
+}
+
+// addFunction assigns and adds a function to the module.
+func addFunction(module *wasm.ModuleInstance, funcName string, fn *wasm.FunctionInstance) {
+	fn.DebugName = funcName
+	module.Functions = append(module.Functions, fn)
+	if module.Exports == nil {
+		module.Exports = map[string]*wasm.ExportInstance{}
+	}
+	module.Exports[funcName] = &wasm.ExportInstance{Type: wasm.ExternTypeFunc, Function: fn}
+	// This link is essential for all engines. For example, functions call other functions defined in the same module.
+	fn.Module = module
 }
 
 // closeModuleEngineWithExitCode allows unit tests to check `CloseWithExitCode` didn't err.

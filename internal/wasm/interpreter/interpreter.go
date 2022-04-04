@@ -11,9 +11,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -124,7 +125,7 @@ func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
 
 func (ce *callEngine) pushFrame(frame *callFrame) {
 	if callStackCeiling <= len(ce.frames) {
-		panic(wasm.ErrRuntimeCallStackOverflow)
+		panic(wasmruntime.ErrRuntimeCallStackOverflow)
 	}
 	ce.frames = append(ce.frames, frame)
 }
@@ -173,7 +174,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	for idx, f := range importedFunctions {
 		cf, ok := e.getCompiledFunction(f)
 		if !ok {
-			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
+			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
 		}
 		me.compiledFunctions = append(me.compiledFunctions, cf)
 	}
@@ -532,16 +533,13 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 			traces := make([]string, len(ce.frames))
 			for i := 0; i < len(traces); i++ {
 				frame := ce.popFrame()
-				name := frame.f.funcInstance.Name
+				name := frame.f.funcInstance.DebugName
 				// TODO: include DWARF symbols. See #58
 				traces[i] = fmt.Sprintf("\t%d: %s", i, name)
 			}
 
 			runtimeErr, ok := v.(error)
 			if ok {
-				if runtimeErr.Error() == "runtime error: integer divide by zero" {
-					runtimeErr = wasm.ErrRuntimeIntegerDivideByZero
-				}
 				err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
 			} else {
 				err = fmt.Errorf("wasm runtime error: %v", v)
@@ -646,7 +644,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 		// how the stack is modified, etc.
 		switch op.kind {
 		case wazeroir.OperationKindUnreachable:
-			panic(wasm.ErrRuntimeUnreachable)
+			panic(wasmruntime.ErrRuntimeUnreachable)
 		case wazeroir.OperationKindBr:
 			{
 				frame.pc = op.us[0]
@@ -686,13 +684,13 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				offset := ce.pop()
 				if offset >= uint64(len(table.Table)) {
-					panic(wasm.ErrRuntimeInvalidTableAccess)
+					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
 				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
 				if !ok {
-					panic(wasm.ErrRuntimeInvalidTableAccess)
+					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				} else if uint64(targetCompiledFunction.funcInstance.TypeID) != op.us[1] {
-					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
+					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
 				// Call in.
@@ -747,12 +745,12 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
-						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
 					ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
 					if uint64(len(memoryInst.Buffer)) < base+8 {
-						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
 					ce.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
@@ -762,7 +760,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+1 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
@@ -776,7 +774,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+2 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
@@ -790,7 +788,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+4 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				if op.b1 == 1 {
 					ce.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
@@ -806,12 +804,12 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
-						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
 					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
 				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
 					if uint64(len(memoryInst.Buffer)) < base+8 {
-						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
 					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
@@ -822,7 +820,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				val := byte(ce.pop())
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+1 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				memoryInst.Buffer[base] = val
 				frame.pc++
@@ -832,7 +830,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				val := uint16(ce.pop())
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+2 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
 				frame.pc++
@@ -842,7 +840,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				val := uint32(ce.pop())
 				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+4 {
-					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
 				frame.pc++
@@ -1105,61 +1103,76 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindDiv:
 			{
-				switch wazeroir.SignedType(op.b1) {
+				// If an integer, check we won't divide by zero.
+				t := wazeroir.SignedType(op.b1)
+				v2, v1 := ce.pop(), ce.pop()
+				switch t {
+				case wazeroir.SignedTypeFloat32, wazeroir.SignedTypeFloat64: // not integers
+				default:
+					if v2 == 0 {
+						panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
+					}
+				}
+
+				switch t {
 				case wazeroir.SignedTypeInt32:
-					v2 := int32(ce.pop())
-					v1 := int32(ce.pop())
-					if v1 == math.MinInt32 && v2 == -1 {
-						panic(wasm.ErrRuntimeIntegerOverflow)
+					d := int32(v2)
+					n := int32(v1)
+					if n == math.MinInt32 && d == -1 {
+						panic(wasmruntime.ErrRuntimeIntegerOverflow)
 					}
-					ce.push(uint64(uint32(v1 / v2)))
+					ce.push(uint64(uint32(n / d)))
 				case wazeroir.SignedTypeInt64:
-					v2 := int64(ce.pop())
-					v1 := int64(ce.pop())
-					if v1 == math.MinInt64 && v2 == -1 {
-						panic(wasm.ErrRuntimeIntegerOverflow)
+					d := int64(v2)
+					n := int64(v1)
+					if n == math.MinInt64 && d == -1 {
+						panic(wasmruntime.ErrRuntimeIntegerOverflow)
 					}
-					ce.push(uint64(v1 / v2))
+					ce.push(uint64(n / d))
 				case wazeroir.SignedTypeUint32:
-					v2 := uint32(ce.pop())
-					v1 := uint32(ce.pop())
-					ce.push(uint64(v1 / v2))
+					d := uint32(v2)
+					n := uint32(v1)
+					ce.push(uint64(n / d))
 				case wazeroir.SignedTypeUint64:
-					v2 := ce.pop()
-					v1 := ce.pop()
-					ce.push(v1 / v2)
+					d := v2
+					n := v1
+					ce.push(n / d)
 				case wazeroir.SignedTypeFloat32:
-					v2 := ce.pop()
-					v1 := ce.pop()
-					v := math.Float32frombits(uint32(v1)) / math.Float32frombits(uint32(v2))
+					d := v2
+					n := v1
+					v := math.Float32frombits(uint32(n)) / math.Float32frombits(uint32(d))
 					ce.push(uint64(math.Float32bits(v)))
 				case wazeroir.SignedTypeFloat64:
-					v2 := ce.pop()
-					v1 := ce.pop()
-					v := math.Float64frombits(v1) / math.Float64frombits(v2)
-					ce.push(uint64(math.Float64bits(v)))
+					d := v2
+					n := v1
+					v := math.Float64frombits(n) / math.Float64frombits(d)
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindRem:
 			{
+				v2, v1 := ce.pop(), ce.pop()
+				if v2 == 0 {
+					panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
+				}
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32:
-					v2 := int32(ce.pop())
-					v1 := int32(ce.pop())
-					ce.push(uint64(uint32(v1 % v2)))
+					d := int32(v2)
+					n := int32(v1)
+					ce.push(uint64(uint32(n % d)))
 				case wazeroir.SignedInt64:
-					v2 := int64(ce.pop())
-					v1 := int64(ce.pop())
-					ce.push(uint64(v1 % v2))
+					d := int64(v2)
+					n := int64(v1)
+					ce.push(uint64(n % d))
 				case wazeroir.SignedUint32:
-					v2 := uint32(ce.pop())
-					v1 := uint32(ce.pop())
-					ce.push(uint64(v1 % v2))
+					d := uint32(v2)
+					n := uint32(v1)
+					ce.push(uint64(n % d))
 				case wazeroir.SignedUint64:
-					v2 := ce.pop()
-					v1 := ce.pop()
-					ce.push(v1 % v2)
+					d := v2
+					n := v1
+					ce.push(n % d)
 				}
 				frame.pc++
 			}
@@ -1408,39 +1421,39 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					case wazeroir.SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(res)
 					}
@@ -1450,39 +1463,39 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					case wazeroir.SignedInt32:
 						v := math.Trunc(math.Float64frombits(ce.pop()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
 						v := math.Trunc(math.Float64frombits(ce.pop()))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(math.Float64frombits(ce.pop()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
 						v := math.Trunc(math.Float64frombits(ce.pop()))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasm.ErrRuntimeInvalidConversionToInteger)
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasm.ErrRuntimeIntegerOverflow)
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
 						}
 						ce.push(res)
 					}

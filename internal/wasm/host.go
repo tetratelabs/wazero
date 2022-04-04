@@ -93,11 +93,11 @@ func (m *Module) buildHostFunctionInstances() (functions []*FunctionInstance) {
 	for idx, typeIndex := range m.FunctionSection {
 		fn := m.HostFunctionSection[idx]
 		f := &FunctionInstance{
-			Name:   functionNames[idx].Name,
-			Kind:   kind(fn.Type()),
-			Type:   m.TypeSection[typeIndex],
-			GoFunc: fn,
-			Index:  Index(idx),
+			DebugName: functionNames[idx].Name,
+			Kind:      kind(fn.Type()),
+			Type:      m.TypeSection[typeIndex],
+			GoFunc:    fn,
+			Index:     Index(idx),
 		}
 		functions = append(functions, f)
 	}

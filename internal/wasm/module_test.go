@@ -692,6 +692,7 @@ func TestModule_buildGlobalInstances(t *testing.T) {
 func TestModule_buildFunctionInstances(t *testing.T) {
 	nopCode := &Code{nil, []byte{OpcodeEnd}}
 	m := Module{
+		TypeSection:   []*FunctionType{{}},
 		ImportSection: []*Import{{Type: ExternTypeFunc}},
 		NameSection: &NameSection{
 			FunctionNames: NameMap{
@@ -706,7 +707,7 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 	actual := m.buildFunctions()
 	expectedNames := []string{"unknown", "two", "unknown", "four", "five"}
 	for i, f := range actual {
-		require.Equal(t, expectedNames[i], f.Name)
+		require.Equal(t, expectedNames[i], f.DebugName)
 		require.Equal(t, nopCode.Body, f.Body)
 	}
 }

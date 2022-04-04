@@ -465,7 +465,7 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 	importCount := m.ImportFuncCount()
 	n, nLen := 0, len(functionNames)
 	for codeIndex, typeIndex := range m.FunctionSection {
-		funcIdx := importCount + uint32(len(functions))
+		funcIdx := importCount + uint32(codeIndex)
 		// Seek to see if there's a better name than "unknown"
 		name := "unknown"
 		for ; n < nLen; n++ {
@@ -479,7 +479,7 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 		}
 
 		f := &FunctionInstance{
-			Name:       name,
+			DebugName:  name,
 			Kind:       FunctionKindWasm,
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,
