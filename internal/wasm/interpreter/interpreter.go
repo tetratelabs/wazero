@@ -6,13 +6,13 @@ import (
 	"math"
 	"math/bits"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -516,28 +516,14 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
-			if buildoptions.IsDebugMode {
-				debug.PrintStack()
-			}
-
-			traces := make([]string, len(ce.frames))
-			for i := 0; i < len(traces); i++ {
+			builder := wasmdebug.NewErrorBuilder()
+			frameCount := len(ce.frames)
+			for i := 0; i < frameCount; i++ {
 				frame := ce.popFrame()
-				name := frame.f.source.DebugName
-				// TODO: include DWARF symbols. See #58
-				traces[i] = fmt.Sprintf("\t%d: %s", i, name)
+				fn := frame.f.source
+				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
 			}
-
-			runtimeErr, ok := v.(error)
-			if ok {
-				err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
-			} else {
-				err = fmt.Errorf("wasm runtime error: %v", v)
-			}
-
-			if len(traces) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
-			}
+			err = builder.FromRecovered(v)
 		}
 	}()
 

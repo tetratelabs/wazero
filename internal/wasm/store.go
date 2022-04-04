@@ -87,7 +87,7 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		// DebugName is for debugging purpose, and is used to augment the stack traces.
+		// DebugName is for debugging purpose, and is used to augment stack traces.
 		DebugName string
 
 		// Kind describes how this function should be called.
@@ -275,10 +275,10 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	var funcSection SectionID
 	if module.HostFunctionSection == nil {
 		funcSection = SectionIDFunction
-		functions = module.buildFunctions()
+		functions = module.buildFunctions(name)
 	} else {
 		funcSection = SectionIDHostFunction
-		functions = module.buildHostFunctionInstances()
+		functions = module.buildHostFunctions(name)
 	}
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.

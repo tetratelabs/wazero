@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
@@ -456,7 +457,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 	return
 }
 
-func (m *Module) buildFunctions() (functions []*FunctionInstance) {
+func (m *Module) buildFunctions(moduleName string) (functions []*FunctionInstance) {
 	var functionNames NameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
@@ -465,27 +466,28 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 	importCount := m.ImportFuncCount()
 	n, nLen := 0, len(functionNames)
 	for codeIndex, typeIndex := range m.FunctionSection {
+		// The function name section begins with imports, but can be sparse. This keeps track of how far in the name
+		// section we've already searched.
 		funcIdx := importCount + uint32(codeIndex)
-		// Seek to see if there's a better name than "unknown"
-		name := "unknown"
+		var funcName string
 		for ; n < nLen; n++ {
 			next := functionNames[n]
 			if next.Index > funcIdx {
 				break // we have function names, but starting at a later index
 			} else if next.Index == funcIdx {
-				name = next.Name
+				funcName = next.Name
 				break
 			}
 		}
 
 		f := &FunctionInstance{
-			DebugName:  name,
 			Kind:       FunctionKindWasm,
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,
 			LocalTypes: m.CodeSection[codeIndex].LocalTypes,
-			Index:      importCount + uint32(codeIndex),
+			Index:      funcIdx,
 		}
+		f.DebugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
 		functions = append(functions, f)
 	}
 	return

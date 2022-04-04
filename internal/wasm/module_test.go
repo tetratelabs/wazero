@@ -701,11 +701,13 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 				{Index: Index(5), Name: "five"},
 			},
 		},
-		CodeSection: []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
+		FunctionSection: []Index{0, 0, 0, 0, 0},
+		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 	}
 
-	actual := m.buildFunctions()
-	expectedNames := []string{"unknown", "two", "unknown", "four", "five"}
+	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
+	actual := m.buildFunctions("counter")
+	expectedNames := []string{"counter.[1]", "counter.two", "counter.[3]", "counter.four", "counter.five"}
 	for i, f := range actual {
 		require.Equal(t, expectedNames[i], f.DebugName)
 		require.Equal(t, nopCode.Body, f.Body)

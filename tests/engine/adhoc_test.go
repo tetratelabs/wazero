@@ -85,12 +85,12 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 	defer module.Close()
 
 	_, err = module.ExportedFunction("main").Call(nil)
-	exp := `wasm runtime error: panic in host function
-wasm backtrace:
-	0: cause_unreachable
-	1: two
-	2: one
-	3: main`
+	exp := `panic in host function (recovered by wazero)
+wasm stack trace:
+	host.cause_unreachable()
+	.two()
+	.one()
+	.main()`
 	require.Equal(t, exp, err.Error())
 }
 
