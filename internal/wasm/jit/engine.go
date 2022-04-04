@@ -5,13 +5,12 @@ import (
 	"math"
 	"reflect"
 	"runtime"
-	"runtime/debug"
-	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -481,32 +480,17 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
-			if buildoptions.IsDebugMode {
-				debug.PrintStack()
-			}
-
-			var frames []string
+			builder := wasmdebug.NewErrorBuilder()
 			// Handle edge-case where the host function is called directly by Go.
 			if ce.globalContext.callFrameStackPointer == 0 {
 				fn := compiled.source
-				frames = append(frames, fmt.Sprintf("\t%d: %s", 0, fn.DebugName))
+				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
 			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
-				f := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].compiledFunction
-				frames = append(frames, fmt.Sprintf("\t%d: %s", i, f.source.DebugName))
-				// TODO: include DWARF symbols. See #58
+				fn := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].compiledFunction.source
+				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
 			}
-
-			runtimeErr, ok := v.(error)
-			if ok {
-				err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
-			} else {
-				err = fmt.Errorf("wasm runtime error: %v", v)
-			}
-
-			if len(frames) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
-			}
+			err = builder.FromRecovered(v)
 		}
 	}()
 

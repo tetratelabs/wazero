@@ -27,6 +27,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 type EngineTester interface {
@@ -310,70 +311,70 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 			input:  []uint64{0},
 			module: imported.Ctx,
 			fn:     imported.Exports[wasmFnName].Function,
-			expectedErr: `wasm runtime error: integer divide by zero
-wasm backtrace:
-	0: wasm_div_by`,
+			expectedErr: `wasm error: integer divide by zero
+wasm stack trace:
+	imported.wasm_div_by(i32) i32`,
 		},
 		{
 			name:   "host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: imported.Ctx,
 			fn:     imported.Exports[hostFnName].Function,
-			expectedErr: `wasm runtime error: host-function panic
-wasm backtrace:
-	0: host_div_by`,
+			expectedErr: `host-function panic (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32`,
 		},
 		{
 			name:   "host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: imported.Ctx,
-			fn:     imported.Exports[hostFnName].Function, // TODO: This should be a normal runtime error
-			expectedErr: `wasm runtime error: runtime error: integer divide by zero
-wasm backtrace:
-	0: host_div_by`,
+			fn:     imported.Exports[hostFnName].Function,
+			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32`,
 		},
 		{
 			name:   "wasm calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: imported.Ctx,
 			fn:     imported.Exports[callHostFnName].Function,
-			expectedErr: `wasm runtime error: host-function panic
-wasm backtrace:
-	0: host_div_by
-	1: call->host_div_by`,
+			expectedErr: `host-function panic (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32
+	imported.call->host_div_by(i32) i32`,
 		},
 		{
 			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.Ctx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `wasm runtime error: runtime error: integer divide by zero
-wasm backtrace:
-	0: host_div_by
-	1: call->host_div_by
-	2: call_import->call->host_div_by`,
+			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32
+	imported.call->host_div_by(i32) i32
+	importing.call_import->call->host_div_by(i32) i32`,
 		},
 		{
 			name:   "wasm calls imported wasm that calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: importing.Ctx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `wasm runtime error: host-function panic
-wasm backtrace:
-	0: host_div_by
-	1: call->host_div_by
-	2: call_import->call->host_div_by`,
+			expectedErr: `host-function panic (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32
+	imported.call->host_div_by(i32) i32
+	importing.call_import->call->host_div_by(i32) i32`,
 		},
 		{
 			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.Ctx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `wasm runtime error: runtime error: integer divide by zero
-wasm backtrace:
-	0: host_div_by
-	1: call->host_div_by
-	2: call_import->call->host_div_by`,
+			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
+wasm stack trace:
+	imported.host_div_by(i32) i32
+	imported.call->host_div_by(i32) i32
+	importing.call_import->call->host_div_by(i32) i32`,
 		},
 	}
 	for _, tt := range tests {
@@ -433,7 +434,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	}
 
 	// To use the function, we first need to add it to a module.
-	imported := &wasm.ModuleInstance{Name: t.Name()}
+	imported := &wasm.ModuleInstance{Name: "imported"}
 	addFunction(imported, wasmFnName, wasmFn)
 	addFunction(imported, hostFnName, hostFn)
 	addFunction(imported, callHostFnName, callHostFn)
@@ -444,7 +445,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	linkModuleToEngine(imported, importedMe)
 
 	// To test stack traces, call the same function from another module
-	importing := &wasm.ModuleInstance{Name: t.Name() + "-importing"}
+	importing := &wasm.ModuleInstance{Name: "importing"}
 
 	// Don't add imported functions yet as NewModuleEngine requires them split.
 	importedFunctions := []*wasm.FunctionInstance{callHostFn}
@@ -484,7 +485,7 @@ func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 
 // addFunction assigns and adds a function to the module.
 func addFunction(module *wasm.ModuleInstance, funcName string, fn *wasm.FunctionInstance) {
-	fn.DebugName = funcName
+	fn.DebugName = wasmdebug.FuncName(module.Name, funcName, fn.Index)
 	module.Functions = append(module.Functions, fn)
 	if module.Exports == nil {
 		module.Exports = map[string]*wasm.ExportInstance{}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -88,17 +90,19 @@ func (m *Module) validateHostFunctions() error {
 	return nil
 }
 
-func (m *Module) buildHostFunctionInstances() (functions []*FunctionInstance) {
+func (m *Module) buildHostFunctions(moduleName string) (functions []*FunctionInstance) {
+	// ModuleBuilder has no imports, which means the FunctionSection index is the same as the position in the function
+	// index namespace. Also, it ensures every function has a name. That's why there is less error checking here.
 	var functionNames = m.NameSection.FunctionNames
 	for idx, typeIndex := range m.FunctionSection {
 		fn := m.HostFunctionSection[idx]
 		f := &FunctionInstance{
-			DebugName: functionNames[idx].Name,
-			Kind:      kind(fn.Type()),
-			Type:      m.TypeSection[typeIndex],
-			GoFunc:    fn,
-			Index:     Index(idx),
+			Kind:   kind(fn.Type()),
+			Type:   m.TypeSection[typeIndex],
+			GoFunc: fn,
+			Index:  Index(idx),
 		}
+		f.DebugName = wasmdebug.FuncName(moduleName, functionNames[f.Index].Name, f.Index)
 		functions = append(functions, f)
 	}
 	return
