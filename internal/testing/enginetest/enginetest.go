@@ -343,25 +343,37 @@ wasm backtrace:
 	1: call->host_div_by`,
 		},
 		{
-			name:        "wasm calls imported wasm that calls host function panics with runtime.Error",
-			input:       []uint64{0},
-			module:      importing.Ctx,
-			fn:          importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `TODO:`,
+			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
+			input:  []uint64{0},
+			module: importing.Ctx,
+			fn:     importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `wasm runtime error: runtime error: integer divide by zero
+wasm backtrace:
+	0: host_div_by
+	1: call->host_div_by
+	2: call_import->call->host_div_by`,
 		},
 		{
-			name:        "wasm calls imported wasm that calls host function that panics",
-			input:       []uint64{math.MaxUint32},
-			module:      importing.Ctx,
-			fn:          importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `TODO:`,
+			name:   "wasm calls imported wasm that calls host function that panics",
+			input:  []uint64{math.MaxUint32},
+			module: importing.Ctx,
+			fn:     importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `wasm runtime error: host-function panic
+wasm backtrace:
+	0: host_div_by
+	1: call->host_div_by
+	2: call_import->call->host_div_by`,
 		},
 		{
-			name:        "wasm calls imported wasm calls host function panics with runtime.Error",
-			input:       []uint64{0},
-			module:      importing.Ctx,
-			fn:          importing.Exports[callImportCallHostFnName].Function,
-			expectedErr: `TODO:`,
+			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
+			input:  []uint64{0},
+			module: importing.Ctx,
+			fn:     importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `wasm runtime error: runtime error: integer divide by zero
+wasm backtrace:
+	0: host_div_by
+	1: call->host_div_by
+	2: call_import->call->host_div_by`,
 		},
 	}
 	for _, tt := range tests {
@@ -449,7 +461,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	// Compile the importing module
 	importingMe, err := e.NewModuleEngine(importing.Name, importedFunctions, importing.Functions, nil, nil)
 	require.NoError(t, err)
-	linkModuleToEngine(importing, importedMe)
+	linkModuleToEngine(importing, importingMe)
 
 	// Add the imported functions back to the importing module.
 	importing.Functions = append(importedFunctions, importing.Functions...)
