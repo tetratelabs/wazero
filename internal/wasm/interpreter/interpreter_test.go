@@ -129,7 +129,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &compiledFunction{
 					moduleEngine: &moduleEngine{},
-					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
+					source:       &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
 						{kind: translateToIROperationKind(tc.opcode)},
@@ -182,7 +182,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 				ce := &callEngine{}
 				f := &compiledFunction{
 					moduleEngine: &moduleEngine{},
-					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
+					source:       &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
 						{kind: translateToIROperationKind(tc.opcode)},
@@ -289,9 +289,7 @@ func TestInterpreter_Close(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			closed, err := me.CloseWithExitCode(0)
-			require.True(t, closed)
-			require.NoError(t, err)
+			me.Close()
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {

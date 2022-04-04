@@ -111,21 +111,27 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 }
 
+func TestImportedAndExportedFunc(t *testing.T) {
+	r := wazero.NewRuntime()
+	testImportedAndExportedFunc(t, r)
+}
+
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
 // Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
-	storeInt := func(nil api.Module, offset uint32, val uint64) uint32 {
-		if !nil.Memory().WriteUint64Le(offset, val) {
+	storeInt := func(m api.Module, offset uint32, val uint64) uint32 {
+		if !m.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
 		// sneak a reference to the memory, so we can check it later
-		memory = nil.Memory().(*wasm.MemoryInstance)
+		memory = m.Memory().(*wasm.MemoryInstance)
 		return 0
 	}
 
-	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
+	host, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
 	require.NoError(t, err)
+	defer host.Close()
 
 	module, err := r.InstantiateModuleFromCode([]byte(`(module $test
 		(import "" "store_int"
@@ -139,7 +145,8 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	defer module.Close()
 
 	// Call store_int and ensure it didn't return an error code.
-	results, err := module.ExportedFunction("store_int").Call(nil, 1, math.MaxUint64)
+	fn := module.ExportedFunction("store_int")
+	results, err := fn.Call(nil, 1, math.MaxUint64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
 
