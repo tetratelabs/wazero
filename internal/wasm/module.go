@@ -479,7 +479,7 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 		}
 
 		f := &FunctionInstance{
-			Name:       name,
+			DebugName:  name,
 			Kind:       FunctionKindWasm,
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,

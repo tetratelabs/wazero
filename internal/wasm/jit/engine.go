@@ -11,8 +11,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -299,19 +300,19 @@ func (s jitCallStatusCode) causePanic() {
 	var err error
 	switch s {
 	case jitCallStatusIntegerOverflow:
-		err = wasm.ErrRuntimeIntegerOverflow
+		err = wasmruntime.ErrRuntimeIntegerOverflow
 	case jitCallStatusIntegerDivisionByZero:
-		err = wasm.ErrRuntimeIntegerDivideByZero
+		err = wasmruntime.ErrRuntimeIntegerDivideByZero
 	case jitCallStatusCodeInvalidFloatToIntConversion:
-		err = wasm.ErrRuntimeInvalidConversionToInteger
+		err = wasmruntime.ErrRuntimeInvalidConversionToInteger
 	case jitCallStatusCodeUnreachable:
-		err = wasm.ErrRuntimeUnreachable
+		err = wasmruntime.ErrRuntimeUnreachable
 	case jitCallStatusCodeMemoryOutOfBounds:
-		err = wasm.ErrRuntimeOutOfBoundsMemoryAccess
+		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 	case jitCallStatusCodeInvalidTableAccess:
-		err = wasm.ErrRuntimeInvalidTableAccess
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
 	case jitCallStatusCodeTypeMismatchOnIndirectCall:
-		err = wasm.ErrRuntimeIndirectCallTypeMismatch
+		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 	}
 	panic(err)
 }
@@ -334,7 +335,7 @@ func (s jitCallStatusCode) String() (ret string) {
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.compiledFunction.source.Name, c.returnAddress, c.returnStackBasePointer,
+		c.compiledFunction.source.DebugName, c.returnAddress, c.returnStackBasePointer,
 	)
 }
 
@@ -368,7 +369,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	for idx, f := range importedFunctions {
 		cf, ok := e.getCompiledFunction(f)
 		if !ok {
-			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
+			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
 		}
 		me.compiledFunctions = append(me.compiledFunctions, cf)
 	}
@@ -495,9 +496,14 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 			}
 
 			var frames []string
+			// Handle edge-case where the host function is called directly by Go.
+			if ce.globalContext.callFrameStackPointer == 0 {
+				fn := compiled.source
+				frames = append(frames, fmt.Sprintf("\t%d: %s", 0, fn.DebugName))
+			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
 				f := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].compiledFunction
-				frames = append(frames, fmt.Sprintf("\t%d: %s", i, f.source.Name))
+				frames = append(frames, fmt.Sprintf("\t%d: %s", i, f.source.DebugName))
 				// TODO: include DWARF symbols. See #58
 			}
 
@@ -629,7 +635,8 @@ func (ce *callEngine) callFrameTop() *callFrame {
 }
 
 func (ce *callEngine) callFrameAt(depth uint64) *callFrame {
-	return &ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-depth]
+	idx := ce.globalContext.callFrameStackPointer - 1 - depth
+	return &ce.callFrameStack[idx]
 }
 
 func (ce *callEngine) valueStackTopIndex() uint64 {
@@ -796,7 +803,7 @@ var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
 func (ce *callEngine) builtinFunctionGrowCallFrameStack() {
 	if callStackCeiling < uint64(len(ce.callFrameStack)+1) {
-		panic(wasm.ErrRuntimeCallStackOverflow)
+		panic(wasmruntime.ErrRuntimeCallStackOverflow)
 	}
 
 	// Double the callstack slice length.

@@ -87,13 +87,8 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		// Name is for debugging purpose, and is used to argument the stack traces.
-		//
-		// When GoFunc is not nil, this returns dot-delimited parameters given to
-		// Store.NewHostModule. Ex. something.realistic
-		//
-		// Otherwise, this is the corresponding value in NameSection.FunctionNames or "unknown" if unavailable.
-		Name string
+		// DebugName is for debugging purpose, and is used to argument the stack traces.
+		DebugName string
 
 		// Kind describes how this function should be called.
 		Kind FunctionKind
@@ -120,7 +115,7 @@ type (
 		// TypeID is assigned by a store for FunctionType.
 		TypeID FunctionTypeID
 
-		// Index holds the index of this function instance in Module.
+		// Index holds the index of this function instance in the function index namespace (beginning with imports).
 		Index Index
 	}
 

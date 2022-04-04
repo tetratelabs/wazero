@@ -8,13 +8,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-func TestCallEngine_PushFrame(t *testing.T) {
+func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 	f1 := &callFrame{}
 	f2 := &callFrame{}
 
@@ -28,7 +28,7 @@ func TestCallEngine_PushFrame(t *testing.T) {
 	require.Equal(t, []*callFrame{f1, f2}, vm.frames)
 }
 
-func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
+func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 	defer func() { callStackCeiling = buildoptions.CallStackCeiling }()
 
 	callStackCeiling = 3
@@ -64,23 +64,27 @@ func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initT
 	return table
 }
 
-func TestEngine_NewModuleEngine(t *testing.T) {
+func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
-func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
+func TestInterpreter_Engine_NewModuleEngine_InitTable(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
-func TestModuleEngine_Call(t *testing.T) {
+func TestInterpreter_ModuleEngine_Call(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
-func TestModuleEngine_Call_HostFn(t *testing.T) {
+func TestInterpreter_ModuleEngine_Call_HostFn(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
-func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
+func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
+	enginetest.RunTestModuleEngine_Call_Errors(t, et)
+}
+
+func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 	translateToIROperationKind := func(op wasm.Opcode) (kind wazeroir.OperationKind) {
 		switch op {
 		case wasm.OpcodeI32Extend8S:
@@ -192,11 +196,11 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 	})
 }
 
-func TestEngineCompile_Errors(t *testing.T) {
+func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := et.NewEngine().(*engine)
 		_, err := e.NewModuleEngine(t.Name(),
-			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
+			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
 			nil, // moduleFunctions
 			nil, // table
 			nil, // tableInit
@@ -208,10 +212,10 @@ func TestEngineCompile_Errors(t *testing.T) {
 		e := et.NewEngine().(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 
 		// initialize the module-engine containing imported functions
@@ -221,9 +225,9 @@ func TestEngineCompile_Errors(t *testing.T) {
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
 
 		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
+			{DebugName: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
 				wasm.OpcodeCall, // Call instruction without immediate for call target index is invalid and should fail to compile.
 			}, Module: &wasm.ModuleInstance{}},
 		}
@@ -239,10 +243,10 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 }
 
-func TestClose(t *testing.T) {
+func TestInterpreter_Close(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
-			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
+			DebugName: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
 	}
 
 	for _, tc := range []struct {

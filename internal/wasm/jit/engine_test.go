@@ -16,7 +16,7 @@ import (
 )
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
-func TestVerifyOffsetValue(t *testing.T) {
+func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var me moduleEngine
 	require.Equal(t, int(unsafe.Offsetof(me.compiledFunctions)), moduleEngineCompiledFunctionsOffset)
 
@@ -116,24 +116,29 @@ func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, init
 	return table
 }
 
-func TestEngine_NewModuleEngine(t *testing.T) {
+func TestJIT_Engine_NewModuleEngine(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
-func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
+func TestJIT_Engine_NewModuleEngine_InitTable(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
-func TestModuleEngine_Call(t *testing.T) {
+func TestJIT_ModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
-func TestModuleEngine_Call_HostFn(t *testing.T) {
+func TestJIT_ModuleEngine_Call_HostFn(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
+}
+
+func TestJIT_ModuleEngine_Call_Errors(t *testing.T) {
+	requireSupportedOSArch(t)
+	enginetest.RunTestModuleEngine_Call_Errors(t, et)
 }
 
 func requireSupportedOSArch(t *testing.T) {
@@ -142,12 +147,12 @@ func requireSupportedOSArch(t *testing.T) {
 	}
 }
 
-func TestEngineCompile_Errors(t *testing.T) {
+func TestJIT_EngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := et.NewEngine()
 		_, err := e.NewModuleEngine(
 			t.Name(),
-			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
+			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
 			nil, // moduleFunctions
 			nil, // table
 			nil, // tableInit
@@ -159,10 +164,10 @@ func TestEngineCompile_Errors(t *testing.T) {
 		e := et.NewEngine().(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
 		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
@@ -170,9 +175,9 @@ func TestEngineCompile_Errors(t *testing.T) {
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
 
 		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
+			{DebugName: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{DebugName: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
 				wasm.OpcodeCall, // Call instruction without immediate for call target index is invalid and should fail to compile.
 			}, Module: &wasm.ModuleInstance{}},
 		}
@@ -198,13 +203,13 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 	f[cf] = finalizer.(func(*compiledFunction))
 }
 
-func TestNewModuleEngine_CompiledFunctions(t *testing.T) {
+func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
-			Name:   strconv.Itoa(id),
-			Type:   &wasm.FunctionType{},
-			Body:   []byte{wasm.OpcodeEnd},
-			Module: &wasm.ModuleInstance{},
+			DebugName: strconv.Itoa(id),
+			Type:      &wasm.FunctionType{},
+			Body:      []byte{wasm.OpcodeEnd},
+			Module:    &wasm.ModuleInstance{},
 		}
 	}
 
@@ -269,7 +274,7 @@ func TestNewModuleEngine_CompiledFunctions(t *testing.T) {
 }
 
 // TestReleaseCompiledFunction_Panic tests that an unexpected panic has some identifying information in it.
-func TestReleaseCompiledFunction_Panic(t *testing.T) {
+func TestJIT_ReleaseCompiledFunction_Panic(t *testing.T) {
 	// capturePanic because there's no require.PanicsWithErrorPrefix
 	errMessage := capturePanic(func() {
 		releaseCompiledFunction(&compiledFunction{
@@ -277,7 +282,8 @@ func TestReleaseCompiledFunction_Panic(t *testing.T) {
 			source:      &wasm.FunctionInstance{Index: 2, Module: &wasm.ModuleInstance{Name: t.Name()}}, // for error string
 		})
 	})
-	require.Contains(t, errMessage.Error(), "jit: failed to munmap code segment for TestReleaseCompiledFunction_Panic.function[2]:")
+	require.Contains(t, errMessage.Error(),
+		fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]:", t.Name()))
 }
 
 // capturePanic returns an error recovered from a panic
@@ -293,10 +299,10 @@ func capturePanic(panics func()) (err error) {
 	return
 }
 
-func TestModuleEngine_Close(t *testing.T) {
+func TestJIT_ModuleEngine_Close(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
-			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
+			DebugName: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
 	}
 
 	for _, tc := range []struct {
@@ -387,7 +393,7 @@ func TestModuleEngine_Close(t *testing.T) {
 // Ensures that value stack and call-frame stack are allocated on heap which
 // allows us to safely access to their data region from native code.
 // See comments on initialValueStackSize and initialCallFrameStackSize.
-func TestSliceAllocatedOnHeap(t *testing.T) {
+func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	e := newEngine()
 	store := wasm.NewStore(e, wasm.Features20191205)
 

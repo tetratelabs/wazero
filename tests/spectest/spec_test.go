@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 //go:embed testdata/*.wasm
@@ -166,29 +167,29 @@ func (c commandActionVal) toUint64() uint64 {
 }
 
 // expectedError returns the expected runtime error when the command type equals assert_trap
-// which expectes engines to emit the errors corresponding command.Text field.
+// which expects engines to emit the errors corresponding command.Text field.
 func (c command) expectedError() (err error) {
 	if c.CommandType != "assert_trap" {
 		panic("unreachable")
 	}
 	switch c.Text {
 	case "out of bounds memory access":
-		err = wasm.ErrRuntimeOutOfBoundsMemoryAccess
+		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 	case "indirect call type mismatch", "indirect call":
-		err = wasm.ErrRuntimeIndirectCallTypeMismatch
+		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 	case "undefined element", "undefined":
-		err = wasm.ErrRuntimeInvalidTableAccess
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
 	case "integer overflow":
-		err = wasm.ErrRuntimeIntegerOverflow
+		err = wasmruntime.ErrRuntimeIntegerOverflow
 	case "invalid conversion to integer":
-		err = wasm.ErrRuntimeInvalidConversionToInteger
+		err = wasmruntime.ErrRuntimeInvalidConversionToInteger
 	case "integer divide by zero":
-		err = wasm.ErrRuntimeIntegerDivideByZero
+		err = wasmruntime.ErrRuntimeIntegerDivideByZero
 	case "unreachable":
-		err = wasm.ErrRuntimeUnreachable
+		err = wasmruntime.ErrRuntimeUnreachable
 	default:
 		if strings.HasPrefix(c.Text, "uninitialized") {
-			err = wasm.ErrRuntimeInvalidTableAccess
+			err = wasmruntime.ErrRuntimeInvalidTableAccess
 		}
 	}
 	return
@@ -421,7 +422,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := callFunction(store, moduleName, c.Action.Field, args...)
-							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
+							require.ErrorIs(t, err, wasmruntime.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
