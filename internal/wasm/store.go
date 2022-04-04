@@ -87,7 +87,7 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		// DebugName is for debugging purpose, and is used to argument the stack traces.
+		// DebugName is for debugging purpose, and is used to augment the stack traces.
 		DebugName string
 
 		// Kind describes how this function should be called.
