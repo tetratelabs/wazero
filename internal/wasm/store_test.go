@@ -105,7 +105,7 @@ func TestStore_Instantiate(t *testing.T) {
 		require.Equal(t, s.modules[""], mod.module)
 		require.Equal(t, s.modules[""].Memory, mod.memory)
 		require.Equal(t, s, mod.store)
-		require.Equal(t, sys, mod.sys)
+		require.Equal(t, sys, mod.Sys)
 	})
 }
 
@@ -153,21 +153,21 @@ func TestStore_CloseModule(t *testing.T) {
 			}, importingModuleName, nil)
 			require.NoError(t, err)
 
-			_, ok := s.modules[importedModuleName]
+			imported, ok := s.modules[importedModuleName]
 			require.True(t, ok)
 
-			_, ok = s.modules[importingModuleName]
+			importing, ok := s.modules[importingModuleName]
 			require.True(t, ok)
 
 			// Close the importing module
-			require.NoError(t, s.CloseModuleWithExitCode(importingModuleName, 0))
+			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
 			require.NotContains(t, s.modules, importingModuleName)
 
 			// Can re-close the importing module
-			require.NoError(t, s.CloseModuleWithExitCode(importingModuleName, 0))
+			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
 
 			// Now we close the imported module.
-			require.NoError(t, s.CloseModuleWithExitCode(importedModuleName, 0))
+			require.NoError(t, imported.Ctx.CloseWithExitCode(0))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
 		})
@@ -210,14 +210,14 @@ func TestStore_hammer(t *testing.T) {
 	hammer.NewHammer(t, P, N).Run(func(name string) {
 		mod, instantiateErr := s.Instantiate(context.Background(), importingModule, name, DefaultSysContext())
 		require.NoError(t, instantiateErr)
-		require.NoError(t, s.CloseModuleWithExitCode(mod.Name(), 0))
+		require.NoError(t, mod.CloseWithExitCode(0))
 	}, nil)
 	if t.Failed() {
 		return // At least one test failed, so return now.
 	}
 
 	// Close the imported module.
-	require.NoError(t, s.CloseModuleWithExitCode(imported.Name(), 0))
+	require.NoError(t, imported.CloseWithExitCode(0))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
@@ -311,102 +311,81 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	})
 }
 
-func TestStore_ExportImportedHostFunction(t *testing.T) {
-	m, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}})
+func TestModuleContext_ExportedFunction(t *testing.T) {
+	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}})
 	require.NoError(t, err)
 
 	s := newStore()
 
 	// Add the host module
-	_, err = s.Instantiate(context.Background(), m, m.NameSection.ModuleName, nil)
+	imported, err := s.Instantiate(context.Background(), host, host.NameSection.ModuleName, nil)
 	require.NoError(t, err)
+	defer imported.Close()
 
-	t.Run("Module is the importing module", func(t *testing.T) {
-		_, err = s.Instantiate(context.Background(), &Module{
+	t.Run("imported function", func(t *testing.T) {
+		importing, err := s.Instantiate(context.Background(), &Module{
 			TypeSection:   []*FunctionType{{}},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
 			MemorySection: &Memory{Min: 1},
 			ExportSection: map[string]*Export{"host.fn": {Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
 		}, "test", nil)
 		require.NoError(t, err)
+		defer importing.Close()
 
-		mod, ok := s.modules["test"]
-		require.True(t, ok)
+		fn := importing.ExportedFunction("host.fn")
+		require.NotNil(t, fn)
 
-		ei, err := mod.getExport("host.fn", ExternTypeFunc)
-		require.NoError(t, err)
-		// We expect the host function to be called in context of the importing module.
-		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
-		// Notably, this ensures the host function call context has the correct memory (from the importing module).
-		require.Equal(t, s.modules["test"], ei.Function.Module)
+		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn"))
+		require.Equal(t, fn.(*importedFn).importingModule, importing)
 	})
 }
 
 func TestFunctionInstance_Call(t *testing.T) {
-	type key string
-	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")
-	notStoreCtx := context.WithValue(context.Background(), key("wazer"), "o")
+	store := NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 
 	// Add the host module
 	functionName := "fn"
+
+	// This is a fake engine, so we don't capture inside the function body.
 	m, err := NewHostModule("host",
 		map[string]interface{}{functionName: func(api.Module) {}},
 	)
 	require.NoError(t, err)
 
-	tests := []struct {
-		name     string
-		ctx      context.Context
-		expected context.Context
-	}{
-		{
-			name:     "nil defaults to store context",
-			ctx:      nil,
-			expected: storeCtx,
-		},
-		{
-			name:     "set overrides store context",
-			ctx:      notStoreCtx,
-			expected: notStoreCtx,
-		},
-	}
+	// Add the host module
+	imported, err := store.Instantiate(context.Background(), m, "host", nil)
+	require.NoError(t, err)
+	defer imported.Close()
 
-	for _, tt := range tests {
-		tc := tt
+	// Make a module to import the function
+	importing, err := store.Instantiate(context.Background(), &Module{
+		TypeSection: []*FunctionType{{}},
+		ImportSection: []*Import{{
+			Type:     ExternTypeFunc,
+			Module:   imported.Name(),
+			Name:     functionName,
+			DescFunc: 0,
+		}},
+		MemorySection: &Memory{Min: 1},
+		ExportSection: map[string]*Export{functionName: {Type: ExternTypeFunc, Name: functionName, Index: 0}},
+	}, "test", nil)
+	require.NoError(t, err)
+	defer imported.Close()
 
-		t.Run(tc.name, func(t *testing.T) {
-			store := NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
-
-			// Add the host module
-			hm, err := store.Instantiate(storeCtx, m, "host", nil)
-			require.NoError(t, err)
-
-			// Make a module to import the function
-			mod, err := store.Instantiate(storeCtx, &Module{
-				TypeSection: []*FunctionType{{}},
-				ImportSection: []*Import{{
-					Type:     ExternTypeFunc,
-					Module:   hm.Name(),
-					Name:     functionName,
-					DescFunc: 0,
-				}},
-				MemorySection: &Memory{Min: 1},
-				ExportSection: map[string]*Export{functionName: {Type: ExternTypeFunc, Name: functionName, Index: 0}},
-			}, "test", nil)
-			require.NoError(t, err)
-
-			// This fails if the function wasn't invoked, or had an unexpected context.
-			_, err = mod.ExportedFunction(functionName).Call(mod.WithContext(tc.ctx))
-			require.NoError(t, err)
-
-			modEngine := store.modules["test"].Engine.(*mockModuleEngine)
-			if tc.expected == nil {
-				require.Nil(t, modEngine.ctx)
-			} else {
-				require.Equal(t, tc.expected, modEngine.ctx.Context())
-			}
-		})
-	}
+	fn := importing.ExportedFunction(functionName)
+	// me.ctx will hold the last seen context.
+	me := imported.module.Engine.(*mockModuleEngine)
+	t.Run("nil defaults to current module", func(t *testing.T) {
+		_, err := fn.Call(nil)
+		require.NoError(t, err)
+		require.Equal(t, importing, me.ctx)
+	})
+	t.Run("override current module context", func(t *testing.T) {
+		ctx := importing.WithContext(context.TODO())
+		_, err := fn.Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, ctx, me.ctx)
+	})
 }
 
 type mockEngine struct {
@@ -447,9 +426,8 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
-	return true, nil
+// Close implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) Close() {
 }
 
 func TestStore_getTypeInstance(t *testing.T) {

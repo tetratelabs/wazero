@@ -8,14 +8,12 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"github.com/tetratelabs/wazero/sys"
 )
 
 type (
@@ -41,14 +39,6 @@ type (
 		// parentEngine holds *engine from which this module engine is created from.
 		parentEngine          *engine
 		importedFunctionCount uint32
-
-		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
-		//
-		// The update value is 1 + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
-		//
-		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
-		// See /RATIONALE.md
-		closed uint64
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -282,7 +272,7 @@ const (
 	jitCallStatusCodeCallBuiltInFunction
 	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
 	jitCallStatusCodeUnreachable
-	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
+	// jitCallStatusCodeInvalidFloatToIntConversion means an invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
 	// jitCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
 	jitCallStatusCodeMemoryOutOfBounds
@@ -383,12 +373,12 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			me.doClose() // safe because the reference to me was never leaked.
+			me.Close() // safe because the reference to me was never leaked.
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
 
 		// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-		// finalizer due to how moduleEngine.doClose is implemented.
+		// finalizer due to how moduleEngine.Close is implemented.
 		e.setFinalizer(compiled, releaseCompiledFunction)
 
 		me.compiledFunctions = append(me.compiledFunctions, compiled)
@@ -404,7 +394,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	return me, nil
 }
 
-// doClose is guarded by the caller with CAS, which means it happens only once. However, there is a race-condition
+// Close is guarded by the caller with CAS, which means it happens only once. However, there is a race-condition
 // inside the critical section: functions are removed from the parent engine, but there's no guard to prevent this
 // moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
 // and even after it new calls can be made, given a reference to this moduleEngine.
@@ -427,7 +417,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 //    * Knowing which in-flight calls from other modules, that can use this module may be tricky
 //    * Pure wasm functions can be left to complete.
 //    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
-func (me *moduleEngine) doClose() {
+func (me *moduleEngine) Close() {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
 		// NOTE: we still rely on the finalizer of cf until the notes on this function are addressed.
@@ -460,12 +450,12 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// compiledFunctions on close aren't locked, neither is this read.
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = failIfClosed(me); err == nil {
+		if err = m.FailIfClosed(); err == nil {
 			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
 		}
 		return
@@ -486,7 +476,7 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
-			err = failIfClosed(me)
+			err = m.FailIfClosed()
 		}
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
@@ -525,9 +515,9 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	}
 
 	if f.Kind == wasm.FunctionKindWasm {
-		ce.execWasmFunction(ctx, compiled)
+		ce.execWasmFunction(m, compiled)
 	} else {
-		ce.execHostFunction(f.Kind, compiled.source.GoFunc, ctx)
+		ce.execHostFunction(f.Kind, compiled.source.GoFunc, m)
 	}
 
 	// Note the top value is the tail of the results,
@@ -537,24 +527,6 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 		results[len(results)-1-i] = ce.popValue()
 	}
 	return
-}
-
-// failIfClosed returns a sys.ExitError if moduleEngine.CloseWithExitCode was called.
-func failIfClosed(me *moduleEngine) error {
-	if closed := atomic.LoadUint64(&me.closed); closed != 0 {
-		return sys.NewExitError(me.name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
-	}
-	return nil
-}
-
-// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
-	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
-	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {
-		return false, nil
-	}
-	me.doClose()
-	return true, nil
 }
 
 func NewEngine() wasm.Engine {

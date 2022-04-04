@@ -224,7 +224,7 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 	}
 	modE, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 	require.NoError(t, err)
-	defer modE.CloseWithExitCode(0) //nolint
+	defer modE.Close()
 	imported := modE.(*moduleEngine)
 
 	importingFinalizer := fakeFinalizer{}
@@ -238,7 +238,7 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 
 	modE, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
 	require.NoError(t, err)
-	defer modE.CloseWithExitCode(0) //nolint
+	defer modE.Close()
 	importing := modE.(*moduleEngine)
 
 	// Ensure the importing module didn't try to finalize the imported functions.
@@ -360,12 +360,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			closed, err := importing.CloseWithExitCode(0)
-			require.True(t, closed)
-			require.NoError(t, err)
-
-			// Closing should flip the status bit, so that it cannot be closed again.
-			require.Equal(t, uint64(1), importing.(*moduleEngine).closed)
+			importing.Close()
 
 			// Closing the importing module shouldn't delete the imported functions from the engine.
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
@@ -379,9 +374,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 			}
 
 			if len(tc.importedFunctions) > 0 {
-				closed, err = imported.CloseWithExitCode(0)
-				require.True(t, closed)
-				require.NoError(t, err)
+				imported.Close()
 			}
 
 			// When all modules are closed, the engine should be empty.

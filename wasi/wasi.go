@@ -1498,7 +1498,7 @@ func sysCtx(m api.Module) *wasm.SysContext {
 	if internal, ok := m.(*wasm.ModuleContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {
-		return internal.Sys()
+		return internal.Sys
 	}
 }
 

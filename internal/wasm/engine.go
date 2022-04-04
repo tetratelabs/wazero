@@ -26,7 +26,6 @@ type ModuleEngine interface {
 	// The ctx's context.Context will be the outer-most ancestor of the argument to api.Function.
 	Call(ctx *ModuleContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
 
-	// CloseWithExitCode releases the resources allocated by functions in this ModuleEngine and ensures new calls (Call)
-	// return a sys.ExitError with the given code. This returns false if already closed.
-	CloseWithExitCode(exitCode uint32) (bool, error)
+	// Close releases all the function instances declared in this module.
+	Close()
 }

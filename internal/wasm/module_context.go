@@ -3,15 +3,18 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // compile time check to ensure ModuleContext implements api.Module
 var _ api.Module = &ModuleContext{}
 
-func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, sys *SysContext) *ModuleContext {
-	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, sys: sys}
+func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, Sys *SysContext) *ModuleContext {
+	zero := uint64(0)
+	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
 }
 
 // ModuleContext implements api.Module
@@ -23,9 +26,25 @@ type ModuleContext struct {
 	memory api.Memory
 	store  *Store
 
-	// sys is not exposed publicly. This is currently only used by wasi.
 	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
-	sys *SysContext
+	// Sys is exposed only for WASI
+	Sys *SysContext
+
+	// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
+	//
+	// The update value is 1 + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
+	//
+	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
+	// See /RATIONALE.md
+	closed *uint64
+}
+
+// FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
+func (m *ModuleContext) FailIfClosed() error {
+	if closed := atomic.LoadUint64(m.closed); closed != 0 {
+		return sys.NewExitError(m.module.Name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
+	}
+	return nil
 }
 
 // Name implements the same method as documented on api.Module
@@ -36,7 +55,7 @@ func (m *ModuleContext) Name() string {
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
-		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, sys: m.sys}
+		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, Sys: m.Sys, closed: m.closed}
 	}
 	return m
 }
@@ -51,15 +70,10 @@ func (m *ModuleContext) Context() context.Context {
 	return m.ctx
 }
 
-// Sys is exposed only for WASI.
-func (m *ModuleContext) Sys() *SysContext {
-	return m.sys
-}
-
 // WithContext implements the same method as documented on api.Module
 func (m *ModuleContext) WithContext(ctx context.Context) api.Module {
 	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
-		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, sys: m.sys}
+		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, Sys: m.Sys, closed: m.closed}
 	}
 	return m
 }
@@ -71,9 +85,13 @@ func (m *ModuleContext) Close() (err error) {
 
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
-	if err = m.store.CloseModuleWithExitCode(m.module.Name, exitCode); err != nil {
-		return err
-	} else if sys := m.sys; sys != nil { // ex nil if from ModuleBuilder
+	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
+	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
+		return nil
+	}
+	m.module.Engine.Close()
+	m.store.deleteModule(m.Name())
+	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
 		return sys.Close()
 	}
 	return
@@ -99,20 +117,48 @@ func (m *ModuleContext) ExportedFunction(name string) api.Function {
 	if err != nil {
 		return nil
 	}
-	return exp.Function
+	if exp.Function.Module == m.module {
+		return exp.Function
+	} else {
+		return &importedFn{importingModule: m, importedFn: exp.Function}
+	}
 }
 
-// ParamTypes implements api.Function ParamTypes
+// importedFn implements api.Function and ensures the call context of an imported function is the importing module.
+type importedFn struct {
+	importingModule *ModuleContext
+	importedFn      *FunctionInstance
+}
+
+// ParamTypes implements the same method as documented on api.Function
+func (f *importedFn) ParamTypes() []api.ValueType {
+	return f.importedFn.ParamTypes()
+}
+
+// ResultTypes implements the same method as documented on api.Function
+func (f *importedFn) ResultTypes() []api.ValueType {
+	return f.importedFn.ResultTypes()
+}
+
+// Call implements the same method as documented on api.Function
+func (f *importedFn) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
+	if m == nil {
+		return f.importedFn.Call(f.importingModule, params...)
+	}
+	return f.importedFn.Call(m, params...)
+}
+
+// ParamTypes implements the same method as documented on api.Function
 func (f *FunctionInstance) ParamTypes() []api.ValueType {
 	return f.Type.Params
 }
 
-// ResultTypes implements api.Function ResultTypes
+// ResultTypes implements the same method as documented on api.Function
 func (f *FunctionInstance) ResultTypes() []api.ValueType {
 	return f.Type.Results
 }
 
-// Call implements api.Function Call
+// Call implements the same method as documented on api.Function
 func (f *FunctionInstance) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
 	mod := f.Module
 	modCtx, ok := m.(*ModuleContext)

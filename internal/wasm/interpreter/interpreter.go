@@ -9,14 +9,12 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"github.com/tetratelabs/wazero/sys"
 )
 
 var callStackCeiling = buildoptions.CallStackCeiling
@@ -64,14 +62,6 @@ type moduleEngine struct {
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine          *engine
 	importedFunctionCount uint32
-
-	// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
-	//
-	// The update value is 1 + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
-	//
-	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
-	// See /RATIONALE.md
-	closed uint64
 }
 
 // callEngine holds context per moduleEngine.Call, and shared across all the
@@ -148,7 +138,7 @@ type callFrame struct {
 
 type compiledFunction struct {
 	moduleEngine *moduleEngine
-	funcInstance *wasm.FunctionInstance
+	source       *wasm.FunctionInstance
 	body         []*interpreterOp
 	hostFn       *reflect.Value
 }
@@ -184,18 +174,18 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		if f.Kind == wasm.FunctionKindWasm {
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
-				me.doClose() // safe because the reference to me was never leaked.
+				me.Close()
 				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
 				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
 			compiled, err = e.lowerIROps(f, ir.Operations)
 			if err != nil {
-				me.doClose() // safe because the reference to me was never leaked.
+				me.Close()
 				return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
 			}
 		} else {
-			compiled = &compiledFunction{hostFn: f.GoFunc, funcInstance: f}
+			compiled = &compiledFunction{hostFn: f.GoFunc, source: f}
 		}
 		compiled.moduleEngine = me
 		me.compiledFunctions = append(me.compiledFunctions, compiled)
@@ -215,7 +205,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 func (me *moduleEngine) Release() error {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
-		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
+		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
 	return nil
 }
@@ -223,7 +213,7 @@ func (me *moduleEngine) Release() error {
 // lowerIROps lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	ops []wazeroir.Operation) (*compiledFunction, error) {
-	ret := &compiledFunction{funcInstance: f}
+	ret := &compiledFunction{source: f}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -500,12 +490,12 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// compiledFunctions on close aren't locked, neither is this read.
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = failIfClosed(me); err == nil {
+		if err = m.FailIfClosed(); err == nil {
 			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
 		}
 		return
@@ -521,7 +511,7 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
-			err = failIfClosed(me)
+			err = m.FailIfClosed()
 		}
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
@@ -533,7 +523,7 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 			traces := make([]string, len(ce.frames))
 			for i := 0; i < len(traces); i++ {
 				frame := ce.popFrame()
-				name := frame.f.funcInstance.DebugName
+				name := frame.f.source.DebugName
 				// TODO: include DWARF symbols. See #58
 				traces[i] = fmt.Sprintf("\t%d: %s", i, name)
 			}
@@ -555,9 +545,9 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 		ce.push(param)
 	}
 	if f.Kind == wasm.FunctionKindWasm {
-		ce.callNativeFunc(ctx, compiled)
+		ce.callNativeFunc(m, compiled)
 	} else {
-		ce.callHostFunc(ctx, compiled)
+		ce.callHostFunc(m, compiled)
 	}
 	results = make([]uint64, len(f.Type.Results))
 	for i := range results {
@@ -566,20 +556,12 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	return
 }
 
-// failIfClosed returns a sys.ExitError if moduleEngine.CloseWithExitCode was called.
-func failIfClosed(me *moduleEngine) error {
-	if closed := atomic.LoadUint64(&me.closed); closed != 0 {
-		return sys.NewExitError(me.name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
-	}
-	return nil
-}
-
 func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
 	wasmParamOffset := 0
-	if f.funcInstance.Kind != wasm.FunctionKindGoNoContext {
+	if f.source.Kind != wasm.FunctionKindGoNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
@@ -601,11 +583,11 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 
 	// A host function is invoked with the calling frame's memory, which may be different if in another module.
 	if len(ce.frames) > 0 {
-		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.funcInstance.Module.Memory)
+		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
 	}
 
 	// Handle any special parameter zero
-	if val := wasm.GetHostFunctionCallContextValue(f.funcInstance.Kind, ctx); val != nil {
+	if val := wasm.GetHostFunctionCallContextValue(f.source.Kind, ctx); val != nil {
 		in[0] = *val
 	}
 
@@ -630,7 +612,7 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 
 func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	frame := &callFrame{f: f}
-	moduleInst := f.funcInstance.Module
+	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
 	table := moduleInst.Table
@@ -689,7 +671,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-				} else if uint64(targetCompiledFunction.funcInstance.TypeID) != op.us[1] {
+				} else if uint64(targetCompiledFunction.source.TypeID) != op.us[1] {
 					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
@@ -1608,19 +1590,9 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	ce.popFrame()
 }
 
-// CloseWithExitCode implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
-	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
-	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {
-		return false, nil
-	}
-	me.doClose()
-	return true, nil
-}
-
-// doClose releases all the function instances declared in this module.
-func (me *moduleEngine) doClose() {
+// Close releases all the function instances declared in this module.
+func (me *moduleEngine) Close() {
 	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
-		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
+		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
 }

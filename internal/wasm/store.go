@@ -183,16 +183,6 @@ func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 		switch exp.Type {
 		case ExternTypeFunc:
 			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
-			// The module instance of the host function is a fake that only includes the function and its types.
-			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.ModuleContext Memory.
-			//
-			// TODO(adrian): shouldn't this be race if multiple modules re-exporting?
-			// maybe we should limit this to only tests.
-			if ei.Function.GoFunc != nil {
-				ei.Function.Module = m
-				ei.Function.Index = index
-			}
 		case ExternTypeGlobal:
 			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
 		case ExternTypeMemory:
@@ -325,18 +315,6 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	// Now that the instantiation is complete without error, add it. This makes it visible for import.
 	s.addModule(m)
 	return m.Ctx, nil
-}
-
-// CloseModuleWithExitCode deallocates resources if a module with the given name exists.
-func (s *Store) CloseModuleWithExitCode(moduleName string, exitCode uint32) error {
-	if m := s.module(moduleName); m == nil {
-		return nil
-	} else if ok, err := m.Engine.CloseWithExitCode(exitCode); err != nil {
-		return err
-	} else if ok {
-		s.deleteModule(moduleName)
-	}
-	return nil
 }
 
 // deleteModule makes the moduleName available for instantiation again.

@@ -40,7 +40,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	t.Run("sets module name", func(t *testing.T) {
 		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, me, 0)
+		defer me.Close()
 		require.Equal(t, t.Name(), me.Name())
 	})
 }
@@ -63,7 +63,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
-	defer closeModuleEngineWithExitCode(t, me, 0)
+	defer me.Close()
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
@@ -94,7 +94,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Instantiate the module, which has nothing but an empty table.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, me, 0)
+		defer me.Close()
 
 		// Since there are no elements to initialize, we expect the table to be nil.
 		require.Equal(t, table.Table, make([]interface{}, 2))
@@ -114,7 +114,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Instantiate the module whose table points to its own functions.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, me, 0)
+		defer me.Close()
 
 		// The functions mapped to the table are defined in the same moduleEngine
 		require.Equal(t, table.Table, et.InitTable(me, table.Min, tableInit))
@@ -134,12 +134,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, imported, 0)
+		defer imported.Close()
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, importing, 0)
+		defer importing.Close()
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
 		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
@@ -164,12 +164,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, imported, 0)
+		defer imported.Close()
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngineWithExitCode(t, importing, 0)
+		defer importing.Close()
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
 		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
@@ -203,7 +203,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 
 	me, err := e.NewModuleEngine(t.Name(), nil, module.Functions, nil, nil)
 	require.NoError(t, err)
-	defer closeModuleEngineWithExitCode(t, me, 0)
+	defer me.Close()
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
@@ -220,37 +220,37 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	e := et.NewEngine()
 
 	imported, importedMe := setupCallTests(t, e)
-	defer closeModuleEngineWithExitCode(t, importedMe, 0)
+	defer importedMe.Close()
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	tests := []struct {
-		name string
-		me   wasm.ModuleEngine
-		fn   *wasm.FunctionInstance
+		name   string
+		module *wasm.ModuleContext
+		fn     *wasm.FunctionInstance
 	}{
 		{
-			name: wasmFnName,
-			me:   importedMe,
-			fn:   imported.Exports[wasmFnName].Function,
+			name:   wasmFnName,
+			module: imported.Ctx,
+			fn:     imported.Exports[wasmFnName].Function,
 		},
 		{
-			name: hostFnName,
-			me:   importedMe,
-			fn:   imported.Exports[hostFnName].Function,
+			name:   hostFnName,
+			module: imported.Ctx,
+			fn:     imported.Exports[hostFnName].Function,
 		},
 		{
-			name: callHostFnName,
-			me:   importedMe,
-			fn:   imported.Exports[callHostFnName].Function,
+			name:   callHostFnName,
+			module: imported.Ctx,
+			fn:     imported.Exports[callHostFnName].Function,
 		},
 	}
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
+			m := tc.module
 			f := tc.fn
-			m := f.Module
-			results, err := m.Engine.Call(m.Ctx, f, 1)
+			results, err := f.Module.Engine.Call(m, f, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -261,11 +261,11 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 	e := et.NewEngine()
 
 	imported, importedMe := setupCallTests(t, e)
-	defer closeModuleEngineWithExitCode(t, importedMe, 0)
+	defer importedMe.Close()
 
 	tests := []struct {
 		name        string
-		me          wasm.ModuleEngine
+		module      *wasm.ModuleContext
 		fn          *wasm.FunctionInstance
 		input       []uint64
 		expectedErr string
@@ -273,74 +273,64 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 		{
 			name:        "host function not enough parameters",
 			input:       []uint64{},
-			me:          importedMe,
+			module:      imported.Ctx,
 			fn:          imported.Exports[hostFnName].Function,
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "host function too many parameters",
 			input:       []uint64{1, 2},
-			me:          importedMe,
+			module:      imported.Ctx,
 			fn:          imported.Exports[hostFnName].Function,
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
 			name:        "wasm function not enough parameters",
 			input:       []uint64{},
-			me:          importedMe,
+			module:      imported.Ctx,
 			fn:          imported.Exports[wasmFnName].Function,
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "wasm function too many parameters",
 			input:       []uint64{1, 2},
-			me:          importedMe,
+			module:      imported.Ctx,
 			fn:          imported.Exports[wasmFnName].Function,
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
-			name:  "wasm function panics with wasmruntime.Error",
-			input: []uint64{0},
-			me:    importedMe,
-			fn:    imported.Exports[wasmFnName].Function,
+			name:   "wasm function panics with wasmruntime.Error",
+			input:  []uint64{0},
+			module: imported.Ctx,
+			fn:     imported.Exports[wasmFnName].Function,
 			expectedErr: `wasm runtime error: integer divide by zero
 wasm backtrace:
 	0: wasm_div_by`,
 		},
 		{
-			name:  "host function that panics",
-			input: []uint64{math.MaxUint32},
-			me:    importedMe,
-			fn:    imported.Exports[hostFnName].Function,
+			name:   "host function that panics",
+			input:  []uint64{math.MaxUint32},
+			module: imported.Ctx,
+			fn:     imported.Exports[hostFnName].Function,
 			expectedErr: `wasm runtime error: host-function panic
 wasm backtrace:
 	0: host_div_by`,
 		},
 		{
-			name:  "host function panics with runtime.Error",
-			input: []uint64{0},
-			me:    importedMe,
-			fn:    imported.Exports[hostFnName].Function, // TODO: This should be a normal runtime error
+			name:   "host function panics with runtime.Error",
+			input:  []uint64{0},
+			module: imported.Ctx,
+			fn:     imported.Exports[hostFnName].Function, // TODO: This should be a normal runtime error
 			expectedErr: `wasm runtime error: runtime error: integer divide by zero
 wasm backtrace:
 	0: host_div_by`,
 		},
 		{
-			name:  "wasm calls host function that panics",
-			input: []uint64{math.MaxUint32},
-			me:    importedMe,
-			fn:    imported.Exports[callHostFnName].Function,
+			name:   "wasm calls host function that panics",
+			input:  []uint64{math.MaxUint32},
+			module: imported.Ctx,
+			fn:     imported.Exports[callHostFnName].Function,
 			expectedErr: `wasm runtime error: host-function panic
-wasm backtrace:
-	0: host_div_by
-	1: call->host_div_by`,
-		},
-		{
-			name:  "wasm calls imported wasm that calls host function panics with runtime.Error",
-			input: []uint64{0},
-			me:    importedMe,
-			fn:    imported.Exports[callHostFnName].Function,
-			expectedErr: `wasm runtime error: runtime error: integer divide by zero
 wasm backtrace:
 	0: host_div_by
 	1: call->host_div_by`,
@@ -349,15 +339,15 @@ wasm backtrace:
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
+			m := tc.module
 			f := tc.fn
-			m := f.Module
-			_, err := m.Engine.Call(m.Ctx, f, tc.input...)
+			_, err := f.Module.Engine.Call(m, f, tc.input...)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Ensure the module still works
-			ret, err := m.Engine.Call(m.Ctx, f, 1)
+			results, err := f.Module.Engine.Call(m, f, 1)
 			require.NoError(t, err)
-			require.Equal(t, uint64(1), ret[0])
+			require.Equal(t, uint64(1), results[0])
 		})
 	}
 }
@@ -438,11 +428,4 @@ func addFunction(module *wasm.ModuleInstance, funcName string, fn *wasm.Function
 	module.Exports[funcName] = &wasm.ExportInstance{Type: wasm.ExternTypeFunc, Function: fn}
 	// This link is essential for all engines. For example, functions call other functions defined in the same module.
 	fn.Module = module
-}
-
-// closeModuleEngineWithExitCode allows unit tests to check `CloseWithExitCode` didn't err.
-func closeModuleEngineWithExitCode(t *testing.T, me wasm.ModuleEngine, exitCode uint32) bool {
-	ok, err := me.CloseWithExitCode(exitCode)
-	require.NoError(t, err)
-	return ok
 }
