@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [test-part-2]
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.17"  # 1.xx == latest patch of 1.xx
