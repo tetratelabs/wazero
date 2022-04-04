@@ -219,7 +219,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 
 	e := et.NewEngine()
 
-	imported, importedMe := setupCallTests(t, e)
+	imported, importedMe, importing, importingMe := setupCallTests(t, e)
+	defer importingMe.Close()
 	defer importedMe.Close()
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
@@ -243,6 +244,11 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 			module: imported.Ctx,
 			fn:     imported.Exports[callHostFnName].Function,
 		},
+		{
+			name:   callImportCallHostFnName,
+			module: importing.Ctx,
+			fn:     importing.Exports[callImportCallHostFnName].Function,
+		},
 	}
 	for _, tt := range tests {
 		tc := tt
@@ -260,7 +266,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 	e := et.NewEngine()
 
-	imported, importedMe := setupCallTests(t, e)
+	imported, importedMe, importing, importingMe := setupCallTests(t, e)
+	defer importingMe.Close()
 	defer importedMe.Close()
 
 	tests := []struct {
@@ -335,6 +342,27 @@ wasm backtrace:
 	0: host_div_by
 	1: call->host_div_by`,
 		},
+		{
+			name:        "wasm calls imported wasm that calls host function panics with runtime.Error",
+			input:       []uint64{0},
+			module:      importing.Ctx,
+			fn:          importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `TODO:`,
+		},
+		{
+			name:        "wasm calls imported wasm that calls host function that panics",
+			input:       []uint64{math.MaxUint32},
+			module:      importing.Ctx,
+			fn:          importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `TODO:`,
+		},
+		{
+			name:        "wasm calls imported wasm calls host function panics with runtime.Error",
+			input:       []uint64{0},
+			module:      importing.Ctx,
+			fn:          importing.Exports[callImportCallHostFnName].Function,
+			expectedErr: `TODO:`,
+		},
 	}
 	for _, tt := range tests {
 		tc := tt
@@ -353,9 +381,10 @@ wasm backtrace:
 }
 
 const (
-	wasmFnName     = "wasm_div_by"
-	hostFnName     = "host_div_by"
-	callHostFnName = "call->" + hostFnName
+	wasmFnName               = "wasm_div_by"
+	hostFnName               = "host_div_by"
+	callHostFnName           = "call->" + hostFnName
+	callImportCallHostFnName = "call_import->" + callHostFnName
 )
 
 // (func (export "wasm_div_by") (param i32) (result i32) (i32.div_u (i32.const 1) (local.get 0)))
@@ -368,7 +397,7 @@ func divBy(d uint32) uint32 {
 	return 1 / d // go panics if d == 0
 }
 
-func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.ModuleEngine) {
+func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.ModuleEngine, *wasm.ModuleInstance, wasm.ModuleEngine) {
 	i32 := wasm.ValueTypeI32
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
 	wasmFn := &wasm.FunctionInstance{
@@ -402,7 +431,30 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
-	return imported, importedMe
+	// To test stack traces, call the same function from another module
+	importing := &wasm.ModuleInstance{Name: t.Name() + "-importing"}
+
+	// Don't add imported functions yet as NewModuleEngine requires them split.
+	importedFunctions := []*wasm.FunctionInstance{callHostFn}
+
+	// Add the exported function.
+	callImportedHostFn := &wasm.FunctionInstance{
+		Kind:  wasm.FunctionKindWasm,
+		Type:  ft,
+		Body:  []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd},
+		Index: 1, // after import
+	}
+	addFunction(importing, callImportCallHostFnName, callImportedHostFn)
+
+	// Compile the importing module
+	importingMe, err := e.NewModuleEngine(importing.Name, importedFunctions, importing.Functions, nil, nil)
+	require.NoError(t, err)
+	linkModuleToEngine(importing, importedMe)
+
+	// Add the imported functions back to the importing module.
+	importing.Functions = append(importedFunctions, importing.Functions...)
+
+	return imported, importedMe, importing, importingMe
 }
 
 // linkModuleToEngine assigns fields that wasm.Store would on instantiation. These includes fields both interpreter and
