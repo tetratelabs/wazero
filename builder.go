@@ -106,6 +106,8 @@ type ModuleBuilder interface {
 	//	builder.ExportGlobalI32("canvas_width", 1024)
 	//
 	// Note: If a global is already exported with the same name, this overwrites it.
+	// Note: The maximum value of v is math.MaxInt32 to match constraints of initialization in binary format.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#value-types%E2%91%A2
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
 	ExportGlobalI32(name string, v int32) ModuleBuilder
 
@@ -116,6 +118,8 @@ type ModuleBuilder interface {
 	//	builder.ExportGlobalI64("start_epoch", 1620216263544)
 	//
 	// Note: If a global is already exported with the same name, this overwrites it.
+	// Note: The maximum value of v is math.MaxInt64 to match constraints of initialization in binary format.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#value-types%E2%91%A2
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
 	ExportGlobalI64(name string, v int64) ModuleBuilder
 
