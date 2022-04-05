@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -14,18 +15,22 @@ import (
 //	hello := func() {
 //		fmt.Fprintln(stdout, "hello!")
 //	}
-//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
+//	env, _ := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
 //
 // If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
 //
-//	env, err := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build()
+//	env, _ := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build()
 //
-//	_, err := r.InstantiateModule(env.WithName("env.1"))
-//	_, err := r.InstantiateModule(env.WithName("env.2"))
+//	env1, _ := r.InstantiateModuleWithConfig(env, NewModuleConfig().WithName("env.1"))
+//	defer env1.Close()
+//
+//	env2, _ := r.InstantiateModuleWithConfig(env, NewModuleConfig().WithName("env.2"))
+//	defer env2.Close()
 //
 // Note: Builder methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
 // Note: Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
 type ModuleBuilder interface {
+	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
 	// ExportFunction adds a function written in Go, which a WebAssembly module can import.
 	//
@@ -74,6 +79,10 @@ type ModuleBuilder interface {
 	// * name - the name to export. Ex "memory" for wasi.ModuleSnapshotPreview1
 	// * minPages - the possibly zero initial size in pages (65536 bytes per page).
 	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (memory (export "memory") 1)
+	//	builder.ExportMemory(1)
+	//
 	// Note: This is allowed to grow to RuntimeConfig.WithMemoryMaxPages (4GiB). To bound it, use ExportMemoryWithMax.
 	// Note: If a memory is already exported with the same name, this overwrites it.
 	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
@@ -82,8 +91,52 @@ type ModuleBuilder interface {
 
 	// ExportMemoryWithMax is like ExportMemory, but can prevent overuse of memory.
 	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (memory (export "memory") 1 1)
+	//	builder.ExportMemoryWithMax(1, 1)
+	//
 	// Note: maxPages must be at least minPages and no larger than RuntimeConfig.WithMemoryMaxPages
 	ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder
+
+	// ExportGlobalI32 exports a global constant of type api.ValueTypeI32.
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (global (export "canvas_width") i32 (i32.const 1024))
+	//	builder.ExportGlobalI32("canvas_width", 1024)
+	//
+	// Note: If a global is already exported with the same name, this overwrites it.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
+	ExportGlobalI32(name string, v uint32) ModuleBuilder
+
+	// ExportGlobalI64 exports a global constant of type api.ValueTypeI64.
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (global (export "start_epoch") i64 (i64.const 1620216263544))
+	//	builder.ExportGlobalI64("start_epoch", 1620216263544)
+	//
+	// Note: If a global is already exported with the same name, this overwrites it.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
+	ExportGlobalI64(name string, v uint64) ModuleBuilder
+
+	// ExportGlobalF32 exports a global constant of type api.ValueTypeF32.
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (global (export "math/pi") f32 (f32.const 3.1415926536))
+	//	builder.ExportGlobalF32("math/pi", 3.1415926536)
+	//
+	// Note: If a global is already exported with the same name, this overwrites it.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
+	ExportGlobalF32(name string, v float32) ModuleBuilder
+
+	// ExportGlobalF64 exports a global constant of type api.ValueTypeF64.
+	//
+	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
+	//	// (global (export "math/pi") f64 (f64.const 3.14159265358979323846264338327950288419716939937510582097494459))
+	//	builder.ExportGlobalF64("math/pi", 3.14159265358979323846264338327950288419716939937510582097494459)
+	//
+	// Note: If a global is already exported with the same name, this overwrites it.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
+	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
 	Build() (*CompiledCode, error)
@@ -100,6 +153,7 @@ type moduleBuilder struct {
 	moduleName   string
 	nameToGoFunc map[string]interface{}
 	nameToMemory map[string]*wasm.Memory
+	nameToGlobal map[string]*wasm.Global
 }
 
 // NewModuleBuilder implements Runtime.NewModuleBuilder
@@ -109,6 +163,7 @@ func (r *runtime) NewModuleBuilder(moduleName string) ModuleBuilder {
 		moduleName:   moduleName,
 		nameToGoFunc: map[string]interface{}{},
 		nameToMemory: map[string]*wasm.Memory{},
+		nameToGlobal: map[string]*wasm.Global{},
 	}
 }
 
@@ -138,6 +193,42 @@ func (b *moduleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint
 	return b
 }
 
+// ExportGlobalI32 implements ModuleBuilder.ExportGlobalI32
+func (b *moduleBuilder) ExportGlobalI32(name string, v uint32) ModuleBuilder {
+	b.nameToGlobal[name] = &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(v)},
+	}
+	return b
+}
+
+// ExportGlobalI64 implements ModuleBuilder.ExportGlobalI64
+func (b *moduleBuilder) ExportGlobalI64(name string, v uint64) ModuleBuilder {
+	b.nameToGlobal[name] = &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(v)},
+	}
+	return b
+}
+
+// ExportGlobalF32 implements ModuleBuilder.ExportGlobalF32
+func (b *moduleBuilder) ExportGlobalF32(name string, v float32) ModuleBuilder {
+	b.nameToGlobal[name] = &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(v))},
+	}
+	return b
+}
+
+// ExportGlobalF64 implements ModuleBuilder.ExportGlobalF64
+func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
+	b.nameToGlobal[name] = &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(v))},
+	}
+	return b
+}
+
 // Build implements ModuleBuilder.Build
 func (b *moduleBuilder) Build() (*CompiledCode, error) {
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
@@ -150,7 +241,7 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 	}
 
 	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
-	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory); err != nil {
+	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal); err != nil {
 		return nil, err
 	} else {
 		return &CompiledCode{module: module}, nil

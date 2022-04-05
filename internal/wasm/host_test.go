@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
 // wasiAPI simulates the real WASI api
@@ -38,6 +39,7 @@ func TestNewHostModule(t *testing.T) {
 		name, moduleName string
 		nameToGoFunc     map[string]interface{}
 		nameToMemory     map[string]*Memory
+		nameToGlobal     map[string]*Global
 		expected         *Module
 	}{
 		{
@@ -50,17 +52,7 @@ func TestNewHostModule(t *testing.T) {
 			expected:   &Module{NameSection: &NameSection{ModuleName: "test"}},
 		},
 		{
-			name:         "memory",
-			nameToMemory: map[string]*Memory{"memory": {1, 2}},
-			expected: &Module{
-				MemorySection: &Memory{Min: 1, Max: 2},
-				ExportSection: map[string]*Export{
-					"memory": {Name: "memory", Type: ExternTypeMemory, Index: 0},
-				},
-			},
-		},
-		{
-			name:       "two struct funcs",
+			name:       "funcs",
 			moduleName: "wasi_snapshot_preview1",
 			nameToGoFunc: map[string]interface{}{
 				functionArgsSizesGet: a.ArgsSizesGet,
@@ -87,6 +79,45 @@ func TestNewHostModule(t *testing.T) {
 			},
 		},
 		{
+			name:         "memory",
+			nameToMemory: map[string]*Memory{"memory": {1, 2}},
+			expected: &Module{
+				MemorySection: &Memory{Min: 1, Max: 2},
+				ExportSection: map[string]*Export{
+					"memory": {Name: "memory", Type: ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
+			name: "globals",
+			nameToGlobal: map[string]*Global{
+				"g2": {
+					Type: &GlobalType{ValType: i32},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(2)},
+				},
+				"g1": {
+					Type: &GlobalType{ValType: i32},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+				},
+			},
+			expected: &Module{
+				GlobalSection: []*Global{
+					{
+						Type: &GlobalType{ValType: i32},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+					},
+					{
+						Type: &GlobalType{ValType: i32},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(2)},
+					},
+				},
+				ExportSection: map[string]*Export{
+					"g1": {Name: "g1", Type: ExternTypeGlobal, Index: 0},
+					"g2": {Name: "g2", Type: ExternTypeGlobal, Index: 1},
+				},
+			},
+		},
+		{
 			name:       "one of each",
 			moduleName: "env",
 			nameToGoFunc: map[string]interface{}{
@@ -95,17 +126,30 @@ func TestNewHostModule(t *testing.T) {
 			nameToMemory: map[string]*Memory{
 				"memory": {1, 1},
 			},
+			nameToGlobal: map[string]*Global{
+				"g": {
+					Type: &GlobalType{ValType: i32},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+				},
+			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection:     []Index{0},
 				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet},
+				GlobalSection: []*Global{
+					{
+						Type: &GlobalType{ValType: i32},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+					},
+				},
+				MemorySection: &Memory{Min: 1, Max: 1},
 				ExportSection: map[string]*Export{
 					"args_sizes_get": {Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
 					"memory":         {Name: "memory", Type: ExternTypeMemory, Index: 0},
+					"g":              {Name: "g", Type: ExternTypeGlobal, Index: 0},
 				},
-				MemorySection: &Memory{Min: 1, Max: 1},
 				NameSection: &NameSection{
 					ModuleName: "env",
 					FunctionNames: NameMap{
@@ -120,7 +164,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -154,6 +198,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		name, moduleName string
 		nameToGoFunc     map[string]interface{}
 		nameToMemory     map[string]*Memory
+		nameToGlobal     map[string]*Global
 		expectedErr      string
 	}{
 		{
@@ -177,13 +222,19 @@ func TestNewHostModule_Errors(t *testing.T) {
 			nameToMemory: map[string]*Memory{"memory": {1, 0}},
 			expectedErr:  "memory[memory] min 1 pages (64 Ki) > max 0 pages (0 Ki)",
 		},
+		{
+			name:         "global collides on func name",
+			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
+			nameToGlobal: map[string]*Global{"fn": {}},
+			expectedErr:  "global[fn] exports the same name as a func",
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}
