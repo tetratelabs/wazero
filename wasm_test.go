@@ -167,6 +167,7 @@ func TestModule_Global(t *testing.T) {
 	tests := []struct {
 		name                      string
 		module                    *wasm.Module // module as wat doesn't yet support globals
+		builder                   func(Runtime) ModuleBuilder
 		expected, expectedMutable bool
 	}{
 		{
@@ -186,16 +187,8 @@ func TestModule_Global(t *testing.T) {
 		},
 		{
 			name: "global exported",
-			module: &wasm.Module{
-				GlobalSection: []*wasm.Global{
-					{
-						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
-					},
-				},
-				ExportSection: map[string]*wasm.Export{
-					"global": {Type: wasm.ExternTypeGlobal, Name: "global"},
-				},
+			builder: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder(t.Name()).ExportGlobalI64("global", 1)
 			},
 			expected: true,
 		},
@@ -222,8 +215,15 @@ func TestModule_Global(t *testing.T) {
 
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
+			var code *CompiledCode
+			if tc.module != nil {
+				code = &CompiledCode{module: tc.module}
+			} else {
+				code, _ = tc.builder(r).Build()
+			}
+
 			// Instantiate the module and get the export of the above global
-			module, err := r.InstantiateModule(&CompiledCode{module: tc.module})
+			module, err := r.InstantiateModule(code)
 			require.NoError(t, err)
 			defer module.Close()
 

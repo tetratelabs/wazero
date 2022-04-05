@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -42,18 +43,6 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("env")
 			},
 			expected: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "env"}},
-		},
-		{
-			name: "ExportMemory",
-			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportMemory("memory", 1)
-			},
-			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
-				},
-			},
 		},
 		{
 			name: "ExportFunction",
@@ -161,6 +150,190 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+				},
+			},
+		},
+		{
+			name: "ExportMemory",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemory("memory", 1)
+			},
+			expected: &wasm.Module{
+				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportMemory overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemory("memory", 1).ExportMemory("memory", 2)
+			},
+			expected: &wasm.Module{
+				MemorySection: &wasm.Memory{Min: 2, Max: wasm.MemoryMaxPages},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportMemoryWithMax",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, 1)
+			},
+			expected: &wasm.Module{
+				MemorySection: &wasm.Memory{Min: 1, Max: 1},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportMemoryWithMax overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, 1).ExportMemoryWithMax("memory", 1, 2)
+			},
+			expected: &wasm.Module{
+				MemorySection: &wasm.Memory{Min: 1, Max: 2},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalI32",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalI32("canvas_width", 1024)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(1024)},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"canvas_width": {Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalI32 overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalI32("canvas_width", 1024).ExportGlobalI32("canvas_width", 2048)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(2048)},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"canvas_width": {Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalI64",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalI64("start_epoch", 1620216263544)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(1620216263544)},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"start_epoch": {Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalI64 overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalI64("start_epoch", 1620216263544).ExportGlobalI64("start_epoch", 1620216263544000)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(1620216263544000)},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"start_epoch": {Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalF32",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalF32("math/pi", 3.1415926536)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(3.1415926536))},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalF32 overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalF32("math/pi", 3.1415926536).ExportGlobalF32("math/pi", 3.14159)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(3.14159))},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalF64",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalF64("math/pi", math.Pi)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(math.Pi))},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				},
+			},
+		},
+		{
+			name: "ExportGlobalF64 overwrites",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportGlobalF64("math/pi", math.Pi).ExportGlobalF64("math/pi", 3.14159)
+			},
+			expected: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(3.14159))},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},

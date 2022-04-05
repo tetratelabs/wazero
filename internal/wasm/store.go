@@ -133,6 +133,7 @@ type (
 		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
 		Val uint64
+		// ^^ TODO: this should be guarded with atomics when mutable
 	}
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.

@@ -408,7 +408,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
-	}}, map[string]*wasm.Memory{})
+	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{})
 	require.NoError(t, err)
 
 	_, err = store.Instantiate(context.Background(), hm, hostModuleName, nil)

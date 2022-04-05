@@ -10,7 +10,7 @@ import (
 )
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameToMemory map[string]*Memory) (m *Module, err error) {
+func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameToMemory map[string]*Memory, nameToGlobal map[string]*Global) (m *Module, err error) {
 	if moduleName != "" {
 		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
 	} else {
@@ -19,7 +19,8 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameT
 
 	funcCount := uint32(len(nameToGoFunc))
 	memoryCount := uint32(len(nameToMemory))
-	exportCount := funcCount + memoryCount
+	globalCount := uint32(len(nameToGlobal))
+	exportCount := funcCount + memoryCount + globalCount
 	if exportCount > 0 {
 		m.ExportSection = make(map[string]*Export, exportCount)
 	}
@@ -32,6 +33,12 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameT
 
 	if memoryCount > 0 {
 		if err = addMemory(m, nameToMemory); err != nil {
+			return
+		}
+	}
+
+	if globalCount > 0 {
+		if err = addGlobals(m, nameToGlobal); err != nil {
 			return
 		}
 	}
@@ -98,6 +105,26 @@ func addMemory(m *Module, nameToMemory map[string]*Memory) error {
 	}
 
 	m.ExportSection[name] = &Export{Type: ExternTypeMemory, Name: name, Index: 0}
+	return nil
+}
+
+func addGlobals(m *Module, globals map[string]*Global) error {
+	globalCount := len(globals)
+	m.GlobalSection = make([]*Global, 0, globalCount)
+
+	globalNames := make([]string, 0, globalCount)
+	for name := range globals {
+		if e, ok := m.ExportSection[name]; ok { // Exports cannot collide on names, regardless of type.
+			return fmt.Errorf("global[%s] exports the same name as a %s", name, ExternTypeName(e.Type))
+		}
+		globalNames = append(globalNames, name)
+	}
+	sort.Strings(globalNames) // For consistent iteration order
+
+	for i, name := range globalNames {
+		m.GlobalSection = append(m.GlobalSection, globals[name])
+		m.ExportSection[name] = &Export{Type: ExternTypeGlobal, Name: name, Index: Index(i)}
+	}
 	return nil
 }
 
