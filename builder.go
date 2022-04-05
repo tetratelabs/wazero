@@ -5,6 +5,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -106,7 +107,7 @@ type ModuleBuilder interface {
 	//
 	// Note: If a global is already exported with the same name, this overwrites it.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
-	ExportGlobalI32(name string, v uint32) ModuleBuilder
+	ExportGlobalI32(name string, v int32) ModuleBuilder
 
 	// ExportGlobalI64 exports a global constant of type api.ValueTypeI64.
 	//
@@ -116,7 +117,7 @@ type ModuleBuilder interface {
 	//
 	// Note: If a global is already exported with the same name, this overwrites it.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
-	ExportGlobalI64(name string, v uint64) ModuleBuilder
+	ExportGlobalI64(name string, v int64) ModuleBuilder
 
 	// ExportGlobalF32 exports a global constant of type api.ValueTypeF32.
 	//
@@ -194,19 +195,21 @@ func (b *moduleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint
 }
 
 // ExportGlobalI32 implements ModuleBuilder.ExportGlobalI32
-func (b *moduleBuilder) ExportGlobalI32(name string, v uint32) ModuleBuilder {
+func (b *moduleBuilder) ExportGlobalI32(name string, v int32) ModuleBuilder {
 	b.nameToGlobal[name] = &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(v)},
+		// Signed per https://www.w3.org/TR/wasm-core-1/#value-types%E2%91%A2
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(uint32(v))},
 	}
 	return b
 }
 
 // ExportGlobalI64 implements ModuleBuilder.ExportGlobalI64
-func (b *moduleBuilder) ExportGlobalI64(name string, v uint64) ModuleBuilder {
+func (b *moduleBuilder) ExportGlobalI64(name string, v int64) ModuleBuilder {
 	b.nameToGlobal[name] = &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(v)},
+		// Signed per https://www.w3.org/TR/wasm-core-1/#value-types%E2%91%A2
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(uint64(v))},
 	}
 	return b
 }
@@ -215,7 +218,7 @@ func (b *moduleBuilder) ExportGlobalI64(name string, v uint64) ModuleBuilder {
 func (b *moduleBuilder) ExportGlobalF32(name string, v float32) ModuleBuilder {
 	b.nameToGlobal[name] = &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(v))},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(v))},
 	}
 	return b
 }
@@ -224,7 +227,7 @@ func (b *moduleBuilder) ExportGlobalF32(name string, v float32) ModuleBuilder {
 func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 	b.nameToGlobal[name] = &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(v))},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(v))},
 	}
 	return b
 }

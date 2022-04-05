@@ -15,6 +15,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
@@ -251,14 +252,14 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	// (global (export "global_f32") f32 (f32.const 666))
 	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(666))},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(666))},
 	})
 	mod.ExportSection["global_f32"] = &wasm.Export{Name: "global_f32", Index: 1, Type: wasm.ExternTypeGlobal}
 
 	// (global (export "global_f64") f64 (f64.const 666))
 	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(666))},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(666))},
 	})
 	mod.ExportSection["global_f64"] = &wasm.Export{Name: "global_f64", Index: 2, Type: wasm.ExternTypeGlobal}
 

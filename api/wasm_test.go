@@ -64,11 +64,11 @@ func TestEncodeDecodeF64(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			encoded := EncodeF64(v)
-			binary := DecodeF64(encoded)
-			if math.IsNaN(binary) { // cannot use require.Equal as NaN by definition doesn't equal itself
-				require.True(t, math.IsNaN(binary))
+			val := DecodeF64(encoded)
+			if math.IsNaN(val) { // cannot use require.Equal as NaN by definition doesn't equal itself
+				require.True(t, math.IsNaN(val))
 			} else {
-				require.Equal(t, v, binary)
+				require.Equal(t, v, val)
 			}
 		})
 	}
