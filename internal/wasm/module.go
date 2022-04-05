@@ -231,11 +231,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, table, MaximumFunctionIndex); err != nil {
 			return err
 		}
-	} else {
-		if err = m.validateHostFunctions(); err != nil {
-			return err
-		}
-	}
+	} // No need to validate host functions as NewHostModule validates
 
 	if _, err = m.validateTable(); err != nil {
 		return err
