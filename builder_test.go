@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -221,13 +222,13 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 		{
 			name: "ExportGlobalI32 overwrites",
 			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportGlobalI32("canvas_width", 1024).ExportGlobalI32("canvas_width", 2048)
+				return r.NewModuleBuilder("").ExportGlobalI32("canvas_width", 1024).ExportGlobalI32("canvas_width", math.MaxInt32)
 			},
 			expected: &wasm.Module{
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(2048)},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(math.MaxInt32)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -255,13 +256,13 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 		{
 			name: "ExportGlobalI64 overwrites",
 			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportGlobalI64("start_epoch", 1620216263544).ExportGlobalI64("start_epoch", 1620216263544000)
+				return r.NewModuleBuilder("").ExportGlobalI64("start_epoch", 1620216263544).ExportGlobalI64("start_epoch", math.MaxInt64)
 			},
 			expected: &wasm.Module{
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(1620216263544000)},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(math.MaxInt64)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -278,7 +279,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(3.1415926536))},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(3.1415926536))},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -289,13 +290,13 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 		{
 			name: "ExportGlobalF32 overwrites",
 			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportGlobalF32("math/pi", 3.1415926536).ExportGlobalF32("math/pi", 3.14159)
+				return r.NewModuleBuilder("").ExportGlobalF32("math/pi", 3.1415926536).ExportGlobalF32("math/pi", math.MaxFloat32)
 			},
 			expected: &wasm.Module{
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: leb128.EncodeUint64(api.EncodeF32(3.14159))},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(math.MaxFloat32))},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -312,7 +313,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(math.Pi))},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(math.Pi))},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -323,13 +324,13 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 		{
 			name: "ExportGlobalF64 overwrites",
 			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportGlobalF64("math/pi", math.Pi).ExportGlobalF64("math/pi", 3.14159)
+				return r.NewModuleBuilder("").ExportGlobalF64("math/pi", math.Pi).ExportGlobalF64("math/pi", math.MaxFloat64)
 			},
 			expected: &wasm.Module{
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: leb128.EncodeUint64(api.EncodeF64(3.14159))},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(math.MaxFloat64))},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{

@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"reflect"
@@ -10,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/u64"
 )
 
 func TestFunctionType_String(t *testing.T) {
@@ -186,20 +187,19 @@ func TestValidateConstExpression(t *testing.T) {
 	for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 		t.Run(ValueTypeName(vt), func(t *testing.T) {
 			t.Run("valid", func(t *testing.T) {
-				// Allocate bytes with enough size for all types.
-				expr := &ConstantExpression{Data: make([]byte, 8)}
+				expr := &ConstantExpression{}
 				switch vt {
 				case ValueTypeI32:
-					expr.Data[0] = 1
+					expr.Data = []byte{1}
 					expr.Opcode = OpcodeI32Const
 				case ValueTypeI64:
-					expr.Data[0] = 2
+					expr.Data = []byte{2}
 					expr.Opcode = OpcodeI64Const
 				case ValueTypeF32:
-					binary.LittleEndian.PutUint32(expr.Data, math.Float32bits(math.MaxFloat32))
+					expr.Data = u64.LeBytes(api.EncodeF32(math.MaxFloat32))
 					expr.Opcode = OpcodeF32Const
 				case ValueTypeF64:
-					binary.LittleEndian.PutUint64(expr.Data, math.Float64bits(math.MaxFloat64))
+					expr.Data = u64.LeBytes(api.EncodeF64(math.MaxFloat64))
 					expr.Opcode = OpcodeF64Const
 				}
 
@@ -661,32 +661,25 @@ func TestModule_validateExports(t *testing.T) {
 }
 
 func TestModule_buildGlobalInstances(t *testing.T) {
-	data := []byte{0, 0, 0, 0, 0, 0, 0, 0}
-	binary.LittleEndian.PutUint64(data, math.Float64bits(1.0))
 	m := Module{GlobalSection: []*Global{
 		{
 			Type: &GlobalType{Mutable: true, ValType: ValueTypeF64},
 			Init: &ConstantExpression{Opcode: OpcodeF64Const,
-				Data: []byte{0, 0, 0, 0, 0, 0, 0xf0, 0x3f}}, // == float64(1.0)
+				Data: u64.LeBytes(api.EncodeF64(math.MaxFloat64))},
 		},
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
 			Init: &ConstantExpression{Opcode: OpcodeI32Const,
-				Data: []byte{1}},
+				Data: leb128.EncodeUint32(math.MaxInt32)},
 		},
 	}}
 
 	globals := m.buildGlobals(nil)
 	expectedGlobals := []*GlobalInstance{
-		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: math.Float64bits(1.0)},
-		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(1)},
+		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
+		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: math.MaxInt32},
 	}
-
-	require.Len(t, globals, len(expectedGlobals))
-	for i := range globals {
-		actual, expected := globals[i], expectedGlobals[i]
-		require.Equal(t, expected, actual)
-	}
+	require.Equal(t, expectedGlobals, globals)
 }
 
 func TestModule_buildFunctionInstances(t *testing.T) {

@@ -447,6 +447,8 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 			gv = api.EncodeF32(v)
 		case float64:
 			gv = api.EncodeF64(v)
+		default:
+			panic(fmt.Errorf("BUG: invalid conversion %d", v))
 		}
 		globals = append(globals, &GlobalInstance{Type: gs.Type, Val: gv})
 	}

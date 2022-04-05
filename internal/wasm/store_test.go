@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
+	"github.com/tetratelabs/wazero/internal/u64"
 )
 
 func TestModuleInstance_Memory(t *testing.T) {
@@ -466,20 +466,19 @@ func TestExecuteConstExpression(t *testing.T) {
 	t.Run("non global expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 			t.Run(ValueTypeName(vt), func(t *testing.T) {
-				// Allocate bytes with enough size for all types.
-				expr := &ConstantExpression{Data: make([]byte, 8)}
+				expr := &ConstantExpression{}
 				switch vt {
 				case ValueTypeI32:
-					expr.Data[0] = 1
+					expr.Data = []byte{1}
 					expr.Opcode = OpcodeI32Const
 				case ValueTypeI64:
-					expr.Data[0] = 2
+					expr.Data = []byte{2}
 					expr.Opcode = OpcodeI64Const
 				case ValueTypeF32:
-					binary.LittleEndian.PutUint32(expr.Data, math.Float32bits(math.MaxFloat32))
+					expr.Data = u64.LeBytes(api.EncodeF32(math.MaxFloat32))
 					expr.Opcode = OpcodeF32Const
 				case ValueTypeF64:
-					binary.LittleEndian.PutUint64(expr.Data, math.Float64bits(math.MaxFloat64))
+					expr.Data = u64.LeBytes(api.EncodeF64(math.MaxFloat64))
 					expr.Opcode = OpcodeF64Const
 				}
 
