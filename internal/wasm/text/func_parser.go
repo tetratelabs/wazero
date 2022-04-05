@@ -145,15 +145,15 @@ func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, _
 func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err error) {
 	var opCode wasm.Opcode
 	switch string(tokenBytes) {
-	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
-		opCode = wasm.OpcodeLocalGet
-		next = p.parseLocalIndex
-	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
-		opCode = wasm.OpcodeI32Add
-		next = p.beginFieldOrInstruction
 	case "call": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
 		opCode = wasm.OpcodeCall
 		next = p.parseFuncIndex
+	case "drop": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
+		opCode = wasm.OpcodeDrop
+		next = p.beginFieldOrInstruction
+	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI32Add
+		next = p.beginFieldOrInstruction
 	case "i32.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 		opCode = wasm.OpcodeI32Extend8S
 		next = p.beginFieldOrInstruction
@@ -169,6 +169,9 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case "i64.extend32_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 		opCode = wasm.OpcodeI64Extend32S
 		next = p.beginFieldOrInstruction
+	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
+		opCode = wasm.OpcodeLocalGet
+		next = p.parseLocalIndex
 	default:
 		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
