@@ -26,6 +26,11 @@ func TestFuncParser(t *testing.T) {
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}},
 		},
 		{
+			name:     "local.get, drop",
+			source:   "(func local.get 0 drop)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeDrop, wasm.OpcodeEnd}},
+		},
+		{
 			name:     "local.get twice",
 			source:   "(func local.get 0 local.get 1)",
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeLocalGet, 0x01, wasm.OpcodeEnd}},

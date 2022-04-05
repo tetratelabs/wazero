@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
+	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -196,79 +197,80 @@ func (c command) expectedError() (err error) {
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	memoryLimitMax := uint32(2)
-	tableLimitMax := uint32(20)
+	// See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
+	mod, err := text.DecodeModule([]byte(`(module $spectest
+(; TODO
+  (global (export "global_i32") i32)
+  (global (export "global_i64") i64)
+  (global (export "global_f32") f32)
+  (global (export "global_f64") f64)
 
-	mod := &wasm.Module{
-		FunctionSection: []uint32{
-			0, // print
-			1, // print_i32
-			2, // print_i64
-			3, // print_f32
-			4, // print_f64
-			5, // print_f64
-			6, // print_f64
-		},
-		TypeSection: []*wasm.FunctionType{
-			{},                                  // print
-			{Params: []byte{wasm.ValueTypeI32}}, // print_i32
-			{Params: []byte{wasm.ValueTypeI64}}, // print_i64
-			{Params: []byte{wasm.ValueTypeF32}}, // print_f32
-			{Params: []byte{wasm.ValueTypeF64}}, // print_f64
-			{Params: []byte{wasm.ValueTypeI32, wasm.ValueTypeF32}}, // print_i32_f32
-			{Params: []byte{wasm.ValueTypeF64, wasm.ValueTypeF64}}, // print_f64_f64
-		},
-		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeEnd}},                                                                                   // print
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_i32
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_i64
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_f32
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_f64
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeLocalGet, 1, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_i32_f32
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeLocalGet, 1, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_f64_f64
-		},
-		GlobalSection: []*wasm.Global{
-			{ // global_i32
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x9a, 0x5} /* = 666 */},
-			},
-			{ // global_i64
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{0x9a, 0x5} /* = 666 */},
-			},
-			{ // global_f32
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x44, 0x26, 0x80, 0x00}},
-			},
-			{ // global_f64
-				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
-			},
-		},
-		MemorySection: &wasm.Memory{
-			Min: 1, Max: memoryLimitMax,
-		},
-		TableSection: &wasm.Table{
-			Min: 10, Max: &tableLimitMax,
-		},
-		ExportSection: map[string]*wasm.Export{
-			"print":         {Name: "print", Index: 0, Type: wasm.ExternTypeFunc},
-			"print_i32":     {Name: "print_i32", Index: 1, Type: wasm.ExternTypeFunc},
-			"print_i64":     {Name: "print_i64", Index: 2, Type: wasm.ExternTypeFunc},
-			"print_f32":     {Name: "print_f32", Index: 3, Type: wasm.ExternTypeFunc},
-			"print_f64":     {Name: "print_f64", Index: 4, Type: wasm.ExternTypeFunc},
-			"print_i32_f32": {Name: "print_i32_f32", Index: 5, Type: wasm.ExternTypeFunc},
-			"print_f64_f64": {Name: "print_f64_f64", Index: 6, Type: wasm.ExternTypeFunc},
-			"global_i32":    {Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal},
-			"global_i64":    {Name: "global_i64", Index: 1, Type: wasm.ExternTypeGlobal},
-			"global_f32":    {Name: "global_f32", Index: 2, Type: wasm.ExternTypeGlobal},
-			"global_f64":    {Name: "global_f64", Index: 3, Type: wasm.ExternTypeGlobal},
-			"table":         {Name: "table", Index: 0, Type: wasm.ExternTypeTable},
-			"memory":        {Name: "memory", Index: 0, Type: wasm.ExternTypeMemory},
-		},
-	}
-	require.NoError(t, mod.Validate(wasm.Features20191205))
-	_, err := store.Instantiate(context.Background(), mod, "spectest", nil)
+  (table (export "table") 10 20 funcref)
+;)
+
+;; TODO: revisit inlining after #215
+
+  (memory 1 2)
+    (export "memory" (memory 0))
+
+;; Note: the following aren't host functions that print to console as it would clutter it. These only drop the inputs.
+  (func)
+     (export "print" (func 0))
+
+  (func (param i32) local.get 0 drop)
+     (export "print_i32" (func 1))
+
+  (func (param i64) local.get 0 drop)
+     (export "print_i64" (func 2))
+
+  (func (param f32) local.get 0 drop)
+     (export "print_f32" (func 3))
+
+  (func (param f64) local.get 0 drop)
+     (export "print_f64" (func 4))
+
+  (func (param i32 f32) local.get 0 drop local.get 1 drop)
+     (export "print_i32_f32" (func 5))
+
+  (func (param f64 f64) local.get 0 drop local.get 1 drop)
+     (export "print_f64_f64" (func 6))
+)`), wasm.Features20191205, wasm.MemoryMaxPages)
+	require.NoError(t, err)
+
+	// (global (export "global_i32") i32)
+	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+	})
+	mod.ExportSection["global_i32"] = &wasm.Export{Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal}
+
+	// (global (export "global_i64") i64)
+	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+	})
+	mod.ExportSection["global_i64"] = &wasm.Export{Name: "global_i64", Index: 1, Type: wasm.ExternTypeGlobal}
+
+	// (global (export "global_f32") f32)
+	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x44, 0x26, 0x80, 0x00}},
+	})
+	mod.ExportSection["global_f32"] = &wasm.Export{Name: "global_f32", Index: 2, Type: wasm.ExternTypeGlobal}
+
+	// (global (export "global_f64") f64)
+	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
+		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
+	})
+	mod.ExportSection["global_f64"] = &wasm.Export{Name: "global_f64", Index: 3, Type: wasm.ExternTypeGlobal}
+
+	//  (table (export "table") 10 20 funcref)
+	tableLimitMax := uint32(20)
+	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
+	mod.ExportSection["table"] = &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable}
+
+	_, err = store.Instantiate(context.Background(), mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
 	require.NoError(t, err)
 }
 
