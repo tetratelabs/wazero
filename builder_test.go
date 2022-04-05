@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -41,6 +42,18 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("env")
 			},
 			expected: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "env"}},
+		},
+		{
+			name: "ExportMemory",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemory("memory", 1)
+			},
+			expected: &wasm.Module{
+				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				},
+			},
 		},
 		{
 			name: "ExportFunction",
@@ -164,8 +177,41 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 	}
 }
 
-// TestNewModuleBuilder_InstantiateModule ensures Runtime.InstantiateModule is called on success.
-func TestNewModuleBuilder_InstantiateModule(t *testing.T) {
+// TestNewModuleBuilder_Build_Errors only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
+func TestNewModuleBuilder_Build_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       func(Runtime) ModuleBuilder
+		expectedErr string
+	}{
+		{
+			name: "memory max > limit",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemory("memory", math.MaxUint32)
+			},
+			expectedErr: "memory[memory] min 4294967295 pages (3 Ti) > max 65536 pages (4 Gi)",
+		},
+		{
+			name: "memory min > limit",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, math.MaxUint32)
+			},
+			expectedErr: "memory[memory] max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, e := tc.input(NewRuntime()).Build()
+			require.EqualError(t, e, tc.expectedErr)
+		})
+	}
+}
+
+// TestNewModuleBuilder_Instantiate ensures Runtime.InstantiateModule is called on success.
+func TestNewModuleBuilder_Instantiate(t *testing.T) {
 	r := NewRuntime()
 	m, err := r.NewModuleBuilder("env").Instantiate()
 	require.NoError(t, err)
@@ -174,8 +220,8 @@ func TestNewModuleBuilder_InstantiateModule(t *testing.T) {
 	require.Equal(t, r.(*runtime).store.Module("env"), m)
 }
 
-// TestNewModuleBuilder_InstantiateModule_Errors ensures errors propagate from Runtime.InstantiateModule
-func TestNewModuleBuilder_InstantiateModule_Errors(t *testing.T) {
+// TestNewModuleBuilder_Instantiate_Errors ensures errors propagate from Runtime.InstantiateModule
+func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
 	r := NewRuntime()
 	_, err := r.NewModuleBuilder("env").Instantiate()
 	require.NoError(t, err)

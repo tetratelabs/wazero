@@ -13,6 +13,10 @@ import (
 type wasiAPI struct {
 }
 
+func ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
+	return 0
+}
+
 func (a *wasiAPI) ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
 	return 0
 }
@@ -32,7 +36,8 @@ func TestNewHostModule(t *testing.T) {
 
 	tests := []struct {
 		name, moduleName string
-		goFuncs          map[string]interface{}
+		nameToGoFunc     map[string]interface{}
+		nameToMemory     map[string]*Memory
 		expected         *Module
 	}{
 		{
@@ -45,9 +50,19 @@ func TestNewHostModule(t *testing.T) {
 			expected:   &Module{NameSection: &NameSection{ModuleName: "test"}},
 		},
 		{
+			name:         "memory",
+			nameToMemory: map[string]*Memory{"memory": {1, 2}},
+			expected: &Module{
+				MemorySection: &Memory{Min: 1, Max: 2},
+				ExportSection: map[string]*Export{
+					"memory": {Name: "memory", Type: ExternTypeMemory, Index: 0},
+				},
+			},
+		},
+		{
 			name:       "two struct funcs",
 			moduleName: "wasi_snapshot_preview1",
-			goFuncs: map[string]interface{}{
+			nameToGoFunc: map[string]interface{}{
 				functionArgsSizesGet: a.ArgsSizesGet,
 				functionFdWrite:      a.FdWrite,
 			},
@@ -71,13 +86,41 @@ func TestNewHostModule(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "one of each",
+			moduleName: "env",
+			nameToGoFunc: map[string]interface{}{
+				functionArgsSizesGet: a.ArgsSizesGet,
+			},
+			nameToMemory: map[string]*Memory{
+				"memory": {1, 1},
+			},
+			expected: &Module{
+				TypeSection: []*FunctionType{
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+				},
+				FunctionSection:     []Index{0},
+				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet},
+				ExportSection: map[string]*Export{
+					"args_sizes_get": {Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
+					"memory":         {Name: "memory", Type: ExternTypeMemory, Index: 0},
+				},
+				MemorySection: &Memory{Min: 1, Max: 1},
+				NameSection: &NameSection{
+					ModuleName: "env",
+					FunctionNames: NameMap{
+						{Index: 0, Name: "args_sizes_get"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.goFuncs)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -107,110 +150,41 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 }
 
 func TestNewHostModule_Errors(t *testing.T) {
-	t.Run("Adds export name to error message", func(t *testing.T) {
-		_, err := NewHostModule("test", map[string]interface{}{"fn": "hello"})
-		require.EqualError(t, err, "func[fn] kind != func: string")
-	})
-}
+	tests := []struct {
+		name, moduleName string
+		nameToGoFunc     map[string]interface{}
+		nameToMemory     map[string]*Memory
+		expectedErr      string
+	}{
+		{
+			name:         "not a function",
+			nameToGoFunc: map[string]interface{}{"fn": t},
+			expectedErr:  "func[fn] kind != func: ptr",
+		},
+		{
+			name:         "memory collides on func name",
+			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
+			nameToMemory: map[string]*Memory{"fn": {1, 1}},
+			expectedErr:  "memory[fn] exports the same name as a func",
+		},
+		{
+			name:         "multiple memories",
+			nameToMemory: map[string]*Memory{"memory": {1, 1}, "mem": {2, 2}},
+			expectedErr:  "only one memory is allowed, but configured: mem, memory",
+		},
+		{
+			name:         "memory max < min",
+			nameToMemory: map[string]*Memory{"memory": {1, 0}},
+			expectedErr:  "memory[memory] min 1 pages (64 Ki) > max 0 pages (0 Ki)",
+		},
+	}
 
-func TestModule_validateHostFunctions(t *testing.T) {
-	notFn := reflect.ValueOf(t)
-	fn := reflect.ValueOf(func(api.Module) {})
+	for _, tt := range tests {
+		tc := tt
 
-	t.Run("ok", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []uint32{0},
-			HostFunctionSection: []*reflect.Value{&fn},
-		}
-		err := m.validateHostFunctions()
-		require.NoError(t, err)
-	})
-	t.Run("function, but no host function", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: nil,
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, "host function count (0) != function count (1)")
-	})
-	t.Run("function out of range of host functions", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []Index{1},
-			HostFunctionSection: []*reflect.Value{&fn},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, "host_function[0] type section index out of range: 1")
-	})
-	t.Run("mismatch params", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{Params: []ValueType{ValueTypeF32}}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: []*reflect.Value{&fn},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, "host_function[0] signature doesn't match type section: v_v != f32_v")
-	})
-	t.Run("mismatch results", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: []*reflect.Value{&fn},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, "host_function[0] signature doesn't match type section: v_v != v_f32")
-	})
-	t.Run("not a function", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: []*reflect.Value{&notFn},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, "host_function[0] is not a valid go func: kind != func: ptr")
-	})
-	t.Run("not a function - exported", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: []*reflect.Value{&notFn},
-			ExportSection:       map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0}},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] export["f1"] is not a valid go func: kind != func: ptr`)
-	})
-	t.Run("not a function  - exported after import", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			ImportSection:       []*Import{{Type: ExternTypeFunc}},
-			FunctionSection:     []Index{1},
-			HostFunctionSection: []*reflect.Value{&notFn},
-			ExportSection:       map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 1}},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] export["f1"] is not a valid go func: kind != func: ptr`)
-	})
-	t.Run("not a function - exported twice", func(t *testing.T) {
-		m := Module{
-			TypeSection:         []*FunctionType{{}},
-			FunctionSection:     []Index{0},
-			HostFunctionSection: []*reflect.Value{&notFn},
-			ExportSection: map[string]*Export{
-				"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0},
-				"f2": {Name: "f2", Type: ExternTypeFunc, Index: 0},
-			},
-		}
-		err := m.validateHostFunctions()
-		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] export["f1","f2"] is not a valid go func: kind != func: ptr`)
-	})
+		t.Run(tc.name, func(t *testing.T) {
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory)
+			require.EqualError(t, e, tc.expectedErr)
+		})
+	}
 }

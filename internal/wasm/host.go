@@ -4,40 +4,62 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*Module, error) {
-	hostFunctionCount := uint32(len(nameToGoFunc))
-	if hostFunctionCount == 0 {
-		if moduleName != "" {
-			return &Module{NameSection: &NameSection{ModuleName: moduleName}}, nil
-		} else {
-			return &Module{}, nil
+func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameToMemory map[string]*Memory) (m *Module, err error) {
+	if moduleName != "" {
+		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
+	} else {
+		m = &Module{}
+	}
+
+	funcCount := uint32(len(nameToGoFunc))
+	memoryCount := uint32(len(nameToMemory))
+	exportCount := funcCount + memoryCount
+	if exportCount > 0 {
+		m.ExportSection = make(map[string]*Export, exportCount)
+	}
+
+	if funcCount > 0 {
+		if err = addFuncs(m, nameToGoFunc); err != nil {
+			return
 		}
 	}
 
-	m := &Module{
-		NameSection:         &NameSection{ModuleName: moduleName, FunctionNames: make([]*NameAssoc, 0, hostFunctionCount)},
-		HostFunctionSection: make([]*reflect.Value, 0, hostFunctionCount),
-		ExportSection:       make(map[string]*Export, hostFunctionCount),
+	if memoryCount > 0 {
+		if err = addMemory(m, nameToMemory); err != nil {
+			return
+		}
 	}
+	return
+}
 
-	// Ensure insertion order is consistent
-	names := make([]string, 0, hostFunctionCount)
+func addFuncs(m *Module, nameToGoFunc map[string]interface{}) error {
+	funcCount := uint32(len(nameToGoFunc))
+	funcNames := make([]string, 0, funcCount)
+	if m.NameSection == nil {
+		m.NameSection = &NameSection{}
+	}
+	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
+	m.FunctionSection = make([]Index, 0, funcCount)
+	m.HostFunctionSection = make([]*reflect.Value, 0, funcCount)
+
+	// Sort names for consistent iteration
 	for k := range nameToGoFunc {
-		names = append(names, k)
+		funcNames = append(funcNames, k)
 	}
-	sort.Strings(names)
+	sort.Strings(funcNames)
 
-	for idx := Index(0); idx < hostFunctionCount; idx++ {
-		name := names[idx]
+	for idx := Index(0); idx < funcCount; idx++ {
+		name := funcNames[idx]
 		fn := reflect.ValueOf(nameToGoFunc[name])
 		_, functionType, _, err := getFunctionType(&fn, false)
 		if err != nil {
-			return nil, fmt.Errorf("func[%s] %w", name, err)
+			return fmt.Errorf("func[%s] %w", name, err)
 		}
 
 		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(functionType))
@@ -45,7 +67,38 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*Mod
 		m.ExportSection[name] = &Export{Type: ExternTypeFunc, Name: name, Index: idx}
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: name})
 	}
-	return m, nil
+	return nil
+}
+
+func addMemory(m *Module, nameToMemory map[string]*Memory) error {
+	memoryCount := uint32(len(nameToMemory))
+
+	// Only one memory can be defined or imported
+	if memoryCount > 1 {
+		memoryNames := make([]string, 0, memoryCount)
+		for k := range nameToMemory {
+			memoryNames = append(memoryNames, k)
+		}
+		sort.Strings(memoryNames) // For consistent error messages
+		return fmt.Errorf("only one memory is allowed, but configured: %s", strings.Join(memoryNames, ", "))
+	}
+
+	// Find the memory name to export.
+	var name string
+	for k, v := range nameToMemory {
+		name = k
+		if v.Min > v.Max {
+			return fmt.Errorf("memory[%s] min %d pages (%s) > max %d pages (%s)", name, v.Min, PagesToUnitOfBytes(v.Min), v.Max, PagesToUnitOfBytes(v.Max))
+		}
+		m.MemorySection = v
+	}
+
+	if e, ok := m.ExportSection[name]; ok { // Exports cannot collide on names, regardless of type.
+		return fmt.Errorf("memory[%s] exports the same name as a %s", name, ExternTypeName(e.Type))
+	}
+
+	m.ExportSection[name] = &Export{Type: ExternTypeMemory, Name: name, Index: 0}
+	return nil
 }
 
 func (m *Module) maybeAddType(ft *FunctionType) Index {
@@ -58,36 +111,6 @@ func (m *Module) maybeAddType(ft *FunctionType) Index {
 	result := m.SectionElementCount(SectionIDType)
 	m.TypeSection = append(m.TypeSection, ft)
 	return result
-}
-
-func (m *Module) validateHostFunctions() error {
-	functionCount := m.SectionElementCount(SectionIDFunction)
-	hostFunctionCount := m.SectionElementCount(SectionIDHostFunction)
-	if functionCount == 0 && hostFunctionCount == 0 {
-		return nil
-	}
-
-	typeCount := m.SectionElementCount(SectionIDType)
-	if hostFunctionCount != functionCount {
-		return fmt.Errorf("host function count (%d) != function count (%d)", hostFunctionCount, functionCount)
-	}
-
-	for idx, typeIndex := range m.FunctionSection {
-		_, ft, _, err := getFunctionType(m.HostFunctionSection[idx], false)
-		if err != nil {
-			return fmt.Errorf("%s is not a valid go func: %w", m.funcDesc(SectionIDHostFunction, Index(idx)), err)
-		}
-
-		if typeIndex >= typeCount {
-			return fmt.Errorf("%s type section index out of range: %d", m.funcDesc(SectionIDHostFunction, Index(idx)), typeIndex)
-		}
-
-		t := m.TypeSection[typeIndex]
-		if !t.EqualsSignature(ft.Params, ft.Results) {
-			return fmt.Errorf("%s signature doesn't match type section: %s != %s", m.funcDesc(SectionIDHostFunction, Index(idx)), ft, t)
-		}
-	}
-	return nil
 }
 
 func (m *Module) buildHostFunctions(moduleName string) (functions []*FunctionInstance) {

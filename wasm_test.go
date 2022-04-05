@@ -121,17 +121,22 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 // TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
 func TestModule_Memory(t *testing.T) {
 	tests := []struct {
-		name, wat   string
+		name        string
+		builder     func(Runtime) ModuleBuilder
 		expected    bool
 		expectedLen uint32
 	}{
 		{
 			name: "no memory",
-			wat:  `(module)`,
+			builder: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder(t.Name())
+			},
 		},
 		{
-			name:        "memory exported, one page",
-			wat:         `(module (memory $mem 1) (export "memory" (memory $mem)))`,
+			name: "memory exported, one page",
+			builder: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder(t.Name()).ExportMemory("memory", 1)
+			},
 			expected:    true,
 			expectedLen: 65536,
 		},
@@ -142,12 +147,10 @@ func TestModule_Memory(t *testing.T) {
 
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
-			code, err := r.CompileModule([]byte(tc.wat))
+			// Instantiate the module and get the export of the above memory
+			module, err := tc.builder(r).Instantiate()
 			require.NoError(t, err)
-
-			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModule(code)
-			require.NoError(t, err)
+			defer module.Close()
 
 			mem := module.ExportedMemory("memory")
 			if tc.expected {
@@ -222,6 +225,7 @@ func TestModule_Global(t *testing.T) {
 			// Instantiate the module and get the export of the above global
 			module, err := r.InstantiateModule(&CompiledCode{module: tc.module})
 			require.NoError(t, err)
+			defer module.Close()
 
 			global := module.ExportedGlobal("global")
 			if !tc.expected {
@@ -296,7 +300,7 @@ func TestFunction_Context(t *testing.T) {
 	}
 }
 
-func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
+func TestRuntime_NewModule_UsesConfiguredContext(t *testing.T) {
 	type key string
 	runtimeCtx := context.WithValue(context.Background(), key("wa"), "zero")
 	config := NewRuntimeConfig().WithContext(runtimeCtx)
@@ -309,8 +313,9 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
+	env, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
+	defer env.Close()
 
 	code, err := r.CompileModule([]byte(`(module $runtime_test.go
 	(import "env" "start" (func $start))
@@ -319,8 +324,10 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = r.InstantiateModule(code)
+	m, err := r.InstantiateModule(code)
 	require.NoError(t, err)
+	defer m.Close()
+
 	require.True(t, calledStart)
 }
 
@@ -378,11 +385,15 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	internal := r.(*runtime).store
 	m1, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("1"))
 	require.NoError(t, err)
+	defer m1.Close()
+
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("1"), m1)
 
 	m2, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("2"))
 	require.NoError(t, err)
+	defer m2.Close()
+
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
 }

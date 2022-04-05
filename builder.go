@@ -1,6 +1,8 @@
 package wazero
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -67,6 +69,22 @@ type ModuleBuilder interface {
 	// ExportFunctions is a convenience that calls ExportFunction for each key/value in the provided map.
 	ExportFunctions(nameToGoFunc map[string]interface{}) ModuleBuilder
 
+	// ExportMemory adds linear memory, which a WebAssembly module can import and become available via api.Memory.
+	//
+	// * name - the name to export. Ex "memory" for wasi.ModuleSnapshotPreview1
+	// * minPages - the possibly zero initial size in pages (65536 bytes per page).
+	//
+	// Note: This is allowed to grow to RuntimeConfig.WithMemoryMaxPages (4GiB). To bound it, use ExportMemoryWithMax.
+	// Note: If a memory is already exported with the same name, this overwrites it.
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
+	ExportMemory(name string, minPages uint32) ModuleBuilder
+
+	// ExportMemoryWithMax is like ExportMemory, but can prevent overuse of memory.
+	//
+	// Note: maxPages must be at least minPages and no larger than RuntimeConfig.WithMemoryMaxPages
+	ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder
+
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
 	Build() (*CompiledCode, error)
 
@@ -81,6 +99,7 @@ type moduleBuilder struct {
 	r            *runtime
 	moduleName   string
 	nameToGoFunc map[string]interface{}
+	nameToMemory map[string]*wasm.Memory
 }
 
 // NewModuleBuilder implements Runtime.NewModuleBuilder
@@ -89,6 +108,7 @@ func (r *runtime) NewModuleBuilder(moduleName string) ModuleBuilder {
 		r:            r,
 		moduleName:   moduleName,
 		nameToGoFunc: map[string]interface{}{},
+		nameToMemory: map[string]*wasm.Memory{},
 	}
 }
 
@@ -106,10 +126,31 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 	return b
 }
 
+// ExportMemory implements ModuleBuilder.ExportMemory
+func (b *moduleBuilder) ExportMemory(name string, minPages uint32) ModuleBuilder {
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: b.r.memoryMaxPages}
+	return b
+}
+
+// ExportMemoryWithMax implements ModuleBuilder.ExportMemoryWithMax
+func (b *moduleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder {
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: maxPages}
+	return b
+}
+
 // Build implements ModuleBuilder.Build
 func (b *moduleBuilder) Build() (*CompiledCode, error) {
+	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
+	maxLimit := b.r.memoryMaxPages
+	for name, mem := range b.nameToMemory {
+		if mem.Max > maxLimit {
+			max := mem.Max
+			return nil, fmt.Errorf("memory[%s] max %d pages (%s) outside range of %d pages (%s)", name, max, wasm.PagesToUnitOfBytes(max), maxLimit, wasm.PagesToUnitOfBytes(maxLimit))
+		}
+	}
+
 	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
-	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc); err != nil {
+	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory); err != nil {
 		return nil, err
 	} else {
 		return &CompiledCode{module: module}, nil
