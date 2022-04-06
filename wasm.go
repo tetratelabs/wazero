@@ -57,6 +57,16 @@ type Runtime interface {
 	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	InstantiateModuleFromCode(source []byte) (api.Module, error)
 
+	// InstantiateModuleFromCodeWithConfig is a convenience function that chains CompileModule to
+	// InstantiateModuleWithConfig.
+	//
+	// Ex. To only change the module name:
+	//	wasm, _ := wazero.NewRuntime().InstantiateModuleFromCodeWithConfig(source, wazero.NewModuleConfig().
+	//		WithName("wasm")
+	//	)
+	//	defer wasm.Close()
+	InstantiateModuleFromCodeWithConfig(source []byte, config *ModuleConfig) (api.Module, error)
+
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
 	// Ex.
@@ -161,6 +171,15 @@ func (r *runtime) InstantiateModuleFromCode(source []byte) (api.Module, error) {
 		return nil, err
 	} else {
 		return r.InstantiateModule(code)
+	}
+}
+
+// InstantiateModuleFromCodeWithConfig implements Runtime.InstantiateModuleFromCodeWithConfig
+func (r *runtime) InstantiateModuleFromCodeWithConfig(source []byte, config *ModuleConfig) (api.Module, error) {
+	if code, err := r.CompileModule(source); err != nil {
+		return nil, err
+	} else {
+		return r.InstantiateModuleWithConfig(code, config)
 	}
 }
 

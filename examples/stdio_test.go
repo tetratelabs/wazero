@@ -19,10 +19,6 @@ var stdioWasm []byte
 func Test_stdio(t *testing.T) {
 	r := wazero.NewRuntime()
 
-	// Compile the `stdioWasm` module.
-	code, err := r.CompileModule(stdioWasm)
-	require.NoError(t, err)
-
 	// Configure standard I/O (ex stdout) to write to buffers instead of no-op.
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
@@ -34,8 +30,8 @@ func Test_stdio(t *testing.T) {
 	require.NoError(t, err)
 	defer wm.Close()
 
-	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
-	module, err := r.InstantiateModuleWithConfig(code, config)
+	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
+	module, err := r.InstantiateModuleFromCodeWithConfig(stdioWasm, config)
 	require.NoError(t, err)
 	defer module.Close()
 
