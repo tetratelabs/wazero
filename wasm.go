@@ -181,7 +181,9 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 		name = code.module.NameSection.ModuleName
 	}
 
-	mod, err = r.store.Instantiate(r.ctx, code.module, name, sys)
+	module := config.replaceImports(code.module)
+
+	mod, err = r.store.Instantiate(r.ctx, module, name, sys)
 	if err != nil {
 		return
 	}

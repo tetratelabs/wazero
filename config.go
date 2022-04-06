@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
@@ -143,6 +144,11 @@ type ModuleConfig struct {
 	preopens map[uint32]*wasm.FileEntry
 	// preopenPaths allow overwriting of existing paths.
 	preopenPaths map[string]uint32
+	// replacedImports holds the latest state of WithImport
+	// Note: Key is NUL delimited as import module and name can both include any UTF-8 characters.
+	replacedImports map[string][2]string
+	// replacedImportModules holds the latest state of WithImportModule
+	replacedImportModules map[string]string
 }
 
 func NewModuleConfig() *ModuleConfig {
@@ -167,6 +173,60 @@ func NewModuleConfig() *ModuleConfig {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%91%A2
 func (c *ModuleConfig) WithName(name string) *ModuleConfig {
 	c.name = name
+	return c
+}
+
+// WithImport replaces a specific import module and name with a new one. This allows you to break up a monolithic
+// module imports, such as "env". This can also help reduce cyclic dependencies.
+//
+// For example, if a module was compiled with one module owning all imports:
+//	(import "js" "tbl" (table $tbl 4 funcref))
+//	(import "js" "increment" (func $increment (result i32)))
+//	(import "js" "decrement" (func $decrement (result i32)))
+//	(import "js" "wasm_increment" (func $wasm_increment (result i32)))
+//	(import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
+//
+// Use this function to import "increment" and "decrement" from the module "go" and other imports from "wasm":
+//	config.WithImportModule("js", "wasm")
+//	config.WithImport("wasm", "increment", "go", "increment")
+//	config.WithImport("wasm", "decrement", "go", "decrement")
+//
+// Upon instantiation, imports resolve as if they were compiled like so:
+//	(import "wasm" "tbl" (table $tbl 4 funcref))
+//	(import "go" "increment" (func $increment (result i32)))
+//	(import "go" "decrement" (func $decrement (result i32)))
+//	(import "wasm" "wasm_increment" (func $wasm_increment (result i32)))
+//	(import "wasm" "wasm_decrement" (func $wasm_decrement (result i32)))
+//
+// Note: Any WithImport instructions happen in order, after any WithImportModule instructions.
+func (c *ModuleConfig) WithImport(oldModule, oldName, newModule, newName string) *ModuleConfig {
+	if c.replacedImports == nil {
+		c.replacedImports = map[string][2]string{}
+	}
+	var builder strings.Builder
+	builder.WriteString(oldModule)
+	builder.WriteByte(0) // delimit with NUL as module and name can be any UTF-8 characters.
+	builder.WriteString(oldName)
+	c.replacedImports[builder.String()] = [2]string{newModule, newName}
+	return c
+}
+
+// WithImportModule replaces every import with oldModule with newModule. This is helpful for modules who have
+// transitioned to a stable status since the underlying wasm was compiled.
+//
+// For example, if a module was compiled like below, with an old module for WASI:
+//	(import "wasi_unstable" "args_get" (func (param i32, i32) (result i32)))
+//
+// Use this function to update it to the current version:
+//	config.WithImportModule("wasi_unstable", wasi.ModuleSnapshotPreview1)
+//
+// See WithImport for a comprehensive example.
+// Note: Any WithImportModule instructions happen in order, before any WithImport instructions.
+func (c *ModuleConfig) WithImportModule(oldModule, newModule string) *ModuleConfig {
+	if c.replacedImportModules == nil {
+		c.replacedImportModules = map[string]string{}
+	}
+	c.replacedImportModules[oldModule] = newModule
 	return c
 }
 
@@ -351,4 +411,54 @@ func (c *ModuleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 	}
 
 	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
+}
+
+func (c *ModuleConfig) replaceImports(module *wasm.Module) *wasm.Module {
+	if (c.replacedImportModules == nil && c.replacedImports == nil) || module.ImportSection == nil {
+		return module
+	}
+
+	changed := false
+
+	ret := *module // shallow copy
+	replacedImports := make([]*wasm.Import, len(module.ImportSection))
+	copy(replacedImports, module.ImportSection)
+
+	// First, replace any import.Module
+	for oldModule, newModule := range c.replacedImportModules {
+		for i, imp := range replacedImports {
+			if imp.Module == oldModule {
+				changed = true
+				cp := *imp // shallow copy
+				cp.Module = newModule
+				replacedImports[i] = &cp
+			} else {
+				replacedImports[i] = imp
+			}
+		}
+	}
+
+	// Now, replace any import.Module+import.Name
+	for oldImport, newImport := range c.replacedImports {
+		for i, imp := range replacedImports {
+			nulIdx := strings.IndexByte(oldImport, 0)
+			oldModule := oldImport[0:nulIdx]
+			oldName := oldImport[nulIdx+1:]
+			if imp.Module == oldModule && imp.Name == oldName {
+				changed = true
+				cp := *imp // shallow copy
+				cp.Module = newImport[0]
+				cp.Name = newImport[1]
+				replacedImports[i] = &cp
+			} else {
+				replacedImports[i] = imp
+			}
+		}
+	}
+
+	if !changed {
+		return module
+	}
+	ret.ImportSection = replacedImports
+	return &ret
 }

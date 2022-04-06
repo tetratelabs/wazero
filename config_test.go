@@ -124,6 +124,386 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 	}
 }
 
+func TestModuleConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		with     func(*ModuleConfig) *ModuleConfig
+		expected *ModuleConfig
+	}{
+		{
+			name: "WithName",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithName("wazero")
+			},
+			expected: &ModuleConfig{
+				name: "wazero",
+			},
+		},
+		{
+			name: "WithName - empty",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithName("")
+			},
+			expected: &ModuleConfig{},
+		},
+		{
+			name: "WithImport",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "abort", "assemblyscript", "abort")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
+			},
+		},
+		{
+			name: "WithImport - empty to non-empty - module",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("", "abort", "assemblyscript", "abort")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"\000abort": {"assemblyscript", "abort"}},
+			},
+		},
+		{
+			name: "WithImport - non-empty to empty - module",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "abort", "", "abort")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"", "abort"}},
+			},
+		},
+		{
+			name: "WithImport - empty to non-empty - name",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "", "assemblyscript", "abort")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000": {"assemblyscript", "abort"}},
+			},
+		},
+		{
+			name: "WithImport - non-empty to empty - name",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "abort", "assemblyscript", "")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", ""}},
+			},
+		},
+		{
+			name: "WithImport - override",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "abort", "assemblyscript", "abort").
+					WithImport("env", "abort", "go", "exit")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"go", "exit"}},
+			},
+		},
+		{
+			name: "WithImport - twice",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImport("env", "abort", "assemblyscript", "abort").
+					WithImport("wasi_unstable", "proc_exit", "wasi_snapshot_preview1", "proc_exit")
+			},
+			expected: &ModuleConfig{
+				replacedImports: map[string][2]string{
+					"env\000abort":               {"assemblyscript", "abort"},
+					"wasi_unstable\000proc_exit": {"wasi_snapshot_preview1", "proc_exit"},
+				},
+			},
+		},
+		{
+			name: "WithImportModule",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImportModule("env", "assemblyscript")
+			},
+			expected: &ModuleConfig{
+				replacedImportModules: map[string]string{"env": "assemblyscript"},
+			},
+		},
+		{
+			name: "WithImportModule - empty to non-empty",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImportModule("", "assemblyscript")
+			},
+			expected: &ModuleConfig{
+				replacedImportModules: map[string]string{"": "assemblyscript"},
+			},
+		},
+		{
+			name: "WithImportModule - non-empty to empty",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImportModule("env", "")
+			},
+			expected: &ModuleConfig{
+				replacedImportModules: map[string]string{"env": ""},
+			},
+		},
+		{
+			name: "WithImportModule - override",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImportModule("env", "assemblyscript").
+					WithImportModule("env", "go")
+			},
+			expected: &ModuleConfig{
+				replacedImportModules: map[string]string{"env": "go"},
+			},
+		},
+		{
+			name: "WithImportModule - twice",
+			with: func(c *ModuleConfig) *ModuleConfig {
+				return c.WithImportModule("env", "go").
+					WithImportModule("wasi_unstable", "wasi_snapshot_preview1")
+			},
+			expected: &ModuleConfig{
+				replacedImportModules: map[string]string{
+					"env":           "go",
+					"wasi_unstable": "wasi_snapshot_preview1",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			input := &ModuleConfig{}
+			rc := tc.with(input)
+			require.Equal(t, tc.expected, rc)
+		})
+	}
+}
+
+func TestModuleConfig_replaceImports(t *testing.T) {
+	tests := []struct {
+		name       string
+		config     *ModuleConfig
+		input      *wasm.Module
+		expected   *wasm.Module
+		expectSame bool
+	}{
+		{
+			name:       "no config, no imports",
+			config:     &ModuleConfig{},
+			input:      &wasm.Module{},
+			expected:   &wasm.Module{},
+			expectSame: true,
+		},
+		{
+			name:   "no config",
+			config: &ModuleConfig{},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+			expectSame: true,
+		},
+		{
+			name: "replacedImportModules",
+			config: &ModuleConfig{
+				replacedImportModules: map[string]string{"wasi_unstable": "wasi_snapshot_preview1"},
+			},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasi_unstable", Name: "args_sizes_get",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasi_unstable", Name: "fd_write",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+			expected: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+		},
+		{
+			name: "replacedImportModules doesn't match",
+			config: &ModuleConfig{
+				replacedImportModules: map[string]string{"env": ""},
+			},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+			expectSame: true,
+		},
+		{
+			name: "replacedImports",
+			config: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
+			},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "env", Name: "abort",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: "seed",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+			expected: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "assemblyscript", Name: "abort",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "env", Name: "seed",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+		},
+		{
+			name: "replacedImports don't match",
+			config: &ModuleConfig{
+				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
+			},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 2,
+					},
+				},
+			},
+			expectSame: true,
+		},
+		{
+			name: "replacedImportModules and replacedImports",
+			config: &ModuleConfig{
+				replacedImportModules: map[string]string{"js": "wasm"},
+				replacedImports: map[string][2]string{
+					"wasm\000increment": {"go", "increment"},
+					"wasm\000decrement": {"go", "decrement"},
+				},
+			},
+			input: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "js", Name: "tbl",
+						Type:      wasm.ExternTypeTable,
+						DescTable: &wasm.Table{Min: 4},
+					},
+					{
+						Module: "js", Name: "increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "js", Name: "decrement",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "js", Name: "wasm_increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "js", Name: "wasm_increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: &wasm.Module{
+				ImportSection: []*wasm.Import{
+					{
+						Module: "wasm", Name: "tbl",
+						Type:      wasm.ExternTypeTable,
+						DescTable: &wasm.Table{Min: 4},
+					},
+					{
+						Module: "go", Name: "increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "go", Name: "decrement",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasm", Name: "wasm_increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+					{
+						Module: "wasm", Name: "wasm_increment",
+						Type:     wasm.ExternTypeFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			actual := tc.config.replaceImports(tc.input)
+			if tc.expectSame {
+				require.Same(t, tc.input, actual)
+			} else {
+				require.NotSame(t, tc.input, actual)
+				require.Equal(t, tc.expected, actual)
+			}
+		})
+	}
+}
+
 func TestModuleConfig_toSysContext(t *testing.T) {
 	testFS := fstest.MapFS{}
 	testFS2 := fstest.MapFS{}
