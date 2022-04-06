@@ -60,10 +60,6 @@ func Test_hostFunc(t *testing.T) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_bytes", getRandomBytes).Instantiate()
 	require.NoError(t, err)
 
-	// Compile the `hostFunc` module.
-	code, err := r.CompileModule(hostFuncWasm)
-	require.NoError(t, err)
-
 	// Configure stdout (console) to write to a buffer.
 	stdout := bytes.NewBuffer(nil)
 	config := wazero.NewModuleConfig().WithStdout(stdout)
@@ -73,8 +69,8 @@ func Test_hostFunc(t *testing.T) {
 	require.NoError(t, err)
 	defer wm.Close()
 
-	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
-	module, err := r.InstantiateModuleWithConfig(code, config)
+	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
+	module, err := r.InstantiateModuleFromCodeWithConfig(hostFuncWasm, config)
 	require.NoError(t, err)
 	defer module.Close()
 

@@ -288,10 +288,7 @@ func TestFunction_Context(t *testing.T) {
 			defer closer() // nolint
 
 			// Instantiate the module and get the export of the above hostFn
-			code, err := r.CompileModule(source)
-			require.NoError(t, err)
-
-			module, err := r.InstantiateModuleWithConfig(code, NewModuleConfig().WithName(t.Name()))
+			module, err := r.InstantiateModuleFromCodeWithConfig(source, NewModuleConfig().WithName(t.Name()))
 			require.NoError(t, err)
 			defer module.Close()
 

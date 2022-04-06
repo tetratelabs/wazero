@@ -42,19 +42,15 @@ func Test_Cat(t *testing.T) {
 	// Combine the above into our baseline config, overriding defaults (which discard stdout and have no file system).
 	config := wazero.NewModuleConfig().WithStdout(stdoutBuf).WithFS(rooted)
 
-	// Compile the `cat` module.
-	code, err := r.CompileModule(catWasm)
-	require.NoError(t, err)
-
 	// Instantiate WASI, which implements system I/O such as console output.
 	wm, err := wasi.InstantiateSnapshotPreview1(r)
 	require.NoError(t, err)
 	defer wm.Close()
 
-	// InstantiateModuleWithConfig by default runs the "_start" function which is what TinyGo compiles "main" to.
+	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "cat" and add args to write "cat.go" to stdout twice.
 	// * We use both "/cat.go" and "./cat.go" because WithFS by default maps the workdir "." to "/".
-	cat, err := r.InstantiateModuleWithConfig(code, config.WithArgs("cat", "/cat.go", "./cat.go"))
+	cat, err := r.InstantiateModuleFromCodeWithConfig(catWasm, config.WithArgs("cat", "/cat.go", "./cat.go"))
 	require.NoError(t, err)
 	defer cat.Close()
 
