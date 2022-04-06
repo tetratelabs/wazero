@@ -211,7 +211,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(1024)},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1024)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -262,7 +262,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(math.MaxInt64)},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(math.MaxInt64)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{

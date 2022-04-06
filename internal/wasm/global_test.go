@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/u64"
 )
 
@@ -156,7 +157,7 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeI32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{1}},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 				},
 			},
@@ -167,7 +168,7 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeI32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{1}},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
@@ -180,7 +181,7 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeI64},
-						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: []byte{1}},
+						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
@@ -223,7 +224,7 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeI32, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{1}},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},
@@ -238,7 +239,7 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeI64, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: []byte{1}},
+						Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: leb128.EncodeInt64(1)},
 					},
 				},
 				ExportSection: map[string]*Export{"global": {Type: ExternTypeGlobal, Name: "global"}},

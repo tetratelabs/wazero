@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/u64"
 )
@@ -148,7 +149,7 @@ func TestStore_CloseModule(t *testing.T) {
 				TypeSection:   []*FunctionType{{}},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection: &Memory{Min: 1},
-				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
+				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
 				TableSection:  &Table{Min: 10},
 			}, importingModuleName, nil)
 			require.NoError(t, err)
@@ -192,7 +193,7 @@ func TestStore_hammer(t *testing.T) {
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:   &Memory{Min: 1},
-		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
+		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
 		TableSection:    &Table{Min: 10},
 		ImportSection: []*Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
@@ -680,21 +681,21 @@ func TestModuleInstance_validateData(t *testing.T) {
 		{
 			name: "ok",
 			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}, Init: []byte{0}},
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x2}}, Init: []byte{0}},
+				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []byte{0}},
+				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}, Init: []byte{0}},
 			},
 		},
 		{
 			name: "out of bounds - single one byte",
 			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x5}}, Init: []byte{0}},
+				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(5)}, Init: []byte{0}},
 			},
 			expErr: true,
 		},
 		{
 			name: "out of bounds - multi bytes",
 			data: []*DataSegment{
-				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x3}}, Init: []byte{0, 1, 2}},
+				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(3)}, Init: []byte{0, 1, 2}},
 			},
 			expErr: true,
 		},
@@ -714,8 +715,8 @@ func TestModuleInstance_validateData(t *testing.T) {
 func TestModuleInstance_applyData(t *testing.T) {
 	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
 	m.applyData([]*DataSegment{
-		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}}, Init: []byte{0xa, 0xf}},
-		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x8}}, Init: []byte{0x1, 0x5}},
+		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
+		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
 	})
 	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
 }

@@ -169,7 +169,7 @@ func (m *MemoryInstance) PageSize() (result uint32) {
 
 // PagesToUnitOfBytes converts the pages to a human-readable form similar to what's specified. Ex. 1 -> "64Ki"
 //
-// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0
 func PagesToUnitOfBytes(pages uint32) string {
 	k := pages * 64
 	if k < 1024 {

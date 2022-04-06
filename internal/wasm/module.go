@@ -152,14 +152,14 @@ type Module struct {
 	// When present, the CodeSection must be nil.
 	//
 	// Note: This section currently has no serialization format, so is not encodable.
-	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A2
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
 	HostFunctionSection []*reflect.Value
 
 	// elementSegments are built on Validate when SectionIDElement is non-empty and all inputs are valid.
 	//
 	// Note: elementSegments retain Module.ElementSection order. Since an ElementSegment can overlap with another, order
 	// preservation ensures a consistent initialization result.
-	// See https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	validatedElementSegments []*validatedElementSegment
 }
 
@@ -393,12 +393,14 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		_, _, err = leb128.DecodeInt32(r)
 		if err != nil {
 			return fmt.Errorf("read i32: %w", err)
 		}
 		actualType = ValueTypeI32
 	case OpcodeI64Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		_, _, err = leb128.DecodeInt64(r)
 		if err != nil {
 			return fmt.Errorf("read i64: %w", err)

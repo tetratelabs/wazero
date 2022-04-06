@@ -245,7 +245,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	// (global (export "global_i32") i32 (i32.const 666))
 	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(666)},
+		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(666)},
 	})
 	mod.ExportSection["global_i32"] = &wasm.Export{Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal}
 

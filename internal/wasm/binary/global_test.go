@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -18,7 +19,7 @@ func TestEncodeGlobal(t *testing.T) {
 			name: "const",
 			input: &wasm.Global{
 				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 			},
 			expected: []byte{
 				wasm.ValueTypeI32, 0x00, // 0 == const
@@ -29,7 +30,7 @@ func TestEncodeGlobal(t *testing.T) {
 			name: "var",
 			input: &wasm.Global{
 				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32, Mutable: true},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{1}},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1)},
 			},
 			expected: []byte{
 				wasm.ValueTypeI32, 0x01, // 1 == var

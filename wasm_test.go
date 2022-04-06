@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
@@ -164,6 +165,8 @@ func TestModule_Memory(t *testing.T) {
 
 // TestModule_Global only covers a couple cases to avoid duplication of internal/wasm/global_test.go
 func TestModule_Global(t *testing.T) {
+	globalVal := int64(100) // intentionally a value that differs in signed vs unsigned encoding
+
 	tests := []struct {
 		name                      string
 		module                    *wasm.Module // module as wat doesn't yet support globals
@@ -180,7 +183,7 @@ func TestModule_Global(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
 			},
@@ -188,7 +191,7 @@ func TestModule_Global(t *testing.T) {
 		{
 			name: "global exported",
 			builder: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder(t.Name()).ExportGlobalI64("global", 1)
+				return r.NewModuleBuilder(t.Name()).ExportGlobalI64("global", globalVal)
 			},
 			expected: true,
 		},
@@ -198,7 +201,7 @@ func TestModule_Global(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{1}},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{
@@ -232,7 +235,7 @@ func TestModule_Global(t *testing.T) {
 				require.Nil(t, global)
 				return
 			}
-			require.Equal(t, uint64(1), global.Get())
+			require.Equal(t, uint64(globalVal), global.Get())
 
 			mutable, ok := global.(api.MutableGlobal)
 			require.Equal(t, tc.expectedMutable, ok)
