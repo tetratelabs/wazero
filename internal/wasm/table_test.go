@@ -80,7 +80,7 @@ func TestModule_validateTable(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}},
 				},
 			},
 			expected: []*validatedElementSegment{},
@@ -94,7 +94,7 @@ func TestModule_validateTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -112,7 +112,7 @@ func TestModule_validateTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -130,7 +130,7 @@ func TestModule_validateTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -148,7 +148,7 @@ func TestModule_validateTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 						Init:       []Index{0, 2},
 					},
 				},
@@ -271,7 +271,7 @@ func TestModule_validateTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 						Init:       []Index{0, 2},
 					},
 					{
@@ -334,7 +334,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI64Const, Data: []byte{0x0}}, Init: []Index{0}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI64Const, Data: const0}, Init: []Index{0}},
 				},
 			},
 			expectedErr: "element[0] has an invalid const expression: i64.const",
@@ -346,7 +346,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}}, Init: []Index{0}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []Index{0}},
 				},
 			},
 			expectedErr: "element was defined, but not table",
@@ -359,7 +359,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x2}}, Init: []Index{0}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}, Init: []Index{0}},
 				},
 			},
 			expectedErr: "element[0].init exceeds min table size",
@@ -372,8 +372,8 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}, Init: []Index{0}},
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}, Init: []Index{0, 0}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []Index{0}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []Index{0, 0}},
 				},
 			},
 			expectedErr: "element[1].init exceeds min table size",
@@ -386,7 +386,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x2}}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)}},
 				},
 			},
 			expectedErr: "element[0].init exceeds min table size",
@@ -399,7 +399,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}, Init: []Index{0, 1}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}, Init: []Index{0, 1}},
 				},
 			},
 			expectedErr: "element[0].init[1] funcidx 1 out of range",
@@ -513,6 +513,9 @@ func TestModule_validateTable_Errors(t *testing.T) {
 	}
 }
 
+var const0 = leb128.EncodeInt32(0)
+var const1 = leb128.EncodeInt32(1)
+
 func TestModule_buildTable(t *testing.T) {
 	three := uint32(3)
 	tests := []struct {
@@ -553,7 +556,7 @@ func TestModule_buildTable(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}}},
+					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}},
 				},
 				validatedElementSegments: []*validatedElementSegment{},
 			},
@@ -568,7 +571,7 @@ func TestModule_buildTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -588,7 +591,7 @@ func TestModule_buildTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -606,7 +609,7 @@ func TestModule_buildTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},
@@ -624,7 +627,7 @@ func TestModule_buildTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 						Init:       []Index{0, 2},
 					},
 				},
@@ -766,7 +769,7 @@ func TestModule_buildTable(t *testing.T) {
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 						Init:       []Index{0, 2},
 					},
 					{
@@ -822,7 +825,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
 					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}},
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 						Init:       []Index{0},
 					},
 				},

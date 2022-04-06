@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -180,7 +181,7 @@ func TestModule_Encode(t *testing.T) {
 				GlobalSection: []*wasm.Global{
 					{
 						Type: &wasm.GlobalType{ValType: i32, Mutable: true},
-						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0}},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
 					},
 				},
 				ExportSection: map[string]*wasm.Export{

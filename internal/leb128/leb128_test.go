@@ -10,6 +10,58 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEncode_DecodeInt32(t *testing.T) {
+	for _, c := range []struct {
+		input    int32
+		expected []byte
+	}{
+		{input: -165675008, expected: []byte{0x80, 0x80, 0x80, 0xb1, 0x7f}},
+		{input: -624485, expected: []byte{0x9b, 0xf1, 0x59}},
+		{input: -16256, expected: []byte{0x80, 0x81, 0x7f}},
+		{input: -4, expected: []byte{0x7c}},
+		{input: -1, expected: []byte{0x7f}},
+		{input: 0, expected: []byte{0x00}},
+		{input: 1, expected: []byte{0x01}},
+		{input: 4, expected: []byte{0x04}},
+		{input: 16256, expected: []byte{0x80, 0xff, 0x0}},
+		{input: 624485, expected: []byte{0xe5, 0x8e, 0x26}},
+		{input: 165675008, expected: []byte{0x80, 0x80, 0x80, 0xcf, 0x0}},
+		{input: int32(math.MaxInt32), expected: []byte{0xff, 0xff, 0xff, 0xff, 0x7}},
+	} {
+		require.Equal(t, c.expected, EncodeInt32(c.input))
+		decoded, _, err := DecodeInt32(bytes.NewReader(c.expected))
+		require.NoError(t, err)
+		require.Equal(t, c.input, decoded)
+	}
+}
+
+func TestEncode_DecodeInt64(t *testing.T) {
+	for _, c := range []struct {
+		input    int64
+		expected []byte
+	}{
+		{input: -math.MaxInt32, expected: []byte{0x81, 0x80, 0x80, 0x80, 0x78}},
+		{input: -165675008, expected: []byte{0x80, 0x80, 0x80, 0xb1, 0x7f}},
+		{input: -624485, expected: []byte{0x9b, 0xf1, 0x59}},
+		{input: -16256, expected: []byte{0x80, 0x81, 0x7f}},
+		{input: -4, expected: []byte{0x7c}},
+		{input: -1, expected: []byte{0x7f}},
+		{input: 0, expected: []byte{0x00}},
+		{input: 1, expected: []byte{0x01}},
+		{input: 4, expected: []byte{0x04}},
+		{input: 16256, expected: []byte{0x80, 0xff, 0x0}},
+		{input: 624485, expected: []byte{0xe5, 0x8e, 0x26}},
+		{input: 165675008, expected: []byte{0x80, 0x80, 0x80, 0xcf, 0x0}},
+		{input: math.MaxInt32, expected: []byte{0xff, 0xff, 0xff, 0xff, 0x7}},
+		{input: math.MaxInt64, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}},
+	} {
+		require.Equal(t, c.expected, EncodeInt64(c.input))
+		decoded, _, err := DecodeInt64(bytes.NewReader(c.expected))
+		require.NoError(t, err)
+		require.Equal(t, c.input, decoded)
+	}
+}
+
 func TestEncodeUint32(t *testing.T) {
 	for _, c := range []struct {
 		input    uint32

@@ -113,7 +113,8 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 
 			ret = append(ret, &validatedElementSegment{oc, globalIdx, elem.Init})
 		} else if oc == OpcodeI32Const {
-			o, _, err := leb128.DecodeUint32(bytes.NewReader(elem.OffsetExpr.Data))
+			// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
+			o, _, err := leb128.DecodeInt32(bytes.NewReader(elem.OffsetExpr.Data))
 			if err != nil {
 				return nil, fmt.Errorf("%s[%d] couldn't read i32.const parameter: %w", SectionIDName(SectionIDElement), idx, err)
 			}

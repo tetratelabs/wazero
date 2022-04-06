@@ -7,7 +7,7 @@ import (
 )
 
 // DecodeFloat32 decodes a float32 in IEEE 754 binary representation.
-// See https://www.w3.org/TR/wasm-core-1/#floating-point%E2%91%A2
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#floating-point%E2%91%A2
 func DecodeFloat32(r io.Reader) (float32, error) {
 	buf := make([]byte, 4)
 	_, err := io.ReadFull(r, buf)
@@ -19,7 +19,7 @@ func DecodeFloat32(r io.Reader) (float32, error) {
 }
 
 // DecodeFloat64 decodes a float64 in IEEE 754 binary representation.
-// See https://www.w3.org/TR/wasm-core-1/#floating-point%E2%91%A2
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#floating-point%E2%91%A2
 func DecodeFloat64(r io.Reader) (float64, error) {
 	buf := make([]byte, 8)
 	_, err := io.ReadFull(r, buf)

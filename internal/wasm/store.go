@@ -474,8 +474,10 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		v, _, _ = leb128.DecodeInt32(r)
 	case OpcodeI64Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		v, _, _ = leb128.DecodeInt64(r)
 	case OpcodeF32Const:
 		v, _ = ieee754.DecodeFloat32(r)

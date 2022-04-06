@@ -368,7 +368,7 @@ func TestModule_validateGlobals(t *testing.T) {
 		m := Module{GlobalSection: []*Global{
 			{
 				Type: &GlobalType{ValType: ValueTypeI32},
-				Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}},
+				Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 			},
 		}}
 		err := m.validateGlobals(nil, 9)
@@ -500,7 +500,7 @@ func TestModule_validateMemory(t *testing.T) {
 			Init: []byte{0x1},
 			OffsetExpression: &ConstantExpression{
 				Opcode: OpcodeI32Const,
-				Data:   []byte{0x1},
+				Data:   leb128.EncodeInt32(1),
 			},
 		}}}
 		err := m.validateMemory(&Memory{}, nil)
@@ -670,7 +670,7 @@ func TestModule_buildGlobalInstances(t *testing.T) {
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
 			Init: &ConstantExpression{Opcode: OpcodeI32Const,
-				Data: leb128.EncodeUint32(math.MaxInt32)},
+				Data: leb128.EncodeInt32(math.MaxInt32)},
 		},
 	}}
 

@@ -21,8 +21,10 @@ func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error)
 	opcode := b
 	switch opcode {
 	case wasm.OpcodeI32Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		_, _, err = leb128.DecodeInt32(r)
 	case wasm.OpcodeI64Const:
+		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		_, _, err = leb128.DecodeInt64(r)
 	case wasm.OpcodeF32Const:
 		_, err = ieee754.DecodeFloat32(r)

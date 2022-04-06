@@ -186,9 +186,26 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 
 Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
 
+## Signed encoding of integer global constant initializers
+wazero treats integer global constant initializers signed as their interpretation is not known at declaration time. For
+example, there is no signed integer [value type](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#value-types%E2%91%A0).
+
+To get at the problem, let's use an example.
+```
+(global (export "start_epoch") i64 (i64.const 1620216263544))
+```
+
+In both signed and unsigned LEB128 encoding, this value is the same bit pattern. The problem is that some numbers are
+not. For example, 16256 is `807f` encoded as unsigned, but `80ff00` encoded as signed.
+
+While the specification mentions uninterpreted integers are in abstract [unsigned values](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#integers%E2%91%A0),
+the binary encoding is clear that they are encoded [signed](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#integers%E2%91%A4).
+
+For consistency, we go with signed encoding in the special case of global constant initializers.
+
 ## Implementation limitations
 
-WebAssembly 1.0 (20191205) specification allows runtimes to [limit certain aspects of Wasm module or execution](https://www.w3.org/TR/2019/REC-2019/REC-wasm-core-1-20191205/#a2-implementation-limitations).
+WebAssembly 1.0 (20191205) specification allows runtimes to [limit certain aspects of Wasm module or execution](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#a2-implementation-limitations).
 
 wazero limitations are imposed pragmatically and described below.
 

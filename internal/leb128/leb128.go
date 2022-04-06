@@ -29,6 +29,40 @@ var encodeCache = [0x80][]byte{
 	{0x70}, {0x71}, {0x72}, {0x73}, {0x74}, {0x75}, {0x76}, {0x77}, {0x78}, {0x79}, {0x7a}, {0x7b}, {0x7c}, {0x7d}, {0x7e}, {0x7f},
 }
 
+// EncodeInt32 encodes the signed value into a buffer in LEB128 format
+//
+// See https://en.wikipedia.org/wiki/LEB128#Encode_signed_integer
+func EncodeInt32(value int32) []byte {
+	return EncodeInt64(int64(value))
+}
+
+// EncodeInt64 encodes the signed value into a buffer in LEB128 format
+//
+// See https://en.wikipedia.org/wiki/LEB128#Encode_signed_integer
+func EncodeInt64(value int64) (buf []byte) {
+	for {
+		// Take 7 remaining low-order bits from the value into b.
+		b := uint8(value & 0x7f)
+		// Extract the sign bit.
+		s := uint8(value & 0x40)
+		value >>= 7
+
+		// The encoding unsigned numbers is simpler as it only needs to check if the value is non-zero to tell if there
+		// are more bits to encode. Signed is a little more complicated as you have to double-check the sign bit.
+		// If either case, set the high-order bit to tell the reader there are more bytes in this int.
+		if (value != -1 || s == 0) && (value != 0 || s != 0) {
+			b |= 0x80
+		}
+
+		// Append b into the buffer
+		buf = append(buf, b)
+		if b&0x80 == 0 {
+			break
+		}
+	}
+	return buf
+}
+
 // EncodeUint32 encodes the value into a buffer in LEB128 format
 //
 // See https://en.wikipedia.org/wiki/LEB128#Encode_unsigned_integer
@@ -51,7 +85,7 @@ func EncodeUint64(value uint64) (buf []byte) {
 		value = value >> 7
 
 		// If there are remaining bits, the value won't be zero: Set the high-
-		// order bit to tell the reader there are more bytes in this uint32.
+		// order bit to tell the reader there are more bytes in this uint.
 		if value != 0 {
 			b |= 0x80
 		}

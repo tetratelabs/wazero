@@ -81,7 +81,7 @@ func (c *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
 // * Zero is a valid value and results in a crash if any module uses memory.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-// See https://www.w3.org/TR/wasm-core-1/#memory-types%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-types%E2%91%A0
 func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig {
 	ret := c.clone()
 	ret.memoryMaxPages = memoryMaxPages

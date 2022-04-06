@@ -93,22 +93,22 @@ func TestNewHostModule(t *testing.T) {
 			nameToGlobal: map[string]*Global{
 				"g2": {
 					Type: &GlobalType{ValType: i32},
-					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(2)},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)},
 				},
 				"g1": {
 					Type: &GlobalType{ValType: i32},
-					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 				},
 			},
 			expected: &Module{
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: i32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 					{
 						Type: &GlobalType{ValType: i32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(2)},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)},
 					},
 				},
 				ExportSection: map[string]*Export{
@@ -129,7 +129,7 @@ func TestNewHostModule(t *testing.T) {
 			nameToGlobal: map[string]*Global{
 				"g": {
 					Type: &GlobalType{ValType: i32},
-					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+					Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 				},
 			},
 			expected: &Module{
@@ -141,7 +141,7 @@ func TestNewHostModule(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: i32},
-						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(1)},
+						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
 					},
 				},
 				MemorySection: &Memory{Min: 1, Max: 1},
