@@ -76,7 +76,7 @@ func Test_hostFunc(t *testing.T) {
 	// InstantiateModuleWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
 	module, err := r.InstantiateModuleWithConfig(code, config)
 	require.NoError(t, err)
-	defer wm.Close()
+	defer module.Close()
 
 	allocateInWasmBufferFn := module.ExportedFunction("allocate_buffer")
 	require.NotNil(t, allocateInWasmBuffer)
