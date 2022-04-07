@@ -18,6 +18,7 @@ import (
 type (
 	// engine is an JIT implementation of wasm.Engine
 	engine struct {
+		enabledFeatures   wasm.Features
 		compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 		mux               sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
@@ -367,7 +368,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		var compiled *compiledFunction
 		var err error
 		if f.Kind == wasm.FunctionKindWasm {
-			compiled, err = compileWasmFunction(f)
+			compiled, err = compileWasmFunction(e.enabledFeatures, f)
 		} else {
 			compiled, err = compileHostFunction(f)
 		}
@@ -513,12 +514,13 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 	return
 }
 
-func NewEngine() wasm.Engine {
-	return newEngine()
+func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+	return newEngine(enabledFeatures)
 }
 
-func newEngine() *engine {
+func newEngine(enabledFeatures wasm.Features) *engine {
 	return &engine{
+		enabledFeatures:   enabledFeatures,
 		compiledFunctions: map[*wasm.FunctionInstance]*compiledFunction{},
 		setFinalizer:      runtime.SetFinalizer,
 	}
@@ -814,8 +816,8 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}, nil
 }
 
-func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	ir, err := wazeroir.Compile(f)
+func compileWasmFunction(enabledFeatures wasm.Features, f *wasm.FunctionInstance) (*compiledFunction, error) {
+	ir, err := wazeroir.Compile(enabledFeatures, f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}

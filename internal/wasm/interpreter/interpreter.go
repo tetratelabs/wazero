@@ -21,12 +21,14 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
+	enabledFeatures   wasm.Features
 	compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 	mux               sync.RWMutex
 }
 
-func NewEngine() wasm.Engine {
+func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return &engine{
+		enabledFeatures:   enabledFeatures,
 		compiledFunctions: make(map[*wasm.FunctionInstance]*compiledFunction),
 	}
 }
@@ -172,7 +174,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	for i, f := range moduleFunctions {
 		var compiled *compiledFunction
 		if f.Kind == wasm.FunctionKindWasm {
-			ir, err := wazeroir.Compile(f)
+			ir, err := wazeroir.Compile(e.enabledFeatures, f)
 			if err != nil {
 				me.Close()
 				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
@@ -311,7 +313,7 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 			op.us[1] = uint64(f.Module.Types[o.TypeIndex].TypeID)
 		case *wazeroir.OperationDrop:
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
-			op.rs[0] = o.Range
+			op.rs[0] = o.Depth
 		case *wazeroir.OperationSelect:
 		case *wazeroir.OperationPick:
 			op.us = make([]uint64, 1)
@@ -629,7 +631,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindBrTable:
 			{
-				if v := int(ce.pop()); v < len(op.us)-1 {
+				if v := uint64(ce.pop()); v < uint64(len(op.us)-1) {
 					ce.drop(op.rs[v+1])
 					frame.pc = op.us[v+1]
 				} else {

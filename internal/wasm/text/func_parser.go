@@ -154,24 +154,34 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
-	case "i32.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI32Extend8S
-		next = p.beginFieldOrInstruction
-	case "i32.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI32Extend16S
-		next = p.beginFieldOrInstruction
-	case "i64.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend8S
-		next = p.beginFieldOrInstruction
-	case "i64.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend16S
-		next = p.beginFieldOrInstruction
-	case "i64.extend32_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend32S
-		next = p.beginFieldOrInstruction
+	case "i32.const": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI32Const
+		next = p.parseI32
+	case "i64.const": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI64Const
+		next = p.parseI64
 	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
 		opCode = wasm.OpcodeLocalGet
 		next = p.parseLocalIndex
+
+		// Next are sign-extension-ops
+		// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+
+	case "i32.extend8_s":
+		opCode = wasm.OpcodeI32Extend8S
+		next = p.beginFieldOrInstruction
+	case "i32.extend16_s":
+		opCode = wasm.OpcodeI32Extend16S
+		next = p.beginFieldOrInstruction
+	case "i64.extend8_s":
+		opCode = wasm.OpcodeI64Extend8S
+		next = p.beginFieldOrInstruction
+	case "i64.extend16_s":
+		opCode = wasm.OpcodeI64Extend16S
+		next = p.beginFieldOrInstruction
+	case "i64.extend32_s":
+		opCode = wasm.OpcodeI64Extend32S
+		next = p.beginFieldOrInstruction
 	default:
 		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
@@ -196,6 +206,32 @@ func (p *funcParser) end() (tokenParser, error) {
 		code = &wasm.Code{Body: append(p.currentBody, wasm.OpcodeEnd)}
 	}
 	return p.onFunc(p.currentTypeIdx, code, p.currentName, p.currentParamNames)
+}
+
+// parseI32 parses a wasm.ValueTypeI32 and appends it to the currentBody.
+func (p *funcParser) parseI32(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint32(tokenBytes); overflow { // TODO: negative and hex
+		return nil, fmt.Errorf("i32 outside range of uint32: %s", tokenBytes)
+	} else { // See /RATIONALE.md we can't tell the signed interpretation of a constant, so default to signed.
+		p.currentBody = append(p.currentBody, leb128.EncodeInt32(int32(i))...)
+	}
+	return p.beginFieldOrInstruction, nil
+}
+
+// parseI64 parses a wasm.ValueTypeI64 and appends it to the currentBody.
+func (p *funcParser) parseI64(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint64(tokenBytes); overflow { // TODO: negative and hex
+		return nil, fmt.Errorf("i64 outside range of uint64: %s", tokenBytes)
+	} else { // See /RATIONALE.md we can't tell the signed interpretation of a constant, so default to signed.
+		p.currentBody = append(p.currentBody, leb128.EncodeInt64(int64(i))...)
+	}
+	return p.beginFieldOrInstruction, nil
 }
 
 // parseFuncIndex parses an index in the function namespace and appends it to the currentBody. If it was an ID, a

@@ -11,7 +11,7 @@ import (
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
-func DecodeModule(binary []byte, _ wasm.Features, memoryMaxPages uint32) (*wasm.Module, error) {
+func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryMaxPages uint32) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
 	// Magic number.
@@ -69,7 +69,7 @@ func DecodeModule(binary []byte, _ wasm.Features, memoryMaxPages uint32) (*wasm.
 			}
 
 		case wasm.SectionIDType:
-			m.TypeSection, err = decodeTypeSection(r)
+			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
 		case wasm.SectionIDImport:
 			if m.ImportSection, err = decodeImportSection(r, memoryMaxPages); err != nil {
 				return nil, err // avoid re-wrapping the error.

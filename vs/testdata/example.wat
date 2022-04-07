@@ -38,6 +38,12 @@
     (export "mem" (memory $mem))
     (memory $mem 1 3)
 
-    ;; add >1.0 feature from https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+    ;; add function using "sign-extension-ops"
+    ;; https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
     (func (param i64) (result i64) local.get 0 i64.extend16_s)
+
+    ;; add function using "multi-value"
+    ;; https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+    (func $swap (param i32 i32) (result i32 i32) local.get 1 local.get 0)
+    (export "swap" (func $swap))
 )

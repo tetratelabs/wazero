@@ -103,8 +103,8 @@ var et = &engineTester{}
 
 type engineTester struct{}
 
-func (e *engineTester) NewEngine() wasm.Engine {
-	return newEngine()
+func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+	return newEngine(enabledFeatures)
 }
 
 func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
@@ -149,7 +149,7 @@ func requireSupportedOSArch(t *testing.T) {
 
 func TestJIT_EngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
-		e := et.NewEngine()
+		e := et.NewEngine(wasm.Features20191205)
 		_, err := e.NewModuleEngine(
 			t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
@@ -161,7 +161,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 	})
 
 	t.Run("release on compilation error", func(t *testing.T) {
-		e := et.NewEngine().(*engine)
+		e := et.NewEngine(wasm.Features20191205).(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
 			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -213,7 +213,7 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 		}
 	}
 
-	e := et.NewEngine().(*engine)
+	e := et.NewEngine(wasm.Features20191205).(*engine)
 
 	importedFinalizer := fakeFinalizer{}
 	e.setFinalizer = importedFinalizer.setFinalizer
@@ -325,7 +325,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			e := et.NewEngine().(*engine)
+			e := et.NewEngine(wasm.Features20191205).(*engine)
 			var imported *moduleEngine
 			if len(tc.importedFunctions) > 0 {
 				// Instantiate the imported module
@@ -387,8 +387,9 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 // allows us to safely access to their data region from native code.
 // See comments on initialValueStackSize and initialCallFrameStackSize.
 func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
-	e := newEngine()
-	store := wasm.NewStore(e, wasm.Features20191205)
+	enabledFeatures := wasm.Features20191205
+	e := newEngine(enabledFeatures)
+	store := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_and_shrink_goroutine_stack"
@@ -408,7 +409,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
-	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{})
+	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
 	require.NoError(t, err)
 
 	_, err = store.Instantiate(context.Background(), hm, hostModuleName, nil)

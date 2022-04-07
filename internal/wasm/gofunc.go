@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -48,7 +47,7 @@ func GetHostFunctionCallContextValue(fk FunctionKind, ctx *ModuleContext) *refle
 }
 
 // getFunctionType returns the function type corresponding to the function signature or errs if invalid.
-func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind, ft *FunctionType, hasErrorResult bool, err error) {
+func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKind, ft *FunctionType, err error) {
 	p := fn.Type()
 
 	if fn.Kind() != reflect.Func {
@@ -62,16 +61,12 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 	}
 
 	rCount := p.NumOut()
-	if (allowErrorResult && rCount > 2) || (!allowErrorResult && rCount > 1) {
-		err = errors.New("multiple results are unsupported")
-		return
-	}
 
-	if allowErrorResult && rCount > 0 {
-		maybeErrIdx := rCount - 1
-		if p.Out(maybeErrIdx).Implements(errorType) {
-			hasErrorResult = true
-			rCount--
+	if rCount > 1 {
+		// Guard >1.0 feature multi-value
+		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
+			err = fmt.Errorf("multiple result types invalid as %v", err)
+			return
 		}
 	}
 
@@ -100,20 +95,20 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 		return
 	}
 
-	if rCount == 0 {
-		return
-	}
+	for i := 0; i < len(ft.Results); i++ {
+		rI := p.Out(i)
+		if t, ok := getTypeOf(rI.Kind()); ok {
+			ft.Results[i] = t
+			continue
+		}
 
-	result := p.Out(0)
-	if t, ok := getTypeOf(result.Kind()); ok {
-		ft.Results[0] = t
+		// Now, we will definitely err, decide which message is best
+		if rI.Implements(errorType) {
+			err = fmt.Errorf("result[%d] is an error, which is unsupported", i)
+		} else {
+			err = fmt.Errorf("result[%d] is unsupported: %s", i, rI.Kind())
+		}
 		return
-	}
-
-	if result.Implements(errorType) {
-		err = errors.New("result[0] is an error, which is unsupported")
-	} else {
-		err = fmt.Errorf("result[0] is unsupported: %s", result.Kind())
 	}
 	return
 }

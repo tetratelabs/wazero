@@ -7,11 +7,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeUseParser {
-	return &typeUseParser{module: module, typeNamespace: typeNamespace}
+func newTypeUseParser(enabledFeatures wasm.Features, module *wasm.Module, typeNamespace *indexNamespace) *typeUseParser {
+	return &typeUseParser{enabledFeatures: enabledFeatures, module: module, typeNamespace: typeNamespace}
 }
 
-// onTypeUse is invoked when the grammar "(param)* (result)?" completes.
+// onTypeUse is invoked when the grammar "(param)* (result)*" completes.
 //
 // * typeIdx if unresolved, this is replaced in moduleParser.resolveTypeUses
 // * paramNames is nil unless IDs existed on at least one "param" field.
@@ -31,6 +31,9 @@ type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPos
 // "type", "param" and "result" inner fields in the correct order.
 // Note: typeUseParser is reusable. The caller resets via begin.
 type typeUseParser struct {
+	// enabledFeatures should be set to moduleParser.enabledFeatures
+	enabledFeatures wasm.Features
+
 	// module during parsing is a read-only pointer to the TypeSection and SectionElementCount
 	module *wasm.Module
 
@@ -75,15 +78,16 @@ type typeUseParser struct {
 	// paramNames are the paramIndex formatted for the wasm.NameSection LocalNames
 	paramNames wasm.NameMap
 
-	// currentParamField is a field index and used to give an appropriate errorContext. Due to abbreviation it may be
-	// unrelated to the length of currentParams
-	currentParamField wasm.Index
+	// currentField is a field index and used to give an appropriate errorContext.
+	//
+	// Note: Due to abbreviation, this may be less than to the length of params or results.
+	currentField wasm.Index
 
-	// parsedParam allows us to check if we parsed a type in a "param" field. We can't use currentParamField because when
-	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
-	parsedParam bool
+	// parsedParamType allows us to check if we parsed a type in a "param" field. This is used to enforce param names
+	// can't coexist with abbreviations.
+	parsedParamType bool
 
-	// parsedParamID is true when the field at currentParamField had an ID. Ex. (param $x i32)
+	// parsedParamID is true when the field at currentField had an ID. Ex. (param $x i32)
 	parsedParamID bool
 }
 
@@ -152,7 +156,7 @@ func (p *typeUseParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte,
 		p.paramIndex = nil
 		p.paramNames = nil
 	}
-	p.currentParamField = 0
+	p.currentField = 0
 	p.parsedTypeField = false
 	if tok == tokenKeyword && string(tokenBytes) == "type" {
 		p.pos = positionType
@@ -198,12 +202,14 @@ func (p *typeUseParser) beginParamOrResult(tok tokenType, tokenBytes []byte, lin
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
 
+	p.parsedParamType = false
 	switch string(tokenBytes) {
 	case "param":
 		p.pos = positionParam
-		p.parsedParam, p.parsedParamID = false, false
+		p.parsedParamID = false
 		return p.parseParamID, nil
 	case "result":
+		p.currentField = 0 // reset
 		p.pos = positionResult
 		return p.parseResult, nil
 	case "type":
@@ -220,6 +226,41 @@ func (p *typeUseParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte
 		return p.beginParamOrResult, nil
 	}
 	return p.parseEnd(tok, tokenBytes, line, col)
+}
+
+// parseMoreResults looks for a '(', and if present returns beginResult to continue any additional results. Otherwise,
+// it calls onType.
+func (p *typeUseParser) parseMoreResults(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok == tokenLParen {
+		p.pos = positionFunc
+		return p.beginResult, nil
+	}
+	return p.parseEnd(tok, tokenBytes, line, col)
+}
+
+// beginResult attempts to begin a "result" field.
+func (p *typeUseParser) beginResult(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != tokenKeyword {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+
+	switch string(tokenBytes) {
+	case "param":
+		return nil, errors.New("param after result")
+	case "result":
+		// Guard >1.0 feature multi-value
+		if err := p.enabledFeatures.Require(wasm.FeatureMultiValue); err != nil {
+			err = fmt.Errorf("multiple result types invalid as %v", err)
+			return nil, err
+		}
+
+		p.pos = positionResult
+		return p.parseResult, nil
+	case "type":
+		return nil, errors.New("type after result")
+	default:
+		return p.end(callbackPositionUnhandledField, tok, tokenBytes, line, col)
+	}
 }
 
 // parseParamID sets any ID if present and resumes with parseParam .
@@ -243,7 +284,7 @@ func (p *typeUseParser) parseParamID(tok tokenType, tokenBytes []byte, line, col
 
 // setParamID adds the normalized ('$' stripped) parameter ID to the paramIndex and the wasm.NameSection.
 func (p *typeUseParser) setParamID(idToken []byte) error {
-	// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
+	// Note: currentField is the index of the param field, but due to mixing and matching of abbreviated params
 	// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
 	var idx wasm.Index
 	if p.currentInlinedType != nil {
@@ -273,9 +314,6 @@ func (p *typeUseParser) setParamID(idToken []byte) error {
 //                                records i32 --^   ^  ^
 //                                    records i32 --+  |
 //              parseMoreParamsOrResult resumes here --+
-//
-// Ex. type is missing `(param)`
-//                errs here --^
 func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenID: // Ex. $len
@@ -285,7 +323,7 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 		if err != nil {
 			return nil, err
 		}
-		if p.parsedParam && p.parsedParamID {
+		if p.parsedParamType && p.parsedParamID {
 			return nil, errors.New("cannot assign IDs to parameters in abbreviated form")
 		}
 		if p.currentInlinedType == nil {
@@ -293,14 +331,11 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 		} else {
 			p.currentInlinedType.Params = append(p.currentInlinedType.Params, vt)
 		}
-		p.parsedParam = true
+		p.parsedParamType = true
 		return p.parseParam, nil
 	case tokenRParen: // end of this field
-		if !p.parsedParam {
-			return nil, errors.New("expected a type")
-		}
 		// since multiple param fields are valid, ex `(func (param i32) (param i64))`, prepare for any next.
-		p.currentParamField++
+		p.currentField++
 		p.pos = positionInitial
 		return p.parseMoreParamsOrResult, nil
 	default:
@@ -308,31 +343,44 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 	}
 }
 
-// parseResult parses the api.ValueType in the "result" field and returns onType to finish the type.
+// parseResult records value type and continues if it is an abbreviated form with multiple value types. When complete,
+// this returns parseMoreResults.
+//
+// Ex. One result type is present `(result i32)`
+//                           records i32 --^  ^
+//            parseMoreResults resumes here --+
+//
+// Ex. Multiple result types are present `(result i32 i64)`
+//                                  records i32 --^   ^  ^
+//                                      records i32 --+  |
+//                       parseMoreResults resumes here --+
 func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
+	case tokenID: // Ex. $len
+		return nil, fmt.Errorf("unexpected ID: %s", tokenBytes)
 	case tokenKeyword: // Ex. i32
-		if p.currentInlinedType != nil && p.currentInlinedType.Results != nil {
-			return nil, errors.New("redundant type")
+		if p.currentInlinedType != nil && len(p.currentInlinedType.Results) > 0 { // ex (result i32 i32)
+			// Guard >1.0 feature multi-value
+			if err := p.enabledFeatures.Require(wasm.FeatureMultiValue); err != nil {
+				err = fmt.Errorf("multiple result types invalid as %v", err)
+				return nil, err
+			}
 		}
-
-		results, err := parseResultType(tokenBytes)
+		vt, err := parseValueType(tokenBytes)
 		if err != nil {
 			return nil, err
 		}
-
 		if p.currentInlinedType == nil {
-			p.currentInlinedType = &wasm.FunctionType{Results: results}
+			p.currentInlinedType = &wasm.FunctionType{Results: []wasm.ValueType{vt}}
 		} else {
-			p.currentInlinedType.Results = results
+			p.currentInlinedType.Results = append(p.currentInlinedType.Results, vt)
 		}
-		return p.parseResult, err
+		return p.parseResult, nil
 	case tokenRParen: // end of this field
-		if p.currentInlinedType == nil || p.currentInlinedType.Results == nil {
-			return nil, errors.New("expected a type")
-		}
+		// since multiple result fields are valid, ex `(func (result i32) (result i64))`, prepare for any next.
+		p.currentField++
 		p.pos = positionInitial
-		return p.parseEnd, nil
+		return p.parseMoreResults, nil
 	default:
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
@@ -348,12 +396,12 @@ func (p *typeUseParser) parseEnd(tok tokenType, tokenBytes []byte, line, col uin
 
 func (p *typeUseParser) errorContext() string {
 	switch p.pos {
-	case positionParam:
-		return fmt.Sprintf(".param[%d]", p.currentParamField)
-	case positionResult:
-		return ".result"
 	case positionType:
 		return ".type"
+	case positionParam:
+		return fmt.Sprintf(".param[%d]", p.currentField)
+	case positionResult:
+		return fmt.Sprintf(".result[%d]", p.currentField)
 	}
 	return ""
 }

@@ -2,37 +2,49 @@ package wasm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
+
+// The wazero specific limitation described at RATIONALE.md.
+const maximumValuesOnStack = 1 << 27
 
 // validateFunction validates the instruction sequence of a function.
 // following the specification https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#instructions%E2%91%A2.
 //
-// f is the validation target function instance.
-// functions is the list of function indexes which are declared on a module from which the target is instantiated.
-// globals is the list of global types which are declared on a module from which the target is instantiated.
-// memories is the list of memory types which are declared on a module from which the target is instantiated.
-// tables is the list of table types which are declared on a module from which the target is instantiated.
-// types is the list of function types which are declared on a module from which the target is instantiated.
-// maxStackValues is the maximum height of values stack which the target is allowed to reach.
+// * idx is the index in the FunctionSection
+// * functions are the function index namespace, which is prefixed by imports. The value is the TypeSection index.
+// * globals are the global index namespace, which is prefixed by imports.
+// * memory is the potentially imported memory and can be nil.
+// * table is the potentially imported table and can be nil.
 //
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
-func validateFunction(
+func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index, globals []*GlobalType, memory *Memory, table *Table) error {
+	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, table, maximumValuesOnStack)
+}
+
+// validateFunctionWithMaxStackValues is like validateFunction, but allows overriding maxStackValues for testing.
+//
+// * maxStackValues is the maximum height of values stack which the target is allowed to reach.
+func (m *Module) validateFunctionWithMaxStackValues(
 	enabledFeatures Features,
-	functionType *FunctionType,
-	body []byte,
-	localTypes []ValueType,
+	idx Index,
 	functions []Index,
 	globals []*GlobalType,
 	memory *Memory,
 	table *Table,
-	types []*FunctionType,
 	maxStackValues int,
 ) error {
+	functionType := m.TypeSection[m.FunctionSection[idx]]
+	body := m.CodeSection[idx].Body
+	localTypes := m.CodeSection[idx].LocalTypes
+	types := m.TypeSection
+
 	// We start with the outermost control block which is for function return if the code branches into it.
 	controlBlockStack := []*controlBlock{{blockType: functionType}}
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
@@ -350,12 +362,12 @@ func validateFunction(
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
 			targetResultType := target.blockType.Results
-			if target.isLoop {
+			if target.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
 				targetResultType = []ValueType{}
 			}
-			if err := valueTypeStack.popResults(targetResultType, false); err != nil {
+			if err = valueTypeStack.popResults(targetResultType, false); err != nil {
 				return fmt.Errorf("type mismatch on the br operation: %v", err)
 			}
 			// br instruction is stack-polymorphic.
@@ -377,7 +389,7 @@ func validateFunction(
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
 			targetResultType := target.blockType.Results
-			if target.isLoop {
+			if target.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
 				targetResultType = []ValueType{}
@@ -421,7 +433,7 @@ func validateFunction(
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
 			expType := lnLabel.blockType.Results
-			if lnLabel.isLoop {
+			if lnLabel.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
 				expType = []ValueType{}
@@ -432,7 +444,7 @@ func validateFunction(
 				}
 				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
 				expType2 := label.blockType.Results
-				if label.isLoop {
+				if label.op == OpcodeLoop {
 					// Loop operation doesn't require results since the continuation is
 					// the beginning of the loop.
 					expType2 = []ValueType{}
@@ -510,10 +522,10 @@ func validateFunction(
 				OpcodeI32LtU, OpcodeI32GtS, OpcodeI32GtU, OpcodeI32LeS,
 				OpcodeI32LeU, OpcodeI32GeS, OpcodeI32GeU:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st i32 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd i32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Eqz:
@@ -525,31 +537,31 @@ func validateFunction(
 				OpcodeI64LtU, OpcodeI64GtS, OpcodeI64GtU,
 				OpcodeI64LeS, OpcodeI64LeU, OpcodeI64GeS, OpcodeI64GeU:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st i64 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd i64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeF32Eq, OpcodeF32Ne, OpcodeF32Lt, OpcodeF32Gt, OpcodeF32Le, OpcodeF32Ge:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd f32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeF64Eq, OpcodeF64Ne, OpcodeF64Lt, OpcodeF64Gt, OpcodeF64Le, OpcodeF64Ge:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Clz, OpcodeI32Ctz, OpcodeI32Popcnt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Add, OpcodeI32Sub, OpcodeI32Mul, OpcodeI32DivS,
@@ -557,15 +569,15 @@ func validateFunction(
 				OpcodeI32Or, OpcodeI32Xor, OpcodeI32Shl, OpcodeI32ShrS,
 				OpcodeI32ShrU, OpcodeI32Rotl, OpcodeI32Rotr:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Clz, OpcodeI64Ctz, OpcodeI64Popcnt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64Add, OpcodeI64Sub, OpcodeI64Mul, OpcodeI64DivS,
@@ -573,44 +585,44 @@ func validateFunction(
 				OpcodeI64Or, OpcodeI64Xor, OpcodeI64Shl, OpcodeI64ShrS,
 				OpcodeI64ShrU, OpcodeI64Rotl, OpcodeI64Rotr:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st i64 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd i64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32Abs, OpcodeF32Neg, OpcodeF32Ceil,
 				OpcodeF32Floor, OpcodeF32Trunc, OpcodeF32Nearest,
 				OpcodeF32Sqrt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32Add, OpcodeF32Sub, OpcodeF32Mul,
 				OpcodeF32Div, OpcodeF32Min, OpcodeF32Max,
 				OpcodeF32Copysign:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd f32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64Abs, OpcodeF64Neg, OpcodeF64Ceil,
 				OpcodeF64Floor, OpcodeF64Trunc, OpcodeF64Nearest,
 				OpcodeF64Sqrt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64Add, OpcodeF64Sub, OpcodeF64Mul,
 				OpcodeF64Div, OpcodeF64Min, OpcodeF64Max,
 				OpcodeF64Copysign:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for %s: %v", InstructionName(op), err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the 2nd f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32WrapI64:
@@ -620,37 +632,37 @@ func validateFunction(
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32TruncF32S, OpcodeI32TruncF32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the f32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32TruncF64S, OpcodeI32TruncF64U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64ExtendI32S, OpcodeI64ExtendI32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64TruncF32S, OpcodeI64TruncF32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the f32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64TruncF64S, OpcodeI64TruncF64U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32ConvertI32s, OpcodeF32ConvertI32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32ConvertI64S, OpcodeF32ConvertI64U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32DemoteF64:
@@ -660,12 +672,12 @@ func validateFunction(
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64ConvertI32S, OpcodeF64ConvertI32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i32 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64ConvertI64S, OpcodeF64ConvertI64U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
+					return fmt.Errorf("cannot pop the i64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64PromoteF32:
@@ -713,7 +725,7 @@ func validateFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -722,10 +734,10 @@ func validateFunction(
 				blockType:      bt,
 				blockTypeBytes: num,
 			})
-			valueTypeStack.pushStackLimit()
+			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -733,12 +745,12 @@ func validateFunction(
 				startAt:        pc,
 				blockType:      bt,
 				blockTypeBytes: num,
-				isLoop:         true,
+				op:             op,
 			})
-			valueTypeStack.pushStackLimit()
+			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -746,12 +758,12 @@ func validateFunction(
 				startAt:        pc,
 				blockType:      bt,
 				blockTypeBytes: num,
-				isIf:           true,
+				op:             op,
 			})
-			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the operand for 'if': %v", err)
 			}
-			valueTypeStack.pushStackLimit()
+			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeElse {
 			bl := controlBlockStack[len(controlBlockStack)-1]
@@ -762,22 +774,38 @@ func validateFunction(
 			}
 			// Before entering instructions inside else, we pop all the values pushed by then block.
 			valueTypeStack.resetAtStackLimit()
+			// Plus we have to push any block params again.
+			for _, p := range bl.blockType.Params {
+				valueTypeStack.push(p)
+			}
 		} else if op == OpcodeEnd {
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.endAt = pc
 			controlBlockStack = controlBlockStack[:len(controlBlockStack)-1]
-			if bl.isIf && bl.elseAt <= bl.startAt {
-				if len(bl.blockType.Results) > 0 {
-					return fmt.Errorf("type mismatch between then and else blocks")
+
+			// OpcodeEnd can end a block or the function itself. Check to see what it is:
+
+			isElse := bl.op == OpcodeIf && bl.elseAt <= bl.startAt
+			if isElse {
+				// If this is the end of block without else,the number of block's results and params must be same.
+				// Otherwise, the value stack would result in the inconsistent state at runtime.
+				if !bytes.Equal(bl.blockType.Results, bl.blockType.Params) {
+					return typeMismatchError("type mismatch between then and else blocks", bl.blockType.Results, bl.blockType.Params)
 				}
-				// To handle if block without else properly,
-				// we set ElseAt to EndAt-1 so we can just skip else.
+				// -1 skips else, to handle if block without else properly.
 				bl.elseAt = bl.endAt - 1
 			}
-			// Check type soundness.
+
+			// Check return types match
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
-				return fmt.Errorf("invalid instruction results at end instruction; expected %v: %v", bl.blockType.Results, err)
+				if bl.op == OpcodeIf {
+					return fmt.Errorf("invalid then block: %v", err)
+				} else if bl.op == 0 { // at the outer-most block: the function return
+					return err
+				}
+				return fmt.Errorf("invalid %s block: %v", InstructionName(bl.op), err)
 			}
+
 			// Put the result types at the end after resetting at the stack limit
 			// since we might have Any type between the limit and the current top.
 			valueTypeStack.resetAtStackLimit()
@@ -788,11 +816,8 @@ func validateFunction(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := functionType.Results
-			for i := 0; i < len(expTypes); i++ {
-				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
-					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
-				}
+			if err := valueTypeStack.popResults(functionType.Results, false); err != nil {
+				return err
 			}
 			// return instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
@@ -850,30 +875,40 @@ const (
 	valueTypeUnknown = ValueType(0xFF)
 )
 
-func (s *valueTypeStack) pop() (ValueType, error) {
-	limit := 0
+func (s *valueTypeStack) tryPop() (vt ValueType, limit int, ok bool) {
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
 	}
 	if len(s.stack) <= limit {
-		return 0, fmt.Errorf("invalid operation: trying to pop at %d with limit %d",
-			len(s.stack), limit)
+		return
 	} else if len(s.stack) == limit+1 && s.stack[limit] == valueTypeUnknown {
-		return valueTypeUnknown, nil
+		vt = valueTypeUnknown
+		ok = true
+		return
 	} else {
-		ret := s.stack[len(s.stack)-1]
+		vt = s.stack[len(s.stack)-1]
 		s.stack = s.stack[:len(s.stack)-1]
-		return ret, nil
+		ok = true
+		return
 	}
 }
 
-func (s *valueTypeStack) popAndVerifyType(expected ValueType) error {
-	actual, err := s.pop()
-	if err != nil {
-		return err
+func (s *valueTypeStack) pop() (ValueType, error) {
+	if vt, limit, ok := s.tryPop(); ok {
+		return vt, nil
+	} else {
+		return 0, fmt.Errorf("invalid operation: trying to pop at %d with limit %d", len(s.stack), limit)
 	}
-	if actual != expected && actual != valueTypeUnknown && expected != valueTypeUnknown {
-		return fmt.Errorf("type mismatch")
+}
+
+// popAndVerifyType returns an error if the stack value is unexpected.
+func (s *valueTypeStack) popAndVerifyType(expected ValueType) error {
+	have, _, ok := s.tryPop()
+	if !ok {
+		return fmt.Errorf("%s missing", ValueTypeName(expected))
+	}
+	if have != expected && have != valueTypeUnknown && expected != valueTypeUnknown {
+		return fmt.Errorf("type mismatch: expected %s, but was %s", ValueTypeName(expected), ValueTypeName(have))
 	}
 	return nil
 }
@@ -904,26 +939,68 @@ func (s *valueTypeStack) popStackLimit() {
 	}
 }
 
-func (s *valueTypeStack) pushStackLimit() {
-	s.stackLimits = append(s.stackLimits, len(s.stack))
+// pushStackLimit pushes the control frame's bottom of the stack.
+// pushStackLimit pushes the control frame's bottom of the stack.
+func (s *valueTypeStack) pushStackLimit(params int) {
+	s.stackLimits = append(s.stackLimits, len(s.stack)-params)
 }
 
-func (s *valueTypeStack) popResults(expResults []ValueType, checkAboveLimit bool) error {
+func (s *valueTypeStack) popResults(want []ValueType, checkAboveLimit bool) error {
 	limit := 0
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
 	}
-	for _, exp := range expResults {
-		if err := s.popAndVerifyType(exp); err != nil {
-			return err
+	// Iterate backwards as we are comparing the result slice against stack value types.
+	countWanted := len(want)
+	for i := countWanted - 1; i >= 0; i-- {
+		have, _, ok := s.tryPop()
+		if !ok {
+			return resultMismatchError(want[:countWanted-i-1], want)
+		}
+		if have != want[i] && have != valueTypeUnknown && want[i] != valueTypeUnknown {
+			return fmt.Errorf("cannot use %s as type %s in return argument", ValueTypeName(have), ValueTypeName(want[i]))
 		}
 	}
 	if checkAboveLimit {
 		if !(limit == len(s.stack) || (limit+1 == len(s.stack) && s.stack[limit] == valueTypeUnknown)) {
-			return fmt.Errorf("leftovers found in the stack")
+			return resultMismatchError(append(s.stack, want...), want)
 		}
 	}
 	return nil
+}
+
+// resultMismatchError returns an error similar to go compiler's error on result type mismatch.
+func resultMismatchError(have, want []ValueType) error {
+	if len(have) > len(want) {
+		return typeMismatchError("too many arguments to return", have, want)
+	}
+	return typeMismatchError("not enough arguments to return", have, want)
+}
+
+// typeMismatchError returns an error similar to go compiler's error on type mismatch.
+func typeMismatchError(message string, have []ValueType, want []ValueType) error {
+	var ret strings.Builder
+	ret.WriteString(message)
+	ret.WriteString("\n\thave (")
+	writeValueTypes(have, &ret)
+	ret.WriteString(")\n\twant (")
+	writeValueTypes(want, &ret)
+	ret.WriteByte(')')
+	return errors.New(ret.String())
+}
+
+func writeValueTypes(vts []ValueType, ret *strings.Builder) {
+	switch len(vts) {
+	case 0:
+	case 1:
+		ret.WriteString(api.ValueTypeName(vts[0]))
+	default:
+		ret.WriteString(api.ValueTypeName(vts[0]))
+		for _, vt := range vts[1:] {
+			ret.WriteString(", ")
+			ret.WriteString(api.ValueTypeName(vt))
+		}
+	}
 }
 
 func (s *valueTypeStack) String() string {
@@ -954,30 +1031,36 @@ type controlBlock struct {
 	startAt, elseAt, endAt uint64
 	blockType              *FunctionType
 	blockTypeBytes         uint64
-	isLoop                 bool
-	isIf                   bool
+	// op is zero when the outermost block
+	op Opcode
 }
 
-func decodeBlockType(types []*FunctionType, r *bytes.Reader) (*FunctionType, uint64, error) {
+func decodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
 		if index < 0 || (index >= int64(len(types))) {
 			return nil, fmt.Errorf("type index out of range: %d", index)
 		}
 		return types[index], nil
-	}, r)
+	}, r, enabledFeatures)
 }
 
 // DecodeBlockType is exported for use in the compiler
-func DecodeBlockType(types []*TypeInstance, r *bytes.Reader) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []*TypeInstance, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
 		if index < 0 || (index >= int64(len(types))) {
 			return nil, fmt.Errorf("type index out of range: %d", index)
 		}
 		return types[index].Type, nil
-	}, r)
+	}, r, enabledFeatures)
 }
 
-func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r *bytes.Reader) (*FunctionType, uint64, error) {
+// decodeBlockTypeImpl decodes the type index from a positive 33-bit signed integer. Negative numbers indicate up to one
+// WebAssembly 1.0 (20191205) compatible result type. Positive numbers are decoded when `enabledFeatures` include
+// FeatureMultiValue and include an index in the Module.TypeSection.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-blocktype
+// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -996,6 +1079,9 @@ func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, 
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
 	default:
+		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
+			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)
+		}
 		ret, err = functionTypeResolver(raw)
 	}
 	return ret, num, err

@@ -110,7 +110,7 @@ func NewRuntime() Runtime {
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
 		ctx:             config.ctx,
-		store:           wasm.NewStore(config.newEngine(), config.enabledFeatures),
+		store:           wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
 		enabledFeatures: config.enabledFeatures,
 		memoryMaxPages:  config.memoryMaxPages,
 	}
@@ -118,9 +118,9 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
+	enabledFeatures wasm.Features
 	ctx             context.Context
 	store           *wasm.Store
-	enabledFeatures wasm.Features
 	memoryMaxPages  uint32
 }
 

@@ -25,11 +25,11 @@ type (
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0
 	Store struct {
-		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
-		engine Engine
-
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures Features
+
+		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
+		engine Engine
 
 		// moduleNames ensures no race conditions instantiating two modules of the same name
 		moduleNames map[string]struct{} // guarded by mux
@@ -228,10 +228,10 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(engine Engine, enabledFeatures Features) *Store {
+func NewStore(enabledFeatures Features, engine Engine) *Store {
 	return &Store{
-		engine:           engine,
 		EnabledFeatures:  enabledFeatures,
+		engine:           engine,
 		moduleNames:      map[string]struct{}{},
 		modules:          map[string]*ModuleInstance{},
 		typeIDs:          map[string]FunctionTypeID{},

@@ -343,9 +343,8 @@ const (
 )
 
 type Label struct {
-	FrameID          uint32
-	OriginalStackLen int
-	Kind             LabelKind
+	FrameID uint32
+	Kind    LabelKind
 }
 
 func (l *Label) String() (ret string) {
@@ -471,7 +470,7 @@ func (o *OperationCallIndirect) Kind() OperationKind {
 	return OperationKindCallIndirect
 }
 
-type OperationDrop struct{ Range *InclusiveRange }
+type OperationDrop struct{ Depth *InclusiveRange }
 
 func (o *OperationDrop) Kind() OperationKind {
 	return OperationKindDrop

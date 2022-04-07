@@ -21,8 +21,22 @@ const (
 	// breaks out to after the OpcodeEnd on the enclosing OpcodeIf.
 	OpcodeElse Opcode = 0x05
 	// OpcodeEnd terminates a control instruction OpcodeBlock, OpcodeLoop or OpcodeIf.
-	OpcodeEnd          Opcode = 0x0b
-	OpcodeBr           Opcode = 0x0c
+	OpcodeEnd Opcode = 0x0b
+
+	// OpcodeBr is a stack-polymorphic opcode that performs an unconditional branch. How the stack is modified depends
+	// on whether the "br" is enclosed by a loop, and if FeatureMultiValue is enabled.
+	//
+	// Here are the rules in pseudocode about how the stack is modified based on the "br" operand L (label):
+	//	if L is loop: append(L.originalStackWithoutInputs, N-values popped from the stack) where N == L.inputs
+	//	else: append(L.originalStackWithoutInputs, N-values popped from the stack) where N == L.results
+	//
+	// In WebAssembly 1.0 (20191205), N can be zero or one. When FeatureMultiValue is enabled, N can be more than one,
+	// depending on the type use of the label L.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfbrl
+	OpcodeBr Opcode = 0x0c
+	// ^^ TODO: Add a diagram to help explain br l means that branch into AFTER l for non-loop labels
+
 	OpcodeBrIf         Opcode = 0x0d
 	OpcodeBrTable      Opcode = 0x0e
 	OpcodeReturn       Opcode = 0x0f

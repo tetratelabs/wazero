@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeTypeSection(r *bytes.Reader) ([]*wasm.FunctionType, error) {
+func decodeTypeSection(enabledFeatures wasm.Features, r *bytes.Reader) ([]*wasm.FunctionType, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -16,49 +16,11 @@ func decodeTypeSection(r *bytes.Reader) ([]*wasm.FunctionType, error) {
 
 	result := make([]*wasm.FunctionType, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeFunctionType(r); err != nil {
+		if result[i], err = decodeFunctionType(enabledFeatures, r); err != nil {
 			return nil, fmt.Errorf("read %d-th type: %v", i, err)
 		}
 	}
 	return result, nil
-}
-
-func decodeFunctionType(r *bytes.Reader) (*wasm.FunctionType, error) {
-	b, err := r.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("read leading byte: %w", err)
-	}
-
-	if b != 0x60 {
-		return nil, fmt.Errorf("%w: %#x != 0x60", ErrInvalidByte, b)
-	}
-
-	s, _, err := leb128.DecodeUint32(r)
-	if err != nil {
-		return nil, fmt.Errorf("could not read parameter count: %w", err)
-	}
-
-	paramTypes, err := decodeValueTypes(r, s)
-	if err != nil {
-		return nil, fmt.Errorf("could not read parameter types: %w", err)
-	}
-
-	s, _, err = leb128.DecodeUint32(r)
-	if err != nil {
-		return nil, fmt.Errorf("could not read result count: %w", err)
-	} else if s > 1 {
-		return nil, fmt.Errorf("multi value results not supported")
-	}
-
-	resultTypes, err := decodeValueTypes(r, s)
-	if err != nil {
-		return nil, fmt.Errorf("could not read result types: %w", err)
-	}
-
-	return &wasm.FunctionType{
-		Params:  paramTypes,
-		Results: resultTypes,
-	}, nil
 }
 
 func decodeImportSection(r *bytes.Reader, memoryMaxPages uint32) ([]*wasm.Import, error) {

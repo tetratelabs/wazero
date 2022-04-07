@@ -16,25 +16,25 @@ import (
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	newEngine       func() wasm.Engine
-	ctx             context.Context
 	enabledFeatures wasm.Features
+	newEngine       func(wasm.Features) wasm.Engine
+	ctx             context.Context
 	memoryMaxPages  uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
-	ctx:             context.Background(),
 	enabledFeatures: wasm.Features20191205,
+	ctx:             context.Background(),
 	memoryMaxPages:  wasm.MemoryMaxPages,
 }
 
 // clone ensures all fields are coped even if nil.
 func (c *RuntimeConfig) clone() *RuntimeConfig {
 	return &RuntimeConfig{
+		enabledFeatures: c.enabledFeatures,
 		newEngine:       c.newEngine,
 		ctx:             c.ctx,
-		enabledFeatures: c.enabledFeatures,
 		memoryMaxPages:  c.memoryMaxPages,
 	}
 }
@@ -89,10 +89,23 @@ func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig
 	return ret
 }
 
+// WithFinishedFeatures enables currently supported "finished" feature proposals. Use this to improve compatibility with
+// tools that enable all features by default.
+//
+// Note: The features implied can vary and can lead to unpredictable behavior during updates.
+// Note: This only includes "finished" features, but "finished" is not an official W3C term: it is possible that
+// "finished" features do not make the next W3C recommended WebAssembly core specification.
+// See https://github.com/WebAssembly/spec/tree/main/proposals
+func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = wasm.FeaturesFinished
+	return ret
+}
+
 // WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
 // WebAssembly 1.0 (20191205).
 //
-// When false, a api.Global can never be cast to a api.MutableGlobal, and any source that includes global vars
+// When false, an api.Global can never be cast to an api.MutableGlobal, and any source that includes global vars
 // will fail to parse.
 func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	ret := c.clone()
@@ -100,13 +113,30 @@ func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	return ret
 }
 
-// WithFeatureSignExtensionOps enables sign-extend operations. This defaults to false as the feature was not finished in
-// WebAssembly 1.0 (20191205).
+// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
+// feature was not finished in WebAssembly 1.0 (20191205).
+//
+// This has the following effects:
+// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
 //
 // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
+	return ret
+}
+
+// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not finished
+// in WebAssembly 1.0 (20191205).
+//
+// This has the following effects:
+// * Function (`func`) types allow more than one result
+// * Block types (`block`, `loop` and `if`) can be arbitrary function types
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
 	return ret
 }
 

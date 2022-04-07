@@ -45,11 +45,11 @@ const (
 // are also enforced in module instantiation, they are also enforced here, to allow relevant source line/col in errors.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A3
 type moduleParser struct {
-	// source is the entire WebAssembly text format source code being parsed.
-	source []byte
-
 	// enabledFeatures ensure parsing errs at the correct line and column number when a feature is disabled.
 	enabledFeatures wasm.Features
+
+	// source is the entire WebAssembly text format source code being parsed.
+	source []byte
 
 	// module holds the fields incrementally parsed from tokens in the source.
 	module *wasm.Module
@@ -147,10 +147,10 @@ func newModuleParser(module *wasm.Module, enabledFeatures wasm.Features, memoryM
 		funcNamespace:   newIndexNamespace(module.SectionElementCount),
 		memoryNamespace: newIndexNamespace(module.SectionElementCount),
 	}
-	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
-	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
+	p.typeParser = newTypeParser(enabledFeatures, p.typeNamespace, p.onTypeEnd)
+	p.typeUseParser = newTypeUseParser(enabledFeatures, module, p.typeNamespace)
 	p.funcParser = newFuncParser(enabledFeatures, p.typeUseParser, p.funcNamespace, p.endFunc)
-	p.memoryParser = newMemoryParser(uint32(memoryMaxPages), p.memoryNamespace, p.endMemory)
+	p.memoryParser = newMemoryParser(memoryMaxPages, p.memoryNamespace, p.endMemory)
 	return &p
 }
 
