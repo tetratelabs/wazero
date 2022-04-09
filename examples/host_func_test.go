@@ -75,7 +75,7 @@ func Test_hostFunc(t *testing.T) {
 	defer module.Close()
 
 	allocateInWasmBufferFn := module.ExportedFunction("allocate_buffer")
-	require.NotNil(t, allocateInWasmBuffer)
+	require.NotNil(t, allocateInWasmBufferFn)
 
 	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
 	allocateInWasmBuffer = func(ctx api.Module, size uint32) uint32 {
