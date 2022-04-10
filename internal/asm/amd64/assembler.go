@@ -1,7 +1,7 @@
 package asm_amd64
 
 import (
-	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/heeus/inv-wazero/internal/asm"
 )
 
 // Assembler is the interface used by amd64 JIT compiler.

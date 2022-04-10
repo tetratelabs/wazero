@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
+	"github.com/heeus/inv-wazero"
 )
 
 // Test_AddInt shows how you can define a function in text format and have it compiled inline.

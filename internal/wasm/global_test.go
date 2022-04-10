@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/u64"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/internal/u64"
 )
 
 func TestGlobalTypes(t *testing.T) {

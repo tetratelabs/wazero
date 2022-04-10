@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/moremath"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/moremath"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 func TestCompiler_compileConsts(t *testing.T) {

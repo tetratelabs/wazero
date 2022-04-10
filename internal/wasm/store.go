@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/ieee754"
-	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/ieee754"
+	"github.com/heeus/inv-wazero/internal/leb128"
 )
 
 type (

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/inv-wazero/api"
 )
 
 func TestModule_ImportFuncCount(t *testing.T) {

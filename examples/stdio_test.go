@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/wasi"
 )
 
 // stdioWasm was compiled from TinyGo testdata/stdio.go

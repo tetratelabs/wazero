@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm/binary"
+	"github.com/heeus/inv-wazero/internal/wasm/text"
+	"github.com/heeus/inv-wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText

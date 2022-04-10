@@ -3,10 +3,10 @@ package wazero
 import (
 	"fmt"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/u64"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/internal/u64"
+	"github.com/heeus/inv-wazero/internal/wasm"
 )
 
 // ModuleBuilder is a way to define a WebAssembly 1.0 (20191205) in Go.

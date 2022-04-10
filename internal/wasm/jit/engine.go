@@ -8,11 +8,11 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/buildoptions"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/buildoptions"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasmdebug"
+	"github.com/heeus/inv-wazero/internal/wasmruntime"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 type (
@@ -787,7 +787,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 }
 
 // golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+// TODO: delete after https://github.com/heeus/inv-wazero/issues/233
 var assemblerMutex = &sync.Mutex{}
 
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {

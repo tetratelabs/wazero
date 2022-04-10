@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
+	"github.com/heeus/inv-wazero"
 )
 
 // wasiArg was compiled from testdata/wasi_arg.wat

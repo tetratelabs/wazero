@@ -3,7 +3,7 @@ package wazeroir
 import (
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm"
 )
 
 // signature represents how a Wasm opcode

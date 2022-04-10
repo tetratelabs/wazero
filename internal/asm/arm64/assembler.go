@@ -1,8 +1,8 @@
 package asm_arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
+	"github.com/heeus/inv-wazero/internal/asm"
+	"github.com/heeus/inv-wazero/internal/asm/golang_asm"
 )
 
 // NewAssembler implements asm.NewAssembler and is used by default.

@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
+	"github.com/heeus/inv-wazero/internal/asm"
+	amd64 "github.com/heeus/inv-wazero/internal/asm/amd64"
 )
 
 func TestAssemblerImpl_Assemble(t *testing.T) {

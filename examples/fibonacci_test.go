@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/wasi"
 )
 
 // fibWasm was compiled from TinyGo testdata/fibonacci.go

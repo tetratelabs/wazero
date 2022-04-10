@@ -5,11 +5,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/asm/amd64_debug"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/asm"
+	amd64 "github.com/heeus/inv-wazero/internal/asm/amd64"
+	"github.com/heeus/inv-wazero/internal/asm/amd64_debug"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 // newDebugAmd64Compiler allows debugging in tests, without pinning a dependency in main code.

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm"
 )
 
 func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeUseParser {

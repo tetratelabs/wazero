@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	arm64 "github.com/heeus/inv-wazero/internal/asm/arm64"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {

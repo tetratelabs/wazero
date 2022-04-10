@@ -3,7 +3,7 @@ package wasm
 import (
 	"fmt"
 
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/inv-wazero/api"
 )
 
 type mutableGlobal struct {

@@ -8,7 +8,7 @@ bench:
 
 .PHONY: bench.check
 bench.check:
-	@cd vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+	@cd vs && go test -benchmem -bench=. . -ldflags '-X github.com/heeus/inv-wazero/vs.ensureJITFastest=true'
 
 bench_testdata_dir := tests/bench/testdata
 
@@ -67,7 +67,7 @@ format:
 	    awk '/^import \($$/,/^\)$$/{if($$0=="")next}{print}' $$f > /tmp/fmt; \
 	    mv /tmp/fmt $$f; \
 	done
-	@go run $(goimports) -w -local github.com/tetratelabs/wazero `find . -name '*.go'`
+	@go run $(goimports) -w -local github.com/heeus/inv-wazero `find . -name '*.go'`
 
 .PHONY: check
 check:

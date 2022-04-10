@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/inv-wazero/api"
 )
 
 type errno uint32

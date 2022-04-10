@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
 )
 
 // ensureJITFastest is overridable via ldflags. Ex.
-//	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+//	-ldflags '-X github.com/heeus/inv-wazero/vs.ensureJITFastest=true'
 var ensureJITFastest = "false"
 
 // facWasm is compiled from testdata/fac.wat
@@ -159,7 +159,7 @@ var facIterArgumentU64 = uint64(30)
 var facIterArgumentI64 = int64(facIterArgumentU64)
 
 // TestFacIter_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
-// This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
+// This is disabled by default, and can be run with -ldflags '-X github.com/heeus/inv-wazero/vs.ensureJITFastest=true'.
 func TestFacIter_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
 		t.Skip()

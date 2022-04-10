@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/wasi"
 )
 
 func Test_WASI(t *testing.T) {

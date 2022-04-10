@@ -13,15 +13,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/u64"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
-	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/internal/u64"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm/binary"
+	"github.com/heeus/inv-wazero/internal/wasm/interpreter"
+	"github.com/heeus/inv-wazero/internal/wasm/jit"
+	"github.com/heeus/inv-wazero/internal/wasm/text"
+	"github.com/heeus/inv-wazero/internal/wasmruntime"
 )
 
 //go:embed testdata/*.wasm
@@ -296,7 +296,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	}
 
 	// If the go:embed path resolution was wrong, this fails.
-	// https://github.com/tetratelabs/wazero/issues/247
+	// https://github.com/heeus/inv-wazero/issues/247
 	require.Greater(t, len(jsonfiles), 1)
 
 	for _, f := range jsonfiles {

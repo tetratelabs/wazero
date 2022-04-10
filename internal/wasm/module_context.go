@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/sys"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/sys"
 )
 
 // compile time check to ensure ModuleContext implements api.Module

@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/testing/hammer"
-	"github.com/tetratelabs/wazero/sys"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/testing/hammer"
+	"github.com/heeus/inv-wazero/sys"
 )
 
 var hammers = map[string]func(t *testing.T, r wazero.Runtime){

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
+	"github.com/heeus/inv-wazero"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.

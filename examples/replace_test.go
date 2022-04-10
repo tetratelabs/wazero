@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
 )
 
 // Test_Replace shows how you can replace a module import when it doesn't match instantiated modules.

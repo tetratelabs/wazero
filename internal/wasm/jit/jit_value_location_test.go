@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/heeus/inv-wazero/internal/asm"
 )
 
 func Test_isIntRegister(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/leb128"
 )
 
 // wasiAPI simulates the real WASI api

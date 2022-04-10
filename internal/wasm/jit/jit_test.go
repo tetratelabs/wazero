@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 func TestMain(m *testing.M) {
@@ -142,7 +142,7 @@ type newTestCompiler func(f *wasm.FunctionInstance, ir *wazeroir.CompilationResu
 
 func (j *jitEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, functype *wasm.FunctionType) compilerImpl {
 	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+	// TODO: delete after https://github.com/heeus/inv-wazero/issues/233
 	assemblerMutex.Lock()
 
 	requireSupportedOSArch(t)

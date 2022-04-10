@@ -3,8 +3,8 @@ package jit
 import (
 	"math"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 // init initializes variables for the arm64 architecture

@@ -9,9 +9,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/internal/wasm"
 )
 
 const (

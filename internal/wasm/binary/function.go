@@ -1,7 +1,7 @@
 package binary
 
 import (
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm"
 )
 
 var nullary = []byte{0x60, 0, 0}

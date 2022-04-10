@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/inv-wazero"
+	"github.com/heeus/inv-wazero/api"
+	"github.com/heeus/inv-wazero/wasi"
 )
 
 // caseWasm was compiled from TinyGo testdata/case.go

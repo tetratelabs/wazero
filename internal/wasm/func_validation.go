@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/heeus/inv-wazero/internal/leb128"
 )
 
 // validateFunction validates the instruction sequence of a function.

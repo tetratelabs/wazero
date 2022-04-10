@@ -9,12 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tetratelabs/wazero/internal/buildoptions"
-	"github.com/tetratelabs/wazero/internal/moremath"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/buildoptions"
+	"github.com/heeus/inv-wazero/internal/moremath"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasmdebug"
+	"github.com/heeus/inv-wazero/internal/wasmruntime"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 var callStackCeiling = buildoptions.CallStackCeiling

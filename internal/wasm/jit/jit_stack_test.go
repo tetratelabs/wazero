@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/inv-wazero/internal/asm"
+	"github.com/heeus/inv-wazero/internal/wazeroir"
 )
 
 func TestCompiler_releaseRegisterToStack(t *testing.T) {

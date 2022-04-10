@@ -9,9 +9,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
-	"github.com/tetratelabs/wazero/internal/wasm/jit"
+	"github.com/heeus/inv-wazero/internal/wasm"
+	"github.com/heeus/inv-wazero/internal/wasm/interpreter"
+	"github.com/heeus/inv-wazero/internal/wasm/jit"
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
