@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/heeus/inv-wazero/internal/buildoptions"
 	"github.com/heeus/inv-wazero/internal/moremath"
@@ -612,8 +611,9 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	for frame.pc < bodyLen {
 		select {
 		case <-ctx.Context().Done():
-			ctx.Context().Err() // deadline exceeded
-		case <-time.After(1 * time.Second):
+			err = ctx.Context().Err() // deadline exceeded
+			return
+		default:
 			op := frame.f.body[frame.pc]
 			// TODO: add description of each operation/case
 			// on, for example, how many args are used,
