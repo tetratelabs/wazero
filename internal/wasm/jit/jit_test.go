@@ -141,16 +141,11 @@ func (j *jitEnv) exec(code []byte) {
 type newTestCompiler func(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error)
 
 func (j *jitEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, functype *wasm.FunctionType) compilerImpl {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-	assemblerMutex.Lock()
-
 	requireSupportedOSArch(t)
 	c, err := fn(
 		&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype},
 		&wazeroir.CompilationResult{LabelCallers: map[string]uint32{}},
 	)
-	t.Cleanup(func() { assemblerMutex.Unlock() })
 	require.NoError(t, err)
 
 	ret, ok := c.(compilerImpl)
@@ -172,6 +167,7 @@ type compilerImpl interface {
 	setValueLocationStack(*valueLocationStack)
 	compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error
 	compileModuleContextInitialization() error
+	compileNOP()
 }
 
 const defaultMemoryPageNumInTest = 1

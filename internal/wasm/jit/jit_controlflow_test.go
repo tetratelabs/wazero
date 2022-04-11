@@ -15,13 +15,11 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-	// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
+	// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
 	// TODO: delete after #233
-	err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
-	require.NoError(t, err)
-	compiler.valueLocationStack().pop()
+	compiler.compileNOP()
 
-	err = compiler.compileHostFunction()
+	err := compiler.compileHostFunction()
 	require.NoError(t, err)
 
 	// Generate and run the code under test.

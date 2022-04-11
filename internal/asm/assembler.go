@@ -80,9 +80,6 @@ type AssemblerBase interface {
 	CompileRegisterToMemory(instruction Instruction, sourceRegister Register, destinationBaseRegister Register, destinationOffsetConst ConstantValue)
 	// CompileJump adds jump-type instruction and returns the corresponding Node in the assembled linked list.
 	CompileJump(jmpInstruction Instruction) Node
-	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,
-	// and returns the corresponding Node in the assembled linked list.
-	CompileJumpToMemory(jmpInstruction Instruction, baseReg Register, offset ConstantValue)
 	// CompileJumpToRegister adds jump-type instruction whose destination is the memory address specified by `reg` register.
 	CompileJumpToRegister(jmpInstruction Instruction, reg Register)
 	// CompileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"

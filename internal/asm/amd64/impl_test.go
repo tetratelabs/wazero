@@ -1,6 +1,7 @@
 package asm_amd64
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -10,6 +11,9 @@ import (
 )
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {
+	a := uint64(0b1110)
+	fmt.Println(-a)
+	fmt.Printf("0b%b\n", -a)
 	n := &NodeImpl{}
 	target := &NodeImpl{}
 	n.AssignJumpTarget(target)

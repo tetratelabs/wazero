@@ -885,7 +885,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			},
 		},
 		{
-			name:    "max-32-bit",
+			name:    "copysign-32-bit",
 			is32bit: true,
 			setupFunc: func(t *testing.T, compiler compilerImpl) {
 				err := compiler.compileCopysign(&wazeroir.OperationCopysign{Type: wazeroir.Float32})

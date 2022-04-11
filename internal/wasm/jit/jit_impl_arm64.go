@@ -39,18 +39,13 @@ type arm64Compiler struct {
 }
 
 func newArm64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	b, err := arm64.NewAssembler(arm64ReservedRegisterForTemporary)
-	if err != nil {
-		return nil, err
-	}
-	c := &arm64Compiler{
+	return &arm64Compiler{
 		f:             f,
-		assembler:     b,
+		assembler:     arm64.NewAssemblerImpl(arm64ReservedRegisterForTemporary),
 		locationStack: newValueLocationStack(),
 		ir:            ir,
 		labels:        map[string]*arm64LabelInfo{},
-	}
-	return c, nil
+	}, nil
 }
 
 var (
@@ -68,11 +63,11 @@ var (
 	// * REG_R18 is reserved as a platform register, and we don't use it in JIT.
 	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in JIT.
 	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
-		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
+		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
 		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R19,
 		arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23, arm64.REG_R24,
-		arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R29, arm64.REG_R30,
+		arm64.REG_R25, arm64.REG_R26, arm64.REG_R29, arm64.REG_R30,
 	}
 )
 
@@ -83,7 +78,7 @@ const (
 	arm64ReservedRegisterForStackBasePointerAddress asm.Register = arm64.REG_R1
 	// arm64ReservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	arm64ReservedRegisterForMemory    asm.Register = arm64.REG_R2
-	arm64ReservedRegisterForTemporary asm.Register = arm64.REG_R3
+	arm64ReservedRegisterForTemporary asm.Register = arm64.REG_R27
 )
 
 const (
@@ -315,6 +310,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	)
 	// "callFrameStackTopAddressRegister = tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit}"
 	c.assembler.CompileLeftShiftedRegisterToRegister(
+		arm64.ADD,
 		callFramePointerReg, callFrameDataSizeMostSignificantSetBit,
 		tmpReg,
 		callFrameStackTopAddressRegister,
@@ -351,7 +347,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		// "rb.caller" is below the top address.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 		tmpReg)
-	c.assembler.CompileJumpToMemory(arm64.B, tmpReg, 0)
+	c.assembler.CompileJumpToMemory(arm64.B, tmpReg)
 
 	c.markRegisterUnused(tmpRegs...)
 	return nil
@@ -742,7 +738,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmpReg, index.register)
 	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
 	brDefaultIndex := c.assembler.CompileJump(arm64.BLO)
-	c.assembler.CompileRegisterToRegister(arm64.MOVW, tmpReg, index.register)
+	c.assembler.CompileRegisterToRegister(arm64.MOVWU, tmpReg, index.register)
 	c.assembler.SetJumpTargetOnNext(brDefaultIndex)
 
 	// We prepare the static data which holds the offset of
@@ -782,7 +778,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	)
 
 	// "index.register = tmpReg + (index.register << 2) (== &offsetData[offset])"
-	c.assembler.CompileLeftShiftedRegisterToRegister(index.register, 2, tmpReg, index.register)
+	c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD, index.register, 2, tmpReg, index.register)
 
 	// "index.register = *index.register (== offsetData[offset])"
 	c.assembler.CompileMemoryToRegister(arm64.MOVW, index.register, 0, index.register)
@@ -795,7 +791,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// So we could achieve the br_table jump by adding them and jump into the resulting address.
 	c.assembler.CompileRegisterToRegister(arm64.ADD, tmpReg, index.register)
 
-	c.assembler.CompileJumpToMemory(arm64.B, index.register, 0)
+	c.assembler.CompileJumpToMemory(arm64.B, index.register)
 
 	// We no longer need the index's register, so mark it unused.
 	c.markRegisterUnused(index.register)
@@ -999,7 +995,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 		compiledFunctionRegister, compiledFunctionCodeInitialAddressOffset,
 		tmp)
 
-	c.assembler.CompileJumpToMemory(arm64.B, tmp, 0)
+	c.assembler.CompileJumpToMemory(arm64.B, tmp)
 
 	// All the registers used are temporary so we mark them unused.
 	c.markRegisterUnused(freeRegisters...)
@@ -1040,6 +1036,7 @@ func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointe
 		destinationRegister)
 	// "destinationRegister += callFrameStackPointerRegister << $callFrameDataSizeMostSignificantSetBit"
 	c.assembler.CompileLeftShiftedRegisterToRegister(
+		arm64.ADD,
 		callFrameStackPointerRegister, callFrameDataSizeMostSignificantSetBit,
 		destinationRegister,
 		destinationRegister,
@@ -1097,6 +1094,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Here we left shifting by 4 in order to get the offset in bytes,
 	// and the table element type is interface which is 16 bytes (two pointers).
 	c.assembler.CompileLeftShiftedRegisterToRegister(
+		arm64.ADD,
 		offset.register, 4,
 		tmp,
 		offset.register,
@@ -1668,7 +1666,8 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	// [result: x2=quotient, x3=remainder]
 	//
 	c.assembler.CompileTwoRegistersToRegister(divInst, divisorReg, dividendReg, resultReg)
-	c.assembler.CompileTwoRegisters(msubInst, divisorReg, dividendReg, resultReg, resultReg)
+	// ResultReg = dividendReg - (divisorReg * resultReg)
+	c.assembler.CompileThreeRegistersToRegister(msubInst, divisorReg, dividendReg, resultReg, resultReg)
 
 	c.markRegisterUnused(dividend.register, divisor.register)
 	c.pushValueLocationOnRegister(resultReg)
@@ -1993,7 +1992,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	//
 	//    mov     x0, -9223372036854775808
 	//    fmov    d2, x0
-	//    vbit     v0.8b, v1.8b, v2.8b
+	//    vbit    v0.8b, v1.8b, v2.8b
 	//
 	// "mov freg, -9223372036854775808 (stored at ce.minimum64BitSignedInt)"
 	c.assembler.CompileMemoryToRegister(
@@ -2011,7 +2010,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
 	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
-	c.assembler.CompileTwoSIMDByteToRegister(arm64.VBIT, freg, x2.register, x1.register)
+	c.assembler.CompileTwoSIMDBytesToSIMDByteRegister(arm64.VBIT, freg, x2.register, x1.register)
 
 	c.markRegisterUnused(x2.register)
 	c.pushValueLocationOnRegister(x1.register)
@@ -2020,7 +2019,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 // compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileI32WrapFromI64() error {
-	return c.compileSimpleUnop(arm64.MOVW)
+	return c.compileSimpleUnop(arm64.MOVWU)
 }
 
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
@@ -2066,7 +2065,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.REG_FPSR, arm64ReservedRegisterForTemporary)
 	// Check if the conversion was undefined by comparing the status with 1.
 	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
-	c.assembler.CompileRegisterAndConstSourceToNone(arm64.CMP, arm64ReservedRegisterForTemporary, 1)
+	c.assembler.CompileRegisterAndConstToNone(arm64.CMP, arm64ReservedRegisterForTemporary, 1)
 
 	brOK := c.assembler.CompileJump(arm64.BNE)
 
@@ -2190,7 +2189,7 @@ func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	if o.Signed {
 		return c.compileSimpleUnop(arm64.SXTW)
 	} else {
-		return c.compileSimpleUnop(arm64.UXTW)
+		return c.compileSimpleUnop(arm64.MOVWU)
 	}
 }
 
@@ -2731,7 +2730,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	// Set the address of callFrameStack[ce.callFrameStackPointer] into currentCallFrameTopAddressRegister.
 	c.compileCalcCallFrameStackTopAddress(currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister)
 
-	// Set the return address (after RET in c.exit below) into returnAddressRegister.
+	// Set the return address (after RET in c.compileExitFromNativeCode below) into returnAddressRegister.
 	c.assembler.CompileReadInstructionAddress(returnAddressRegister, arm64.RET)
 
 	// Write returnAddressRegister into callFrameStack[ce.callFrameStackPointer-1].returnAddress.
@@ -3011,7 +3010,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 	// Finally, we calculate "arm64ReservedRegisterForStackBasePointerAddress + arm64ReservedRegisterForTemporary << 3"
 	// where we shift tmpReg by 3 because stack pointer is an index in the []uint64
 	// so we must multiply the value by the size of uint64 = 8 bytes.
-	c.assembler.CompileLeftShiftedRegisterToRegister(
+	c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 		arm64ReservedRegisterForTemporary, 3, arm64ReservedRegisterForStackBasePointerAddress,
 		arm64ReservedRegisterForStackBasePointerAddress)
 }

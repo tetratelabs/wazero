@@ -7,6 +7,9 @@ import (
 // Assembler is the interface used by amd64 JIT compiler.
 type Assembler interface {
 	asm.AssemblerBase
+	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,
+	// and returns the corresponding Node in the assembled linked list.
+	CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset asm.ConstantValue)
 	// CompileRegisterToRegisterWithMode adds an instruction where source and destination
 	// are `from` and `to` registers and the instruction's "Mode" is specified by `Mode`.
 	CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode Mode)

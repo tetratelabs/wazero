@@ -183,7 +183,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 		}
 
 		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
-		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+		require.EqualError(t, err, "function[invalid code(2/2)] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
