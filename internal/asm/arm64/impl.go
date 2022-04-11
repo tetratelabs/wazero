@@ -1859,7 +1859,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6570-L6583
 			tmpRegBits := registerBits(a.temporaryRegister)
 			// OOR $c, tmpReg
-			a.loadConstViaBitMaskImmediate(uc, tmpRegBits, true, false)
+			a.loadConstViaBitMaskImmediate(uc, tmpRegBits, true)
 
 			// ADD/SUB tmpReg, dstReg
 			a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
@@ -1907,7 +1907,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		ic := int64(c32)
 		if ic >= 0 && (ic <= 0xfff || (ic&0xfff) == 0 && (uint64(ic>>12) <= 0xfff)) {
 			if isBitMaskImmediate(uint64(c)) {
-				a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false, true)
+				a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false)
 				return
 			}
 		}
@@ -1920,7 +1920,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
 			a.load16bitAlignedConst((int64(^c32) >> (16 * t)), byte(t), dstRegBits, true, false)
 		} else if isBitMaskImmediate(uint64(c)) {
-			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false, true)
+			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false)
 		} else {
 			// Othewise we use MOVZ and MOVK to load it.
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6623-L6630
@@ -1948,7 +1948,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1798-L1852
 		if c >= 0 && (c <= 0xfff || (c&0xfff) == 0 && (uint64(c>>12) <= 0xfff)) {
 			if isBitMaskImmediate(uint64(c)) {
-				a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true, false)
+				a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true)
 				return
 			}
 		}
@@ -1961,7 +1961,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
 			a.load16bitAlignedConst((int64(^c) >> (16 * t)), byte(t), dstRegBits, true, true)
 		} else if isBitMaskImmediate(uint64(c)) {
-			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true, false)
+			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true)
 		} else {
 			a.load64bitConst(c, dstRegBits)
 		}
@@ -2141,7 +2141,7 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 
 // loadBitMaskImmediate loads the constant with ORR (bitmask immediate).
 // https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ORR--immediate---Bitwise-OR--immediate--?lang=en
-func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst64bit bool, is32bit bool) {
+func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst64bit bool) {
 	var size uint32
 	switch {
 	case x != x>>32|x<<32:
@@ -2179,7 +2179,7 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst
 	// https://dinfuehr.github.io/blog/encoding-of-immediate-values-on-aarch64/
 	var n byte
 	var mode = 32
-	if !is32bit && size == 64 {
+	if dst64bit && size == 64 {
 		n = 0b1
 		mode = 64
 	}
