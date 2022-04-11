@@ -3,8 +3,9 @@ package asm_amd64
 import "github.com/tetratelabs/wazero/internal/asm"
 
 // AMD64-specific conditional register states.
-// https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
-// https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf
+//
+// See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
+// See https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf
 const (
 	ConditionalRegisterStateE  = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
 	ConditionalRegisterStateNE                                                //˜ZF not equal to zero
@@ -21,10 +22,10 @@ const (
 )
 
 // AMD64-specific instructions.
-// https://www.felixcloutier.com/x86/index.html
 //
-// Note: here we do not define all of amd64 instructions, and we only define the ones used by wazero's JIT compiler.
-// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
+// Note: This only defines amd64 instructions used by wazero's JIT compiler.
+// Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
+// See https://www.felixcloutier.com/x86/index.html
 const (
 	NONE asm.Instruction = iota
 	ADDL
@@ -426,10 +427,10 @@ func InstructionName(instruction asm.Instruction) string {
 }
 
 // Arm64-specific registers.
-// https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
-// https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 //
-// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
+// Note: naming convention intentionally matches the Go assembler: https://go.dev/doc/asm
+// See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
+// See https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 const (
 	REG_AX asm.Register = asm.NilRegister + 1 + iota
 	REG_CX

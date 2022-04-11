@@ -12,7 +12,8 @@ import (
 	asm_arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 )
 
-func newGoasmAssembler(t *testing.T, tmpReg asm.Register) asm_arm64.Assembler {
+// TODO: Comment why tmpReg is unused.
+func newGoasmAssembler(t *testing.T, _ asm.Register) asm_arm64.Assembler {
 	a, err := newAssembler(asm.NilRegister)
 	require.NoError(t, err)
 	a.CompileStandAlone(asm_arm64.NOP)
@@ -1041,7 +1042,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		cb := a.OnGenerateCallbacks[0]
 
 		targetNode := a.Current
-		targetNode.OffsetInBinaryField = (uint64(math.MaxInt64))
+		targetNode.OffsetInBinaryField = uint64(math.MaxInt64)
 
 		err := cb(nil)
 		require.EqualError(t, err, "BUG: too large offset for ADR")

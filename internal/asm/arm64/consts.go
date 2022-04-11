@@ -5,8 +5,9 @@ import (
 )
 
 // Arm64-specific register states.
-// https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
-// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
+//
+// Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
+// See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
 const (
 	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
 	COND_NE
@@ -27,8 +28,9 @@ const (
 )
 
 // Arm64-specific registers.
-// https://developer.arm.com/documentation/dui0801/a/Overview-of-AArch64-state/Predeclared-core-register-names-in-AArch64-state
-// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
+//
+// Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
+// See https://developer.arm.com/documentation/dui0801/a/Overview-of-AArch64-state/Predeclared-core-register-names-in-AArch64-state
 const (
 	// Integer registers.
 
@@ -107,6 +109,7 @@ const (
 	// Assign each conditional register state to the unique register ID.
 	// This is to reduce the size of NodeImpl struct without having dedicated field
 	// for conditional register state which would not be used by most nodes.
+
 	REG_COND_EQ
 	REG_COND_NE
 	REG_COND_HS
@@ -125,7 +128,7 @@ const (
 	REG_COND_NV
 )
 
-// conditionalRegisterStateToRegister casst a conditional register to its unique register ID.
+// conditionalRegisterStateToRegister cast a conditional register to its unique register ID.
 // See the comment on REG_COND_EQ above.
 func conditionalRegisterStateToRegister(c asm.ConditionalRegisterState) asm.Register {
 	switch c {
@@ -337,7 +340,8 @@ func RegisterName(r asm.Register) string {
 
 // Arm64-specific instructions.
 //
-// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
+// Note: This only defines arm64 instructions used by wazero's JIT compiler.
+// Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 const (
 	NOP asm.Instruction = iota
 	RET

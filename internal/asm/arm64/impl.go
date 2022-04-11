@@ -33,22 +33,22 @@ type NodeImpl struct {
 	JumpOrigins map[*NodeImpl]struct{}
 }
 
-// AssignJumpTarget implements asm.Node.AssignJumpTarget.
+// AssignJumpTarget implements the same method as documented on asm.Node.
 func (n *NodeImpl) AssignJumpTarget(target asm.Node) {
 	n.JumpTarget = target.(*NodeImpl)
 }
 
-// AssignSourceConstant implements asm.Node.AssignSourceConstant.
+// AssignDestinationConstant implements the same method as documented on asm.Node.
 func (n *NodeImpl) AssignDestinationConstant(value asm.ConstantValue) {
 	n.DstConst = value
 }
 
-// AssignSourceConstant implements asm.Node.AssignSourceConstant.
+// AssignSourceConstant implements the same method as documented on asm.Node.
 func (n *NodeImpl) AssignSourceConstant(value asm.ConstantValue) {
 	n.SrcConst = value
 }
 
-// OffsetInBinary implements asm.Node.OffsetInBinary.
+// OffsetInBinary implements the same method as documented on asm.Node.
 func (n *NodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
 	return n.OffsetInBinaryField
 }
@@ -195,7 +195,7 @@ type constPool struct {
 	// which needs to access the const in this constPool.
 	firstUseOffsetInBinary *asm.NodeOffsetInBinary
 	consts                 []int32
-	// offsetFinalizedCallbacks holds the callbacks keyed on the constats.
+	// offsetFinalizedCallbacks holds the callbacks keyed on the constants.
 	// These callbacks are called when the offsets of the constants in the binary
 	// have been determined.
 	offsetFinalizedCallbacks map[int32][]func(offsetOfConstInBinary int)
@@ -244,14 +244,14 @@ func (a *AssemblerImpl) addNode(node *NodeImpl) {
 // Assemble implements asm.AssemblerBase
 func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	// arm64 has 32-bit fixed length instructions,
-	// but note that some of nodes are encoded as multiple instructions,
+	// but note that some nodes are encoded as multiple instructions,
 	// so the resulting binary might not be the size of count*8.
 	a.Buf.Grow(a.nodeCount * 8)
 
 	for n := a.Root; n != nil; n = n.Next {
-		n.OffsetInBinaryField = (uint64(a.Buf.Len()))
+		n.OffsetInBinaryField = uint64(a.Buf.Len())
 		if err := a.EncodeNode(n); err != nil {
-			return nil, fmt.Errorf("%w: %v", err, n)
+			return nil, err
 		}
 		a.maybeFlushConstPool(n.Next == nil)
 	}
@@ -265,7 +265,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// maybeFlushConstPool maybe flushes the current constants in the constPool.
+// maybeFlushConstPool flushes the constant pool if endOfBinary or a boundary condition was met.
 func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	if a.pool.firstUseOffsetInBinary == nil {
 		return
@@ -274,7 +274,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	// If endOfBinary = true, we no longer need to emit the instructions, therefore
 	// flush all the constants.
 	if endOfBinary ||
-		// Also if the offset between the first usage of the constant pool and
+		// Also, if the offset between the first usage of the constant pool and
 		// the first constant would exceed 2^20 -1(= 2MiB-1), which is the maximum offset
 		// for load(literal) instruction, flush all the constants in the pool.
 		(a.Buf.Len()-int(*a.pool.firstUseOffsetInBinary)) >= (1<<20)-1-4 { // -4 for unconditional branch to skip the constants.
@@ -373,71 +373,93 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
+	if err != nil {
+		err = fmt.Errorf("%w: %s", err, n) // Ensure the error is debuggable by including the string value.
+	}
 	return
 }
 
-// CompileStandAlone implements asm.AssemblerBase.CompileStandAlone
+// CompileStandAlone implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	return a.newNode(instruction, OperandTypesNoneToNone)
 }
 
-// CompileConstToRegister implements asm.AssemblerBase.CompileConstToRegister
-func (a *AssemblerImpl) CompileConstToRegister(instruction asm.Instruction, value asm.ConstantValue, destinationReg asm.Register) (inst asm.Node) {
+// CompileConstToRegister implements the same method as documented on asm.AssemblerBase.
+func (a *AssemblerImpl) CompileConstToRegister(
+	instruction asm.Instruction,
+	value asm.ConstantValue,
+	destinationReg asm.Register,
+) (inst asm.Node) {
 	n := a.newNode(instruction, OperandTypesConstToRegister)
 	n.SrcConst = value
 	n.DstReg = destinationReg
 	return n
 }
 
-// CompileRegisterToRegister implements asm.AssemblerBase.CompileRegisterToRegister
+// CompileRegisterToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	n := a.newNode(instruction, OperandTypesRegisterToRegister)
 	n.SrcReg = from
 	n.DstReg = to
 }
 
-// CompileMemoryToRegister implements asm.AssemblerBase.CompileMemoryToRegister
-func (a *AssemblerImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
+// CompileMemoryToRegister implements the same method as documented on asm.AssemblerBase.
+func (a *AssemblerImpl) CompileMemoryToRegister(
+	instruction asm.Instruction,
+	sourceBaseReg asm.Register,
+	sourceOffsetConst asm.ConstantValue,
+	destinationReg asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesMemoryToRegister)
 	n.SrcReg = sourceBaseReg
 	n.SrcConst = sourceOffsetConst
 	n.DstReg = destinationReg
 }
 
-// CompileRegisterToMemory implements asm.AssemblerBase.CompileRegisterToMemory
-func (a *AssemblerImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst asm.ConstantValue) {
+// CompileRegisterToMemory implements the same method as documented on asm.AssemblerBase.
+func (a *AssemblerImpl) CompileRegisterToMemory(
+	instruction asm.Instruction,
+	sourceRegister, destinationBaseRegister asm.Register,
+	destinationOffsetConst asm.ConstantValue,
+) {
 	n := a.newNode(instruction, OperandTypesRegisterToMemory)
 	n.SrcReg = sourceRegister
 	n.DstReg = destinationBaseRegister
 	n.DstConst = destinationOffsetConst
 }
 
-// CompileJump implements asm.AssemblerBase.CompileJump
+// CompileJump implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	return a.newNode(jmpInstruction, OperandTypesNoneToBranch)
 }
 
-// CompileJumpToMemory implements asm.AssemblerBase.CompileJumpToMemory
+// CompileJumpToMemory implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register) {
 	n := a.newNode(jmpInstruction, OperandTypesNoneToMemory)
 	n.DstReg = baseReg
 }
 
-// CompileJumpToRegister implements asm.AssemblerBase.CompileJumpToRegister
+// CompileJumpToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	n := a.newNode(jmpInstruction, OperandTypesNoneToRegister)
 	n.DstReg = reg
 }
 
-// CompileReadInstructionAddress implements asm.AssemblerBase.CompileReadInstructionAddress
-func (a *AssemblerImpl) CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
+// CompileReadInstructionAddress implements the same method as documented on asm.AssemblerBase.
+func (a *AssemblerImpl) CompileReadInstructionAddress(
+	destinationRegister asm.Register,
+	beforeAcquisitionTargetInstruction asm.Instruction,
+) {
 	n := a.newNode(ADR, OperandTypesMemoryToRegister)
 	n.DstReg = destinationRegister
 	n.readInstructionAddressBeforeTargetInstruction = beforeAcquisitionTargetInstruction
 }
 
 // CompileMemoryWithRegisterOffsetToRegister implements Assembler.CompileMemoryWithRegisterOffsetToRegister
-func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, srcBaseReg, srcOffsetReg, dstReg asm.Register) {
+func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToRegister(
+	instruction asm.Instruction,
+	srcBaseReg, srcOffsetReg, dstReg asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesMemoryToRegister)
 	n.DstReg = dstReg
 	n.SrcReg = srcBaseReg
@@ -445,7 +467,10 @@ func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToRegister(instruction as
 }
 
 // CompileRegisterToMemoryWithRegisterOffset implements Assembler.CompileRegisterToMemoryWithRegisterOffset
-func (a *AssemblerImpl) CompileRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, srcReg, dstBaseReg, dstOffsetReg asm.Register) {
+func (a *AssemblerImpl) CompileRegisterToMemoryWithRegisterOffset(
+	instruction asm.Instruction,
+	srcReg, dstBaseReg, dstOffsetReg asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesRegisterToMemory)
 	n.SrcReg = srcReg
 	n.DstReg = dstBaseReg
@@ -460,8 +485,11 @@ func (a *AssemblerImpl) CompileTwoRegistersToRegister(instruction asm.Instructio
 	n.DstReg = dst
 }
 
-// CompileTwoRegisters implements Assembler.CompileThreeRegistersToRegister
-func (a *AssemblerImpl) CompileThreeRegistersToRegister(instruction asm.Instruction, src1, src2, src3, dst asm.Register) {
+// CompileThreeRegistersToRegister implements Assembler.CompileThreeRegistersToRegister
+func (a *AssemblerImpl) CompileThreeRegistersToRegister(
+	instruction asm.Instruction,
+	src1, src2, src3, dst asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesThreeRegistersToRegister)
 	n.SrcReg = src1
 	n.SrcReg2 = src2
@@ -477,14 +505,23 @@ func (a *AssemblerImpl) CompileTwoRegistersToNone(instruction asm.Instruction, s
 }
 
 // CompileRegisterAndConstToNone implements Assembler.CompileRegisterAndConstToNone
-func (a *AssemblerImpl) CompileRegisterAndConstToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue) {
+func (a *AssemblerImpl) CompileRegisterAndConstToNone(
+	instruction asm.Instruction,
+	src asm.Register,
+	srcConst asm.ConstantValue,
+) {
 	n := a.newNode(instruction, OperandTypesRegisterAndConstToNone)
 	n.SrcReg = src
 	n.SrcConst = srcConst
 }
 
 // CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister
-func (a *AssemblerImpl) CompileLeftShiftedRegisterToRegister(instruction asm.Instruction, shiftedSourceReg asm.Register, shiftNum asm.ConstantValue, srcReg, dstReg asm.Register) {
+func (a *AssemblerImpl) CompileLeftShiftedRegisterToRegister(
+	instruction asm.Instruction,
+	shiftedSourceReg asm.Register,
+	shiftNum asm.ConstantValue,
+	srcReg, dstReg asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesLeftShiftedRegisterToRegister)
 	n.SrcReg = srcReg
 	n.SrcReg2 = shiftedSourceReg
@@ -500,7 +537,10 @@ func (a *AssemblerImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, s
 }
 
 // CompileTwoSIMDBytesToSIMDByteRegister implements Assembler.CompileTwoSIMDBytesToSIMDByteRegister
-func (a *AssemblerImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
+func (a *AssemblerImpl) CompileTwoSIMDBytesToSIMDByteRegister(
+	instruction asm.Instruction,
+	srcReg1, srcReg2, dstReg asm.Register,
+) {
 	n := a.newNode(instruction, OperandTypesTwoSIMDBytesToSIMDByteRegister)
 	n.SrcReg = srcReg1
 	n.SrcReg2 = srcReg2
@@ -885,13 +925,13 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			sf, tp, opcode = 0b1, 0b00, 0b000
 		case FCVTZSSW: // Single to signed 32-bit.
 			sf, tp, opcode = 0b0, 0b00, 0b000
-		case FCVTZUD: // Dobule to unsigned 64-bit.
+		case FCVTZUD: // Double to unsigned 64-bit.
 			sf, tp, opcode = 0b1, 0b01, 0b001
 		case FCVTZUDW: // Double to unsigned 32-bit.
 			sf, tp, opcode = 0b0, 0b01, 0b001
-		case FCVTZUS: // Signle to unsigned 64-bit.
+		case FCVTZUS: // Single to unsigned 64-bit.
 			sf, tp, opcode = 0b1, 0b00, 0b001
-		case FCVTZUSW: // Signle to unsigned 32-bit.
+		case FCVTZUSW: // Single to unsigned 32-bit.
 			sf, tp, opcode = 0b0, 0b00, 0b001
 		}
 
@@ -1035,7 +1075,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			return
 		}
 
-		// NEG is encded as "SUB dst, XZR, src" = "dst = 0 - src"
+		// NEG is encoded as "SUB dst, XZR, src" = "dst = 0 - src"
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_shift
 		var sf byte
 		if inst == NEG {
@@ -1362,7 +1402,7 @@ func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) 
 func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case CMPW, CMP:
-		// Comare on two registesr is an alias for "SUBS (src1, src2) ZERO"
+		// Compare on two registers is an alias for "SUBS (src1, src2) ZERO"
 		// which can be encoded as SUBS (shifted registers) with zero shifting.
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Register?lang=en#addsub_shift
 		src1RegBits, err := intRegisterBits(n.SrcReg)
@@ -1475,8 +1515,13 @@ func validateMemoryOffset(offset int64) (err error) {
 
 // encodeLoadOrStoreWithConstOffset encodes load/store instructions with the constant offset.
 //
-// The encoding strategy here matches the Go's assembler.
-func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(baseRegBits, targetRegBits byte, offset int64, opcode, size, v byte, datasize, datasizeLog2 int64) (err error) {
+// Note: Encoding strategy intentionally matches the Go assembler: https://go.dev/doc/asm
+func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
+	baseRegBits, targetRegBits byte,
+	offset int64,
+	opcode, size, v byte,
+	datasize, datasizeLog2 int64,
+) (err error) {
 	if err = validateMemoryOffset(offset); err != nil {
 		return
 	}
@@ -1496,9 +1541,9 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(baseRegBits, targetRegB
 		}
 	}
 
-	// At this point we have the assumption that offset is postive and multiple of datasize.
+	// At this point we have the assumption that offset is positive and multiple of datasize.
 	if offset < (1<<12)<<datasizeLog2 {
-		// This cae can be encoded as a single "unsigned immediate".
+		// This case can be encoded as a single "unsigned immediate".
 		m := offset / datasize
 		a.Buf.Write([]byte{
 			(baseRegBits << 5) | targetRegBits,
@@ -1542,7 +1587,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(baseRegBits, targetRegB
 		})
 	} else {
 		// This case we load the const via ldr(literal) into tem register,
-		// and the target const is placed after this instrction below.
+		// and the target const is placed after this instruction below.
 		loadLiteralOffsetInBinary := uint64(a.Buf.Len())
 
 		// First we emit the ldr(literal) with offset zero as we don't yet know the const's placement in the binary.
@@ -1697,7 +1742,7 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 
 	var opcode byte = 0b01 // Opcode for load instructions.
 	if n.Instruction == MOVW || n.Instruction == MOVH || n.Instruction == MOVB {
-		// Sign-extend load (without "U" suffix execept 64-bit MOVD) needs different opcode.
+		// Sign-extend load (without "U" suffix except 64-bit MOVD) needs different opcode.
 		opcode = 0b10
 	}
 	if n.SrcReg2 != asm.NilRegister {
@@ -1725,10 +1770,12 @@ func const16bitAligned(v int64) (ret int) {
 	return
 }
 
-// isBitMaskImmediate determins if the value can be encoded as "bitmask immediate".
-// >> Such an immediate is a 32-bit or 64-bit pattern viewed as a vector of identical elements of size e = 2, 4, 8, 16, 32, or 64 bits.
-// >> Each element contains the same sub-pattern: a single run of 1 to e-1 non-zero bits, rotated by 0 to e-1 bits.
-// https://developer.arm.com/documentation/dui0802/b/A64-General-Instructions/MOV--bitmask-immediate-
+// isBitMaskImmediate determines if the value can be encoded as "bitmask immediate".
+//
+//	Such an immediate is a 32-bit or 64-bit pattern viewed as a vector of identical elements of size e = 2, 4, 8, 16, 32, or 64 bits.
+//	Each element contains the same sub-pattern: a single run of 1 to e-1 non-zero bits, rotated by 0 to e-1 bits.
+//
+// See https://developer.arm.com/documentation/dui0802/b/A64-General-Instructions/MOV--bitmask-immediate-
 func isBitMaskImmediate(x uint64) bool {
 	// All zeros and ones are not "bitmask immediate" by defainition.
 	if x == 0 || x == 0xffff_ffff_ffff_ffff {
@@ -1758,7 +1805,7 @@ func isBitMaskImmediate(x uint64) bool {
 }
 
 // sequenceOfSetbits returns true if the number's binary representation is the sequence set bit (1).
-// Otherwise false. For example: 0b1110 -> true, 0b1010 -> false
+// For example: 0b1110 -> true, 0b1010 -> false
 func sequenceOfSetbits(x uint64) bool {
 	y := getLowestBit(x)
 	// If x is a sequence of set bit, this should results in the number
@@ -1886,7 +1933,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		}
 
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3163-L3203
-		// Othewise we use MOVZ and MOVNs for loading const into tmpRegister.
+		// Otherwise we use MOVZ and MOVNs for loading const into tmpRegister.
 		tmpRegBits := registerBits(a.temporaryRegister)
 		a.load64bitConst(c, tmpRegBits)
 		a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
@@ -1917,12 +1964,12 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// We could load it into temporary with movk.
 			a.load16bitAlignedConst(int64(c32)>>(16*t), byte(t), dstRegBits, false, false)
 		} else if t := const16bitAligned(int64(^c32)); t >= 0 {
-			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
+			// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
 			a.load16bitAlignedConst((int64(^c32) >> (16 * t)), byte(t), dstRegBits, true, false)
 		} else if isBitMaskImmediate(uint64(c)) {
 			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false)
 		} else {
-			// Othewise we use MOVZ and MOVK to load it.
+			// Otherwise, we use MOVZ and MOVK to load it.
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6623-L6630
 			c16 := uint16(c32)
 			// MOVZ: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
@@ -1958,7 +2005,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// We could load it into temporary with movk.
 			a.load16bitAlignedConst(c>>(16*t), byte(t), dstRegBits, false, true)
 		} else if t := const16bitAligned(int64(^c)); t >= 0 {
-			// Also if the reverse of the const can fit within 16-bit range, do the same ^^.
+			// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
 			a.load16bitAlignedConst((int64(^c) >> (16 * t)), byte(t), dstRegBits, true, true)
 		} else if isBitMaskImmediate(uint64(c)) {
 			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true)
@@ -2018,8 +2065,10 @@ func (a *AssemblerImpl) movn(v uint64, shfitNum int, dstRegBits byte) {
 	})
 }
 
-// load64bitConst loads a 64-bit constant into the register, following the same logic to decide how to load large 64-bit consts as in
-// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6632-L6759
+// load64bitConst loads a 64-bit constant into the register, following the same logic to decide how to load large 64-bit
+// consts as in the Go assembler.
+//
+// See https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L6632-L6759
 func (a *AssemblerImpl) load64bitConst(c int64, dstRegBits byte) {
 	var bits [4]uint64
 	var zeros, negs int
@@ -2139,7 +2188,7 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 	})
 }
 
-// loadBitMaskImmediate loads the constant with ORR (bitmask immediate).
+// loadConstViaBitMaskImmediate loads the constant with ORR (bitmask immediate).
 // https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ORR--immediate---Bitwise-OR--immediate--?lang=en
 func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst64bit bool) {
 	var size uint32

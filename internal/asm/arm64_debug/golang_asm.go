@@ -12,20 +12,21 @@ import (
 	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
-// NewAssembler implements asm.NewAssembler and is used by default.
+// TODO: this comment seems wrong
+// newAssembler implements asm.NewAssembler and is used by default.
 // This returns an implementation of Assembler interface via our homemade assembler implementation.
 func newAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
 	g, err := golang_asm.NewGolangAsmBaseAssembler("arm64")
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 
-// assemblerGoAsmImpl implements Assembler for golang-asm library.
+// assemblerGoAsmImpl implements asm_arm64.Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
 	*golang_asm.GolangAsmBaseAssembler
 	temporaryRegister asm.Register
 }
 
-// CompileConstToRegister implements Assembler.CompileConstToRegisterInstruction.
+// CompileConstToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -46,7 +47,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 	return golang_asm.NewGolangAsmNode(inst)
 }
 
-// CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
+// CompileMemoryToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -58,7 +59,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction
 	a.AddInstruction(inst)
 }
 
-// CompileMemoryWithRegisterOffsetToRegister implements Assembler.CompileMemoryWithRegisterOffsetToRegister.
+// CompileMemoryWithRegisterOffsetToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -71,7 +72,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
+// CompileRegisterToMemory implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst asm.ConstantValue) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -96,7 +97,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffset(instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
+// CompileRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -107,7 +108,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileTwoRegistersToRegister implements Assembler.CompileTwoRegistersToRegister.
+// CompileTwoRegistersToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, destination asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -119,7 +120,7 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instr
 	a.AddInstruction(inst)
 }
 
-// CompileTwoRegisters implements Assembler.CompileThreeRegistersToRegister.
+// CompileThreeRegistersToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileThreeRegistersToRegister(instruction asm.Instruction, src1, src2, src3, dst asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -132,12 +133,12 @@ func (a *assemblerGoAsmImpl) CompileThreeRegistersToRegister(instruction asm.Ins
 	a.AddInstruction(inst)
 }
 
-// CompileTwoRegistersToNone implements Assembler.CompileTwoRegistersToNone.
+// CompileTwoRegistersToNone implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	// TYPE_NONE indicates that this instruction doesn't have a destination.
-	// Note: this line is deletable as the value equals zero in anyway.
+	// Note: this line is deletable as the value equals zero anyway.
 	inst.To.Type = obj.TYPE_NONE
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = castAsGolangAsmRegister[src1]
@@ -145,12 +146,12 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterAndConstToNone implements Assembler.CompileRegisterAndConstToNone.
+// CompileRegisterAndConstToNone implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterAndConstToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	// TYPE_NONE indicates that this instruction doesn't have a destination.
-	// Note: this line is deletable as the value equals zero in anyway.
+	// Note: this line is deletable as the value equals zero anyway.
 	inst.To.Type = obj.TYPE_NONE
 	inst.From.Type = obj.TYPE_CONST
 	inst.From.Offset = srcConst
@@ -158,7 +159,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterAndConstToNone(instruction asm.Instr
 	a.AddInstruction(inst)
 }
 
-// CompileJump implements AssemblerBase.CompileJump.
+// CompileJump implements the same method as documented on asm.AssemblerBase.
 func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	br := a.NewProg()
 	br.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -167,7 +168,7 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 	return golang_asm.NewGolangAsmNode(br)
 }
 
-// CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
+// CompileJumpToMemory implements the same method as documented on asm.AssemblerBase.
 func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register) {
 	br := a.NewProg()
 	br.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -176,7 +177,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(br)
 }
 
-// CompileJumpToRegister implements AssemblerBase.CompileJumpToRegister.
+// CompileJumpToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ret := a.NewProg()
 	ret.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -185,7 +186,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instructio
 	a.AddInstruction(ret)
 }
 
-// CompileStandAlone implements AssemblerBase.CompileStandAlone.
+// CompileStandAlone implements the same method as documented on asm.AssemblerBase.
 func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	prog := a.NewProg()
 	prog.As = castAsGolangAsmInstruction[instruction]
@@ -193,7 +194,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.
 	return golang_asm.NewGolangAsmNode(prog)
 }
 
-// CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister.
+// CompileLeftShiftedRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(instruction asm.Instruction, shiftedSourceReg asm.Register, shiftNum asm.ConstantValue, srcReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -206,7 +207,7 @@ func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(instruction as
 	a.AddInstruction(inst)
 }
 
-// CompileReadInstructionAddress implements AssemblerBase.CompileReadInstructionAddress.
+// CompileReadInstructionAddress implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
@@ -263,7 +264,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Re
 	})
 }
 
-// CompileConditionalRegisterSet implements Assembler.CompileConditionalRegisterSet.
+// CompileConditionalRegisterSet implements the same method as documented on asm_arm64.Assembler.
 //
 // We use CSET instruction to set 1 on the register if the condition satisfies:
 // https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
@@ -283,7 +284,7 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
-// CompileTwoSIMDBytesToSIMDByteRegister implements Assembler.CompileTwoSIMDBytesToSIMDByteRegister.
+// CompileTwoSIMDBytesToSIMDByteRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
 	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
 	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -301,7 +302,7 @@ func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction a
 
 }
 
-// CompileSIMDByteToSIMDByte implements Assembler.CompileSIMDByteToSIMDByte.
+// CompileSIMDByteToSIMDByte implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -317,7 +318,7 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileSIMDByteToRegister implements Assembler.CompileSIMDByteToRegister.
+// CompileSIMDByteToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFlaotReg)

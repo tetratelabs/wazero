@@ -32,7 +32,7 @@ func NewDebugAssembler() (asm_amd64.Assembler, error) {
 	return &testAssembler{a: a, goasm: goasm}, nil
 }
 
-// testAssembler implements Assembler.
+// testAssembler implements asm_amd64.Assembler.
 // This assembler ensures that our assembler produces exactly the same binary as the Go's official assembler.
 // Disabled by default, and can be used for debugging only.
 //
@@ -55,31 +55,31 @@ func (tn *testNode) String() string {
 	return tn.n.String()
 }
 
-// AssignJumpTarget implements asm.Node.AssignJumpTarget.
+// AssignJumpTarget implements the same method as documented on asm.Node.
 func (tn *testNode) AssignJumpTarget(target asm.Node) {
 	targetTestNode := target.(*testNode)
 	tn.goasm.AssignJumpTarget(targetTestNode.goasm)
 	tn.n.AssignJumpTarget(targetTestNode.n)
 }
 
-// AssignDestinationConstant implements asm.Node.AssignDestinationConstant.
+// AssignDestinationConstant implements the same method as documented on asm.Node.
 func (tn *testNode) AssignDestinationConstant(value asm.ConstantValue) {
 	tn.goasm.AssignDestinationConstant(value)
 	tn.n.AssignDestinationConstant(value)
 }
 
-// AssignSourceConstant implements asm.Node.AssignSourceConstant.
+// AssignSourceConstant implements the same method as documented on asm.Node.
 func (tn *testNode) AssignSourceConstant(value asm.ConstantValue) {
 	tn.goasm.AssignSourceConstant(value)
 	tn.n.AssignSourceConstant(value)
 }
 
-// OffsetInBinary implements asm.Node.OffsetInBinary.
+// OffsetInBinary implements the same method as documented on asm.Node.
 func (tn *testNode) OffsetInBinary() asm.NodeOffsetInBinary {
 	return tn.goasm.OffsetInBinary()
 }
 
-// Assemble implements Assembler.Assemble.
+// Assemble implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) Assemble() ([]byte, error) {
 	ret, err := ta.goasm.Assemble()
 	if err != nil {
@@ -99,7 +99,7 @@ func (ta *testAssembler) Assemble() ([]byte, error) {
 	return ret, nil
 }
 
-// SetJumpTargetOnNext implements Assembler.SetJumpTargetOnNext.
+// SetJumpTargetOnNext implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	for _, n := range nodes {
 		targetTestNode := n.(*testNode)
@@ -108,121 +108,167 @@ func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	}
 }
 
-// BuildJumpTable implements Assembler.BuildJumpTable.
+// BuildJumpTable implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.Node) {
 	ta.goasm.BuildJumpTable(table, initialInstructions)
 	ta.a.BuildJumpTable(table, initialInstructions)
 }
 
-// CompileStandAlone implements Assembler.CompileStandAlone.
+// CompileStandAlone implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileStandAlone(instruction)
 	ret2 := ta.a.CompileStandAlone(instruction)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileConstToRegister implements Assembler.CompileConstToRegister.
+// CompileConstToRegister implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileConstToRegister(instruction asm.Instruction, value asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	ret := ta.goasm.CompileConstToRegister(instruction, value, destinationReg)
 	ret2 := ta.a.CompileConstToRegister(instruction, value, destinationReg)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
+// CompileRegisterToRegister implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	ta.goasm.CompileRegisterToRegister(instruction, from, to)
 	ta.a.CompileRegisterToRegister(instruction, from, to)
 }
 
-// CompileMemoryToRegister implements Assembler.CompileMemoryToRegister.
-func (ta *testAssembler) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
+// CompileMemoryToRegister implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileMemoryToRegister(
+	instruction asm.Instruction,
+	sourceBaseReg asm.Register,
+	sourceOffsetConst asm.ConstantValue,
+	destinationReg asm.Register,
+) {
 	ta.goasm.CompileMemoryToRegister(instruction, sourceBaseReg, sourceOffsetConst, destinationReg)
 	ta.a.CompileMemoryToRegister(instruction, sourceBaseReg, sourceOffsetConst, destinationReg)
 }
 
-// CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
-func (ta *testAssembler) CompileRegisterToMemory(instruction asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst asm.ConstantValue) {
+// CompileRegisterToMemory implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToMemory(
+	instruction asm.Instruction,
+	sourceRegister, destinationBaseRegister asm.Register,
+	destinationOffsetConst asm.ConstantValue,
+) {
 	ta.goasm.CompileRegisterToMemory(instruction, sourceRegister, destinationBaseRegister, destinationOffsetConst)
 	ta.a.CompileRegisterToMemory(instruction, sourceRegister, destinationBaseRegister, destinationOffsetConst)
 }
 
-// CompileJump implements Assembler.CompileJump.
+// CompileJump implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileJump(jmpInstruction)
 	ret2 := ta.a.CompileJump(jmpInstruction)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileJumpToMemory implements Assembler.CompileJumpToMemory.
-func (ta *testAssembler) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset asm.ConstantValue) {
+// CompileJumpToMemory implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileJumpToMemory(
+	jmpInstruction asm.Instruction,
+	baseReg asm.Register,
+	offset asm.ConstantValue,
+) {
 	ta.goasm.CompileJumpToMemory(jmpInstruction, baseReg, offset)
 	ta.a.CompileJumpToMemory(jmpInstruction, baseReg, offset)
 }
 
-// CompileJumpToRegister implements Assembler.CompileJumpToRegister.
+// CompileJumpToRegister implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ta.goasm.CompileJumpToRegister(jmpInstruction, reg)
 	ta.a.CompileJumpToRegister(jmpInstruction, reg)
 }
 
-// CompileReadInstructionAddress implements Assembler.CompileReadInstructionAddress.
-func (ta *testAssembler) CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
+// CompileReadInstructionAddress implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileReadInstructionAddress(
+	destinationRegister asm.Register,
+	beforeAcquisitionTargetInstruction asm.Instruction,
+) {
 	ta.goasm.CompileReadInstructionAddress(destinationRegister, beforeAcquisitionTargetInstruction)
 	ta.a.CompileReadInstructionAddress(destinationRegister, beforeAcquisitionTargetInstruction)
 }
 
-// CompileRegisterToRegisterWithMode implements Assembler.CompileRegisterToRegisterWithMode.
-func (ta *testAssembler) CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode asm_amd64.Mode) {
+// CompileRegisterToRegisterWithMode implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToRegisterWithMode(
+	instruction asm.Instruction,
+	from, to asm.Register,
+	mode asm_amd64.Mode,
+) {
 	ta.goasm.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
 	ta.a.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
 }
 
-// CompileMemoryWithIndexToRegister implements Assembler.CompileMemoryWithIndexToRegister.
-func (ta *testAssembler) CompileMemoryWithIndexToRegister(instruction asm.Instruction, srcBaseReg asm.Register, srcOffsetConst int64, srcIndex asm.Register, srcScale int16, dstReg asm.Register) {
+// CompileMemoryWithIndexToRegister implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileMemoryWithIndexToRegister(
+	instruction asm.Instruction,
+	srcBaseReg asm.Register,
+	srcOffsetConst int64,
+	srcIndex asm.Register,
+	srcScale int16,
+	dstReg asm.Register,
+) {
 	ta.goasm.CompileMemoryWithIndexToRegister(instruction, srcBaseReg, srcOffsetConst, srcIndex, srcScale, dstReg)
 	ta.a.CompileMemoryWithIndexToRegister(instruction, srcBaseReg, srcOffsetConst, srcIndex, srcScale, dstReg)
 }
 
-// CompileRegisterToMemoryWithIndex implements Assembler.CompileRegisterToMemoryWithIndex.
-func (ta *testAssembler) CompileRegisterToMemoryWithIndex(instruction asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndex asm.Register, dstScale int16) {
+// CompileRegisterToMemoryWithIndex implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToMemoryWithIndex(
+	instruction asm.Instruction,
+	srcReg, dstBaseReg asm.Register,
+	dstOffsetConst int64,
+	dstIndex asm.Register,
+	dstScale int16,
+) {
 	ta.goasm.CompileRegisterToMemoryWithIndex(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale)
 	ta.a.CompileRegisterToMemoryWithIndex(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale)
 }
 
-// CompileRegisterToConst implements Assembler.CompileRegisterToConst.
-func (ta *testAssembler) CompileRegisterToConst(instruction asm.Instruction, srcRegister asm.Register, value int64) asm.Node {
+// CompileRegisterToConst implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToConst(
+	instruction asm.Instruction,
+	srcRegister asm.Register,
+	value int64,
+) asm.Node {
 	ret := ta.goasm.CompileRegisterToConst(instruction, srcRegister, value)
 	ret2 := ta.a.CompileRegisterToConst(instruction, srcRegister, value)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileRegisterToNone implements Assembler.CompileRegisterToNone.
+// CompileRegisterToNone implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileRegisterToNone(instruction asm.Instruction, register asm.Register) {
 	ta.goasm.CompileRegisterToNone(instruction, register)
 	ta.a.CompileRegisterToNone(instruction, register)
 }
 
-// CompileNoneToRegister implements Assembler.CompileNoneToRegister.
+// CompileNoneToRegister implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileNoneToRegister(instruction asm.Instruction, register asm.Register) {
 	ta.goasm.CompileNoneToRegister(instruction, register)
 	ta.a.CompileNoneToRegister(instruction, register)
 }
 
-// CompileNoneToMemory implements Assembler.CompileNoneToMemory.
+// CompileNoneToMemory implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileNoneToMemory(instruction asm.Instruction, baseReg asm.Register, offset int64) {
 	ta.goasm.CompileNoneToMemory(instruction, baseReg, offset)
 	ta.a.CompileNoneToMemory(instruction, baseReg, offset)
 }
 
-// CompileConstToMemory implements Assembler.CompileConstToMemory.
-func (ta *testAssembler) CompileConstToMemory(instruction asm.Instruction, value int64, dstbaseReg asm.Register, dstOffset int64) asm.Node {
+// CompileConstToMemory implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileConstToMemory(
+	instruction asm.Instruction,
+	value int64,
+	dstbaseReg asm.Register,
+	dstOffset int64,
+) asm.Node {
 	ret := ta.goasm.CompileConstToMemory(instruction, value, dstbaseReg, dstOffset)
 	ret2 := ta.a.CompileConstToMemory(instruction, value, dstbaseReg, dstOffset)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileMemoryToConst implements Assembler.CompileMemoryToConst.
-func (ta *testAssembler) CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node {
+// CompileMemoryToConst implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileMemoryToConst(
+	instruction asm.Instruction,
+	srcBaseReg asm.Register,
+	srcOffset, value int64,
+) asm.Node {
 	ret := ta.goasm.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
 	ret2 := ta.a.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
