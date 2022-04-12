@@ -5,7 +5,7 @@ execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm`
 extension.
 
 wazero is a [WebAssembly 1.0 (20191205)](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/) spec compliant runtime written in Go.
-It has zero platform dependencies, and doesn't rely on CGO. This means you can
+It has *zero dependencies*, and doesn't rely on CGO. This means you can
 run applications in other languages and still keep cross compilation.
 
 Import wazero and extend your Go application with code written in any language!
