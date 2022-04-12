@@ -609,982 +609,980 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
-		select {
-		case <-ctx.Context().Done():
-			err = ctx.Context().Err() // deadline exceeded
+		err = ctx.Context().Err() // deadline exceeded
+		if nil != err {
 			return
-		default:
-			op := frame.f.body[frame.pc]
-			// TODO: add description of each operation/case
-			// on, for example, how many args are used,
-			// how the stack is modified, etc.
-			switch op.kind {
-			case wazeroir.OperationKindUnreachable:
-				panic(wasmruntime.ErrRuntimeUnreachable)
-			case wazeroir.OperationKindBr:
-				{
+		}
+		op := frame.f.body[frame.pc]
+		// TODO: add description of each operation/case
+		// on, for example, how many args are used,
+		// how the stack is modified, etc.
+		switch op.kind {
+		case wazeroir.OperationKindUnreachable:
+			panic(wasmruntime.ErrRuntimeUnreachable)
+		case wazeroir.OperationKindBr:
+			{
+				frame.pc = op.us[0]
+			}
+		case wazeroir.OperationKindBrIf:
+			{
+				if ce.pop() > 0 {
+					ce.drop(op.rs[0])
+					frame.pc = op.us[0]
+				} else {
+					ce.drop(op.rs[1])
+					frame.pc = op.us[1]
+				}
+			}
+		case wazeroir.OperationKindBrTable:
+			{
+				if v := int(ce.pop()); v < len(op.us)-1 {
+					ce.drop(op.rs[v+1])
+					frame.pc = op.us[v+1]
+				} else {
+					// Default branch.
+					ce.drop(op.rs[0])
 					frame.pc = op.us[0]
 				}
-			case wazeroir.OperationKindBrIf:
-				{
-					if ce.pop() > 0 {
-						ce.drop(op.rs[0])
-						frame.pc = op.us[0]
-					} else {
-						ce.drop(op.rs[1])
-						frame.pc = op.us[1]
+			}
+		case wazeroir.OperationKindCall:
+			{
+				f := compiledFunctions[op.us[0]]
+				if f.hostFn != nil {
+					ce.callHostFunc(ctx, f)
+				} else {
+					err = ce.callNativeFunc(ctx, f)
+					if nil != err {
+						return
 					}
 				}
-			case wazeroir.OperationKindBrTable:
-				{
-					if v := int(ce.pop()); v < len(op.us)-1 {
-						ce.drop(op.rs[v+1])
-						frame.pc = op.us[v+1]
-					} else {
-						// Default branch.
-						ce.drop(op.rs[0])
-						frame.pc = op.us[0]
-					}
+				frame.pc++
+			}
+		case wazeroir.OperationKindCallIndirect:
+			{
+				offset := ce.pop()
+				if offset >= uint64(len(table.Table)) {
+					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
-			case wazeroir.OperationKindCall:
-				{
-					f := compiledFunctions[op.us[0]]
-					if f.hostFn != nil {
-						ce.callHostFunc(ctx, f)
-					} else {
-						err = ce.callNativeFunc(ctx, f)
-						if nil != err {
-							return
-						}
-					}
-					frame.pc++
+				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+				} else if uint64(targetCompiledFunction.source.TypeID) != op.us[1] {
+					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
-			case wazeroir.OperationKindCallIndirect:
-				{
-					offset := ce.pop()
-					if offset >= uint64(len(table.Table)) {
-						panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-					}
-					targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
-					if !ok {
-						panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-					} else if uint64(targetCompiledFunction.source.TypeID) != op.us[1] {
-						panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
-					}
 
-					// Call in.
-					if targetCompiledFunction.hostFn != nil {
-						ce.callHostFunc(ctx, targetCompiledFunction)
-					} else {
-						err = ce.callNativeFunc(ctx, targetCompiledFunction)
-						if nil != err {
-							return
-						}
+				// Call in.
+				if targetCompiledFunction.hostFn != nil {
+					ce.callHostFunc(ctx, targetCompiledFunction)
+				} else {
+					err = ce.callNativeFunc(ctx, targetCompiledFunction)
+					if nil != err {
+						return
 					}
-					frame.pc++
 				}
-			case wazeroir.OperationKindDrop:
-				{
-					ce.drop(op.rs[0])
-					frame.pc++
+				frame.pc++
+			}
+		case wazeroir.OperationKindDrop:
+			{
+				ce.drop(op.rs[0])
+				frame.pc++
+			}
+		case wazeroir.OperationKindSelect:
+			{
+				c := ce.pop()
+				v2 := ce.pop()
+				if c == 0 {
+					_ = ce.pop()
+					ce.push(v2)
 				}
-			case wazeroir.OperationKindSelect:
-				{
-					c := ce.pop()
-					v2 := ce.pop()
-					if c == 0 {
-						_ = ce.pop()
-						ce.push(v2)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindPick:
-				{
-					ce.push(ce.stack[len(ce.stack)-1-int(op.us[0])])
-					frame.pc++
-				}
-			case wazeroir.OperationKindSwap:
-				{
-					index := len(ce.stack) - 1 - int(op.us[0])
-					ce.stack[len(ce.stack)-1], ce.stack[index] = ce.stack[index], ce.stack[len(ce.stack)-1]
-					frame.pc++
-				}
-			case wazeroir.OperationKindGlobalGet:
-				{
-					g := globals[op.us[0]]
-					ce.push(g.Val)
-					frame.pc++
-				}
-			case wazeroir.OperationKindGlobalSet:
-				{
-					g := globals[op.us[0]]
-					g.Val = ce.pop()
-					frame.pc++
-				}
-			case wazeroir.OperationKindLoad:
-				{
-					base := op.us[1] + ce.pop()
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-						if uint64(len(memoryInst.Buffer)) < base+4 {
-							panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-						}
-						ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
-					case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-						if uint64(len(memoryInst.Buffer)) < base+8 {
-							panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-						}
-						ce.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindLoad8:
-				{
-					base := op.us[1] + ce.pop()
-					if uint64(len(memoryInst.Buffer)) < base+1 {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					switch wazeroir.SignedInt(op.b1) {
-					case wazeroir.SignedInt32, wazeroir.SignedInt64:
-						ce.push(uint64(int8(memoryInst.Buffer[base])))
-					case wazeroir.SignedUint32, wazeroir.SignedUint64:
-						ce.push(uint64(uint8(memoryInst.Buffer[base])))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindLoad16:
-				{
-					base := op.us[1] + ce.pop()
-					if uint64(len(memoryInst.Buffer)) < base+2 {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					switch wazeroir.SignedInt(op.b1) {
-					case wazeroir.SignedInt32, wazeroir.SignedInt64:
-						ce.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
-					case wazeroir.SignedUint32, wazeroir.SignedUint64:
-						ce.push(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindLoad32:
-				{
-					base := op.us[1] + ce.pop()
+				frame.pc++
+			}
+		case wazeroir.OperationKindPick:
+			{
+				ce.push(ce.stack[len(ce.stack)-1-int(op.us[0])])
+				frame.pc++
+			}
+		case wazeroir.OperationKindSwap:
+			{
+				index := len(ce.stack) - 1 - int(op.us[0])
+				ce.stack[len(ce.stack)-1], ce.stack[index] = ce.stack[index], ce.stack[len(ce.stack)-1]
+				frame.pc++
+			}
+		case wazeroir.OperationKindGlobalGet:
+			{
+				g := globals[op.us[0]]
+				ce.push(g.Val)
+				frame.pc++
+			}
+		case wazeroir.OperationKindGlobalSet:
+			{
+				g := globals[op.us[0]]
+				g.Val = ce.pop()
+				frame.pc++
+			}
+		case wazeroir.OperationKindLoad:
+			{
+				base := op.us[1] + ce.pop()
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					if op.b1 == 1 {
-						ce.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
-					} else {
-						ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindStore:
-				{
-					val := ce.pop()
-					base := op.us[1] + ce.pop()
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-						if uint64(len(memoryInst.Buffer)) < base+4 {
-							panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-						}
-						binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
-					case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-						if uint64(len(memoryInst.Buffer)) < base+8 {
-							panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-						}
-						binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindStore8:
-				{
-					val := byte(ce.pop())
-					base := op.us[1] + ce.pop()
-					if uint64(len(memoryInst.Buffer)) < base+1 {
+					ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
+				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					memoryInst.Buffer[base] = val
-					frame.pc++
+					ce.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
-			case wazeroir.OperationKindStore16:
-				{
-					val := uint16(ce.pop())
-					base := op.us[1] + ce.pop()
-					if uint64(len(memoryInst.Buffer)) < base+2 {
-						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
-					}
-					binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
-					frame.pc++
+				frame.pc++
+			}
+		case wazeroir.OperationKindLoad8:
+			{
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-			case wazeroir.OperationKindStore32:
-				{
-					val := uint32(ce.pop())
-					base := op.us[1] + ce.pop()
+				switch wazeroir.SignedInt(op.b1) {
+				case wazeroir.SignedInt32, wazeroir.SignedInt64:
+					ce.push(uint64(int8(memoryInst.Buffer[base])))
+				case wazeroir.SignedUint32, wazeroir.SignedUint64:
+					ce.push(uint64(uint8(memoryInst.Buffer[base])))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindLoad16:
+			{
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				switch wazeroir.SignedInt(op.b1) {
+				case wazeroir.SignedInt32, wazeroir.SignedInt64:
+					ce.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
+				case wazeroir.SignedUint32, wazeroir.SignedUint64:
+					ce.push(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindLoad32:
+			{
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if op.b1 == 1 {
+					ce.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
+				} else {
+					ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindStore:
+			{
+				val := ce.pop()
+				base := op.us[1] + ce.pop()
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
-					frame.pc++
+					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
+				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
+						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
+					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
-			case wazeroir.OperationKindMemorySize:
-				{
-					ce.push(uint64(memoryInst.PageSize()))
-					frame.pc++
+				frame.pc++
+			}
+		case wazeroir.OperationKindStore8:
+			{
+				val := byte(ce.pop())
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-			case wazeroir.OperationKindMemoryGrow:
-				{
-					n := ce.pop()
-					res := memoryInst.Grow(uint32(n))
-					ce.push(uint64(res))
-					frame.pc++
+				memoryInst.Buffer[base] = val
+				frame.pc++
+			}
+		case wazeroir.OperationKindStore16:
+			{
+				val := uint16(ce.pop())
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-			case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,
-				wazeroir.OperationKindConstF32, wazeroir.OperationKindConstF64:
-				{
-					ce.push(op.us[0])
-					frame.pc++
+				binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
+				frame.pc++
+			}
+		case wazeroir.OperationKindStore32:
+			{
+				val := uint32(ce.pop())
+				base := op.us[1] + ce.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-			case wazeroir.OperationKindEq:
-				{
-					var b bool
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-						v2, v1 := ce.pop(), ce.pop()
-						b = v1 == v2
-					case wazeroir.UnsignedTypeF32:
-						v2, v1 := ce.pop(), ce.pop()
-						b = math.Float32frombits(uint32(v2)) == math.Float32frombits(uint32(v1))
-					case wazeroir.UnsignedTypeF64:
-						v2, v1 := ce.pop(), ce.pop()
-						b = math.Float64frombits(v2) == math.Float64frombits(v1)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindNe:
-				{
-					var b bool
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-						v2, v1 := ce.pop(), ce.pop()
-						b = v1 != v2
-					case wazeroir.UnsignedTypeF32:
-						v2, v1 := ce.pop(), ce.pop()
-						b = math.Float32frombits(uint32(v2)) != math.Float32frombits(uint32(v1))
-					case wazeroir.UnsignedTypeF64:
-						v2, v1 := ce.pop(), ce.pop()
-						b = math.Float64frombits(v2) != math.Float64frombits(v1)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindEqz:
-				{
-					if ce.pop() == 0 {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindLt:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					var b bool
-					switch wazeroir.SignedType(op.b1) {
-					case wazeroir.SignedTypeInt32:
-						b = int32(v1) < int32(v2)
-					case wazeroir.SignedTypeInt64:
-						b = int64(v1) < int64(v2)
-					case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
-						b = v1 < v2
-					case wazeroir.SignedTypeFloat32:
-						b = math.Float32frombits(uint32(v1)) < math.Float32frombits(uint32(v2))
-					case wazeroir.SignedTypeFloat64:
-						b = math.Float64frombits(v1) < math.Float64frombits(v2)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindGt:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					var b bool
-					switch wazeroir.SignedType(op.b1) {
-					case wazeroir.SignedTypeInt32:
-						b = int32(v1) > int32(v2)
-					case wazeroir.SignedTypeInt64:
-						b = int64(v1) > int64(v2)
-					case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
-						b = v1 > v2
-					case wazeroir.SignedTypeFloat32:
-						b = math.Float32frombits(uint32(v1)) > math.Float32frombits(uint32(v2))
-					case wazeroir.SignedTypeFloat64:
-						b = math.Float64frombits(v1) > math.Float64frombits(v2)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindLe:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					var b bool
-					switch wazeroir.SignedType(op.b1) {
-					case wazeroir.SignedTypeInt32:
-						b = int32(v1) <= int32(v2)
-					case wazeroir.SignedTypeInt64:
-						b = int64(v1) <= int64(v2)
-					case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
-						b = v1 <= v2
-					case wazeroir.SignedTypeFloat32:
-						b = math.Float32frombits(uint32(v1)) <= math.Float32frombits(uint32(v2))
-					case wazeroir.SignedTypeFloat64:
-						b = math.Float64frombits(v1) <= math.Float64frombits(v2)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindGe:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					var b bool
-					switch wazeroir.SignedType(op.b1) {
-					case wazeroir.SignedTypeInt32:
-						b = int32(v1) >= int32(v2)
-					case wazeroir.SignedTypeInt64:
-						b = int64(v1) >= int64(v2)
-					case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
-						b = v1 >= v2
-					case wazeroir.SignedTypeFloat32:
-						b = math.Float32frombits(uint32(v1)) >= math.Float32frombits(uint32(v2))
-					case wazeroir.SignedTypeFloat64:
-						b = math.Float64frombits(v1) >= math.Float64frombits(v2)
-					}
-					if b {
-						ce.push(1)
-					} else {
-						ce.push(0)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindAdd:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32:
-						v := uint32(v1) + uint32(v2)
-						ce.push(uint64(v))
-					case wazeroir.UnsignedTypeI64:
-						ce.push(v1 + v2)
-					case wazeroir.UnsignedTypeF32:
-						v := math.Float32frombits(uint32(v1)) + math.Float32frombits(uint32(v2))
-						ce.push(uint64(math.Float32bits(v)))
-					case wazeroir.UnsignedTypeF64:
-						v := math.Float64frombits(v1) + math.Float64frombits(v2)
-						ce.push(math.Float64bits(v))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindSub:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32:
-						ce.push(uint64(uint32(v1) - uint32(v2)))
-					case wazeroir.UnsignedTypeI64:
-						ce.push(v1 - v2)
-					case wazeroir.UnsignedTypeF32:
-						v := math.Float32frombits(uint32(v1)) - math.Float32frombits(uint32(v2))
-						ce.push(uint64(math.Float32bits(v)))
-					case wazeroir.UnsignedTypeF64:
-						v := math.Float64frombits(v1) - math.Float64frombits(v2)
-						ce.push(math.Float64bits(v))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindMul:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					switch wazeroir.UnsignedType(op.b1) {
-					case wazeroir.UnsignedTypeI32:
-						ce.push(uint64(uint32(v1) * uint32(v2)))
-					case wazeroir.UnsignedTypeI64:
-						ce.push(v1 * v2)
-					case wazeroir.UnsignedTypeF32:
-						v := math.Float32frombits(uint32(v2)) * math.Float32frombits(uint32(v1))
-						ce.push(uint64(math.Float32bits(v)))
-					case wazeroir.UnsignedTypeF64:
-						v := math.Float64frombits(v2) * math.Float64frombits(v1)
-						ce.push(math.Float64bits(v))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindClz:
-				{
-					v := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(bits.LeadingZeros32(uint32(v))))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(bits.LeadingZeros64(v)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindCtz:
-				{
-					v := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(bits.TrailingZeros32(uint32(v))))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(bits.TrailingZeros64(v)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindPopcnt:
-				{
-					v := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(bits.OnesCount32(uint32(v))))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(bits.OnesCount64(v)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindDiv:
-				{
-					// If an integer, check we won't divide by zero.
-					t := wazeroir.SignedType(op.b1)
+				binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
+				frame.pc++
+			}
+		case wazeroir.OperationKindMemorySize:
+			{
+				ce.push(uint64(memoryInst.PageSize()))
+				frame.pc++
+			}
+		case wazeroir.OperationKindMemoryGrow:
+			{
+				n := ce.pop()
+				res := memoryInst.Grow(uint32(n))
+				ce.push(uint64(res))
+				frame.pc++
+			}
+		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,
+			wazeroir.OperationKindConstF32, wazeroir.OperationKindConstF64:
+			{
+				ce.push(op.us[0])
+				frame.pc++
+			}
+		case wazeroir.OperationKindEq:
+			{
+				var b bool
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
 					v2, v1 := ce.pop(), ce.pop()
-					switch t {
-					case wazeroir.SignedTypeFloat32, wazeroir.SignedTypeFloat64: // not integers
-					default:
-						if v2 == 0 {
-							panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
-						}
-					}
-
-					switch t {
-					case wazeroir.SignedTypeInt32:
-						d := int32(v2)
-						n := int32(v1)
-						if n == math.MinInt32 && d == -1 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
-						}
-						ce.push(uint64(uint32(n / d)))
-					case wazeroir.SignedTypeInt64:
-						d := int64(v2)
-						n := int64(v1)
-						if n == math.MinInt64 && d == -1 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
-						}
-						ce.push(uint64(n / d))
-					case wazeroir.SignedTypeUint32:
-						d := uint32(v2)
-						n := uint32(v1)
-						ce.push(uint64(n / d))
-					case wazeroir.SignedTypeUint64:
-						d := v2
-						n := v1
-						ce.push(n / d)
-					case wazeroir.SignedTypeFloat32:
-						d := v2
-						n := v1
-						v := math.Float32frombits(uint32(n)) / math.Float32frombits(uint32(d))
-						ce.push(uint64(math.Float32bits(v)))
-					case wazeroir.SignedTypeFloat64:
-						d := v2
-						n := v1
-						v := math.Float64frombits(n) / math.Float64frombits(d)
-						ce.push(math.Float64bits(v))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindRem:
-				{
+					b = v1 == v2
+				case wazeroir.UnsignedTypeF32:
 					v2, v1 := ce.pop(), ce.pop()
+					b = math.Float32frombits(uint32(v2)) == math.Float32frombits(uint32(v1))
+				case wazeroir.UnsignedTypeF64:
+					v2, v1 := ce.pop(), ce.pop()
+					b = math.Float64frombits(v2) == math.Float64frombits(v1)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindNe:
+			{
+				var b bool
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
+					v2, v1 := ce.pop(), ce.pop()
+					b = v1 != v2
+				case wazeroir.UnsignedTypeF32:
+					v2, v1 := ce.pop(), ce.pop()
+					b = math.Float32frombits(uint32(v2)) != math.Float32frombits(uint32(v1))
+				case wazeroir.UnsignedTypeF64:
+					v2, v1 := ce.pop(), ce.pop()
+					b = math.Float64frombits(v2) != math.Float64frombits(v1)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindEqz:
+			{
+				if ce.pop() == 0 {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindLt:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				var b bool
+				switch wazeroir.SignedType(op.b1) {
+				case wazeroir.SignedTypeInt32:
+					b = int32(v1) < int32(v2)
+				case wazeroir.SignedTypeInt64:
+					b = int64(v1) < int64(v2)
+				case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
+					b = v1 < v2
+				case wazeroir.SignedTypeFloat32:
+					b = math.Float32frombits(uint32(v1)) < math.Float32frombits(uint32(v2))
+				case wazeroir.SignedTypeFloat64:
+					b = math.Float64frombits(v1) < math.Float64frombits(v2)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindGt:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				var b bool
+				switch wazeroir.SignedType(op.b1) {
+				case wazeroir.SignedTypeInt32:
+					b = int32(v1) > int32(v2)
+				case wazeroir.SignedTypeInt64:
+					b = int64(v1) > int64(v2)
+				case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
+					b = v1 > v2
+				case wazeroir.SignedTypeFloat32:
+					b = math.Float32frombits(uint32(v1)) > math.Float32frombits(uint32(v2))
+				case wazeroir.SignedTypeFloat64:
+					b = math.Float64frombits(v1) > math.Float64frombits(v2)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindLe:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				var b bool
+				switch wazeroir.SignedType(op.b1) {
+				case wazeroir.SignedTypeInt32:
+					b = int32(v1) <= int32(v2)
+				case wazeroir.SignedTypeInt64:
+					b = int64(v1) <= int64(v2)
+				case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
+					b = v1 <= v2
+				case wazeroir.SignedTypeFloat32:
+					b = math.Float32frombits(uint32(v1)) <= math.Float32frombits(uint32(v2))
+				case wazeroir.SignedTypeFloat64:
+					b = math.Float64frombits(v1) <= math.Float64frombits(v2)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindGe:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				var b bool
+				switch wazeroir.SignedType(op.b1) {
+				case wazeroir.SignedTypeInt32:
+					b = int32(v1) >= int32(v2)
+				case wazeroir.SignedTypeInt64:
+					b = int64(v1) >= int64(v2)
+				case wazeroir.SignedTypeUint32, wazeroir.SignedTypeUint64:
+					b = v1 >= v2
+				case wazeroir.SignedTypeFloat32:
+					b = math.Float32frombits(uint32(v1)) >= math.Float32frombits(uint32(v2))
+				case wazeroir.SignedTypeFloat64:
+					b = math.Float64frombits(v1) >= math.Float64frombits(v2)
+				}
+				if b {
+					ce.push(1)
+				} else {
+					ce.push(0)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindAdd:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32:
+					v := uint32(v1) + uint32(v2)
+					ce.push(uint64(v))
+				case wazeroir.UnsignedTypeI64:
+					ce.push(v1 + v2)
+				case wazeroir.UnsignedTypeF32:
+					v := math.Float32frombits(uint32(v1)) + math.Float32frombits(uint32(v2))
+					ce.push(uint64(math.Float32bits(v)))
+				case wazeroir.UnsignedTypeF64:
+					v := math.Float64frombits(v1) + math.Float64frombits(v2)
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindSub:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32:
+					ce.push(uint64(uint32(v1) - uint32(v2)))
+				case wazeroir.UnsignedTypeI64:
+					ce.push(v1 - v2)
+				case wazeroir.UnsignedTypeF32:
+					v := math.Float32frombits(uint32(v1)) - math.Float32frombits(uint32(v2))
+					ce.push(uint64(math.Float32bits(v)))
+				case wazeroir.UnsignedTypeF64:
+					v := math.Float64frombits(v1) - math.Float64frombits(v2)
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindMul:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				switch wazeroir.UnsignedType(op.b1) {
+				case wazeroir.UnsignedTypeI32:
+					ce.push(uint64(uint32(v1) * uint32(v2)))
+				case wazeroir.UnsignedTypeI64:
+					ce.push(v1 * v2)
+				case wazeroir.UnsignedTypeF32:
+					v := math.Float32frombits(uint32(v2)) * math.Float32frombits(uint32(v1))
+					ce.push(uint64(math.Float32bits(v)))
+				case wazeroir.UnsignedTypeF64:
+					v := math.Float64frombits(v2) * math.Float64frombits(v1)
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindClz:
+			{
+				v := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(bits.LeadingZeros32(uint32(v))))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(bits.LeadingZeros64(v)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindCtz:
+			{
+				v := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(bits.TrailingZeros32(uint32(v))))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(bits.TrailingZeros64(v)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindPopcnt:
+			{
+				v := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(bits.OnesCount32(uint32(v))))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(bits.OnesCount64(v)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindDiv:
+			{
+				// If an integer, check we won't divide by zero.
+				t := wazeroir.SignedType(op.b1)
+				v2, v1 := ce.pop(), ce.pop()
+				switch t {
+				case wazeroir.SignedTypeFloat32, wazeroir.SignedTypeFloat64: // not integers
+				default:
 					if v2 == 0 {
 						panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
 					}
-					switch wazeroir.SignedInt(op.b1) {
+				}
+
+				switch t {
+				case wazeroir.SignedTypeInt32:
+					d := int32(v2)
+					n := int32(v1)
+					if n == math.MinInt32 && d == -1 {
+						panic(wasmruntime.ErrRuntimeIntegerOverflow)
+					}
+					ce.push(uint64(uint32(n / d)))
+				case wazeroir.SignedTypeInt64:
+					d := int64(v2)
+					n := int64(v1)
+					if n == math.MinInt64 && d == -1 {
+						panic(wasmruntime.ErrRuntimeIntegerOverflow)
+					}
+					ce.push(uint64(n / d))
+				case wazeroir.SignedTypeUint32:
+					d := uint32(v2)
+					n := uint32(v1)
+					ce.push(uint64(n / d))
+				case wazeroir.SignedTypeUint64:
+					d := v2
+					n := v1
+					ce.push(n / d)
+				case wazeroir.SignedTypeFloat32:
+					d := v2
+					n := v1
+					v := math.Float32frombits(uint32(n)) / math.Float32frombits(uint32(d))
+					ce.push(uint64(math.Float32bits(v)))
+				case wazeroir.SignedTypeFloat64:
+					d := v2
+					n := v1
+					v := math.Float64frombits(n) / math.Float64frombits(d)
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindRem:
+			{
+				v2, v1 := ce.pop(), ce.pop()
+				if v2 == 0 {
+					panic(wasmruntime.ErrRuntimeIntegerDivideByZero)
+				}
+				switch wazeroir.SignedInt(op.b1) {
+				case wazeroir.SignedInt32:
+					d := int32(v2)
+					n := int32(v1)
+					ce.push(uint64(uint32(n % d)))
+				case wazeroir.SignedInt64:
+					d := int64(v2)
+					n := int64(v1)
+					ce.push(uint64(n % d))
+				case wazeroir.SignedUint32:
+					d := uint32(v2)
+					n := uint32(v1)
+					ce.push(uint64(n % d))
+				case wazeroir.SignedUint64:
+					d := v2
+					n := v1
+					ce.push(n % d)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindAnd:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(uint32(v2) & uint32(v1)))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(v2 & v1))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindOr:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(uint32(v2) | uint32(v1)))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(v2 | v1))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindXor:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(uint32(v2) ^ uint32(v1)))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(v2 ^ v1))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindShl:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(uint32(v1) << (uint32(v2) % 32)))
+				} else {
+					// UnsignedInt64
+					ce.push(v1 << (v2 % 64))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindShr:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				switch wazeroir.SignedInt(op.b1) {
+				case wazeroir.SignedInt32:
+					ce.push(uint64(int32(v1) >> (uint32(v2) % 32)))
+				case wazeroir.SignedInt64:
+					ce.push(uint64(int64(v1) >> (v2 % 64)))
+				case wazeroir.SignedUint32:
+					ce.push(uint64(uint32(v1) >> (uint32(v2) % 32)))
+				case wazeroir.SignedUint64:
+					ce.push(v1 >> (v2 % 64))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindRotl:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(bits.RotateLeft64(v1, int(v2))))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindRotr:
+			{
+				v2 := ce.pop()
+				v1 := ce.pop()
+				if op.b1 == 0 {
+					// UnsignedInt32
+					ce.push(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
+				} else {
+					// UnsignedInt64
+					ce.push(uint64(bits.RotateLeft64(v1, -int(v2))))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindAbs:
+			{
+				if op.b1 == 0 {
+					// Float32
+					const mask uint32 = 1 << 31
+					ce.push(uint64(uint32(ce.pop()) &^ mask))
+				} else {
+					// Float64
+					const mask uint64 = 1 << 63
+					ce.push(uint64(ce.pop() &^ mask))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindNeg:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v := -math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(v)))
+				} else {
+					// Float64
+					v := -math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindCeil:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v := math.Ceil(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
+				} else {
+					// Float64
+					v := math.Ceil(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindFloor:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v := math.Floor(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
+				} else {
+					// Float64
+					v := math.Floor(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindTrunc:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
+				} else {
+					// Float64
+					v := math.Trunc(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindNearest:
+			{
+				if op.b1 == 0 {
+					// Float32
+					f := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
+				} else {
+					// Float64
+					f := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindSqrt:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v := math.Sqrt(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
+				} else {
+					// Float64
+					v := math.Sqrt(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindMin:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v2 := math.Float32frombits(uint32(ce.pop()))
+					v1 := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
+				} else {
+					v2 := math.Float64frombits(ce.pop())
+					v1 := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindMax:
+			{
+
+				if op.b1 == 0 {
+					// Float32
+					v2 := math.Float32frombits(uint32(ce.pop()))
+					v1 := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
+				} else {
+					// Float64
+					v2 := math.Float64frombits(ce.pop())
+					v1 := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindCopysign:
+			{
+				if op.b1 == 0 {
+					// Float32
+					v2 := uint32(ce.pop())
+					v1 := uint32(ce.pop())
+					const signbit = 1 << 31
+					ce.push(uint64(v1&^signbit | v2&signbit))
+				} else {
+					// Float64
+					v2 := ce.pop()
+					v1 := ce.pop()
+					const signbit = 1 << 63
+					ce.push(v1&^signbit | v2&signbit)
+				}
+				frame.pc++
+			}
+		case wazeroir.OperationKindI32WrapFromI64:
+			{
+				ce.push(uint64(uint32(ce.pop())))
+				frame.pc++
+			}
+		case wazeroir.OperationKindITruncFromF:
+			{
+				if op.b1 == 0 {
+					// Float32
+					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
-						d := int32(v2)
-						n := int32(v1)
-						ce.push(uint64(uint32(n % d)))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < math.MinInt32 || v > math.MaxInt32 {
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
-						d := int64(v2)
-						n := int64(v1)
-						ce.push(uint64(n % d))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+						res := int64(v)
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < math.MinInt64 || v >= math.MaxInt64 {
+							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
-						d := uint32(v2)
-						n := uint32(v1)
-						ce.push(uint64(n % d))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < 0 || v > math.MaxUint32 {
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
-						d := v2
-						n := v1
-						ce.push(n % d)
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+						res := uint64(v)
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < 0 || v >= math.MaxUint64 {
+							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(res)
 					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindAnd:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(uint32(v2) & uint32(v1)))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(v2 & v1))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindOr:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(uint32(v2) | uint32(v1)))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(v2 | v1))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindXor:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(uint32(v2) ^ uint32(v1)))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(v2 ^ v1))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindShl:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(uint32(v1) << (uint32(v2) % 32)))
-					} else {
-						// UnsignedInt64
-						ce.push(v1 << (v2 % 64))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindShr:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					switch wazeroir.SignedInt(op.b1) {
+				} else {
+					// Float64
+					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
-						ce.push(uint64(int32(v1) >> (uint32(v2) % 32)))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < math.MinInt32 || v > math.MaxInt32 {
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
-						ce.push(uint64(int64(v1) >> (v2 % 64)))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
+						res := int64(v)
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < math.MinInt64 || v >= math.MaxInt64 {
+							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
-						ce.push(uint64(uint32(v1) >> (uint32(v2) % 32)))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < 0 || v > math.MaxUint32 {
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
-						ce.push(v1 >> (v2 % 64))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
+						res := uint64(v)
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+						} else if v < 0 || v >= math.MaxUint64 {
+							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
+							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+						}
+						ce.push(res)
 					}
-					frame.pc++
 				}
-			case wazeroir.OperationKindRotl:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(bits.RotateLeft64(v1, int(v2))))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindRotr:
-				{
-					v2 := ce.pop()
-					v1 := ce.pop()
-					if op.b1 == 0 {
-						// UnsignedInt32
-						ce.push(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
-					} else {
-						// UnsignedInt64
-						ce.push(uint64(bits.RotateLeft64(v1, -int(v2))))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindAbs:
-				{
-					if op.b1 == 0 {
+				frame.pc++
+			}
+		case wazeroir.OperationKindFConvertFromI:
+			{
+				switch wazeroir.SignedInt(op.b1) {
+				case wazeroir.SignedInt32:
+					if op.b2 == 0 {
 						// Float32
-						const mask uint32 = 1 << 31
-						ce.push(uint64(uint32(ce.pop()) &^ mask))
-					} else {
-						// Float64
-						const mask uint64 = 1 << 63
-						ce.push(uint64(ce.pop() &^ mask))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindNeg:
-				{
-					if op.b1 == 0 {
-						// Float32
-						v := -math.Float32frombits(uint32(ce.pop()))
+						v := float32(int32(ce.pop()))
 						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := -math.Float64frombits(ce.pop())
+						v := float64(int32(ce.pop()))
 						ce.push(math.Float64bits(v))
 					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindCeil:
-				{
-					if op.b1 == 0 {
+				case wazeroir.SignedInt64:
+					if op.b2 == 0 {
 						// Float32
-						v := math.Ceil(float64(math.Float32frombits(uint32(ce.pop()))))
-						ce.push(uint64(math.Float32bits(float32(v))))
+						v := float32(int64(ce.pop()))
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := math.Ceil(float64(math.Float64frombits(ce.pop())))
+						v := float64(int64(ce.pop()))
 						ce.push(math.Float64bits(v))
 					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindFloor:
-				{
-					if op.b1 == 0 {
+				case wazeroir.SignedUint32:
+					if op.b2 == 0 {
 						// Float32
-						v := math.Floor(float64(math.Float32frombits(uint32(ce.pop()))))
-						ce.push(uint64(math.Float32bits(float32(v))))
+						v := float32(uint32(ce.pop()))
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := math.Floor(float64(math.Float64frombits(ce.pop())))
+						v := float64(uint32(ce.pop()))
 						ce.push(math.Float64bits(v))
 					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindTrunc:
-				{
-					if op.b1 == 0 {
+				case wazeroir.SignedUint64:
+					if op.b2 == 0 {
 						// Float32
-						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
-						ce.push(uint64(math.Float32bits(float32(v))))
+						v := float32(ce.pop())
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := math.Trunc(float64(math.Float64frombits(ce.pop())))
+						v := float64(ce.pop())
 						ce.push(math.Float64bits(v))
 					}
-					frame.pc++
 				}
-			case wazeroir.OperationKindNearest:
-				{
-					if op.b1 == 0 {
-						// Float32
-						f := math.Float32frombits(uint32(ce.pop()))
-						ce.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
-					} else {
-						// Float64
-						f := math.Float64frombits(ce.pop())
-						ce.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindSqrt:
-				{
-					if op.b1 == 0 {
-						// Float32
-						v := math.Sqrt(float64(math.Float32frombits(uint32(ce.pop()))))
-						ce.push(uint64(math.Float32bits(float32(v))))
-					} else {
-						// Float64
-						v := math.Sqrt(float64(math.Float64frombits(ce.pop())))
-						ce.push(math.Float64bits(v))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindMin:
-				{
-					if op.b1 == 0 {
-						// Float32
-						v2 := math.Float32frombits(uint32(ce.pop()))
-						v1 := math.Float32frombits(uint32(ce.pop()))
-						ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
-					} else {
-						v2 := math.Float64frombits(ce.pop())
-						v1 := math.Float64frombits(ce.pop())
-						ce.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindMax:
-				{
-
-					if op.b1 == 0 {
-						// Float32
-						v2 := math.Float32frombits(uint32(ce.pop()))
-						v1 := math.Float32frombits(uint32(ce.pop()))
-						ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
-					} else {
-						// Float64
-						v2 := math.Float64frombits(ce.pop())
-						v1 := math.Float64frombits(ce.pop())
-						ce.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindCopysign:
-				{
-					if op.b1 == 0 {
-						// Float32
-						v2 := uint32(ce.pop())
-						v1 := uint32(ce.pop())
-						const signbit = 1 << 31
-						ce.push(uint64(v1&^signbit | v2&signbit))
-					} else {
-						// Float64
-						v2 := ce.pop()
-						v1 := ce.pop()
-						const signbit = 1 << 63
-						ce.push(v1&^signbit | v2&signbit)
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindI32WrapFromI64:
-				{
-					ce.push(uint64(uint32(ce.pop())))
-					frame.pc++
-				}
-			case wazeroir.OperationKindITruncFromF:
-				{
-					if op.b1 == 0 {
-						// Float32
-						switch wazeroir.SignedInt(op.b2) {
-						case wazeroir.SignedInt32:
-							v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < math.MinInt32 || v > math.MaxInt32 {
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(int32(v)))
-						case wazeroir.SignedInt64:
-							v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
-							res := int64(v)
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < math.MinInt64 || v >= math.MaxInt64 {
-								// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
-								// and that's why we use '>=' not '>' to check overflow.
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(res))
-						case wazeroir.SignedUint32:
-							v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < 0 || v > math.MaxUint32 {
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(uint32(v)))
-						case wazeroir.SignedUint64:
-							v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
-							res := uint64(v)
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < 0 || v >= math.MaxUint64 {
-								// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
-								// and that's why we use '>=' not '>' to check overflow.
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(res)
-						}
-					} else {
-						// Float64
-						switch wazeroir.SignedInt(op.b2) {
-						case wazeroir.SignedInt32:
-							v := math.Trunc(math.Float64frombits(ce.pop()))
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < math.MinInt32 || v > math.MaxInt32 {
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(int32(v)))
-						case wazeroir.SignedInt64:
-							v := math.Trunc(math.Float64frombits(ce.pop()))
-							res := int64(v)
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < math.MinInt64 || v >= math.MaxInt64 {
-								// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
-								// and that's why we use '>=' not '>' to check overflow.
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(res))
-						case wazeroir.SignedUint32:
-							v := math.Trunc(math.Float64frombits(ce.pop()))
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < 0 || v > math.MaxUint32 {
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(uint64(uint32(v)))
-						case wazeroir.SignedUint64:
-							v := math.Trunc(math.Float64frombits(ce.pop()))
-							res := uint64(v)
-							if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
-							} else if v < 0 || v >= math.MaxUint64 {
-								// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
-								// and that's why we use '>=' not '>' to check overflow.
-								panic(wasmruntime.ErrRuntimeIntegerOverflow)
-							}
-							ce.push(res)
-						}
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindFConvertFromI:
-				{
-					switch wazeroir.SignedInt(op.b1) {
-					case wazeroir.SignedInt32:
-						if op.b2 == 0 {
-							// Float32
-							v := float32(int32(ce.pop()))
-							ce.push(uint64(math.Float32bits(v)))
-						} else {
-							// Float64
-							v := float64(int32(ce.pop()))
-							ce.push(math.Float64bits(v))
-						}
-					case wazeroir.SignedInt64:
-						if op.b2 == 0 {
-							// Float32
-							v := float32(int64(ce.pop()))
-							ce.push(uint64(math.Float32bits(v)))
-						} else {
-							// Float64
-							v := float64(int64(ce.pop()))
-							ce.push(math.Float64bits(v))
-						}
-					case wazeroir.SignedUint32:
-						if op.b2 == 0 {
-							// Float32
-							v := float32(uint32(ce.pop()))
-							ce.push(uint64(math.Float32bits(v)))
-						} else {
-							// Float64
-							v := float64(uint32(ce.pop()))
-							ce.push(math.Float64bits(v))
-						}
-					case wazeroir.SignedUint64:
-						if op.b2 == 0 {
-							// Float32
-							v := float32(ce.pop())
-							ce.push(uint64(math.Float32bits(v)))
-						} else {
-							// Float64
-							v := float64(ce.pop())
-							ce.push(math.Float64bits(v))
-						}
-					}
-					frame.pc++
-				}
-			case wazeroir.OperationKindF32DemoteFromF64:
-				{
-					v := float32(math.Float64frombits(ce.pop()))
-					ce.push(uint64(math.Float32bits(v)))
-					frame.pc++
-				}
-			case wazeroir.OperationKindF64PromoteFromF32:
-				{
-					v := float64(math.Float32frombits(uint32(ce.pop())))
-					ce.push(math.Float64bits(v))
-					frame.pc++
-				}
-			case wazeroir.OperationKindExtend:
-				{
-					if op.b1 == 1 {
-						// Signed.
-						v := int64(int32(ce.pop()))
-						ce.push(uint64(v))
-					} else {
-						v := uint64(uint32(ce.pop()))
-						ce.push(v)
-					}
-					frame.pc++
-				}
-
-			case wazeroir.OperationKindSignExtend32From8:
-				{
-					v := int32(int8(ce.pop()))
-					ce.push(uint64(v))
-					frame.pc++
-				}
-			case wazeroir.OperationKindSignExtend32From16:
-				{
-					v := int32(int16(ce.pop()))
-					ce.push(uint64(v))
-					frame.pc++
-				}
-			case wazeroir.OperationKindSignExtend64From8:
-				{
-					v := int64(int8(ce.pop()))
-					ce.push(uint64(v))
-					frame.pc++
-				}
-			case wazeroir.OperationKindSignExtend64From16:
-				{
-					v := int64(int16(ce.pop()))
-					ce.push(uint64(v))
-					frame.pc++
-				}
-			case wazeroir.OperationKindSignExtend64From32:
-				{
+				frame.pc++
+			}
+		case wazeroir.OperationKindF32DemoteFromF64:
+			{
+				v := float32(math.Float64frombits(ce.pop()))
+				ce.push(uint64(math.Float32bits(v)))
+				frame.pc++
+			}
+		case wazeroir.OperationKindF64PromoteFromF32:
+			{
+				v := float64(math.Float32frombits(uint32(ce.pop())))
+				ce.push(math.Float64bits(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindExtend:
+			{
+				if op.b1 == 1 {
+					// Signed.
 					v := int64(int32(ce.pop()))
 					ce.push(uint64(v))
-					frame.pc++
+				} else {
+					v := uint64(uint32(ce.pop()))
+					ce.push(v)
 				}
+				frame.pc++
+			}
+
+		case wazeroir.OperationKindSignExtend32From8:
+			{
+				v := int32(int8(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend32From16:
+			{
+				v := int32(int16(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From8:
+			{
+				v := int64(int8(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From16:
+			{
+				v := int64(int16(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From32:
+			{
+				v := int64(int32(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
 			}
 		}
 	}
