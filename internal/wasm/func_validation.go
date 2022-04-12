@@ -801,7 +801,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				// If this is the end of block without else, the number of block's results and params must be same.
 				// Otherwise, the value stack would result in the inconsistent state at runtime.
 				if !bytes.Equal(bl.blockType.Results, bl.blockType.Params) {
-					return typeCountError(false, OpcodeElseName, bl.blockType.Results, bl.blockType.Params)
+					return typeCountError(false, OpcodeElseName, bl.blockType.Params, bl.blockType.Results)
 				}
 				// -1 skips else, to handle if block without else properly.
 				bl.elseAt = bl.endAt - 1
