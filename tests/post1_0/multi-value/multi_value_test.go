@@ -76,6 +76,9 @@ func testMultiValue(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig)
 		t.Run("if.wast", func(t *testing.T) {
 			testIf(t, r)
 		})
+		t.Run("loop.wast", func(t *testing.T) {
+			testLoop(t, r)
+		})
 	})
 }
 
@@ -256,6 +259,30 @@ func testIf(t *testing.T, r wazero.Runtime) {
 		{name: "add64_u_saturated", params: []uint64{api.EncodeI64(-1), 1}, expected: []uint64{api.EncodeI64(-1)}},
 		{name: "add64_u_saturated", params: []uint64{api.EncodeI64(-1), api.EncodeI64(-1)}, expected: []uint64{api.EncodeI64(-1)}},
 		{name: "add64_u_saturated", params: []uint64{0x8000000000000000, 0x8000000000000000}, expected: []uint64{api.EncodeI64(-1)}},
+		{name: "type-use"},
+	})
+}
+
+// loopWasm was compiled from testdata/loop.wat
+//go:embed testdata/loop.wasm
+var loopWasm []byte
+
+func testLoop(t *testing.T, r wazero.Runtime) {
+	module, err := r.InstantiateModuleFromCode(loopWasm)
+	require.NoError(t, err)
+	defer module.Close()
+
+	testFunctions(t, module, []funcTest{
+		{name: "as-binary-operands", expected: []uint64{12}},
+		{name: "as-compare-operands", expected: []uint64{0}},
+		{name: "as-mixed-operands", expected: []uint64{27}},
+		{name: "break-multi-value", expected: []uint64{18, api.EncodeI32(-18), 18}},
+		{name: "param", expected: []uint64{3}},
+		{name: "params", expected: []uint64{3}},
+		{name: "params-id", expected: []uint64{3}},
+		{name: "param-break", expected: []uint64{13}},
+		{name: "params-break", expected: []uint64{12}},
+		{name: "params-id-break", expected: []uint64{3}},
 		{name: "type-use"},
 	})
 }
