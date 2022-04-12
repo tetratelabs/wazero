@@ -373,7 +373,7 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		}
 		if err != nil {
 			me.Close() // safe because the reference to me was never leaked.
-			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
+			return nil, fmt.Errorf("function[%s(%d/%d)] %w", f.DebugName, i, len(moduleFunctions)-1, err)
 		}
 
 		// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
@@ -786,14 +786,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
-// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-var assemblerMutex = &sync.Mutex{}
-
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	assemblerMutex.Lock()
-	defer assemblerMutex.Unlock()
-
 	compiler, err := newCompiler(f, nil)
 	if err != nil {
 		return nil, err
@@ -822,9 +815,6 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 }
 
 func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	assemblerMutex.Lock()
-	defer assemblerMutex.Unlock()
-
 	ir, err := wazeroir.Compile(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)

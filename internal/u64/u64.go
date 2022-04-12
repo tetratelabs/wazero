@@ -1,6 +1,6 @@
 package u64
 
-// LeBytes returns a byte array corresponding to the 8 bytes in the uint64 in little-endian byte order.
+// LeBytes returns a byte slice corresponding to the 8 bytes in the uint64 in little-endian byte order.
 func LeBytes(v uint64) []byte {
 	return []byte{
 		byte(v),

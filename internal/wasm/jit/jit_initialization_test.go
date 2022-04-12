@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func TestCompiler_compileModuleContextInitialization(t *testing.T) {
@@ -73,14 +72,11 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
 			tc.moduleInstance.Engine = me
 
-			// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
+			// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
 			// TODO: delete after #233
-			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
-			require.NoError(t, err)
-			loc := compiler.valueLocationStack().pop()
-			compiler.valueLocationStack().markRegisterUnused(loc.register)
+			compiler.compileNOP()
 
-			err = compiler.compileModuleContextInitialization()
+			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
 			require.Empty(t, compiler.valueLocationStack().usedRegisters)
 
@@ -124,13 +120,11 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env := newJITEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-				// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
+				// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
 				// TODO: delete after #233
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
-				require.NoError(t, err)
-				compiler.valueLocationStack().pop()
+				compiler.compileNOP()
 
-				err = compiler.compileMaybeGrowValueStack()
+				err := compiler.compileMaybeGrowValueStack()
 				require.NoError(t, err)
 				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
 
@@ -155,13 +149,11 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-		// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
+		// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
 		// TODO: delete after #233
-		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
-		require.NoError(t, err)
-		compiler.valueLocationStack().pop()
+		compiler.compileNOP()
 
-		err = compiler.compileMaybeGrowValueStack()
+		err := compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)
 
 		// On the return from grow value stack, we simply return.

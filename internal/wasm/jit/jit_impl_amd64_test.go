@@ -363,3 +363,7 @@ func (c *amd64Compiler) setStackPointerCeil(v uint64) {
 func (c *amd64Compiler) setValueLocationStack(s *valueLocationStack) {
 	c.locationStack = s
 }
+
+func (a *amd64Compiler) compileNOP() {
+	a.assembler.CompileStandAlone(amd64.NOP)
+}

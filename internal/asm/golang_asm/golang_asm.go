@@ -24,23 +24,23 @@ func (n *GolangAsmNode) String() string {
 	return n.prog.String()
 }
 
-// OffsetInBinary implements Node.OffsetInBinary.
+// OffsetInBinary implements the same method as documented on asm.Node.
 func (n *GolangAsmNode) OffsetInBinary() asm.NodeOffsetInBinary {
 	return asm.NodeOffsetInBinary(n.prog.Pc)
 }
 
-// AssignJumpTarget implements Node.AssignJumpTarget.
+// AssignJumpTarget implements the same method as documented on asm.Node.
 func (n *GolangAsmNode) AssignJumpTarget(target asm.Node) {
 	b := target.(*GolangAsmNode)
 	n.prog.To.SetTarget(b.prog)
 }
 
-// AssignDestinationConstant implements Node.AssignDestinationConstant.
+// AssignDestinationConstant implements the same method as documented on asm.Node.
 func (n *GolangAsmNode) AssignDestinationConstant(value asm.ConstantValue) {
 	n.prog.To.Offset = value
 }
 
-// AssignSourceConstant implements Node.AssignSourceConstant.
+// AssignSourceConstant implements the same method as documented on asm.Node.
 func (n *GolangAsmNode) AssignSourceConstant(value asm.ConstantValue) {
 	n.prog.From.Offset = value
 }
@@ -48,9 +48,11 @@ func (n *GolangAsmNode) AssignSourceConstant(value asm.ConstantValue) {
 // GolangAsmBaseAssembler implements *part of* AssemblerBase for golang-asm library.
 type GolangAsmBaseAssembler struct {
 	b *goasm.Builder
-	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
+
+	// setBranchTargetOnNextNodes holds branch kind instructions (BR, conditional BR, etc)
 	// where we want to set the next coming instruction as the destination of these BR instructions.
 	setBranchTargetOnNextNodes []asm.Node
+
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
 	onGenerateCallbacks []func(code []byte) error
 }
@@ -63,7 +65,7 @@ func NewGolangAsmBaseAssembler(arch string) (*GolangAsmBaseAssembler, error) {
 	return &GolangAsmBaseAssembler{b: b}, nil
 }
 
-// Assemble implements AssemblerBase.Assemble
+// Assemble implements the same method as documented on asm.AssemblerBase.
 func (a *GolangAsmBaseAssembler) Assemble() ([]byte, error) {
 	code := a.b.Assemble()
 	for _, cb := range a.onGenerateCallbacks {
@@ -74,17 +76,17 @@ func (a *GolangAsmBaseAssembler) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
+// SetJumpTargetOnNext implements the same method as documented on asm.AssemblerBase.
 func (a *GolangAsmBaseAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
 }
 
-// AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
+// AddOnGenerateCallBack implements the same method as documented on asm.AssemblerBase.
 func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 	a.onGenerateCallbacks = append(a.onGenerateCallbacks, cb)
 }
 
-// BuildJumpTable implements AssemblerBase.BuildJumpTable
+// BuildJumpTable implements the same method as documented on asm.AssemblerBase.
 func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []asm.Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Build the offset table for each target.

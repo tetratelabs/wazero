@@ -12,7 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
 )
 
-// assemblerGoAsmImpl implements Assembler for golang-asm library.
+// assemblerGoAsmImpl implements asm_amd64.Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
 	*golang_asm.GolangAsmBaseAssembler
 }
@@ -22,7 +22,7 @@ func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
 	return &assemblerGoAsmImpl{g}, err
 }
 
-// CompileStandAlone implements Assembler.CompileStandAlone.
+// CompileStandAlone implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileStandAlone(inst asm.Instruction) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -30,7 +30,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(inst asm.Instruction) asm.Node {
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
+// CompileRegisterToRegister implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToRegister(inst asm.Instruction, from, to asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -41,9 +41,15 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegister(inst asm.Instruction, fro
 	a.AddInstruction(p)
 }
 
-// CompileMemoryWithIndexToRegister implements Assembler.CompileMemoryWithIndexToRegister.
-func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegister(inst asm.Instruction,
-	sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, sourceIndexReg asm.Register, sourceScale int16, destinationReg asm.Register) {
+// CompileMemoryWithIndexToRegister implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegister(
+	inst asm.Instruction,
+	sourceBaseReg asm.Register,
+	sourceOffsetConst asm.ConstantValue,
+	sourceIndexReg asm.Register,
+	sourceScale int16,
+	destinationReg asm.Register,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
@@ -56,8 +62,14 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegister(inst asm.Instructi
 	a.AddInstruction(p)
 }
 
-// CompileRegisterToMemoryWithIndex implements Assembler.CompileRegisterToMemoryWithIndex.
-func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst asm.ConstantValue, dstIndexReg asm.Register, dstScale int16) {
+// CompileRegisterToMemoryWithIndex implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(
+	inst asm.Instruction,
+	srcReg, dstBaseReg asm.Register,
+	dstOffsetConst asm.ConstantValue,
+	dstIndexReg asm.Register,
+	dstScale int16,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
@@ -70,8 +82,12 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(inst asm.Instructi
 	a.AddInstruction(p)
 }
 
-// CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
-func (a *assemblerGoAsmImpl) CompileRegisterToMemory(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst asm.ConstantValue) {
+// CompileRegisterToMemory implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemory(
+	inst asm.Instruction,
+	sourceRegister, destinationBaseRegister asm.Register,
+	destinationOffsetConst asm.ConstantValue,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
@@ -82,8 +98,12 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemory(inst asm.Instruction, sourc
 	a.AddInstruction(p)
 }
 
-// CompileConstToRegister implements Assembler.CompileConstToRegister.
-func (a *assemblerGoAsmImpl) CompileConstToRegister(inst asm.Instruction, constValue asm.ConstantValue, destinationRegister asm.Register) asm.Node {
+// CompileConstToRegister implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileConstToRegister(
+	inst asm.Instruction,
+	constValue asm.ConstantValue,
+	destinationRegister asm.Register,
+) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -94,8 +114,12 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(inst asm.Instruction, constV
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileRegisterToConst implements Assembler.CompileRegisterToConst.
-func (a *assemblerGoAsmImpl) CompileRegisterToConst(inst asm.Instruction, srcRegister asm.Register, constValue asm.ConstantValue) asm.Node {
+// CompileRegisterToConst implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileRegisterToConst(
+	inst asm.Instruction,
+	srcRegister asm.Register,
+	constValue asm.ConstantValue,
+) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
@@ -106,7 +130,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToConst(inst asm.Instruction, srcReg
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileRegisterToNone implements Assembler.CompileRegisterToNone.
+// CompileRegisterToNone implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToNone(inst asm.Instruction, register asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -116,7 +140,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToNone(inst asm.Instruction, registe
 	a.AddInstruction(p)
 }
 
-// CompileNoneToRegister implements Assembler.CompileNoneToRegister.
+// CompileNoneToRegister implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileNoneToRegister(inst asm.Instruction, register asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -126,8 +150,12 @@ func (a *assemblerGoAsmImpl) CompileNoneToRegister(inst asm.Instruction, registe
 	a.AddInstruction(p)
 }
 
-// CompileNoneToMemory implements Assembler.CompileNoneToMemory.
-func (a *assemblerGoAsmImpl) CompileNoneToMemory(inst asm.Instruction, baseReg asm.Register, offset asm.ConstantValue) {
+// CompileNoneToMemory implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileNoneToMemory(
+	inst asm.Instruction,
+	baseReg asm.Register,
+	offset asm.ConstantValue,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
@@ -137,8 +165,13 @@ func (a *assemblerGoAsmImpl) CompileNoneToMemory(inst asm.Instruction, baseReg a
 	a.AddInstruction(p)
 }
 
-// CompileConstToMemory implements Assembler.CompileConstToMemory.
-func (a *assemblerGoAsmImpl) CompileConstToMemory(inst asm.Instruction, constValue asm.ConstantValue, baseReg asm.Register, offset asm.ConstantValue) asm.Node {
+// CompileConstToMemory implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileConstToMemory(
+	inst asm.Instruction,
+	constValue asm.ConstantValue,
+	baseReg asm.Register,
+	offset asm.ConstantValue,
+) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -150,8 +183,13 @@ func (a *assemblerGoAsmImpl) CompileConstToMemory(inst asm.Instruction, constVal
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
-func (a *assemblerGoAsmImpl) CompileMemoryToRegister(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
+// CompileMemoryToRegister implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileMemoryToRegister(
+	inst asm.Instruction,
+	sourceBaseReg asm.Register,
+	sourceOffsetConst asm.ConstantValue,
+	destinationReg asm.Register,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_MEM
@@ -162,8 +200,12 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegister(inst asm.Instruction, sourc
 	a.AddInstruction(p)
 }
 
-// CompileMemoryToConst implements Assembler.CompileMemoryToConst.
-func (a *assemblerGoAsmImpl) CompileMemoryToConst(inst asm.Instruction, baseReg asm.Register, offset asm.ConstantValue, constValue asm.ConstantValue) asm.Node {
+// CompileMemoryToConst implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileMemoryToConst(
+	inst asm.Instruction,
+	baseReg asm.Register,
+	offset, constValue asm.ConstantValue,
+) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
@@ -175,7 +217,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryToConst(inst asm.Instruction, baseReg 
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileJump implements Assembler.CompileJump.
+// CompileJump implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -184,7 +226,7 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 	return golang_asm.NewGolangAsmNode(p)
 }
 
-// CompileJumpToRegister implements Assembler.CompileJumpToRegister.
+// CompileJumpToRegister implements the same method as documented on asm_amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -193,8 +235,12 @@ func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instructio
 	a.AddInstruction(p)
 }
 
-// CompileJumpToMemory implements Assembler.CompileJumpToMemory.
-func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset asm.ConstantValue) {
+// CompileJumpToMemory implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileJumpToMemory(
+	jmpInstruction asm.Instruction,
+	baseReg asm.Register,
+	offset asm.ConstantValue,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[jmpInstruction]
 	p.To.Type = obj.TYPE_MEM
@@ -203,8 +249,12 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(p)
 }
 
-// CompileRegisterToRegisterWithMode implements Assembler.CompileRegisterToRegisterWithMode.
-func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithMode(inst asm.Instruction, from, to asm.Register, mode asm_amd64.Mode) {
+// CompileRegisterToRegisterWithMode implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithMode(
+	inst asm.Instruction,
+	from, to asm.Register,
+	mode asm_amd64.Mode,
+) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -216,8 +266,11 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithMode(inst asm.Instruct
 	a.AddInstruction(p)
 }
 
-// CompileReadInstructionAddress implements Assembler.CompileReadInstructionAddress.
-func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
+// CompileReadInstructionAddress implements the same method as documented on asm_amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(
+	destinationRegister asm.Register,
+	beforeAcquisitionTargetInstruction asm.Instruction,
+) {
 	// Emit the instruction in the form of "LEA destination [RIP + offset]".
 	readInstructionAddress := a.NewProg()
 	readInstructionAddress.As = x86.ALEAQ

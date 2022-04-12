@@ -4,8 +4,9 @@ module github.com/tetratelabs/wazero
 go 1.17
 
 require (
+	// Test-only dependency.
 	github.com/stretchr/testify v1.7.0
-	// Once we reach some maturity, remove this dep and implement our own assembler.
+	// Test-only dependency.
 	github.com/twitchyliquid64/golang-asm v0.15.1
 )
 
