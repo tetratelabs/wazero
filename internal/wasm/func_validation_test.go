@@ -188,11 +188,13 @@ var (
 	f32, f64, i32, i64 = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64
 	i32_i32            = &FunctionType{Params: []ValueType{i32}, Results: []ValueType{i32}}
 	i32i32_i32         = &FunctionType{Params: []ValueType{i32, i32}, Results: []ValueType{i32}}
+	i32_v              = &FunctionType{Params: []ValueType{i32}}
 	v_v                = &FunctionType{}
 	v_f32              = &FunctionType{Results: []ValueType{f32}}
 	v_f32f32           = &FunctionType{Results: []ValueType{f32, f32}}
 	v_f64i32           = &FunctionType{Results: []ValueType{f64, i32}}
 	v_f64f64           = &FunctionType{Results: []ValueType{f64, f64}}
+	v_i32              = &FunctionType{Results: []ValueType{i32}}
 	v_i32i32           = &FunctionType{Results: []ValueType{i32, i32}}
 	v_i32i64           = &FunctionType{Results: []ValueType{i32, i64}}
 	v_i64i64           = &FunctionType{Results: []ValueType{i64, i64}}
@@ -217,7 +219,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (f64, i32)`,
 		},
@@ -228,7 +230,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeNop, OpcodeEnd}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (i32, i32)`,
 		},
@@ -239,7 +241,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeI64Const, 0, OpcodeEnd}}},
 			},
-			expectedErr: `too many arguments to return
+			expectedErr: `too many results
 	have (i32, i64)
 	want ()`,
 		},
@@ -249,10 +251,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_f32f32},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeF32Const, 0, 0, 0, 0, OpcodeEnd, // (f32.const 0)
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have (f32)
 	want (f32, f32)`,
 		},
@@ -262,10 +265,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_f32},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeF32Const, 0, 0, 0, 0, OpcodeF32Const, 0, 0, 0, 0, OpcodeEnd, // (f32.const 0) (f32.const 0)
+					OpcodeF32Const, 0, 0, 0, 0, OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0) (f32.const 0)
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `too many arguments to return
+			expectedErr: `too many results
 	have (f32, f32)
 	want (f32)`,
 		},
@@ -276,7 +280,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeReturn, OpcodeEnd}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (f32, f32)`,
 		},
@@ -287,7 +291,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: []byte{OpcodeNop, OpcodeReturn, OpcodeEnd}}}, // (return (nop))
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (i32, i64)`,
 		},
@@ -297,10 +301,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_i64i64},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeI64Const, 0, OpcodeReturn, OpcodeEnd, // (return (i64.const 0))
+					OpcodeI64Const, 0, OpcodeReturn, // (return (i64.const 0))
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have (i64)
 	want (i64, i64)`,
 		},
@@ -314,10 +319,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeReturn, OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeEnd,
+					OpcodeReturn, OpcodeI32Const, 1, OpcodeI32Const, 2,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (i32, i32)`,
 		},
@@ -331,10 +337,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeI32Const, 1, OpcodeReturn, OpcodeI32Const, 2, OpcodeEnd,
+					OpcodeI32Const, 1, OpcodeReturn, OpcodeI32Const, 2,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have (i32)
 	want (i32, i32)`,
 		},
@@ -349,10 +356,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeNop, OpcodeReturn, // (return (nop))
-					OpcodeI32Const, 1, OpcodeEnd, // (i32.const 1)
+					OpcodeI32Const, 1, // (i32.const 1)
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `not enough arguments to return
+			expectedErr: `not enough results
 	have ()
 	want (i32, i32)`,
 		},
@@ -364,10 +372,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI64Const, 1, OpcodeReturn, // (return (i64.const 1))
-					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeEnd, // (i32.const 1) (i32.const 2)
+					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as type i32 in return argument",
+			expectedErr: "cannot use i64 as type i32 result[1]",
 		},
 		{
 			name: `func.wast - type-return-first-num-vs-nums`,
@@ -380,10 +389,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI64Const, 1, OpcodeReturn, // (return (i64.const 1))
-					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeReturn, OpcodeEnd, // (return (i32.const 1) (i32.const 2))
+					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeReturn, // (return (i32.const 1) (i32.const 2))
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as type i32 in return argument",
+			expectedErr: "cannot use i64 as type i32 result[1]",
 		},
 		{
 			name: `func.wast - type-break-last-num-vs-nums`,
@@ -391,10 +401,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				TypeSection:     []*FunctionType{v_i32i32},
 				FunctionSection: []Index{0},
 				CodeSection: []*Code{{Body: []byte{
-					OpcodeI32Const, 0, OpcodeBr, 0, OpcodeEnd, // (br 0 (i32.const 0))
+					OpcodeI32Const, 0, OpcodeBr, 0, // (br 0 (i32.const 0))
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have (i32)
 	want (i32, i32)`,
 		},
@@ -410,10 +421,10 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeBr, 0, // (br 0)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
-					OpcodeEnd,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have ()
 	want (i32, i32)`,
 		},
@@ -429,10 +440,10 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeBr, 0, // (br 0 (i32.const 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2)
-					OpcodeEnd,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have (i32)
 	want (i32, i32)`,
 		},
@@ -448,10 +459,10 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeBlock, 0x40, OpcodeBr, 0x01, OpcodeEnd, // (block (br 1))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
-					OpcodeEnd,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have ()
 	want (i32, i32)`,
 		},
@@ -467,10 +478,10 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeBlock, 0x40, OpcodeNop, OpcodeBr, 0x01, OpcodeEnd, // (block (br 1 (nop)))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
-					OpcodeEnd,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have ()
 	want (i32, i32)`,
 		},
@@ -486,10 +497,10 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeBlock, 0x7f, OpcodeI32Const, 1, OpcodeBr, 1, OpcodeEnd, // (block (result i32) (br 1 (i32.const 1)))
 					OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeBr, 0, // (br 0 (i32.const 1) (i32.const 2))
-					OpcodeEnd,
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `type mismatch on the br operation: not enough arguments to return
+			expectedErr: `not enough results in br block
 	have (i32)
 	want (i32, i32)`,
 		},
@@ -508,11 +519,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI32Const, 1, // (i32.const 1)
 					OpcodeI32Const, 0, OpcodeIf, 0, // (if (type $sig) (i32.const 0)
-					OpcodeEnd, // )
-					OpcodeEnd, // )
+					OpcodeEnd, // if
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `too many arguments to return
+			expectedErr: `too many results
 	have (i32)
 	want ()`,
 		},
@@ -528,11 +539,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
-					OpcodeEnd, // )
-					OpcodeEnd, // )
+					OpcodeEnd, // if
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `invalid then block: too many arguments to return
+			expectedErr: `too many results in if block
 	have (i32, i32)
 	want ()`,
 		},
@@ -549,11 +560,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
 					OpcodeElse, // (else)
-					OpcodeEnd,  // )
-					OpcodeEnd,  // )
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
 				}}},
 			},
-			expectedErr: `invalid then block: too many arguments to return
+			expectedErr: `too many results in if block
 	have (i32, i32)
 	want ()`,
 		},
@@ -569,11 +580,11 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 				CodeSection: []*Code{{Body: []byte{
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1) (then)
 					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 2, // (else (i32.const 1) (i32.const 2))
-					OpcodeEnd, // )
-					OpcodeEnd, // )
+					OpcodeEnd, // if
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `invalid else block: too many arguments to return
+			expectedErr: `too many results in else block
 	have (i32, i32)
 	want ()`,
 		},
@@ -590,13 +601,174 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
 					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
 					OpcodeElse, OpcodeI32Const, 2, OpcodeI32Const, 1, // (else (i32.const 2) (i32.const 1))
-					OpcodeEnd, // )
-					OpcodeEnd, // )
+					OpcodeEnd, // if
+					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: `invalid then block: too many arguments to return
+			expectedErr: `too many results in if block
 	have (i32, i32)
 	want ()`,
+		},
+
+		// test/core/loop.wast
+		{
+			name: `loop.wast - wrong signature for loop type use`,
+			// This example should err because the loop type use returns no values, but its block returns one:
+			//  (module
+			//    (type $sig (func))
+			//    (func (loop (type $sig) (i32.const 0)))
+			//  )
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0, OpcodeI32Const, 0, // (loop (type $sig) (i32.const 0))
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in loop block
+	have (i32)
+	want ()`,
+		},
+		{
+			name: `loop.wast - type-value-nums-vs-void`,
+			// This example should err because the empty block type requires no values, but the loop returns two:
+			//  (module (func $type-value-nums-vs-void
+			//    (loop (i32.const 1) (i32.const 2))
+			//  ))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x40, OpcodeI32Const, 1, OpcodeI32Const, 2, // (loop (i32.const 1) (i32.const 2))
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in loop block
+	have (i32, i32)
+	want ()`,
+		},
+		{
+			name: `loop.wast - type-value-empty-vs-nums`,
+			// This example should err because the loop type use returns two values, but the block returns none:
+			//	(module (func $type-value-empty-vs-nums (result i32 i32)
+			//	  (loop (result i32 i32))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x0, // (loop (result i32 i32)) - matches existing func type
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in loop block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `loop.wast - type-value-void-vs-nums`,
+			// This example should err because the loop type use returns two values, but the block returns none:
+			//	(module (func $type-value-void-vs-nums (result i32 i32)
+			//	  (loop (result i32 i32) (nop))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
+					OpcodeNop, // (nop)
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in loop block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `loop.wast - type-value-num-vs-nums`,
+			// This example should err because the loop type use returns two values, but the block returns one:
+			//	(module (func $type-value-num-vs-nums (result i32 i32)
+			//	  (loop (result i32 i32) (i32.const 0))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
+					OpcodeI32Const, 0, // (i32.const 0)
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in loop block
+	have (i32)
+	want (i32, i32)`,
+		},
+		{
+			name: `loop.wast - type-value-partial-vs-nums`,
+			// This example should err because the loop type use returns two values, but the block returns one:
+			//	(module (func $type-value-partial-vs-nums (result i32 i32)
+			//	  (i32.const 1) (loop (result i32 i32) (i32.const 2))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, // (i32.const 1) - NOTE: outside the loop!
+					OpcodeLoop, 0x0, // (loop (result i32 i32) - matches existing func type
+					OpcodeI32Const, 2, // (i32.const 2)
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in loop block
+	have (i32)
+	want (i32, i32)`,
+		},
+		{
+			name: `loop.wast - type-value-nums-vs-num`,
+			// This example should err because the loop type use returns one value, but the block returns two:
+			//	(module (func $type-value-nums-vs-num (result i32)
+			//	  (loop (result i32) (i32.const 1) (i32.const 2))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x0, // (loop (result i32) - matches existing func type
+					OpcodeI32Const, 1, OpcodeI32Const, 2, // (i32.const 1) (i32.const 2))
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in loop block
+	have (i32, i32)
+	want (i32)`,
+		},
+		{
+			name: `loop.wast - type-param-void-vs-num`,
+			// This example should err because the loop type use returns one value, but the block returns two:
+			//	(module (func $type-param-void-vs-num
+			//	  (loop (param i32) (drop))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x1, // (loop (param i32)
+					OpcodeDrop, // (drop)
+					OpcodeEnd,  // loop
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params in loop block
+	have ()
+	want (i32)`,
 		},
 	}
 

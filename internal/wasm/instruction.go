@@ -254,186 +254,369 @@ const (
 	LastOpcode = OpcodeI64Extend32S
 )
 
-var instructionNames = [256]string{
-	OpcodeUnreachable:       "unreachable",
-	OpcodeNop:               "nop",
-	OpcodeBlock:             "block",
-	OpcodeLoop:              "loop",
-	OpcodeIf:                "if",
-	OpcodeElse:              "else",
-	OpcodeEnd:               "end",
-	OpcodeBr:                "br",
-	OpcodeBrIf:              "br_if",
-	OpcodeBrTable:           "br_table",
-	OpcodeReturn:            "return",
-	OpcodeCall:              "call",
-	OpcodeCallIndirect:      "call_indirect",
-	OpcodeDrop:              "drop",
-	OpcodeSelect:            "select",
-	OpcodeLocalGet:          "local.get",
-	OpcodeLocalSet:          "local.set",
-	OpcodeLocalTee:          "local.tee",
-	OpcodeGlobalGet:         "global.get",
-	OpcodeGlobalSet:         "global.set",
-	OpcodeI32Load:           "i32.load",
-	OpcodeI64Load:           "i64.load",
-	OpcodeF32Load:           "f32.load",
-	OpcodeF64Load:           "f64.load",
-	OpcodeI32Load8S:         "i32.load8_s",
-	OpcodeI32Load8U:         "i32.load8_u",
-	OpcodeI32Load16S:        "i32.load16_s",
-	OpcodeI32Load16U:        "i32.load16_u",
-	OpcodeI64Load8S:         "i64.load8_s",
-	OpcodeI64Load8U:         "i64.load8_u",
-	OpcodeI64Load16S:        "i64.load16_s",
-	OpcodeI64Load16U:        "i64.load16_u",
-	OpcodeI64Load32S:        "i64.load32_s",
-	OpcodeI64Load32U:        "i64.load32_u",
-	OpcodeI32Store:          "i32.store",
-	OpcodeI64Store:          "i64.store",
-	OpcodeF32Store:          "f32.store",
-	OpcodeF64Store:          "f64.store",
-	OpcodeI32Store8:         "i32.store8",
-	OpcodeI32Store16:        "i32.store16",
-	OpcodeI64Store8:         "i64.store8",
-	OpcodeI64Store16:        "i64.store16",
-	OpcodeI64Store32:        "i64.store32",
-	OpcodeMemorySize:        "memory.size",
-	OpcodeMemoryGrow:        "memory.grow",
-	OpcodeI32Const:          "i32.const",
-	OpcodeI64Const:          "i64.const",
-	OpcodeF32Const:          "f32.const",
-	OpcodeF64Const:          "f64.const",
-	OpcodeI32Eqz:            "i32.eqz",
-	OpcodeI32Eq:             "i32.eq",
-	OpcodeI32Ne:             "i32.ne",
-	OpcodeI32LtS:            "i32.lt_s",
-	OpcodeI32LtU:            "i32.lt_u",
-	OpcodeI32GtS:            "i32.gt_s",
-	OpcodeI32GtU:            "i32.gt_u",
-	OpcodeI32LeS:            "i32.le_s",
-	OpcodeI32LeU:            "i32.le_u",
-	OpcodeI32GeS:            "i32.ge_s",
-	OpcodeI32GeU:            "i32.ge_u",
-	OpcodeI64Eqz:            "i64.eqz",
-	OpcodeI64Eq:             "i64.eq",
-	OpcodeI64Ne:             "i64.ne",
-	OpcodeI64LtS:            "i64.lt_s",
-	OpcodeI64LtU:            "i64.lt_u",
-	OpcodeI64GtS:            "i64.gt_s",
-	OpcodeI64GtU:            "i64.gt_u",
-	OpcodeI64LeS:            "i64.le_s",
-	OpcodeI64LeU:            "i64.le_u",
-	OpcodeI64GeS:            "i64.ge_s",
-	OpcodeI64GeU:            "i64.ge_u",
-	OpcodeF32Eq:             "f32.eq",
-	OpcodeF32Ne:             "f32.ne",
-	OpcodeF32Lt:             "f32.lt",
-	OpcodeF32Gt:             "f32.gt",
-	OpcodeF32Le:             "f32.le",
-	OpcodeF32Ge:             "f32.ge",
-	OpcodeF64Eq:             "f64.eq",
-	OpcodeF64Ne:             "f64.ne",
-	OpcodeF64Lt:             "f64.lt",
-	OpcodeF64Gt:             "f64.gt",
-	OpcodeF64Le:             "f64.le",
-	OpcodeF64Ge:             "f64.ge",
-	OpcodeI32Clz:            "i32.clz",
-	OpcodeI32Ctz:            "i32.ctz",
-	OpcodeI32Popcnt:         "i32.popcnt",
-	OpcodeI32Add:            "i32.add",
-	OpcodeI32Sub:            "i32.sub",
-	OpcodeI32Mul:            "i32.mul",
-	OpcodeI32DivS:           "i32.div_s",
-	OpcodeI32DivU:           "i32.div_u",
-	OpcodeI32RemS:           "i32.rem_s",
-	OpcodeI32RemU:           "i32.rem_u",
-	OpcodeI32And:            "i32.and",
-	OpcodeI32Or:             "i32.or",
-	OpcodeI32Xor:            "i32.xor",
-	OpcodeI32Shl:            "i32.shl",
-	OpcodeI32ShrS:           "i32.shr_s",
-	OpcodeI32ShrU:           "i32.shr_u",
-	OpcodeI32Rotl:           "i32.rotl",
-	OpcodeI32Rotr:           "i32.rotr",
-	OpcodeI64Clz:            "i64.clz",
-	OpcodeI64Ctz:            "i64.ctz",
-	OpcodeI64Popcnt:         "i64.popcnt",
-	OpcodeI64Add:            "i64.add",
-	OpcodeI64Sub:            "i64.sub",
-	OpcodeI64Mul:            "i64.mul",
-	OpcodeI64DivS:           "i64.div_s",
-	OpcodeI64DivU:           "i64.div_u",
-	OpcodeI64RemS:           "i64.rem_s",
-	OpcodeI64RemU:           "i64.rem_u",
-	OpcodeI64And:            "i64.and",
-	OpcodeI64Or:             "i64.or",
-	OpcodeI64Xor:            "i64.xor",
-	OpcodeI64Shl:            "i64.shl",
-	OpcodeI64ShrS:           "i64.shr_s",
-	OpcodeI64ShrU:           "i64.shr_u",
-	OpcodeI64Rotl:           "i64.rotl",
-	OpcodeI64Rotr:           "i64.rotr",
-	OpcodeF32Abs:            "f32.abs",
-	OpcodeF32Neg:            "f32.neg",
-	OpcodeF32Ceil:           "f32.ceil",
-	OpcodeF32Floor:          "f32.floor",
-	OpcodeF32Trunc:          "f32.trunc",
-	OpcodeF32Nearest:        "f32.nearest",
-	OpcodeF32Sqrt:           "f32.sqrt",
-	OpcodeF32Add:            "f32.add",
-	OpcodeF32Sub:            "f32.sub",
-	OpcodeF32Mul:            "f32.mul",
-	OpcodeF32Div:            "f32.div",
-	OpcodeF32Min:            "f32.min",
-	OpcodeF32Max:            "f32.max",
-	OpcodeF32Copysign:       "f32.copysign",
-	OpcodeF64Abs:            "f64.abs",
-	OpcodeF64Neg:            "f64.neg",
-	OpcodeF64Ceil:           "f64.ceil",
-	OpcodeF64Floor:          "f64.floor",
-	OpcodeF64Trunc:          "f64.trunc",
-	OpcodeF64Nearest:        "f64.nearest",
-	OpcodeF64Sqrt:           "f64.sqrt",
-	OpcodeF64Add:            "f64.add",
-	OpcodeF64Sub:            "f64.sub",
-	OpcodeF64Mul:            "f64.mul",
-	OpcodeF64Div:            "f64.div",
-	OpcodeF64Min:            "f64.min",
-	OpcodeF64Max:            "f64.max",
-	OpcodeF64Copysign:       "f64.copysign",
-	OpcodeI32WrapI64:        "i32.wrap_i64",
-	OpcodeI32TruncF32S:      "i32.trunc_f32_s",
-	OpcodeI32TruncF32U:      "i32.trunc_f32_u",
-	OpcodeI32TruncF64S:      "i32.trunc_f64_s",
-	OpcodeI32TruncF64U:      "i32.trunc_f64_u",
-	OpcodeI64ExtendI32S:     "i64.extend_i32_s",
-	OpcodeI64ExtendI32U:     "i64.extend_i32_u",
-	OpcodeI64TruncF32S:      "i64.trunc_f32_s",
-	OpcodeI64TruncF32U:      "i64.trunc_f32_u",
-	OpcodeI64TruncF64S:      "i64.trunc_f64_s",
-	OpcodeI64TruncF64U:      "i64.trunc_f64_u",
-	OpcodeF32ConvertI32s:    "f32.convert_i32_s",
-	OpcodeF32ConvertI32U:    "f32.convert_i32_u",
-	OpcodeF32ConvertI64S:    "f32.convert_i64_s",
-	OpcodeF32ConvertI64U:    "f32.convert_i64u",
-	OpcodeF32DemoteF64:      "f32.demote_f64",
-	OpcodeF64ConvertI32S:    "f64.convert_i32_s",
-	OpcodeF64ConvertI32U:    "f64.convert_i32_u",
-	OpcodeF64ConvertI64S:    "f64.convert_i64_s",
-	OpcodeF64ConvertI64U:    "f64.convert_i64_u",
-	OpcodeF64PromoteF32:     "f64.promote_f32",
-	OpcodeI32ReinterpretF32: "i32.reinterpret_f32",
-	OpcodeI64ReinterpretF64: "i64.reinterpret_f64",
-	OpcodeF32ReinterpretI32: "f32.reinterpret_i32",
-	OpcodeF64ReinterpretI64: "f64.reinterpret_i64",
+const (
+	OpcodeUnreachableName       = "unreachable"
+	OpcodeNopName               = "nop"
+	OpcodeBlockName             = "block"
+	OpcodeLoopName              = "loop"
+	OpcodeIfName                = "if"
+	OpcodeElseName              = "else"
+	OpcodeEndName               = "end"
+	OpcodeBrName                = "br"
+	OpcodeBrIfName              = "br_if"
+	OpcodeBrTableName           = "br_table"
+	OpcodeReturnName            = "return"
+	OpcodeCallName              = "call"
+	OpcodeCallIndirectName      = "call_indirect"
+	OpcodeDropName              = "drop"
+	OpcodeSelectName            = "select"
+	OpcodeLocalGetName          = "local.get"
+	OpcodeLocalSetName          = "local.set"
+	OpcodeLocalTeeName          = "local.tee"
+	OpcodeGlobalGetName         = "global.get"
+	OpcodeGlobalSetName         = "global.set"
+	OpcodeI32LoadName           = "i32.load"
+	OpcodeI64LoadName           = "i64.load"
+	OpcodeF32LoadName           = "f32.load"
+	OpcodeF64LoadName           = "f64.load"
+	OpcodeI32Load8SName         = "i32.load8_s"
+	OpcodeI32Load8UName         = "i32.load8_u"
+	OpcodeI32Load16SName        = "i32.load16_s"
+	OpcodeI32Load16UName        = "i32.load16_u"
+	OpcodeI64Load8SName         = "i64.load8_s"
+	OpcodeI64Load8UName         = "i64.load8_u"
+	OpcodeI64Load16SName        = "i64.load16_s"
+	OpcodeI64Load16UName        = "i64.load16_u"
+	OpcodeI64Load32SName        = "i64.load32_s"
+	OpcodeI64Load32UName        = "i64.load32_u"
+	OpcodeI32StoreName          = "i32.store"
+	OpcodeI64StoreName          = "i64.store"
+	OpcodeF32StoreName          = "f32.store"
+	OpcodeF64StoreName          = "f64.store"
+	OpcodeI32Store8Name         = "i32.store8"
+	OpcodeI32Store16Name        = "i32.store16"
+	OpcodeI64Store8Name         = "i64.store8"
+	OpcodeI64Store16Name        = "i64.store16"
+	OpcodeI64Store32Name        = "i64.store32"
+	OpcodeMemorySizeName        = "memory.size"
+	OpcodeMemoryGrowName        = "memory.grow"
+	OpcodeI32ConstName          = "i32.const"
+	OpcodeI64ConstName          = "i64.const"
+	OpcodeF32ConstName          = "f32.const"
+	OpcodeF64ConstName          = "f64.const"
+	OpcodeI32EqzName            = "i32.eqz"
+	OpcodeI32EqName             = "i32.eq"
+	OpcodeI32NeName             = "i32.ne"
+	OpcodeI32LtSName            = "i32.lt_s"
+	OpcodeI32LtUName            = "i32.lt_u"
+	OpcodeI32GtSName            = "i32.gt_s"
+	OpcodeI32GtUName            = "i32.gt_u"
+	OpcodeI32LeSName            = "i32.le_s"
+	OpcodeI32LeUName            = "i32.le_u"
+	OpcodeI32GeSName            = "i32.ge_s"
+	OpcodeI32GeUName            = "i32.ge_u"
+	OpcodeI64EqzName            = "i64.eqz"
+	OpcodeI64EqName             = "i64.eq"
+	OpcodeI64NeName             = "i64.ne"
+	OpcodeI64LtSName            = "i64.lt_s"
+	OpcodeI64LtUName            = "i64.lt_u"
+	OpcodeI64GtSName            = "i64.gt_s"
+	OpcodeI64GtUName            = "i64.gt_u"
+	OpcodeI64LeSName            = "i64.le_s"
+	OpcodeI64LeUName            = "i64.le_u"
+	OpcodeI64GeSName            = "i64.ge_s"
+	OpcodeI64GeUName            = "i64.ge_u"
+	OpcodeF32EqName             = "f32.eq"
+	OpcodeF32NeName             = "f32.ne"
+	OpcodeF32LtName             = "f32.lt"
+	OpcodeF32GtName             = "f32.gt"
+	OpcodeF32LeName             = "f32.le"
+	OpcodeF32GeName             = "f32.ge"
+	OpcodeF64EqName             = "f64.eq"
+	OpcodeF64NeName             = "f64.ne"
+	OpcodeF64LtName             = "f64.lt"
+	OpcodeF64GtName             = "f64.gt"
+	OpcodeF64LeName             = "f64.le"
+	OpcodeF64GeName             = "f64.ge"
+	OpcodeI32ClzName            = "i32.clz"
+	OpcodeI32CtzName            = "i32.ctz"
+	OpcodeI32PopcntName         = "i32.popcnt"
+	OpcodeI32AddName            = "i32.add"
+	OpcodeI32SubName            = "i32.sub"
+	OpcodeI32MulName            = "i32.mul"
+	OpcodeI32DivSName           = "i32.div_s"
+	OpcodeI32DivUName           = "i32.div_u"
+	OpcodeI32RemSName           = "i32.rem_s"
+	OpcodeI32RemUName           = "i32.rem_u"
+	OpcodeI32AndName            = "i32.and"
+	OpcodeI32OrName             = "i32.or"
+	OpcodeI32XorName            = "i32.xor"
+	OpcodeI32ShlName            = "i32.shl"
+	OpcodeI32ShrSName           = "i32.shr_s"
+	OpcodeI32ShrUName           = "i32.shr_u"
+	OpcodeI32RotlName           = "i32.rotl"
+	OpcodeI32RotrName           = "i32.rotr"
+	OpcodeI64ClzName            = "i64.clz"
+	OpcodeI64CtzName            = "i64.ctz"
+	OpcodeI64PopcntName         = "i64.popcnt"
+	OpcodeI64AddName            = "i64.add"
+	OpcodeI64SubName            = "i64.sub"
+	OpcodeI64MulName            = "i64.mul"
+	OpcodeI64DivSName           = "i64.div_s"
+	OpcodeI64DivUName           = "i64.div_u"
+	OpcodeI64RemSName           = "i64.rem_s"
+	OpcodeI64RemUName           = "i64.rem_u"
+	OpcodeI64AndName            = "i64.and"
+	OpcodeI64OrName             = "i64.or"
+	OpcodeI64XorName            = "i64.xor"
+	OpcodeI64ShlName            = "i64.shl"
+	OpcodeI64ShrSName           = "i64.shr_s"
+	OpcodeI64ShrUName           = "i64.shr_u"
+	OpcodeI64RotlName           = "i64.rotl"
+	OpcodeI64RotrName           = "i64.rotr"
+	OpcodeF32AbsName            = "f32.abs"
+	OpcodeF32NegName            = "f32.neg"
+	OpcodeF32CeilName           = "f32.ceil"
+	OpcodeF32FloorName          = "f32.floor"
+	OpcodeF32TruncName          = "f32.trunc"
+	OpcodeF32NearestName        = "f32.nearest"
+	OpcodeF32SqrtName           = "f32.sqrt"
+	OpcodeF32AddName            = "f32.add"
+	OpcodeF32SubName            = "f32.sub"
+	OpcodeF32MulName            = "f32.mul"
+	OpcodeF32DivName            = "f32.div"
+	OpcodeF32MinName            = "f32.min"
+	OpcodeF32MaxName            = "f32.max"
+	OpcodeF32CopysignName       = "f32.copysign"
+	OpcodeF64AbsName            = "f64.abs"
+	OpcodeF64NegName            = "f64.neg"
+	OpcodeF64CeilName           = "f64.ceil"
+	OpcodeF64FloorName          = "f64.floor"
+	OpcodeF64TruncName          = "f64.trunc"
+	OpcodeF64NearestName        = "f64.nearest"
+	OpcodeF64SqrtName           = "f64.sqrt"
+	OpcodeF64AddName            = "f64.add"
+	OpcodeF64SubName            = "f64.sub"
+	OpcodeF64MulName            = "f64.mul"
+	OpcodeF64DivName            = "f64.div"
+	OpcodeF64MinName            = "f64.min"
+	OpcodeF64MaxName            = "f64.max"
+	OpcodeF64CopysignName       = "f64.copysign"
+	OpcodeI32WrapI64Name        = "i32.wrap_i64"
+	OpcodeI32TruncF32SName      = "i32.trunc_f32_s"
+	OpcodeI32TruncF32UName      = "i32.trunc_f32_u"
+	OpcodeI32TruncF64SName      = "i32.trunc_f64_s"
+	OpcodeI32TruncF64UName      = "i32.trunc_f64_u"
+	OpcodeI64ExtendI32SName     = "i64.extend_i32_s"
+	OpcodeI64ExtendI32UName     = "i64.extend_i32_u"
+	OpcodeI64TruncF32SName      = "i64.trunc_f32_s"
+	OpcodeI64TruncF32UName      = "i64.trunc_f32_u"
+	OpcodeI64TruncF64SName      = "i64.trunc_f64_s"
+	OpcodeI64TruncF64UName      = "i64.trunc_f64_u"
+	OpcodeF32ConvertI32sName    = "f32.convert_i32_s"
+	OpcodeF32ConvertI32UName    = "f32.convert_i32_u"
+	OpcodeF32ConvertI64SName    = "f32.convert_i64_s"
+	OpcodeF32ConvertI64UName    = "f32.convert_i64u"
+	OpcodeF32DemoteF64Name      = "f32.demote_f64"
+	OpcodeF64ConvertI32SName    = "f64.convert_i32_s"
+	OpcodeF64ConvertI32UName    = "f64.convert_i32_u"
+	OpcodeF64ConvertI64SName    = "f64.convert_i64_s"
+	OpcodeF64ConvertI64UName    = "f64.convert_i64_u"
+	OpcodeF64PromoteF32Name     = "f64.promote_f32"
+	OpcodeI32ReinterpretF32Name = "i32.reinterpret_f32"
+	OpcodeI64ReinterpretF64Name = "i64.reinterpret_f64"
+	OpcodeF32ReinterpretI32Name = "f32.reinterpret_i32"
+	OpcodeF64ReinterpretI64Name = "f64.reinterpret_i64"
 
 	// Below are toggled with FeatureSignExtensionOps
-	OpcodeI32Extend8S:  "i32.extend8_s",
-	OpcodeI32Extend16S: "i32.extend16_s",
-	OpcodeI64Extend8S:  "i64.extend8_s",
-	OpcodeI64Extend16S: "i64.extend16_s",
-	OpcodeI64Extend32S: "i64.extend32_s",
+
+	OpcodeI32Extend8SName  = "i32.extend8_s"
+	OpcodeI32Extend16SName = "i32.extend16_s"
+	OpcodeI64Extend8SName  = "i64.extend8_s"
+	OpcodeI64Extend16SName = "i64.extend16_s"
+	OpcodeI64Extend32SName = "i64.extend32_s"
+)
+
+var instructionNames = [256]string{
+	OpcodeUnreachable:       OpcodeUnreachableName,
+	OpcodeNop:               OpcodeNopName,
+	OpcodeBlock:             OpcodeBlockName,
+	OpcodeLoop:              OpcodeLoopName,
+	OpcodeIf:                OpcodeIfName,
+	OpcodeElse:              OpcodeElseName,
+	OpcodeEnd:               OpcodeEndName,
+	OpcodeBr:                OpcodeBrName,
+	OpcodeBrIf:              OpcodeBrIfName,
+	OpcodeBrTable:           OpcodeBrTableName,
+	OpcodeReturn:            OpcodeReturnName,
+	OpcodeCall:              OpcodeCallName,
+	OpcodeCallIndirect:      OpcodeCallIndirectName,
+	OpcodeDrop:              OpcodeDropName,
+	OpcodeSelect:            OpcodeSelectName,
+	OpcodeLocalGet:          OpcodeLocalGetName,
+	OpcodeLocalSet:          OpcodeLocalSetName,
+	OpcodeLocalTee:          OpcodeLocalTeeName,
+	OpcodeGlobalGet:         OpcodeGlobalGetName,
+	OpcodeGlobalSet:         OpcodeGlobalSetName,
+	OpcodeI32Load:           OpcodeI32LoadName,
+	OpcodeI64Load:           OpcodeI64LoadName,
+	OpcodeF32Load:           OpcodeF32LoadName,
+	OpcodeF64Load:           OpcodeF64LoadName,
+	OpcodeI32Load8S:         OpcodeI32Load8SName,
+	OpcodeI32Load8U:         OpcodeI32Load8UName,
+	OpcodeI32Load16S:        OpcodeI32Load16SName,
+	OpcodeI32Load16U:        OpcodeI32Load16UName,
+	OpcodeI64Load8S:         OpcodeI64Load8SName,
+	OpcodeI64Load8U:         OpcodeI64Load8UName,
+	OpcodeI64Load16S:        OpcodeI64Load16SName,
+	OpcodeI64Load16U:        OpcodeI64Load16UName,
+	OpcodeI64Load32S:        OpcodeI64Load32SName,
+	OpcodeI64Load32U:        OpcodeI64Load32UName,
+	OpcodeI32Store:          OpcodeI32StoreName,
+	OpcodeI64Store:          OpcodeI64StoreName,
+	OpcodeF32Store:          OpcodeF32StoreName,
+	OpcodeF64Store:          OpcodeF64StoreName,
+	OpcodeI32Store8:         OpcodeI32Store8Name,
+	OpcodeI32Store16:        OpcodeI32Store16Name,
+	OpcodeI64Store8:         OpcodeI64Store8Name,
+	OpcodeI64Store16:        OpcodeI64Store16Name,
+	OpcodeI64Store32:        OpcodeI64Store32Name,
+	OpcodeMemorySize:        OpcodeMemorySizeName,
+	OpcodeMemoryGrow:        OpcodeMemoryGrowName,
+	OpcodeI32Const:          OpcodeI32ConstName,
+	OpcodeI64Const:          OpcodeI64ConstName,
+	OpcodeF32Const:          OpcodeF32ConstName,
+	OpcodeF64Const:          OpcodeF64ConstName,
+	OpcodeI32Eqz:            OpcodeI32EqzName,
+	OpcodeI32Eq:             OpcodeI32EqName,
+	OpcodeI32Ne:             OpcodeI32NeName,
+	OpcodeI32LtS:            OpcodeI32LtSName,
+	OpcodeI32LtU:            OpcodeI32LtUName,
+	OpcodeI32GtS:            OpcodeI32GtSName,
+	OpcodeI32GtU:            OpcodeI32GtUName,
+	OpcodeI32LeS:            OpcodeI32LeSName,
+	OpcodeI32LeU:            OpcodeI32LeUName,
+	OpcodeI32GeS:            OpcodeI32GeSName,
+	OpcodeI32GeU:            OpcodeI32GeUName,
+	OpcodeI64Eqz:            OpcodeI64EqzName,
+	OpcodeI64Eq:             OpcodeI64EqName,
+	OpcodeI64Ne:             OpcodeI64NeName,
+	OpcodeI64LtS:            OpcodeI64LtSName,
+	OpcodeI64LtU:            OpcodeI64LtUName,
+	OpcodeI64GtS:            OpcodeI64GtSName,
+	OpcodeI64GtU:            OpcodeI64GtUName,
+	OpcodeI64LeS:            OpcodeI64LeSName,
+	OpcodeI64LeU:            OpcodeI64LeUName,
+	OpcodeI64GeS:            OpcodeI64GeSName,
+	OpcodeI64GeU:            OpcodeI64GeUName,
+	OpcodeF32Eq:             OpcodeF32EqName,
+	OpcodeF32Ne:             OpcodeF32NeName,
+	OpcodeF32Lt:             OpcodeF32LtName,
+	OpcodeF32Gt:             OpcodeF32GtName,
+	OpcodeF32Le:             OpcodeF32LeName,
+	OpcodeF32Ge:             OpcodeF32GeName,
+	OpcodeF64Eq:             OpcodeF64EqName,
+	OpcodeF64Ne:             OpcodeF64NeName,
+	OpcodeF64Lt:             OpcodeF64LtName,
+	OpcodeF64Gt:             OpcodeF64GtName,
+	OpcodeF64Le:             OpcodeF64LeName,
+	OpcodeF64Ge:             OpcodeF64GeName,
+	OpcodeI32Clz:            OpcodeI32ClzName,
+	OpcodeI32Ctz:            OpcodeI32CtzName,
+	OpcodeI32Popcnt:         OpcodeI32PopcntName,
+	OpcodeI32Add:            OpcodeI32AddName,
+	OpcodeI32Sub:            OpcodeI32SubName,
+	OpcodeI32Mul:            OpcodeI32MulName,
+	OpcodeI32DivS:           OpcodeI32DivSName,
+	OpcodeI32DivU:           OpcodeI32DivUName,
+	OpcodeI32RemS:           OpcodeI32RemSName,
+	OpcodeI32RemU:           OpcodeI32RemUName,
+	OpcodeI32And:            OpcodeI32AndName,
+	OpcodeI32Or:             OpcodeI32OrName,
+	OpcodeI32Xor:            OpcodeI32XorName,
+	OpcodeI32Shl:            OpcodeI32ShlName,
+	OpcodeI32ShrS:           OpcodeI32ShrSName,
+	OpcodeI32ShrU:           OpcodeI32ShrUName,
+	OpcodeI32Rotl:           OpcodeI32RotlName,
+	OpcodeI32Rotr:           OpcodeI32RotrName,
+	OpcodeI64Clz:            OpcodeI64ClzName,
+	OpcodeI64Ctz:            OpcodeI64CtzName,
+	OpcodeI64Popcnt:         OpcodeI64PopcntName,
+	OpcodeI64Add:            OpcodeI64AddName,
+	OpcodeI64Sub:            OpcodeI64SubName,
+	OpcodeI64Mul:            OpcodeI64MulName,
+	OpcodeI64DivS:           OpcodeI64DivSName,
+	OpcodeI64DivU:           OpcodeI64DivUName,
+	OpcodeI64RemS:           OpcodeI64RemSName,
+	OpcodeI64RemU:           OpcodeI64RemUName,
+	OpcodeI64And:            OpcodeI64AndName,
+	OpcodeI64Or:             OpcodeI64OrName,
+	OpcodeI64Xor:            OpcodeI64XorName,
+	OpcodeI64Shl:            OpcodeI64ShlName,
+	OpcodeI64ShrS:           OpcodeI64ShrSName,
+	OpcodeI64ShrU:           OpcodeI64ShrUName,
+	OpcodeI64Rotl:           OpcodeI64RotlName,
+	OpcodeI64Rotr:           OpcodeI64RotrName,
+	OpcodeF32Abs:            OpcodeF32AbsName,
+	OpcodeF32Neg:            OpcodeF32NegName,
+	OpcodeF32Ceil:           OpcodeF32CeilName,
+	OpcodeF32Floor:          OpcodeF32FloorName,
+	OpcodeF32Trunc:          OpcodeF32TruncName,
+	OpcodeF32Nearest:        OpcodeF32NearestName,
+	OpcodeF32Sqrt:           OpcodeF32SqrtName,
+	OpcodeF32Add:            OpcodeF32AddName,
+	OpcodeF32Sub:            OpcodeF32SubName,
+	OpcodeF32Mul:            OpcodeF32MulName,
+	OpcodeF32Div:            OpcodeF32DivName,
+	OpcodeF32Min:            OpcodeF32MinName,
+	OpcodeF32Max:            OpcodeF32MaxName,
+	OpcodeF32Copysign:       OpcodeF32CopysignName,
+	OpcodeF64Abs:            OpcodeF64AbsName,
+	OpcodeF64Neg:            OpcodeF64NegName,
+	OpcodeF64Ceil:           OpcodeF64CeilName,
+	OpcodeF64Floor:          OpcodeF64FloorName,
+	OpcodeF64Trunc:          OpcodeF64TruncName,
+	OpcodeF64Nearest:        OpcodeF64NearestName,
+	OpcodeF64Sqrt:           OpcodeF64SqrtName,
+	OpcodeF64Add:            OpcodeF64AddName,
+	OpcodeF64Sub:            OpcodeF64SubName,
+	OpcodeF64Mul:            OpcodeF64MulName,
+	OpcodeF64Div:            OpcodeF64DivName,
+	OpcodeF64Min:            OpcodeF64MinName,
+	OpcodeF64Max:            OpcodeF64MaxName,
+	OpcodeF64Copysign:       OpcodeF64CopysignName,
+	OpcodeI32WrapI64:        OpcodeI32WrapI64Name,
+	OpcodeI32TruncF32S:      OpcodeI32TruncF32SName,
+	OpcodeI32TruncF32U:      OpcodeI32TruncF32UName,
+	OpcodeI32TruncF64S:      OpcodeI32TruncF64SName,
+	OpcodeI32TruncF64U:      OpcodeI32TruncF64UName,
+	OpcodeI64ExtendI32S:     OpcodeI64ExtendI32SName,
+	OpcodeI64ExtendI32U:     OpcodeI64ExtendI32UName,
+	OpcodeI64TruncF32S:      OpcodeI64TruncF32SName,
+	OpcodeI64TruncF32U:      OpcodeI64TruncF32UName,
+	OpcodeI64TruncF64S:      OpcodeI64TruncF64SName,
+	OpcodeI64TruncF64U:      OpcodeI64TruncF64UName,
+	OpcodeF32ConvertI32s:    OpcodeF32ConvertI32sName,
+	OpcodeF32ConvertI32U:    OpcodeF32ConvertI32UName,
+	OpcodeF32ConvertI64S:    OpcodeF32ConvertI64SName,
+	OpcodeF32ConvertI64U:    OpcodeF32ConvertI64UName,
+	OpcodeF32DemoteF64:      OpcodeF32DemoteF64Name,
+	OpcodeF64ConvertI32S:    OpcodeF64ConvertI32SName,
+	OpcodeF64ConvertI32U:    OpcodeF64ConvertI32UName,
+	OpcodeF64ConvertI64S:    OpcodeF64ConvertI64SName,
+	OpcodeF64ConvertI64U:    OpcodeF64ConvertI64UName,
+	OpcodeF64PromoteF32:     OpcodeF64PromoteF32Name,
+	OpcodeI32ReinterpretF32: OpcodeI32ReinterpretF32Name,
+	OpcodeI64ReinterpretF64: OpcodeI64ReinterpretF64Name,
+	OpcodeF32ReinterpretI32: OpcodeF32ReinterpretI32Name,
+	OpcodeF64ReinterpretI64: OpcodeF64ReinterpretI64Name,
+
+	// Below are toggled with FeatureSignExtensionOps
+	OpcodeI32Extend8S:  OpcodeI32Extend8SName,
+	OpcodeI32Extend16S: OpcodeI32Extend16SName,
+	OpcodeI64Extend8S:  OpcodeI64Extend8SName,
+	OpcodeI64Extend16S: OpcodeI64Extend16SName,
+	OpcodeI64Extend32S: OpcodeI64Extend32SName,
 }
 
 // InstructionName returns the instruction corresponding to this binary Opcode.

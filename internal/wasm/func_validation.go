@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -299,7 +300,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			case OpcodeLocalGet:
 				inputLen := uint32(len(functionType.Params))
 				if l := uint32(len(localTypes)) + inputLen; index >= l {
-					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
+					return fmt.Errorf("invalid local index for %s %d >= %d(=len(locals)+len(parameters))",
+						OpcodeLocalGetName, index, l)
 				}
 				if index < inputLen {
 					valueTypeStack.push(functionType.Params[index])
@@ -309,7 +311,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			case OpcodeLocalSet:
 				inputLen := uint32(len(functionType.Params))
 				if l := uint32(len(localTypes)) + inputLen; index >= l {
-					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
+					return fmt.Errorf("invalid local index for %s %d >= %d(=len(locals)+len(parameters))",
+						OpcodeLocalSetName, index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
@@ -323,7 +326,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			case OpcodeLocalTee:
 				inputLen := uint32(len(functionType.Params))
 				if l := uint32(len(localTypes)) + inputLen; index >= l {
-					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
+					return fmt.Errorf("invalid local index for %s %d >= %d(=len(locals)+len(parameters))",
+						OpcodeLocalTeeName, index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
@@ -337,14 +341,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(expType)
 			case OpcodeGlobalGet:
 				if index >= uint32(len(globals)) {
-					return fmt.Errorf("invalid global index")
+					return fmt.Errorf("invalid index for %s", OpcodeGlobalGetName)
 				}
 				valueTypeStack.push(globals[index].ValType)
 			case OpcodeGlobalSet:
 				if index >= uint32(len(globals)) {
 					return fmt.Errorf("invalid global index")
 				} else if !globals[index].Mutable {
-					return fmt.Errorf("global.set when not mutable")
+					return fmt.Errorf("%s when not mutable", OpcodeGlobalSetName)
 				} else if err := valueTypeStack.popAndVerifyType(
 					globals[index].ValType); err != nil {
 					return err
@@ -356,7 +360,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
-				return fmt.Errorf("invalid br operation: index out of range")
+				return fmt.Errorf("invalid %s operation: index out of range", OpcodeBrName)
 			}
 			pc += num - 1
 			// Check type soundness.
@@ -367,8 +371,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				// the beginning of the loop.
 				targetResultType = []ValueType{}
 			}
-			if err = valueTypeStack.popResults(targetResultType, false); err != nil {
-				return fmt.Errorf("type mismatch on the br operation: %v", err)
+			if err = valueTypeStack.popResults(op, targetResultType, false); err != nil {
+				return err
 			}
 			// br instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
@@ -379,12 +383,12 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for br_if: index=%d with %d for the current lable stack length",
-					index, len(controlBlockStack))
+					"invalid ln param given for %s: index=%d with %d for the current lable stack length",
+					OpcodeBrIfName, index, len(controlBlockStack))
 			}
 			pc += num - 1
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-				return fmt.Errorf("cannot pop the required operand for br_if")
+				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrIfName)
 			}
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
@@ -394,8 +398,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				// the beginning of the loop.
 				targetResultType = []ValueType{}
 			}
-			if err := valueTypeStack.popResults(targetResultType, false); err != nil {
-				return fmt.Errorf("type mismatch on the br_if operation: %v", err)
+			if err := valueTypeStack.popResults(op, targetResultType, false); err != nil {
+				return err
 			}
 			// Push back the result
 			for _, t := range targetResultType {
@@ -423,13 +427,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %w", err)
 			} else if int(ln) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for br_table: ln=%d with %d for the current lable stack length",
-					ln, len(controlBlockStack))
+					"invalid ln param given for %s: ln=%d with %d for the current lable stack length",
+					OpcodeBrTableName, ln, len(controlBlockStack))
 			}
 			pc += n + num - 1
 			// Check type soundness.
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-				return fmt.Errorf("cannot pop the required operand for br_table")
+				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
 			expType := lnLabel.blockType.Results
@@ -440,7 +444,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 			for _, l := range list {
 				if int(l) >= len(controlBlockStack) {
-					return fmt.Errorf("invalid l param given for br_table")
+					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
 				}
 				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
 				expType2 := label.blockType.Results
@@ -450,16 +454,16 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					expType2 = []ValueType{}
 				}
 				if len(expType) != len(expType2) {
-					return fmt.Errorf("incosistent block type length for br_table at %d; %v (ln=%d) != %v (l=%d)", l, expType, ln, expType2, l)
+					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expType, ln, expType2, l)
 				}
 				for i := range expType {
 					if expType[i] != expType2[i] {
-						return fmt.Errorf("incosistent block type for br_table at %d", l)
+						return fmt.Errorf("incosistent block type for %s at %d", OpcodeBrTableName, l)
 					}
 				}
 			}
-			if err := valueTypeStack.popResults(expType, false); err != nil {
-				return fmt.Errorf("type mismatch on the br_table operation: %v", err)
+			if err = valueTypeStack.popResults(op, expType, false); err != nil {
+				return err
 			}
 			// br_table instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
@@ -476,7 +480,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			funcType := types[functions[index]]
 			for i := 0; i < len(funcType.Params); i++ {
 				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
-					return fmt.Errorf("type mismatch on call operation param type")
+					return fmt.Errorf("type mismatch on %s operation param type", OpcodeCallName)
 				}
 			}
 			for _, exp := range funcType.Results {
@@ -491,21 +495,21 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 			pc++
 			if body[pc] != 0x00 {
-				return fmt.Errorf("call_indirect reserved bytes not zero but got %d", body[pc])
+				return fmt.Errorf("%s reserved bytes not zero but got %d", OpcodeCallIndirectName, body[pc])
 			}
 			if table == nil {
-				return fmt.Errorf("table not given while having call_indirect")
+				return fmt.Errorf("table not given while having %s", OpcodeCallIndirectName)
 			}
 			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-				return fmt.Errorf("cannot pop the in table index's type for call_indirect")
+				return fmt.Errorf("cannot pop the in table index's type for %s", OpcodeCallIndirectName)
 			}
 			if int(typeIndex) >= len(types) {
-				return fmt.Errorf("invalid type index at call_indirect: %d", typeIndex)
+				return fmt.Errorf("invalid type index at %s: %d", OpcodeCallIndirectName, typeIndex)
 			}
 			funcType := types[typeIndex]
 			for i := 0; i < len(funcType.Params); i++ {
 				if err = valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
-					return fmt.Errorf("type mismatch on call_indirect operation input type")
+					return fmt.Errorf("type mismatch on %s operation input type", OpcodeCallIndirectName)
 				}
 			}
 			for _, exp := range funcType.Results {
@@ -515,7 +519,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			switch op {
 			case OpcodeI32Eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the operand for i32.eqz: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeI32EqzName, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Eq, OpcodeI32Ne, OpcodeI32LtS,
@@ -530,7 +534,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the operand for i64.eqz: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeI64EqzName, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Eq, OpcodeI64Ne, OpcodeI64LtS,
@@ -627,7 +631,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32WrapI64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the operand for i32.wrap_i64: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeI32WrapI64Name, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32TruncF32S, OpcodeI32TruncF32U:
@@ -667,7 +671,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32DemoteF64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the operand for f32.demote_f64: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeF32DemoteF64Name, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64ConvertI32S, OpcodeF64ConvertI32U:
@@ -682,27 +686,27 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64PromoteF32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the operand for f64.promote_f32: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeF64PromoteF32Name, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32ReinterpretF32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the operand for i32.reinterpret_f32: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeI32ReinterpretF32Name, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64ReinterpretF64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the operand for i64.reinterpret_f64: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeI64ReinterpretF64Name, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32ReinterpretI32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the operand for f32.reinterpret_i32: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeF32ReinterpretI32Name, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64ReinterpretI64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeF64ReinterpretI64Name, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32Extend8S, OpcodeI32Extend16S:
@@ -747,6 +751,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				blockTypeBytes: num,
 				op:             op,
 			})
+			if err = valueTypeStack.popParams(op, bt.Params, false); err != nil {
+				return err
+			}
+			// Plus we have to push any block params again.
+			for _, p := range bt.Params {
+				valueTypeStack.push(p)
+			}
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeIf {
@@ -769,8 +780,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.
-			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
-				return fmt.Errorf("invalid then block: %v", err)
+			if err := valueTypeStack.popResults(OpcodeIf, bl.blockType.Results, true); err != nil {
+				return err
 			}
 			// Before entering instructions inside else, we pop all the values pushed by then block.
 			valueTypeStack.resetAtStackLimit()
@@ -787,26 +798,26 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 			ifMissingElse := bl.op == OpcodeIf && bl.elseAt <= bl.startAt
 			if ifMissingElse {
-				// If this is the end of block without else,the number of block's results and params must be same.
+				// If this is the end of block without else, the number of block's results and params must be same.
 				// Otherwise, the value stack would result in the inconsistent state at runtime.
 				if !bytes.Equal(bl.blockType.Results, bl.blockType.Params) {
-					return typeMismatchError("type mismatch between then and else blocks", bl.blockType.Results, bl.blockType.Params)
+					return typeCountError(false, OpcodeElseName, bl.blockType.Results, bl.blockType.Params)
 				}
 				// -1 skips else, to handle if block without else properly.
 				bl.elseAt = bl.endAt - 1
 			}
 
+			// Determine the block context
+			ctx := "" // the outer-most block: the function return
+			if bl.op == OpcodeIf && !ifMissingElse && bl.elseAt > 0 {
+				ctx = OpcodeElseName
+			} else if bl.op != 0 {
+				ctx = InstructionName(bl.op)
+			}
+
 			// Check return types match
-			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
-				if bl.op == OpcodeIf {
-					if !ifMissingElse && bl.elseAt > 0 {
-						return fmt.Errorf("invalid else block: %v", err)
-					}
-					return fmt.Errorf("invalid then block: %v", err)
-				} else if bl.op == 0 { // at the outer-most block: the function return
-					return err
-				}
-				return fmt.Errorf("invalid %s block: %v", InstructionName(bl.op), err)
+			if err := valueTypeStack.requireStackValues(false, ctx, bl.blockType.Results, true); err != nil {
+				return err
 			}
 
 			// Put the result types at the end after resetting at the stack limit
@@ -819,7 +830,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			if err := valueTypeStack.popResults(functionType.Results, false); err != nil {
+			// Same formatting as OpcodeEnd on the outer-most block
+			if err := valueTypeStack.requireStackValues(false, "", functionType.Results, false); err != nil {
 				return err
 			}
 			// return instruction is stack-polymorphic.
@@ -882,15 +894,16 @@ func (s *valueTypeStack) tryPop() (vt ValueType, limit int, ok bool) {
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
 	}
-	if len(s.stack) <= limit {
+	stackLen := len(s.stack)
+	if stackLen <= limit {
 		return
-	} else if len(s.stack) == limit+1 && s.stack[limit] == valueTypeUnknown {
+	} else if stackLen == limit+1 && s.stack[limit] == valueTypeUnknown {
 		vt = valueTypeUnknown
 		ok = true
 		return
 	} else {
-		vt = s.stack[len(s.stack)-1]
-		s.stack = s.stack[:len(s.stack)-1]
+		vt = s.stack[stackLen-1]
+		s.stack = s.stack[:stackLen-1]
 		ok = true
 		return
 	}
@@ -943,47 +956,93 @@ func (s *valueTypeStack) popStackLimit() {
 }
 
 // pushStackLimit pushes the control frame's bottom of the stack.
-// pushStackLimit pushes the control frame's bottom of the stack.
 func (s *valueTypeStack) pushStackLimit(params int) {
-	s.stackLimits = append(s.stackLimits, len(s.stack)-params)
+	limit := len(s.stack) - params
+	s.stackLimits = append(s.stackLimits, limit)
 }
 
-func (s *valueTypeStack) popResults(want []ValueType, checkAboveLimit bool) error {
+func (s *valueTypeStack) popParams(oc Opcode, want []ValueType, checkAboveLimit bool) error {
+	return s.requireStackValues(true, InstructionName(oc), want, checkAboveLimit)
+}
+
+func (s *valueTypeStack) popResults(oc Opcode, want []ValueType, checkAboveLimit bool) error {
+	return s.requireStackValues(false, InstructionName(oc), want, checkAboveLimit)
+}
+
+func (s *valueTypeStack) requireStackValues(
+	isParam bool,
+	context string,
+	want []ValueType,
+	checkAboveLimit bool,
+) error {
 	limit := 0
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
 	}
-	// Iterate backwards as we are comparing the result slice against stack value types.
+	// Iterate backwards as we are comparing the desired slice against stack value types.
 	countWanted := len(want)
 	for i := countWanted - 1; i >= 0; i-- {
-		have, _, ok := s.tryPop()
+		popped, _, ok := s.tryPop()
 		if !ok {
-			return resultMismatchError(want[:countWanted-i-1], want)
+			have := want[:countWanted-i-1]
+			if len(have) > len(want) {
+				return typeCountError(isParam, context, have, want)
+			}
+			return typeCountError(isParam, context, have, want)
 		}
-		if have != want[i] && have != valueTypeUnknown && want[i] != valueTypeUnknown {
-			return fmt.Errorf("cannot use %s as type %s in return argument", ValueTypeName(have), ValueTypeName(want[i]))
+		if popped != want[i] && popped != valueTypeUnknown && want[i] != valueTypeUnknown {
+			return typeMismatchError(isParam, context, popped, want[i], i)
 		}
 	}
 	if checkAboveLimit {
 		if !(limit == len(s.stack) || (limit+1 == len(s.stack) && s.stack[limit] == valueTypeUnknown)) {
-			return resultMismatchError(append(s.stack, want...), want)
+			return typeCountError(isParam, context, append(s.stack, want...), want)
 		}
 	}
 	return nil
 }
 
-// resultMismatchError returns an error similar to go compiler's error on result type mismatch.
-func resultMismatchError(have, want []ValueType) error {
-	if len(have) > len(want) {
-		return typeMismatchError("too many arguments to return", have, want)
+// typeMismatchError returns an error similar to go compiler's error on type mismatch.
+func typeMismatchError(isParam bool, context string, have ValueType, want ValueType, i int) error {
+	var ret strings.Builder
+	ret.WriteString("cannot use ")
+	ret.WriteString(ValueTypeName(have))
+	ret.WriteString(" as type ")
+	ret.WriteString(ValueTypeName(want))
+	if context != "" {
+		ret.WriteString(" in ")
+		ret.WriteString(context)
+		ret.WriteString(" block ")
 	}
-	return typeMismatchError("not enough arguments to return", have, want)
+	if isParam {
+		ret.WriteString(" param")
+	} else {
+		ret.WriteString(" result")
+	}
+	ret.WriteString("[")
+	ret.WriteString(strconv.Itoa(i))
+	ret.WriteByte(']')
+	return errors.New(ret.String())
 }
 
-// typeMismatchError returns an error similar to go compiler's error on type mismatch.
-func typeMismatchError(message string, have []ValueType, want []ValueType) error {
+// typeCountError returns an error similar to go compiler's error on type count mismatch.
+func typeCountError(isParam bool, context string, have []ValueType, want []ValueType) error {
 	var ret strings.Builder
-	ret.WriteString(message)
+	if len(have) > len(want) {
+		ret.WriteString("too many ")
+	} else {
+		ret.WriteString("not enough ")
+	}
+	if isParam {
+		ret.WriteString("params")
+	} else {
+		ret.WriteString("results")
+	}
+	if context != "" {
+		ret.WriteString(" in ")
+		ret.WriteString(context)
+		ret.WriteString(" block")
+	}
 	ret.WriteString("\n\thave (")
 	writeValueTypes(have, &ret)
 	ret.WriteString(")\n\twant (")
