@@ -1007,21 +1007,20 @@ func typeMismatchError(isParam bool, context string, have ValueType, want ValueT
 	var ret strings.Builder
 	ret.WriteString("cannot use ")
 	ret.WriteString(ValueTypeName(have))
-	ret.WriteString(" as type ")
-	ret.WriteString(ValueTypeName(want))
 	if context != "" {
 		ret.WriteString(" in ")
 		ret.WriteString(context)
 		ret.WriteString(" block ")
 	}
 	if isParam {
-		ret.WriteString(" param")
+		ret.WriteString(" as param")
 	} else {
-		ret.WriteString(" result")
+		ret.WriteString(" as result")
 	}
 	ret.WriteString("[")
 	ret.WriteString(strconv.Itoa(i))
-	ret.WriteByte(']')
+	ret.WriteString("] type ")
+	ret.WriteString(ValueTypeName(want))
 	return errors.New(ret.String())
 }
 

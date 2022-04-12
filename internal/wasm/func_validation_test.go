@@ -376,7 +376,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as type i32 result[1]",
+			expectedErr: "cannot use i64 as result[1] type i32",
 		},
 		{
 			name: `func.wast - type-return-first-num-vs-nums`,
@@ -393,7 +393,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as type i32 result[1]",
+			expectedErr: "cannot use i64 as result[1] type i32",
 		},
 		{
 			name: `func.wast - type-break-last-num-vs-nums`,
