@@ -891,6 +891,504 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 	have (i32)
 	want (i32, i32)`,
 		},
+		{
+			name: `if.wast - type-then-value-nums-vs-num`,
+			// This should err because the if branch returns two values, but its type use requires one:
+			//	(module (func $type-then-value-nums-vs-num (result i32)
+			//	  (if (result i32) (i32.const 1) (then (i32.const 1) (i32.const 1)) (else (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in if block
+	have (i32, i32)
+	want (i32)`,
+		},
+		{
+			name: `if.wast - type-else-value-nums-vs-num`,
+			// This should err because the else branch returns two values, but its type use requires one:
+			//	(module (func $type-else-value-nums-vs-num (result i32)
+			//	  (if (result i32) (i32.const 1) (then (i32.const 1)) (else (i32.const 1) (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
+					OpcodeI32Const, 1, // (then (i32.const 1))
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in else block
+	have (i32, i32)
+	want (i32)`,
+		},
+		{
+			name: `if.wast - type-both-value-nums-vs-num`,
+			// This should err because the if branch returns two values, but its type use requires one:
+			//	(module (func $type-both-value-nums-vs-num (result i32)
+			//	  (if (result i32) (i32.const 1) (then (i32.const 1) (i32.const 1)) (else (i32.const 1) (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in if block
+	have (i32, i32)
+	want (i32)`,
+		},
+		{
+			name: `if.wast - type-both-different-value-nums-vs-nums`,
+			// This should err because the if branch returns three values, but its type use requires two:
+			//	(module (func $type-both-different-value-nums-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1) (then (i32.const 1) (i32.const 1) (i32.const 1)) (else (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `too many results in if block
+	have (i32, i32, i32)
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-then-break-last-void-vs-nums`,
+			// This should err because the branch in the if returns no values, but its type use requires two:
+			//	(module (func $type-then-break-last-void-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1) (then (br 0)) (else (i32.const 1) (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeBr, 0, // (then (br 0))
+					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1)))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-else-break-last-void-vs-nums`,
+			// This should err because the branch in the else returns no values, but its type use requires two:
+			//	(module (func $type-else-break-last-void-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1) (then (i32.const 1) (i32.const 1)) (else (br 0)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeBr, 0, // (else (br 0))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-then-break-empty-vs-nums`,
+			// This should err because the branch in the if returns no values, but its type use requires two:
+			//	(module (func $type-then-break-empty-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (br 0) (i32.const 1) (i32.const 1))
+			//	    (else (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: consts are outside the br block
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-else-break-empty-vs-nums`,
+			// This should err because the branch in the else returns no values, but its type use requires two:
+			//	(module (func $type-else-break-empty-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (i32.const 1) (i32.const 1))
+			//	    (else (br 0) (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: consts are outside the br block
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-then-break-void-vs-nums`,
+			// This should err because the branch in the if evaluates to no values, but its type use requires two:
+			//	(module (func $type-then-break-void-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (br 0 (nop)) (i32.const 1) (i32.const 1))
+			//	    (else (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeNop, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0 (nop)) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: consts are outside the br block
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-else-break-void-vs-nums`,
+			// This should err because the branch in the else evaluates to no values, but its type use requires two:
+			//	(module (func $type-else-break-void-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (i32.const 1) (i32.const 1))
+			//	    (else (br 0 (nop)) (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeNop, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0 (nop)) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: consts are outside the br block
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have ()
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-then-break-num-vs-nums`,
+			// This should err because the branch in the if evaluates to one value, but its type use requires two:
+			//	(module (func $type-then-break-num-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
+			//	    (else (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: only one (incorrect) const is inside the br block
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (i32.const 1) (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have (i64)
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-else-break-num-vs-nums`,
+			// This should err because the branch in the else evaluates to one value, but its type use requires two:
+			//	(module (func $type-else-break-num-vs-nums (result i32 i32)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (i32.const 1) (i32.const 1))
+			//	    (else (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 1, // (then (i32.const 1) (i32.const 1))
+					OpcodeElse, OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, OpcodeI32Const, 1, // (else (br 0 (i64.const 1)) (i32.const 1) (i32.const 1))
+					// ^^ NOTE: only one (incorrect) const is inside the br block
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have (i64)
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-then-break-partial-vs-nums`,
+			// This should err because the branch in the if evaluates to one value, but its type use requires two:
+			//	(module (func $type-then-break-partial-vs-nums (result i32 i32)
+			//	  (i32.const 1)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (br 0 (i64.const 1)) (i32.const 1))
+			//	    (else (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, // (i32.const 1)
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, // (then (br 0 (i64.const 1)) (i32.const 1))
+					// ^^ NOTE: only one (incorrect) const is inside the br block
+					OpcodeElse, OpcodeI32Const, 1, // (else (i32.const 1))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in br block
+	have (i64)
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-else-break-partial-vs-nums`,
+			// This should err because the branch in the if evaluates to one value, but its type use requires two:
+			//	(module (func $type-else-break-partial-vs-nums (result i32 i32)
+			//	  (i32.const 1)
+			//	  (if (result i32 i32) (i32.const 1)
+			//	    (then (i32.const 1))
+			//	    (else (br 0 (i64.const 1)) (i32.const 1))
+			//	  )
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_i32i32},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, // (i32.const 1)
+					OpcodeI32Const, 1, OpcodeIf, 0x00, // (if (result i32 i32) (i32.const 1)
+					OpcodeI32Const, 1, // (then (i32.const 1))
+					OpcodeElse, OpcodeI64Const, 1, OpcodeBr, 0, OpcodeI32Const, 1, // (else (br 0 (i64.const 1)) (i32.const 1))
+					// ^^ NOTE: only one (incorrect) const is inside the br block
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough results in if block
+	have (i32)
+	want (i32, i32)`,
+		},
+		{
+			name: `if.wast - type-param-void-vs-num`,
+			// This should err because the stack has no values, but the if type use requires two:
+			//	(module (func $type-param-void-vs-num
+			//	  (if (param i32) (i32.const 1) (then (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
+					OpcodeDrop, // (then (drop)))
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have ()
+	want (i32)`,
+		},
+		{
+			name: `if.wast - type-param-void-vs-nums`,
+			// This should err because the stack has no values, but the if type use requires two:
+			//	(module (func $type-param-void-vs-nums
+			//	  (if (param i32 f64) (i32.const 1) (then (drop) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32f64_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32 f64) (i32.const 1)
+					OpcodeI32Const, 1, OpcodeDrop, // (then (drop) (drop))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have ()
+	want (i32, f64)`,
+		},
+		{
+			name: `if.wast - type-param-num-vs-num`,
+			// This should err because the stack has a different value that what the if type use requires:
+			//	(module (func $type-param-num-vs-num
+			//	  (f32.const 0) (if (param i32) (i32.const 1) (then (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
+					OpcodeDrop, // (then (drop))
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: "cannot use f32 in if block as param[0] type i32",
+		},
+		{
+			name: `if.wast - type-param-num-vs-nums`,
+			// This should err because the stack has one value, but the if type use requires two:
+			//	(module (func $type-param-num-vs-nums
+			//	  (f32.const 0) (if (param f32 i32) (i32.const 1) (then (drop) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, f32i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param f32 i32) (i32.const 1)
+					OpcodeDrop, OpcodeDrop, // (then (drop) (drop))
+					OpcodeEnd, // if
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have (f32)
+	want (f32, i32)`,
+		},
+		{
+			name: `if.wast - type-param-nested-void-vs-num`,
+			// This should err because the stack has no values, but the if type use requires one:
+			//	(module (func $type-param-nested-void-vs-num
+			//	  (block (if (param i32) (i32.const 1) (then (drop))))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
+					OpcodeDrop, // (then (drop))
+					OpcodeEnd,  // block
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have ()
+	want (i32)`,
+		},
+		{
+			name: `if.wast - type-param-void-vs-nums`,
+			// This should err because the stack has no values, but the if type use requires two:
+			//	(module (func $type-param-void-vs-nums
+			//	  (block (if (param i32 f64) (i32.const 1) (then (drop) (drop))))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32f64_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32 f64) (i32.const 1)
+					OpcodeDrop, // (then (drop) (drop))
+					OpcodeEnd,  // block
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have ()
+	want (i32, f64)`,
+		},
+		{
+			name: `if.wast - type-param-num-vs-num`,
+			// This should err because the stack has a different values than required by the if type use:
+			//	(module (func $type-param-num-vs-num
+			//	  (block (f32.const 0) (if (param i32) (i32.const 1) (then (drop))))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param i32) (i32.const 1)
+					OpcodeDrop, // (then (drop))
+					OpcodeEnd,  // block
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: "cannot use f32 in if block as param[0] type i32",
+		},
+		{
+			name: `if.wast - type-param-num-vs-nums`,
+			// This should err because the stack has one value, but the if type use requires two:
+			//	(module (func $type-param-num-vs-nums
+			//	  (block (f32.const 0) (if (param f32 i32) (i32.const 1) (then (drop) (drop))))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, f32i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeI32Const, 1, OpcodeIf, 0x01, // (if (param f32 i32) (i32.const 1)
+					OpcodeDrop, // (then (drop) (drop))
+					OpcodeEnd,  // block
+					OpcodeEnd,  // if
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for if block
+	have (f32)
+	want (f32, i32)`,
+		},
 
 		// test/core/loop.wast
 		{

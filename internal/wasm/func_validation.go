@@ -774,6 +774,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the operand for 'if': %v", err)
 			}
+			if err = valueTypeStack.popParams(op, bt.Params, false); err != nil {
+				return err
+			}
+			// Plus we have to push any block params again.
+			for _, p := range bt.Params {
+				valueTypeStack.push(p)
+			}
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeElse {
