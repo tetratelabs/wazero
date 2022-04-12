@@ -103,6 +103,9 @@ var (
 )
 
 var (
+	// amd64CallingConvensionModuleInstanceAddressRegister holds *wasm.ModuleInstance of the
+	// next executing function instance. The value is set and used when making function calls
+	// or function returns in the ModuleContextInitialization. See compileModuleContextInitialization.
 	amd64CallingConvensionModuleInstanceAddressRegister = amd64.REG_R12
 )
 
@@ -3564,6 +3567,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	// So we increment the call frame stack pointer.
 	c.assembler.CompileNoneToMemory(amd64.INCQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
+	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConvensionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, targetCompiledFunctionAddressRegister, compiledFunctionModuleInstanceAddressOffset,
 		amd64CallingConvensionModuleInstanceAddressRegister)
 
@@ -3601,6 +3605,8 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
 	c.compileReleaseAllRegistersToStack()
 
+	// amd64CallingConvensionModuleInstanceAddressRegister holds the module intstance's address
+	// so mark it used so that it won't be used as a free register.
 	c.locationStack.markRegisterUsed(amd64CallingConvensionModuleInstanceAddressRegister)
 	defer c.locationStack.markRegisterUnused(amd64CallingConvensionModuleInstanceAddressRegister)
 
@@ -3679,8 +3685,9 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 		tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 
-	// 2)
+	// 2) Load rc.caller.moduleInstanceAddress into amd64CallingConvensionModuleInstanceAddressRegister
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		// "rc.caller" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameCompiledFunctionOffset),
 		amd64CallingConvensionModuleInstanceAddressRegister,
 	)
@@ -3883,6 +3890,8 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 // callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) compileModuleContextInitialization() error {
+	// amd64CallingConvensionModuleInstanceAddressRegister holds the module intstance's address
+	// so mark it used so that it won't be used as a free register until the module context initialization finishes.
 	c.locationStack.markRegisterUsed(amd64CallingConvensionModuleInstanceAddressRegister)
 	defer c.locationStack.markRegisterUnused(amd64CallingConvensionModuleInstanceAddressRegister)
 
@@ -3906,10 +3915,12 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, amd64CallingConvensionModuleInstanceAddressRegister)
 	jmpIfModuleNotChange := c.assembler.CompileJump(amd64.JEQ)
 
+	// If engine.ModuleContext.ModuleInstanceAddress is not euqal the value on amd64CallingConvensionModuleInstanceAddressRegister,
+	// we have to put the new value there.
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ, amd64CallingConvensionModuleInstanceAddressRegister,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
 
-	// Otherwise, we have to update the following fields:
+	// Also, we have to update the following fields:
 	// * callEngine.moduleContext.globalElement0Address
 	// * callEngine.moduleContext.tableElement0Address
 	// * callEngine.moduleContext.tableSliceLen
