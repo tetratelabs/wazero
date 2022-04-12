@@ -981,22 +981,32 @@ func (s *valueTypeStack) requireStackValues(
 	}
 	// Iterate backwards as we are comparing the desired slice against stack value types.
 	countWanted := len(want)
+
+	// First, check if there are enough values on the stack.
+	have := make([]ValueType, 0, countWanted)
 	for i := countWanted - 1; i >= 0; i-- {
 		popped, _, ok := s.tryPop()
 		if !ok {
-			have := want[:countWanted-i-1]
 			if len(have) > len(want) {
 				return typeCountError(isParam, context, have, want)
 			}
 			return typeCountError(isParam, context, have, want)
 		}
-		if popped != want[i] && popped != valueTypeUnknown && want[i] != valueTypeUnknown {
-			return typeMismatchError(isParam, context, popped, want[i], i)
-		}
+		have = append(have, popped)
 	}
+
+	// Now, check if there are too many values.
 	if checkAboveLimit {
 		if !(limit == len(s.stack) || (limit+1 == len(s.stack) && s.stack[limit] == valueTypeUnknown)) {
 			return typeCountError(isParam, context, append(s.stack, want...), want)
+		}
+	}
+
+	// Finally, check the types of the values:
+	for i, v := range have {
+		nextWant := want[countWanted-i-1] // have is in reverse order (stack)
+		if v != nextWant && v != valueTypeUnknown && nextWant != valueTypeUnknown {
+			return typeMismatchError(isParam, context, v, nextWant, i)
 		}
 	}
 	return nil
@@ -1010,7 +1020,7 @@ func typeMismatchError(isParam bool, context string, have ValueType, want ValueT
 	if context != "" {
 		ret.WriteString(" in ")
 		ret.WriteString(context)
-		ret.WriteString(" block ")
+		ret.WriteString(" block")
 	}
 	if isParam {
 		ret.WriteString(" as param")
@@ -1038,7 +1048,11 @@ func typeCountError(isParam bool, context string, have []ValueType, want []Value
 		ret.WriteString("results")
 	}
 	if context != "" {
-		ret.WriteString(" in ")
+		if isParam {
+			ret.WriteString(" for ")
+		} else {
+			ret.WriteString(" in ")
+		}
 		ret.WriteString(context)
 		ret.WriteString(" block")
 	}

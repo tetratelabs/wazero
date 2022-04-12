@@ -186,7 +186,9 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 
 var (
 	f32, f64, i32, i64 = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64
+	f32i32_v           = &FunctionType{Params: []ValueType{f32, i32}}
 	i32_i32            = &FunctionType{Params: []ValueType{i32}, Results: []ValueType{i32}}
+	i32f64_v           = &FunctionType{Params: []ValueType{i32, f64}}
 	i32i32_i32         = &FunctionType{Params: []ValueType{i32, i32}, Results: []ValueType{i32}}
 	i32_v              = &FunctionType{Params: []ValueType{i32}}
 	v_v                = &FunctionType{}
@@ -311,7 +313,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-return-empty-vs-nums`,
-			// This example should err because (return) precedes the values expected in the signature (i32i32):
+			// This should err because (return) precedes the values expected in the signature (i32i32):
 			//	(module (func $type-return-empty-vs-nums (result i32 i32)
 			//	  (return) (i32.const 1) (i32.const 2)
 			//	))
@@ -329,7 +331,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-return-partial-vs-nums`,
-			// This example should err because (return) precedes one of the values expected in the signature (i32i32):
+			// This should err because (return) precedes one of the values expected in the signature (i32i32):
 			//	(module (func $type-return-partial-vs-nums (result i32 i32)
 			//	  (i32.const 1) (return) (i32.const 2)
 			//	))
@@ -347,7 +349,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-return-void-vs-nums`,
-			// This example should err because (return) is empty due to nop, but the signature requires i32i32:
+			// This should err because (return) is empty due to nop, but the signature requires i32i32:
 			//	(module (func $type-return-void-vs-nums (result i32 i32)
 			//	  (return (nop)) (i32.const 1)
 			//	))
@@ -376,11 +378,13 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as result[1] type i32",
+			expectedErr: `not enough results
+	have (i64)
+	want (i32, i32)`,
 		},
 		{
 			name: `func.wast - type-return-first-num-vs-nums`,
-			// This example should err because the first return doesn't match the result types i32i32:
+			// This should err because the return block doesn't return enough values.
 			//	(module (func $type-return-first-num-vs-nums (result i32 i32)
 			//	  (return (i32.const 1)) (return (i32.const 1) (i32.const 2))
 			//	))
@@ -393,7 +397,9 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeEnd, // func
 				}}},
 			},
-			expectedErr: "cannot use i64 as result[1] type i32",
+			expectedErr: `not enough results
+	have (i64)
+	want (i32, i32)`,
 		},
 		{
 			name: `func.wast - type-break-last-num-vs-nums`,
@@ -411,7 +417,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-break-void-vs-nums`,
-			// This example should err because (br 0) returns no values, but its enclosing function requires two:
+			// This should err because (br 0) returns no values, but its enclosing function requires two:
 			//	(module (func $type-break-void-vs-nums (result i32 i32)
 			//	  (br 0) (i32.const 1) (i32.const 2)
 			//	))
@@ -430,7 +436,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-break-num-vs-nums`,
-			// This example should err because (br 0) returns one value, but its enclosing function requires two:
+			// This should err because (br 0) returns one value, but its enclosing function requires two:
 			//	(module (func $type-break-num-vs-nums (result i32 i32)
 			//	  (br 0 (i32.const 1)) (i32.const 1) (i32.const 2)
 			//	))
@@ -449,7 +455,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-break-nested-empty-vs-nums`,
-			// This example should err because (br 1) doesn't return values, but its enclosing function does:
+			// This should err because (br 1) doesn't return values, but its enclosing function does:
 			//	(module (func $type-break-nested-empty-vs-nums (result i32 i32)
 			//	  (block (br 1)) (br 0 (i32.const 1) (i32.const 2))
 			//	))
@@ -468,7 +474,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-break-nested-void-vs-nums`,
-			// This example should err because nop returns the empty type, but the enclosing function returns i32i32:
+			// This should err because nop returns the empty type, but the enclosing function returns i32i32:
 			//	(module (func $type-break-nested-void-vs-nums (result i32 i32)
 			//	  (block (br 1 (nop))) (br 0 (i32.const 1) (i32.const 2))
 			//	))
@@ -487,7 +493,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `func.wast - type-break-nested-num-vs-nums`,
-			// This example should err because the block signature is v_i32, but the enclosing function is v_i32i32:
+			// This should err because the block signature is v_i32, but the enclosing function is v_i32i32:
 			//	(module (func $type-break-nested-num-vs-nums (result i32 i32)
 			//	  (block (result i32) (br 1 (i32.const 1))) (br 0 (i32.const 1) (i32.const 2))
 			//	))
@@ -508,7 +514,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		// test/core/if.wast
 		{
 			name: `if.wast - wrong signature for if type use`,
-			// This example should err because (br 0) returns no values, but its enclosing function requires two:
+			// This should err because (br 0) returns no values, but its enclosing function requires two:
 			//  (module
 			//    (type $sig (func))
 			//    (func (i32.const 1) (if (type $sig) (i32.const 0) (then)))
@@ -529,7 +535,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `if.wast - type-then-value-nums-vs-void`,
-			// This example should err because (if) without a type use returns no values, but its (then) returns two:
+			// This should err because (if) without a type use returns no values, but its (then) returns two:
 			//	(module (func $type-then-value-nums-vs-void
 			//	  (if (i32.const 1) (then (i32.const 1) (i32.const 2)))
 			//	))
@@ -549,7 +555,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `if.wast - type-then-value-nums-vs-void-else`,
-			// This example should err because (if) without a type use returns no values, but its (then) returns two:
+			// This should err because (if) without a type use returns no values, but its (then) returns two:
 			//	(module (func $type-then-value-nums-vs-void-else
 			//	  (if (i32.const 1) (then (i32.const 1) (i32.const 2)) (else))
 			//	))
@@ -570,7 +576,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `if.wast - type-else-value-nums-vs-void`,
-			// This example should err because (if) without a type use returns no values, but its (else) returns two:
+			// This should err because (if) without a type use returns no values, but its (else) returns two:
 			//	(module (func $type-else-value-nums-vs-void
 			//	  (if (i32.const 1) (then) (else (i32.const 1) (i32.const 2)))
 			//	))
@@ -590,7 +596,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `if.wast - type-both-value-nums-vs-void`,
-			// This example should err because (if) without a type use returns no values, each branch returns two:
+			// This should err because (if) without a type use returns no values, each branch returns two:
 			//	(module (func $type-both-value-nums-vs-void
 			//	  (if (i32.const 1) (then (i32.const 1) (i32.const 2)) (else (i32.const 2) (i32.const 1)))
 			//	))
@@ -613,7 +619,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		// test/core/loop.wast
 		{
 			name: `loop.wast - wrong signature for loop type use`,
-			// This example should err because the loop type use returns no values, but its block returns one:
+			// This should err because the loop type use returns no values, but its block returns one:
 			//  (module
 			//    (type $sig (func))
 			//    (func (loop (type $sig) (i32.const 0)))
@@ -633,7 +639,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-nums-vs-void`,
-			// This example should err because the empty block type requires no values, but the loop returns two:
+			// This should err because the empty block type requires no values, but the loop returns two:
 			//  (module (func $type-value-nums-vs-void
 			//    (loop (i32.const 1) (i32.const 2))
 			//  ))
@@ -652,7 +658,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-empty-vs-nums`,
-			// This example should err because the loop type use returns two values, but the block returns none:
+			// This should err because the loop type use returns two values, but the block returns none:
 			//	(module (func $type-value-empty-vs-nums (result i32 i32)
 			//	  (loop (result i32 i32))
 			//	))
@@ -671,7 +677,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-void-vs-nums`,
-			// This example should err because the loop type use returns two values, but the block returns none:
+			// This should err because the loop type use returns two values, but the block returns none:
 			//	(module (func $type-value-void-vs-nums (result i32 i32)
 			//	  (loop (result i32 i32) (nop))
 			//	))
@@ -691,7 +697,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-num-vs-nums`,
-			// This example should err because the loop type use returns two values, but the block returns one:
+			// This should err because the loop type use returns two values, but the block returns one:
 			//	(module (func $type-value-num-vs-nums (result i32 i32)
 			//	  (loop (result i32 i32) (i32.const 0))
 			//	))
@@ -711,7 +717,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-partial-vs-nums`,
-			// This example should err because the loop type use returns two values, but the block returns one:
+			// This should err because the loop type use returns two values, but the block returns one:
 			//	(module (func $type-value-partial-vs-nums (result i32 i32)
 			//	  (i32.const 1) (loop (result i32 i32) (i32.const 2))
 			//	))
@@ -732,7 +738,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-value-nums-vs-num`,
-			// This example should err because the loop type use returns one value, but the block returns two:
+			// This should err because the loop type use returns one value, but the block returns two:
 			//	(module (func $type-value-nums-vs-num (result i32)
 			//	  (loop (result i32) (i32.const 1) (i32.const 2))
 			//	))
@@ -752,7 +758,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		},
 		{
 			name: `loop.wast - type-param-void-vs-num`,
-			// This example should err because the loop type use returns one value, but the block returns two:
+			// This should err because the loop type use requires one param, but the stack has none:
 			//	(module (func $type-param-void-vs-num
 			//	  (loop (param i32) (drop))
 			//	))
@@ -766,9 +772,158 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 					OpcodeEnd,  // func
 				}}},
 			},
-			expectedErr: `not enough params in loop block
+			expectedErr: `not enough params for loop block
 	have ()
 	want (i32)`,
+		},
+		{
+			name: `loop.wast - type-param-void-vs-nums`,
+			// This should err because the loop type use requires two params, but the stack has none:
+			//	(module (func $type-param-void-vs-nums
+			//	  (loop (param i32 f64) (drop) (drop))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32f64_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeLoop, 0x1, // (loop (param i32 f64)
+					OpcodeDrop, // (drop)
+					OpcodeDrop, // (drop)
+					OpcodeEnd,  // loop
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for loop block
+	have ()
+	want (i32, f64)`,
+		},
+		{
+			name: `loop.wast - type-param-num-vs-num`,
+			// This should err because the loop type use requires a different param type than what's on the stack:
+			//	(module (func $type-param-num-vs-num
+			//	  (f32.const 0) (loop (param i32) (drop))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeLoop, 0x1, // (loop (param i32)
+					OpcodeDrop, // (drop)
+					OpcodeEnd,  // loop
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: "cannot use f32 in loop block as param[0] type i32",
+		},
+		{
+			name: `loop.wast - type-param-num-vs-num`,
+			// This should err because the loop type use requires a more parameters than what's on the stack:
+			//	(module (func $type-param-num-vs-nums
+			//	  (f32.const 0) (loop (param f32 i32) (drop) (drop))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, f32i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeLoop, 0x1, // (loop (param f32 i32)
+					OpcodeDrop, OpcodeDrop, // (drop) (drop)
+					OpcodeEnd, // loop
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough params for loop block
+	have (f32)
+	want (f32, i32)`,
+		},
+		{
+			name: `loop.wast - type-param-nested-void-vs-num`,
+			// This should err because the loop type use requires a more parameters than what's on the stack:
+			//	(module (func $type-param-nested-void-vs-num
+			//	  (block (loop (param i32) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeLoop, 0x1, // (loop (param i32)
+					OpcodeDrop, // (drop)
+					OpcodeEnd,  // loop
+					OpcodeEnd,  // block
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: `not enough params for loop block
+	have ()
+	want (i32)`,
+		},
+		{
+			name: `loop.wast - type-param-void-vs-nums`,
+			// This should err because the loop type use requires a more parameters than what's on the stack:
+			//	(module (func $type-param-void-vs-nums
+			//	  (block (loop (param i32 f64) (drop) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32f64_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeLoop, 0x1, // (loop (param i32 f64)
+					OpcodeDrop, OpcodeDrop, // (drop) (drop)
+					OpcodeEnd, // loop
+					OpcodeEnd, // block
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough params for loop block
+	have ()
+	want (i32, f64)`,
+		},
+		{
+			name: `loop.wast - type-param-void-vs-nums`,
+			// This should err because the loop type use requires a different param type than what's on the stack:
+			//	(module (func $type-param-num-vs-num
+			//	  (block (f32.const 0) (loop (param i32) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeLoop, 0x1, // (loop (param i32)
+					OpcodeDrop, // (drop)
+					OpcodeEnd,  // loop
+					OpcodeEnd,  // block
+					OpcodeEnd,  // func
+				}}},
+			},
+			expectedErr: "cannot use f32 in loop block as param[0] type i32",
+		},
+		{
+			name: `loop.wast - type-param-void-vs-nums`,
+			// This should err because the loop type use requires a more parameters than what's on the stack:
+			//	(module (func $type-param-num-vs-nums
+			//	  (block (f32.const 0) (loop (param f32 i32) (drop) (drop)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v, f32i32_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeBlock, 0x40, // (block
+					OpcodeF32Const, 0, 0, 0, 0, // (f32.const 0)
+					OpcodeLoop, 0x1, // (loop (param f32 i32)
+					OpcodeDrop, OpcodeDrop, // (drop) (drop)
+					OpcodeEnd, // loop
+					OpcodeEnd, // block
+					OpcodeEnd, // func
+				}}},
+			},
+			expectedErr: `not enough params for loop block
+	have (f32)
+	want (f32, i32)`,
 		},
 	}
 
