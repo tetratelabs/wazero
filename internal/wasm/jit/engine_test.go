@@ -60,6 +60,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionCodeInitialAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), compiledFunctionStackPointerCeilOffset)
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), compiledFunctionSourceOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), compiledFunctionModuleInstanceAddressOffset)
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance

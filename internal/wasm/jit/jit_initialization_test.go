@@ -177,7 +177,10 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.NotZero(t, returnAddress)
-		jitcall(returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
+		jitcall(
+			returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
+			uintptr(unsafe.Pointer(env.module())),
+		)
 
 		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())

@@ -173,11 +173,13 @@ type (
 		codeInitialAddress uintptr
 		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		stackPointerCeil uint64
+		// The source function instance from which this is compiled.
+		source *wasm.FunctionInstance
+
+		moduleInstanceAddress uintptr //nolint
 
 		// Followings are not accessed by JITed code.
 
-		// The source function instance from which this is compiled.
-		source *wasm.FunctionInstance
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for compiledFunctionStaticData type.
@@ -229,9 +231,10 @@ const (
 	callFrameCompiledFunctionOffset        = 16
 
 	// Offsets for compiledFunction.
-	compiledFunctionCodeInitialAddressOffset = 0
-	compiledFunctionStackPointerCeilOffset   = 8
-	compiledFunctionSourceOffset             = 16
+	compiledFunctionCodeInitialAddressOffset    = 0
+	compiledFunctionStackPointerCeilOffset      = 8
+	compiledFunctionSourceOffset                = 16
+	compiledFunctionModuleInstanceAddressOffset = 24
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset = 48
@@ -683,7 +686,7 @@ jitentry:
 		}
 
 		// Call into the JIT code.
-		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)))
+		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
 
 		// Check the status code from JIT code.
 		switch status := ce.exitContext.statusCode; status {
@@ -809,10 +812,11 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}
 
 	return &compiledFunction{
-		source:             f,
-		codeSegment:        code,
-		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		stackPointerCeil:   stackPointerCeil,
+		source:                f,
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+		stackPointerCeil:      stackPointerCeil,
 	}, nil
 }
 
@@ -1006,10 +1010,11 @@ func compileWasmFunction(enabledFeatures wasm.Features, f *wasm.FunctionInstance
 	}
 
 	return &compiledFunction{
-		source:             f,
-		codeSegment:        code,
-		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		stackPointerCeil:   stackPointerCeil,
-		staticData:         staticData,
+		source:                f,
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+		stackPointerCeil:      stackPointerCeil,
+		staticData:            staticData,
 	}, nil
 }

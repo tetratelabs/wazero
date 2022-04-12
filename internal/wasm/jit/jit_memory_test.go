@@ -40,7 +40,10 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	require.Equal(t, builtinFunctionIndexMemoryGrow, env.builtinFunctionCallAddress())
 
 	// Reenter from the return address.
-	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
+	jitcall(
+		env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
+		uintptr(unsafe.Pointer(env.module())),
+	)
 
 	// Check if the code successfully executed the code after builtin function call.
 	require.Equal(t, expValue, env.stackTopAsUint32())

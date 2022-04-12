@@ -724,6 +724,9 @@ func (a *AssemblerImpl) encodeNoneToNone(n *NodeImpl) (err error) {
 	case RET:
 		// https://www.felixcloutier.com/x86/ret
 		err = a.Buf.WriteByte(0xc3)
+	case UD2:
+		// https://mudongliang.github.io/x86/html/file_module_x86_id_318.html
+		_, err = a.Buf.Write([]byte{0x0f, 0x0b})
 	default:
 		err = errorEncodingUnsupported(n)
 	}

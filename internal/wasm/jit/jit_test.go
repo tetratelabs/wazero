@@ -120,8 +120,9 @@ func (j *jitEnv) callEngine() *callEngine {
 
 func (j *jitEnv) exec(code []byte) {
 	compiledFunction := &compiledFunction{
-		codeSegment:        code,
-		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
 		source: &wasm.FunctionInstance{
 			Kind:   wasm.FunctionKindWasm,
 			Type:   &wasm.FunctionType{},
@@ -134,6 +135,7 @@ func (j *jitEnv) exec(code []byte) {
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(j.ce)),
+		uintptr(unsafe.Pointer(j.moduleInstance)),
 	)
 }
 
