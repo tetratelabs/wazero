@@ -13,7 +13,9 @@ These impose some difficulties on JIT engine purely written in Go because we *ca
 
 ## How to generate native codes
 
-We are using our own assembler which is implemented from scrach in [`internal/asm`](../../asm/) package. The reason why we are re-implementing it rather than using the existing assembler (e.g. [`twitchyliquid64/golang-asm`](https://github.com/twitchyliquid64/golang-asm)) is that one of our goals is to have zero dependencies in wazero project, plus golang-asm is not thread-safe which unables us to do conccurrent compilation (See [#233](https://github.com/tetratelabs/wazero/issues/233)).
+wazero uses its own assembler, implemented from scratch in the [`internal/asm`](../../asm/) package. The primary rationale are wazero's zero dependency policy, and to enable concurrent compilation (a feature the WebAssembly binary format optimizes for).
+
+Before this, wazero used [`twitchyliquid64/golang-asm`](https://github.com/twitchyliquid64/golang-asm). However, this was not only a dependency (one of our goals is to have zero dependencies), but also a large one (several megabytes added to the binary). Moreover, any copy of golang-asm is not thread-safe, so can't be used for concurrent compilation (See [#233](https://github.com/tetratelabs/wazero/issues/233)).
 
 The assembled native codes are represented as `[]byte` and the slice region is marked as executable via mmap system call.
 
