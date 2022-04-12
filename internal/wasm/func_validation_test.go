@@ -536,6 +536,68 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 	have (i32, i32)
 	want ()`,
 		},
+		{
+			name: `if.wast - type-then-value-nums-vs-void-else`,
+			// This example should err because (if) without a type use returns no values, but its (then) returns two:
+			//	(module (func $type-then-value-nums-vs-void-else
+			//	  (if (i32.const 1) (then (i32.const 1) (i32.const 2)) (else))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
+					OpcodeElse, // (else)
+					OpcodeEnd,  // )
+					OpcodeEnd,  // )
+				}}},
+			},
+			expectedErr: `invalid then block: too many arguments to return
+	have (i32, i32)
+	want ()`,
+		},
+		{
+			name: `if.wast - type-else-value-nums-vs-void`,
+			// This example should err because (if) without a type use returns no values, but its (else) returns two:
+			//	(module (func $type-else-value-nums-vs-void
+			//	  (if (i32.const 1) (then) (else (i32.const 1) (i32.const 2)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1) (then)
+					OpcodeElse, OpcodeI32Const, 1, OpcodeI32Const, 2, // (else (i32.const 1) (i32.const 2))
+					OpcodeEnd, // )
+					OpcodeEnd, // )
+				}}},
+			},
+			expectedErr: `invalid else block: too many arguments to return
+	have (i32, i32)
+	want ()`,
+		},
+		{
+			name: `if.wast - type-both-value-nums-vs-void`,
+			// This example should err because (if) without a type use returns no values, each branch returns two:
+			//	(module (func $type-both-value-nums-vs-void
+			//	  (if (i32.const 1) (then (i32.const 1) (i32.const 2)) (else (i32.const 2) (i32.const 1)))
+			//	))
+			module: &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{{Body: []byte{
+					OpcodeI32Const, 1, OpcodeIf, 0x40, // (if (i32.const 1)
+					OpcodeI32Const, 1, OpcodeI32Const, 2, // (then (i32.const 1) (i32.const 2))
+					OpcodeElse, OpcodeI32Const, 2, OpcodeI32Const, 1, // (else (i32.const 2) (i32.const 1))
+					OpcodeEnd, // )
+					OpcodeEnd, // )
+				}}},
+			},
+			expectedErr: `invalid then block: too many arguments to return
+	have (i32, i32)
+	want ()`,
+		},
 	}
 
 	for _, tt := range tests {

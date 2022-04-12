@@ -770,7 +770,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
-				return fmt.Errorf("invalid instruction results in then instructions")
+				return fmt.Errorf("invalid then block: %v", err)
 			}
 			// Before entering instructions inside else, we pop all the values pushed by then block.
 			valueTypeStack.resetAtStackLimit()
@@ -785,8 +785,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 			// OpcodeEnd can end a block or the function itself. Check to see what it is:
 
-			isElse := bl.op == OpcodeIf && bl.elseAt <= bl.startAt
-			if isElse {
+			ifMissingElse := bl.op == OpcodeIf && bl.elseAt <= bl.startAt
+			if ifMissingElse {
 				// If this is the end of block without else,the number of block's results and params must be same.
 				// Otherwise, the value stack would result in the inconsistent state at runtime.
 				if !bytes.Equal(bl.blockType.Results, bl.blockType.Params) {
@@ -799,6 +799,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			// Check return types match
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
 				if bl.op == OpcodeIf {
+					if !ifMissingElse && bl.elseAt > 0 {
+						return fmt.Errorf("invalid else block: %v", err)
+					}
 					return fmt.Errorf("invalid then block: %v", err)
 				} else if bl.op == 0 { // at the outer-most block: the function return
 					return err
