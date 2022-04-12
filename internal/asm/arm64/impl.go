@@ -326,6 +326,9 @@ func (a *AssemblerImpl) addConstPool(v int32, useOffset asm.NodeOffsetInBinary) 
 }
 
 // Bytes returns the encoded binary.
+//
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) Bytes() []byte {
 	// 16 bytes alignment to match our impl with golang-asm.
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L62
@@ -565,6 +568,8 @@ func errorEncodingUnsupported(n *NodeImpl) error {
 	return fmt.Errorf("%s is unsupported for %s type", InstructionName(n.Instruction), n.Types)
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeNoneToNone(n *NodeImpl) (err error) {
 	if n.Instruction != NOP {
 		err = errorEncodingUnsupported(n)
@@ -572,6 +577,8 @@ func (a *AssemblerImpl) EncodeNoneToNone(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 	// "Unconditional branch (register)" in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions
 	var opc byte
@@ -598,6 +605,8 @@ func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case B, BEQ, BGE, BGT, BHI, BHS, BLE, BLO, BLS, BLT, BMI, BNE, BVS:
@@ -702,6 +711,8 @@ func checkRegisterToRegisterType(src, dst asm.Register, requireSrcInt, requireDs
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
 	case ADD, ADDW, SUB:
@@ -1207,6 +1218,8 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeLeftShiftedRegisterToRegister(n *NodeImpl) (err error) {
 
 	baseRegBits, err := intRegisterBits(n.SrcReg)
@@ -1242,6 +1255,8 @@ func (a *AssemblerImpl) EncodeLeftShiftedRegisterToRegister(n *NodeImpl) (err er
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
 	case AND, ANDW, ORR, ORRW, EOR, EORW:
@@ -1359,6 +1374,8 @@ func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case MSUB, MSUBW:
@@ -1399,6 +1416,8 @@ func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) 
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case CMPW, CMP:
@@ -1455,6 +1474,8 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRegisterAndConstToNone(n *NodeImpl) (err error) {
 	if n.Instruction != CMP {
 		return errorEncodingUnsupported(n)
@@ -1632,6 +1653,8 @@ var storeOrLoadInstructionTable = map[asm.Instruction]struct {
 	FMOVS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 	inst, ok := storeOrLoadInstructionTable[n.Instruction]
 	if !ok {
@@ -1716,6 +1739,8 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 	if n.Instruction == ADR {
 		return a.encodeADR(n)
@@ -1829,6 +1854,8 @@ func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, src1RegBits byte, src
 	})
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 	// Alias for readability.
 	c := n.SrcConst
@@ -2174,7 +2201,7 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 		// MOVN: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
 		lastByte = 0b0_00_10010
 	} else {
-		// MOVZ: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVZ
+		// MOVZ: https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MOVN
 		lastByte = 0b0_10_10010
 	}
 	if dst64bit {
@@ -2190,35 +2217,35 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 
 // loadConstViaBitMaskImmediate loads the constant with ORR (bitmask immediate).
 // https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ORR--immediate---Bitwise-OR--immediate--?lang=en
-func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst64bit bool) {
+func (a *AssemblerImpl) loadConstViaBitMaskImmediate(c uint64, regBits byte, dst64bit bool) {
 	var size uint32
 	switch {
-	case x != x>>32|x<<32:
+	case c != c>>32|c<<32:
 		size = 64
-	case x != x>>16|x<<48:
+	case c != c>>16|c<<48:
 		size = 32
-		x = uint64(int64(int32(x)))
-	case x != x>>8|x<<56:
+		c = uint64(int64(int32(c)))
+	case c != c>>8|c<<56:
 		size = 16
-		x = uint64(int64(int16(x)))
-	case x != x>>4|x<<60:
+		c = uint64(int64(int16(c)))
+	case c != c>>4|c<<60:
 		size = 8
-		x = uint64(int64(int8(x)))
-	case x != x>>2|x<<62:
+		c = uint64(int64(int8(c)))
+	case c != c>>2|c<<62:
 		size = 4
-		x = uint64(int64(x<<60) >> 60)
+		c = uint64(int64(c<<60) >> 60)
 	default:
 		size = 2
-		x = uint64(int64(x<<62) >> 62)
+		c = uint64(int64(c<<62) >> 62)
 	}
 
 	neg := false
-	if int64(x) < 0 {
-		x = ^x
+	if int64(c) < 0 {
+		c = ^c
 		neg = true
 	}
 
-	onesSize, nonZeroPos := getOnesSequenceSize(x)
+	onesSize, nonZeroPos := getOnesSequenceSize(c)
 	if neg {
 		nonZeroPos = onesSize + nonZeroPos
 		onesSize = size - onesSize
@@ -2236,7 +2263,6 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst
 	r := byte((size - nonZeroPos) & (size - 1) & uint32(mode-1))
 	s := byte((onesSize - 1) | 63&^(size<<1-1))
 
-	// OOR $c, tmpReg
 	var sf byte
 	if dst64bit {
 		sf = 0b1
@@ -2252,8 +2278,8 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(x uint64, regBits byte, dst
 func getOnesSequenceSize(x uint64) (size, nonZeroPos uint32) {
 	// Take 0b00111000 for example:
 	y := getLowestBit(x)               // = 0b0000100
-	nonZeroPos = setBitPos(y)          // 3
-	size = setBitPos(x+y) - nonZeroPos // = setBitPos(0b0100000) - 3 = 6 - 3 = 3
+	nonZeroPos = setBitPos(y)          // = 2
+	size = setBitPos(x+y) - nonZeroPos // = setBitPos(0b0100000) - 2 = 5 - 2 = 3
 	return
 }
 
@@ -2267,6 +2293,8 @@ func setBitPos(x uint64) (ret uint32) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeSIMDByteToSIMDByte(n *NodeImpl) (err error) {
 	if n.Instruction != VCNT {
 		return errorEncodingUnsupported(n)
@@ -2292,6 +2320,8 @@ func (a *AssemblerImpl) EncodeSIMDByteToSIMDByte(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeSIMDByteToRegister(n *NodeImpl) (err error) {
 	if n.Instruction != VUADDLV {
 		return errorEncodingUnsupported(n)
@@ -2317,6 +2347,8 @@ func (a *AssemblerImpl) EncodeSIMDByteToRegister(n *NodeImpl) (err error) {
 	return
 }
 
+// Exported for inter-op testing with golang-asm.
+// TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeTwoSIMDBytesToSIMDByteRegister(n *NodeImpl) (err error) {
 	if n.Instruction != VBIT {
 		return errorEncodingUnsupported(n)
