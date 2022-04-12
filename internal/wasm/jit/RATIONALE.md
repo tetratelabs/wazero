@@ -1,6 +1,6 @@
 # Just-In-Time compilation engine
 
-This package implements the JIT engine for WebAssembly *purely written in Go*. 
+This package implements the JIT engine for WebAssembly *purely written in Go*.
 In this README, we describe the background, technical difficulties and some of the design choices.
 
 ## General limitations on pure Go JIT engines
@@ -13,13 +13,13 @@ These impose some difficulties on JIT engine purely written in Go because we *ca
 
 ## How to generate native codes
 
-Currently we rely on [`twitchyliquid64/golang-asm`](https://github.com/twitchyliquid64/golang-asm) to assemble native codes. The library is just a copy of Go official compiler's assembler with modified import paths. So once we reach some maturity, we could implement our own assembler to reduce the unnecessary dependency as being less dependency is one of our primary goal in this project.
+We are using our own assembler which is implemented from scrach in [`internal/asm`](../../asm/) package. The reason why we are re-implementing it rather than using the existing assembler (e.g. [`twitchyliquid64/golang-asm`](https://github.com/twitchyliquid64/golang-asm)) is that one of our goals is to have zero dependencies in wazero project, plus golang-asm is not thread-safe which unables us to do conccurrent compilation (See [#233](https://github.com/tetratelabs/wazero/issues/233)).
 
 The assembled native codes are represented as `[]byte` and the slice region is marked as executable via mmap system call.
 
 ## How to enter native codes
 
-Assuming that we have a native code as `[]byte`, it is straightforward to enter the native code region via 
+Assuming that we have a native code as `[]byte`, it is straightforward to enter the native code region via
 Go assembly code. In this package, we have the function without body called `jitcall`
 
 ```go
