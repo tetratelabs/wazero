@@ -9,7 +9,7 @@ TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-24
         // We save the return address value into archContext.jitReturnAddress in Engine.
         // Note that the const 120 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
         MOVD R30,120(R0)
-        // Load the address of *wasm.ModuleInstance into arm64CallingConvensionModuleInstanceAddressRegister.
+        // Load the address of *wasm.ModuleInstance into arm64CallingConventionModuleInstanceAddressRegister.
         MOVD moduleInstanceAddress+16(FP),R29
         // Load the address of native code.
         MOVD codeSegment+0(FP),R1
