@@ -3,9 +3,10 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"log"
+
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"log"
 )
 
 // main shows how you can replace a module import when it doesn't match instantiated modules.

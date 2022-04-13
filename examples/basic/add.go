@@ -3,11 +3,12 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // main implements a basic function in both Go and WebAssembly.
@@ -28,7 +29,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer wasm.Close()
-
 
 	// Add a module to the runtime named "host/math" which exports one function "add", implemented in Go.
 	host, err := r.NewModuleBuilder("host/math").

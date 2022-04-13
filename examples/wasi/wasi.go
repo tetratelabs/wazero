@@ -3,11 +3,12 @@ package main
 import (
 	"embed"
 	_ "embed"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 	"io/fs"
 	"log"
 	"os"
+
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
 // catFS is an embedded filesystem limited to test.txt

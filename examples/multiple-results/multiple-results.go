@@ -3,9 +3,10 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"log"
+
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"log"
 )
 
 // main implements functions with multiple returns values, using both an approach portable with any WebAssembly 1.0
