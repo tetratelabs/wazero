@@ -102,7 +102,7 @@ func resultOffsetHostFunctions(r wazero.Runtime) (api.Module, error) {
 // Note: While "multi-value" is not yet a W3C recommendation, most WebAssembly runtimes support it by default.
 // See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 func Test_MultipleResults_MultiValue(t *testing.T) {
-	// wazero is enables only W3C recommended features by default. Opt-in to other features like so:
+	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
 	r := wazero.NewRuntimeWithConfig(
 		wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
 		// ^^ Note: You can enable all features via WithFinishedFeatures.
