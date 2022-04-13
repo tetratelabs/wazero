@@ -176,7 +176,7 @@ type (
 		// source is the source function instance from which this is compiled.
 		source *wasm.FunctionInstance
 		// moduleInstanceAddress holds the address of source.ModuleInstance.
-		moduleInstanceAddress uintptr //nolint
+		moduleInstanceAddress uintptr
 
 		// Followings are not accessed by JITed code.
 
