@@ -166,18 +166,20 @@ type (
 	compiledFunction struct {
 		// The following fields are accessed by JITed code.
 
-		// Pre-calculated pointer pointing to the initial byte of .codeSegment slice.
+		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
+		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		stackPointerCeil uint64
+		// source is the source function instance from which this is compiled.
+		source *wasm.FunctionInstance
+		// moduleInstanceAddress holds the address of source.ModuleInstance.
+		moduleInstanceAddress uintptr
 
 		// Followings are not accessed by JITed code.
 
-		// The source function instance from which this is compiled.
-		source *wasm.FunctionInstance
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for compiledFunctionStaticData type.
@@ -229,9 +231,10 @@ const (
 	callFrameCompiledFunctionOffset        = 16
 
 	// Offsets for compiledFunction.
-	compiledFunctionCodeInitialAddressOffset = 0
-	compiledFunctionStackPointerCeilOffset   = 8
-	compiledFunctionSourceOffset             = 16
+	compiledFunctionCodeInitialAddressOffset    = 0
+	compiledFunctionStackPointerCeilOffset      = 8
+	compiledFunctionSourceOffset                = 16
+	compiledFunctionModuleInstanceAddressOffset = 24
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset = 48
@@ -672,7 +675,9 @@ func (ce *callEngine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, c
 }
 
 func (ce *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
-	ce.pushCallFrame(f)
+	// Push the initial callframe.
+	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
+	ce.globalContext.callFrameStackPointer++
 
 jitentry:
 	{
@@ -683,7 +688,7 @@ jitentry:
 		}
 
 		// Call into the JIT code.
-		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)))
+		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
 
 		// Check the status code from JIT code.
 		switch status := ce.exitContext.statusCode; status {
@@ -720,29 +725,6 @@ jitentry:
 			status.causePanic()
 		}
 	}
-}
-
-// pushInitialFrame is implemented in assembly as well, but this Go version is used BEFORE jit entry.
-func (ce *callEngine) pushCallFrame(f *compiledFunction) {
-	// Push the new frame to the top of stack.
-	ce.callFrameStack[ce.globalContext.callFrameStackPointer] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
-	ce.globalContext.callFrameStackPointer++
-
-	// For example, if we have the following state (where "_" means no value pushed),
-	//       base            sp
-	//        |              |
-	// [...., A, B, C, D, E, _, _ ]
-	//
-	// and the target function requires 2 params, we need to pass D and E as arguments.
-	//
-	// Therefore, the target function start executing under the following state:
-	//                base   sp
-	//                 |     |
-	// [...., A, B, C, D, E, _, _ ]
-	//
-	// That means the next stack base pointer is calculated as follows (note stack pointer is relative to base):
-	ce.valueStackContext.stackBasePointer =
-		ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer - uint64(len(f.source.Type.Params))
 }
 
 func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
@@ -809,10 +791,11 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}
 
 	return &compiledFunction{
-		source:             f,
-		codeSegment:        code,
-		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		stackPointerCeil:   stackPointerCeil,
+		source:                f,
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+		stackPointerCeil:      stackPointerCeil,
 	}, nil
 }
 
@@ -1006,10 +989,11 @@ func compileWasmFunction(enabledFeatures wasm.Features, f *wasm.FunctionInstance
 	}
 
 	return &compiledFunction{
-		source:             f,
-		codeSegment:        code,
-		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		stackPointerCeil:   stackPointerCeil,
-		staticData:         staticData,
+		source:                f,
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+		stackPointerCeil:      stackPointerCeil,
+		staticData:            staticData,
 	}, nil
 }

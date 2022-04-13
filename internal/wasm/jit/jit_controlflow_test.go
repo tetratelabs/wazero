@@ -31,7 +31,10 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
 
 	// Re-enter the return address.
-	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
+	jitcall(env.callFrameStackPeek().returnAddress,
+		uintptr(unsafe.Pointer(env.callEngine())),
+		uintptr(unsafe.Pointer(env.module())),
+	)
 
 	// After that, the code must exit with returned status.
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -665,8 +668,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 						require.NoError(t, err)
 
 						cf := &compiledFunction{
-							codeSegment:        code,
-							codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+							codeSegment:           code,
+							codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+							moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 							source: &wasm.FunctionInstance{
 								TypeID: targetTypeID,
 							},
@@ -717,7 +721,10 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							// Grow the callFrame stack, and exec again from the return address.
 							ce := env.callEngine()
 							ce.builtinFunctionGrowCallFrameStack()
-							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)))
+							jitcall(
+								env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)),
+								uintptr(unsafe.Pointer(env.module())),
+							)
 						}
 
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -774,8 +781,9 @@ func TestCompiler_compileCall(t *testing.T) {
 					require.NoError(t, err)
 					index := wasm.Index(i)
 					me.compiledFunctions = append(me.compiledFunctions, &compiledFunction{
-						codeSegment:        code,
-						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+						codeSegment:           code,
+						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+						moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 					})
 					env.module().Functions = append(env.module().Functions,
 						&wasm.FunctionInstance{Type: targetFunctionType, Index: index})
@@ -816,7 +824,10 @@ func TestCompiler_compileCall(t *testing.T) {
 				// Grow the callFrame stack, and exec again from the return address.
 				ce := env.callEngine()
 				ce.builtinFunctionGrowCallFrameStack()
-				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)))
+				jitcall(
+					env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)),
+					uintptr(unsafe.Pointer(env.module())),
+				)
 			}
 
 			// Check status and returned values.
@@ -879,7 +890,10 @@ func TestCompiler_returnFunction(t *testing.T) {
 				require.NoError(t, err)
 
 				// Compiles and adds to the engine.
-				compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0]))}
+				compiledFunction := &compiledFunction{
+					codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+					moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
+				}
 				moduleEngine.compiledFunctions = append(moduleEngine.compiledFunctions, compiledFunction)
 
 				// Pushes the frame whose return address equals the beginning of the function just compiled.

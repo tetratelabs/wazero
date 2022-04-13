@@ -81,6 +81,10 @@ const (
 	arm64ReservedRegisterForTemporary asm.Register = arm64.REG_R27
 )
 
+var (
+	arm64CallingConventionModuleInstanceAddressRegister = arm64.REG_R29
+)
+
 const (
 	// arm64CallEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
 	arm64CallEngineArchContextJITCallReturnAddressOffset = 120
@@ -201,12 +205,12 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
-	// We must initialize the stack base pointer register so that we can manipulate the stack properly.
-	c.compileReservedStackBasePointerRegisterInitialization()
-
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
+
+	// We must initialize the stack base pointer register so that we can manipulate the stack properly.
+	c.compileReservedStackBasePointerRegisterInitialization()
 
 	c.compileReservedMemoryRegisterInitialization()
 	return nil
@@ -278,6 +282,11 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		return err
 	}
 
+	// arm64CallingConventionModuleInstanceAddressRegister holds the module intstance's address
+	// so mark it used so that it won't be used as a free register.
+	c.locationStack.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
+	defer c.locationStack.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
+
 	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
@@ -331,7 +340,8 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	//
 	// What we have to do in the following is that
 	//   1) Set ce.valueStackContext.stackBasePointer to the value on "rb.caller".
-	//   2) Jump into the address of "ra.caller".
+	//   2) Load rc.caller.moduleInstanceAddress into arm64CallingConventionModuleInstanceAddressRegister.
+	//   3) Jump into the address of "ra.caller".
 
 	// 1) Set ce.valueStackContext.stackBasePointer to the value on "rb.caller".
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
@@ -342,7 +352,16 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		tmpReg,
 		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 
-	// 2) Branch into the address of "ra.caller".
+	// 2) Load rc.caller.moduleInstanceAddress into arm64CallingConventionModuleInstanceAddressRegister.
+	c.assembler.CompileMemoryToRegister(arm64.MOVD,
+		// "rb.caller" is below the top address.
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameCompiledFunctionOffset),
+		arm64CallingConventionModuleInstanceAddressRegister)
+	c.assembler.CompileMemoryToRegister(arm64.MOVD,
+		arm64CallingConventionModuleInstanceAddressRegister, compiledFunctionModuleInstanceAddressOffset,
+		arm64CallingConventionModuleInstanceAddressRegister)
+
+	// 3) Branch into the address of "ra.caller".
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
 		// "rb.caller" is below the top address.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
@@ -990,6 +1009,12 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 		tmp,
 		arm64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
+	// Also, we have to put the compiledFunction's moduleinstance address into arm64CallingConventionModuleInstanceAddressRegister.
+	c.assembler.CompileMemoryToRegister(arm64.MOVD,
+		compiledFunctionRegister, compiledFunctionModuleInstanceAddressOffset,
+		arm64CallingConventionModuleInstanceAddressRegister,
+	)
+
 	// Then, br into the target function's initial address.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
 		compiledFunctionRegister, compiledFunctionCodeInitialAddressOffset,
@@ -1016,12 +1041,12 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 		}
 	}
 
-	// On the function return, we initialize the state for this function.
-	c.compileReservedStackBasePointerRegisterInitialization()
-
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
+
+	// On the function return, we initialize the state for this function.
+	c.compileReservedStackBasePointerRegisterInitialization()
 
 	c.compileReservedMemoryRegisterInitialization()
 	return nil
@@ -3030,27 +3055,32 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // ce.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
+	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
+
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
 	c.markRegisterUsed(regs...)
 
 	// Alias these free registers for readability.
-	moduleInstanceAddressRegister, tmpX, tmpY := regs[0], regs[1], regs[2]
-
-	// Load the absolute address of the current function's module instance.
-	// Note: this should be modified to support Clone() functionality per #179.
-	c.assembler.CompileConstToRegister(arm64.MOVD, int64(uintptr(unsafe.Pointer(c.f.Module))), moduleInstanceAddressRegister)
+	tmpX, tmpY := regs[0], regs[1]
 
 	// "tmpX = ce.ModuleInstanceAddress"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, tmpX)
 
 	// If the module instance address stays the same, we could skip the entire code below.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, moduleInstanceAddressRegister, tmpX)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64CallingConventionModuleInstanceAddressRegister, tmpX)
 	brIfModuleUnchanged := c.assembler.CompileJump(arm64.BEQ)
 
-	// Otherwise, we have to update the following fields:
+	// Otherwise, update the moduleEngine.moduleContext.ModuleInstanceAddress.
+	c.assembler.CompileRegisterToMemory(arm64.MOVD,
+		arm64CallingConventionModuleInstanceAddressRegister,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset,
+	)
+
+	// Also, we have to update the following fields:
 	// * callEngine.moduleContext.globalElement0Address
 	// * callEngine.moduleContext.memoryElement0Address
 	// * callEngine.moduleContext.memorySliceLen
@@ -3066,7 +3096,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	if len(c.f.Module.Globals) > 0 {
 		// "tmpX = &moduleInstance.Globals[0]"
 		c.assembler.CompileMemoryToRegister(arm64.MOVD,
-			moduleInstanceAddressRegister, moduleInstanceGlobalsOffset,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceGlobalsOffset,
 			tmpX,
 		)
 
@@ -3086,7 +3116,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		// "tmpX = moduleInstance.Memory"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			moduleInstanceAddressRegister, moduleInstanceMemoryOffset,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceMemoryOffset,
 			tmpX,
 		)
 
@@ -3130,7 +3160,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		// "tmpX = &tables[0] (type of **wasm.Table)"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			moduleInstanceAddressRegister, moduleInstanceTableOffset,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceTableOffset,
 			tmpX,
 		)
 
@@ -3175,7 +3205,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		// * https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			moduleInstanceAddressRegister, moduleInstanceEngineOffset+interfaceDataOffset,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceEngineOffset+interfaceDataOffset,
 			tmpX,
 		)
 

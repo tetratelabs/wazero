@@ -11,4 +11,4 @@ var (
 // ce is "*callEngine" as uintptr.
 //
 // Note: this is implemented in per-arch Go assembler file. For example, arch_amd64.s implements this for amd64.
-func jitcall(codeSegment, ce uintptr)
+func jitcall(codeSegment, ce uintptr, moduleInstanceAddress uintptr)
