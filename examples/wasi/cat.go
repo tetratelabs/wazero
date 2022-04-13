@@ -44,8 +44,8 @@ func main() {
 
 	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "wasi" and add args to write "test.txt" to stdout twice.
-	// * We use both "/test.txt" and "./test.txt" because WithFS by default maps the workdir "." to "/".
-	cat, err := r.InstantiateModuleFromCodeWithConfig(catWasm, config.WithArgs("wasi", "/test.txt", "./test.txt"))
+	// * We use "/test.txt" or "./test.txt" because WithFS by default maps the workdir "." to "/".
+	cat, err := r.InstantiateModuleFromCodeWithConfig(catWasm, config.WithArgs("wasi", os.Args[1]))
 	if err != nil {
 		log.Fatal(err)
 	}
