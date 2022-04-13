@@ -675,7 +675,9 @@ func (ce *callEngine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, c
 }
 
 func (ce *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
-	ce.pushCallFrame(f)
+	// Push the initial callframe.
+	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
+	ce.globalContext.callFrameStackPointer++
 
 jitentry:
 	{
@@ -723,29 +725,6 @@ jitentry:
 			status.causePanic()
 		}
 	}
-}
-
-// pushInitialFrame is implemented in assembly as well, but this Go version is used BEFORE jit entry.
-func (ce *callEngine) pushCallFrame(f *compiledFunction) {
-	// Push the new frame to the top of stack.
-	ce.callFrameStack[ce.globalContext.callFrameStackPointer] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
-	ce.globalContext.callFrameStackPointer++
-
-	// For example, if we have the following state (where "_" means no value pushed),
-	//       base            sp
-	//        |              |
-	// [...., A, B, C, D, E, _, _ ]
-	//
-	// and the target function requires 2 params, we need to pass D and E as arguments.
-	//
-	// Therefore, the target function start executing under the following state:
-	//                base   sp
-	//                 |     |
-	// [...., A, B, C, D, E, _, _ ]
-	//
-	// That means the next stack base pointer is calculated as follows (note stack pointer is relative to base):
-	ce.valueStackContext.stackBasePointer =
-		ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer - uint64(len(f.source.Type.Params))
 }
 
 func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {

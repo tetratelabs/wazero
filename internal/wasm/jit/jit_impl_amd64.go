@@ -3581,7 +3581,6 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	// This could be reached after returnFunction(), so callEngine.valueStackContext.stackBasePointer
 	// and callEngine.moduleContext.moduleInstanceAddress are changed (See comments in returnFunction()).
 	// Therefore we have to initialize the state according to these changes.
-	// Due to the change to callEngine.moduleContext.moduleInstanceAddress.
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}

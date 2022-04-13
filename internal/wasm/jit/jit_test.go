@@ -130,7 +130,8 @@ func (j *jitEnv) exec(code []byte) {
 		},
 	}
 
-	j.ce.pushCallFrame(compiledFunction)
+	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{compiledFunction: compiledFunction}
+	j.ce.globalContext.callFrameStackPointer++
 
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
