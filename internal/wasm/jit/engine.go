@@ -166,16 +166,16 @@ type (
 	compiledFunction struct {
 		// The following fields are accessed by JITed code.
 
-		// Pre-calculated pointer pointing to the initial byte of .codeSegment slice.
+		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
+		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		stackPointerCeil uint64
-		// The source function instance from which this is compiled.
+		// source is the source function instance from which this is compiled.
 		source *wasm.FunctionInstance
-
+		// moduleInstanceAddress holds the address of source.ModuleInstance.
 		moduleInstanceAddress uintptr //nolint
 
 		// Followings are not accessed by JITed code.
