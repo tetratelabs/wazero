@@ -59,7 +59,10 @@ func TestFeatures_String(t *testing.T) {
 		{name: "none", feature: 0, expected: ""},
 		{name: "mutable-global", feature: FeatureMutableGlobal, expected: "mutable-global"},
 		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expected: "sign-extension-ops"},
-		{name: "undefined", feature: 1 << 63, expected: "undefined"},
+		{name: "multi-value", feature: FeatureMultiValue, expected: "multi-value"},
+		{name: "features", feature: FeatureMutableGlobal | FeatureMultiValue, expected: "mutable-global|multi-value"},
+		{name: "undefined", feature: 1 << 63, expected: ""},
+		{name: "all", feature: FeaturesFinished, expected: "mutable-global|sign-extension-ops|multi-value"},
 	}
 
 	for _, tt := range tests {
@@ -76,10 +79,11 @@ func TestFeatures_Require(t *testing.T) {
 		feature     Features
 		expectedErr string
 	}{
-		{name: "none", feature: 0, expectedErr: "feature mutable-global is disabled"},
+		{name: "none", feature: 0, expectedErr: "feature \"mutable-global\" is disabled"},
 		{name: "mutable-global", feature: FeatureMutableGlobal},
-		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expectedErr: "feature mutable-global is disabled"},
-		{name: "undefined", feature: 1 << 63, expectedErr: "feature mutable-global is disabled"},
+		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expectedErr: "feature \"mutable-global\" is disabled"},
+		{name: "multi-value", feature: FeatureMultiValue, expectedErr: "feature \"mutable-global\" is disabled"},
+		{name: "undefined", feature: 1 << 63, expectedErr: "feature \"mutable-global\" is disabled"},
 	}
 
 	for _, tt := range tests {

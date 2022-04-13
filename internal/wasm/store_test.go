@@ -91,7 +91,13 @@ func TestModuleInstance_Memory(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
-	m, err := NewHostModule("", map[string]interface{}{"fn": func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+	m, err := NewHostModule(
+		"",
+		map[string]interface{}{"fn": func(api.Module) {}},
+		map[string]*Memory{},
+		map[string]*Global{},
+		Features20191205,
+	)
 	require.NoError(t, err)
 
 	type key string
@@ -121,7 +127,13 @@ func TestStore_CloseModule(t *testing.T) {
 		{
 			name: "Module imports HostModule",
 			initializer: func(t *testing.T, s *Store) {
-				m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+				m, err := NewHostModule(
+					importedModuleName,
+					map[string]interface{}{"fn": func(api.Module) {}},
+					map[string]*Memory{},
+					map[string]*Global{},
+					Features20191205,
+				)
 				require.NoError(t, err)
 				_, err = s.Instantiate(context.Background(), m, importedModuleName, nil)
 				require.NoError(t, err)
@@ -178,7 +190,13 @@ func TestStore_CloseModule(t *testing.T) {
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+	m, err := NewHostModule(
+		importedModuleName,
+		map[string]interface{}{"fn": func(api.Module) {}},
+		map[string]*Memory{},
+		map[string]*Global{},
+		Features20191205,
+	)
 	require.NoError(t, err)
 
 	s := newStore()
@@ -228,7 +246,13 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+	m, err := NewHostModule(
+		importedModuleName,
+		map[string]interface{}{"fn": func(api.Module) {}},
+		map[string]*Memory{},
+		map[string]*Global{},
+		Features20191205,
+	)
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
@@ -313,7 +337,13 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestModuleContext_ExportedFunction(t *testing.T) {
-	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+	host, err := NewHostModule(
+		"host",
+		map[string]interface{}{"host_fn": func(api.Module) {}},
+		map[string]*Memory{},
+		map[string]*Global{},
+		Features20191205,
+	)
 	require.NoError(t, err)
 
 	s := newStore()
@@ -342,13 +372,19 @@ func TestModuleContext_ExportedFunction(t *testing.T) {
 }
 
 func TestFunctionInstance_Call(t *testing.T) {
-	store := NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
+	store := NewStore(Features20191205, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
 
 	// Add the host module
 	functionName := "fn"
 
 	// This is a fake engine, so we don't capture inside the function body.
-	m, err := NewHostModule("host", map[string]interface{}{functionName: func(api.Module) {}}, map[string]*Memory{}, map[string]*Global{})
+	m, err := NewHostModule(
+		"host",
+		map[string]interface{}{functionName: func(api.Module) {}},
+		map[string]*Memory{},
+		map[string]*Global{},
+		Features20191205,
+	)
 	require.NoError(t, err)
 
 	// Add the host module
@@ -399,7 +435,7 @@ type mockModuleEngine struct {
 }
 
 func newStore() *Store {
-	return NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
+	return NewStore(Features20191205, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.

@@ -1143,7 +1143,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.compileDropRange(o.Range)
+	return c.compileDropRange(o.Depth)
 }
 
 // compileDropRange is the implementation of compileDrop. See compiler.compileDrop.

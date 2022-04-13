@@ -343,9 +343,8 @@ const (
 )
 
 type Label struct {
-	FrameID          uint32
-	OriginalStackLen int
-	Kind             LabelKind
+	FrameID uint32
+	Kind    LabelKind
 }
 
 func (l *Label) String() (ret string) {
@@ -471,7 +470,7 @@ func (o *OperationCallIndirect) Kind() OperationKind {
 	return OperationKindCallIndirect
 }
 
-type OperationDrop struct{ Range *InclusiveRange }
+type OperationDrop struct{ Depth *InclusiveRange }
 
 func (o *OperationDrop) Kind() OperationKind {
 	return OperationKindDrop
@@ -507,8 +506,19 @@ func (o *OperationGlobalSet) Kind() OperationKind {
 	return OperationKindGlobalSet
 }
 
+// MemoryImmediate is the "memarg" to all memory instructions.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A0
 type MemoryImmediate struct {
-	Alignment, Offset uint32
+	// Alignment the expected alignment (expressed as the exponent of a power of 2). Default to the natural alignment.
+	//
+	// "Natural alignment" is defined here as the smallest power of two that can hold the size of the value type. Ex
+	// wasm.ValueTypeI64 is encoded in 8 little-endian bytes. 2^3 = 8, so the natural alignment is three.
+	Alignment uint32
+
+	// Offset is the address offset added to the instruction's dynamic address operand, yielding a 33-bit effective
+	// address that is the zero-based index at which the memory is accessed. Default to zero.
+	Offset uint32
 }
 
 type OperationLoad struct {

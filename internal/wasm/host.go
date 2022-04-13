@@ -10,7 +10,13 @@ import (
 )
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameToMemory map[string]*Memory, nameToGlobal map[string]*Global) (m *Module, err error) {
+func NewHostModule(
+	moduleName string,
+	nameToGoFunc map[string]interface{},
+	nameToMemory map[string]*Memory,
+	nameToGlobal map[string]*Global,
+	enabledFeatures Features,
+) (m *Module, err error) {
 	if moduleName != "" {
 		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
 	} else {
@@ -26,7 +32,7 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameT
 	}
 
 	if funcCount > 0 {
-		if err = addFuncs(m, nameToGoFunc); err != nil {
+		if err = addFuncs(m, nameToGoFunc, enabledFeatures); err != nil {
 			return
 		}
 	}
@@ -37,6 +43,7 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameT
 		}
 	}
 
+	// TODO: we can use enabledFeatures to fail early on things like mutable globals (once supported)
 	if globalCount > 0 {
 		if err = addGlobals(m, nameToGlobal); err != nil {
 			return
@@ -45,7 +52,7 @@ func NewHostModule(moduleName string, nameToGoFunc map[string]interface{}, nameT
 	return
 }
 
-func addFuncs(m *Module, nameToGoFunc map[string]interface{}) error {
+func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Features) error {
 	funcCount := uint32(len(nameToGoFunc))
 	funcNames := make([]string, 0, funcCount)
 	if m.NameSection == nil {
@@ -64,7 +71,7 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}) error {
 	for idx := Index(0); idx < funcCount; idx++ {
 		name := funcNames[idx]
 		fn := reflect.ValueOf(nameToGoFunc[name])
-		_, functionType, _, err := getFunctionType(&fn, false)
+		_, functionType, err := getFunctionType(&fn, enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("func[%s] %w", name, err)
 		}

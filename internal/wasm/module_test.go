@@ -530,7 +530,7 @@ func TestModule_validateImports(t *testing.T) {
 				Type:       ExternTypeGlobal,
 				DescGlobal: &GlobalType{ValType: ValueTypeI32, Mutable: true},
 			},
-			expectedErr: `invalid import["m"."n"] global: feature mutable-global is disabled`,
+			expectedErr: `invalid import["m"."n"] global: feature "mutable-global" is disabled`,
 		},
 		{
 			name:            "table",
@@ -611,7 +611,7 @@ func TestModule_validateExports(t *testing.T) {
 			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeGlobal, Index: 0}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
-			expectedErr:     `invalid export["e1"] global[0]: feature mutable-global is disabled`,
+			expectedErr:     `invalid export["e1"] global[0]: feature "mutable-global" is disabled`,
 		},
 		{
 			name:            "global out of range",

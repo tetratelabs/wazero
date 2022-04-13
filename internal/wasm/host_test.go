@@ -26,6 +26,10 @@ func (a *wasiAPI) FdWrite(ctx api.Module, fd, iovs, iovsCount, resultSize uint32
 	return 0
 }
 
+func swap(x, y uint32) (uint32, uint32) {
+	return y, x
+}
+
 func TestNewHostModule(t *testing.T) {
 	i32 := ValueTypeI32
 
@@ -34,6 +38,8 @@ func TestNewHostModule(t *testing.T) {
 	fnArgsSizesGet := reflect.ValueOf(a.ArgsSizesGet)
 	functionFdWrite := "fd_write"
 	fnFdWrite := reflect.ValueOf(a.FdWrite)
+	functionSwap := "swap"
+	fnSwap := reflect.ValueOf(swap)
 
 	tests := []struct {
 		name, moduleName string
@@ -76,6 +82,20 @@ func TestNewHostModule(t *testing.T) {
 						{Index: 1, Name: "fd_write"},
 					},
 				},
+			},
+		},
+		{
+			name:       "multi-value",
+			moduleName: "swapper",
+			nameToGoFunc: map[string]interface{}{
+				functionSwap: swap,
+			},
+			expected: &Module{
+				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
+				FunctionSection:     []Index{0},
+				HostFunctionSection: []*reflect.Value{&fnSwap},
+				ExportSection:       map[string]*Export{"swap": {Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				NameSection:         &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},
 		{
@@ -164,7 +184,13 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal)
+			m, e := NewHostModule(
+				tc.moduleName,
+				tc.nameToGoFunc,
+				tc.nameToMemory,
+				tc.nameToGlobal,
+				Features20191205|FeatureMultiValue,
+			)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -207,6 +233,12 @@ func TestNewHostModule_Errors(t *testing.T) {
 			expectedErr:  "func[fn] kind != func: ptr",
 		},
 		{
+			name:         "function has multiple results",
+			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
+			nameToMemory: map[string]*Memory{"fn": {1, 1}},
+			expectedErr:  "func[fn] multiple result types invalid as feature \"multi-value\" is disabled",
+		},
+		{
 			name:         "memory collides on func name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToMemory: map[string]*Memory{"fn": {1, 1}},
@@ -234,7 +266,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal, Features20191205)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

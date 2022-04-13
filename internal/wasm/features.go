@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Features are the currently enabled features.
@@ -15,14 +16,34 @@ type Features uint64
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205
 const Features20191205 = FeatureMutableGlobal
 
+// FeaturesFinished include all supported finished features, regardless of W3C status.
+//
+// See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
+const FeaturesFinished = 0xffffffffffffffff
+
 const (
 	// FeatureMutableGlobal decides if global vars are allowed to be imported or exported (ExternTypeGlobal)
 	// See https://github.com/WebAssembly/mutable-global
 	FeatureMutableGlobal Features = 1 << iota
 
-	// FeatureSignExtensionOps decides if parsing should succeed on wasm.GlobalType Mutable
+	// FeatureSignExtensionOps decides if parsing should succeed on the following instructions:
+	//
+	// * OpcodeI32Extend8S
+	// * OpcodeI32Extend16S
+	// * OpcodeI64Extend8S
+	// * OpcodeI64Extend16S
+	// * OpcodeI64Extend32S
+	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	FeatureSignExtensionOps
+
+	// FeatureMultiValue decides if parsing should succeed on the following:
+	//
+	// * FunctionType.Results length greater than one.
+	// * `block`, `loop` and `if` can be arbitrary function types.
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+	FeatureMultiValue
 )
 
 // Set assigns the value for the given feature.
@@ -41,23 +62,38 @@ func (f Features) Get(feature Features) bool {
 // Require fails with a configuration error if the given feature is not enabled
 func (f Features) Require(feature Features) error {
 	if f&feature == 0 {
-		return fmt.Errorf("feature %s is disabled", feature)
+		return fmt.Errorf("feature %q is disabled", feature)
 	}
 	return nil
 }
 
 // String implements fmt.Stringer by returning each enabled feature.
 func (f Features) String() string {
+	var builder strings.Builder
+	for i := Features(0); i < 63; i++ { // cycle through all bits to reduce code and maintenance
+		if f.Get(i) {
+			if name := featureName(i); name != "" {
+				if builder.Len() > 0 {
+					builder.WriteByte('|')
+				}
+				builder.WriteString(name)
+			}
+		}
+	}
+	return builder.String()
+}
+
+func featureName(f Features) string {
 	switch f {
-	case 0:
-		return ""
 	case FeatureMutableGlobal:
 		// match https://github.com/WebAssembly/mutable-global
 		return "mutable-global"
 	case FeatureSignExtensionOps:
 		// match https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 		return "sign-extension-ops"
-	default:
-		return "undefined" // TODO: when there are multiple features join known ones on pipe (|)
+	case FeatureMultiValue:
+		// match https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+		return "multi-value"
 	}
+	return ""
 }

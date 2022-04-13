@@ -11,9 +11,8 @@ import (
 
 func TestFuncParser(t *testing.T) {
 	tests := []struct {
-		name, source    string
-		enabledFeatures wasm.Features
-		expected        *wasm.Code
+		name, source string
+		expected     *wasm.Code
 	}{
 		{
 			name:     "empty",
@@ -46,9 +45,41 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
-			name:            "i32.extend8_s",
-			source:          "(func (param i32) local.get 0 i32.extend8_s)",
-			enabledFeatures: wasm.FeatureSignExtensionOps,
+			name:     "i32.const",
+			source:   "(func i32.const 306)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeI32Const, 0xb2, 0x02, wasm.OpcodeEnd}},
+		},
+		{
+			name:     "i64.const",
+			source:   "(func i64.const 356)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeI64Const, 0xe4, 0x02, wasm.OpcodeEnd}},
+		},
+		{
+			name:   "i64.load",
+			source: "(func i32.const 8 i64.load)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to load
+				wasm.OpcodeI64Load, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.store",
+			source: "(func i32.const 8 i64.const 37 i64.store)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to store
+				wasm.OpcodeI64Const, 37, // value to store
+				wasm.OpcodeI64Store, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+
+		// Below are changes to test/core/i32 and i64.wast from the commit that added "sign-extension-ops" support.
+		// See https://github.com/WebAssembly/spec/commit/e308ca2ae04d5083414782e842a81f931138cf2e
+
+		{
+			name:   "i32.extend8_s",
+			source: "(func (param i32) local.get 0 i32.extend8_s)",
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI32Extend8S,
@@ -56,9 +87,8 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
-			name:            "i32.extend16_s",
-			source:          "(func (param i32) local.get 0 i32.extend16_s)",
-			enabledFeatures: wasm.FeatureSignExtensionOps,
+			name:   "i32.extend16_s",
+			source: "(func (param i32) local.get 0 i32.extend16_s)",
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI32Extend16S,
@@ -66,9 +96,8 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
-			name:            "i64.extend8_s",
-			source:          "(func (param i64) local.get 0 i64.extend8_s)",
-			enabledFeatures: wasm.FeatureSignExtensionOps,
+			name:   "i64.extend8_s",
+			source: "(func (param i64) local.get 0 i64.extend8_s)",
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI64Extend8S,
@@ -76,9 +105,8 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
-			name:            "i64.extend16_s",
-			source:          "(func (param i64) local.get 0 i64.extend16_s)",
-			enabledFeatures: wasm.FeatureSignExtensionOps,
+			name:   "i64.extend16_s",
+			source: "(func (param i64) local.get 0 i64.extend16_s)",
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI64Extend16S,
@@ -86,9 +114,8 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
-			name:            "i64.extend32_s",
-			source:          "(func (param i64) local.get 0 i64.extend32_s)",
-			enabledFeatures: wasm.FeatureSignExtensionOps,
+			name:   "i64.extend32_s",
+			source: "(func (param i64) local.get 0 i64.extend32_s)",
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI64Extend32S,
@@ -108,7 +135,7 @@ func TestFuncParser(t *testing.T) {
 			}
 
 			module := &wasm.Module{}
-			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			fp := newFuncParser(wasm.FeaturesFinished, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -118,7 +145,6 @@ func TestFuncParser(t *testing.T) {
 func TestFuncParser_Call_Unresolved(t *testing.T) {
 	tests := []struct {
 		name, source            string
-		enabledFeatures         wasm.Features
 		expectedCode            *wasm.Code
 		expectedUnresolvedIndex *unresolvedIndex
 	}{
@@ -167,7 +193,7 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 			}
 
 			module := &wasm.Module{}
-			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			fp := newFuncParser(wasm.Features20191205, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expectedCode, parsedCode)
 			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
@@ -177,9 +203,8 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 
 func TestFuncParser_Call_Resolved(t *testing.T) {
 	tests := []struct {
-		name, source    string
-		enabledFeatures wasm.Features
-		expected        *wasm.Code
+		name, source string
+		expected     *wasm.Code
 	}{
 		{
 			name:     "index zero",
@@ -228,7 +253,7 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
+			fp := newFuncParser(wasm.FeaturesFinished, &typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -237,9 +262,8 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 
 func TestFuncParser_Errors(t *testing.T) {
 	tests := []struct {
-		name, source    string
-		enabledFeatures wasm.Features
-		expectedErr     string
+		name, source string
+		expectedErr  string
 	}{
 		{
 			name:        "not field",
@@ -262,6 +286,16 @@ func TestFuncParser_Errors(t *testing.T) {
 			expectedErr: "1:17: index outside range of uint32: 4294967296",
 		},
 		{
+			name:        "i32.const overflow",
+			source:      "(func i32.const 4294967296)",
+			expectedErr: "1:17: i32 outside range of uint32: 4294967296",
+		},
+		{
+			name:        "i64.const overflow",
+			source:      "(func i64.const 18446744073709551616)",
+			expectedErr: "1:17: i64 outside range of uint64: 18446744073709551616",
+		},
+		{
 			name:        "instruction not yet supported",
 			source:      "(func f32.const 1.1)",
 			expectedErr: "1:7: unsupported instruction: f32.const",
@@ -279,32 +313,32 @@ func TestFuncParser_Errors(t *testing.T) {
 		{
 			name:        "duplicate result",
 			source:      "(func (result i32) (result i32))",
-			expectedErr: "1:21: at most one result allowed",
+			expectedErr: "1:21: multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
 			name:        "i32.extend8_s disabled",
 			source:      "(func (param i32) local.get 0 i32.extend8_s)",
-			expectedErr: "1:31: i32.extend8_s invalid as feature sign-extension-ops is disabled",
+			expectedErr: "1:31: i32.extend8_s invalid as feature \"sign-extension-ops\" is disabled",
 		},
 		{
 			name:        "i32.extend16_s disabled",
 			source:      "(func (param i32) local.get 0 i32.extend16_s)",
-			expectedErr: "1:31: i32.extend16_s invalid as feature sign-extension-ops is disabled",
+			expectedErr: "1:31: i32.extend16_s invalid as feature \"sign-extension-ops\" is disabled",
 		},
 		{
 			name:        "i64.extend8_s disabled",
 			source:      "(func (param i64) local.get 0 i64.extend8_s)",
-			expectedErr: "1:31: i64.extend8_s invalid as feature sign-extension-ops is disabled",
+			expectedErr: "1:31: i64.extend8_s invalid as feature \"sign-extension-ops\" is disabled",
 		},
 		{
 			name:        "i64.extend16_s disabled",
 			source:      "(func (param i64) local.get 0 i64.extend16_s)",
-			expectedErr: "1:31: i64.extend16_s invalid as feature sign-extension-ops is disabled",
+			expectedErr: "1:31: i64.extend16_s invalid as feature \"sign-extension-ops\" is disabled",
 		},
 		{
 			name:        "i64.extend32_s disabled",
 			source:      "(func (param i64) local.get 0 i64.extend32_s)",
-			expectedErr: "1:31: i64.extend32_s invalid as feature sign-extension-ops is disabled",
+			expectedErr: "1:31: i64.extend32_s invalid as feature \"sign-extension-ops\" is disabled",
 		},
 	}
 
@@ -313,7 +347,7 @@ func TestFuncParser_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{}
-			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), failOnFunc)
+			fp := newFuncParser(wasm.Features20191205, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}

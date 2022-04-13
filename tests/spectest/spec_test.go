@@ -283,7 +283,7 @@ func TestInterpreter(t *testing.T) {
 	runTest(t, interpreter.NewEngine)
 }
 
-func runTest(t *testing.T, newEngine func() wasm.Engine) {
+func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -309,7 +309,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			store := wasm.NewStore(newEngine(), wasm.Features20191205)
+			enabledFeatures := wasm.Features20191205
+			store := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
 			addSpectestModule(t, store)
 
 			var lastInstantiatedModuleName string
@@ -320,9 +321,9 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 					case "module":
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
+						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemoryMaxPages)
 						require.NoError(t, err, msg)
-						require.NoError(t, mod.Validate(wasm.Features20191205))
+						require.NoError(t, mod.Validate(enabledFeatures))
 
 						moduleName := c.Name
 						if moduleName == "" { // When "(module ...) directive doesn't have name.

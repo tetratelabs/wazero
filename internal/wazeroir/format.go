@@ -44,7 +44,7 @@ func formatOperation(w io.StringWriter, b Operation) {
 	case *OperationCallIndirect:
 		str = fmt.Sprintf("call_indirect: type=%d, table=%d", o.TypeIndex, o.TableIndex)
 	case *OperationDrop:
-		str = fmt.Sprintf("drop %d..%d", o.Range.Start, o.Range.End)
+		str = fmt.Sprintf("drop %d..%d", o.Depth.Start, o.Depth.End)
 	case *OperationSelect:
 		str = "select"
 	case *OperationPick:

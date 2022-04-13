@@ -26,10 +26,12 @@ const (
 
 type (
 	controlFrame struct {
-		frameID          uint32
-		originalStackLen int
-		returns          []UnsignedType
-		kind             controlFrameKind
+		frameID uint32
+		// originalStackLen holds the number of values on the stack
+		// when start executing this control frame minus params for the block.
+		originalStackLenWithoutParam int
+		blockType                    *wasm.FunctionType
+		kind                         controlFrameKind
 	}
 	controlFrames struct{ frames []*controlFrame }
 )
@@ -103,6 +105,7 @@ func (c *controlFrames) push(frame *controlFrame) {
 }
 
 type compiler struct {
+	enabledFeatures  wasm.Features
 	stack            []UnsignedType
 	currentID        uint32
 	controlFrames    *controlFrames
@@ -154,8 +157,13 @@ type CompilationResult struct {
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the JIT compilation engine.
-func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
-	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]uint32{}}}
+func Compile(enabledFeatures wasm.Features, f *wasm.FunctionInstance) (*CompilationResult, error) {
+	c := compiler{
+		enabledFeatures: enabledFeatures,
+		controlFrames:   &controlFrames{},
+		f:               f,
+		result:          CompilationResult{LabelCallers: map[string]uint32{}},
+	}
 
 	// Push function arguments.
 	for _, t := range f.Type.Params {
@@ -170,18 +178,13 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	}
 
 	// Insert the function control frame.
-	returns := make([]UnsignedType, 0, len(f.Type.Results))
-	for _, t := range f.Type.Results {
-		returns = append(returns, wasmValueTypeToUnsignedType(t))
-	}
 	c.controlFrames.push(&controlFrame{
-		frameID:          c.nextID(),
-		originalStackLen: len(f.Type.Params),
-		returns:          returns,
-		kind:             controlFrameKindFunction,
+		frameID:   c.nextID(),
+		blockType: f.Type,
+		kind:      controlFrameKindFunction,
 	})
 
-	// Now enter the function body.
+	// Now, enter the function body.
 	for !c.controlFrames.empty() {
 		if err := c.handleInstruction(); err != nil {
 			return nil, fmt.Errorf("handling instruction: %w", err)
@@ -221,7 +224,7 @@ operatorSwitch:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
 		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
-			bytes.NewReader(c.f.Body[c.pc+1:]))
+			bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
 		}
@@ -236,18 +239,15 @@ operatorSwitch:
 
 		// Create a new frame -- entering this block.
 		frame := &controlFrame{
-			frameID:          c.nextID(),
-			originalStackLen: len(c.stack),
-			kind:             controlFrameKindBlockWithoutContinuationLabel,
-		}
-		for _, t := range bt.Results {
-			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
+			frameID:                      c.nextID(),
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			kind:                         controlFrameKindBlockWithoutContinuationLabel,
+			blockType:                    bt,
 		}
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
-		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
-			bytes.NewReader(c.f.Body[c.pc+1:]))
+		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types, bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
 		}
@@ -262,17 +262,15 @@ operatorSwitch:
 
 		// Create a new frame -- entering loop.
 		frame := &controlFrame{
-			frameID:          c.nextID(),
-			originalStackLen: len(c.stack),
-			kind:             controlFrameKindLoop,
-		}
-		for _, t := range bt.Results {
-			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
+			frameID:                      c.nextID(),
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			kind:                         controlFrameKindLoop,
+			blockType:                    bt,
 		}
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader, OriginalStackLen: frame.originalStackLen}
+		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader}
 		c.result.LabelCallers[loopLabel.String()]++
 
 		// Emit the branch operation to enter inside the loop.
@@ -284,8 +282,7 @@ operatorSwitch:
 		)
 
 	case wasm.OpcodeIf:
-		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
-			bytes.NewReader(c.f.Body[c.pc+1:]))
+		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types, bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)
 		}
@@ -300,20 +297,18 @@ operatorSwitch:
 
 		// Create a new frame -- entering if.
 		frame := &controlFrame{
-			frameID:          c.nextID(),
-			originalStackLen: len(c.stack),
+			frameID:                      c.nextID(),
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
-			kind: controlFrameKindIfWithoutElse,
-		}
-		for _, t := range bt.Results {
-			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
+			kind:      controlFrameKindIfWithoutElse,
+			blockType: bt,
 		}
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
-		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
+		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
 		c.result.LabelCallers[thenLabel.String()]++
 		c.result.LabelCallers[elseLabel.String()]++
 
@@ -337,12 +332,17 @@ operatorSwitch:
 			// If it is currently in unreachable, and the non-nested if,
 			// reset the stack so we can correctly handle the else block.
 			top := c.controlFrames.top()
-			c.stack = c.stack[:top.originalStackLen]
+			c.stack = c.stack[:top.originalStackLenWithoutParam]
 			top.kind = controlFrameKindIfWithElse
+
+			// Re-push the parameters to the if block so that else block can use them.
+			for _, t := range frame.blockType.Params {
+				c.stackPush(wasmValueTypeToUnsignedType(t))
+			}
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: top.originalStackLen}
+			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
 			c.resetUnreachable()
 			c.emit(
 				&OperationLabel{Label: elseLabel},
@@ -357,11 +357,17 @@ operatorSwitch:
 		// We need to reset the stack so that
 		// the values pushed inside the then block
 		// do not affect the else block.
-		dropOp := &OperationDrop{Range: c.getFrameDropRange(frame)}
-		c.stack = c.stack[:frame.originalStackLen]
+		dropOp := &OperationDrop{Depth: c.getFrameDropRange(frame, false)}
+
+		// Reset the stack manipulated by the then block, and re-push the block param types to the stack.
+
+		c.stack = c.stack[:frame.originalStackLenWithoutParam]
+		for _, t := range frame.blockType.Params {
+			c.stackPush(wasmValueTypeToUnsignedType(t))
+		}
 
 		// Prep labels for else and the continuation of this if block.
-		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: frame.originalStackLen}
+		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
 		continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 		c.result.LabelCallers[continuationLabel.String()]++
 
@@ -386,15 +392,15 @@ operatorSwitch:
 				return nil
 			}
 
-			c.stack = c.stack[:frame.originalStackLen]
-			for _, t := range frame.returns {
-				c.stackPush(t)
+			c.stack = c.stack[:frame.originalStackLenWithoutParam]
+			for _, t := range frame.blockType.Results {
+				c.stackPush(wasmValueTypeToUnsignedType(t))
 			}
 
-			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation, OriginalStackLen: len(c.stack)}
+			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
 				c.result.LabelCallers[continuationLabel.String()]++
 				c.emit(
 					&OperationLabel{Label: elseLabel},
@@ -414,12 +420,12 @@ operatorSwitch:
 
 		// We need to reset the stack so that
 		// the values pushed inside the block.
-		dropOp := &OperationDrop{Range: c.getFrameDropRange(frame)}
-		c.stack = c.stack[:frame.originalStackLen]
+		dropOp := &OperationDrop{Depth: c.getFrameDropRange(frame, true)}
+		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 
 		// Push the result types onto the stack.
-		for _, t := range frame.returns {
-			c.stackPush(t)
+		for _, t := range frame.blockType.Results {
+			c.stackPush(wasmValueTypeToUnsignedType(t))
 		}
 
 		// Emit the instructions according to the kind of the current control frame.
@@ -437,8 +443,8 @@ operatorSwitch:
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
+			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
 			c.result.LabelCallers[continuationLabel.String()] += 2
 			c.emit(
 				dropOp,
@@ -451,7 +457,7 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
 			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,
@@ -476,7 +482,7 @@ operatorSwitch:
 
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
-		dropOp := &OperationDrop{Range: c.getFrameDropRange(targetFrame)}
+		dropOp := &OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
 		target := targetFrame.asBranchTarget()
 		c.result.LabelCallers[target.Label.String()]++
 		c.emit(
@@ -496,7 +502,7 @@ operatorSwitch:
 
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
-		drop := c.getFrameDropRange(targetFrame)
+		drop := c.getFrameDropRange(targetFrame, false)
 		target := targetFrame.asBranchTarget()
 		c.result.LabelCallers[target.Label.String()]++
 
@@ -530,7 +536,7 @@ operatorSwitch:
 			c.pc += n
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
-			drop := c.getFrameDropRange(targetFrame)
+			drop := c.getFrameDropRange(targetFrame, false)
 			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asBranchTarget()}
 			targets[i] = target
 			c.result.LabelCallers[target.Target.Label.String()]++
@@ -544,7 +550,7 @@ operatorSwitch:
 		c.pc += n
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
-		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame)
+		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame, false)
 		defaultTarget := defaultTargetFrame.asBranchTarget()
 		c.result.LabelCallers[defaultTarget.Label.String()]++
 
@@ -562,7 +568,7 @@ operatorSwitch:
 		c.markUnreachable()
 	case wasm.OpcodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
-		dropOp := &OperationDrop{Range: c.getFrameDropRange(functionFrame)}
+		dropOp := &OperationDrop{Depth: c.getFrameDropRange(functionFrame, false)}
 
 		// Cleanup the stack and then jmp to function frame's continuation (meaning return).
 		c.emit(
@@ -595,7 +601,7 @@ operatorSwitch:
 		)
 	case wasm.OpcodeDrop:
 		c.emit(
-			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
+			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 		)
 	case wasm.OpcodeSelect:
 		c.emit(
@@ -620,7 +626,7 @@ operatorSwitch:
 			// +1 because we already manipulated the stack before
 			// called localDepth ^^.
 			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
+			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 		)
 	case wasm.OpcodeLocalTee:
 		if index == nil {
@@ -630,7 +636,7 @@ operatorSwitch:
 		c.emit(
 			&OperationPick{Depth: 0},
 			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
+			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 		)
 	case wasm.OpcodeGlobalGet:
 		if index == nil {
@@ -647,7 +653,7 @@ operatorSwitch:
 			&OperationGlobalSet{Index: *index},
 		)
 	case wasm.OpcodeI32Load:
-		imm, err := c.readMemoryImmediate("i32.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32LoadName)
 		if err != nil {
 			return err
 		}
@@ -655,7 +661,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load:
-		imm, err := c.readMemoryImmediate("i64.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64LoadName)
 		if err != nil {
 			return err
 		}
@@ -663,7 +669,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Load:
-		imm, err := c.readMemoryImmediate("f32.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF32LoadName)
 		if err != nil {
 			return err
 		}
@@ -671,7 +677,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Load:
-		imm, err := c.readMemoryImmediate("f64.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF64LoadName)
 		if err != nil {
 			return err
 		}
@@ -679,7 +685,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8S:
-		imm, err := c.readMemoryImmediate("i32.load8_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8SName)
 		if err != nil {
 			return err
 		}
@@ -687,7 +693,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8U:
-		imm, err := c.readMemoryImmediate("i32.load8_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8UName)
 		if err != nil {
 			return err
 		}
@@ -695,7 +701,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16S:
-		imm, err := c.readMemoryImmediate("i32.load16_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16SName)
 		if err != nil {
 			return err
 		}
@@ -703,7 +709,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16U:
-		imm, err := c.readMemoryImmediate("i32.load16_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16UName)
 		if err != nil {
 			return err
 		}
@@ -711,7 +717,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8S:
-		imm, err := c.readMemoryImmediate("i64.load8_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8SName)
 		if err != nil {
 			return err
 		}
@@ -719,7 +725,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8U:
-		imm, err := c.readMemoryImmediate("i64.load8_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8UName)
 		if err != nil {
 			return err
 		}
@@ -727,7 +733,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16S:
-		imm, err := c.readMemoryImmediate("i64.load16_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16SName)
 		if err != nil {
 			return err
 		}
@@ -735,7 +741,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16U:
-		imm, err := c.readMemoryImmediate("i64.load16_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16UName)
 		if err != nil {
 			return err
 		}
@@ -743,7 +749,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32S:
-		imm, err := c.readMemoryImmediate("i64.load32_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32SName)
 		if err != nil {
 			return err
 		}
@@ -751,7 +757,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: true, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32U:
-		imm, err := c.readMemoryImmediate("i64.load32_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32UName)
 		if err != nil {
 			return err
 		}
@@ -759,7 +765,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: false, Arg: imm},
 		)
 	case wasm.OpcodeI32Store:
-		imm, err := c.readMemoryImmediate("i32.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32StoreName)
 		if err != nil {
 			return err
 		}
@@ -767,7 +773,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store:
-		imm, err := c.readMemoryImmediate("i64.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64StoreName)
 		if err != nil {
 			return err
 		}
@@ -775,7 +781,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Store:
-		imm, err := c.readMemoryImmediate("f32.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF32StoreName)
 		if err != nil {
 			return err
 		}
@@ -783,7 +789,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Store:
-		imm, err := c.readMemoryImmediate("f64.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF64StoreName)
 		if err != nil {
 			return err
 		}
@@ -791,7 +797,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Store8:
-		imm, err := c.readMemoryImmediate("i32.store8")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store8Name)
 		if err != nil {
 			return err
 		}
@@ -799,7 +805,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Store16:
-		imm, err := c.readMemoryImmediate("i32.store16")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store16Name)
 		if err != nil {
 			return err
 		}
@@ -807,7 +813,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store8:
-		imm, err := c.readMemoryImmediate("i64.store8")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store8Name)
 		if err != nil {
 			return err
 		}
@@ -815,7 +821,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store16:
-		imm, err := c.readMemoryImmediate("i64.store16")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store16Name)
 		if err != nil {
 			return err
 		}
@@ -823,7 +829,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store32:
-		imm, err := c.readMemoryImmediate("i64.store32")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store32Name)
 		if err != nil {
 			return err
 		}
@@ -1493,7 +1499,7 @@ func (c *compiler) emit(ops ...Operation) {
 				// we could remove such operations.
 				// That happens when drop operation is unnecessary.
 				// i.e. when there's no need to adjust stack before jmp.
-				if o.Range == nil {
+				if o.Depth == nil {
 					continue
 				}
 			}
@@ -1530,18 +1536,28 @@ func (c *compiler) localDepth(n uint32) int {
 	return int(len(c.stack)) - 1 - int(n)
 }
 
-// Returns the range (starting from top of the stack) that spans across
-// the stack. The range is supposed to be dropped from the stack when
-// the given frame exists.
-func (c *compiler) getFrameDropRange(frame *controlFrame) *InclusiveRange {
-	start := len(frame.returns)
+// getFrameDropRange returns the range (starting from top of the stack) that spans across the stack. The range is
+// supposed to be dropped from the stack when the given frame exists or branch into it.
+//
+// * frame is the control frame which the call-site is trying to branch into or exit.
+// * isEnd true if the call-site is handling wasm.OpcodeEnd.
+func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *InclusiveRange {
+	var start int
+	if !isEnd && frame.kind == controlFrameKindLoop {
+		// If this is not End and the call-site is trying to branch into the Loop control frame,
+		// we have to start executing from the beginning of the loop block.
+		// Therefore, we have to pass the inputs to the frame.
+		start = len(frame.blockType.Params)
+	} else {
+		start = len(frame.blockType.Results)
+	}
 	var end int
 	if frame.kind == controlFrameKindFunction {
 		// On the function return, we eliminate all the contents on the stack
 		// including locals (existing below of frame.originalStackLen)
 		end = len(c.stack) - 1
 	} else {
-		end = len(c.stack) - 1 - frame.originalStackLen
+		end = len(c.stack) - 1 - frame.originalStackLenWithoutParam
 	}
 	if start <= end {
 		return &InclusiveRange{Start: start, End: end}

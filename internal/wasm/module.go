@@ -292,20 +292,12 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 		return fmt.Errorf("code count (%d) != function count (%d)", codeCount, functionCount)
 	}
 
-	// The wazero specific limitation described at RATIONALE.md.
-	const maximumValuesOnStack = 1 << 27
 	for idx, typeIndex := range m.FunctionSection {
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
 
-		if err := validateFunction(
-			enabledFeatures,
-			m.TypeSection[typeIndex],
-			m.CodeSection[idx].Body,
-			m.CodeSection[idx].LocalTypes,
-			functions, globals, memory, table, m.TypeSection, maximumValuesOnStack); err != nil {
-
+		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, table); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}

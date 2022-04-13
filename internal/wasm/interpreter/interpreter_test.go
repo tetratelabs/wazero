@@ -51,8 +51,8 @@ var et = &engineTester{}
 type engineTester struct {
 }
 
-func (e engineTester) NewEngine() wasm.Engine {
-	return NewEngine()
+func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+	return NewEngine(enabledFeatures)
 }
 
 func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
@@ -198,7 +198,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 
 func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
-		e := et.NewEngine().(*engine)
+		e := et.NewEngine(wasm.Features20191205).(*engine)
 		_, err := e.NewModuleEngine(t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
 			nil, // moduleFunctions
@@ -209,7 +209,7 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 	})
 
 	t.Run("release on compilation error", func(t *testing.T) {
-		e := et.NewEngine().(*engine)
+		e := et.NewEngine(wasm.Features20191205).(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
 			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -269,7 +269,7 @@ func TestInterpreter_Close(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			e := et.NewEngine().(*engine)
+			e := et.NewEngine(wasm.Features20191205).(*engine)
 			if len(tc.importedFunctions) > 0 {
 				// initialize the module-engine containing imported functions
 				me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions, nil, nil)

@@ -121,8 +121,6 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 	switch string(tokenBytes) {
 	case "param":
 		return nil, errors.New("param after result")
-	case "result":
-		return nil, moreThanOneInvalid("result")
 	case "local":
 		return nil, errors.New("TODO: local")
 	}
@@ -145,33 +143,47 @@ func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, _
 func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err error) {
 	var opCode wasm.Opcode
 	switch string(tokenBytes) {
-	case "call": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
+	case wasm.OpcodeCallName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
 		opCode = wasm.OpcodeCall
 		next = p.parseFuncIndex
-	case "drop": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
+	case wasm.OpcodeDropName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
 		opCode = wasm.OpcodeDrop
 		next = p.beginFieldOrInstruction
-	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+	case wasm.OpcodeI32AddName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
-	case "i32.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI32Extend8S
-		next = p.beginFieldOrInstruction
-	case "i32.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI32Extend16S
-		next = p.beginFieldOrInstruction
-	case "i64.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend8S
-		next = p.beginFieldOrInstruction
-	case "i64.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend16S
-		next = p.beginFieldOrInstruction
-	case "i64.extend32_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-		opCode = wasm.OpcodeI64Extend32S
-		next = p.beginFieldOrInstruction
-	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
+	case wasm.OpcodeI32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI32Const
+		next = p.parseI32
+	case wasm.OpcodeI64ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI64Const
+		next = p.parseI64
+	case wasm.OpcodeI64LoadName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeI64Instruction(wasm.OpcodeI64Load)
+	case wasm.OpcodeI64StoreName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeI64Instruction(wasm.OpcodeI64Store)
+	case wasm.OpcodeLocalGetName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#variable-instructions%E2%91%A0
 		opCode = wasm.OpcodeLocalGet
 		next = p.parseLocalIndex
+
+		// Next are sign-extension-ops
+		// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+
+	case wasm.OpcodeI32Extend8SName:
+		opCode = wasm.OpcodeI32Extend8S
+		next = p.beginFieldOrInstruction
+	case wasm.OpcodeI32Extend16SName:
+		opCode = wasm.OpcodeI32Extend16S
+		next = p.beginFieldOrInstruction
+	case wasm.OpcodeI64Extend8SName:
+		opCode = wasm.OpcodeI64Extend8S
+		next = p.beginFieldOrInstruction
+	case wasm.OpcodeI64Extend16SName:
+		opCode = wasm.OpcodeI64Extend16S
+		next = p.beginFieldOrInstruction
+	case wasm.OpcodeI64Extend32SName:
+		opCode = wasm.OpcodeI64Extend32S
+		next = p.beginFieldOrInstruction
 	default:
 		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
@@ -187,6 +199,16 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	return next, nil
 }
 
+func (p *funcParser) encodeI64Instruction(oc wasm.Opcode) (tokenParser, error) {
+	p.currentBody = append(
+		p.currentBody,
+		oc,
+		3, // alignment=3 (natural alignment) because 2^3 = size of I64 (8 bytes)
+		0, // offset=0 because that's the default
+	)
+	return p.beginFieldOrInstruction, nil
+}
+
 // end invokes onFunc to continue parsing
 func (p *funcParser) end() (tokenParser, error) {
 	var code *wasm.Code
@@ -196,6 +218,32 @@ func (p *funcParser) end() (tokenParser, error) {
 		code = &wasm.Code{Body: append(p.currentBody, wasm.OpcodeEnd)}
 	}
 	return p.onFunc(p.currentTypeIdx, code, p.currentName, p.currentParamNames)
+}
+
+// parseI32 parses a wasm.ValueTypeI32 and appends it to the currentBody.
+func (p *funcParser) parseI32(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint32(tokenBytes); overflow { // TODO: negative and hex
+		return nil, fmt.Errorf("i32 outside range of uint32: %s", tokenBytes)
+	} else { // See /RATIONALE.md we can't tell the signed interpretation of a constant, so default to signed.
+		p.currentBody = append(p.currentBody, leb128.EncodeInt32(int32(i))...)
+	}
+	return p.beginFieldOrInstruction, nil
+}
+
+// parseI64 parses a wasm.ValueTypeI64 and appends it to the currentBody.
+func (p *funcParser) parseI64(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint64(tokenBytes); overflow { // TODO: negative and hex
+		return nil, fmt.Errorf("i64 outside range of uint64: %s", tokenBytes)
+	} else { // See /RATIONALE.md we can't tell the signed interpretation of a constant, so default to signed.
+		p.currentBody = append(p.currentBody, leb128.EncodeInt64(int64(i))...)
+	}
+	return p.beginFieldOrInstruction, nil
 }
 
 // parseFuncIndex parses an index in the function namespace and appends it to the currentBody. If it was an ID, a

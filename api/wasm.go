@@ -248,6 +248,16 @@ type Memory interface {
 	Write(offset uint32, v []byte) bool
 }
 
+// EncodeI32 encodes the input as a ValueTypeI32.
+func EncodeI32(input int32) uint64 {
+	return uint64(uint32(input))
+}
+
+// EncodeI64 encodes the input as a ValueTypeI64.
+func EncodeI64(input int64) uint64 {
+	return uint64(input)
+}
+
 // EncodeF32 encodes the input as a ValueTypeF32.
 // See DecodeF32
 func EncodeF32(input float32) uint64 {

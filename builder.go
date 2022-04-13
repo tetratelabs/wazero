@@ -247,8 +247,13 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 		}
 	}
 
-	// TODO: we can use r.enabledFeatures to fail early on things like mutable globals
-	if module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal); err != nil {
+	if module, err := wasm.NewHostModule(
+		b.moduleName,
+		b.nameToGoFunc,
+		b.nameToMemory,
+		b.nameToGlobal,
+		b.r.enabledFeatures,
+	); err != nil {
 		return nil, err
 	} else {
 		return &CompiledCode{module: module}, nil

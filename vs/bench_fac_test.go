@@ -27,13 +27,13 @@ var ensureJITFastest = "false"
 //go:embed testdata/fac.wasm
 var facWasm []byte
 
-// TestFacIter ensures that the code in BenchmarkFacIter works as expected.
-func TestFacIter(t *testing.T) {
+// TestFac ensures that the code in BenchmarkFac works as expected.
+func TestFac(t *testing.T) {
 	const in = 30
 	expValue := uint64(0x865df5dd54000000)
 
 	t.Run("Interpreter", func(t *testing.T) {
-		mod, fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
+		mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
 		require.NoError(t, err)
 		defer mod.Close()
 
@@ -45,7 +45,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("JIT", func(t *testing.T) {
-		mod, fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
+		mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
 		require.NoError(t, err)
 		defer mod.Close()
 
@@ -57,7 +57,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("wasmer-go", func(t *testing.T) {
-		store, instance, fn, err := newWasmerForFacIterBench()
+		store, instance, fn, err := newWasmerForFacBench()
 		require.NoError(t, err)
 		defer store.Close()
 		defer instance.Close()
@@ -70,7 +70,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("wasmtime-go", func(t *testing.T) {
-		store, run, err := newWasmtimeForFacIterBench()
+		store, run, err := newWasmtimeForFacBench()
 		require.NoError(t, err)
 		for i := 0; i < 10000; i++ {
 			res, err := run.Call(store, in)
@@ -82,7 +82,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("go-wasm3", func(t *testing.T) {
-		env, runtime, run, err := newGoWasm3ForFacIterBench()
+		env, runtime, run, err := newGoWasm3ForFacBench()
 		require.NoError(t, err)
 		defer env.Destroy()
 		defer runtime.Destroy()
@@ -97,12 +97,12 @@ func TestFacIter(t *testing.T) {
 	})
 }
 
-// BenchmarkFacIter_Init tracks the time spent readying a function for use
-func BenchmarkFacIter_Init(b *testing.B) {
+// BenchmarkFac_Init tracks the time spent readying a function for use
+func BenchmarkFac_Init(b *testing.B) {
 	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mod, _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
+			mod, _, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -113,7 +113,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("JIT", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mod, _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
+			mod, _, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -124,7 +124,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("wasmer-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			store, instance, _, err := newWasmerForFacIterBench()
+			store, instance, _, err := newWasmerForFacBench()
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -136,7 +136,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("wasmtime-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, _, err := newWasmtimeForFacIterBench(); err != nil {
+			if _, _, err := newWasmtimeForFacBench(); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -145,7 +145,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("go-wasm3", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			env, runtime, _, err := newGoWasm3ForFacIterBench()
+			env, runtime, _, err := newGoWasm3ForFacBench()
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -155,17 +155,17 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	})
 }
 
-var facIterArgumentU64 = uint64(30)
-var facIterArgumentI64 = int64(facIterArgumentU64)
+var facArgumentU64 = uint64(30)
+var facArgumentI64 = int64(facArgumentU64)
 
-// TestFacIter_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
+// TestFac_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
-func TestFacIter_JIT_Fastest(t *testing.T) {
+func TestFac_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
 		t.Skip()
 	}
 
-	jitResult := testing.Benchmark(jitFacIterInvoke)
+	jitResult := testing.Benchmark(jitFacInvoke)
 
 	cases := []struct {
 		runtimeName string
@@ -173,19 +173,19 @@ func TestFacIter_JIT_Fastest(t *testing.T) {
 	}{
 		{
 			runtimeName: "interpreter",
-			result:      testing.Benchmark(interpreterFacIterInvoke),
+			result:      testing.Benchmark(interpreterFacInvoke),
 		},
 		{
 			runtimeName: "wasmer-go",
-			result:      testing.Benchmark(wasmerGoFacIterInvoke),
+			result:      testing.Benchmark(wasmerGoFacInvoke),
 		},
 		{
 			runtimeName: "wasmtime-go",
-			result:      testing.Benchmark(wasmtimeGoFacIterInvoke),
+			result:      testing.Benchmark(wasmtimeGoFacInvoke),
 		},
 		{
 			runtimeName: "go-wasm3",
-			result:      testing.Benchmark(goWasm3FacIterInvoke),
+			result:      testing.Benchmark(goWasm3FacInvoke),
 		},
 	}
 
@@ -202,57 +202,57 @@ func TestFacIter_JIT_Fastest(t *testing.T) {
 			// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
 			nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
 			msg := fmt.Sprintf("JIT engine must be faster than %s. "+
-				"Run BenchmarkFacIter_Invoke with ensureJITFastest=false instead to see the detailed result",
+				"Run BenchmarkFac_Invoke with ensureJITFastest=false instead to see the detailed result",
 				tc.runtimeName)
 			require.Lessf(t, jitNanoPerOp, nanoPerOp, msg)
 		})
 	}
 }
 
-// BenchmarkFacIter_Invoke benchmarks the time spent invoking a factorial calculation.
-func BenchmarkFacIter_Invoke(b *testing.B) {
+// BenchmarkFac_Invoke benchmarks the time spent invoking a factorial calculation.
+func BenchmarkFac_Invoke(b *testing.B) {
 	if ensureJITFastest == "true" {
 		// If ensureJITFastest == "true", the benchmark for invocation will be run by
-		// TestFacIter_JIT_Fastest so skip here.
+		// TestFac_JIT_Fastest so skip here.
 		b.Skip()
 	}
-	b.Run("Interpreter", interpreterFacIterInvoke)
-	b.Run("JIT", jitFacIterInvoke)
-	b.Run("wasmer-go", wasmerGoFacIterInvoke)
-	b.Run("wasmtime-go", wasmtimeGoFacIterInvoke)
-	b.Run("go-wasm3", goWasm3FacIterInvoke)
+	b.Run("Interpreter", interpreterFacInvoke)
+	b.Run("JIT", jitFacInvoke)
+	b.Run("wasmer-go", wasmerGoFacInvoke)
+	b.Run("wasmtime-go", wasmtimeGoFacInvoke)
+	b.Run("go-wasm3", goWasm3FacInvoke)
 }
 
-func interpreterFacIterInvoke(b *testing.B) {
-	mod, fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
+func interpreterFacInvoke(b *testing.B) {
+	mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer mod.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(nil, facIterArgumentU64); err != nil {
+		if _, err = fn.Call(nil, facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func jitFacIterInvoke(b *testing.B) {
-	mod, fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
+func jitFacInvoke(b *testing.B) {
+	mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer mod.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(nil, facIterArgumentU64); err != nil {
+		if _, err = fn.Call(nil, facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func wasmerGoFacIterInvoke(b *testing.B) {
-	store, instance, fn, err := newWasmerForFacIterBench()
+func wasmerGoFacInvoke(b *testing.B) {
+	store, instance, fn, err := newWasmerForFacBench()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -260,35 +260,35 @@ func wasmerGoFacIterInvoke(b *testing.B) {
 	defer instance.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn(facIterArgumentI64); err != nil {
+		if _, err = fn(facArgumentI64); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func wasmtimeGoFacIterInvoke(b *testing.B) {
-	store, run, err := newWasmtimeForFacIterBench()
+func wasmtimeGoFacInvoke(b *testing.B) {
+	store, run, err := newWasmtimeForFacBench()
 	if err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// go-wasm3 only maps the int type
-		if _, err = run.Call(store, int(facIterArgumentI64)); err != nil {
+		if _, err = run.Call(store, int(facArgumentI64)); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func goWasm3FacIterInvoke(b *testing.B) {
-	env, runtime, run, err := newGoWasm3ForFacIterBench()
+func goWasm3FacInvoke(b *testing.B) {
+	env, runtime, run, err := newGoWasm3ForFacBench()
 	if err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// go-wasm3 only maps the int type
-		if _, err = run(int(facIterArgumentI64)); err != nil {
+		if _, err = run(int(facArgumentI64)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -296,7 +296,7 @@ func goWasm3FacIterInvoke(b *testing.B) {
 	env.Destroy()
 }
 
-func newWazeroFacIterBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
+func newWazeroFacBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
 	r := wazero.NewRuntimeWithConfig(config)
 
 	m, err := r.InstantiateModuleFromCode(facWasm)
@@ -304,12 +304,12 @@ func newWazeroFacIterBench(config *wazero.RuntimeConfig) (api.Module, api.Functi
 		return nil, nil, err
 	}
 
-	return m, m.ExportedFunction("fac-iter"), nil
+	return m, m.ExportedFunction("fac"), nil
 }
 
-// newWasmerForFacIterBench returns the store and instance that scope the factorial function.
+// newWasmerForFacBench returns the store and instance that scope the factorial function.
 // Note: these should be closed
-func newWasmerForFacIterBench() (*wasmer.Store, *wasmer.Instance, wasmer.NativeFunction, error) {
+func newWasmerForFacBench() (*wasmer.Store, *wasmer.Instance, wasmer.NativeFunction, error) {
 	store := wasmer.NewStore(wasmer.NewEngine())
 	importObject := wasmer.NewImportObject()
 	module, err := wasmer.NewModule(store, facWasm)
@@ -320,7 +320,7 @@ func newWasmerForFacIterBench() (*wasmer.Store, *wasmer.Instance, wasmer.NativeF
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	f, err := instance.Exports.GetFunction("fac-iter")
+	f, err := instance.Exports.GetFunction("fac")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -330,7 +330,7 @@ func newWasmerForFacIterBench() (*wasmer.Store, *wasmer.Instance, wasmer.NativeF
 	return store, instance, f, nil
 }
 
-func newWasmtimeForFacIterBench() (*wasmtime.Store, *wasmtime.Func, error) {
+func newWasmtimeForFacBench() (*wasmtime.Store, *wasmtime.Func, error) {
 	store := wasmtime.NewStore(wasmtime.NewEngine())
 	module, err := wasmtime.NewModule(store.Engine, facWasm)
 	if err != nil {
@@ -342,14 +342,14 @@ func newWasmtimeForFacIterBench() (*wasmtime.Store, *wasmtime.Func, error) {
 		return nil, nil, err
 	}
 
-	run := instance.GetFunc(store, "fac-iter")
+	run := instance.GetFunc(store, "fac")
 	if run == nil {
 		return nil, nil, errors.New("not a function")
 	}
 	return store, run, nil
 }
 
-func newGoWasm3ForFacIterBench() (*wasm3.Environment, *wasm3.Runtime, wasm3.FunctionWrapper, error) {
+func newGoWasm3ForFacBench() (*wasm3.Environment, *wasm3.Runtime, wasm3.FunctionWrapper, error) {
 	env := wasm3.NewEnvironment()
 	runtime := wasm3.NewRuntime(&wasm3.Config{
 		Environment: wasm3.NewEnvironment(),
@@ -366,7 +366,7 @@ func newGoWasm3ForFacIterBench() (*wasm3.Environment, *wasm3.Runtime, wasm3.Func
 		return nil, nil, nil, err
 	}
 
-	run, err := runtime.FindFunction("fac-iter")
+	run, err := runtime.FindFunction("fac")
 	if err != nil {
 		return nil, nil, nil, err
 	}

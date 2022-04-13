@@ -1,4 +1,4 @@
-package post1_0
+package sign_extension_ops
 
 import (
 	_ "embed"
@@ -10,25 +10,15 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-func TestJIT(t *testing.T) {
+func TestSignExtensionOps_JIT(t *testing.T) {
 	if !wazero.JITSupported {
 		t.Skip()
 	}
-	runOptionalFeatureTests(t, wazero.NewRuntimeConfigJIT)
+	testSignExtensionOps(t, wazero.NewRuntimeConfigJIT)
 }
 
-func TestInterpreter(t *testing.T) {
-	runOptionalFeatureTests(t, wazero.NewRuntimeConfigInterpreter)
-}
-
-// runOptionalFeatureTests tests features enabled by feature flags (wasm.Features) as they were unfinished when
-// WebAssembly 1.0 (20191205) was released.
-//
-// See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
-func runOptionalFeatureTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	t.Run("sign-extension-ops", func(t *testing.T) {
-		testSignExtensionOps(t, newRuntimeConfig)
-	})
+func TestSignExtensionOps_Interpreter(t *testing.T) {
+	testSignExtensionOps(t, wazero.NewRuntimeConfigInterpreter)
 }
 
 // signExtend is a WebAssembly 1.0 (20191205) Text Format source, except that it uses opcodes from 'sign-extension-ops'.

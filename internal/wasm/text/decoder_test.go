@@ -14,9 +14,8 @@ func TestDecodeModule(t *testing.T) {
 	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
 
 	tests := []struct {
-		name, input     string
-		enabledFeatures wasm.Features
-		expected        *wasm.Module
+		name, input string
+		expected    *wasm.Module
 	}{
 		{
 			name:     "empty",
@@ -57,6 +56,24 @@ func TestDecodeModule(t *testing.T) {
 				}},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
+				},
+			},
+		},
+		{
+			name:  "type func multiple abbreviated results",
+			input: "(module (type (func (param i32 i32) (result i32 i32))))",
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
+				},
+			},
+		},
+		{
+			name:  "type func multiple results",
+			input: "(module (type (func (param i32) (param i32) (result i32) (result i32))))",
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
 				},
 			},
 		},
@@ -208,7 +225,6 @@ func TestDecodeModule(t *testing.T) {
 			input: `(module
 			(func (param i64) (result i64) local.get 0 i64.extend16_s)
 		)`,
-			enabledFeatures: wasm.FeatureSignExtensionOps,
 			expected: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{i64_i64},
 				FunctionSection: []wasm.Index{0},
@@ -619,6 +635,21 @@ func TestDecodeModule(t *testing.T) {
 					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
+			},
+		},
+		{
+			name:  "import func multiple abbreviated results",
+			input: `(module (import "misc" "swap" (func $swap (param i32 i32) (result i32 i32))))`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}},
+				ImportSection: []*wasm.Import{{
+					Module: "misc", Name: "swap",
+					Type:     wasm.ExternTypeFunc,
+					DescFunc: 0,
+				}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "swap"}},
+				},
 			},
 		},
 		{
@@ -1100,6 +1131,18 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name:  "func multiple abbreviated results",
+			input: "(module (func $swap (param i32 i32) (result i32 i32) local.get 1 local.get 0))",
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0x01, wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "swap"}},
+				},
+			},
+		},
+		{
 			name: "func call - index",
 			input: `(module
 			(func)
@@ -1507,10 +1550,7 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.enabledFeatures == 0 {
-				tc.enabledFeatures = wasm.Features20191205
-			}
-			m, err := DecodeModule([]byte(tc.input), tc.enabledFeatures, wasm.MemoryMaxPages)
+			m, err := DecodeModule([]byte(tc.input), wasm.FeaturesFinished, wasm.MemoryMaxPages)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -1519,10 +1559,9 @@ func TestDecodeModule(t *testing.T) {
 
 func TestParseModule_Errors(t *testing.T) {
 	tests := []struct {
-		name, input     string
-		enabledFeatures wasm.Features
-		memoryMaxPages  uint32
-		expectedErr     string
+		name, input    string
+		memoryMaxPages uint32
+		expectedErr    string
 	}{
 		{
 			name:        "forgot parens",
@@ -1580,9 +1619,19 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:30: unexpected ID: $Math in module.import[0]",
 		},
 		{
-			name:        "type ID clash",
+			name:        "type func ID clash",
 			input:       "(module (type $1 (func)) (type $1 (func (param i32))))",
 			expectedErr: "1:32: duplicate ID $1 in module.type[1]",
+		},
+		{
+			name:        "type func multiple abbreviated results - multi-value disabled",
+			input:       "(module (type (func (param i32 i32) (result i32 i32))))",
+			expectedErr: "1:49: multiple result types invalid as feature \"multi-value\" is disabled in module.type[0].func.result[0]",
+		},
+		{
+			name:        "type func multiple results - multi-value disabled",
+			input:       "(module (type (func (param i32) (param i32) (result i32) (result i32))))",
+			expectedErr: "1:59: multiple result types invalid as feature \"multi-value\" is disabled in module.type[0].func",
 		},
 		{
 			name:        "import missing module",
@@ -1685,16 +1734,6 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:63: duplicate ID $x in module.import[0].func.param[2]",
 		},
 		{
-			name:        "import func missing param0 type",
-			input:       "(module (import \"\" \"\" (func (param))))",
-			expectedErr: "1:35: expected a type in module.import[0].func.param[0]",
-		},
-		{
-			name:        "import func missing param1 type",
-			input:       "(module (import \"\" \"\" (func (param i32) (param))))",
-			expectedErr: "1:47: expected a type in module.import[0].func.param[1]",
-		},
-		{
 			name:        "import func wrong param0 type",
 			input:       "(module (import \"\" \"\" (func (param f65))))",
 			expectedErr: "1:36: unknown type: f65 in module.import[0].func.param[0]",
@@ -1705,29 +1744,19 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:48: unknown type: f65 in module.import[0].func.param[1]",
 		},
 		{
-			name:        "import func double result",
-			input:       "(module (import \"\" \"\" (func (param i32) (result i32) (result i32))))",
-			expectedErr: "1:54: unexpected '(' in module.import[0].func",
+			name:        "import func multiple abbreviated results - multi-value disabled",
+			input:       `(module (import "misc" "swap" (func $swap (param i32 i32) (result i32 i32))))`,
+			expectedErr: "1:71: multiple result types invalid as feature \"multi-value\" is disabled in module.import[0].func.result[0]",
 		},
 		{
-			name:        "import func double result type",
-			input:       "(module (import \"\" \"\" (func (param i32) (result i32 i32))))",
-			expectedErr: "1:53: redundant type in module.import[0].func.result",
+			name:        "import func multiple results - multi-value disabled",
+			input:       `(module (import "misc" "swap" (func $swap (param i32) (param i32) (result i32) (result i32))))`,
+			expectedErr: "1:81: multiple result types invalid as feature \"multi-value\" is disabled in module.import[0].func",
 		},
 		{
 			name:        "import func wrong result type",
 			input:       "(module (import \"\" \"\" (func (param i32) (result f65))))",
-			expectedErr: "1:49: unknown type: f65 in module.import[0].func.result",
-		},
-		{
-			name:        "import func wrong no param type",
-			input:       "(module (import \"\" \"\" (func (param))))",
-			expectedErr: "1:35: expected a type in module.import[0].func.param[0]",
-		},
-		{
-			name:        "import func no result type",
-			input:       "(module (import \"\" \"\" (func (param i32) (result))))",
-			expectedErr: "1:48: expected a type in module.import[0].func.result",
+			expectedErr: "1:49: unknown type: f65 in module.import[0].func.result[0]",
 		},
 		{
 			name:        "import func wrong param token",
@@ -1737,7 +1766,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "import func wrong result token",
 			input:       "(module (import \"\" \"\" (func (result () ))))",
-			expectedErr: "1:37: unexpected '(' in module.import[0].func.result",
+			expectedErr: "1:37: unexpected '(' in module.import[0].func.result[0]",
 		},
 		{
 			name:        "import func ID after param",
@@ -1777,7 +1806,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "import func param after result",
 			input:       "(module (import \"\" \"\" (func (result i32) (param i32))))",
-			expectedErr: "1:42: unexpected '(' in module.import[0].func",
+			expectedErr: "1:43: param after result in module.import[0].func",
 		},
 		{
 			name:        "import func double desc",
@@ -1830,16 +1859,6 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:29: cannot assign IDs to parameters in abbreviated form in module.func[0].param[0]",
 		},
 		{
-			name:        "func missing param0 type",
-			input:       "(module (func (param)))",
-			expectedErr: "1:21: expected a type in module.func[0].param[0]",
-		},
-		{
-			name:        "func missing param1 type",
-			input:       "(module (func (param i32) (param)))",
-			expectedErr: "1:33: expected a type in module.func[0].param[1]",
-		},
-		{
 			name:        "func wrong param0 type",
 			input:       "(module (func (param f65)))",
 			expectedErr: "1:22: unknown type: f65 in module.func[0].param[0]",
@@ -1850,29 +1869,19 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:34: unknown type: f65 in module.func[0].param[1]",
 		},
 		{
-			name:        "func duplicate result",
-			input:       "(module (func (param i32) (result i32) (result i32)))",
-			expectedErr: "1:41: at most one result allowed in module.func[0]",
+			name:        "func multiple abbreviated results - multi-value disabled",
+			input:       "(module (func $swap (param i32 i32) (result i32 i32) local.get 1 local.get 0))",
+			expectedErr: "1:49: multiple result types invalid as feature \"multi-value\" is disabled in module.func[0].result[0]",
 		},
 		{
-			name:        "func double result type",
-			input:       "(module (func (param i32) (result i32 i32)))",
-			expectedErr: "1:39: redundant type in module.func[0].result",
+			name:        "func multiple results - multi-value disabled",
+			input:       "(module (func $swap (param i32) (param i32) (result i32) (result i32) local.get 1 local.get 0))",
+			expectedErr: "1:59: multiple result types invalid as feature \"multi-value\" is disabled in module.func[0]",
 		},
 		{
 			name:        "func wrong result type",
 			input:       "(module (func (param i32) (result f65)))",
-			expectedErr: "1:35: unknown type: f65 in module.func[0].result",
-		},
-		{
-			name:        "func wrong no param type",
-			input:       "(module (func (param)))",
-			expectedErr: "1:21: expected a type in module.func[0].param[0]",
-		},
-		{
-			name:        "func no result type",
-			input:       "(module (func (param i32) (result)))",
-			expectedErr: "1:34: expected a type in module.func[0].result",
+			expectedErr: "1:35: unknown type: f65 in module.func[0].result[0]",
 		},
 		{
 			name:        "func wrong param token",
@@ -1882,7 +1891,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "func wrong result token",
 			input:       "(module (func (result () )))",
-			expectedErr: "1:23: unexpected '(' in module.func[0].result",
+			expectedErr: "1:23: unexpected '(' in module.func[0].result[0]",
 		},
 		{
 			name:        "func ID after param",
@@ -1965,7 +1974,7 @@ func TestParseModule_Errors(t *testing.T) {
 			input: `(module
 			(func (param i64) (result i64) local.get 0 i64.extend16_s)
 		)`,
-			expectedErr: "2:47: i64.extend16_s invalid as feature sign-extension-ops is disabled in module.func[0]",
+			expectedErr: "2:47: i64.extend16_s invalid as feature \"sign-extension-ops\" is disabled in module.func[0]",
 		},
 		{
 			name:           "memory over max",
@@ -2115,13 +2124,10 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.enabledFeatures == 0 {
-				tc.enabledFeatures = wasm.Features20191205
-			}
 			if tc.memoryMaxPages == 0 {
 				tc.memoryMaxPages = wasm.MemoryMaxPages
 			}
-			_, err := DecodeModule([]byte(tc.input), tc.enabledFeatures, tc.memoryMaxPages)
+			_, err := DecodeModule([]byte(tc.input), wasm.Features20191205, tc.memoryMaxPages)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

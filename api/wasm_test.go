@@ -41,6 +41,7 @@ func TestEncodeDecodeF32(t *testing.T) {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			encoded := EncodeF32(v)
 			binary := DecodeF32(encoded)
+			require.Zero(t, encoded>>32)     // Ensures high bits aren't set
 			if math.IsNaN(float64(binary)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 				require.True(t, math.IsNaN(float64(binary)))
 			} else {
@@ -70,6 +71,35 @@ func TestEncodeDecodeF64(t *testing.T) {
 			} else {
 				require.Equal(t, v, val)
 			}
+		})
+	}
+}
+
+func TestEncodeCastI32(t *testing.T) {
+	for _, v := range []int32{
+		0, 100, -100, 1, -1,
+		math.MaxInt32,
+		math.MinInt32,
+	} {
+		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+			encoded := EncodeI32(v)
+			require.Zero(t, encoded>>32) // Ensures high bits aren't set
+			binary := int32(encoded)
+			require.Equal(t, v, binary)
+		})
+	}
+}
+
+func TestEncodeCastI64(t *testing.T) {
+	for _, v := range []int64{
+		0, 100, -100, 1, -1,
+		math.MaxInt64,
+		math.MinInt64,
+	} {
+		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+			encoded := EncodeI64(v)
+			binary := int64(encoded)
+			require.Equal(t, v, binary)
 		})
 	}
 }

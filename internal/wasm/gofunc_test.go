@@ -10,61 +10,20 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-type errno uint32
-
 func TestGetFunctionType(t *testing.T) {
 	i32, i64, f32, f64 := ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64
 
-	tests := []struct {
-		name              string
-		inputFunc         interface{}
-		allowErrorResult  bool
-		expectedKind      FunctionKind
-		expectedType      *FunctionType
-		expectErrorResult bool
+	var tests = []struct {
+		name         string
+		inputFunc    interface{}
+		expectedKind FunctionKind
+		expectedType *FunctionType
 	}{
 		{
 			name:         "nullary",
 			inputFunc:    func() {},
 			expectedKind: FunctionKindGoNoContext,
 			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
-		},
-		{
-			name:             "nullary allowErrorResult",
-			inputFunc:        func() {},
-			allowErrorResult: true,
-			expectedKind:     FunctionKindGoNoContext,
-			expectedType:     &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
-		},
-		{
-			name:              "void error result",
-			inputFunc:         func() error { return nil },
-			allowErrorResult:  true,
-			expectedKind:      FunctionKindGoNoContext,
-			expectErrorResult: true,
-			expectedType:      &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
-		},
-		{
-			name:             "void uint32 allowErrorResult",
-			inputFunc:        func() uint32 { return 0 },
-			allowErrorResult: true,
-			expectedKind:     FunctionKindGoNoContext,
-			expectedType:     &FunctionType{Params: []ValueType{}, Results: []ValueType{i32}},
-		},
-		{
-			name:             "void type uint32 allowErrorResult",
-			inputFunc:        func() errno { return 0 },
-			allowErrorResult: true,
-			expectedKind:     FunctionKindGoNoContext,
-			expectedType:     &FunctionType{Params: []ValueType{}, Results: []ValueType{i32}},
-		},
-		{
-			name:              "void (uint32,error) results",
-			inputFunc:         func() (uint32, error) { return 0, nil },
-			allowErrorResult:  true,
-			expectedKind:      FunctionKindGoNoContext,
-			expectErrorResult: true,
-			expectedType:      &FunctionType{Params: []ValueType{}, Results: []ValueType{i32}},
 		},
 		{
 			name:         "wasm.Module void return",
@@ -85,6 +44,12 @@ func TestGetFunctionType(t *testing.T) {
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
 		},
 		{
+			name:         "all supported params and all supported results",
+			inputFunc:    func(uint32, uint64, float32, float64) (uint32, uint64, float32, float64) { return 0, 0, 0, 0 },
+			expectedKind: FunctionKindGoNoContext,
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32, i64, f32, f64}},
+		},
+		{
 			name:         "all supported params and i32 result - wasm.Module",
 			inputFunc:    func(api.Module, uint32, uint64, float32, float64) uint32 { return 0 },
 			expectedKind: FunctionKindGoModule,
@@ -97,17 +62,15 @@ func TestGetFunctionType(t *testing.T) {
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
 		},
 	}
-
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.inputFunc)
-			fk, ft, hasErrorResult, err := getFunctionType(&rVal, tc.allowErrorResult)
+			fk, ft, err := getFunctionType(&rVal, Features20191205|FeatureMultiValue)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedKind, fk)
 			require.Equal(t, tc.expectedType, ft)
-			require.Equal(t, tc.expectErrorResult, hasErrorResult)
 		})
 	}
 }
@@ -140,9 +103,9 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 			expectedErr: "result[0] is an error, which is unsupported",
 		},
 		{
-			name:        "multiple results",
+			name:        "multiple results - multi-value not enabled",
 			input:       func() (uint64, uint32) { return 0, 0 },
-			expectedErr: "multiple results are unsupported",
+			expectedErr: "multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
 			name:        "multiple context types",
@@ -166,7 +129,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.input)
-			_, _, _, err := getFunctionType(&rVal, tc.allowErrorResult)
+			_, _, err := getFunctionType(&rVal, Features20191205)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

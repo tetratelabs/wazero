@@ -31,12 +31,12 @@ import (
 )
 
 type EngineTester interface {
-	NewEngine() wasm.Engine
+	NewEngine(enabledFeatures wasm.Features) wasm.Engine
 	InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{}
 }
 
 func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
-	e := et.NewEngine()
+	e := et.NewEngine(wasm.Features20191205)
 
 	t.Run("sets module name", func(t *testing.T) {
 		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
@@ -47,7 +47,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 }
 
 func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
-	e := et.NewEngine()
+	e := et.NewEngine(wasm.Features20191205)
 
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	i64 := wasm.ValueTypeI64
@@ -84,7 +84,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 }
 
 func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
-	e := et.NewEngine()
+	e := et.NewEngine(wasm.Features20191205)
 
 	t.Run("no table elements", func(t *testing.T) {
 		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
@@ -185,9 +185,10 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 		return v
 	})
 
-	e := et.NewEngine()
+	features := wasm.Features20191205
+	e := et.NewEngine(features)
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module, nil)
+	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(features, e), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
@@ -218,7 +219,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	runTestModuleEngine_Call_HostFn_ModuleContext(t, et) // TODO: refactor to use the same test interface.
 
-	e := et.NewEngine()
+	e := et.NewEngine(wasm.Features20191205)
 
 	imported, importedMe, importing, importingMe := setupCallTests(t, e)
 	defer importingMe.Close()
@@ -265,7 +266,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 }
 
 func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
-	e := et.NewEngine()
+	e := et.NewEngine(wasm.Features20191205)
 
 	imported, importedMe, importing, importingMe := setupCallTests(t, e)
 	defer importingMe.Close()
