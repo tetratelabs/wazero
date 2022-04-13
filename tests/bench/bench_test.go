@@ -22,7 +22,7 @@ func BenchmarkEngines(b *testing.B) {
 		defer m.Close()
 		runAllBenches(b, m)
 	})
-	if runtime.GOARCH == "amd64" {
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("jit", func(b *testing.B) {
 			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
 			defer m.Close()
@@ -46,8 +46,10 @@ func runBase64Benches(b *testing.B, m api.Module) {
 		numPerExec := uint64(numPerExec)
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
-			if _, err := base64.Call(nil, numPerExec); err != nil {
-				b.Fatal(err)
+			for i := 0; i < b.N; i++ {
+				if _, err := base64.Call(nil, numPerExec); err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
