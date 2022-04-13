@@ -17,7 +17,7 @@ bench_testdata_dir := tests/bench/testdata
 build.bench:
 	tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none -target=wasi $(bench_testdata_dir)/case.go
 
-wasi_testdata_dir := ./examples/testdata
+wasi_testdata_dir := ./examples/*/testdata
 .PHONY: build.examples
 build.examples:
 	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'

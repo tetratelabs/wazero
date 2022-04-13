@@ -4,13 +4,13 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
-      - 'examples/wasm/*.go'
+      - 'examples/*/testdata/*.go'
       - 'Makefile'
   push:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
-      - 'examples/wasm/*.go'
+      - 'examples/*/testdata/*.go'
       - 'Makefile'
 
 jobs:
