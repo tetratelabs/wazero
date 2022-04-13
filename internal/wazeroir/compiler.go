@@ -653,7 +653,7 @@ operatorSwitch:
 			&OperationGlobalSet{Index: *index},
 		)
 	case wasm.OpcodeI32Load:
-		imm, err := c.readMemoryImmediate("i32.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32LoadName)
 		if err != nil {
 			return err
 		}
@@ -661,7 +661,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load:
-		imm, err := c.readMemoryImmediate("i64.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64LoadName)
 		if err != nil {
 			return err
 		}
@@ -669,7 +669,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Load:
-		imm, err := c.readMemoryImmediate("f32.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF32LoadName)
 		if err != nil {
 			return err
 		}
@@ -677,7 +677,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Load:
-		imm, err := c.readMemoryImmediate("f64.load")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF64LoadName)
 		if err != nil {
 			return err
 		}
@@ -685,7 +685,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8S:
-		imm, err := c.readMemoryImmediate("i32.load8_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8SName)
 		if err != nil {
 			return err
 		}
@@ -693,7 +693,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8U:
-		imm, err := c.readMemoryImmediate("i32.load8_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8UName)
 		if err != nil {
 			return err
 		}
@@ -701,7 +701,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16S:
-		imm, err := c.readMemoryImmediate("i32.load16_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16SName)
 		if err != nil {
 			return err
 		}
@@ -709,7 +709,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16U:
-		imm, err := c.readMemoryImmediate("i32.load16_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16UName)
 		if err != nil {
 			return err
 		}
@@ -717,7 +717,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8S:
-		imm, err := c.readMemoryImmediate("i64.load8_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8SName)
 		if err != nil {
 			return err
 		}
@@ -725,7 +725,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8U:
-		imm, err := c.readMemoryImmediate("i64.load8_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8UName)
 		if err != nil {
 			return err
 		}
@@ -733,7 +733,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16S:
-		imm, err := c.readMemoryImmediate("i64.load16_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16SName)
 		if err != nil {
 			return err
 		}
@@ -741,7 +741,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16U:
-		imm, err := c.readMemoryImmediate("i64.load16_u")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16UName)
 		if err != nil {
 			return err
 		}
@@ -749,7 +749,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32S:
-		imm, err := c.readMemoryImmediate("i64.load32_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32SName)
 		if err != nil {
 			return err
 		}
@@ -757,7 +757,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: true, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32U:
-		imm, err := c.readMemoryImmediate("i64.load32_s")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32UName)
 		if err != nil {
 			return err
 		}
@@ -765,7 +765,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: false, Arg: imm},
 		)
 	case wasm.OpcodeI32Store:
-		imm, err := c.readMemoryImmediate("i32.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32StoreName)
 		if err != nil {
 			return err
 		}
@@ -773,7 +773,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store:
-		imm, err := c.readMemoryImmediate("i64.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64StoreName)
 		if err != nil {
 			return err
 		}
@@ -781,7 +781,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Store:
-		imm, err := c.readMemoryImmediate("f32.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF32StoreName)
 		if err != nil {
 			return err
 		}
@@ -789,7 +789,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Store:
-		imm, err := c.readMemoryImmediate("f64.store")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeF64StoreName)
 		if err != nil {
 			return err
 		}
@@ -797,7 +797,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Store8:
-		imm, err := c.readMemoryImmediate("i32.store8")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store8Name)
 		if err != nil {
 			return err
 		}
@@ -805,7 +805,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Store16:
-		imm, err := c.readMemoryImmediate("i32.store16")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store16Name)
 		if err != nil {
 			return err
 		}
@@ -813,7 +813,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store8:
-		imm, err := c.readMemoryImmediate("i64.store8")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store8Name)
 		if err != nil {
 			return err
 		}
@@ -821,7 +821,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store16:
-		imm, err := c.readMemoryImmediate("i64.store16")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store16Name)
 		if err != nil {
 			return err
 		}
@@ -829,7 +829,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store32:
-		imm, err := c.readMemoryImmediate("i64.store32")
+		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store32Name)
 		if err != nil {
 			return err
 		}

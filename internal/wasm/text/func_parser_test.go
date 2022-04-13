@@ -54,6 +54,25 @@ func TestFuncParser(t *testing.T) {
 			source:   "(func i64.const 356)",
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeI64Const, 0xe4, 0x02, wasm.OpcodeEnd}},
 		},
+		{
+			name:   "i64.load",
+			source: "(func i32.const 8 i64.load)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to load
+				wasm.OpcodeI64Load, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.store",
+			source: "(func i32.const 8 i64.const 37 i64.store)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to store
+				wasm.OpcodeI64Const, 37, // value to store
+				wasm.OpcodeI64Store, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
 
 		// Below are changes to test/core/i32 and i64.wast from the commit that added "sign-extension-ops" support.
 		// See https://github.com/WebAssembly/spec/commit/e308ca2ae04d5083414782e842a81f931138cf2e

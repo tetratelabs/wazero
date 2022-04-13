@@ -145,41 +145,45 @@ func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, _
 func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err error) {
 	var opCode wasm.Opcode
 	switch string(tokenBytes) {
-	case "call": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
+	case wasm.OpcodeCallName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
 		opCode = wasm.OpcodeCall
 		next = p.parseFuncIndex
-	case "drop": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
+	case wasm.OpcodeDropName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
 		opCode = wasm.OpcodeDrop
 		next = p.beginFieldOrInstruction
-	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+	case wasm.OpcodeI32AddName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
-	case "i32.const": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+	case wasm.OpcodeI32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Const
 		next = p.parseI32
-	case "i64.const": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+	case wasm.OpcodeI64ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI64Const
 		next = p.parseI64
-	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
+	case wasm.OpcodeI64LoadName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeI64Instruction(wasm.OpcodeI64Load)
+	case wasm.OpcodeI64StoreName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeI64Instruction(wasm.OpcodeI64Store)
+	case wasm.OpcodeLocalGetName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#variable-instructions%E2%91%A0
 		opCode = wasm.OpcodeLocalGet
 		next = p.parseLocalIndex
 
 		// Next are sign-extension-ops
 		// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 
-	case "i32.extend8_s":
+	case wasm.OpcodeI32Extend8SName:
 		opCode = wasm.OpcodeI32Extend8S
 		next = p.beginFieldOrInstruction
-	case "i32.extend16_s":
+	case wasm.OpcodeI32Extend16SName:
 		opCode = wasm.OpcodeI32Extend16S
 		next = p.beginFieldOrInstruction
-	case "i64.extend8_s":
+	case wasm.OpcodeI64Extend8SName:
 		opCode = wasm.OpcodeI64Extend8S
 		next = p.beginFieldOrInstruction
-	case "i64.extend16_s":
+	case wasm.OpcodeI64Extend16SName:
 		opCode = wasm.OpcodeI64Extend16S
 		next = p.beginFieldOrInstruction
-	case "i64.extend32_s":
+	case wasm.OpcodeI64Extend32SName:
 		opCode = wasm.OpcodeI64Extend32S
 		next = p.beginFieldOrInstruction
 	default:
@@ -195,6 +199,16 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 
 	p.currentBody = append(p.currentBody, opCode)
 	return next, nil
+}
+
+func (p *funcParser) encodeI64Instruction(oc wasm.Opcode) (tokenParser, error) {
+	p.currentBody = append(
+		p.currentBody,
+		oc,
+		3, // alignment=3 (natural alignment) because 2^3 = size of I64 (8 bytes)
+		0, // offset=0 because that's the default
+	)
+	return p.beginFieldOrInstruction, nil
 }
 
 // end invokes onFunc to continue parsing
