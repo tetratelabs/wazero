@@ -67,13 +67,7 @@ func importAfterModuleDefined(section wasm.SectionID) error {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tables%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A0
 func moreThanOneInvalidInSection(section wasm.SectionID) error {
-	return moreThanOneInvalid(wasm.SectionIDName(section))
-}
-
-// TODO: multi-value
-// moreThanOneInvalid is the failure when a declaration that can result in more than one item.
-func moreThanOneInvalid(context string) error {
-	return fmt.Errorf("at most one %s allowed", context)
+	return fmt.Errorf("at most one %s allowed", wasm.SectionIDName(section))
 }
 
 func unhandledSection(section wasm.SectionID) error {

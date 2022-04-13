@@ -121,8 +121,6 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 	switch string(tokenBytes) {
 	case "param":
 		return nil, errors.New("param after result")
-	case "result":
-		return nil, moreThanOneInvalid("result")
 	case "local":
 		return nil, errors.New("TODO: local")
 	}

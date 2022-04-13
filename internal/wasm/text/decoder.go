@@ -204,7 +204,7 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			return p.parseExportName, nil
 		case "start":
 			if p.module.SectionElementCount(wasm.SectionIDStart) > 0 {
-				return nil, moreThanOneInvalid("start")
+				return nil, moreThanOneInvalidInSection(wasm.SectionIDStart)
 			}
 			p.pos = positionStart
 			return p.parseStart, nil
