@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// main is the same as cat: "concatenate and print files."
+// main is the same as wasi: "concatenate and print files."
 func main() {
 	// Start at arg[1] because args[0] is the program name.
 	for i := 1; i < len(os.Args); i++ {

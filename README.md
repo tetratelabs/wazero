@@ -12,7 +12,9 @@ Import wazero and extend your Go application with code written in any language!
 
 ## Example
 
-Here's an example of using wazero to invoke a factorial function:
+The best way to learn this and other features you get with wazero is by trying one of our [examples](examples).
+For the impatient, here's how invoking a factorial function looks in wazero:
+
 ```golang
 func main() {
 	// Read a WebAssembly binary containing an exported "fac" function.
@@ -54,9 +56,6 @@ module, err := r.InstantiateModule(binary, config)
 defer module.Close()
 ...
 ```
-
-The best way to learn this and other features you get with wazero is by trying
-[examples](examples).
 
 ## Runtime
 

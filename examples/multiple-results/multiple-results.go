@@ -1,38 +1,75 @@
-package examples
+package main
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
+	_ "embed"
+	"fmt"
+	"log"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )
 
-// Test_MultiReturn_V1_0 implements functions with multiple returns values, using an approach portable with any
-// WebAssembly 1.0 (20191205) runtime.
+// main implements functions with multiple returns values, using both an approach portable with any WebAssembly 1.0
+// (20191205) runtime, as well one dependent on the "multiple-results" feature.
 //
-// Note: This is the same approach used by WASI snapshot-01!
+// The portable approach uses parameters to return additional results. The parameter value is a memory offset to write
+// the next value. This is the same approach used by WASI snapshot-01!
+//  * resultOffsetWasmFunctions
+//  * resultOffsetHostFunctions
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-func Test_MultipleResults(t *testing.T) {
-	r := wazero.NewRuntime()
+//
+// Another approach is to enable the "multiple-results" feature. While "multiple-results" is not yet a W3C recommendation, most
+// WebAssembly runtimes support it by default.
+//  * multiValueWasmFunctions
+//  * multiValueHostFunctions
+// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+func main() {
+	// Create a portable WebAssembly Runtime.
+	runtime := wazero.NewRuntime()
 
-	// Instantiate a module that illustrates multiple results using functions defined as WebAssembly instructions.
-	wasm, err := resultOffsetWasmFunctions(r)
-	require.NoError(t, err)
+	// Add a module that uses offset parameters for multiple results, with functions defined in WebAssembly.
+	wasm, err := resultOffsetWasmFunctions(runtime)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer wasm.Close()
 
-	// Instantiate a module that illustrates multiple results using functions defined in Go.
-	host, err := resultOffsetHostFunctions(r)
-	require.NoError(t, err)
-	defer wasm.Close()
+	// Add a module that uses offset parameters for multiple results, with functions defined in Go.
+	host, err := resultOffsetHostFunctions(runtime)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer host.Close()
 
-	// Prove both implementations have the same effects!
-	for _, mod := range []api.Module{wasm, host} {
-		callGetNumber := mod.ExportedFunction("call_get_age")
-		results, err := callGetNumber.Call(nil)
-		require.NoError(t, err)
-		require.Equal(t, []uint64{37}, results)
+	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
+	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
+		wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
+		// ^^ Note: You can enable all features via WithFinishedFeatures.
+	)
+
+	// Add a module that uses multiple results values, with functions defined in WebAssembly.
+	wasmWithMultiValue, err := multiValueWasmFunctions(runtimeWithMultiValue)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer wasmWithMultiValue.Close()
+
+	// Add a module that uses multiple results values, with functions defined in Go.
+	hostWithMultiValue, err := multiValueHostFunctions(runtimeWithMultiValue)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer hostWithMultiValue.Close()
+
+	// Call the same function in all modules and print the results to the console.
+	for _, mod := range []api.Module{wasm, host, wasmWithMultiValue, hostWithMultiValue} {
+		getAge := mod.ExportedFunction("call_get_age")
+		results, err := getAge.Call(nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("%s: age=%d\n", mod.Name(), results[0])
 	}
 }
 
@@ -96,38 +133,7 @@ func resultOffsetHostFunctions(r wazero.Runtime) (api.Module, error) {
 		}).Instantiate()
 }
 
-// Test_MultipleResults_MultiValue implements functions with multiple returns values naturally, due to enabling the
-// "multi-value" feature.
-//
-// Note: While "multi-value" is not yet a W3C recommendation, most WebAssembly runtimes support it by default.
-// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
-func Test_MultipleResults_MultiValue(t *testing.T) {
-	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
-	r := wazero.NewRuntimeWithConfig(
-		wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
-		// ^^ Note: You can enable all features via WithFinishedFeatures.
-	)
-
-	// Instantiate a module that illustrates multi-value functions defined as WebAssembly instructions.
-	wasm, err := multiValueWasmFunctions(r)
-	require.NoError(t, err)
-	defer wasm.Close()
-
-	// Instantiate a module that illustrates multi-value functions using functions defined in Go.
-	host, err := multiValueHostFunctions(r)
-	require.NoError(t, err)
-	defer wasm.Close()
-
-	// Prove both implementations have the same effects!
-	for _, mod := range []api.Module{wasm, host} {
-		callGetNumber := mod.ExportedFunction("call_get_age")
-		results, err := callGetNumber.Call(nil)
-		require.NoError(t, err)
-		require.Equal(t, []uint64{37}, results)
-	}
-}
-
-// multiValueWasmFunctions defines Wasm functions that illustrate multiple results using the "multi-value" feature.
+// multiValueWasmFunctions defines Wasm functions that illustrate multiple results using the "multiple-results" feature.
 func multiValueWasmFunctions(r wazero.Runtime) (api.Module, error) {
 	return r.InstantiateModuleFromCode([]byte(`(module $multi-value/wasm
 
@@ -148,7 +154,7 @@ func multiValueWasmFunctions(r wazero.Runtime) (api.Module, error) {
 )`))
 }
 
-// multiValueHostFunctions defines Wasm functions that illustrate multiple results using the "multi-value" feature.
+// multiValueHostFunctions defines Wasm functions that illustrate multiple results using the "multiple-results" feature.
 func multiValueHostFunctions(r wazero.Runtime) (api.Module, error) {
 	return r.NewModuleBuilder("multi-value/host").
 		// Define a function that returns two results
