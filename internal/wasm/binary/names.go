@@ -51,6 +51,7 @@ func decodeNameSection(r *bytes.Reader, limit uint64) (result *wasm.NameSection,
 			return nil, fmt.Errorf("failed to read the size of subsection[%d]: %w", subsectionID, err)
 		}
 		limit -= bytesRead
+
 		switch subsectionID {
 		case subsectionIDModuleName:
 			if result.ModuleName, _, err = decodeUTF8(r, "module name"); err != nil {
