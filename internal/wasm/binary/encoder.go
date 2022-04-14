@@ -40,13 +40,13 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeStartSection(*m.StartSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDElement) > 0 {
-		panic("TODO: ElementSection")
+		bytes = append(bytes, encodeElementSection(m.ElementSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDCode) > 0 {
 		bytes = append(bytes, encodeCodeSection(m.CodeSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDData) > 0 {
-		panic("TODO: DataSection")
+		bytes = append(bytes, encodeDataSection(m.DataSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDCustom) > 0 {
 		// >> The name section should appear only once in a module, and only after the data section.

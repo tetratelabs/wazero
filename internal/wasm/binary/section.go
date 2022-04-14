@@ -275,3 +275,27 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 func encodeStartSection(funcidx wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }
+
+// encodeEelementSection encodes a wasm.SectionIDElement for the elements in WebAssembly 1.0 (20191205)
+// Binary Format.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#element-section%E2%91%A0
+func encodeElementSection(elements []*wasm.ElementSegment) []byte {
+	contents := leb128.EncodeUint32(uint32(len(elements)))
+	for _, e := range elements {
+		contents = append(contents, encodeElement(e)...)
+	}
+	return encodeSection(wasm.SectionIDElement, contents)
+}
+
+// encodeDataSection encodes a wasm.SectionIDData for the data in WebAssembly 1.0 (20191205)
+// Binary Format.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#data-section%E2%91%A0
+func encodeDataSection(datum []*wasm.DataSegment) []byte {
+	contents := leb128.EncodeUint32(uint32(len(datum)))
+	for _, d := range datum {
+		contents = append(contents, encodeDataSegment(d)...)
+	}
+	return encodeSection(wasm.SectionIDData, contents)
+}
