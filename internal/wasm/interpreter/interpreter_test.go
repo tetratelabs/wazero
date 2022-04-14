@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
@@ -245,11 +246,6 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 }
 
 func TestInterpreter_Close(t *testing.T) {
-	newFunctionInstance := func(id int) *wasm.FunctionInstance {
-		return &wasm.FunctionInstance{
-			DebugName: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
-	}
-
 	for _, tc := range []struct {
 		name                               string
 		importedFunctions, moduleFunctions []*wasm.FunctionInstance
@@ -300,5 +296,116 @@ func TestInterpreter_Close(t *testing.T) {
 				require.NotContains(t, e.compiledFunctions, f, i)
 			}
 		})
+	}
+}
+
+func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
+	e := et.NewEngine(wasm.Features20191205).(*engine)
+	exp := []*compiledFunction{
+		{source: &wasm.FunctionInstance{DebugName: "1"}},
+		{source: &wasm.FunctionInstance{DebugName: "2"}},
+	}
+	m := &wasm.Module{}
+
+	e.addCachedCompiledFunctions(m, exp)
+
+	actual, ok := e.getCachedCompiledFunctions(m)
+	require.True(t, ok)
+	require.Len(t, actual, len(exp))
+	for i := range actual {
+		require.Equal(t, exp[i], actual[i])
+	}
+
+	e.deleteCachedCompiledFunctions(m)
+	_, ok = e.getCachedCompiledFunctions(m)
+	require.False(t, ok)
+}
+
+func TestEngine_NewModuleEngine_cache(t *testing.T) {
+	e := et.NewEngine(wasm.Features20191205).(*engine)
+	importedModuleSource := &wasm.Module{}
+
+	// No cache.
+	importedME, err := e.NewModuleEngine("1", importedModuleSource, nil, []*wasm.FunctionInstance{
+		newFunctionInstance(1),
+		newFunctionInstance(2),
+	}, nil, nil)
+	require.NoError(t, err)
+
+	// Cached.
+	importedMEFromCache, err := e.NewModuleEngine("2", importedModuleSource, nil, []*wasm.FunctionInstance{
+		newFunctionInstance(1),
+		newFunctionInstance(2),
+	}, nil, nil)
+	require.NoError(t, err)
+
+	require.NotEqual(t, importedME, importedMEFromCache)
+	require.NotEqual(t, importedME.Name(), importedMEFromCache.Name())
+
+	// Check compiled functions.
+	ime, imeCache := importedME.(*moduleEngine), importedMEFromCache.(*moduleEngine)
+	require.Equal(t, len(ime.compiledFunctions), len(imeCache.compiledFunctions))
+
+	for i, fn := range ime.compiledFunctions {
+		// Compiled functions must be cloend.
+		fnCached := imeCache.compiledFunctions[i]
+		require.NotEqual(t, fn, fnCached)
+		require.NotEqual(t, fn.moduleEngine, fnCached.moduleEngine)
+		require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
+		// But the body stays the same.
+		require.Equal(t, fn.body, fnCached.body)
+	}
+
+	// Next is to veirfy the caching works for modules with imports.
+	importedFunc := ime.compiledFunctions[0].source
+	moduleSource := &wasm.Module{}
+
+	// No cache.
+	modEng, err := e.NewModuleEngine("3", moduleSource,
+		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
+		[]*wasm.FunctionInstance{
+			newFunctionInstance(10),
+			newFunctionInstance(20),
+		}, nil, nil)
+	require.NoError(t, err)
+
+	// Cached.
+	modEngCache, err := e.NewModuleEngine("4", moduleSource,
+		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
+		[]*wasm.FunctionInstance{
+			newFunctionInstance(10),
+			newFunctionInstance(20),
+		}, nil, nil)
+	require.NoError(t, err)
+
+	require.NotEqual(t, modEng, modEngCache)
+	require.NotEqual(t, modEng.Name(), modEngCache.Name())
+
+	me, meCache := modEng.(*moduleEngine), modEngCache.(*moduleEngine)
+	require.Equal(t, len(me.compiledFunctions), len(meCache.compiledFunctions))
+
+	for i, fn := range me.compiledFunctions {
+		fnCached := meCache.compiledFunctions[i]
+		if i == 0 {
+			// This case the function is imported, so it must be the same for both module engines.
+			require.Equal(t, fn, fnCached)
+			require.Equal(t, importedFunc, fn.source)
+		} else {
+			// Compiled functions must be cloend.
+			require.NotEqual(t, fn, fnCached)
+			require.NotEqual(t, fn.moduleEngine, fnCached.moduleEngine)
+			require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
+			// But the code segment stays the same.
+			require.Equal(t, fn.body, fnCached.body)
+		}
+	}
+}
+
+func newFunctionInstance(id int) *wasm.FunctionInstance {
+	return &wasm.FunctionInstance{
+		DebugName: strconv.Itoa(id),
+		Type:      &wasm.FunctionType{},
+		Body:      []byte{wasm.OpcodeEnd},
+		Module:    &wasm.ModuleInstance{},
 	}
 }
