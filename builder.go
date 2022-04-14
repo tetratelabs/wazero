@@ -265,6 +265,8 @@ func (b *moduleBuilder) Instantiate() (api.Module, error) {
 	if module, err := b.Build(); err != nil {
 		return nil, err
 	} else {
+		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside of this function.
+		defer module.Close()
 		return b.r.InstantiateModuleWithConfig(module, NewModuleConfig().WithName(b.moduleName))
 	}
 }

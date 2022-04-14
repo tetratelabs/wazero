@@ -13,7 +13,9 @@ type Engine interface {
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(name string, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
+	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
+
+	ReleaseCompilationCache(module *Module)
 }
 
 // ModuleEngine implements function calls for a given module.

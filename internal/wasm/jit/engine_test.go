@@ -153,6 +153,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 		e := et.NewEngine(wasm.Features20191205)
 		_, err := e.NewModuleEngine(
 			t.Name(),
+			&wasm.Module{},
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
 			nil, // moduleFunctions
 			nil, // table
@@ -170,7 +171,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
-		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+		_, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -183,7 +184,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
+		_, err = e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, nil, nil)
 		require.EqualError(t, err, "function[invalid code(2/2)] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -205,15 +206,6 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 }
 
 func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
-	newFunctionInstance := func(id int) *wasm.FunctionInstance {
-		return &wasm.FunctionInstance{
-			DebugName: strconv.Itoa(id),
-			Type:      &wasm.FunctionType{},
-			Body:      []byte{wasm.OpcodeEnd},
-			Module:    &wasm.ModuleInstance{},
-		}
-	}
-
 	e := et.NewEngine(wasm.Features20191205).(*engine)
 
 	importedFinalizer := fakeFinalizer{}
@@ -223,7 +215,7 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 		newFunctionInstance(10),
 		newFunctionInstance(20),
 	}
-	modE, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+	modE, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 	require.NoError(t, err)
 	defer modE.Close()
 	imported := modE.(*moduleEngine)
@@ -237,7 +229,7 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 		newFunctionInstance(300),
 	}
 
-	modE, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
+	modE, err = e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, nil, nil)
 	require.NoError(t, err)
 	defer modE.Close()
 	importing := modE.(*moduleEngine)
@@ -332,6 +324,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 				// Instantiate the imported module
 				modEngine, err := e.NewModuleEngine(
 					fmt.Sprintf("%s - imported functions", t.Name()),
+					&wasm.Module{},
 					nil, // moduleFunctions
 					tc.importedFunctions,
 					nil, // table
@@ -344,6 +337,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 
 			importing, err := e.NewModuleEngine(
 				fmt.Sprintf("%s - module-defined functions", t.Name()),
+				&wasm.Module{},
 				tc.importedFunctions,
 				tc.moduleFunctions,
 				nil, // table
@@ -475,5 +469,116 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 
 			require.Equal(t, uint32(expectedReturnValue), uint32(ret[0]))
 		})
+	}
+}
+
+func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
+	e := newEngine(wasm.Features20191205)
+	exp := []*compiledFunction{
+		{source: &wasm.FunctionInstance{DebugName: "1"}},
+		{source: &wasm.FunctionInstance{DebugName: "2"}},
+	}
+	m := &wasm.Module{}
+
+	e.addCachedCompiledFunctions(m, exp)
+
+	actual, ok := e.getCachedCompiledFunctions(m)
+	require.True(t, ok)
+	require.Len(t, actual, len(exp))
+	for i := range actual {
+		require.Equal(t, exp[i], actual[i])
+	}
+
+	e.deleteCachedCompiledFunctions(m)
+	_, ok = e.getCachedCompiledFunctions(m)
+	require.False(t, ok)
+}
+
+func TestEngine_NewModuleEngine_cache(t *testing.T) {
+	e := newEngine(wasm.Features20191205)
+	importedModuleSource := &wasm.Module{}
+
+	// No cache.
+	importedME, err := e.NewModuleEngine("1", importedModuleSource, nil, []*wasm.FunctionInstance{
+		newFunctionInstance(1),
+		newFunctionInstance(2),
+	}, nil, nil)
+	require.NoError(t, err)
+
+	// Cached.
+	importedMEFromCache, err := e.NewModuleEngine("2", importedModuleSource, nil, []*wasm.FunctionInstance{
+		newFunctionInstance(1),
+		newFunctionInstance(2),
+	}, nil, nil)
+	require.NoError(t, err)
+
+	require.NotEqual(t, importedME, importedMEFromCache)
+	require.NotEqual(t, importedME.Name(), importedMEFromCache.Name())
+
+	// Check compiled functions.
+	ime, imeCache := importedME.(*moduleEngine), importedMEFromCache.(*moduleEngine)
+	require.Equal(t, len(ime.compiledFunctions), len(imeCache.compiledFunctions))
+
+	for i, fn := range ime.compiledFunctions {
+		// Compiled functions must be cloend.
+		fnCached := imeCache.compiledFunctions[i]
+		require.NotEqual(t, fn, fnCached)
+		require.NotEqual(t, fn.moduleInstanceAddress, fnCached.moduleInstanceAddress)
+		require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
+		// But the code segment stays the same.
+		require.Equal(t, fn.codeSegment, fnCached.codeSegment)
+	}
+
+	// Next is to veirfy the caching works for modules with imports.
+	importedFunc := ime.compiledFunctions[0].source
+	moduleSource := &wasm.Module{}
+
+	// No cache.
+	modEng, err := e.NewModuleEngine("3", moduleSource,
+		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
+		[]*wasm.FunctionInstance{
+			newFunctionInstance(10),
+			newFunctionInstance(20),
+		}, nil, nil)
+	require.NoError(t, err)
+
+	// Cached.
+	modEngCache, err := e.NewModuleEngine("4", moduleSource,
+		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
+		[]*wasm.FunctionInstance{
+			newFunctionInstance(10),
+			newFunctionInstance(20),
+		}, nil, nil)
+	require.NoError(t, err)
+
+	require.NotEqual(t, modEng, modEngCache)
+	require.NotEqual(t, modEng.Name(), modEngCache.Name())
+
+	me, meCache := modEng.(*moduleEngine), modEngCache.(*moduleEngine)
+	require.Equal(t, len(me.compiledFunctions), len(meCache.compiledFunctions))
+
+	for i, fn := range me.compiledFunctions {
+		fnCached := meCache.compiledFunctions[i]
+		if i == 0 {
+			// This case the function is imported, so it must be the same for both module engines.
+			require.Equal(t, fn, fnCached)
+			require.Equal(t, importedFunc, fn.source)
+		} else {
+			// Compiled functions must be cloend.
+			require.NotEqual(t, fn, fnCached)
+			require.NotEqual(t, fn.moduleInstanceAddress, fnCached.moduleInstanceAddress)
+			require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
+			// But the code segment stays the same.
+			require.Equal(t, fn.codeSegment, fnCached.codeSegment)
+		}
+	}
+}
+
+func newFunctionInstance(id int) *wasm.FunctionInstance {
+	return &wasm.FunctionInstance{
+		DebugName: strconv.Itoa(id),
+		Type:      &wasm.FunctionType{},
+		Body:      []byte{wasm.OpcodeEnd},
+		Module:    &wasm.ModuleInstance{},
 	}
 }

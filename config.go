@@ -148,6 +148,33 @@ func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
 type CompiledCode struct {
 	module *wasm.Module
+	// cachedEngines maps wasm.Engine to []*wasm.Module which originate from this .module.
+	// This is necessary to tracks which engine caches *Module where latter might be different
+	// from .module via import replacement config.
+	cachedEngines map[wasm.Engine]map[*wasm.Module]struct{}
+}
+
+// Close releases all the allocated resources for this CompiledCode.
+func (c *CompiledCode) Close() {
+	for engine, modules := range c.cachedEngines {
+		for module := range modules {
+			engine.ReleaseCompilationCache(module)
+		}
+	}
+}
+
+func (c *CompiledCode) addCacheEntry(module *wasm.Module, engine wasm.Engine) {
+	if c.cachedEngines == nil {
+		c.cachedEngines = map[wasm.Engine]map[*wasm.Module]struct{}{}
+	}
+
+	cache, ok := c.cachedEngines[engine]
+	if !ok {
+		cache = map[*wasm.Module]struct{}{}
+		c.cachedEngines[engine] = cache
+	}
+
+	cache[module] = struct{}{}
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating system.

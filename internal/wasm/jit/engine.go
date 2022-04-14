@@ -18,9 +18,10 @@ import (
 type (
 	// engine is an JIT implementation of wasm.Engine
 	engine struct {
-		enabledFeatures   wasm.Features
-		compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
-		mux               sync.RWMutex
+		enabledFeatures                  wasm.Features
+		compiledFunctions                map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
+		cachedCompiledFunctionsPerModule map[*wasm.Module][]*compiledFunction
+		mux                              sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer func(obj interface{}, finalizer interface{})
 	}
@@ -193,6 +194,19 @@ type (
 	compiledFunctionStaticData = [][]byte
 )
 
+func (c *compiledFunction) clone(newSourceInstance *wasm.FunctionInstance) *compiledFunction {
+	// Note: we don't need to set finalizer to mummap the code segment since it is
+	// already a target of mummap by the finalizer set on the original compiledFunction `c`.
+	return &compiledFunction{
+		codeInitialAddress:    c.codeInitialAddress,
+		stackPointerCeil:      c.stackPointerCeil,
+		source:                newSourceInstance,
+		moduleInstanceAddress: uintptr(unsafe.Pointer(newSourceInstance.Module)),
+		codeSegment:           c.codeSegment,
+		staticData:            c.staticData,
+	}
+}
+
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
 const (
@@ -349,8 +363,13 @@ func releaseCompiledFunction(compiledFn *compiledFunction) {
 	}
 }
 
+// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
+func (e *engine) ReleaseCompilationCache(module *wasm.Module) {
+	e.deleteCachedCompiledFunctions(module)
+}
+
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -359,36 +378,50 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		importedFunctionCount: imported,
 	}
 
-	for idx, f := range importedFunctions {
-		cf, ok := e.getCompiledFunction(f)
-		if !ok {
-			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
+	cached, ok := e.getCachedCompiledFunctions(module)
+	if ok { // cache hit.
+		for i, c := range cached {
+			if i >= len(importedFunctions) {
+				// If this is non-import, we have to clone the compiled function,
+				// Otherwise, there would be race of instance accesses (e.g. memory).
+				c = c.clone(moduleFunctions[i-len(importedFunctions)])
+			}
+			me.compiledFunctions = append(me.compiledFunctions, c)
 		}
-		me.compiledFunctions = append(me.compiledFunctions, cf)
-	}
-
-	for i, f := range moduleFunctions {
-		var compiled *compiledFunction
-		var err error
-		if f.Kind == wasm.FunctionKindWasm {
-			compiled, err = compileWasmFunction(e.enabledFeatures, f)
-		} else {
-			compiled, err = compileHostFunction(f)
-		}
-		if err != nil {
-			me.Close() // safe because the reference to me was never leaked.
-			return nil, fmt.Errorf("function[%s(%d/%d)] %w", f.DebugName, i, len(moduleFunctions)-1, err)
+	} else { // cache miss.
+		for idx, f := range importedFunctions {
+			cf, ok := e.getCompiledFunction(f)
+			if !ok {
+				return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
+			}
+			me.compiledFunctions = append(me.compiledFunctions, cf)
 		}
 
-		// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-		// finalizer due to how moduleEngine.Close is implemented.
-		e.setFinalizer(compiled, releaseCompiledFunction)
+		for i, f := range moduleFunctions {
+			var compiled *compiledFunction
+			var err error
+			if f.Kind == wasm.FunctionKindWasm {
+				compiled, err = compileWasmFunction(e.enabledFeatures, f)
+			} else {
+				compiled, err = compileHostFunction(f)
+			}
+			if err != nil {
+				me.Close() // safe because the reference to me was never leaked.
+				return nil, fmt.Errorf("function[%s(%d/%d)] %w", f.DebugName, i, len(moduleFunctions)-1, err)
+			}
 
-		me.compiledFunctions = append(me.compiledFunctions, compiled)
+			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
+			// finalizer due to how moduleEngine.Close is implemented.
+			e.setFinalizer(compiled, releaseCompiledFunction)
 
-		// Add the compiled function to the store-wide engine as well so that
-		// the future importing module can refer the function instance.
-		e.addCompiledFunction(f, compiled)
+			me.compiledFunctions = append(me.compiledFunctions, compiled)
+
+			// Add the compiled function to the store-wide engine as well so that
+			// the future importing module can refer the function instance.
+			e.addCompiledFunction(f, compiled)
+		}
+
+		e.addCachedCompiledFunctions(module, me.compiledFunctions)
 	}
 
 	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
@@ -444,6 +477,24 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	e.mux.RLock()
 	defer e.mux.RUnlock()
 	cf, ok = e.compiledFunctions[f]
+	return
+}
+func (e *engine) deleteCachedCompiledFunctions(module *wasm.Module) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	delete(e.cachedCompiledFunctionsPerModule, module)
+}
+
+func (e *engine) addCachedCompiledFunctions(module *wasm.Module, fs []*compiledFunction) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.cachedCompiledFunctionsPerModule[module] = fs
+}
+
+func (e *engine) getCachedCompiledFunctions(module *wasm.Module) (fs []*compiledFunction, ok bool) {
+	e.mux.RLock()
+	defer e.mux.RUnlock()
+	fs, ok = e.cachedCompiledFunctionsPerModule[module]
 	return
 }
 
@@ -523,9 +574,10 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 
 func newEngine(enabledFeatures wasm.Features) *engine {
 	return &engine{
-		enabledFeatures:   enabledFeatures,
-		compiledFunctions: map[*wasm.FunctionInstance]*compiledFunction{},
-		setFinalizer:      runtime.SetFinalizer,
+		enabledFeatures:                  enabledFeatures,
+		compiledFunctions:                map[*wasm.FunctionInstance]*compiledFunction{},
+		cachedCompiledFunctionsPerModule: map[*wasm.Module][]*compiledFunction{},
+		setFinalizer:                     runtime.SetFinalizer,
 	}
 }
 
@@ -785,17 +837,11 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	stackPointerCeil := uint64(len(f.Type.Params))
-	if res := uint64(len(f.Type.Results)); stackPointerCeil < res {
-		stackPointerCeil = res
-	}
-
 	return &compiledFunction{
 		source:                f,
 		codeSegment:           code,
 		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
 		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-		stackPointerCeil:      stackPointerCeil,
 	}, nil
 }
 

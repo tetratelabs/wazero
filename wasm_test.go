@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -406,4 +407,73 @@ func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx api
 	return []byte(fmt.Sprintf(
 		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
 	)), mod.Close
+}
+
+func TestCompiledCode_addCacheEntry(t *testing.T) {
+	c := &CompiledCode{}
+
+	m1, e1 := &wasm.Module{}, &mockEngine{name: "1"}
+	for i := 0; i < 5; i++ {
+		c.addCacheEntry(m1, e1)
+	}
+
+	require.Contains(t, c.cachedEngines, e1)
+	require.Contains(t, c.cachedEngines[e1], m1)
+	require.Len(t, c.cachedEngines[e1], 1)
+
+	m2, e2 := &wasm.Module{}, &mockEngine{name: "2"}
+	for i := 0; i < 5; i++ {
+		c.addCacheEntry(m2, e2)
+	}
+
+	require.Contains(t, c.cachedEngines, e1)
+	require.Contains(t, c.cachedEngines, e2)
+	require.Contains(t, c.cachedEngines[e1], m1)
+	require.Contains(t, c.cachedEngines[e2], m2)
+	require.Len(t, c.cachedEngines[e1], 1)
+	require.Len(t, c.cachedEngines[e2], 1)
+}
+
+func TestCompiledCode_Close(t *testing.T) {
+	e1, e2 := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}},
+		&mockEngine{name: "2", cachedModules: map[*wasm.Module]struct{}{}}
+
+	c := &CompiledCode{}
+	for _, e := range []wasm.Engine{e1, e2} {
+		for i := 0; i < 10; i++ {
+			m := &wasm.Module{}
+			_, _ = e.NewModuleEngine(strconv.Itoa(i), m, nil, nil, nil, nil)
+			c.addCacheEntry(m, e)
+		}
+	}
+
+	// Before Close.
+	require.Len(t, e1.cachedModules, 10)
+	require.Len(t, e2.cachedModules, 10)
+	require.Len(t, c.cachedEngines, 2)
+	for _, modules := range c.cachedEngines {
+		require.Len(t, modules, 10)
+	}
+
+	c.Close()
+
+	// After Close.
+	require.Len(t, e1.cachedModules, 0)
+	require.Len(t, e2.cachedModules, 0)
+}
+
+type mockEngine struct {
+	name          string
+	cachedModules map[*wasm.Module]struct{}
+}
+
+// NewModuleEngine implements the same method as documented on wasm.Engine.
+func (e *mockEngine) NewModuleEngine(_ string, module *wasm.Module, _, _ []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+	e.cachedModules[module] = struct{}{}
+	return nil, nil
+}
+
+// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
+func (e *mockEngine) ReleaseCompilationCache(module *wasm.Module) {
+	delete(e.cachedModules, module)
 }

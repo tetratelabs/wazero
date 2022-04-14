@@ -33,6 +33,11 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	}
 }
 
+// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
+func (e *engine) ReleaseCompilationCache(*wasm.Module) {
+	// TODO: implement cache!
+}
+
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
@@ -154,7 +159,7 @@ type interpreterOp struct {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, _ *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
