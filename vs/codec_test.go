@@ -63,8 +63,8 @@ func newExample() *wasm.Module {
 		ExportSection: []*wasm.Export{
 			{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
 			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
-			{Name: "swap", Type: wasm.ExternTypeFunc, Index: wasm.Index(6)},
 			{Name: "mem", Type: wasm.ExternTypeMemory, Index: wasm.Index(0)},
+			{Name: "swap", Type: wasm.ExternTypeFunc, Index: wasm.Index(6)},
 		},
 		StartSection: &three,
 		NameSection: &wasm.NameSection{
