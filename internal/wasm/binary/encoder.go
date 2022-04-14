@@ -50,11 +50,6 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	if m.SectionElementCount(wasm.SectionIDData) > 0 {
 		bytes = append(bytes, encodeDataSection(m.DataSection)...)
 	}
-	// var str []string
-	// for _, b := range bytes {
-	// str = append(str, fmt.Sprintf("0x%x", b))
-	// }
-	// fmt.Println(strings.Join(str, ", "))
 	if m.SectionElementCount(wasm.SectionIDCustom) > 0 {
 		// >> The name section should appear only once in a module, and only after the data section.
 		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
@@ -63,10 +58,5 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 		}
 	}
-	// str = nil
-	// for _, b := range bytes {
-	// str = append(str, fmt.Sprintf("0x%x", b))
-	// }
-	// fmt.Println(strings.Join(str, ", "))
 	return
 }

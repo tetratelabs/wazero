@@ -581,7 +581,8 @@ type limitsType struct {
 
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
-	Min, Max uint32
+	Min, Max     uint32
+	IsMaxEncoded bool
 }
 
 type GlobalType struct {
@@ -606,6 +607,9 @@ type Export struct {
 
 	// Name is what the host refers to this definition as.
 	Name string
+
+	// EncodedIndex is the index of this Export description encoded in the Export section of binary.
+	EncodedIndex Index
 
 	// Index is the index of the definition to export, the index namespace is by Type
 	// Ex. If ExternTypeFunc, this is a position in the function index namespace.

@@ -55,8 +55,8 @@ func encodeImport(i *wasm.Import) []byte {
 		data = append(data, wasm.ElemTypeFuncref)
 		data = append(data, encodeLimitsType(i.DescTable.Min, i.DescTable.Max)...)
 	case wasm.ExternTypeMemory:
-		var maxPtr = &i.DescMem.Max
-		if i.DescMem.Max == wasm.MemoryMaxPages {
+		maxPtr := &i.DescMem.Max
+		if !i.DescMem.IsMaxEncoded {
 			maxPtr = nil
 		}
 		data = append(data, encodeLimitsType(i.DescMem.Min, maxPtr)...)

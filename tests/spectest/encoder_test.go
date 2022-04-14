@@ -15,18 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
-func Test(t *testing.T) {
-	const a = "binary-leb128.1.wasm"
-	buf, err := testcases.ReadFile(testdataPath(a))
-	require.NoError(t, err)
-
-	mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
-	require.NoError(t, err)
-
-	encodedBuf := binary.EncodeModule(mod)
-	require.Equal(t, buf, encodedBuf)
-}
-
+// stripCustomSections strips all the custom sections from the given binary.
 func stripCustomSections(binary []byte) ([]byte, error) {
 	r := bytes.NewReader(binary)
 	out := bytes.NewBuffer(nil)
@@ -61,6 +50,8 @@ func stripCustomSections(binary []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
+// TestBinaryEncoder ensures that binary.Encoder produces exactly the same binaries
+// after ecoding them module custom sections for all the valid binaries in spectests.
 func TestBinaryEncoder(t *testing.T) {
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)

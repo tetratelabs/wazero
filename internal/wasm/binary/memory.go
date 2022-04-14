@@ -15,8 +15,11 @@ func decodeMemory(r *bytes.Reader, memoryMaxPages uint32) (*wasm.Memory, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	var max uint32
+	var isMaxEncoded bool
 	if maxP != nil {
+		isMaxEncoded = true
 		max = *maxP
 	} else {
 		max = memoryMaxPages
@@ -28,15 +31,15 @@ func decodeMemory(r *bytes.Reader, memoryMaxPages uint32) (*wasm.Memory, error) 
 	} else if min > max {
 		return nil, fmt.Errorf("min %d pages (%s) > max %d pages (%s)", min, wasm.PagesToUnitOfBytes(min), max, wasm.PagesToUnitOfBytes(max))
 	}
-	return &wasm.Memory{Min: min, Max: max}, nil
+	return &wasm.Memory{Min: min, Max: max, IsMaxEncoded: isMaxEncoded}, nil
 }
 
 // encodeMemory returns the wasm.Memory encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func encodeMemory(i *wasm.Memory) []byte {
-	var maxPtr = &i.Max
-	if i.Max == wasm.MemoryMaxPages {
+	maxPtr := &i.Max
+	if !i.IsMaxEncoded {
 		maxPtr = nil
 	}
 	return encodeLimitsType(i.Min, maxPtr)

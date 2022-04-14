@@ -3,6 +3,7 @@ package binary
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -101,6 +102,7 @@ func decodeExportSection(r *bytes.Reader) (map[string]*wasm.Export, error) {
 	exportSection := make(map[string]*wasm.Export, vs)
 	for i := wasm.Index(0); i < vs; i++ {
 		export, err := decodeExport(r)
+		export.EncodedIndex = i
 		if err != nil {
 			return nil, fmt.Errorf("read export: %w", err)
 		}
@@ -262,7 +264,14 @@ func encodeGlobalSection(globals []*wasm.Global) []byte {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
 func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	contents := leb128.EncodeUint32(uint32(len(exports)))
+	es := make([]*wasm.Export, 0, len(exports))
 	for _, e := range exports {
+		es = append(es, e)
+	}
+	sort.Slice(es, func(i, j int) bool {
+		return es[i].EncodedIndex < es[j].EncodedIndex
+	})
+	for _, e := range es {
 		contents = append(contents, encodeExport(e)...)
 	}
 	return encodeSection(wasm.SectionIDExport, contents)
