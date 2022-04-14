@@ -16,22 +16,51 @@ import (
 //go:embed testdata/case.wasm
 var caseWasm []byte
 
-func BenchmarkEngines(b *testing.B) {
+func BenchmarkInvocation(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
 		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
 		defer m.Close()
-		runAllBenches(b, m)
+		runAllInvocationBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("jit", func(b *testing.B) {
 			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
 			defer m.Close()
-			runAllBenches(b, m)
+			runAllInvocationBenches(b, m)
 		})
 	}
 }
 
-func runAllBenches(b *testing.B, m api.Module) {
+func BenchmarkInitialization(b *testing.B) {
+	b.Run("interpreter", func(b *testing.B) {
+		r := createRuntime(b, wazero.NewRuntimeConfigInterpreter())
+		runInitializationBench(b, r)
+	})
+
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
+		b.Run("jit", func(b *testing.B) {
+			r := createRuntime(b, wazero.NewRuntimeConfigJIT())
+			runInitializationBench(b, r)
+		})
+	}
+}
+
+func runInitializationBench(b *testing.B, r wazero.Runtime) {
+	compiled, err := r.CompileModule(caseWasm)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mod, err := r.InstantiateModule(compiled)
+		if err != nil {
+			b.Fatal(err)
+		}
+		mod.Close()
+	}
+}
+
+func runAllInvocationBenches(b *testing.B, m api.Module) {
 	runBase64Benches(b, m)
 	runFibBenches(b, m)
 	runStringManipulationBenches(b, m)
@@ -120,6 +149,17 @@ func runRandomMatMul(b *testing.B, m api.Module) {
 }
 
 func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.RuntimeConfig) api.Module {
+	r := createRuntime(b, engine)
+
+	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
+	m, err := r.InstantiateModuleFromCode(caseWasm)
+	if err != nil {
+		b.Fatal(err)
+	}
+	return m
+}
+
+func createRuntime(b *testing.B, engine *wazero.RuntimeConfig) wazero.Runtime {
 	getRandomString := func(ctx api.Module, retBufPtr uint32, retBufSize uint32) {
 		results, err := ctx.ExportedFunction("allocate_buffer").Call(ctx, 10)
 		if err != nil {
@@ -147,11 +187,5 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromCode(caseWasm)
-	if err != nil {
-		b.Fatal(err)
-	}
-	return m
+	return r
 }
