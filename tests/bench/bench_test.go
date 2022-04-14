@@ -50,6 +50,7 @@ func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer compiled.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mod, err := r.InstantiateModule(compiled)

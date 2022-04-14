@@ -20,7 +20,7 @@ type (
 	engine struct {
 		enabledFeatures                  wasm.Features
 		compiledFunctions                map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
-		cachedCompiledFunctionsPerModule map[*wasm.Module][]*compiledFunction
+		cachedCompiledFunctionsPerModule map[*wasm.Module][]*compiledFunction         // guarded by mutex.
 		mux                              sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer func(obj interface{}, finalizer interface{})
@@ -378,8 +378,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		importedFunctionCount: imported,
 	}
 
-	cached, ok := e.getCachedCompiledFunctions(module)
-	if ok { // cache hit.
+	if cached, ok := e.getCachedCompiledFunctions(module); ok { // cache hit.
 		for i, c := range cached {
 			if i >= len(importedFunctions) {
 				// If this is non-import, we have to clone the compiled function,
