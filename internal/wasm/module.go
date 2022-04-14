@@ -581,7 +581,8 @@ type limitsType struct {
 
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
-	Min, Max     uint32
+	Min, Max uint32
+	// IsMaxEncoded true if the Max is encoded in the orignial source (binary or text).
 	IsMaxEncoded bool
 }
 
