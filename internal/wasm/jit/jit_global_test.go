@@ -32,7 +32,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := compiler.valueLocationStack().peek()
 			require.True(t, global.onRegister())
-			require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
+			require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 			switch tp {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isFloatRegister(global.register))

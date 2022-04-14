@@ -173,7 +173,7 @@ func TestStore_CloseModule(t *testing.T) {
 
 			// Close the importing module
 			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
-			require.NotContains(t, s.modules, importingModuleName)
+			require.Nil(t, s.modules[importingModuleName])
 
 			// Can re-close the importing module
 			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
@@ -181,7 +181,6 @@ func TestStore_CloseModule(t *testing.T) {
 			// Now we close the imported module.
 			require.NoError(t, imported.Ctx.CloseWithExitCode(0))
 			require.Nil(t, s.modules[importedModuleName])
-			require.NotContains(t, s.modules, importedModuleName)
 		})
 	}
 }
@@ -238,7 +237,7 @@ func TestStore_hammer(t *testing.T) {
 	require.NoError(t, imported.CloseWithExitCode(0))
 
 	// All instances are freed.
-	require.Len(t, s.modules, 0)
+	require.Zero(t, len(s.modules))
 }
 
 func TestStore_Instantiate_Errors(t *testing.T) {
@@ -622,8 +621,8 @@ func TestStore_resolveImports(t *testing.T) {
 			}
 			functions, _, _, _, err := s.resolveImports(m)
 			require.NoError(t, err)
-			require.Contains(t, functions, f)
-			require.Contains(t, functions, g)
+			require.True(t, functionsContain(functions, f), "expected to find %v in %v", f, functions)
+			require.True(t, functionsContain(functions, g), "expected to find %v in %v", g, functions)
 		})
 		t.Run("type out of range", func(t *testing.T) {
 			s := newStore()
@@ -647,11 +646,11 @@ func TestStore_resolveImports(t *testing.T) {
 	t.Run("global", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
-			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
-			_, globals, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
+			g := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: g}}, Name: moduleName}
+			_, globals, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: g.Type}}})
 			require.NoError(t, err)
-			require.Contains(t, globals, inst)
+			require.True(t, globalsContain(globals, g), "expected to find %v in %v", g, globals)
 		})
 		t.Run("mutability mismatch", func(t *testing.T) {
 			s := newStore()
@@ -757,4 +756,22 @@ func TestModuleInstance_applyData(t *testing.T) {
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
 	})
 	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
+}
+
+func globalsContain(globals []*GlobalInstance, want *GlobalInstance) bool {
+	for _, f := range globals {
+		if f == want {
+			return true
+		}
+	}
+	return false
+}
+
+func functionsContain(functions []*FunctionInstance, want *FunctionInstance) bool {
+	for _, f := range functions {
+		if f == want {
+			return true
+		}
+	}
+	return false
 }

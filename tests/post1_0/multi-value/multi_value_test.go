@@ -299,7 +299,7 @@ func testFunctions(t *testing.T, module api.Module, tests []funcTest) {
 			results, err := module.ExportedFunction(tc.name).Call(nil, tc.params...)
 			require.NoError(t, err)
 			if tc.expected == nil {
-				require.Empty(t, results)
+				require.Equal(t, 0, len(results), "expected no results")
 			} else {
 				require.Equal(t, tc.expected, results)
 			}

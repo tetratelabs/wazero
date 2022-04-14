@@ -357,7 +357,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 							}
 						case "get":
 							_, exps := c.getAssertReturnArgsExps()
-							require.Len(t, exps, 1)
+							require.Equal(t, 1, len(exps))
 							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module

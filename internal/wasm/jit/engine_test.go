@@ -173,7 +173,7 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 		_, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 
-		require.Len(t, e.compiledFunctions, len(importedFunctions))
+		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
 
 		moduleFunctions := []*wasm.FunctionInstance{
 			{DebugName: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -187,9 +187,9 @@ func TestJIT_EngineCompile_Errors(t *testing.T) {
 		require.EqualError(t, err, "function[invalid code(2/2)] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		require.Len(t, e.compiledFunctions, len(importedFunctions))
+		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
 		for _, f := range moduleFunctions {
-			require.NotContains(t, e.compiledFunctions, f)
+			require.Nil(t, e.compiledFunctions[f])
 		}
 	})
 }
@@ -236,10 +236,10 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 	// Ensure the importing module didn't try to finalize the imported functions.
 	require.Equal(t, len(importedFunctions), len(imported.compiledFunctions))
 	for _, f := range importedFunctions {
-		require.Contains(t, e.compiledFunctions, f)
+		require.NotNil(t, e.compiledFunctions[f], f)
 		cf := e.compiledFunctions[f]
-		require.Contains(t, importedFinalizer, cf)
-		require.NotContains(t, importingFinalizer, cf)
+		require.NotNil(t, importedFinalizer[cf], cf)
+		require.Nil(t, importingFinalizer[cf], cf)
 	}
 
 	// The importing module's compiled functions include ones it compiled (module-defined) and imported ones).
@@ -247,10 +247,10 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 
 	// Ensure the importing module only tried to finalize its own functions.
 	for _, f := range moduleFunctions {
-		require.Contains(t, e.compiledFunctions, f)
+		require.NotNil(t, e.compiledFunctions[f], f)
 		cf := e.compiledFunctions[f]
-		require.NotContains(t, importedFinalizer, cf)
-		require.Contains(t, importingFinalizer, cf)
+		require.Nil(t, importedFinalizer[cf], cf)
+		require.NotNil(t, importingFinalizer[cf], cf)
 	}
 
 	// Pretend the finalizer executed, by invoking them one-by-one.
@@ -316,7 +316,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 				)
 				require.NoError(t, err)
 				imported = modEngine.(*moduleEngine)
-				require.Len(t, imported.compiledFunctions, len(tc.importedFunctions))
+				require.Equal(t, len(tc.importedFunctions), len(imported.compiledFunctions))
 			}
 
 			importing, err := e.NewModuleEngine(
@@ -328,28 +328,28 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 				nil, // tableInit
 			)
 			require.NoError(t, err)
-			require.Len(t, importing.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(importing.(*moduleEngine).compiledFunctions))
 
-			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(e.compiledFunctions))
 
 			for _, f := range tc.importedFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 			for _, f := range tc.moduleFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 
 			importing.Close()
 
 			// Closing the importing module shouldn't delete the imported functions from the engine.
-			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
+			require.Equal(t, len(tc.importedFunctions), len(e.compiledFunctions))
 			for _, f := range tc.importedFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 
 			// However, closing the importing module should delete its own functions from the engine.
 			for i, f := range tc.moduleFunctions {
-				require.NotContains(t, e.compiledFunctions, f, i)
+				require.Nil(t, e.compiledFunctions[f], i)
 			}
 
 			if len(tc.importedFunctions) > 0 {
@@ -357,7 +357,7 @@ func TestJIT_ModuleEngine_Close(t *testing.T) {
 			}
 
 			// When all modules are closed, the engine should be empty.
-			require.Empty(t, e.compiledFunctions)
+			require.Equal(t, 0, len(e.compiledFunctions), "expected no compiledFunctions")
 		})
 	}
 }
@@ -469,7 +469,7 @@ func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
 
 	actual, ok := e.getCachedCompiledFunctions(m)
 	require.True(t, ok)
-	require.Len(t, actual, len(exp))
+	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}

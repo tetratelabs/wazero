@@ -419,21 +419,21 @@ func TestCompiledCode_addCacheEntry(t *testing.T) {
 		c.addCacheEntry(m1, e1)
 	}
 
-	require.Contains(t, c.cachedEngines, e1)
-	require.Contains(t, c.cachedEngines[e1], m1)
-	require.Len(t, c.cachedEngines[e1], 1)
+	require.NotNil(t, c.cachedEngines[e1])
+	require.NotNil(t, c.cachedEngines[e1][m1])
+	require.Equal(t, 1, len(c.cachedEngines[e1]))
 
 	m2, e2 := &wasm.Module{}, &mockEngine{name: "2"}
 	for i := 0; i < 5; i++ {
 		c.addCacheEntry(m2, e2)
 	}
 
-	require.Contains(t, c.cachedEngines, e1)
-	require.Contains(t, c.cachedEngines, e2)
-	require.Contains(t, c.cachedEngines[e1], m1)
-	require.Contains(t, c.cachedEngines[e2], m2)
-	require.Len(t, c.cachedEngines[e1], 1)
-	require.Len(t, c.cachedEngines[e2], 1)
+	require.NotNil(t, c.cachedEngines[e1])
+	require.NotNil(t, c.cachedEngines[e2])
+	require.NotNil(t, c.cachedEngines[e1][m1])
+	require.NotNil(t, c.cachedEngines[e2][m2])
+	require.Equal(t, 1, len(c.cachedEngines[e1]))
+	require.Equal(t, 1, len(c.cachedEngines[e2]))
 }
 
 func TestCompiledCode_Close(t *testing.T) {
@@ -450,18 +450,18 @@ func TestCompiledCode_Close(t *testing.T) {
 	}
 
 	// Before Close.
-	require.Len(t, e1.cachedModules, 10)
-	require.Len(t, e2.cachedModules, 10)
-	require.Len(t, c.cachedEngines, 2)
+	require.Equal(t, 10, len(e1.cachedModules))
+	require.Equal(t, 10, len(e2.cachedModules))
+	require.Equal(t, 2, len(c.cachedEngines))
 	for _, modules := range c.cachedEngines {
-		require.Len(t, modules, 10)
+		require.Equal(t, 10, len(modules))
 	}
 
 	c.Close()
 
 	// After Close.
-	require.Len(t, e1.cachedModules, 0)
-	require.Len(t, e2.cachedModules, 0)
+	require.Zero(t, len(e1.cachedModules))
+	require.Zero(t, len(e2.cachedModules))
 }
 
 type mockEngine struct {

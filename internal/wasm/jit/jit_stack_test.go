@@ -98,7 +98,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			compiler.valueLocationStack().stack = make([]*valueLocation, tc.stackPointer)
 
 			// Record that that top value is on top.
-			require.Len(t, compiler.valueLocationStack().usedRegisters, 0)
+			require.Zero(t, len(compiler.valueLocationStack().usedRegisters))
 			loc := compiler.valueLocationStack().pushValueLocationOnStack()
 			if tc.isFloat {
 				loc.setRegisterType(generalPurposeRegisterTypeFloat)
@@ -111,7 +111,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Release the stack-allocated value to register.
 			err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
 			require.NoError(t, err)
-			require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
+			require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 			require.True(t, loc.onRegister())
 
 			// To verify the behavior, increment the value on the register.

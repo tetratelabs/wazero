@@ -35,10 +35,10 @@ func TestValueLocationStack_basic(t *testing.T) {
 	// markRegisterUsed.
 	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
 	s.markRegisterUsed(tmpReg2)
-	require.Contains(t, s.usedRegisters, tmpReg2)
+	require.NotNil(t, s.usedRegisters[tmpReg2], tmpReg2)
 	// releaseRegister.
 	s.releaseRegister(loc)
-	require.NotContains(t, s.usedRegisters, loc.register)
+	require.Equal(t, s.usedRegisters[loc.register], struct{}{}, "expected %v to not contain %v", s.usedRegisters, loc.register)
 	require.Equal(t, asm.NilRegister, loc.register)
 	// Clone.
 	cloned := s.clone()

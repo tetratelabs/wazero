@@ -434,7 +434,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			err = compiler.compileBrTable(tc.o)
 			require.NoError(t, err)
 
-			require.Len(t, compiler.valueLocationStack().usedRegisters, 0)
+			require.Zero(t, len(compiler.valueLocationStack().usedRegisters))
 
 			requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
 		})

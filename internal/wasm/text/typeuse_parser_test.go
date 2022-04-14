@@ -200,7 +200,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
-				require.Empty(t, tp.inlinedTypes)
+				require.Equal(t, 0, len(tp.inlinedTypes), "expected no inlinedTypes")
 			} else {
 				require.Equal(t, tc.expectedInlinedType, tp.inlinedTypes[0])
 			}
@@ -308,9 +308,9 @@ func TestTypeUseParser_ReuseExistingType(t *testing.T) {
 
 		tp := newTypeUseParser(wasm.FeaturesFinished, module, typeNamespace)
 		return tp, func(t *testing.T) {
-			require.Nil(t, tp.typeNamespace.unresolvedIndices)
-			require.Nil(t, tp.inlinedTypes)
-			require.Nil(t, tp.inlinedTypeIndices)
+			require.Zero(t, len(tp.typeNamespace.unresolvedIndices))
+			require.Zero(t, len(tp.inlinedTypes))
+			require.Zero(t, len(tp.inlinedTypeIndices))
 		}
 	})
 }

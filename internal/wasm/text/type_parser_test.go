@@ -193,7 +193,7 @@ func TestTypeParser(t *testing.T) {
 			require.Equal(t, tc.expected, parsed)
 			require.Equal(t, uint32(1), tp.typeNamespace.count)
 			if tc.expectedID == "" {
-				require.Empty(t, tp.typeNamespace.idToIdx)
+				require.Equal(t, 0, len(tp.typeNamespace.idToIdx), "expected no indices")
 			} else {
 				// Since the parser was initially empty, the expected index of the parsed type is 0
 				require.Equal(t, map[string]wasm.Index{tc.expectedID: wasm.Index(0)}, tp.typeNamespace.idToIdx)

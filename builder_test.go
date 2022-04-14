@@ -415,7 +415,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
-	require.Nil(t, actual.CodeSection) // Host functions are implemented in Go, not Wasm!
+	require.Zero(t, len(actual.CodeSection)) // Host functions are implemented in Go, not Wasm!
 	require.Equal(t, expected.DataSection, actual.DataSection)
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
