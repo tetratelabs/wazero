@@ -40,7 +40,6 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	if m.SectionElementCount(wasm.SectionIDStart) > 0 {
 		bytes = append(bytes, encodeStartSection(*m.StartSection)...)
 	}
-
 	if m.SectionElementCount(wasm.SectionIDElement) > 0 {
 		bytes = append(bytes, encodeElementSection(m.ElementSection)...)
 	}

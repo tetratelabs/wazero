@@ -76,7 +76,7 @@ func TestMemorySection(t *testing.T) {
 				0x01,             // 1 memory
 				0x01, 0x02, 0x03, // (memory 2 3)
 			},
-			expected: &wasm.Memory{Min: 2, Max: three},
+			expected: &wasm.Memory{Min: 2, Max: three, IsMaxEncoded: true},
 		},
 	}
 
@@ -139,8 +139,8 @@ func TestDecodeExportSection(t *testing.T) {
 				wasm.ExternTypeFunc, 0x01, // func[1]
 			},
 			expected: map[string]*wasm.Export{
-				"":  {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2)},
-				"a": {Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1)},
+				"":  {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2), EncodedIndex: 0},
+				"a": {Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1), EncodedIndex: 1},
 			},
 		},
 	}

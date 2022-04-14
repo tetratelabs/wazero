@@ -99,7 +99,7 @@ func TestNewHostModule(t *testing.T) {
 		},
 		{
 			name:         "memory",
-			nameToMemory: map[string]*Memory{"memory": {1, 2}},
+			nameToMemory: map[string]*Memory{"memory": {Min: 1, Max: 2}},
 			expected: &Module{
 				MemorySection: &Memory{Min: 1, Max: 2},
 				ExportSection: map[string]*Export{
@@ -143,7 +143,7 @@ func TestNewHostModule(t *testing.T) {
 				functionArgsSizesGet: a.ArgsSizesGet,
 			},
 			nameToMemory: map[string]*Memory{
-				"memory": {1, 1},
+				"memory": {Min: 1, Max: 1},
 			},
 			nameToGlobal: map[string]*Global{
 				"g": {
@@ -234,23 +234,23 @@ func TestNewHostModule_Errors(t *testing.T) {
 		{
 			name:         "function has multiple results",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
-			nameToMemory: map[string]*Memory{"fn": {1, 1}},
+			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
 			expectedErr:  "func[fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
 			name:         "memory collides on func name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
-			nameToMemory: map[string]*Memory{"fn": {1, 1}},
+			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
 			expectedErr:  "memory[fn] exports the same name as a func",
 		},
 		{
 			name:         "multiple memories",
-			nameToMemory: map[string]*Memory{"memory": {1, 1}, "mem": {2, 2}},
+			nameToMemory: map[string]*Memory{"memory": {Min: 1, Max: 1}, "mem": {Min: 2, Max: 2}},
 			expectedErr:  "only one memory is allowed, but configured: mem, memory",
 		},
 		{
 			name:         "memory max < min",
-			nameToMemory: map[string]*Memory{"memory": {1, 0}},
+			nameToMemory: map[string]*Memory{"memory": {Min: 1, Max: 0}},
 			expectedErr:  "memory[memory] min 1 pages (64 Ki) > max 0 pages (0 Ki)",
 		},
 		{

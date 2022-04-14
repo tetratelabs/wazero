@@ -570,6 +570,7 @@ func (p *moduleParser) parseExportEnd(tok tokenType, tokenBytes []byte, _, _ uin
 	if p.module.ExportSection == nil {
 		p.module.ExportSection = map[string]*wasm.Export{e.Name: e}
 	} else {
+		e.EncodedIndex = wasm.Index(len(p.module.ExportSection))
 		p.module.ExportSection[e.Name] = e
 	}
 	p.pos = positionModule
