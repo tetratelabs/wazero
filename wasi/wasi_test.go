@@ -2015,15 +2015,16 @@ func instantiateModule(t *testing.T, wasifunction, wasiimport string, sysCtx *wa
 	_, err := r.NewModuleBuilder("wasi_snapshot_preview1").ExportFunctions(fns).Instantiate()
 	require.NoError(t, err)
 
-	m, err := r.CompileModule([]byte(fmt.Sprintf(`(module
+	compiled, err := r.CompileModule([]byte(fmt.Sprintf(`(module
   %[2]s
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
 )`, wasifunction, wasiimport)))
 	require.NoError(t, err)
+	defer compiled.Close()
 
-	mod, err := r.InstantiateModuleWithConfig(m, wazero.NewModuleConfig().WithName(t.Name()))
+	mod, err := r.InstantiateModuleWithConfig(compiled, wazero.NewModuleConfig().WithName(t.Name()))
 	require.NoError(t, err)
 
 	if sysCtx != nil {

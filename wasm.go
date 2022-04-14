@@ -72,6 +72,7 @@ type Runtime interface {
 	// Ex.
 	//	r := wazero.NewRuntime()
 	//	code, _ := r.CompileModule(source)
+	//  defer code.Close()
 	//	module, _ := r.InstantiateModule(code)
 	//	defer module.Close()
 	//

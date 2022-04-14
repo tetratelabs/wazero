@@ -57,6 +57,7 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			code, err := r.CompileModule(tc.source)
 			require.NoError(t, err)
+			defer code.Close()
 			if tc.expectedName != "" {
 				require.Equal(t, tc.expectedName, code.module.NameSection.ModuleName)
 			}
@@ -323,6 +324,7 @@ func TestRuntime_NewModule_UsesConfiguredContext(t *testing.T) {
 	(start $start)
 )`))
 	require.NoError(t, err)
+	defer code.Close()
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
 	m, err := r.InstantiateModule(code)
@@ -379,6 +381,7 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	r := NewRuntime()
 	base, err := r.CompileModule([]byte(`(module $0 (memory 1))`))
 	require.NoError(t, err)
+	defer base.Close()
 
 	require.Equal(t, "0", base.module.NameSection.ModuleName)
 

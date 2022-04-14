@@ -32,6 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer code.Close()
 
 	// Instantiate the module, replacing the import "env.abort" with "assemblyscript.abort".
 	mod, err := r.InstantiateModuleWithConfig(code, wazero.NewModuleConfig().
