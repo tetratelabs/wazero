@@ -1,10 +1,10 @@
 package main
 
-// ExampleMain ensures the following will work:
+// Example_main ensures the following will work:
 //
 //	go build multiple-results.go
 //	./multiple-results
-func ExampleMain() {
+func Example_main() {
 
 	main()
 

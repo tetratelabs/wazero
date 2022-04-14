@@ -4,11 +4,11 @@ import (
 	"os"
 )
 
-// ExampleMain ensures the following will work:
+// Example_main ensures the following will work:
 //
 //	go build add.go
 //	./add 7 9
-func ExampleMain() {
+func Example_main() {
 
 	// Save the old os.Args and replace with our example input.
 	oldArgs := os.Args
