@@ -16,7 +16,7 @@ func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error)
 	}
 
 	remainingBeforeData := int64(r.Len())
-	offsetAtData := (r.Size()) - remainingBeforeData
+	offsetAtData := r.Size() - remainingBeforeData
 
 	opcode := b
 	switch opcode {
