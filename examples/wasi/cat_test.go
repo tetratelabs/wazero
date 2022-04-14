@@ -7,6 +7,7 @@ import "os"
 //	go build cat.go
 //	./cat ./test.txt
 func Example_main() {
+
 	// Save the old os.Args and replace with our example input.
 	oldArgs := os.Args
 	os.Args = []string{"cat", "./test.txt"}

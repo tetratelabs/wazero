@@ -1,7 +1,6 @@
 package binary
 
 import (
-	_ "embed"
 	"reflect"
 	"testing"
 
