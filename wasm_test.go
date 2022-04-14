@@ -100,7 +100,7 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 		{
 			name:        "memory has too many pages - binary",
 			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
-			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Max: 3}}),
+			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true}}),
 			expectedErr: "section memory: max 3 pages (192 Ki) outside range of 2 pages (128 Ki)",
 		},
 	}
@@ -205,8 +205,8 @@ func TestModule_Global(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"global": {Type: wasm.ExternTypeGlobal, Name: "global"},
+				ExportSection: []*wasm.Export{
+					{Type: wasm.ExternTypeGlobal, Name: "global"},
 				},
 			},
 			expected:        true,

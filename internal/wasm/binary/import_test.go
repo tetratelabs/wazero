@@ -8,6 +8,10 @@ import (
 )
 
 func TestEncodeImport(t *testing.T) {
+	ptrOfUint32 := func(v uint32) *uint32 {
+		return &v
+	}
+
 	tests := []struct {
 		name     string
 		input    *wasm.Import
@@ -96,6 +100,52 @@ func TestEncodeImport(t *testing.T) {
 				0x02, 'p', 'i',
 				wasm.ExternTypeGlobal,
 				wasm.ValueTypeF64, 0x01, // 1 == var
+			},
+		},
+		{
+			name: "table",
+			input: &wasm.Import{
+				Type:      wasm.ExternTypeTable,
+				Module:    "my",
+				Name:      "table",
+				DescTable: &wasm.Table{Min: 1, Max: ptrOfUint32(2)},
+			},
+			expected: []byte{
+				0x02, 'm', 'y',
+				0x05, 't', 'a', 'b', 'l', 'e',
+				wasm.ExternTypeTable,
+				wasm.ElemTypeFuncref,
+				0x1, 0x1, 0x2, // Limit with max.
+			},
+		},
+		{
+			name: "memory",
+			input: &wasm.Import{
+				Type:    wasm.ExternTypeMemory,
+				Module:  "my",
+				Name:    "memory",
+				DescMem: &wasm.Memory{Min: 1, Max: 2, IsMaxEncoded: true},
+			},
+			expected: []byte{
+				0x02, 'm', 'y',
+				0x06, 'm', 'e', 'm', 'o', 'r', 'y',
+				wasm.ExternTypeMemory,
+				0x1, 0x1, 0x2, // Limit with max.
+			},
+		},
+		{
+			name: "memory - defaultt max",
+			input: &wasm.Import{
+				Type:    wasm.ExternTypeMemory,
+				Module:  "my",
+				Name:    "memory",
+				DescMem: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages, IsMaxEncoded: false},
+			},
+			expected: []byte{
+				0x02, 'm', 'y',
+				0x06, 'm', 'e', 'm', 'o', 'r', 'y',
+				wasm.ExternTypeMemory,
+				0x0, 0x1, // Limit without max.
 			},
 		},
 	}

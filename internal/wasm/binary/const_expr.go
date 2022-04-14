@@ -48,10 +48,17 @@ func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error)
 		return nil, fmt.Errorf("constant expression has been not terminated")
 	}
 
-	data := make([]byte, remainingBeforeData-int64(r.Len()))
+	data := make([]byte, remainingBeforeData-int64(r.Len())-1)
 	if _, err := r.ReadAt(data, offsetAtData); err != nil {
 		return nil, fmt.Errorf("error re-buffering ConstantExpression.Data")
 	}
 
 	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, nil
+}
+
+func encodeConstantExpression(expr *wasm.ConstantExpression) (ret []byte) {
+	ret = append(ret, expr.Opcode)
+	ret = append(ret, expr.Data...)
+	ret = append(ret, wasm.OpcodeEnd)
+	return
 }

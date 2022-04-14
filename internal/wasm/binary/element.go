@@ -38,3 +38,17 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 
 	return &wasm.ElementSegment{OffsetExpr: expr, Init: init}, nil
 }
+
+// encodeCode returns the wasm.ElementSegment encoded in WebAssembly 1.0 (20191205) Binary Format.
+//
+// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#element-section%E2%91%A0
+func encodeElement(e *wasm.ElementSegment) (ret []byte) {
+	// Currently multiple tables are not supported.
+	ret = append(ret, leb128.EncodeInt32(0)...)
+	ret = append(ret, encodeConstantExpression(e.OffsetExpr)...)
+	ret = append(ret, leb128.EncodeUint32(uint32(len(e.Init)))...)
+	for _, idx := range e.Init {
+		ret = append(ret, leb128.EncodeInt32(int32(idx))...)
+	}
+	return
+}

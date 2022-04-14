@@ -246,26 +246,26 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
 		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(666)},
 	})
-	mod.ExportSection["global_i32"] = &wasm.Export{Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal}
+	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal})
 
 	// (global (export "global_f32") f32 (f32.const 666))
 	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
 		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(666))},
 	})
-	mod.ExportSection["global_f32"] = &wasm.Export{Name: "global_f32", Index: 1, Type: wasm.ExternTypeGlobal}
+	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_f32", Index: 1, Type: wasm.ExternTypeGlobal})
 
 	// (global (export "global_f64") f64 (f64.const 666))
 	mod.GlobalSection = append(mod.GlobalSection, &wasm.Global{
 		Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
 		Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(666))},
 	})
-	mod.ExportSection["global_f64"] = &wasm.Export{Name: "global_f64", Index: 2, Type: wasm.ExternTypeGlobal}
+	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "global_f64", Index: 2, Type: wasm.ExternTypeGlobal})
 
 	//  (table (export "table") 10 20 funcref)
 	tableLimitMax := uint32(20)
 	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
-	mod.ExportSection["table"] = &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable}
+	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
 	_, err = store.Instantiate(context.Background(), mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
 	require.NoError(t, err)

@@ -28,7 +28,22 @@ func NewHostModule(
 	globalCount := uint32(len(nameToGlobal))
 	exportCount := funcCount + memoryCount + globalCount
 	if exportCount > 0 {
-		m.ExportSection = make(map[string]*Export, exportCount)
+		m.ExportSection = make([]*Export, 0, exportCount)
+	}
+
+	// Check name collision as exports cannot collide on names, regardless of type.
+	for name := range nameToGoFunc {
+		if _, ok := nameToMemory[name]; ok {
+			return nil, fmt.Errorf("func[%s] exports the same name as a memory", name)
+		}
+		if _, ok := nameToGlobal[name]; ok {
+			return nil, fmt.Errorf("func[%s] exports the same name as a global", name)
+		}
+	}
+	for name := range nameToMemory {
+		if _, ok := nameToGlobal[name]; ok {
+			return nil, fmt.Errorf("memory[%s] exports the same name as a global", name)
+		}
 	}
 
 	if funcCount > 0 {
@@ -78,7 +93,7 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 
 		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(functionType))
 		m.HostFunctionSection = append(m.HostFunctionSection, &fn)
-		m.ExportSection[name] = &Export{Type: ExternTypeFunc, Name: name, Index: idx}
+		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: name, Index: idx})
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: name})
 	}
 	return nil
@@ -107,11 +122,7 @@ func addMemory(m *Module, nameToMemory map[string]*Memory) error {
 		m.MemorySection = v
 	}
 
-	if e, ok := m.ExportSection[name]; ok { // Exports cannot collide on names, regardless of type.
-		return fmt.Errorf("memory[%s] exports the same name as a %s", name, ExternTypeName(e.Type))
-	}
-
-	m.ExportSection[name] = &Export{Type: ExternTypeMemory, Name: name, Index: 0}
+	m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeMemory, Name: name, Index: 0})
 	return nil
 }
 
@@ -121,16 +132,13 @@ func addGlobals(m *Module, globals map[string]*Global) error {
 
 	globalNames := make([]string, 0, globalCount)
 	for name := range globals {
-		if e, ok := m.ExportSection[name]; ok { // Exports cannot collide on names, regardless of type.
-			return fmt.Errorf("global[%s] exports the same name as a %s", name, ExternTypeName(e.Type))
-		}
 		globalNames = append(globalNames, name)
 	}
 	sort.Strings(globalNames) // For consistent iteration order
 
 	for i, name := range globalNames {
 		m.GlobalSection = append(m.GlobalSection, globals[name])
-		m.ExportSection[name] = &Export{Type: ExternTypeGlobal, Name: name, Index: Index(i)}
+		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeGlobal, Name: name, Index: Index(i)})
 	}
 	return nil
 }

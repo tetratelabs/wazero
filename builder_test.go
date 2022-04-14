@@ -55,8 +55,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
-				ExportSection: map[string]*wasm.Export{
-					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
@@ -74,8 +74,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
-				ExportSection: map[string]*wasm.Export{
-					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
@@ -95,9 +95,9 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*wasm.Export{
-					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
@@ -119,9 +119,9 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*wasm.Export{
-					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
@@ -144,9 +144,9 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
-				ExportSection: map[string]*wasm.Export{
-					"1": {Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
-					"2": {Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
@@ -160,8 +160,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -172,8 +172,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 2, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -184,8 +184,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1, Max: 1},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -196,8 +196,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1, Max: 2},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -213,8 +213,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(1024)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"canvas_width": {Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -230,8 +230,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeUint32(math.MaxInt32)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"canvas_width": {Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "canvas_width", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -247,8 +247,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeUint64(1620216263544)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"start_epoch": {Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -264,8 +264,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(math.MaxInt64)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"start_epoch": {Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "start_epoch", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -281,8 +281,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(3.1415926536))},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -298,8 +298,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: u64.LeBytes(api.EncodeF32(math.MaxFloat32))},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -315,8 +315,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(math.Pi))},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},
@@ -332,8 +332,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: u64.LeBytes(api.EncodeF64(math.MaxFloat64))},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"math/pi": {Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "math/pi", Type: wasm.ExternTypeGlobal, Index: 0},
 				},
 			},
 		},

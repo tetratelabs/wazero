@@ -270,8 +270,8 @@ func TestModule_SectionElementCount(t *testing.T) {
 				CodeSection: []*Code{
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
 				},
-				ExportSection: map[string]*Export{
-					"AddInt": {Name: "AddInt", Type: ExternTypeFunc, Index: Index(0)},
+				ExportSection: []*Export{
+					{Name: "AddInt", Type: ExternTypeFunc, Index: Index(0)},
 				},
 				StartSection: &zero,
 			},
