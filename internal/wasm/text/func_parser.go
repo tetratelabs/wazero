@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/wasm"
 )
 
 func newFuncParser(enabledFeatures wasm.Features, typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {

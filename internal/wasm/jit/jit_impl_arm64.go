@@ -14,10 +14,10 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/asm"
+	arm64 "github.com/heeus/hwazero/internal/asm/arm64"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 type arm64Compiler struct {

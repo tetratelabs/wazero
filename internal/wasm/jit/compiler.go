@@ -1,7 +1,7 @@
 package jit
 
 import (
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 // compiler is the interface of architecture-specific native code compiler,

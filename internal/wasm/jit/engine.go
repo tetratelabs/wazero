@@ -8,11 +8,11 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/buildoptions"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/buildoptions"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasmdebug"
+	"github.com/heeus/hwazero/internal/wasmruntime"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 type (

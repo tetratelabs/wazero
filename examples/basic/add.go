@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/api"
 )
 
 // main implements a basic function in both Go and WebAssembly.

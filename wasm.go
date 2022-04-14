@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasm/binary"
+	"github.com/heeus/hwazero/internal/wasm/text"
 )
 
 // Runtime allows embedding of WebAssembly 1.0 (20191205) modules.

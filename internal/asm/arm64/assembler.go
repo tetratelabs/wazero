@@ -1,7 +1,7 @@
 package asm_arm64
 
 import (
-	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/heeus/hwazero/internal/asm"
 )
 
 // Assembler is the interface for arm64 specific assembler.

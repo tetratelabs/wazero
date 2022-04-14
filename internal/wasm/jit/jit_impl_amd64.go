@@ -12,11 +12,11 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/asm"
+	amd64 "github.com/heeus/hwazero/internal/asm/amd64"
+	"github.com/heeus/hwazero/internal/buildoptions"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 var (

@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/u64"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/u64"
+	"github.com/heeus/hwazero/internal/wasm"
 )
 
 // TestNewModuleBuilder_Build only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go

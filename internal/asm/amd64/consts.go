@@ -1,6 +1,6 @@
 package asm_amd64
 
-import "github.com/tetratelabs/wazero/internal/asm"
+import "github.com/heeus/hwazero/internal/asm"
 
 // AMD64-specific conditional register states.
 //

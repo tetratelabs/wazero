@@ -3,8 +3,8 @@ package jit
 import (
 	"testing"
 
-	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	arm64 "github.com/heeus/hwazero/internal/asm/arm64"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 // wasiArg was compiled from testdata/wasi_arg.wat

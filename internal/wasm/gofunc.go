@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/hwazero/api"
 )
 
 // FunctionKind identifies the type of function that can be called.

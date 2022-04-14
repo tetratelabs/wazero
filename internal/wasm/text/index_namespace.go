@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasm"
 )
 
 // newIndexNamespace sectionElementCount parameter should be wasm.Module SectionElementCount unless testing.

@@ -7,9 +7,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/asm"
+	amd64 "github.com/heeus/hwazero/internal/asm/amd64"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 func TestAssemblerImpl_Assemble(t *testing.T) {
