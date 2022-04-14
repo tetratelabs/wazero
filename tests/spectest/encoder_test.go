@@ -45,8 +45,8 @@ func requireStripCustomSections(t *testing.T, binary []byte) []byte {
 	return out.Bytes()
 }
 
-// TestBinaryEncoder ensures that binary.Encoder produces exactly the same binaries
-// after ecoding them module custom sections for all the valid binaries in spectests.
+// TestBinaryEncoder ensures that binary.EncodeModule produces exactly the same binaries
+// for wasm.Module via binary.DecodeModule modulo custom sections for all the valid binaries in spectests.
 func TestBinaryEncoder(t *testing.T) {
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
