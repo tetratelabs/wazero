@@ -41,19 +41,8 @@ func NewHostModule(
 		}
 	}
 	for name := range nameToMemory {
-		if _, ok := nameToGoFunc[name]; ok {
-			return nil, fmt.Errorf("memory[%s] exports the same name as a func", name)
-		}
 		if _, ok := nameToGlobal[name]; ok {
 			return nil, fmt.Errorf("memory[%s] exports the same name as a global", name)
-		}
-	}
-	for name := range nameToGlobal {
-		if _, ok := nameToGoFunc[name]; ok {
-			return nil, fmt.Errorf("global[%s] exports the same name as a func", name)
-		}
-		if _, ok := nameToMemory[name]; ok {
-			return nil, fmt.Errorf("global[%s] exports the same name as a memory", name)
 		}
 	}
 
