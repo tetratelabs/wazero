@@ -35,5 +35,9 @@ func decodeMemory(r *bytes.Reader, memoryMaxPages uint32) (*wasm.Memory, error) 
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func encodeMemory(i *wasm.Memory) []byte {
-	return encodeLimitsType(i.Min, &i.Max)
+	var maxPtr = &i.Max
+	if i.Max == wasm.MemoryMaxPages {
+		maxPtr = nil
+	}
+	return encodeLimitsType(i.Min, maxPtr)
 }

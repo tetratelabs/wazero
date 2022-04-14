@@ -1,14 +1,65 @@
 package spectests
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
+
+func Test(t *testing.T) {
+	const a = "binary-leb128.1.wasm"
+	buf, err := testcases.ReadFile(testdataPath(a))
+	require.NoError(t, err)
+
+	mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
+	require.NoError(t, err)
+
+	encodedBuf := binary.EncodeModule(mod)
+	require.Equal(t, buf, encodedBuf)
+}
+
+func stripCustomSections(binary []byte) ([]byte, error) {
+	r := bytes.NewReader(binary)
+	out := bytes.NewBuffer(nil)
+	io.CopyN(out, r, 8)
+
+	for {
+		sectionID, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("read section id: %w", err)
+		}
+
+		sectionSize, _, err := leb128.DecodeUint32(r)
+		if err != nil {
+			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID), err)
+		}
+
+		switch sectionID {
+		case wasm.SectionIDCustom:
+			if _, err = io.CopyN(io.Discard, r, int64(sectionSize)); err != nil {
+				return nil, errors.New("failed to ignore custom section")
+			}
+		default:
+			out.WriteByte(sectionID)
+			out.Write(leb128.EncodeUint32(sectionSize))
+			if _, err := io.CopyN(out, r, int64(sectionSize)); err != nil {
+				return nil, fmt.Errorf("failed to copy %s section", wasm.SectionIDName(sectionID))
+			}
+		}
+	}
+	return out.Bytes(), nil
+}
 
 func TestBinaryEncoder(t *testing.T) {
 	files, err := testcases.ReadDir("testdata")
@@ -25,8 +76,11 @@ func TestBinaryEncoder(t *testing.T) {
 
 			for _, c := range base.Commands {
 				if c.CommandType == "module" {
-					t.Run(filename, func(t *testing.T) {
+					t.Run(c.Filename, func(t *testing.T) {
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
+						require.NoError(t, err)
+
+						buf, err = stripCustomSections(buf)
 						require.NoError(t, err)
 
 						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
