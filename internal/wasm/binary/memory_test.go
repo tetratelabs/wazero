@@ -24,6 +24,11 @@ func TestMemoryType(t *testing.T) {
 			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
+			name:     "min 0 - default max",
+			input:    &wasm.Memory{Max: wasm.MemoryMaxPages},
+			expected: []byte{0x0, 0},
+		},
+		{
 			name:     "min 0, max 0",
 			input:    &wasm.Memory{Max: zero, IsMaxEncoded: true},
 			expected: []byte{0x1, 0, 0},
