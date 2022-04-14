@@ -200,7 +200,7 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := et.NewEngine(wasm.Features20191205).(*engine)
 		_, err := e.NewModuleEngine(t.Name(),
-			nil,
+			&wasm.Module{},
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
 			nil, // moduleFunctions
 			nil, // table
@@ -220,7 +220,7 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 		}
 
 		// initialize the module-engine containing imported functions
-		_, err := e.NewModuleEngine(t.Name(), nil, nil, importedFunctions, nil, nil)
+		_, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -233,7 +233,7 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.NewModuleEngine(t.Name(), nil, importedFunctions, moduleFunctions, nil, nil)
+		_, err = e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, nil, nil)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -273,12 +273,12 @@ func TestInterpreter_Close(t *testing.T) {
 			e := et.NewEngine(wasm.Features20191205).(*engine)
 			if len(tc.importedFunctions) > 0 {
 				// initialize the module-engine containing imported functions
-				me, err := e.NewModuleEngine(t.Name(), nil, nil, tc.importedFunctions, nil, nil)
+				me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, tc.importedFunctions, nil, nil)
 				require.NoError(t, err)
 				require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
-			me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions, tc.moduleFunctions, nil, nil)
+			me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, tc.importedFunctions, tc.moduleFunctions, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
