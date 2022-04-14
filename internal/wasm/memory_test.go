@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestMemoryPageConsts(t *testing.T) {

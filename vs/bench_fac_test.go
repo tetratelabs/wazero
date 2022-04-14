@@ -12,11 +12,11 @@ import (
 
 	"github.com/birros/go-wasm3"
 	"github.com/bytecodealliance/wasmtime-go"
-	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // ensureJITFastest is overridable via ldflags. Ex.
@@ -201,10 +201,9 @@ func TestFac_JIT_Fastest(t *testing.T) {
 		t.Run(tc.runtimeName, func(t *testing.T) {
 			// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
 			nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
-			msg := fmt.Sprintf("JIT engine must be faster than %s. "+
+			require.True(t, jitNanoPerOp < nanoPerOp, "jitNanoPerOp(%f) is not less than nanoPerOp(%f). JIT engine must be faster than %s. "+
 				"Run BenchmarkFac_Invoke with ensureJITFastest=false instead to see the detailed result",
-				tc.runtimeName)
-			require.Lessf(t, jitNanoPerOp, nanoPerOp, msg)
+				tc.runtimeName, jitNanoPerOp, nanoPerOp)
 		})
 	}
 }

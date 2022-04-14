@@ -4,10 +4,9 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestMultiValue_JIT(t *testing.T) {

@@ -8,11 +8,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 )
 

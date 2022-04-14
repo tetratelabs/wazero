@@ -7,10 +7,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestAssemblerImpl_Assemble(t *testing.T) {

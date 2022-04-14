@@ -3,8 +3,7 @@ package jit
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )

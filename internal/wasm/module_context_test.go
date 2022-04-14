@@ -5,7 +5,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestModuleContext_WithContext(t *testing.T) {

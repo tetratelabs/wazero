@@ -5,9 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestGetFunctionType(t *testing.T) {
