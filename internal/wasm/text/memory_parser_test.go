@@ -24,7 +24,7 @@ func TestMemoryParser(t *testing.T) {
 		{
 			name:     "min 0, max 0",
 			input:    "(memory 0 0)",
-			expected: &wasm.Memory{Max: zero},
+			expected: &wasm.Memory{Max: zero, IsMaxEncoded: true},
 		},
 		{
 			name:     "min largest",
@@ -40,17 +40,17 @@ func TestMemoryParser(t *testing.T) {
 		{
 			name:     "min 0, max largest",
 			input:    "(memory 0 65536)",
-			expected: &wasm.Memory{Max: max},
+			expected: &wasm.Memory{Max: max, IsMaxEncoded: true},
 		},
 		{
 			name:     "min largest max largest",
 			input:    "(memory 65536 65536)",
-			expected: &wasm.Memory{Min: max, Max: max},
+			expected: &wasm.Memory{Min: max, Max: max, IsMaxEncoded: true},
 		},
 		{
 			name:       "min largest max largest - ID",
 			input:      "(memory $mem 65536 65536)",
-			expected:   &wasm.Memory{Min: max, Max: max},
+			expected:   &wasm.Memory{Min: max, Max: max, IsMaxEncoded: true},
 			expectedID: "mem",
 		},
 	}
@@ -162,8 +162,8 @@ func TestMemoryParser_Errors(t *testing.T) {
 
 func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.Memory, *memoryParser, error) {
 	var parsed *wasm.Memory
-	var setFunc onMemory = func(min, max uint32) tokenParser {
-		parsed = &wasm.Memory{Min: min, Max: max}
+	var setFunc onMemory = func(min, max uint32, maxDecoded bool) tokenParser {
+		parsed = &wasm.Memory{Min: min, Max: max, IsMaxEncoded: maxDecoded}
 		return parseErr
 	}
 	tp := newMemoryParser(wasm.MemoryMaxPages, memoryNamespace, setFunc)

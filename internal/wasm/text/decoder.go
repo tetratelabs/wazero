@@ -451,8 +451,8 @@ func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, name string,
 
 // endMemory adds the limits for the current memory, and increments memoryNamespace as it is shared across imported and
 // module-defined memories. Finally, this returns parseModule to prepare for the next field.
-func (p *moduleParser) endMemory(min, max uint32) tokenParser {
-	p.module.MemorySection = &wasm.Memory{Min: min, Max: max}
+func (p *moduleParser) endMemory(min, max uint32, maxDecoded bool) tokenParser {
+	p.module.MemorySection = &wasm.Memory{Min: min, Max: max, IsMaxEncoded: maxDecoded}
 	p.pos = positionModule
 	return p.parseModule
 }

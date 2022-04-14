@@ -11,7 +11,7 @@ func newMemoryParser(memoryMaxPages uint32, memoryNamespace *indexNamespace, onM
 	return &memoryParser{memoryMaxPages: memoryMaxPages, memoryNamespace: memoryNamespace, onMemory: onMemory}
 }
 
-type onMemory func(min, max uint32) tokenParser
+type onMemory func(min, max uint32, maxDecooded bool) tokenParser
 
 // memoryParser parses a api.Memory from and dispatches to onMemory.
 //
@@ -24,6 +24,7 @@ type onMemory func(min, max uint32) tokenParser
 type memoryParser struct {
 	// memoryMaxPages is the limit of pages (not bytes) for each wasm.Memory.
 	memoryMaxPages uint32
+	maxDecoded     bool
 
 	memoryNamespace *indexNamespace
 
@@ -89,6 +90,7 @@ func (p *memoryParser) beginMax(tok tokenType, tokenBytes []byte, line, col uint
 		} else if i < p.currentMin {
 			return nil, fmt.Errorf("min %d pages (%s) > max %d pages (%s)", p.currentMin, wasm.PagesToUnitOfBytes(p.currentMin), i, wasm.PagesToUnitOfBytes(i))
 		}
+		p.maxDecoded = true
 		p.currentMax = i
 		return p.end, nil
 	case tokenRParen:
@@ -104,5 +106,5 @@ func (p *memoryParser) end(tok tokenType, tokenBytes []byte, _, _ uint32) (token
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
 	p.memoryNamespace.count++
-	return p.onMemory(p.currentMin, p.currentMax), nil
+	return p.onMemory(p.currentMin, p.currentMax, p.maxDecoded), nil
 }

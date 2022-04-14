@@ -59,10 +59,10 @@ func newExample() *wasm.Module {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeI64Extend16S, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
 		},
-		MemorySection: &wasm.Memory{Min: 1, Max: three},
+		MemorySection: &wasm.Memory{Min: 1, Max: three, IsMaxEncoded: true},
 		ExportSection: []*wasm.Export{
-			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
 			{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
+			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
 			{Name: "swap", Type: wasm.ExternTypeFunc, Index: wasm.Index(6)},
 			{Name: "mem", Type: wasm.ExternTypeMemory, Index: wasm.Index(0)},
 		},
