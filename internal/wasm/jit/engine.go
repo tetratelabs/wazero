@@ -378,24 +378,20 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		importedFunctionCount: imported,
 	}
 
+	for idx, f := range importedFunctions {
+		cf, ok := e.getCompiledFunction(f)
+		if !ok {
+			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
+		}
+		me.compiledFunctions = append(me.compiledFunctions, cf)
+	}
+
 	if cached, ok := e.getCachedCompiledFunctions(module); ok { // cache hit.
-		for i, c := range cached {
-			if i >= len(importedFunctions) {
-				// If this is non-import, we have to clone the compiled function,
-				// Otherwise, there would be race of instance accesses (e.g. memory).
-				c = c.clone(moduleFunctions[i-len(importedFunctions)])
-			}
-			me.compiledFunctions = append(me.compiledFunctions, c)
+		for i, c := range cached[len(importedFunctions):] {
+			cloned := c.clone(moduleFunctions[i])
+			me.compiledFunctions = append(me.compiledFunctions, cloned)
 		}
 	} else { // cache miss.
-		for idx, f := range importedFunctions {
-			cf, ok := e.getCompiledFunction(f)
-			if !ok {
-				return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
-			}
-			me.compiledFunctions = append(me.compiledFunctions, cf)
-		}
-
 		for i, f := range moduleFunctions {
 			var compiled *compiledFunction
 			var err error
