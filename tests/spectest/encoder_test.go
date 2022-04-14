@@ -3,8 +3,6 @@ package spectests
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -15,39 +13,36 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
-// stripCustomSections strips all the custom sections from the given binary.
-func stripCustomSections(binary []byte) ([]byte, error) {
+// requireStripCustomSections strips all the custom sections from the given binary.
+func requireStripCustomSections(t *testing.T, binary []byte) []byte {
 	r := bytes.NewReader(binary)
 	out := bytes.NewBuffer(nil)
-	io.CopyN(out, r, 8)
+	_, err := io.CopyN(out, r, 8)
+	require.NoError(t, err)
 
 	for {
 		sectionID, err := r.ReadByte()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, fmt.Errorf("read section id: %w", err)
+			require.NoError(t, err)
 		}
 
 		sectionSize, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID), err)
-		}
+		require.NoError(t, err)
 
 		switch sectionID {
 		case wasm.SectionIDCustom:
-			if _, err = io.CopyN(io.Discard, r, int64(sectionSize)); err != nil {
-				return nil, errors.New("failed to ignore custom section")
-			}
+			_, err = io.CopyN(io.Discard, r, int64(sectionSize))
+			require.NoError(t, err)
 		default:
 			out.WriteByte(sectionID)
 			out.Write(leb128.EncodeUint32(sectionSize))
-			if _, err := io.CopyN(out, r, int64(sectionSize)); err != nil {
-				return nil, fmt.Errorf("failed to copy %s section", wasm.SectionIDName(sectionID))
-			}
+			_, err := io.CopyN(out, r, int64(sectionSize))
+			require.NoError(t, err)
 		}
 	}
-	return out.Bytes(), nil
+	return out.Bytes()
 }
 
 // TestBinaryEncoder ensures that binary.Encoder produces exactly the same binaries
@@ -71,8 +66,7 @@ func TestBinaryEncoder(t *testing.T) {
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err)
 
-						buf, err = stripCustomSections(buf)
-						require.NoError(t, err)
+						buf = requireStripCustomSections(t, buf)
 
 						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
 						require.NoError(t, err)

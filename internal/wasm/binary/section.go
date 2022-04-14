@@ -102,13 +102,13 @@ func decodeExportSection(r *bytes.Reader) (map[string]*wasm.Export, error) {
 	exportSection := make(map[string]*wasm.Export, vs)
 	for i := wasm.Index(0); i < vs; i++ {
 		export, err := decodeExport(r)
-		export.EncodedIndex = i
 		if err != nil {
 			return nil, fmt.Errorf("read export: %w", err)
 		}
 		if _, ok := exportSection[export.Name]; ok {
 			return nil, fmt.Errorf("export[%d] duplicates name %q", i, export.Name)
 		}
+		export.EncodedIndex = i
 		exportSection[export.Name] = export
 	}
 	return exportSection, nil
