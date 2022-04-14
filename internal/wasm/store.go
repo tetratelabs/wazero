@@ -176,7 +176,7 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	m.buildExports(module.ExportSection)
 }
 
-func (m *ModuleInstance) buildExports(exports map[string]*Export) {
+func (m *ModuleInstance) buildExports(exports []*Export) {
 	m.Exports = make(map[string]*ExportInstance, len(exports))
 	for _, exp := range exports {
 		index := exp.Index

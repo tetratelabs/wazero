@@ -127,7 +127,7 @@ func TestDecodeExportSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected map[string]*wasm.Export
+		expected []*wasm.Export
 	}{
 		{
 			name: "empty and non-empty name",
@@ -138,9 +138,9 @@ func TestDecodeExportSection(t *testing.T) {
 				0x01, 'a', // Size of name, name
 				wasm.ExternTypeFunc, 0x01, // func[1]
 			},
-			expected: map[string]*wasm.Export{
-				"":  {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2), EncodedIndex: 0},
-				"a": {Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1), EncodedIndex: 1},
+			expected: []*wasm.Export{
+				{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2)},
+				{Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1)},
 			},
 		},
 	}

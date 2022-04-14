@@ -113,7 +113,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDExport.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
-	ExportSection map[string]*Export
+	ExportSection []*Export
 
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//
@@ -350,30 +350,30 @@ func (m *Module) validateImports(enabledFeatures Features) error {
 }
 
 func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, table *Table) error {
-	for name, exp := range m.ExportSection {
+	for _, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
 		case ExternTypeFunc:
 			if index >= uint32(len(functions)) {
-				return fmt.Errorf("unknown function for export[%q]", name)
+				return fmt.Errorf("unknown function for export[%q]", exp.Name)
 			}
 		case ExternTypeGlobal:
 			if index >= uint32(len(globals)) {
-				return fmt.Errorf("unknown global for export[%q]", name)
+				return fmt.Errorf("unknown global for export[%q]", exp.Name)
 			}
 			if !globals[index].Mutable {
 				continue
 			}
 			if err := enabledFeatures.Require(FeatureMutableGlobal); err != nil {
-				return fmt.Errorf("invalid export[%q] global[%d]: %w", name, index, err)
+				return fmt.Errorf("invalid export[%q] global[%d]: %w", exp.Name, index, err)
 			}
 		case ExternTypeMemory:
 			if index > 0 || memory == nil {
-				return fmt.Errorf("memory for export[%q] out of range", name)
+				return fmt.Errorf("memory for export[%q] out of range", exp.Name)
 			}
 		case ExternTypeTable:
 			if index > 0 || table == nil {
-				return fmt.Errorf("table for export[%q] out of range", name)
+				return fmt.Errorf("table for export[%q] out of range", exp.Name)
 			}
 		}
 	}
@@ -608,9 +608,6 @@ type Export struct {
 
 	// Name is what the host refers to this definition as.
 	Name string
-
-	// EncodedIndex is the index of this Export description encoded in the Export section of binary.
-	EncodedIndex Index
 
 	// Index is the index of the definition to export, the index namespace is by Type
 	// Ex. If ExternTypeFunc, this is a position in the function index namespace.

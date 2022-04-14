@@ -3,7 +3,6 @@ package binary
 import (
 	"bytes"
 	"fmt"
-	"sort"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -93,23 +92,25 @@ func decodeGlobalSection(r *bytes.Reader) ([]*wasm.Global, error) {
 	return result, nil
 }
 
-func decodeExportSection(r *bytes.Reader) (map[string]*wasm.Export, error) {
+func decodeExportSection(r *bytes.Reader) ([]*wasm.Export, error) {
 	vs, _, sizeErr := leb128.DecodeUint32(r)
 	if sizeErr != nil {
 		return nil, fmt.Errorf("get size of vector: %v", sizeErr)
 	}
 
-	exportSection := make(map[string]*wasm.Export, vs)
+	usedName := make(map[string]struct{}, vs)
+	exportSection := make([]*wasm.Export, 0, vs)
 	for i := wasm.Index(0); i < vs; i++ {
 		export, err := decodeExport(r)
 		if err != nil {
 			return nil, fmt.Errorf("read export: %w", err)
 		}
-		if _, ok := exportSection[export.Name]; ok {
+		if _, ok := usedName[export.Name]; ok {
 			return nil, fmt.Errorf("export[%d] duplicates name %q", i, export.Name)
+		} else {
+			usedName[export.Name] = struct{}{}
 		}
-		export.EncodedIndex = i
-		exportSection[export.Name] = export
+		exportSection = append(exportSection, export)
 	}
 	return exportSection, nil
 }
@@ -262,16 +263,9 @@ func encodeGlobalSection(globals []*wasm.Global) []byte {
 //
 // See encodeExport
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
-func encodeExportSection(exports map[string]*wasm.Export) []byte {
+func encodeExportSection(exports []*wasm.Export) []byte {
 	contents := leb128.EncodeUint32(uint32(len(exports)))
-	es := make([]*wasm.Export, 0, len(exports))
 	for _, e := range exports {
-		es = append(es, e)
-	}
-	sort.Slice(es, func(i, j int) bool {
-		return es[i].EncodedIndex < es[j].EncodedIndex
-	})
-	for _, e := range es {
 		contents = append(contents, encodeExport(e)...)
 	}
 	return encodeSection(wasm.SectionIDExport, contents)

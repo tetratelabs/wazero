@@ -38,14 +38,14 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, different name",
 			input: &Module{
 				MemorySection: &Memory{Min: 1},
-				ExportSection: map[string]*Export{"momory": {Type: ExternTypeMemory, Name: "momory", Index: 0}},
+				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "momory", Index: 0}},
 			},
 		},
 		{
 			name: "memory exported, but zero length",
 			input: &Module{
 				MemorySection: &Memory{},
-				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected: true,
 		},
@@ -53,7 +53,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, one page",
 			input: &Module{
 				MemorySection: &Memory{Min: 1},
-				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536,
@@ -62,7 +62,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, two pages",
 			input: &Module{
 				MemorySection: &Memory{Min: 2},
-				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
+				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536 * 2,
@@ -145,7 +145,7 @@ func TestStore_CloseModule(t *testing.T) {
 					TypeSection:     []*FunctionType{{}},
 					FunctionSection: []uint32{0},
 					CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
-					ExportSection:   map[string]*Export{"fn": {Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+					ExportSection:   []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
 				}, importedModuleName, nil)
 				require.NoError(t, err)
 			},
@@ -357,7 +357,7 @@ func TestModuleContext_ExportedFunction(t *testing.T) {
 			TypeSection:   []*FunctionType{{}},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
 			MemorySection: &Memory{Min: 1},
-			ExportSection: map[string]*Export{"host.fn": {Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
+			ExportSection: []*Export{{Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
 		}, "test", nil)
 		require.NoError(t, err)
 		defer importing.Close()
@@ -401,7 +401,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 			DescFunc: 0,
 		}},
 		MemorySection: &Memory{Min: 1},
-		ExportSection: map[string]*Export{functionName: {Type: ExternTypeFunc, Name: functionName, Index: 0}},
+		ExportSection: []*Export{{Type: ExternTypeFunc, Name: functionName, Index: 0}},
 	}, "test", nil)
 	require.NoError(t, err)
 	defer imported.Close()

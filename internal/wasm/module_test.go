@@ -444,7 +444,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []*FunctionType{{}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0}},
+			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
 		}
 		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -456,7 +456,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			ImportSection:   []*Import{{Type: ExternTypeFunc}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 1}},
+			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
 		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
@@ -467,9 +467,9 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []*FunctionType{{}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
-			ExportSection: map[string]*Export{
-				"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0},
-				"f2": {Name: "f2", Type: ExternTypeFunc, Index: 0},
+			ExportSection: []*Export{
+				{Name: "f1", Type: ExternTypeFunc, Index: 0},
+				{Name: "f2", Type: ExternTypeFunc, Index: 0},
 			},
 		}
 		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
@@ -572,78 +572,78 @@ func TestModule_validateExports(t *testing.T) {
 	for _, tc := range []struct {
 		name            string
 		enabledFeatures Features
-		exportSection   map[string]*Export
+		exportSection   []*Export
 		functions       []Index
 		globals         []*GlobalType
 		memory          *Memory
 		table           *Table
 		expectedErr     string
 	}{
-		{name: "empty export section", exportSection: map[string]*Export{}},
+		{name: "empty export section", exportSection: []*Export{}},
 		{
 			name:            "func",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeFunc, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 0}},
 			functions:       []Index{100 /* arbitrary type id*/},
 		},
 		{
 			name:            "func out of range",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeFunc, Index: 1}},
+			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 1, Name: "e"}},
 			functions:       []Index{100 /* arbitrary type id*/},
-			expectedErr:     `unknown function for export["e1"]`,
+			expectedErr:     `unknown function for export["e"]`,
 		},
 		{
 			name:            "global const",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeGlobal, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32}},
 		},
 		{
 			name:            "global var",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeGlobal, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
 		},
 		{
 			name:            "global var disabled",
 			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeGlobal, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0, Name: "e"}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
-			expectedErr:     `invalid export["e1"] global[0]: feature "mutable-global" is disabled`,
+			expectedErr:     `invalid export["e"] global[0]: feature "mutable-global" is disabled`,
 		},
 		{
 			name:            "global out of range",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeGlobal, Index: 1}},
+			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 1, Name: "e"}},
 			globals:         []*GlobalType{{}},
-			expectedErr:     `unknown global for export["e1"]`,
+			expectedErr:     `unknown global for export["e"]`,
 		},
 		{
 			name:            "table",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeTable, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}},
 			table:           &Table{},
 		},
 		{
 			name:            "table out of range",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeTable, Index: 1}},
+			exportSection:   []*Export{{Type: ExternTypeTable, Index: 1, Name: "e"}},
 			table:           &Table{},
-			expectedErr:     `table for export["e1"] out of range`,
+			expectedErr:     `table for export["e"] out of range`,
 		},
 		{
 			name:            "memory",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0}},
 			memory:          &Memory{},
 		},
 		{
 			name:            "memory out of range",
 			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 0}},
+			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0, Name: "e"}},
 			table:           &limitsType{},
-			expectedErr:     `memory for export["e1"] out of range`,
+			expectedErr:     `memory for export["e"] out of range`,
 		},
 	} {
 		tc := tc

@@ -70,9 +70,9 @@ func TestNewHostModule(t *testing.T) {
 				},
 				FunctionSection:     []Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet, &fnFdWrite},
-				ExportSection: map[string]*Export{
-					"args_sizes_get": {Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
-					"fd_write":       {Name: "fd_write", Type: ExternTypeFunc, Index: 1},
+				ExportSection: []*Export{
+					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
+					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
 				},
 				NameSection: &NameSection{
 					ModuleName: "wasi_snapshot_preview1",
@@ -93,7 +93,7 @@ func TestNewHostModule(t *testing.T) {
 				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection:     []Index{0},
 				HostFunctionSection: []*reflect.Value{&fnSwap},
-				ExportSection:       map[string]*Export{"swap": {Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				ExportSection:       []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
 				NameSection:         &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},
@@ -102,9 +102,7 @@ func TestNewHostModule(t *testing.T) {
 			nameToMemory: map[string]*Memory{"memory": {Min: 1, Max: 2}},
 			expected: &Module{
 				MemorySection: &Memory{Min: 1, Max: 2},
-				ExportSection: map[string]*Export{
-					"memory": {Name: "memory", Type: ExternTypeMemory, Index: 0},
-				},
+				ExportSection: []*Export{{Name: "memory", Type: ExternTypeMemory, Index: 0}},
 			},
 		},
 		{
@@ -130,9 +128,9 @@ func TestNewHostModule(t *testing.T) {
 						Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(2)},
 					},
 				},
-				ExportSection: map[string]*Export{
-					"g1": {Name: "g1", Type: ExternTypeGlobal, Index: 0},
-					"g2": {Name: "g2", Type: ExternTypeGlobal, Index: 1},
+				ExportSection: []*Export{
+					{Name: "g1", Type: ExternTypeGlobal, Index: 0},
+					{Name: "g2", Type: ExternTypeGlobal, Index: 1},
 				},
 			},
 		},
@@ -164,10 +162,10 @@ func TestNewHostModule(t *testing.T) {
 					},
 				},
 				MemorySection: &Memory{Min: 1, Max: 1},
-				ExportSection: map[string]*Export{
-					"args_sizes_get": {Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
-					"memory":         {Name: "memory", Type: ExternTypeMemory, Index: 0},
-					"g":              {Name: "g", Type: ExternTypeGlobal, Index: 0},
+				ExportSection: []*Export{
+					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
+					{Name: "memory", Type: ExternTypeMemory, Index: 0},
+					{Name: "g", Type: ExternTypeGlobal, Index: 0},
 				},
 				NameSection: &NameSection{
 					ModuleName: "env",
@@ -234,14 +232,14 @@ func TestNewHostModule_Errors(t *testing.T) {
 		{
 			name:         "function has multiple results",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
-			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
+			nameToMemory: map[string]*Memory{"mem": {Min: 1, Max: 1}},
 			expectedErr:  "func[fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
-			name:         "memory collides on func name",
+			name:         "func collides on memory name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
-			expectedErr:  "memory[fn] exports the same name as a func",
+			expectedErr:  "func[fn] exports the same name as a memory",
 		},
 		{
 			name:         "multiple memories",
@@ -254,10 +252,10 @@ func TestNewHostModule_Errors(t *testing.T) {
 			expectedErr:  "memory[memory] min 1 pages (64 Ki) > max 0 pages (0 Ki)",
 		},
 		{
-			name:         "global collides on func name",
+			name:         "func collides on global name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToGlobal: map[string]*Global{"fn": {}},
-			expectedErr:  "global[fn] exports the same name as a func",
+			expectedErr:  "func[fn] exports the same name as a global",
 		},
 	}
 

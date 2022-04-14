@@ -1232,8 +1232,8 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{FunctionNames: wasm.NameMap{{Index: 0, Name: "bar"}}},
 			},
@@ -1249,8 +1249,8 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 			},
 		},
@@ -1266,9 +1266,9 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 0},
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "bar"}},
@@ -1288,9 +1288,9 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 0},
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 1, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
@@ -1313,9 +1313,9 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 0},
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 1, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
@@ -1338,9 +1338,9 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 0},
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 1, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 			},
 		},
@@ -1357,9 +1357,9 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Type: wasm.ExternTypeFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeFunc, Index: 0, EncodedIndex: 0},
-					"bar": {Name: "bar", Type: wasm.ExternTypeFunc, Index: 1, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeFunc, Index: 0},
+					{Name: "bar", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 			},
 		},
@@ -1384,8 +1384,8 @@ func TestDecodeModule(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"AddInt": {Name: "AddInt", Type: wasm.ExternTypeFunc, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "addInt"}},
@@ -1406,8 +1406,8 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 0, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -1419,8 +1419,8 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 0, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},
@@ -1437,9 +1437,9 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0, 0, 0},
 				CodeSection:     []*wasm.Code{{Body: end}, {Body: end}, {Body: end}},
-				ExportSection: map[string]*wasm.Export{
-					"":  {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2), EncodedIndex: 0},
-					"a": {Name: "a", Type: wasm.ExternTypeFunc, Index: 1, EncodedIndex: 1},
+				ExportSection: []*wasm.Export{
+					{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2)},
+					{Name: "a", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 			},
 		},
@@ -1451,8 +1451,8 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
-				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
 			},
 		},

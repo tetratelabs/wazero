@@ -436,9 +436,9 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
 		},
 		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 1}},
-		ExportSection: map[string]*wasm.Export{
-			valueStackCorruption: {Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
-			callStackCorruption:  {Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
+		ExportSection: []*wasm.Export{
+			{Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
+			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
 	}
 

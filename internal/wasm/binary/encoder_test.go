@@ -130,8 +130,8 @@ func TestModule_Encode(t *testing.T) {
 				CodeSection: []*wasm.Code{
 					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"AddInt": {Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(0)},
+				ExportSection: []*wasm.Export{
+					{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(0)},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "addInt"}},
@@ -183,8 +183,8 @@ func TestModule_Encode(t *testing.T) {
 						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
 					},
 				},
-				ExportSection: map[string]*wasm.Export{
-					"sp": {Name: "sp", Type: wasm.ExternTypeGlobal, Index: wasm.Index(0)},
+				ExportSection: []*wasm.Export{
+					{Name: "sp", Type: wasm.ExternTypeGlobal, Index: wasm.Index(0)},
 				},
 			},
 			expected: append(append(Magic, version...),

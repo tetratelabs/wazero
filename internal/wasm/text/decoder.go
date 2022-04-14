@@ -98,6 +98,8 @@ type moduleParser struct {
 	// field counts can be different from the count in a section when abbreviated imports exist. To give an accurate
 	// errorContext, we count explicitly.
 	fieldCountFunc uint32
+
+	exportedName map[string]struct{}
 }
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
@@ -468,8 +470,13 @@ func (p *moduleParser) parseExportName(tok tokenType, tokenBytes []byte, _, _ ui
 	switch tok {
 	case tokenString: // Ex. "" or "PI"
 		name := string(tokenBytes[1 : len(tokenBytes)-1]) // strip quotes
-		if _, ok := p.module.ExportSection[name]; ok {
+		if p.exportedName == nil {
+			p.exportedName = map[string]struct{}{}
+		}
+		if _, ok := p.exportedName[name]; ok {
 			return nil, fmt.Errorf("%q already exported", name)
+		} else {
+			p.exportedName[name] = struct{}{}
 		}
 		p.currentModuleField = &wasm.Export{Name: name}
 		return p.parseExport, nil
@@ -567,12 +574,7 @@ func (p *moduleParser) parseExportEnd(tok tokenType, tokenBytes []byte, _, _ uin
 
 	e := p.currentModuleField.(*wasm.Export)
 	p.currentModuleField = nil
-	if p.module.ExportSection == nil {
-		p.module.ExportSection = map[string]*wasm.Export{e.Name: e}
-	} else {
-		e.EncodedIndex = wasm.Index(len(p.module.ExportSection))
-		p.module.ExportSection[e.Name] = e
-	}
+	p.module.ExportSection = append(p.module.ExportSection, e)
 	p.pos = positionModule
 	return p.parseModule, nil
 }
