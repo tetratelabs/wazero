@@ -456,6 +456,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	}
 }
 
+// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
 func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
 	e := newEngine(wasm.Features20191205)
 	exp := []*compiledFunction{
@@ -478,6 +479,7 @@ func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
 	require.False(t, ok)
 }
 
+// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
 func TestEngine_NewModuleEngine_cache(t *testing.T) {
 	e := newEngine(wasm.Features20191205)
 	importedModuleSource := &wasm.Module{}

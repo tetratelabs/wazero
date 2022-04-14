@@ -362,7 +362,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		// Ensure that compilation cache doesn't cause race on memory instance.
 		before, ok := module.Memory().ReadUint64Le(1)
 		require.True(t, ok)
-		// Value must be zero as the memory must not be affected by the previously insantiated modules.
+		// Value must be zero as the memory must not be affected by the previously instantiated modules.
 		require.Zero(t, before)
 
 		f := module.ExportedFunction("store")

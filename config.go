@@ -149,8 +149,8 @@ func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 type CompiledCode struct {
 	module *wasm.Module
 	// cachedEngines maps wasm.Engine to []*wasm.Module which originate from this .module.
-	// This is necessary to tracks which engine caches *Module where latter might be different
-	// from .module via import replacement config.
+	// This is necessary to track which engine caches *Module where latter might be different
+	// from .module via import replacement config (ModuleConfig.WithImport).
 	cachedEngines map[wasm.Engine]map[*wasm.Module]struct{}
 }
 

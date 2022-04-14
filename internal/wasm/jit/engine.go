@@ -195,8 +195,8 @@ type (
 )
 
 func (c *compiledFunction) clone(newSourceInstance *wasm.FunctionInstance) *compiledFunction {
-	// Note: we don't need to set finalizer to mummap the code segment since it is
-	// already a target of mummap by the finalizer set on the original compiledFunction `c`.
+	// Note: we don't need to set finalizer to munmap the code segment since it is
+	// already a target of munmap by the finalizer set on the original compiledFunction `c`.
 	return &compiledFunction{
 		codeInitialAddress:    c.codeInitialAddress,
 		stackPointerCeil:      c.stackPointerCeil,
