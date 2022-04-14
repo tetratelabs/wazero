@@ -407,7 +407,7 @@ type catchFunctions struct {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *catchFunctions) NewModuleEngine(_ string, _, functions []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *catchFunctions) NewModuleEngine(_ string, _ *wasm.Module, _, functions []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	e.functions = functions
 	return e, nil
 }
@@ -423,5 +423,7 @@ func (e *catchFunctions) Call(_ *wasm.ModuleContext, _ *wasm.FunctionInstance, _
 }
 
 // Close implements the same method as documented on wasm.ModuleEngine.
-func (e *catchFunctions) Close() {
-}
+func (e *catchFunctions) Close() {}
+
+// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
+func (e *catchFunctions) ReleaseCompilationCache(*wasm.Module) {}

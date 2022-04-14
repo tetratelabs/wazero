@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -15,13 +16,14 @@ import (
 )
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
-	"huge stack":                           testHugeStack,
-	"unreachable":                          testUnreachable,
-	"recursive entry":                      testRecursiveEntry,
-	"imported-and-exported func":           testImportedAndExportedFunc,
-	"host function with context parameter": testHostFunctionContextParameter,
-	"host function with numeric parameter": testHostFunctionNumericParameter,
-	"close module with in-flight calls":    testCloseInFlight,
+	"huge stack":                              testHugeStack,
+	"unreachable":                             testUnreachable,
+	"recursive entry":                         testRecursiveEntry,
+	"imported-and-exported func":              testImportedAndExportedFunc,
+	"host function with context parameter":    testHostFunctionContextParameter,
+	"host function with numeric parameter":    testHostFunctionNumericParameter,
+	"close module with in-flight calls":       testCloseInFlight,
+	"multiple instantiation from same source": testMultipleInstantiation,
 }
 
 func TestEngineJIT(t *testing.T) {
@@ -335,5 +337,43 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			_, err = importing.ExportedFunction(tc.function).Call(nil, 5)
 			require.Equal(t, expectedErr, err)
 		})
+	}
+}
+
+func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
+	compiled, err := r.CompileModule([]byte(`(module $test
+		(memory 1)
+		(func $store
+          i32.const 1    ;; memory offset
+		  i64.const 1000 ;; expected value
+		  i64.store
+		)
+		(export "store" (func $store))
+	  )`))
+	require.NoError(t, err)
+	defer compiled.Close()
+
+	// Instantiate multiple modules with the same source (*CompiledCode).
+	for i := 0; i < 100; i++ {
+		module, err := r.InstantiateModuleWithConfig(compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
+		require.NoError(t, err)
+		defer module.Close()
+
+		// Ensure that compilation cache doesn't cause race on memory instance.
+		before, ok := module.Memory().ReadUint64Le(1)
+		require.True(t, ok)
+		// Value must be zero as the memory must not be affected by the previously instantiated modules.
+		require.Zero(t, before)
+
+		f := module.ExportedFunction("store")
+		require.NotNil(t, f)
+
+		_, err = f.Call(nil)
+		require.NoError(t, err)
+
+		// After the call, the value must be set properly.
+		after, ok := module.Memory().ReadUint64Le(1)
+		require.True(t, ok)
+		require.Equal(t, uint64(1000), after)
 	}
 }

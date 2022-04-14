@@ -293,7 +293,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		hm := s.modules[importedModuleName]
 		require.NotNil(t, hm)
 
-		engine := s.engine.(*mockEngine)
+		engine := s.Engine.(*mockEngine)
 		engine.shouldCompileFail = true
 
 		_, err = s.Instantiate(context.Background(), &Module{
@@ -312,7 +312,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 	t.Run("start func failed", func(t *testing.T) {
 		s := newStore()
-		engine := s.engine.(*mockEngine)
+		engine := s.Engine.(*mockEngine)
 		engine.callFailIndex = 1
 
 		_, err = s.Instantiate(context.Background(), m, importedModuleName, nil)
@@ -438,12 +438,15 @@ func newStore() *Store {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
 	}
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
+
+// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
+func (e *mockEngine) ReleaseCompilationCache(*Module) {}
 
 // Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {

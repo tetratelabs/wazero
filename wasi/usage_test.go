@@ -26,6 +26,7 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 
 	code, err := r.CompileModule(wasiArg)
 	require.NoError(t, err)
+	defer code.Close()
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {

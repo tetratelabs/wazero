@@ -29,7 +29,7 @@ type (
 		EnabledFeatures Features
 
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
-		engine Engine
+		Engine Engine
 
 		// moduleNames ensures no race conditions instantiating two modules of the same name
 		moduleNames map[string]struct{} // guarded by mux
@@ -231,7 +231,7 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 func NewStore(enabledFeatures Features, engine Engine) *Store {
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
-		engine:           engine,
+		Engine:           engine,
 		moduleNames:      map[string]struct{}{},
 		modules:          map[string]*ModuleInstance{},
 		typeIDs:          map[string]FunctionTypeID{},
@@ -292,7 +292,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	}
 
 	// Plus, we are ready to compile functions.
-	m.Engine, err = s.engine.NewModuleEngine(name, importedFunctions, functions, table, tableInit)
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, table, tableInit)
 	if err != nil {
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}

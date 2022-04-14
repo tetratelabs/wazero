@@ -38,7 +38,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(wasm.Features20191205)
 
 	t.Run("sets module name", func(t *testing.T) {
-		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
+		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 		defer me.Close()
 		require.Equal(t, t.Name(), me.Name())
@@ -61,7 +61,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	addFunction(module, "fn", fn)
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
+	me, err := e.NewModuleEngine(module.Name, nil, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
 	defer me.Close()
 	linkModuleToEngine(module, me)
@@ -92,7 +92,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		var tableInit map[wasm.Index]wasm.Index
 
 		// Instantiate the module, which has nothing but an empty table.
-		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
 		defer me.Close()
 
@@ -112,7 +112,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		tableInit := map[wasm.Index]wasm.Index{0: 2}
 
 		// Instantiate the module whose table points to its own functions.
-		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
 		defer me.Close()
 
@@ -132,12 +132,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		tableInit := map[wasm.Index]wasm.Index{0: 2}
 
 		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+		imported, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 		defer imported.Close()
 
 		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		importing, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
 		defer importing.Close()
 
@@ -162,12 +162,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		tableInit := map[wasm.Index]wasm.Index{0: 0, 1: 4}
 
 		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+		imported, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 		defer imported.Close()
 
 		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		importing, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
 		defer importing.Close()
 
@@ -202,7 +202,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	module.Types = []*wasm.TypeInstance{{Type: f.Type}}
 	module.Functions = []*wasm.FunctionInstance{f}
 
-	me, err := e.NewModuleEngine(t.Name(), nil, module.Functions, nil, nil)
+	me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
 	defer me.Close()
 
@@ -440,7 +440,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	addFunction(imported, callHostFnName, callHostFn)
 
 	// Compile the imported module
-	importedMe, err := e.NewModuleEngine(imported.Name, nil, imported.Functions, nil, nil)
+	importedMe, err := e.NewModuleEngine(imported.Name, &wasm.Module{}, nil, imported.Functions, nil, nil)
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
@@ -460,7 +460,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	addFunction(importing, callImportCallHostFnName, callImportedHostFn)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importedFunctions, importing.Functions, nil, nil)
+	importingMe, err := e.NewModuleEngine(importing.Name, &wasm.Module{}, importedFunctions, importing.Functions, nil, nil)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 

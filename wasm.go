@@ -72,6 +72,7 @@ type Runtime interface {
 	// Ex.
 	//	r := wazero.NewRuntime()
 	//	code, _ := r.CompileModule(source)
+	//	defer code.Close()
 	//	module, _ := r.InstantiateModule(code)
 	//	defer module.Close()
 	//
@@ -170,6 +171,8 @@ func (r *runtime) InstantiateModuleFromCode(source []byte) (api.Module, error) {
 	if code, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {
+		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
+		defer code.Close()
 		return r.InstantiateModule(code)
 	}
 }
@@ -179,6 +182,8 @@ func (r *runtime) InstantiateModuleFromCodeWithConfig(source []byte, config *Mod
 	if code, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {
+		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
+		defer code.Close()
 		return r.InstantiateModuleWithConfig(code, config)
 	}
 }
@@ -217,5 +222,6 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 			return
 		}
 	}
+	code.addCacheEntry(module, r.store.Engine)
 	return
 }

@@ -6,6 +6,7 @@ type Engine interface {
 	// NewModuleEngine compiles down the function instances in a module, and returns ModuleEngine for the module.
 	//
 	// * name is the name the module was instantiated with used for error handling.
+	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
 	// * importedFunctions: functions this module imports, already compiled in this engine.
 	// * moduleFunctions: functions declared in this module that must be compiled.
 	// * table: a possibly shared table used by this module. When nil tableInit will be nil.
@@ -13,7 +14,10 @@ type Engine interface {
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(name string, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
+	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
+
+	// ReleaseCompilationCache releases compilation caches for the given module (source).
+	ReleaseCompilationCache(module *Module)
 }
 
 // ModuleEngine implements function calls for a given module.
