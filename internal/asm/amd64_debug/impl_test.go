@@ -1190,7 +1190,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		require.Len(t, a.OnGenerateCallbacks, 1)
+		require.Equal(t, 1, len(a.OnGenerateCallbacks))
 		cb := a.OnGenerateCallbacks[0]
 
 		targetNode := a.Current
@@ -1707,11 +1707,11 @@ func TestNodeImpl_GetRegisterToRegisterModRM(t *testing.T) {
 
 							// Skip the opcode for MOVL to make this test opcode-independent.
 							if rexPrefix != amd64.RexPrefixNone {
-								require.Len(t, expectedBytes, 3)
+								require.Equal(t, 3, len(expectedBytes))
 								require.Equal(t, expectedBytes[0], rexPrefix)
 								require.Equal(t, expectedBytes[2], modRM)
 							} else {
-								require.Len(t, expectedBytes, 2)
+								require.Equal(t, 2, len(expectedBytes))
 								require.Equal(t, expectedBytes[1], modRM)
 							}
 						})
@@ -1739,11 +1739,11 @@ func TestNodeImpl_GetRegisterToRegisterModRM(t *testing.T) {
 					require.NoError(t, err)
 
 					if rexPrefix != amd64.RexPrefixNone {
-						require.Len(t, expectedBytes, 5)
+						require.Equal(t, 5, len(expectedBytes))
 						require.Equal(t, expectedBytes[1], rexPrefix)
 						require.Equal(t, expectedBytes[4], modRM)
 					} else {
-						require.Len(t, expectedBytes, 4)
+						require.Equal(t, 4, len(expectedBytes))
 						require.Equal(t, expectedBytes[3], modRM)
 					}
 				})
@@ -1769,11 +1769,11 @@ func TestNodeImpl_GetRegisterToRegisterModRM(t *testing.T) {
 					require.NoError(t, err)
 
 					if rexPrefix != amd64.RexPrefixNone {
-						require.Len(t, expectedBytes, 5)
+						require.Equal(t, 5, len(expectedBytes))
 						require.Equal(t, expectedBytes[1], rexPrefix)
 						require.Equal(t, expectedBytes[4], modRM)
 					} else {
-						require.Len(t, expectedBytes, 4)
+						require.Equal(t, 4, len(expectedBytes))
 						require.Equal(t, expectedBytes[3], modRM)
 					}
 				})
@@ -1799,11 +1799,11 @@ func TestNodeImpl_GetRegisterToRegisterModRM(t *testing.T) {
 					require.NoError(t, err)
 
 					if rexPrefix != amd64.RexPrefixNone {
-						require.Len(t, expectedBytes, 5)
+						require.Equal(t, 5, len(expectedBytes))
 						require.Equal(t, expectedBytes[1], rexPrefix)
 						require.Equal(t, expectedBytes[4], modRM)
 					} else {
-						require.Len(t, expectedBytes, 4)
+						require.Equal(t, 4, len(expectedBytes))
 						require.Equal(t, expectedBytes[3], modRM)
 					}
 				})

@@ -77,7 +77,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
-			require.Empty(t, compiler.valueLocationStack().usedRegisters)
+			require.Equal(t, 0, len(compiler.valueLocationStack().usedRegisters), "expected no usedRegisters")
 
 			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 

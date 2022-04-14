@@ -32,7 +32,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 
 		// NOP must be ignored.
 		actual := a.Buf.Bytes()
-		require.Len(t, actual, 0)
+		require.Zero(t, len(actual))
 	})
 }
 
@@ -1037,7 +1037,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		require.Len(t, a.OnGenerateCallbacks, 1)
+		require.Equal(t, 1, len(a.OnGenerateCallbacks))
 		cb := a.OnGenerateCallbacks[0]
 
 		targetNode := a.Current

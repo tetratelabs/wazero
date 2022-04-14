@@ -61,7 +61,7 @@ func TestCompile(t *testing.T) {
 			}
 			functions, err := compileFunctions(enabledFeatures, tc.module)
 			require.NoError(t, err)
-			require.Len(t, functions, 1)
+			require.Equal(t, 1, len(functions))
 
 			res, err := Compile(enabledFeatures, functions[0])
 			require.NoError(t, err)
@@ -368,7 +368,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			}
 			functions, err := compileFunctions(enabledFeatures, tc.module)
 			require.NoError(t, err)
-			require.Len(t, functions, 1)
+			require.Equal(t, 1, len(functions))
 
 			res, err := Compile(enabledFeatures, functions[0])
 			require.NoError(t, err)
@@ -383,7 +383,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	}
 	functions, err := compileFunctions(enabledFeatures, module)
 	require.NoError(t, err)
-	require.Len(t, functions, 1)
+	require.Equal(t, 1, len(functions))
 
 	res, err := Compile(enabledFeatures, functions[0])
 	require.NoError(t, err)

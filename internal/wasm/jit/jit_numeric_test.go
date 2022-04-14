@@ -958,13 +958,13 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 
 					// At this point two values are pushed.
 					require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
-					require.Len(t, compiler.valueLocationStack().usedRegisters, 2)
+					require.Equal(t, 2, len(compiler.valueLocationStack().usedRegisters))
 
 					tc.setupFunc(t, compiler)
 
 					// We consumed two values, but push one value after operation.
 					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
+					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -1259,13 +1259,13 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 
 					// At this point two values are pushed.
 					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
+					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 
 					tc.setupFunc(t, compiler)
 
 					// We consumed one value, but push the result after operation.
 					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
+					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)

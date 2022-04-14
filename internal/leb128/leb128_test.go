@@ -6,8 +6,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -121,8 +119,8 @@ func TestDecodeUint32(t *testing.T) {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			assert.Equal(t, c.exp, actual)
-			assert.Equal(t, uint64(len(c.bytes)), num)
+			require.Equal(t, c.exp, actual)
+			require.Equal(t, uint64(len(c.bytes)), num)
 		}
 	}
 }
@@ -146,8 +144,8 @@ func TestDecodeUint64(t *testing.T) {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			assert.Equal(t, c.exp, actual)
-			assert.Equal(t, uint64(len(c.bytes)), num)
+			require.Equal(t, c.exp, actual)
+			require.Equal(t, uint64(len(c.bytes)), num)
 		}
 	}
 }
@@ -172,11 +170,11 @@ func TestDecodeInt32(t *testing.T) {
 	} {
 		actual, num, err := DecodeInt32(bytes.NewReader(c.bytes))
 		if c.expErr {
-			assert.Error(t, err, fmt.Sprintf("%d-th got value %d", i, actual))
+			require.Error(t, err, fmt.Sprintf("%d-th got value %d", i, actual))
 		} else {
-			assert.NoError(t, err, i)
-			assert.Equal(t, c.exp, actual, i)
-			assert.Equal(t, uint64(len(c.bytes)), num, i)
+			require.NoError(t, err, i)
+			require.Equal(t, c.exp, actual, i)
+			require.Equal(t, uint64(len(c.bytes)), num, i)
 		}
 	}
 }
@@ -201,8 +199,8 @@ func TestDecodeInt33AsInt64(t *testing.T) {
 	} {
 		actual, num, err := DecodeInt33AsInt64(bytes.NewReader(c.bytes))
 		require.NoError(t, err)
-		assert.Equal(t, c.exp, actual)
-		assert.Equal(t, uint64(len(c.bytes)), num)
+		require.Equal(t, c.exp, actual)
+		require.Equal(t, uint64(len(c.bytes)), num)
 	}
 }
 
@@ -223,7 +221,7 @@ func TestDecodeInt64(t *testing.T) {
 	} {
 		actual, num, err := DecodeInt64(bytes.NewReader(c.bytes))
 		require.NoError(t, err)
-		assert.Equal(t, c.exp, actual)
-		assert.Equal(t, uint64(len(c.bytes)), num)
+		require.Equal(t, c.exp, actual)
+		require.Equal(t, uint64(len(c.bytes)), num)
 	}
 }

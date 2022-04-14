@@ -185,13 +185,13 @@ func TestModuleContext_Close(t *testing.T) {
 
 		// We use side effects to determine if Close in fact called SysContext.Close (without repeating sys_test.go).
 		// One side effect of SysContext.Close is that it clears the openedFiles map. Verify our base case.
-		require.NotEmpty(t, sys.openedFiles)
+		require.True(t, len(sys.openedFiles) > 0, "sys.openedFiles was empty")
 
 		// Closing should not err.
 		require.NoError(t, m.Close())
 
 		// Verify our intended side-effect
-		require.Empty(t, sys.openedFiles)
+		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
 
 		// Verify no error closing again.
 		require.NoError(t, m.Close())

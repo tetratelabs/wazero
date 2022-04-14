@@ -18,14 +18,14 @@ func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 	f1 := &callFrame{}
 	f2 := &callFrame{}
 
-	vm := callEngine{}
-	require.Empty(t, vm.frames)
+	ce := callEngine{}
+	require.Equal(t, 0, len(ce.frames), "expected no frames")
 
-	vm.pushFrame(f1)
-	require.Equal(t, []*callFrame{f1}, vm.frames)
+	ce.pushFrame(f1)
+	require.Equal(t, []*callFrame{f1}, ce.frames)
 
-	vm.pushFrame(f2)
-	require.Equal(t, []*callFrame{f1, f2}, vm.frames)
+	ce.pushFrame(f2)
+	require.Equal(t, []*callFrame{f1, f2}, ce.frames)
 }
 
 func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
@@ -225,7 +225,7 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 		_, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 
-		require.Len(t, e.compiledFunctions, len(importedFunctions))
+		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
 
 		moduleFunctions := []*wasm.FunctionInstance{
 			{DebugName: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -239,9 +239,9 @@ func TestInterpreter_EngineCompile_Errors(t *testing.T) {
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		require.Len(t, e.compiledFunctions, len(importedFunctions))
+		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
 		for _, f := range moduleFunctions {
-			require.NotContains(t, e.compiledFunctions, f)
+			require.Nil(t, e.compiledFunctions[f])
 		}
 	})
 }
@@ -272,29 +272,29 @@ func TestInterpreter_Close(t *testing.T) {
 				// initialize the module-engine containing imported functions
 				me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, tc.importedFunctions, nil, nil)
 				require.NoError(t, err)
-				require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
+				require.Equal(t, len(tc.importedFunctions), len(me.(*moduleEngine).compiledFunctions))
 			}
 
 			me, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, tc.importedFunctions, tc.moduleFunctions, nil, nil)
 			require.NoError(t, err)
-			require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(me.(*moduleEngine).compiledFunctions))
 
-			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(e.compiledFunctions))
 			for _, f := range tc.importedFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 			for _, f := range tc.moduleFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 
 			me.Close()
 
-			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
+			require.Equal(t, len(tc.importedFunctions), len(e.compiledFunctions))
 			for _, f := range tc.importedFunctions {
-				require.Contains(t, e.compiledFunctions, f)
+				require.NotNil(t, e.compiledFunctions[f], f)
 			}
 			for i, f := range tc.moduleFunctions {
-				require.NotContains(t, e.compiledFunctions, f, i)
+				require.Nil(t, e.compiledFunctions[f], i)
 			}
 		})
 	}
@@ -312,7 +312,7 @@ func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
 
 	actual, ok := e.getCachedCompiledFunctions(m)
 	require.True(t, ok)
-	require.Len(t, actual, len(exp))
+	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
