@@ -6,10 +6,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 	asm_arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // TODO: Comment why tmpReg is unused.

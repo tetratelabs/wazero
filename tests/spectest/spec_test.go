@@ -11,10 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -297,7 +296,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 
 	// If the go:embed path resolution was wrong, this fails.
 	// https://github.com/tetratelabs/wazero/issues/247
-	require.Greater(t, len(jsonfiles), 1)
+	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
 
 	for _, f := range jsonfiles {
 		raw, err := testcases.ReadFile(f)

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/bytecodealliance/wasmtime-go"
-	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"

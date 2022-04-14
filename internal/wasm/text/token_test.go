@@ -3,7 +3,7 @@ package text
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestTokenType_String(t *testing.T) {

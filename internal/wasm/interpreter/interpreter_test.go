@@ -7,10 +7,9 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -43,7 +42,9 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 	vm.pushFrame(f1)
 	vm.pushFrame(f2)
 	vm.pushFrame(f3)
-	require.Panics(t, func() { vm.pushFrame(f4) })
+
+	captured := require.CapturePanic(func() { vm.pushFrame(f4) })
+	require.EqualError(t, captured, "callstack overflow")
 }
 
 // et is used for tests defined in the enginetest package.

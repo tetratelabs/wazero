@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 var maxUint32 = uint32(math.MaxUint32)

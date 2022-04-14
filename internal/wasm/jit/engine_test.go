@@ -9,9 +9,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -268,28 +267,13 @@ func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
 
 // TestReleaseCompiledFunction_Panic tests that an unexpected panic has some identifying information in it.
 func TestJIT_ReleaseCompiledFunction_Panic(t *testing.T) {
-	// capturePanic because there's no require.PanicsWithErrorPrefix
-	errMessage := capturePanic(func() {
+	captured := require.CapturePanic(func() {
 		releaseCompiledFunction(&compiledFunction{
 			codeSegment: []byte{wasm.OpcodeEnd},                                                         // never compiled means it was never mapped.
 			source:      &wasm.FunctionInstance{Index: 2, Module: &wasm.ModuleInstance{Name: t.Name()}}, // for error string
 		})
 	})
-	require.Contains(t, errMessage.Error(),
-		fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]:", t.Name()))
-}
-
-// capturePanic returns an error recovered from a panic
-func capturePanic(panics func()) (err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			if e, ok := recovered.(error); ok {
-				err = e
-			}
-		}
-	}()
-	panics()
-	return
+	require.Contains(t, captured.Error(), fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]:", t.Name()))
 }
 
 func TestJIT_ModuleEngine_Close(t *testing.T) {

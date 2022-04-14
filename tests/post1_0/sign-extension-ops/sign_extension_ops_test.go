@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestSignExtensionOps_JIT(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T) {

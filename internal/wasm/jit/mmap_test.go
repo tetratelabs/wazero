@@ -5,44 +5,44 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 var code, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
 func Test_mmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
-	assert := require.New(t)
 	newCode, err := mmapCodeSegment(code)
-	assert.NoError(err)
+	require.NoError(t, err)
 	// Verify that the mmap is the same as the original.
-	assert.Equal(code, newCode)
+	require.Equal(t, code, newCode)
 	// TODO: test newCode can executed.
 
 	t.Run("panic on zero length", func(t *testing.T) {
-		require.PanicsWithError(t, "BUG: mmapCodeSegment with zero length", func() {
+		captured := require.CapturePanic(func() {
 			_, _ = mmapCodeSegment(make([]byte, 0))
 		})
+		require.EqualError(t, captured, "BUG: mmapCodeSegment with zero length")
 	})
 }
 
 func Test_munmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
-	assert := require.New(t)
 
 	// Errors if never mapped
-	assert.Error(munmapCodeSegment(code))
+	require.Error(t, munmapCodeSegment(code))
 
 	newCode, err := mmapCodeSegment(code)
-	assert.NoError(err)
+	require.NoError(t, err)
 	// First munmap should succeed.
-	assert.NoError(munmapCodeSegment(newCode))
+	require.NoError(t, munmapCodeSegment(newCode))
 	// Double munmap should fail.
-	assert.Error(munmapCodeSegment(newCode))
+	require.Error(t, munmapCodeSegment(newCode))
 
 	t.Run("panic on zero length", func(t *testing.T) {
-		require.PanicsWithError(t, "BUG: munmapCodeSegment with zero length", func() {
+		captured := require.CapturePanic(func() {
 			_ = munmapCodeSegment(make([]byte, 0))
 		})
+		require.EqualError(t, captured, "BUG: munmapCodeSegment with zero length")
 	})
 }
