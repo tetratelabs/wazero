@@ -6,8 +6,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
-
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -176,7 +175,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
-		require.NotZero(t, returnAddress)
+		require.True(t, returnAddress != 0, "returnAddress was non-zero %d", returnAddress)
 		jitcall(
 			returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
 			uintptr(unsafe.Pointer(env.module())),

@@ -3,9 +3,8 @@ package jit
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {

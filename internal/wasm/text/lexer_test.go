@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // exampleWat was at one time in the wasmtime repo under cranelift. We added a unicode comment for fun!

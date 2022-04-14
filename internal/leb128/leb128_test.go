@@ -7,7 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestEncode_DecodeInt32(t *testing.T) {
