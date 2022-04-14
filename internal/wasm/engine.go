@@ -15,6 +15,7 @@ type Engine interface {
 	// due to reasons such as out-of-bounds.
 	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
 
+	// ReleaseCompilationCache releases compilation caches for the given module (source).
 	ReleaseCompilationCache(module *Module)
 }
 
