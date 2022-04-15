@@ -4,8 +4,7 @@ import "os"
 
 // Example_main ensures the following will work:
 //
-//	go build age-calculator.go
-//	./age-calculator 2000
+//	go run age-calculator.go 2000
 func Example_main() {
 
 	// Save the old os.Args and replace with our example input.
