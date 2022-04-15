@@ -5,8 +5,8 @@ This example shows how to define, import and call a Go-defined function from a W
 If the current year is 2022, and we give the argument 2000, [age-calculator.go](age-calculator.go) should output 22.
 ```bash
 $ go run age-calculator.go 2000
-log outside wasm >> 22
-log inside wasm >> 22
+println >> 21
+log_i32 >> 21
 ```
 
 ### Background
