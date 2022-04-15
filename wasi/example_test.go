@@ -1,7 +1,6 @@
 package wasi
 
 import (
-	_ "embed"
 	"fmt"
 	"log"
 	"os"
