@@ -30,7 +30,7 @@ func main() {
 }
 ```
 
-Note: While the [source for this](tests/bench/testdata/fac.wat) is in the
+Note: While the [source for this](internal/integration_test/bench/testdata/fac.wat) is in the
 WebAssembly 1.0 (20191205) Text Format, it could have been written in another
 language that compiles to (targets) WebAssembly, such as AssemblyScript, C, C++, Rust, TinyGo or Zig.
 
