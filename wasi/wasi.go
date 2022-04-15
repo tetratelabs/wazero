@@ -1,3 +1,7 @@
+// Package wasi contains Go-defined functions to access system calls, such as opening a file, similar to Go's x/sys
+// package. These are accessible from WebAssembly-defined functions via importing ModuleSnapshotPreview1.
+//
+// See https://github.com/WebAssembly/WASI
 package wasi
 
 import (
@@ -21,10 +25,6 @@ const (
 )
 
 // InstantiateSnapshotPreview1 instantiates ModuleSnapshotPreview1, so that other modules can import them.
-//
-// Ex. After you configure like this, other modules can import functions like "wasi_snapshot_preview1" "fd_write".
-//	wm, _ := wasi.InstantiateSnapshotPreview1(r)
-//	defer wm.Close()
 //
 // Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
 func InstantiateSnapshotPreview1(r wazero.Runtime) (api.Module, error) {

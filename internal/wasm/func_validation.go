@@ -480,7 +480,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			funcType := types[functions[index]]
 			for i := 0; i < len(funcType.Params); i++ {
 				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
-					return fmt.Errorf("type mismatch on %s operation param type", OpcodeCallName)
+					return fmt.Errorf("type mismatch on %s operation param type: %v", OpcodeCallName, err)
 				}
 			}
 			for _, exp := range funcType.Results {

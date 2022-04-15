@@ -4,8 +4,7 @@ import "os"
 
 // Example_main ensures the following will work:
 //
-//	go build cat.go
-//	./cat ./test.txt
+//	go run cat.go ./test.txt
 func Example_main() {
 
 	// Save the old os.Args and replace with our example input.

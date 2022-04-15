@@ -2,8 +2,7 @@ package main
 
 // Example_main ensures the following will work:
 //
-//	go build multiple-results.go
-//	./multiple-results
+//	go run multiple-results.go
 func Example_main() {
 
 	main()

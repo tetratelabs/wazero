@@ -24,13 +24,13 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 	require.NoError(t, err)
 	defer wm.Close()
 
-	code, err := r.CompileModule(wasiArg)
+	compiled, err := r.CompileModule(wasiArg)
 	require.NoError(t, err)
-	defer code.Close()
+	defer compiled.Close()
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {
-		mod, err := r.InstantiateModuleWithConfig(code, sys.WithArgs(tc).WithName(tc))
+		mod, err := r.InstantiateModuleWithConfig(compiled, sys.WithArgs(tc).WithName(tc))
 		require.NoError(t, err)
 
 		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).
