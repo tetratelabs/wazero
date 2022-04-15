@@ -1,4 +1,4 @@
-package main
+package multiple_results
 
 // Example_main ensures the following will work:
 //

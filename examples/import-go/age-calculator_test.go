@@ -1,4 +1,4 @@
-package main
+package age_calculator
 
 import "os"
 

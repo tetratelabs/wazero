@@ -1,4 +1,4 @@
-package main
+package replace_import
 
 // Example_main ensures the following will work:
 //

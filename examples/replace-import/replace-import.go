@@ -1,4 +1,4 @@
-package main
+package replace_import
 
 import (
 	_ "embed"
