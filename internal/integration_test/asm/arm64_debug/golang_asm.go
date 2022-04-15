@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	asm_arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
+	"github.com/tetratelabs/wazero/internal/integration_test/asm/golang_asm"
 )
 
 // TODO: this comment seems wrong

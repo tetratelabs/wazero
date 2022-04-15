@@ -49,6 +49,7 @@ build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags m
 .PHONY: test
 test:
 	@go test ./... -timeout 120s
+	@cd ./internal/integration_test && go test ./... -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 

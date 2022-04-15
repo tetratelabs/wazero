@@ -5,25 +5,9 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/asm/amd64_debug"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
-
-// newDebugAmd64Compiler allows debugging in tests, without pinning a dependency in main code.
-func newDebugAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	c, err := newAmd64Compiler(f, ir)
-	if err != nil {
-		return nil, err
-	}
-	a, err := amd64_debug.NewDebugAssembler()
-	if err != nil {
-		return nil, err
-	}
-	c.(*amd64Compiler).assembler = a
-	return c, nil
-}
 
 func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
@@ -87,7 +71,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const x2Value uint32 = 51
 						const dxValue uint64 = 111111
 
-						compiler := env.requireNewCompiler(t, newDebugAmd64Compiler, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -209,7 +193,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const dxValue uint64 = 111111
 
 						env := newJITEnvironment()
-						compiler := env.requireNewCompiler(t, newDebugAmd64Compiler, nil).(*amd64Compiler)
+						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -288,7 +272,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("invalid", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, newDebugAmd64Compiler, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -304,7 +288,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, newDebugAmd64Compiler, nil).(*amd64Compiler)
+		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
