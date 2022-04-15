@@ -17,7 +17,7 @@ jobs:
     name: Pre-commit check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           # TODO: Change to a matrix to ensure developers can use the latest version, noting often there is a lag of
           # weeks before the latest version is usable. Ex. golangci/golangci-lint#2649
@@ -29,9 +29,9 @@ jobs:
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-ubuntu.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
@@ -55,13 +55,13 @@ jobs:
         - "1.18"
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
@@ -85,13 +85,13 @@ jobs:
         - "riscv64"
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
@@ -125,13 +125,13 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build

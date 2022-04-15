@@ -26,7 +26,7 @@ jobs:
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # TinyGo -> Wasm is not idempotent, so we only check things build.
       - name: Build examples
