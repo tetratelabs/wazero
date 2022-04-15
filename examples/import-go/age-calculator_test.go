@@ -1,24 +1,21 @@
 package age_calculator
 
-import "os"
+import (
+	"testing"
 
-// Example_main ensures the following will work:
+	"github.com/tetratelabs/wazero/internal/testing/maintester"
+	"github.com/tetratelabs/wazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
 //	go run age-calculator.go 2000
-func Example_main() {
+func Test_main(t *testing.T) {
+	// Set ENV to ensure this test doesn't need maintenance every year.
+	t.Setenv("CURRENT_YEAR", "2021")
 
-	// Save the old os.Args and replace with our example input.
-	oldArgs := os.Args
-	_ = os.Setenv("CURRENT_YEAR", "2021")
-	os.Args = []string{"age-calculator", "2000"}
-	defer func() {
-		os.Args = oldArgs
-		_ = os.Unsetenv("CURRENT_YEAR")
-	}()
-
-	main()
-
-	// Output:
-	// println >> 21
-	// log_i32 >> 21
+	stdout, _ := maintester.TestMain(t, main, "age-calculator", "2000")
+	require.Equal(t, `println >> 21
+log_i32 >> 21
+`, stdout)
 }

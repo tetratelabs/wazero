@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // Runtime allows embedding of WebAssembly 1.0 (20191205) modules.
@@ -195,8 +196,8 @@ func (r *runtime) InstantiateModule(code *CompiledCode) (mod api.Module, err err
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
 func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
-	var sys *wasm.SysContext
-	if sys, err = config.toSysContext(); err != nil {
+	var sysCtx *wasm.SysContext
+	if sysCtx, err = config.toSysContext(); err != nil {
 		return
 	}
 
@@ -207,7 +208,7 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 
 	module := config.replaceImports(code.module)
 
-	mod, err = r.store.Instantiate(r.ctx, module, name, sys)
+	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
 	if err != nil {
 		return
 	}
@@ -218,6 +219,9 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 			continue
 		}
 		if _, err = start.Call(mod.WithContext(r.ctx)); err != nil {
+			if _, ok := err.(*sys.ExitError); ok {
+				return
+			}
 			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)
 			return
 		}

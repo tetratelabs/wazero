@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestRuntime_DecodeModule(t *testing.T) {
@@ -399,6 +400,19 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
+}
+
+func TestInstantiateModuleWithConfig_ExitError(t *testing.T) {
+	r := NewRuntime()
+
+	start := func(m api.Module) {
+		require.NoError(t, m.CloseWithExitCode(2))
+	}
+
+	_, err := r.NewModuleBuilder("env").ExportFunction("_start", start).Instantiate()
+
+	// Ensure the exit error propagated and didn't wrap.
+	require.Equal(t, err, sys.NewExitError("env", 2))
 }
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.

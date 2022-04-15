@@ -1,12 +1,16 @@
 package replace_import
 
-// Example_main ensures the following will work:
+import (
+	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/maintester"
+	"github.com/tetratelabs/wazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
 //	go run replace-import.go
-func Example_main() {
-
-	main()
-
-	// Output:
-	// module "needs-import" closed with exit_code(255)
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "replace-import")
+	require.Equal(t, "module \"needs-import\" closed with exit_code(255)\n", stdout)
 }

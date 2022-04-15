@@ -1,22 +1,18 @@
 package add
 
 import (
-	"os"
+	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/maintester"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// Example_main ensures the following will work:
+// Test_main ensures the following will work:
 //
 //	go run add.go 7 9
-func Example_main() {
-
-	// Save the old os.Args and replace with our example input.
-	oldArgs := os.Args
-	os.Args = []string{"add", "7", "9"}
-	defer func() { os.Args = oldArgs }()
-
-	main()
-
-	// Output:
-	// wasm/math: 7 + 9 = 16
-	// host/math: 7 + 9 = 16
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "add", "7", "9")
+	require.Equal(t, `wasm/math: 7 + 9 = 16
+host/math: 7 + 9 = 16
+`, stdout)
 }
