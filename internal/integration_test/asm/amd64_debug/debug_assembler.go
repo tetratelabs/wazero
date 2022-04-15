@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	asm_amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/asm/golang_asm"
+	"github.com/tetratelabs/wazero/internal/integration_test/asm/golang_asm"
 )
 
 // NewDebugAssembler can be used for ensuring that our assembler produces exactly the same binary as Go.

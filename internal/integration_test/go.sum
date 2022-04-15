@@ -1,0 +1,4 @@
+github.com/tetratelabs/wazero v0.0.0-20220414083743-1e383881edc0 h1:MYB8s3+HS4qaxvnEDJm3Qsn0NQXvBhowgSJVyBZeW+k=
+github.com/tetratelabs/wazero v0.0.0-20220414083743-1e383881edc0/go.mod h1:5JB7ectLUx/rulnLfKI628r3/wUm1grVYnHfmQ2hpBY=
+github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS4MhqMhdFk5YI=
+github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
