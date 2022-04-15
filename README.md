@@ -159,7 +159,7 @@ default. However, the following status covers what's currently possible with
 | mutable-global                        |   ✅   |
 | nontrapping-float-to-int-conversions  |   ❌   |
 | sign-extension-ops                    |   ✅   |
-| multi-value                           |   ❌   |
+| multi-value                           |   ✅   |
 | JS-BigInt-integration                 |  N/A   |
 | reference-types                       |   ❌   |
 | bulk-memory-operations                |   ❌   |
