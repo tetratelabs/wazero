@@ -1,4 +1,4 @@
-package main
+package add
 
 import (
 	_ "embed"

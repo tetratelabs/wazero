@@ -1,9 +1,8 @@
-package main
+package replace_import
 
 // Example_main ensures the following will work:
 //
-//	go build replace-import.go
-//	./replace-import
+//	go run replace-import.go
 func Example_main() {
 
 	main()

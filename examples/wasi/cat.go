@@ -1,4 +1,4 @@
-package main
+package wasi_example
 
 import (
 	"embed"

@@ -1,4 +1,4 @@
-package main
+package add
 
 import (
 	"os"
@@ -6,8 +6,7 @@ import (
 
 // Example_main ensures the following will work:
 //
-//	go build add.go
-//	./add 7 9
+//	go run add.go 7 9
 func Example_main() {
 
 	// Save the old os.Args and replace with our example input.

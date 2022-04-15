@@ -152,6 +152,9 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case wasm.OpcodeI32AddName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
+	case wasm.OpcodeI32SubName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeI32Sub
+		next = p.beginFieldOrInstruction
 	case wasm.OpcodeI32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Const
 		next = p.parseI32
