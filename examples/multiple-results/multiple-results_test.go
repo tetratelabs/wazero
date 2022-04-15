@@ -1,15 +1,20 @@
 package multiple_results
 
-// Example_main ensures the following will work:
+import (
+	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/maintester"
+	"github.com/tetratelabs/wazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
 //	go run multiple-results.go
-func Example_main() {
-
-	main()
-
-	// Output:
-	// result-offset/wasm: age=37
-	// result-offset/host: age=37
-	// multi-value/wasm: age=37
-	// multi-value/host: age=37
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "multiple-results")
+	require.Equal(t, `result-offset/wasm: age=37
+result-offset/host: age=37
+multi-value/wasm: age=37
+multi-value/host: age=37
+`, stdout)
 }

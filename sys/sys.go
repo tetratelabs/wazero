@@ -11,7 +11,7 @@ import (
 // Here's an example of how to get the exit code:
 //	main := module.ExportedFunction("main")
 //	if err := main(nil); err != nil {
-//		if exitErr, ok := err.(*wazero.ExitError); ok {
+//		if exitErr, ok := err.(*sys.ExitError); ok {
 //			// If your main function expects to exit, this could be ok if Code == 0
 //		}
 //	--snip--

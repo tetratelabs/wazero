@@ -1,19 +1,16 @@
 package wasi_example
 
-import "os"
+import (
+	"testing"
 
-// Example_main ensures the following will work:
+	"github.com/tetratelabs/wazero/internal/testing/maintester"
+	"github.com/tetratelabs/wazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
 //	go run cat.go ./test.txt
-func Example_main() {
-
-	// Save the old os.Args and replace with our example input.
-	oldArgs := os.Args
-	os.Args = []string{"cat", "./test.txt"}
-	defer func() { os.Args = oldArgs }()
-
-	main()
-
-	// Output:
-	// hello filesystem
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "cat", "./test.txt")
+	require.Equal(t, "hello filesystem\n", stdout)
 }
