@@ -524,7 +524,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 	fdToClose := uint32(3) // arbitrary fd
 	fdToKeep := uint32(4)  // another arbitrary fd
 
-	setupFD := func() (api.Module, api.Function, *wasiAPI) {
+	setupFD := func() (api.Module, api.Function, *snapshotPreview1) {
 		// fd_close needs to close an open file descriptor. Open two files so that we can tell which is closed.
 		path1, path2 := "a", "b"
 		testFs := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
@@ -949,12 +949,12 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 	type fdReadFn func(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
 	tests := []struct {
 		name   string
-		fdRead func(*wasiAPI, api.Module, api.Function) fdReadFn
+		fdRead func(*snapshotPreview1, api.Module, api.Function) fdReadFn
 	}{
-		{"snapshotPreview1.FdRead", func(a *wasiAPI, _ api.Module, _ api.Function) fdReadFn {
+		{"snapshotPreview1.FdRead", func(a *snapshotPreview1, _ api.Module, _ api.Function) fdReadFn {
 			return a.FdRead
 		}},
-		{functionFdRead, func(_ *wasiAPI, mod api.Module, fn api.Function) fdReadFn {
+		{functionFdRead, func(_ *snapshotPreview1, mod api.Module, fn api.Function) fdReadFn {
 			return func(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 				results, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
@@ -1339,12 +1339,12 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 	type fdWriteFn func(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
 	tests := []struct {
 		name    string
-		fdWrite func(*wasiAPI, api.Module, api.Function) fdWriteFn
+		fdWrite func(*snapshotPreview1, api.Module, api.Function) fdWriteFn
 	}{
-		{"snapshotPreview1.FdWrite", func(a *wasiAPI, _ api.Module, _ api.Function) fdWriteFn {
+		{"snapshotPreview1.FdWrite", func(a *snapshotPreview1, _ api.Module, _ api.Function) fdWriteFn {
 			return a.FdWrite
 		}},
-		{functionFdWrite, func(_ *wasiAPI, mod api.Module, fn api.Function) fdWriteFn {
+		{functionFdWrite, func(_ *snapshotPreview1, mod api.Module, fn api.Function) fdWriteFn {
 			return func(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 				results, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
@@ -1563,7 +1563,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	// rights are ignored per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 	fsRightsBase, fsRightsInheriting := uint64(1), uint64(2)
 
-	setup := func() (*wasiAPI, api.Module, api.Function) {
+	setup := func() (*snapshotPreview1, api.Module, api.Function) {
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
 		sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
 			workdirFD: {Path: ".", FS: testFS},
@@ -2005,7 +2005,7 @@ func maskMemory(t *testing.T, mod api.Module, size int) {
 	}
 }
 
-func instantiateModule(t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (*wasiAPI, api.Module, api.Function) {
+func instantiateModule(t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (*snapshotPreview1, api.Module, api.Function) {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
 	// The package `wazero` has a simpler interface for adding host modules, but we can't use that as it would create an
