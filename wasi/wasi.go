@@ -18,11 +18,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const (
-	// ModuleSnapshotPreview1 is the module name WASI functions are exported into
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-	ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
-)
+// ModuleSnapshotPreview1 is the module name WASI functions are exported into
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
+const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 
 // InstantiateSnapshotPreview1 instantiates ModuleSnapshotPreview1, so that other modules can import them.
 //
@@ -33,18 +31,6 @@ func InstantiateSnapshotPreview1(r wazero.Runtime) (api.Module, error) {
 }
 
 const (
-	// functionStart is the name of the nullary function a module must export if it is a WASI Command Module.
-	//
-	// Note: When this is exported functionInitialize must not be.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-	functionStart = "_start" // nolint
-
-	// functionInitialize is the name of the nullary function a module must export if it is a WASI Reactor Module.
-	//
-	// Note: When this is exported functionStart must not be.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-	functionInitialize = "_initialize" // nolint
-
 	// functionArgsGet reads command-line argument data.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
 	functionArgsGet = "args_get"
@@ -439,540 +425,7 @@ const (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 // See https://github.com/WebAssembly/WASI/issues/215
 // See https://wwa.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
-type snapshotPreview1 interface {
-	// ArgsGet is the WASI function that reads command-line argument data (WithArgs).
-	//
-	// There are two parameters. Both are offsets in api.Module Memory. If either are invalid due to
-	// memory constraints, this returns ErrnoFault.
-	//
-	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
-	//   * ArgsSizesGet result argc * 4 bytes are written to this offset
-	// * argvBuf - is the offset to write the null terminated arguments to m.Memory
-	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
-	//
-	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
-	//    parameters argv=7 and argvBuf=1, this function writes the below to `m.Memory`:
-	//
-	//               argvBufSize          uint32le    uint32le
-	//            +----------------+     +--------+  +--------+
-	//            |                |     |        |  |        |
-	// []byte{?, 'a', 0, 'b', 'c', 0, ?, 1, 0, 0, 0, 3, 0, 0, 0, ?}
-	//  argvBuf --^                      ^           ^
-	//                            argv --|           |
-	//          offset that begins "a" --+           |
-	//                     offset that begins "bc" --+
-	//
-	// Note: importArgsGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See ArgsSizesGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsGet(m api.Module, argv, argvBuf uint32) Errno
-
-	// ArgsSizesGet is the WASI function named functionArgsSizesGet that reads command-line argument data (WithArgs)
-	// sizes.
-	//
-	// There are two result parameters: these are offsets in the api.Module Memory to write
-	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
-	// returns ErrnoFault.
-	//
-	// * resultArgc - is the offset to write the argument count to m.Memory
-	// * resultArgvBufSize - is the offset to write the null-terminated argument length to m.Memory
-	//
-	// For example, if WithArgs are []string{"a","bc"} and
-	//    parameters resultArgc=1 and resultArgvBufSize=6, this function writes the below to `m.Memory`:
-	//
-	//                   uint32le       uint32le
-	//                  +--------+     +--------+
-	//                  |        |     |        |
-	//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
-	//     resultArgc --^              ^
-	//         2 args --+              |
-	//             resultArgvBufSize --|
-	//   len([]byte{'a',0,'b',c',0}) --+
-	//
-	// Note: importArgsSizesGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See ArgsGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(m api.Module, resultArgc, resultArgvBufSize uint32) Errno
-
-	// EnvironGet is the WASI function named functionEnvironGet that reads environment variables. (WithEnviron)
-	//
-	// There are two parameters. Both are offsets in api.Module Memory. If either are invalid due to
-	// memory constraints, this returns ErrnoFault.
-	//
-	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
-	//   * EnvironSizesGet result environc * 4 bytes are written to this offset
-	// * environBuf - is the offset to write the environment variables to m.Memory
-	//   * the format is the same as os.Environ, null terminated "key=val" entries
-	//   * EnvironSizesGet result environBufSize bytes are written to this offset
-	//
-	// For example, if EnvironSizesGet wrote environc=2 and environBufSize=9 for environment variables: "a=b", "b=cd"
-	//   and parameters environ=11 and environBuf=1, this function writes the below to `m.Memory`:
-	//
-	//                           environBufSize                 uint32le    uint32le
-	//              +------------------------------------+     +--------+  +--------+
-	//              |                                    |     |        |  |        |
-	//   []byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
-	// environBuf --^                                          ^           ^
-	//                              environ offset for "a=b" --+           |
-	//                                         environ offset for "b=cd" --+
-	//
-	// Note: importEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See EnvironSizesGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironGet(m api.Module, environ, environBuf uint32) Errno
-
-	// EnvironSizesGet is the WASI function named functionEnvironSizesGet that reads environment variable
-	// (WithEnviron) sizes.
-	//
-	// There are two result parameters: these are offsets in the wasi.Module Memory to write
-	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
-	// returns ErrnoFault.
-	//
-	// * resultEnvironc - is the offset to write the environment variable count to m.Memory
-	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to m.Memory
-	//
-	// For example, if WithEnviron is []string{"a=b","b=cd"} and
-	//    parameters resultEnvironc=1 and resultEnvironBufSize=6, this function writes the below to `m.Memory`:
-	//
-	//                   uint32le       uint32le
-	//                  +--------+     +--------+
-	//                  |        |     |        |
-	//        []byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
-	// resultEnvironc --^              ^
-	//    2 variables --+              |
-	//          resultEnvironBufSize --|
-	//    len([]byte{'a','=','b',0,    |
-	//           'b','=','c','d',0}) --+
-	//
-	// Note: importEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See EnvironGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironSizesGet(m api.Module, resultEnvironc, resultEnvironBufSize uint32) Errno
-
-	// ClockResGet is the WASI function named functionClockResGet and is stubbed for GrainLang per #271
-	ClockResGet(m api.Module, id uint32, resultResolution uint32) Errno
-
-	// ClockTimeGet is the WASI function named functionClockTimeGet that returns the time value of a clock (time.Now).
-	//
-	// * id - The clock id for which to return the time.
-	// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
-	// * resultTimestamp - the offset to write the timestamp to m.Memory
-	//   * the timestamp is epoch nanoseconds encoded as a uint64 little-endian encoding.
-	//
-	// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
-	//   parameters resultTimestamp=1, this function writes the below to `m.Memory`:
-	//
-	//                                      uint64le
-	//                    +------------------------------------------+
-	//                    |                                          |
-	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
-	//  resultTimestamp --^
-	//
-	// Note: importClockTimeGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `clock_gettime` in POSIX.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
-	// See https://linux.die.net/man/3/clock_gettime
-	ClockTimeGet(m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno
-
-	// FdAdvise is the WASI function named functionFdAdvise and is stubbed for GrainLang per #271
-	FdAdvise(m api.Module, fd uint32, offset, len uint64, resultAdvice uint32) Errno
-
-	// FdAllocate is the WASI function named functionFdAllocate and is stubbed for GrainLang per #271
-	FdAllocate(m api.Module, fd uint32, offset, len uint64) Errno
-
-	// FdClose is the WASI function to close a file descriptor. This returns ErrnoBadf if the fd is invalid.
-	//
-	// * fd - the file descriptor to close
-	//
-	// Note: importFdClose shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `close` in POSIX.
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
-	// See https://linux.die.net/man/3/close
-	FdClose(m api.Module, fd uint32) Errno
-
-	// FdDatasync is the WASI function named functionFdDatasync and is stubbed for GrainLang per #271
-	FdDatasync(m api.Module, fd uint32) Errno
-
-	// FdFdstatGet is the WASI function to return the attributes of a file descriptor.
-	//
-	// * fd - the file descriptor to get the fdstat attributes data
-	// * resultFdstat - the offset to write the result fdstat data
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `resultFdstat` contains an invalid offset due to the memory constraint
-	//
-	// fdstat byte layout is 24-byte size, which as the following elements in order
-	// * fs_filetype 1 byte, to indicate the file type
-	// * fs_flags 2 bytes, to indicate the file descriptor flag
-	// * 5 pad bytes
-	// * fs_right_base 8 bytes, to indicate the current rights of the fd
-	// * fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
-	//
-	// For example, with a file corresponding with `fd` was a directory (=3) opened with `fd_read` right (=1) and no fs_flags (=0),
-	//    parameter resultFdstat=1, this function writes the below to `m.Memory`:
-	//
-	//                   uint16le   padding            uint64le                uint64le
-	//          uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
-	//                  |  |  |  |           |  |                    |  |                    |
-	//        []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
-	//   resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
-	//                  |
-	//                  +-- fs_filetype
-	//
-	// Note: importFdFdstatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: FdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
-	// See https://linux.die.net/man/3/fsync
-	FdFdstatGet(m api.Module, fd, resultFdstat uint32) Errno
-
-	// FdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags and is stubbed for GrainLang per #271
-	FdFdstatSetFlags(m api.Module, fd uint32, flags uint32) Errno
-
-	// FdFdstatSetRights is the WASI function named functionFdFdstatSetRights and is stubbed for GrainLang per #271
-	FdFdstatSetRights(m api.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) Errno
-
-	// FdFilestatGet is the WASI function named functionFdFilestatGet
-	FdFilestatGet(m api.Module, fd uint32, resultBuf uint32) Errno
-
-	// FdFilestatSetSize is the WASI function named functionFdFilestatSetSize
-	FdFilestatSetSize(m api.Module, fd uint32, size uint64) Errno
-
-	// FdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes
-	FdFilestatSetTimes(m api.Module, fd uint32, atim, mtim uint64, fstFlags uint32) Errno
-
-	// FdPread is the WASI function named functionFdPread
-	FdPread(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) Errno
-
-	// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
-	//
-	// * fd - the file descriptor to get the prestat
-	// * resultPrestat - the offset to write the result prestat data
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid or the `fd` is not a pre-opened directory.
-	// * wasi.ErrnoFault - if `resultPrestat` is an invalid offset due to the memory constraint
-	//
-	// prestat byte layout is 8 bytes, beginning with an 8-bit tag and 3 pad bytes. The only valid tag is `prestat_dir`,
-	// which is tag zero. This simplifies the byte layout to 4 empty bytes followed by the uint32le encoded path length.
-	//
-	// For example, the directory name corresponding with `fd` was "/tmp" and
-	//    parameter resultPrestat=1, this function writes the below to `m.Memory`:
-	//
-	//                     padding   uint32le
-	//          uint8 --+  +-----+  +--------+
-	//                  |  |     |  |        |
-	//        []byte{?, 0, 0, 0, 0, 4, 0, 0, 0, ?}
-	//  resultPrestat --^           ^
-	//            tag --+           |
-	//                              +-- size in bytes of the string "/tmp"
-	//
-	// Note: importFdPrestatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See FdPrestatDirName
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
-	FdPrestatGet(m api.Module, fd uint32, resultPrestat uint32) Errno
-
-	// FdPrestatDirName is the WASI function to return the path of the pre-opened directory of a file descriptor.
-	//
-	// * fd - the file descriptor to get the path of the pre-opened directory
-	// * path - the offset in `m.Memory` to write the result path
-	// * pathLen - the count of bytes to write to `path`
-	//   * This should match the uint32le FdPrestatGet writes to offset `resultPrestat`+4
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `path` is an invalid offset due to the memory constraint
-	// * wasi.ErrnoNametoolong - if `pathLen` is longer than the actual length of the result path
-	//
-	// For example, the directory name corresponding with `fd` was "/tmp" and
-	//    parameters path=1 pathLen=4 (correct), this function will write the below to `m.Memory`:
-	//
-	//                  pathLen
-	//              +--------------+
-	//              |              |
-	//   []byte{?, '/', 't', 'm', 'p', ?}
-	//       path --^
-	//
-	// Note: importFdPrestatDirName shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See FdPrestatGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
-	FdPrestatDirName(m api.Module, fd, path, pathLen uint32) Errno
-	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
-
-	// FdPwrite is the WASI function named functionFdPwrite
-	FdPwrite(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) Errno
-
-	// FdRead is the WASI function to read from a file descriptor.
-	//
-	// * fd - an opened file descriptor to read data from
-	// * iovs - the offset in `m.Memory` to read offset, size pairs representing where to write file data.
-	//   * Both offset and length are encoded as uint32le.
-	// * iovsCount - the count of memory offset, size pairs to read sequentially starting at iovs.
-	// * resultSize - the offset in `m.Memory` to write the number of bytes read
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
-	// * wasi.ErrnoIo - if an IO related error happens during the operation
-	//
-	// For example, this function needs to first read `iovs` to determine where to write contents. If
-	//    parameters iovs=1 iovsCount=2, this function reads two offset/length pairs from `m.Memory`:
-	//
-	//                      iovs[0]                  iovs[1]
-	//              +---------------------+   +--------------------+
-	//              | uint32le    uint32le|   |uint32le    uint32le|
-	//              +---------+  +--------+   +--------+  +--------+
-	//              |         |  |        |   |        |  |        |
-	//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
-	//       iovs --^            ^            ^           ^
-	//              |            |            |           |
-	//     offset --+   length --+   offset --+  length --+
-	//
-	// If the contents of the `fd` parameter was "wazero" (6 bytes) and
-	//    parameter resultSize=26, this function writes the below to `m.Memory`:
-	//
-	//                       iovs[0].length        iovs[1].length
-	//                      +--------------+       +----+       uint32le
-	//                      |              |       |    |      +--------+
-	//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
-	//     iovs[0].offset --^                      ^           ^
-	//                            iovs[1].offset --+           |
-	//                                            resultSize --+
-	//
-	// Note: importFdRead shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `readv` in POSIX.
-	// See FdWrite
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
-	// See https://linux.die.net/man/3/readv
-	FdRead(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
-
-	// FdReaddir is the WASI function named functionFdReaddir
-	FdReaddir(m api.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) Errno
-
-	// FdRenumber is the WASI function named functionFdRenumber
-	FdRenumber(m api.Module, fd, to uint32) Errno
-
-	// FdSeek is the WASI function to move the offset of a file descriptor.
-	//
-	// * fd: the file descriptor to move the offset of
-	// * offset: the signed int64, which is encoded as uint64, input argument to `whence`, which results in a new offset
-	// * whence: the operator that creates the new offset, given `offset` bytes
-	//   * If io.SeekStart, new offset == `offset`.
-	//   * If io.SeekCurrent, new offset == existing offset + `offset`.
-	//   * If io.SeekEnd, new offset == file size of `fd` + `offset`.
-	// * resultNewoffset: the offset in `m.Memory` to write the new offset to, relative to start of the file
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `resultNewoffset` is an invalid offset in `m.Memory` due to the memory constraint
-	// * wasi.ErrnoInval - if `whence` is an invalid value
-	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system
-	//
-	// For example, if fd 3 is a file with offset 0, and
-	//   parameters fd=3, offset=4, whence=0 (=io.SeekStart), resultNewOffset=1,
-	//   this function writes the below to `m.Memory`:
-	//
-	//                           uint64le
-	//                    +--------------------+
-	//                    |                    |
-	//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
-	//  resultNewoffset --^
-	//
-	// See io.Seeker
-	// Note: importFdSeek shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `lseek` in POSIX.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
-	// See https://linux.die.net/man/3/lseek
-	FdSeek(m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno
-
-	// FdSync is the WASI function named functionFdSync
-	FdSync(m api.Module, fd uint32) Errno
-
-	// FdTell is the WASI function named functionFdTell
-	FdTell(m api.Module, fd, resultOffset uint32) Errno
-
-	// FdWrite is the WASI function to write to a file descriptor.
-	//
-	// * fd - an opened file descriptor to write data to
-	// * iovs - the offset in `m.Memory` to read offset, size pairs representing the data to write to `fd`
-	//   * Both offset and length are encoded as uint32le.
-	// * iovsCount - the count of memory offset, size pairs to read sequentially starting at iovs.
-	// * resultSize - the offset in `m.Memory` to write the number of bytes written
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
-	// * wasi.ErrnoIo - if an IO related error happens during the operation
-	//
-	// For example, this function needs to first read `iovs` to determine what to write to `fd`. If
-	//    parameters iovs=1 iovsCount=2, this function reads two offset/length pairs from `m.Memory`:
-	//
-	//                      iovs[0]                  iovs[1]
-	//              +---------------------+   +--------------------+
-	//              | uint32le    uint32le|   |uint32le    uint32le|
-	//              +---------+  +--------+   +--------+  +--------+
-	//              |         |  |        |   |        |  |        |
-	//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
-	//       iovs --^            ^            ^           ^
-	//              |            |            |           |
-	//     offset --+   length --+   offset --+  length --+
-	//
-	// This function reads those chunks `m.Memory` into the `fd` sequentially.
-	//
-	//                       iovs[0].length        iovs[1].length
-	//                      +--------------+       +----+
-	//                      |              |       |    |
-	//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ? }
-	//     iovs[0].offset --^                      ^
-	//                            iovs[1].offset --+
-	//
-	// Since "wazero" was written, if parameter resultSize=26, this function writes the below to `m.Memory`:
-	//
-	//                      uint32le
-	//                     +--------+
-	//                     |        |
-	//   []byte{ 0..24, ?, 6, 0, 0, 0', ? }
-	//        resultSize --^
-	//
-	// Note: importFdWrite shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `writev` in POSIX.
-	// See FdRead
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
-	// See https://linux.die.net/man/3/writev
-	FdWrite(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
-
-	// PathCreateDirectory is the WASI function named functionPathCreateDirectory
-	PathCreateDirectory(m api.Module, fd, path, pathLen uint32) Errno
-
-	// PathFilestatGet is the WASI function named functionPathFilestatGet
-	PathFilestatGet(m api.Module, fd, flags, path, pathLen, resultBuf uint32) Errno
-
-	// PathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
-	PathFilestatSetTimes(m api.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) Errno
-
-	// PathLink is the WASI function named functionPathLink
-	PathLink(m api.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno
-
-	// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
-	//
-	// * fd - the file descriptor of a directory that `path` is relative to
-	// * dirflags - flags to indicate how to resolve `path`
-	// * path - the offset in `m.Memory` to read the path string from
-	// * pathLen - the length of `path`
-	// * oFlags - the open flags to indicate the method by which to open the file
-	// * fsRightsBase - the rights of the newly created file descriptor for `path`
-	// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
-	// * fdFlags - the file descriptor flags
-	// * resultOpenedFd - the offset in `m.Memory` to write the newly created file descriptor to.
-	//     * The result FD value is guaranteed to be less than 2**31
-	//
-	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
-	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `resultOpenedFd` contains an invalid offset due to the memory constraint
-	// * wasi.ErrnoNoent - if `path` does not exist.
-	// * wasi.ErrnoExist - if `path` exists, while `oFlags` requires that it must not.
-	// * wasi.ErrnoNotdir - if `path` is not a directory, while `oFlags` requires that it must be.
-	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system.
-	//
-	// For example, this function needs to first read `path` to determine the file to open.
-	//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `m.Memory`:
-	//
-	//                   pathLen
-	//               +------------------------+
-	//               |                        |
-	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
-	//        path --^
-	//
-	// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 5 with the given flags,
-	// this function writes the blow to `m.Memory`:
-	//
-	//                          uint32le
-	//                         +--------+
-	//                         |        |
-	//        []byte{ 0..6, ?, 5, 0, 0, 0, ?}
-	//        resultOpenedFd --^
-	//
-	// Note: importPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// Note: This is similar to `openat` in POSIX.
-	// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
-	// See https://linux.die.net/man/3/openat
-	PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
-		fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) Errno
-
-	// PathReadlink is the WASI function named functionPathReadlink
-	PathReadlink(m api.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) Errno
-
-	// PathRemoveDirectory is the WASI function named functionPathRemoveDirectory
-	PathRemoveDirectory(m api.Module, fd, path, pathLen uint32) Errno
-
-	// PathRename is the WASI function named functionPathRename
-	PathRename(m api.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno
-
-	// PathSymlink is the WASI function named functionPathSymlink
-	PathSymlink(m api.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) Errno
-
-	// PathUnlinkFile is the WASI function named functionPathUnlinkFile
-	PathUnlinkFile(m api.Module, fd, path, pathLen uint32) Errno
-
-	// PollOneoff is the WASI function named functionPollOneoff
-	PollOneoff(m api.Module, in, out, nsubscriptions, resultNevents uint32) Errno
-
-	// ProcExit is the WASI function that terminates the execution of the module with an exit code.
-	// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
-	//
-	// * rval - The exit code.
-	//
-	// In wazero, this calls api.Module CloseWithExitCode.
-	//
-	// Note: importProcExit shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-	ProcExit(m api.Module, rval uint32)
-
-	// ProcRaise is the WASI function named functionProcRaise
-	ProcRaise(m api.Module, sig uint32) Errno
-
-	// SchedYield is the WASI function named functionSchedYield
-	SchedYield(m api.Module) Errno
-
-	// RandomGet is the WASI function named functionRandomGet that write random data in buffer (rand.Read()).
-	//
-	// * buf - is the m.Memory offset to write random values
-	// * bufLen - size of random data in bytes
-	//
-	// For example, if underlying random source was seeded like `rand.NewSource(42)`, we expect `m.Memory` to contain:
-	//
-	//                             bufLen (5)
-	//                    +--------------------------+
-	//                    |                        	 |
-	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
-	//              buf --^
-	//
-	// Note: importRandomGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-	RandomGet(m api.Module, buf, bufLen uint32) Errno
-
-	// SockRecv is the WASI function named functionSockRecv
-	SockRecv(m api.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) Errno
-
-	// SockSend is the WASI function named functionSockSend
-	SockSend(m api.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) Errno
-
-	// SockShutdown is the WASI function named functionSockShutdown
-	SockShutdown(m api.Module, fd, how uint32) Errno
-}
-
-var _ snapshotPreview1 = &wasiAPI{}
-
-type wasiAPI struct {
+type snapshotPreview1 struct {
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
 	randSource      func([]byte) error
@@ -981,8 +434,8 @@ type wasiAPI struct {
 // snapshotPreview1Functions returns all go functions that implement snapshotPreview1.
 // These should be exported in the module named "wasi_snapshot_preview1".
 // See wasm.NewHostModule
-func snapshotPreview1Functions() (a *wasiAPI, nameToGoFunc map[string]interface{}) {
-	a = newAPI()
+func snapshotPreview1Functions() (a *snapshotPreview1, nameToGoFunc map[string]interface{}) {
+	a = newSnapshotPreview1()
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -1035,14 +488,64 @@ func snapshotPreview1Functions() (a *wasiAPI, nameToGoFunc map[string]interface{
 	return
 }
 
-// ArgsGet implements snapshotPreview1.ArgsGet
-func (a *wasiAPI) ArgsGet(m api.Module, argv, argvBuf uint32) Errno {
+// ArgsGet is the WASI function that reads command-line argument data (WithArgs).
+//
+// There are two parameters. Both are offsets in api.Module Memory. If either are invalid due to
+// memory constraints, this returns ErrnoFault.
+//
+// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
+//   * ArgsSizesGet result argc * 4 bytes are written to this offset
+// * argvBuf - is the offset to write the null terminated arguments to m.Memory
+//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
+//
+// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
+//    parameters argv=7 and argvBuf=1, this function writes the below to `m.Memory`:
+//
+//               argvBufSize          uint32le    uint32le
+//            +----------------+     +--------+  +--------+
+//            |                |     |        |  |        |
+// []byte{?, 'a', 0, 'b', 'c', 0, ?, 1, 0, 0, 0, 3, 0, 0, 0, ?}
+//  argvBuf --^                      ^           ^
+//                            argv --|           |
+//          offset that begins "a" --+           |
+//                     offset that begins "bc" --+
+//
+// Note: importArgsGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See ArgsSizesGet
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (a *snapshotPreview1) ArgsGet(m api.Module, argv, argvBuf uint32) Errno {
 	sys := sysCtx(m)
 	return writeOffsetsAndNullTerminatedValues(m.Memory(), sys.Args(), argv, argvBuf)
 }
 
-// ArgsSizesGet implements snapshotPreview1.ArgsSizesGet
-func (a *wasiAPI) ArgsSizesGet(m api.Module, resultArgc, resultArgvBufSize uint32) Errno {
+// ArgsSizesGet is the WASI function named functionArgsSizesGet that reads command-line argument data (WithArgs)
+// sizes.
+//
+// There are two result parameters: these are offsets in the api.Module Memory to write
+// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
+// returns ErrnoFault.
+//
+// * resultArgc - is the offset to write the argument count to m.Memory
+// * resultArgvBufSize - is the offset to write the null-terminated argument length to m.Memory
+//
+// For example, if WithArgs are []string{"a","bc"} and
+//    parameters resultArgc=1 and resultArgvBufSize=6, this function writes the below to `m.Memory`:
+//
+//                   uint32le       uint32le
+//                  +--------+     +--------+
+//                  |        |     |        |
+//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
+//     resultArgc --^              ^
+//         2 args --+              |
+//             resultArgvBufSize --|
+//   len([]byte{'a',0,'b',c',0}) --+
+//
+// Note: importArgsSizesGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See ArgsGet
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (a *snapshotPreview1) ArgsSizesGet(m api.Module, resultArgc, resultArgvBufSize uint32) Errno {
 	sys := sysCtx(m)
 	mem := m.Memory()
 
@@ -1055,14 +558,65 @@ func (a *wasiAPI) ArgsSizesGet(m api.Module, resultArgc, resultArgvBufSize uint3
 	return ErrnoSuccess
 }
 
-// EnvironGet implements snapshotPreview1.EnvironGet
-func (a *wasiAPI) EnvironGet(m api.Module, environ uint32, environBuf uint32) Errno {
+// EnvironGet is the WASI function named functionEnvironGet that reads environment variables. (WithEnviron)
+//
+// There are two parameters. Both are offsets in api.Module Memory. If either are invalid due to
+// memory constraints, this returns ErrnoFault.
+//
+// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
+//   * EnvironSizesGet result environc * 4 bytes are written to this offset
+// * environBuf - is the offset to write the environment variables to m.Memory
+//   * the format is the same as os.Environ, null terminated "key=val" entries
+//   * EnvironSizesGet result environBufSize bytes are written to this offset
+//
+// For example, if EnvironSizesGet wrote environc=2 and environBufSize=9 for environment variables: "a=b", "b=cd"
+//   and parameters environ=11 and environBuf=1, this function writes the below to `m.Memory`:
+//
+//                           environBufSize                 uint32le    uint32le
+//              +------------------------------------+     +--------+  +--------+
+//              |                                    |     |        |  |        |
+//   []byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
+// environBuf --^                                          ^           ^
+//                              environ offset for "a=b" --+           |
+//                                         environ offset for "b=cd" --+
+//
+// Note: importEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See EnvironSizesGet
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (a *snapshotPreview1) EnvironGet(m api.Module, environ uint32, environBuf uint32) Errno {
 	sys := sysCtx(m)
 	return writeOffsetsAndNullTerminatedValues(m.Memory(), sys.Environ(), environ, environBuf)
 }
 
-// EnvironSizesGet implements snapshotPreview1.EnvironSizesGet
-func (a *wasiAPI) EnvironSizesGet(m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
+// EnvironSizesGet is the WASI function named functionEnvironSizesGet that reads environment variable
+// (WithEnviron) sizes.
+//
+// There are two result parameters: these are offsets in the wasi.Module Memory to write
+// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
+// returns ErrnoFault.
+//
+// * resultEnvironc - is the offset to write the environment variable count to m.Memory
+// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to m.Memory
+//
+// For example, if WithEnviron is []string{"a=b","b=cd"} and
+//    parameters resultEnvironc=1 and resultEnvironBufSize=6, this function writes the below to `m.Memory`:
+//
+//                   uint32le       uint32le
+//                  +--------+     +--------+
+//                  |        |     |        |
+//        []byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
+// resultEnvironc --^              ^
+//    2 variables --+              |
+//          resultEnvironBufSize --|
+//    len([]byte{'a','=','b',0,    |
+//           'b','=','c','d',0}) --+
+//
+// Note: importEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See EnvironGet
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (a *snapshotPreview1) EnvironSizesGet(m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
 	sys := sysCtx(m)
 	mem := m.Memory()
 
@@ -1076,13 +630,32 @@ func (a *wasiAPI) EnvironSizesGet(m api.Module, resultEnvironc uint32, resultEnv
 	return ErrnoSuccess
 }
 
-// ClockResGet implements snapshotPreview1.ClockResGet
-func (a *wasiAPI) ClockResGet(m api.Module, id uint32, resultResolution uint32) Errno {
+// ClockResGet is the WASI function named functionClockResGet and is stubbed for GrainLang per #271
+func (a *snapshotPreview1) ClockResGet(m api.Module, id uint32, resultResolution uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// ClockTimeGet implements snapshotPreview1.ClockTimeGet
-func (a *wasiAPI) ClockTimeGet(m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
+// ClockTimeGet is the WASI function named functionClockTimeGet that returns the time value of a clock (time.Now).
+//
+// * id - The clock id for which to return the time.
+// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
+// * resultTimestamp - the offset to write the timestamp to m.Memory
+//   * the timestamp is epoch nanoseconds encoded as a uint64 little-endian encoding.
+//
+// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
+//   parameters resultTimestamp=1, this function writes the below to `m.Memory`:
+//
+//                                      uint64le
+//                    +------------------------------------------+
+//                    |                                          |
+//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
+//  resultTimestamp --^
+//
+// Note: importClockTimeGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `clock_gettime` in POSIX.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
+// See https://linux.die.net/man/3/clock_gettime
+func (a *snapshotPreview1) ClockTimeGet(m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: id and precision are currently ignored.
 	if !m.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return ErrnoFault
@@ -1090,18 +663,25 @@ func (a *wasiAPI) ClockTimeGet(m api.Module, id uint32, precision uint64, result
 	return ErrnoSuccess
 }
 
-// FdAdvise implements snapshotPreview1.FdAdvise
-func (a *wasiAPI) FdAdvise(m api.Module, fd uint32, offset, len uint64, resultAdvice uint32) Errno {
+// FdAdvise is the WASI function named functionFdAdvise and is stubbed for GrainLang per #271
+func (a *snapshotPreview1) FdAdvise(m api.Module, fd uint32, offset, len uint64, resultAdvice uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdAllocate implements snapshotPreview1.FdAllocate
-func (a *wasiAPI) FdAllocate(m api.Module, fd uint32, offset, len uint64) Errno {
+// FdAllocate is the WASI function named functionFdAllocate and is stubbed for GrainLang per #271
+func (a *snapshotPreview1) FdAllocate(m api.Module, fd uint32, offset, len uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdClose implements snapshotPreview1.FdClose
-func (a *wasiAPI) FdClose(m api.Module, fd uint32) Errno {
+// FdClose is the WASI function to close a file descriptor. This returns ErrnoBadf if the fd is invalid.
+//
+// * fd - the file descriptor to close
+//
+// Note: importFdClose shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `close` in POSIX.
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
+// See https://linux.die.net/man/3/close
+func (a *snapshotPreview1) FdClose(m api.Module, fd uint32) Errno {
 	sys := sysCtx(m)
 
 	if ok, err := sys.CloseFile(fd); err != nil {
@@ -1113,13 +693,44 @@ func (a *wasiAPI) FdClose(m api.Module, fd uint32) Errno {
 	return ErrnoSuccess
 }
 
-// FdDatasync implements snapshotPreview1.FdDatasync
-func (a *wasiAPI) FdDatasync(m api.Module, fd uint32) Errno {
+// FdDatasync is the WASI function named functionFdDatasync and is stubbed for GrainLang per #271
+func (a *snapshotPreview1) FdDatasync(m api.Module, fd uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdFdstatGet implements snapshotPreview1.FdFdstatGet
-func (a *wasiAPI) FdFdstatGet(m api.Module, fd uint32, resultStat uint32) Errno {
+// FdFdstatGet is the WASI function to return the attributes of a file descriptor.
+//
+// * fd - the file descriptor to get the fdstat attributes data
+// * resultFdstat - the offset to write the result fdstat data
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `resultFdstat` contains an invalid offset due to the memory constraint
+//
+// fdstat byte layout is 24-byte size, which as the following elements in order
+// * fs_filetype 1 byte, to indicate the file type
+// * fs_flags 2 bytes, to indicate the file descriptor flag
+// * 5 pad bytes
+// * fs_right_base 8 bytes, to indicate the current rights of the fd
+// * fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
+//
+// For example, with a file corresponding with `fd` was a directory (=3) opened with `fd_read` right (=1) and no fs_flags (=0),
+//    parameter resultFdstat=1, this function writes the below to `m.Memory`:
+//
+//                   uint16le   padding            uint64le                uint64le
+//          uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
+//                  |  |  |  |           |  |                    |  |                    |
+//        []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
+//   resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
+//                  |
+//                  +-- fs_filetype
+//
+// Note: importFdFdstatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: FdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
+// See https://linux.die.net/man/3/fsync
+func (a *snapshotPreview1) FdFdstatGet(m api.Module, fd uint32, resultStat uint32) Errno {
 	sys := sysCtx(m)
 
 	if _, ok := sys.OpenedFile(fd); !ok {
@@ -1128,8 +739,34 @@ func (a *wasiAPI) FdFdstatGet(m api.Module, fd uint32, resultStat uint32) Errno 
 	return ErrnoSuccess
 }
 
-// FdPrestatGet implements snapshotPreview1.FdPrestatGet
-func (a *wasiAPI) FdPrestatGet(m api.Module, fd uint32, resultPrestat uint32) Errno {
+// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
+//
+// * fd - the file descriptor to get the prestat
+// * resultPrestat - the offset to write the result prestat data
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid or the `fd` is not a pre-opened directory.
+// * wasi.ErrnoFault - if `resultPrestat` is an invalid offset due to the memory constraint
+//
+// prestat byte layout is 8 bytes, beginning with an 8-bit tag and 3 pad bytes. The only valid tag is `prestat_dir`,
+// which is tag zero. This simplifies the byte layout to 4 empty bytes followed by the uint32le encoded path length.
+//
+// For example, the directory name corresponding with `fd` was "/tmp" and
+//    parameter resultPrestat=1, this function writes the below to `m.Memory`:
+//
+//                     padding   uint32le
+//          uint8 --+  +-----+  +--------+
+//                  |  |     |  |        |
+//        []byte{?, 0, 0, 0, 0, 4, 0, 0, 0, ?}
+//  resultPrestat --^           ^
+//            tag --+           |
+//                              +-- size in bytes of the string "/tmp"
+//
+// Note: importFdPrestatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See FdPrestatDirName
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
+func (a *snapshotPreview1) FdPrestatGet(m api.Module, fd uint32, resultPrestat uint32) Errno {
 	sys := sysCtx(m)
 
 	entry, ok := sys.OpenedFile(fd)
@@ -1149,39 +786,62 @@ func (a *wasiAPI) FdPrestatGet(m api.Module, fd uint32, resultPrestat uint32) Er
 	return ErrnoSuccess
 }
 
-// FdFdstatSetFlags implements snapshotPreview1.FdFdstatSetFlags
-func (a *wasiAPI) FdFdstatSetFlags(m api.Module, fd uint32, flags uint32) Errno {
+// FdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags and is stubbed for GrainLang per #271
+func (a *snapshotPreview1) FdFdstatSetFlags(m api.Module, fd uint32, flags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFdstatSetRights implements snapshotPreview1.FdFdstatSetRights
 // Note: This will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-func (a *wasiAPI) FdFdstatSetRights(m api.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) Errno {
+func (a *snapshotPreview1) FdFdstatSetRights(m api.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdFilestatGet implements snapshotPreview1.FdFilestatGet
-func (a *wasiAPI) FdFilestatGet(m api.Module, fd uint32, resultBuf uint32) Errno {
+// FdFilestatGet is the WASI function named functionFdFilestatGet
+func (a *snapshotPreview1) FdFilestatGet(m api.Module, fd uint32, resultBuf uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdFilestatSetSize implements snapshotPreview1.FdFilestatSetSize
-func (a *wasiAPI) FdFilestatSetSize(m api.Module, fd uint32, size uint64) Errno {
+// FdFilestatSetSize is the WASI function named functionFdFilestatSetSize
+func (a *snapshotPreview1) FdFilestatSetSize(m api.Module, fd uint32, size uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdFilestatSetTimes implements snapshotPreview1.FdFilestatSetTimes
-func (a *wasiAPI) FdFilestatSetTimes(m api.Module, fd uint32, atim, mtim uint64, fstFlags uint32) Errno {
+// FdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes
+func (a *snapshotPreview1) FdFilestatSetTimes(m api.Module, fd uint32, atim, mtim uint64, fstFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdPread implements snapshotPreview1.FdPread
-func (a *wasiAPI) FdPread(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) Errno {
+// FdPread is the WASI function named functionFdPread
+func (a *snapshotPreview1) FdPread(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdPrestatDirName implements snapshotPreview1.FdPrestatDirName
-func (a *wasiAPI) FdPrestatDirName(m api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
+// FdPrestatDirName is the WASI function to return the path of the pre-opened directory of a file descriptor.
+//
+// * fd - the file descriptor to get the path of the pre-opened directory
+// * path - the offset in `m.Memory` to write the result path
+// * pathLen - the count of bytes to write to `path`
+//   * This should match the uint32le FdPrestatGet writes to offset `resultPrestat`+4
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `path` is an invalid offset due to the memory constraint
+// * wasi.ErrnoNametoolong - if `pathLen` is longer than the actual length of the result path
+//
+// For example, the directory name corresponding with `fd` was "/tmp" and
+//    parameters path=1 pathLen=4 (correct), this function will write the below to `m.Memory`:
+//
+//                  pathLen
+//              +--------------+
+//              |              |
+//   []byte{?, '/', 't', 'm', 'p', ?}
+//       path --^
+//
+// Note: importFdPrestatDirName shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See FdPrestatGet
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
+func (a *snapshotPreview1) FdPrestatDirName(m api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
 	sys := sysCtx(m)
 
 	f, ok := sys.OpenedFile(fd)
@@ -1201,13 +861,55 @@ func (a *wasiAPI) FdPrestatDirName(m api.Module, fd uint32, pathPtr uint32, path
 	return ErrnoSuccess
 }
 
-// FdPwrite implements snapshotPreview1.FdPwrite
-func (a *wasiAPI) FdPwrite(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) Errno {
+// FdPwrite is the WASI function named functionFdPwrite
+func (a *snapshotPreview1) FdPwrite(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdRead implements snapshotPreview1.FdRead
-func (a *wasiAPI) FdRead(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+// FdRead is the WASI function to read from a file descriptor.
+//
+// * fd - an opened file descriptor to read data from
+// * iovs - the offset in `m.Memory` to read offset, size pairs representing where to write file data.
+//   * Both offset and length are encoded as uint32le.
+// * iovsCount - the count of memory offset, size pairs to read sequentially starting at iovs.
+// * resultSize - the offset in `m.Memory` to write the number of bytes read
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
+// * wasi.ErrnoIo - if an IO related error happens during the operation
+//
+// For example, this function needs to first read `iovs` to determine where to write contents. If
+//    parameters iovs=1 iovsCount=2, this function reads two offset/length pairs from `m.Memory`:
+//
+//                      iovs[0]                  iovs[1]
+//              +---------------------+   +--------------------+
+//              | uint32le    uint32le|   |uint32le    uint32le|
+//              +---------+  +--------+   +--------+  +--------+
+//              |         |  |        |   |        |  |        |
+//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
+//       iovs --^            ^            ^           ^
+//              |            |            |           |
+//     offset --+   length --+   offset --+  length --+
+//
+// If the contents of the `fd` parameter was "wazero" (6 bytes) and
+//    parameter resultSize=26, this function writes the below to `m.Memory`:
+//
+//                       iovs[0].length        iovs[1].length
+//                      +--------------+       +----+       uint32le
+//                      |              |       |    |      +--------+
+//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
+//     iovs[0].offset --^                      ^           ^
+//                            iovs[1].offset --+           |
+//                                            resultSize --+
+//
+// Note: importFdRead shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `readv` in POSIX.
+// See FdWrite
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
+// See https://linux.die.net/man/3/readv
+func (a *snapshotPreview1) FdRead(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sys := sysCtx(m)
 
 	var reader io.Reader
@@ -1249,18 +951,48 @@ func (a *wasiAPI) FdRead(m api.Module, fd, iovs, iovsCount, resultSize uint32) E
 	return ErrnoSuccess
 }
 
-// FdReaddir implements snapshotPreview1.FdReaddir
-func (a *wasiAPI) FdReaddir(m api.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) Errno {
+// FdReaddir is the WASI function named functionFdReaddir
+func (a *snapshotPreview1) FdReaddir(m api.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdRenumber implements snapshotPreview1.FdRenumber
-func (a *wasiAPI) FdRenumber(m api.Module, fd, to uint32) Errno {
+// FdRenumber is the WASI function named functionFdRenumber
+func (a *snapshotPreview1) FdRenumber(m api.Module, fd, to uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdSeek implements snapshotPreview1.FdSeek
-func (a *wasiAPI) FdSeek(m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
+// FdSeek is the WASI function to move the offset of a file descriptor.
+//
+// * fd: the file descriptor to move the offset of
+// * offset: the signed int64, which is encoded as uint64, input argument to `whence`, which results in a new offset
+// * whence: the operator that creates the new offset, given `offset` bytes
+//   * If io.SeekStart, new offset == `offset`.
+//   * If io.SeekCurrent, new offset == existing offset + `offset`.
+//   * If io.SeekEnd, new offset == file size of `fd` + `offset`.
+// * resultNewoffset: the offset in `m.Memory` to write the new offset to, relative to start of the file
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `resultNewoffset` is an invalid offset in `m.Memory` due to the memory constraint
+// * wasi.ErrnoInval - if `whence` is an invalid value
+// * wasi.ErrnoIo - if other error happens during the operation of the underying file system
+//
+// For example, if fd 3 is a file with offset 0, and
+//   parameters fd=3, offset=4, whence=0 (=io.SeekStart), resultNewOffset=1,
+//   this function writes the below to `m.Memory`:
+//
+//                           uint64le
+//                    +--------------------+
+//                    |                    |
+//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
+//  resultNewoffset --^
+//
+// See io.Seeker
+// Note: importFdSeek shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `lseek` in POSIX.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
+// See https://linux.die.net/man/3/lseek
+func (a *snapshotPreview1) FdSeek(m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
 	sys := sysCtx(m)
 
 	var seeker io.Seeker
@@ -1287,18 +1019,66 @@ func (a *wasiAPI) FdSeek(m api.Module, fd uint32, offset uint64, whence uint32, 
 	return ErrnoSuccess
 }
 
-// FdSync implements snapshotPreview1.FdSync
-func (a *wasiAPI) FdSync(m api.Module, fd uint32) Errno {
+// FdSync is the WASI function named functionFdSync
+func (a *snapshotPreview1) FdSync(m api.Module, fd uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdTell implements snapshotPreview1.FdTell
-func (a *wasiAPI) FdTell(m api.Module, fd, resultOffset uint32) Errno {
+// FdTell is the WASI function named functionFdTell
+func (a *snapshotPreview1) FdTell(m api.Module, fd, resultOffset uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// FdWrite implements snapshotPreview1.FdWrite
-func (a *wasiAPI) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+// FdWrite is the WASI function to write to a file descriptor.
+//
+// * fd - an opened file descriptor to write data to
+// * iovs - the offset in `m.Memory` to read offset, size pairs representing the data to write to `fd`
+//   * Both offset and length are encoded as uint32le.
+// * iovsCount - the count of memory offset, size pairs to read sequentially starting at iovs.
+// * resultSize - the offset in `m.Memory` to write the number of bytes written
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
+// * wasi.ErrnoIo - if an IO related error happens during the operation
+//
+// For example, this function needs to first read `iovs` to determine what to write to `fd`. If
+//    parameters iovs=1 iovsCount=2, this function reads two offset/length pairs from `m.Memory`:
+//
+//                      iovs[0]                  iovs[1]
+//              +---------------------+   +--------------------+
+//              | uint32le    uint32le|   |uint32le    uint32le|
+//              +---------+  +--------+   +--------+  +--------+
+//              |         |  |        |   |        |  |        |
+//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
+//       iovs --^            ^            ^           ^
+//              |            |            |           |
+//     offset --+   length --+   offset --+  length --+
+//
+// This function reads those chunks `m.Memory` into the `fd` sequentially.
+//
+//                       iovs[0].length        iovs[1].length
+//                      +--------------+       +----+
+//                      |              |       |    |
+//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ? }
+//     iovs[0].offset --^                      ^
+//                            iovs[1].offset --+
+//
+// Since "wazero" was written, if parameter resultSize=26, this function writes the below to `m.Memory`:
+//
+//                      uint32le
+//                     +--------+
+//                     |        |
+//   []byte{ 0..24, ?, 6, 0, 0, 0', ? }
+//        resultSize --^
+//
+// Note: importFdWrite shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `writev` in POSIX.
+// See FdRead
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
+// See https://linux.die.net/man/3/writev
+func (a *snapshotPreview1) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sys := sysCtx(m)
 
 	var writer io.Writer
@@ -1345,29 +1125,72 @@ func (a *wasiAPI) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize uint32) 
 	return ErrnoSuccess
 }
 
-// PathCreateDirectory implements snapshotPreview1.PathCreateDirectory
-func (a *wasiAPI) PathCreateDirectory(m api.Module, fd, path, pathLen uint32) Errno {
+// PathCreateDirectory is the WASI function named functionPathCreateDirectory
+func (a *snapshotPreview1) PathCreateDirectory(m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathFilestatGet implements snapshotPreview1.PathFilestatGet
-func (a *wasiAPI) PathFilestatGet(m api.Module, fd, flags, path, pathLen, resultBuf uint32) Errno {
+// PathFilestatGet is the WASI function named functionPathFilestatGet
+func (a *snapshotPreview1) PathFilestatGet(m api.Module, fd, flags, path, pathLen, resultBuf uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathFilestatSetTimes implements snapshotPreview1.PathFilestatSetTimes
-func (a *wasiAPI) PathFilestatSetTimes(m api.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) Errno {
+// PathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
+func (a *snapshotPreview1) PathFilestatSetTimes(m api.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathLink implements snapshotPreview1.PathLink
-func (a *wasiAPI) PathLink(m api.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
+// PathLink is the WASI function named functionPathLink
+func (a *snapshotPreview1) PathLink(m api.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathOpen implements snapshotPreview1.PathOpen
+// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
+//
+// * fd - the file descriptor of a directory that `path` is relative to
+// * dirflags - flags to indicate how to resolve `path`
+// * path - the offset in `m.Memory` to read the path string from
+// * pathLen - the length of `path`
+// * oFlags - the open flags to indicate the method by which to open the file
+// * fsRightsBase - the rights of the newly created file descriptor for `path`
+// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
+// * fdFlags - the file descriptor flags
+// * resultOpenedFd - the offset in `m.Memory` to write the newly created file descriptor to.
+//     * The result FD value is guaranteed to be less than 2**31
+//
+// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+// * wasi.ErrnoBadf - if `fd` is invalid
+// * wasi.ErrnoFault - if `resultOpenedFd` contains an invalid offset due to the memory constraint
+// * wasi.ErrnoNoent - if `path` does not exist.
+// * wasi.ErrnoExist - if `path` exists, while `oFlags` requires that it must not.
+// * wasi.ErrnoNotdir - if `path` is not a directory, while `oFlags` requires that it must be.
+// * wasi.ErrnoIo - if other error happens during the operation of the underying file system.
+//
+// For example, this function needs to first read `path` to determine the file to open.
+//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `m.Memory`:
+//
+//                   pathLen
+//               +------------------------+
+//               |                        |
+//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
+//        path --^
+//
+// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 5 with the given flags,
+// this function writes the blow to `m.Memory`:
+//
+//                          uint32le
+//                         +--------+
+//                         |        |
+//        []byte{ 0..6, ?, 5, 0, 0, 0, ?}
+//        resultOpenedFd --^
+//
+// Note: importPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `openat` in POSIX.
+// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
 // Note: Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-func (a *wasiAPI) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
+// See https://linux.die.net/man/3/openat
+func (a *snapshotPreview1) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
 	sys := sysCtx(m)
 
@@ -1399,53 +1222,75 @@ func (a *wasiAPI) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen, oflags 
 	return ErrnoSuccess
 }
 
-// PathReadlink implements snapshotPreview1.PathReadlink
-func (a *wasiAPI) PathReadlink(m api.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) Errno {
+// PathReadlink is the WASI function named functionPathReadlink
+func (a *snapshotPreview1) PathReadlink(m api.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathRemoveDirectory implements snapshotPreview1.PathRemoveDirectory
-func (a *wasiAPI) PathRemoveDirectory(m api.Module, fd, path, pathLen uint32) Errno {
+// PathRemoveDirectory is the WASI function named functionPathRemoveDirectory
+func (a *snapshotPreview1) PathRemoveDirectory(m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathRename implements snapshotPreview1.PathRename
-func (a *wasiAPI) PathRename(m api.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
+// PathRename is the WASI function named functionPathRename
+func (a *snapshotPreview1) PathRename(m api.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathSymlink implements snapshotPreview1.PathSymlink
-func (a *wasiAPI) PathSymlink(m api.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) Errno {
+// PathSymlink is the WASI function named functionPathSymlink
+func (a *snapshotPreview1) PathSymlink(m api.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PathUnlinkFile implements snapshotPreview1.PathUnlinkFile
-func (a *wasiAPI) PathUnlinkFile(m api.Module, fd, path, pathLen uint32) Errno {
+// PathUnlinkFile is the WASI function named functionPathUnlinkFile
+func (a *snapshotPreview1) PathUnlinkFile(m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// PollOneoff implements snapshotPreview1.PollOneoff
-func (a *wasiAPI) PollOneoff(m api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
+// PollOneoff is the WASI function named functionPollOneoff
+func (a *snapshotPreview1) PollOneoff(m api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// ProcExit implements snapshotPreview1.ProcExit
-func (a *wasiAPI) ProcExit(m api.Module, exitCode uint32) {
+// ProcExit is the WASI function that terminates the execution of the module with an exit code.
+// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
+//
+// * rval - The exit code.
+//
+// In wazero, this calls api.Module CloseWithExitCode.
+//
+// Note: importProcExit shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
+func (a *snapshotPreview1) ProcExit(m api.Module, exitCode uint32) {
 	_ = m.CloseWithExitCode(exitCode)
 }
 
-// ProcRaise implements snapshotPreview1.ProcRaise
-func (a *wasiAPI) ProcRaise(m api.Module, sig uint32) Errno {
+// ProcRaise is the WASI function named functionProcRaise
+func (a *snapshotPreview1) ProcRaise(m api.Module, sig uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// SchedYield implements snapshotPreview1.SchedYield
-func (a *wasiAPI) SchedYield(m api.Module) Errno {
+// SchedYield is the WASI function named functionSchedYield
+func (a *snapshotPreview1) SchedYield(m api.Module) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// RandomGet implements snapshotPreview1.RandomGet
-func (a *wasiAPI) RandomGet(m api.Module, buf uint32, bufLen uint32) (errno Errno) {
+// RandomGet is the WASI function named functionRandomGet that write random data in buffer (rand.Read()).
+//
+// * buf - is the m.Memory offset to write random values
+// * bufLen - size of random data in bytes
+//
+// For example, if underlying random source was seeded like `rand.NewSource(42)`, we expect `m.Memory` to contain:
+//
+//                             bufLen (5)
+//                    +--------------------------+
+//                    |                        	 |
+//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
+//              buf --^
+//
+// Note: importRandomGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
+func (a *snapshotPreview1) RandomGet(m api.Module, buf uint32, bufLen uint32) (errno Errno) {
 	randomBytes := make([]byte, bufLen)
 	err := a.randSource(randomBytes)
 	if err != nil {
@@ -1460,18 +1305,18 @@ func (a *wasiAPI) RandomGet(m api.Module, buf uint32, bufLen uint32) (errno Errn
 	return ErrnoSuccess
 }
 
-// SockRecv implements snapshotPreview1.SockRecv
-func (a *wasiAPI) SockRecv(m api.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) Errno {
+// SockRecv is the WASI function named functionSockRecv
+func (a *snapshotPreview1) SockRecv(m api.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// SockSend implements snapshotPreview1.SockSend
-func (a *wasiAPI) SockSend(m api.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) Errno {
+// SockSend is the WASI function named functionSockSend
+func (a *snapshotPreview1) SockSend(m api.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// SockShutdown implements snapshotPreview1.SockShutdown
-func (a *wasiAPI) SockShutdown(m api.Module, fd, how uint32) Errno {
+// SockShutdown is the WASI function named functionSockShutdown
+func (a *snapshotPreview1) SockShutdown(m api.Module, fd, how uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1481,9 +1326,8 @@ const (
 	fdStderr = 2
 )
 
-// newAPI is exported for benchmarks
-func newAPI() *wasiAPI {
-	return &wasiAPI{
+func newSnapshotPreview1() *snapshotPreview1 {
+	return &snapshotPreview1{
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
