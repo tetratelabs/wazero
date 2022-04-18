@@ -309,7 +309,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 
 	e := et.NewEngine(wasm.Features20191205)
 
-	hostFn, _, imported, _, importing, _ := setupCallTests(t, e)
+	host, imported, importing, close := setupCallTests(t, e)
+	defer close()
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	tests := []struct {
@@ -324,8 +325,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 		},
 		{
 			name:   hostFnName,
-			module: hostFn.Ctx,
-			fn:     hostFn.Exports[hostFnName].Function,
+			module: host.Ctx,
+			fn:     host.Exports[hostFnName].Function,
 		},
 		{
 			name:   callHostFnName,
@@ -354,7 +355,8 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 	e := et.NewEngine(wasm.Features20191205)
 
-	host, _, imported, _, importing, _ := setupCallTests(t, e)
+	host, imported, importing, close := setupCallTests(t, e)
+	defer close()
 
 	tests := []struct {
 		name        string
@@ -495,7 +497,7 @@ func divBy(d uint32) uint32 {
 	return 1 / d // go panics if d == 0
 }
 
-func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.ModuleEngine, *wasm.ModuleInstance, wasm.ModuleEngine, *wasm.ModuleInstance, wasm.ModuleEngine) {
+func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
 	i32 := wasm.ValueTypeI32
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
 
@@ -564,7 +566,11 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, wasm.Mod
 	// Add the imported functions back to the importing module.
 	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importing.Functions...)
 
-	return hostFnModuleInstance, hostFnME, imported, importedMe, importing, importingMe
+	return hostFnModuleInstance, imported, importing, func() {
+		e.DeleteCompiledModule(hostFnModule)
+		e.DeleteCompiledModule(importedModule)
+		e.DeleteCompiledModule(importingModule)
+	}
 }
 
 // linkModuleToEngine assigns fields that wasm.Store would on instantiation. These includes fields both interpreter and
