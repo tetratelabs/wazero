@@ -434,7 +434,8 @@ func TestCompiledCode_Close(t *testing.T) {
 	var cs []*CompiledCode
 	for i := 0; i < 10; i++ {
 		m := &wasm.Module{}
-		e.CompileModule(m)
+		err := e.CompileModule(m)
+		require.NoError(t, err)
 		cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
 	}
 
