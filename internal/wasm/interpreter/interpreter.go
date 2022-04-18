@@ -178,6 +178,9 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 	if module.IsHostMdule() {
+		// If this is the host module, there's nothing to do as the runtime reprsentation of
+		// host function in interpreter is its Go function itself as opposed to Wasm functions,
+		// which need to be compiled down to wazeroir.
 		for _, hf := range module.HostFunctionSection {
 			funcs = append(funcs, &code{hostFn: hf})
 		}
