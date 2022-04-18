@@ -247,17 +247,16 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 		}
 	}
 
-	if module, err := wasm.NewHostModule(
-		b.moduleName,
-		b.nameToGoFunc,
-		b.nameToMemory,
-		b.nameToGlobal,
-		b.r.enabledFeatures,
-	); err != nil {
+	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
+	if err != nil {
 		return nil, err
-	} else {
-		return &CompiledCode{module: module}, nil
 	}
+
+	if err = b.r.store.Engine.CompileModule(module); err != nil {
+		return nil, err
+	}
+
+	return &CompiledCode{module: module}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
