@@ -59,7 +59,7 @@ func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initT
 	table := make([]interface{}, initTableLen)
 	internal := me.(*moduleEngine)
 	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.compiledFunctions[fnidx]
+		table[idx] = internal.codes[fnidx]
 	}
 	return table
 }
@@ -127,7 +127,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
-				f := &compiledFunctionInstance{
+				f := &function{
 					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
@@ -179,7 +179,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%s(i64.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
-				f := &compiledFunctionInstance{
+				f := &function{
 					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
@@ -223,7 +223,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		_, ok := e.compiledFunctions[errModule]
+		_, ok := e.codes[errModule]
 		require.False(t, ok)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -242,33 +242,33 @@ func TestInterpreter_Compile(t *testing.T) {
 		err := e.CompileModule(okModule)
 		require.NoError(t, err)
 
-		compiled, ok := e.compiledFunctions[okModule]
+		compiled, ok := e.codes[okModule]
 		require.True(t, ok)
 		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
-		_, ok = e.compiledFunctions[okModule]
+		_, ok = e.codes[okModule]
 		require.True(t, ok)
 	})
 }
 
-func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
+func TestEngine_CachedcodesPerModule(t *testing.T) {
 	e := et.NewEngine(wasm.Features20191205).(*engine)
-	exp := []*compiledFunction{
+	exp := []*code{
 		{body: []*interpreterOp{}},
 		{body: []*interpreterOp{}},
 	}
 	m := &wasm.Module{}
 
-	e.addCompiledFunctions(m, exp)
+	e.addcodes(m, exp)
 
-	actual, ok := e.getCompiledFunctions(m)
+	actual, ok := e.getcodes(m)
 	require.True(t, ok)
 	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
 
-	e.deleteCompiledFunctions(m)
-	_, ok = e.getCompiledFunctions(m)
+	e.deletecodes(m)
+	_, ok = e.getcodes(m)
 	require.False(t, ok)
 }

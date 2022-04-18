@@ -16,7 +16,7 @@ import (
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var me moduleEngine
-	require.Equal(t, int(unsafe.Offsetof(me.compiledFunctions)), moduleEngineCompiledFunctionsOffset)
+	require.Equal(t, int(unsafe.Offsetof(me.functions)), moduleEngineFunctionsOffset)
 
 	var ce callEngine
 	// Offsets for callEngine.globalContext.
@@ -33,7 +33,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.compiledFunctionsElement0Address)), callEngineModuleContextCompiledFunctionsElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextcodesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
@@ -52,14 +52,14 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(frame.compiledFunction)), callFrameCompiledFunctionOffset)
+	require.Equal(t, int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset)
 
-	// Offsets for compiledFunction.
-	var compiledFunc compiledFunctionInstance
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionInstanceCodeInitialAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), compiledFunctionInstanceStackPointerCeilOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), compiledFunctionInstanceSourceOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), compiledFunctionInstanceModuleInstanceAddressOffset)
+	// Offsets for code.
+	var compiledFunc function
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), functionStackPointerCeilOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset)
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
@@ -112,7 +112,7 @@ func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, init
 	table := make([]interface{}, initTableLen)
 	internal := me.(*moduleEngine)
 	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.compiledFunctions[fnidx]
+		table[idx] = internal.functions[fnidx]
 	}
 	return table
 }
@@ -148,14 +148,14 @@ func requireSupportedOSArch(t *testing.T) {
 	}
 }
 
-type fakeFinalizer map[*compiledFunction]func(*compiledFunction)
+type fakeFinalizer map[*code]func(*code)
 
 func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
-	cf := obj.(*compiledFunction)
+	cf := obj.(*code)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
 	}
-	f[cf] = finalizer.(func(*compiledFunction))
+	f[cf] = finalizer.(func(*code))
 }
 
 func TestJIT_CompileModule(t *testing.T) {
@@ -182,7 +182,7 @@ func TestJIT_CompileModule(t *testing.T) {
 		err = e.CompileModule(okModule)
 		require.NoError(t, err)
 
-		compiled, ok := e.compiledFunctions[okModule]
+		compiled, ok := e.codes[okModule]
 		require.True(t, ok)
 		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
@@ -208,15 +208,15 @@ func TestJIT_CompileModule(t *testing.T) {
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
-		_, ok := e.compiledFunctions[errModule]
+		_, ok := e.codes[errModule]
 		require.False(t, ok)
 	})
 }
 
-// TestReleaseCompiledFunction_Panic tests that an unexpected panic has some identifying information in it.
-func TestJIT_ReleaseCompiledFunction_Panic(t *testing.T) {
+// TestReleasecode_Panic tests that an unexpected panic has some identifying information in it.
+func TestJIT_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
-		releaseCompiledFunction(&compiledFunction{
+		releaseCode(&code{
 			indexInModule: 2,
 			sourceModule:  &wasm.Module{NameSection: &wasm.NameSection{ModuleName: t.Name()}},
 			codeSegment:   []byte{wasm.OpcodeEnd}, // never compiled means it was never mapped.
@@ -326,24 +326,24 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 }
 
 // TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
-func TestEngine_CachedCompiledFunctions(t *testing.T) {
+func TestEngine_Cachedcodes(t *testing.T) {
 	e := newEngine(wasm.Features20191205)
-	exp := []*compiledFunction{
+	exp := []*code{
 		{codeSegment: []byte{0x0}},
 		{codeSegment: []byte{0x0}},
 	}
 	m := &wasm.Module{}
 
-	e.addCompiledFunctions(m, exp)
+	e.addCodes(m, exp)
 
-	actual, ok := e.getCompiledFunctions(m)
+	actual, ok := e.getCodes(m)
 	require.True(t, ok)
 	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
 
-	e.deleteCompiledFunctions(m)
-	_, ok = e.getCompiledFunctions(m)
+	e.deleteCodes(m)
+	_, ok = e.getCodes(m)
 	require.False(t, ok)
 }

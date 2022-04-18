@@ -117,10 +117,10 @@ func (j *jitEnv) callEngine() *callEngine {
 	return j.ce
 }
 
-func (j *jitEnv) exec(code []byte) {
-	compiledFunction := &compiledFunctionInstance{
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+func (j *jitEnv) exec(codeSegment []byte) {
+	f := &function{
+		parent:                &code{codeSegment: codeSegment},
+		codeInitialAddress:    uintptr(unsafe.Pointer(&codeSegment[0])),
 		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
 		source: &wasm.FunctionInstance{
 			Kind:   wasm.FunctionKindWasm,
@@ -129,11 +129,11 @@ func (j *jitEnv) exec(code []byte) {
 		},
 	}
 
-	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{compiledFunction: compiledFunction}
+	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
 	j.ce.globalContext.callFrameStackPointer++
 
 	jitcall(
-		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(&codeSegment[0])),
 		uintptr(unsafe.Pointer(j.ce)),
 		uintptr(unsafe.Pointer(j.moduleInstance)),
 	)

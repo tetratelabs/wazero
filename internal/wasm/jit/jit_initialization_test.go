@@ -81,7 +81,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				ir.Globals = append(ir.Globals, g.Type)
 			}
 			compiler := env.requireNewCompiler(t, newCompiler, ir)
-			me := &moduleEngine{compiledFunctions: make([]*compiledFunctionInstance, 10)}
+			me := &moduleEngine{functions: make([]*function, 10)}
 			tc.moduleInstance.Engine = me
 
 			// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
@@ -120,7 +120,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.TypeIDs[0])), ce.moduleContext.typeIDsElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&me.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.codesElement0Address)
 		})
 	}
 }

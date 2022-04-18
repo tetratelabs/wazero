@@ -612,7 +612,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		table := make([]interface{}, 10)
 		env.setTable(table)
 
-		cf := &compiledFunctionInstance{source: &wasm.FunctionInstance{TypeID: 50}}
+		cf := &function{source: &wasm.FunctionInstance{TypeID: 50}}
 		table[0] = cf
 
 		// Place the offset value.
@@ -652,7 +652,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				// and the typeID  matches the table[targetOffset]'s type ID.
 				env.module().TypeIDs = make([]wasm.FunctionTypeID, 100)
 				env.module().TypeIDs[operation.TypeIndex] = targetTypeID
-				env.module().Engine = &moduleEngine{compiledFunctions: []*compiledFunctionInstance{}}
+				env.module().Engine = &moduleEngine{functions: []*function{}}
 
 				me := env.moduleEngine()
 				for i := 0; i < len(table); i++ {
@@ -672,19 +672,19 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 						err = compiler.compileReturnFunction()
 						require.NoError(t, err)
 
-						code, _, _, err := compiler.compile()
+						c, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
-						cf := &compiledFunctionInstance{
-							codeSegment:           code,
-							codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+						f := &function{
+							parent:                &code{codeSegment: c},
+							codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 							moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 							source: &wasm.FunctionInstance{
 								TypeID: targetTypeID,
 							},
 						}
-						me.compiledFunctions = append(me.compiledFunctions, cf)
-						table[i] = cf
+						me.functions = append(me.functions, f)
+						table[i] = f
 					})
 				}
 
@@ -789,12 +789,12 @@ func TestCompiler_compileCall(t *testing.T) {
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
-					code, _, _, err := compiler.compile()
+					c, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					index := wasm.Index(i)
-					me.compiledFunctions = append(me.compiledFunctions, &compiledFunctionInstance{
-						codeSegment:           code,
-						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+					me.functions = append(me.functions, &function{
+						parent:                &code{codeSegment: c},
+						codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 						moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 					})
 					env.module().Functions = append(env.module().Functions,
@@ -903,23 +903,24 @@ func TestCompiler_returnFunction(t *testing.T) {
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
-				code, _, _, err := compiler.compile()
+				c, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Compiles and adds to the engine.
-				compiledFunction := &compiledFunctionInstance{
-					codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+				f := &function{
+					parent:                &code{codeSegment: c},
+					codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 					moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 				}
-				moduleEngine.compiledFunctions = append(moduleEngine.compiledFunctions, compiledFunction)
+				moduleEngine.functions = append(moduleEngine.functions, f)
 
 				// Pushes the frame whose return address equals the beginning of the function just compiled.
 				frame := callFrame{
 					// Set the return address to the beginning of the function so that we can execute the constI32 above.
-					returnAddress: compiledFunction.codeInitialAddress,
+					returnAddress: f.codeInitialAddress,
 					// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
 					returnStackBasePointer: uint64(funcIndex) * 5,
-					compiledFunction:       compiledFunction,
+					function:               f,
 				}
 				ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
 				ce.globalContext.callFrameStackPointer++
@@ -930,7 +931,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
 		// Run code from the top frame.
-		env.exec(ce.callFrameTop().compiledFunction.codeSegment)
+		env.exec(ce.callFrameTop().function.parent.codeSegment)
 
 		// Check the exit status and the values on stack.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())

@@ -21,39 +21,39 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
-	enabledFeatures   wasm.Features
-	compiledFunctions map[*wasm.Module][]*compiledFunction // guarded by mutex.
-	mux               sync.RWMutex
+	enabledFeatures wasm.Features
+	codes           map[*wasm.Module][]*code // guarded by mutex.
+	mux             sync.RWMutex
 }
 
 func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return &engine{
-		enabledFeatures:   enabledFeatures,
-		compiledFunctions: map[*wasm.Module][]*compiledFunction{},
+		enabledFeatures: enabledFeatures,
+		codes:           map[*wasm.Module][]*code{},
 	}
 }
 
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *engine) DeleteCompiledModule(m *wasm.Module) {
-	e.deleteCompiledFunctions(m)
+	e.deletecodes(m)
 }
 
-func (e *engine) deleteCompiledFunctions(module *wasm.Module) {
+func (e *engine) deletecodes(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.compiledFunctions, module)
+	delete(e.codes, module)
 }
 
-func (e *engine) addCompiledFunctions(module *wasm.Module, fs []*compiledFunction) {
+func (e *engine) addcodes(module *wasm.Module, fs []*code) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.compiledFunctions[module] = fs
+	e.codes[module] = fs
 }
 
-func (e *engine) getCompiledFunctions(module *wasm.Module) (fs []*compiledFunction, ok bool) {
+func (e *engine) getcodes(module *wasm.Module) (fs []*code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	fs, ok = e.compiledFunctions[module]
+	fs, ok = e.codes[module]
 	return
 }
 
@@ -62,9 +62,9 @@ type moduleEngine struct {
 	// name is the name the module was instantiated with used for error handling.
 	name string
 
-	// compiledFunctions are the compiled functions in a module instances.
+	// codes are the compiled functions in a module instances.
 	// The index is module instance-scoped.
-	compiledFunctions []*compiledFunctionInstance
+	codes []*function
 
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine          *engine
@@ -137,25 +137,25 @@ func (ce *callEngine) popFrame() (frame *callFrame) {
 }
 
 type callFrame struct {
-	// pc is the program counter representing the current position in compiledFunction.body.
+	// pc is the program counter representing the current position in code.body.
 	pc uint64
 	// f is the compiled function used in this function frame.
-	f *compiledFunctionInstance
+	f *function
 }
 
-type compiledFunction struct {
+type code struct {
 	body   []*interpreterOp
 	hostFn *reflect.Value
 }
 
-type compiledFunctionInstance struct {
+type function struct {
 	source *wasm.FunctionInstance
 	body   []*interpreterOp
 	hostFn *reflect.Value
 }
 
-func (c *compiledFunction) instantiate(f *wasm.FunctionInstance) *compiledFunctionInstance {
-	return &compiledFunctionInstance{
+func (c *code) instantiate(f *wasm.FunctionInstance) *function {
+	return &function{
 		source: f,
 		body:   c.body,
 		hostFn: c.hostFn,
@@ -172,14 +172,14 @@ type interpreterOp struct {
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(module *wasm.Module) error {
-	if _, ok := e.getCompiledFunctions(module); ok { // cache hit!
+	if _, ok := e.getcodes(module); ok { // cache hit!
 		return nil
 	}
 
-	funcs := make([]*compiledFunction, 0, len(module.FunctionSection))
+	funcs := make([]*code, 0, len(module.FunctionSection))
 	if module.IsHostMdule() {
 		for _, hf := range module.HostFunctionSection {
-			funcs = append(funcs, &compiledFunction{hostFn: hf})
+			funcs = append(funcs, &code{hostFn: hf})
 		}
 	} else {
 		irs, err := wazeroir.CompileFunctions(e.enabledFeatures, module)
@@ -194,7 +194,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 			funcs = append(funcs, compiled)
 		}
 	}
-	e.addCompiledFunctions(module, funcs)
+	e.addcodes(module, funcs)
 	return nil
 
 }
@@ -209,31 +209,31 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for _, f := range importedFunctions {
-		cf := f.Module.Engine.(*moduleEngine).compiledFunctions[f.Index]
-		me.compiledFunctions = append(me.compiledFunctions, cf)
+		cf := f.Module.Engine.(*moduleEngine).codes[f.Index]
+		me.functions = append(me.functions, cf)
 	}
 
-	compiledFunctions, ok := e.getCompiledFunctions(module)
+	codes, ok := e.getcodes(module)
 	if !ok {
 		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
 	}
 
-	for i, c := range compiledFunctions {
+	for i, c := range codes {
 		f := moduleFunctions[i]
-		insntantiatedCompiledFunction := c.instantiate(f)
-		me.compiledFunctions = append(me.compiledFunctions, insntantiatedCompiledFunction)
+		insntantiatedcode := c.instantiate(f)
+		me.functions = append(me.functions, insntantiatedcode)
 	}
 
 	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
-		table.Table[elemIdx] = me.compiledFunctions[funcidx]
+		table.Table[elemIdx] = me.functions[funcidx]
 	}
 	return me, nil
 }
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
-func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*compiledFunction, error) {
+func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 	ops := ir.Operations
-	ret := &compiledFunction{}
+	ret := &code{}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -511,11 +511,11 @@ func (me *moduleEngine) Name() string {
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
-	// compiledFunctions on close aren't locked, neither is this read.
-	compiled := me.compiledFunctions[f.Index]
+	// codes on close aren't locked, neither is this read.
+	compiled := me.functions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = m.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
+			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", me.name, f.Index))
 		}
 		return
 	}
@@ -561,7 +561,7 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 	return
 }
 
-func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunctionInstance) {
+func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *function) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -615,14 +615,14 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunctionI
 	ce.popFrame()
 }
 
-func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctionInstance) {
+func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
 	table := moduleInst.Table
 	typeIDs := f.source.Module.TypeIDs
-	compiledFunctions := f.source.Module.Engine.(*moduleEngine).compiledFunctions
+	codes := f.source.Module.Engine.(*moduleEngine).codes
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -660,7 +660,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindCall:
 			{
-				f := compiledFunctions[op.us[0]]
+				f := codes[op.us[0]]
 				if f.hostFn != nil {
 					ce.callHostFunc(ctx, f)
 				} else {
@@ -674,18 +674,18 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if offset >= uint64(len(table.Table)) {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
-				targetCompiledFunction, ok := table.Table[offset].(*compiledFunctionInstance)
+				targetcode, ok := table.Table[offset].(*function)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-				} else if targetCompiledFunction.source.TypeID != typeIDs[op.us[0]] {
+				} else if targetcode.source.TypeID != typeIDs[op.us[0]] {
 					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
 				// Call in.
-				if targetCompiledFunction.hostFn != nil {
-					ce.callHostFunc(ctx, targetCompiledFunction)
+				if targetcode.hostFn != nil {
+					ce.callHostFunc(ctx, targetcode)
 				} else {
-					ce.callNativeFunc(ctx, targetCompiledFunction)
+					ce.callNativeFunc(ctx, targetcode)
 				}
 				frame.pc++
 			}
