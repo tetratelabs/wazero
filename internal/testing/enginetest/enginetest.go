@@ -115,6 +115,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			TypeSection:     []*wasm.FunctionType{},
 			FunctionSection: []uint32{},
 			CodeSection:     []*wasm.Code{},
+			ID:              wasm.ModuleID{0},
 		}
 		err := e.CompileModule(m)
 		require.NoError(t, err)
@@ -135,6 +136,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{1},
 		}
 
 		err := e.CompileModule(m)
@@ -165,6 +167,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{2},
 		}
 
 		err := e.CompileModule(importedModule)
@@ -189,6 +192,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			TypeSection:     []*wasm.FunctionType{},
 			FunctionSection: []uint32{},
 			CodeSection:     []*wasm.Code{},
+			ID:              wasm.ModuleID{3},
 		}
 		err = e.CompileModule(importingModule)
 		require.NoError(t, err)
@@ -210,6 +214,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{4},
 		}
 
 		err := e.CompileModule(importedModule)
@@ -233,6 +238,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{5},
 		}
 
 		err = e.CompileModule(importingModule)
@@ -506,6 +512,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 		HostFunctionSection: []*reflect.Value{&hostFnVal},
 		TypeSection:         []*wasm.FunctionType{ft},
 		FunctionSection:     []wasm.Index{0},
+		ID:                  wasm.ModuleID{0},
 	}
 
 	err := e.CompileModule(hostFnModule)
@@ -526,6 +533,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, byte(0), // Calling imported host function ^.
 				wasm.OpcodeEnd}},
 		},
+		ID: wasm.ModuleID{1},
 	}
 
 	err = e.CompileModule(importedModule)
@@ -550,6 +558,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd}},
 		},
 		ImportSection: []*wasm.Import{{}},
+		ID:            wasm.ModuleID{2},
 	}
 	err = e.CompileModule(importingModule)
 	require.NoError(t, err)

@@ -256,9 +256,7 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 		return nil, err
 	}
 
-	ret := &CompiledCode{module: module}
-	ret.addCacheEntry(module, b.r.store.Engine)
-	return &CompiledCode{module: module}, nil
+	return &CompiledCode{module: module, compiledEngine: b.r.store.Engine}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate

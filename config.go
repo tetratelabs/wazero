@@ -148,35 +148,15 @@ func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
 type CompiledCode struct {
 	module *wasm.Module
-	// cachedEngines maps wasm.Engine to []*wasm.Module which originate from this .module.
-	// This is necessary to track which engine caches *Module where latter might be different
-	// from .module via import replacement config (ModuleConfig.WithImport).
-	cachedEngines map[wasm.Engine]map[*wasm.Module]struct{}
+	// compiledEngine holds an engine on which `module` is compiled.
+	compiledEngine wasm.Engine
 }
 
 // Close releases all the allocated resources for this CompiledCode.
 //
 // Note: it is safe to call Close while having outstanding calls from Modules instantiated from this *CompiledCode.
 func (c *CompiledCode) Close() {
-	for engine, modules := range c.cachedEngines {
-		for module := range modules {
-			engine.DeleteCompiledModule(module)
-		}
-	}
-}
-
-func (c *CompiledCode) addCacheEntry(module *wasm.Module, engine wasm.Engine) {
-	if c.cachedEngines == nil {
-		c.cachedEngines = map[wasm.Engine]map[*wasm.Module]struct{}{}
-	}
-
-	cache, ok := c.cachedEngines[engine]
-	if !ok {
-		cache = map[*wasm.Module]struct{}{}
-		c.cachedEngines[engine] = cache
-	}
-
-	cache[module] = struct{}{}
+	c.compiledEngine.DeleteCompiledModule(c.module)
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating system.

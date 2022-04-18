@@ -217,13 +217,14 @@ func TestInterpreter_Compile(t *testing.T) {
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeCall}}, // Call instruction without immediate for call target index is invalid and should fail to compile.
 			},
+			ID: wasm.ModuleID{},
 		}
 
 		err := e.CompileModule(errModule)
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		_, ok := e.codes[errModule]
+		_, ok := e.codes[errModule.ID]
 		require.False(t, ok)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -238,15 +239,16 @@ func TestInterpreter_Compile(t *testing.T) {
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{},
 		}
 		err := e.CompileModule(okModule)
 		require.NoError(t, err)
 
-		compiled, ok := e.codes[okModule]
+		compiled, ok := e.codes[okModule.ID]
 		require.True(t, ok)
 		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
-		_, ok = e.codes[okModule]
+		_, ok = e.codes[okModule.ID]
 		require.True(t, ok)
 	})
 }
