@@ -3221,10 +3221,10 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			tmpX,
 		)
 
-		// "tmpY = [tmpX + moduleEnginecodesOffset] (== &moduleEngine.codes[0])"
+		// "tmpY = [tmpX + moduleEngineFunctionsOffset] (== &moduleEngine.codes[0])"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			tmpX, moduleEnginecodesOffset,
+			tmpX, moduleEngineFunctionsOffset,
 			tmpY,
 		)
 
