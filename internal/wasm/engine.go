@@ -20,6 +20,8 @@ type Engine interface {
 	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
 
 	// DeleteCompiledModule releases compilation caches for the given module (source).
+	// Note: it is safe to call this function for a module from which module instances are instantiated even when these module instances
+	// are having outstanding calls.
 	DeleteCompiledModule(module *Module)
 }
 
