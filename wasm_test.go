@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
-	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -61,6 +60,7 @@ func TestRuntime_DecodeModule(t *testing.T) {
 			if tc.expectedName != "" {
 				require.Equal(t, tc.expectedName, code.module.NameSection.ModuleName)
 			}
+			require.Equal(t, r.(*runtime).store.Engine, code.compiledEngine)
 		})
 	}
 }
@@ -428,57 +428,25 @@ func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx api
 	)), mod.Close
 }
 
-func TestCompiledCode_addCacheEntry(t *testing.T) {
-	c := &CompiledCode{}
-
-	m1, e1 := &wasm.Module{}, &mockEngine{name: "1"}
-	for i := 0; i < 5; i++ {
-		c.addCacheEntry(m1, e1)
-	}
-
-	require.NotNil(t, c.cachedEngines[e1])
-	require.NotNil(t, c.cachedEngines[e1][m1])
-	require.Equal(t, 1, len(c.cachedEngines[e1]))
-
-	m2, e2 := &wasm.Module{}, &mockEngine{name: "2"}
-	for i := 0; i < 5; i++ {
-		c.addCacheEntry(m2, e2)
-	}
-
-	require.NotNil(t, c.cachedEngines[e1])
-	require.NotNil(t, c.cachedEngines[e2])
-	require.NotNil(t, c.cachedEngines[e1][m1])
-	require.NotNil(t, c.cachedEngines[e2][m2])
-	require.Equal(t, 1, len(c.cachedEngines[e1]))
-	require.Equal(t, 1, len(c.cachedEngines[e2]))
-}
-
 func TestCompiledCode_Close(t *testing.T) {
-	e1, e2 := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}},
-		&mockEngine{name: "2", cachedModules: map[*wasm.Module]struct{}{}}
+	e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 
-	c := &CompiledCode{}
-	for _, e := range []wasm.Engine{e1, e2} {
-		for i := 0; i < 10; i++ {
-			m := &wasm.Module{}
-			_, _ = e.NewModuleEngine(strconv.Itoa(i), m, nil, nil, nil, nil)
-			c.addCacheEntry(m, e)
-		}
+	var cs []*CompiledCode
+	for i := 0; i < 10; i++ {
+		m := &wasm.Module{}
+		e.CompileModule(m)
+		cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
 	}
 
 	// Before Close.
-	require.Equal(t, 10, len(e1.cachedModules))
-	require.Equal(t, 10, len(e2.cachedModules))
-	require.Equal(t, 2, len(c.cachedEngines))
-	for _, modules := range c.cachedEngines {
-		require.Equal(t, 10, len(modules))
+	require.Equal(t, 10, len(e.cachedModules))
+
+	for _, c := range cs {
+		c.Close()
 	}
 
-	c.Close()
-
 	// After Close.
-	require.Zero(t, len(e1.cachedModules))
-	require.Zero(t, len(e2.cachedModules))
+	require.Zero(t, len(e.cachedModules))
 }
 
 type mockEngine struct {
@@ -487,8 +455,7 @@ type mockEngine struct {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, module *wasm.Module, _, _ []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
-	e.cachedModules[module] = struct{}{}
+func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _, _ []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	return nil, nil
 }
 
@@ -497,4 +464,7 @@ func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 	delete(e.cachedModules, module)
 }
 
-func (e *mockEngine) CompileModule(module *wasm.Module) error { return nil }
+func (e *mockEngine) CompileModule(module *wasm.Module) error {
+	e.cachedModules[module] = struct{}{}
+	return nil
+}

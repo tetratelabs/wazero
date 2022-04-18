@@ -173,6 +173,7 @@ func TestJIT_CompileModule(t *testing.T) {
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeEnd}},
 			},
+			ID: wasm.ModuleID{},
 		}
 
 		err := e.CompileModule(okModule)
@@ -182,7 +183,7 @@ func TestJIT_CompileModule(t *testing.T) {
 		err = e.CompileModule(okModule)
 		require.NoError(t, err)
 
-		compiled, ok := e.codes[okModule]
+		compiled, ok := e.codes[okModule.ID]
 		require.True(t, ok)
 		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
@@ -201,6 +202,7 @@ func TestJIT_CompileModule(t *testing.T) {
 				{Body: []byte{wasm.OpcodeEnd}},
 				{Body: []byte{wasm.OpcodeCall}}, // Call instruction without immediate for call target index is invalid and should fail to compile.
 			},
+			ID: wasm.ModuleID{},
 		}
 
 		e := et.NewEngine(wasm.Features20191205).(*engine)
@@ -208,7 +210,7 @@ func TestJIT_CompileModule(t *testing.T) {
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
-		_, ok := e.codes[errModule]
+		_, ok := e.codes[errModule.ID]
 		require.False(t, ok)
 	})
 }
@@ -306,6 +308,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 			{Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
 			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
+		ID: wasm.ModuleID{1},
 	}
 
 	err = store.Engine.CompileModule(m)

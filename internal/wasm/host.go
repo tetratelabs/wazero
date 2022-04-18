@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"reflect"
 	"sort"
@@ -64,6 +65,10 @@ func NewHostModule(
 			return
 		}
 	}
+
+	// Assins the ModuleID by calculating sha256 on inputs as host modules do not have `source` to hash.
+	m.ID = sha256.Sum256([]byte(fmt.Sprintf("%s:%v:%v:%v:%v",
+		moduleName, nameToGoFunc, nameToMemory, nameToGlobal, enabledFeatures)))
 	return
 }
 

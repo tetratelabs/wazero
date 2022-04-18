@@ -19,7 +19,7 @@ type (
 	// engine is an JIT implementation of wasm.Engine
 	engine struct {
 		enabledFeatures wasm.Features
-		codes           map[*wasm.Module][]*code // guarded by mutex.
+		codes           map[wasm.ModuleID][]*code // guarded by mutex.
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer func(obj interface{}, finalizer interface{})
@@ -475,19 +475,19 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 func (e *engine) deleteCodes(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.codes, module)
+	delete(e.codes, module.ID)
 }
 
 func (e *engine) addCodes(module *wasm.Module, fs []*code) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.codes[module] = fs
+	e.codes[module.ID] = fs
 }
 
 func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	fs, ok = e.codes[module]
+	fs, ok = e.codes[module.ID]
 	return
 }
 
@@ -568,7 +568,7 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 func newEngine(enabledFeatures wasm.Features) *engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
-		codes:           map[*wasm.Module][]*code{},
+		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
 	}
 }

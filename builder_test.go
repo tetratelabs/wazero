@@ -346,7 +346,10 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			b := tc.input(NewRuntime()).(*moduleBuilder)
 			m, err := b.Build()
 			require.NoError(t, err)
+
 			requireHostModuleEquals(t, tc.expected, m.module)
+
+			require.Equal(t, b.r.store.Engine, m.compiledEngine)
 
 			// Built module must be instantiable by Engine.
 			_, err = b.r.InstantiateModule(m)

@@ -2,6 +2,7 @@ package spectests
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -326,6 +327,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemoryMaxPages)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
+						mod.ID = sha256.Sum256(buf)
 
 						moduleName := c.Name
 						if moduleName == "" { // When "(module ...) directive doesn't have name.
@@ -337,8 +339,10 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 								moduleName = c.Filename
 							}
 						}
+
 						err = store.Engine.CompileModule(mod)
 						require.NoError(t, err, msg)
+
 						moduleName = strings.TrimPrefix(moduleName, "$")
 						_, err = store.Instantiate(context.Background(), mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
@@ -462,6 +466,8 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 	if err != nil {
 		return
 	}
+
+	mod.ID = sha256.Sum256(buf)
 
 	err = store.Engine.CompileModule(mod)
 	if err != nil {

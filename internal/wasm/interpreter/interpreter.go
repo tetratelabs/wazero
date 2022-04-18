@@ -22,14 +22,14 @@ var callStackCeiling = buildoptions.CallStackCeiling
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
 	enabledFeatures wasm.Features
-	codes           map[*wasm.Module][]*code // guarded by mutex.
+	codes           map[wasm.ModuleID][]*code // guarded by mutex.
 	mux             sync.RWMutex
 }
 
 func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
-		codes:           map[*wasm.Module][]*code{},
+		codes:           map[wasm.ModuleID][]*code{},
 	}
 }
 
@@ -41,19 +41,19 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 func (e *engine) deleteCodes(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.codes, module)
+	delete(e.codes, module.ID)
 }
 
 func (e *engine) addCodes(module *wasm.Module, fs []*code) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.codes[module] = fs
+	e.codes[module.ID] = fs
 }
 
 func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	fs, ok = e.codes[module]
+	fs, ok = e.codes[module.ID]
 	return
 }
 

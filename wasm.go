@@ -3,6 +3,7 @@ package wazero
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
@@ -164,13 +165,15 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 		return nil, err
 	}
 
+	// ID is used as a key for compilation caches.
+	// TODO: should be possible to calculate sha256 during decoding.
+	internal.ID = sha256.Sum256(source)
+
 	if err = r.store.Engine.CompileModule(internal); err != nil {
 		return nil, err
 	}
 
-	ret := &CompiledCode{module: internal}
-	ret.addCacheEntry(internal, r.store.Engine)
-	return ret, nil
+	return &CompiledCode{module: internal, compiledEngine: r.store.Engine}, nil
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
@@ -213,14 +216,6 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 	}
 
 	module := config.replaceImports(code.module)
-	if module != code.module {
-		// If replacing imports had an effect, the module changed, so we have to recompile it.
-		// TODO: maybe we should move replaceImports configs into CompileModule.
-		if err = r.store.Engine.CompileModule(module); err != nil {
-			return nil, err
-		}
-		code.addCacheEntry(module, r.store.Engine)
-	}
 
 	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
 	if err != nil {
