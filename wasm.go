@@ -3,7 +3,6 @@ package wazero
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 
@@ -165,9 +164,7 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 		return nil, err
 	}
 
-	// ID is used as a key for compilation caches.
-	// TODO: should be possible to calculate sha256 during decoding.
-	internal.ID = sha256.Sum256(source)
+	internal.AssignModuleID(source)
 
 	if err = r.store.Engine.CompileModule(internal); err != nil {
 		return nil, err

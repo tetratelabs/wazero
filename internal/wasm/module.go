@@ -177,6 +177,10 @@ const (
 	MaximumFunctionIndex = uint32(1 << 27)
 )
 
+func (m *Module) AssignModuleID(source []byte) {
+	m.ID = sha256.Sum256(source)
+}
+
 // TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
 // TODO: Returning nil should be impossible when decode results are validated. Validate decode before back-filling tests.
