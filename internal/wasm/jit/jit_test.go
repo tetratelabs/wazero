@@ -118,7 +118,7 @@ func (j *jitEnv) callEngine() *callEngine {
 }
 
 func (j *jitEnv) exec(code []byte) {
-	compiledFunction := &compiledFunction{
+	compiledFunction := &compiledFunctionInstance{
 		codeSegment:           code,
 		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
 		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
@@ -140,14 +140,19 @@ func (j *jitEnv) exec(code []byte) {
 }
 
 // newTestCompiler allows us to test a different architecture than the current one.
-type newTestCompiler func(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error)
+type newTestCompiler func(ir *wazeroir.CompilationResult) (compiler, error)
 
-func (j *jitEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, functype *wasm.FunctionType) compilerImpl {
+func (j *jitEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *wazeroir.CompilationResult) compilerImpl {
 	requireSupportedOSArch(t)
-	c, err := fn(
-		&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype},
-		&wazeroir.CompilationResult{LabelCallers: map[string]uint32{}},
-	)
+
+	if ir == nil {
+		ir = &wazeroir.CompilationResult{
+			LabelCallers: map[string]uint32{},
+			Signature:    &wasm.FunctionType{},
+		}
+	}
+	c, err := fn(ir)
+
 	require.NoError(t, err)
 
 	ret, ok := c.(compilerImpl)

@@ -218,7 +218,7 @@ func TestModule_Global(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		r := NewRuntime()
+		r := NewRuntime().(*runtime)
 		t.Run(tc.name, func(t *testing.T) {
 			var code *CompiledCode
 			if tc.module != nil {
@@ -226,6 +226,9 @@ func TestModule_Global(t *testing.T) {
 			} else {
 				code, _ = tc.builder(r).Build()
 			}
+
+			err := r.store.Engine.CompileModule(code.module)
+			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above global
 			module, err := r.InstantiateModule(code)
@@ -489,7 +492,9 @@ func (e *mockEngine) NewModuleEngine(_ string, module *wasm.Module, _, _ []*wasm
 	return nil, nil
 }
 
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *mockEngine) ReleaseCompilationCache(module *wasm.Module) {
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 	delete(e.cachedModules, module)
 }
+
+func (e *mockEngine) CompileModule(module *wasm.Module) error { return nil }

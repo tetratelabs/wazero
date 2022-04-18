@@ -16,7 +16,10 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				Signature: &wasm.FunctionType{},
+				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},
+			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
@@ -66,7 +69,10 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				Signature: &wasm.FunctionType{},
+				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},
+			})
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})

@@ -115,7 +115,6 @@ func (c *amd64Compiler) String() string {
 
 type amd64Compiler struct {
 	assembler amd64.Assembler
-	f         *wasm.FunctionInstance
 	ir        *wazeroir.CompilationResult
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
@@ -131,9 +130,8 @@ type amd64Compiler struct {
 	staticData                           compiledFunctionStaticData
 }
 
-func newAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	c := &amd64Compiler{
-		f:             f,
 		assembler:     amd64.NewAssemblerImpl(),
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
@@ -226,8 +224,8 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	if c.f != nil && c.f.Type != nil {
-		for _, t := range c.f.Type.Params {
+	if c.ir != nil {
+		for _, t := range c.ir.Signature.Params {
 			loc := c.locationStack.pushValueLocationOnStack()
 			switch t {
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -349,7 +347,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
-	wasmType := c.f.Module.Globals[o.Index].Type.ValType
+	wasmType := c.ir.Globals[o.Index].ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
 		valueReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
@@ -731,18 +729,19 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 
 // compileCall implements compiler.compileCall for the amd64 architecture.
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
-	target := c.f.Module.Functions[o.FunctionIndex]
-	if err := c.compileCallFunctionImpl(o.FunctionIndex, asm.NilRegister, target.Type); err != nil {
+	target := c.ir.Functions[o.FunctionIndex]
+	targetType := c.ir.Types[target]
+	if err := c.compileCallFunctionImpl(o.FunctionIndex, asm.NilRegister, targetType); err != nil {
 		return err
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.Type.Params); i++ {
+	for i := 0; i < len(targetType.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range target.Type.Results {
+	for _, t := range targetType.Results {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -765,6 +764,13 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	if err != nil {
 		return err
 	}
+	c.locationStack.markRegisterUsed(tmp)
+
+	tmp2, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	c.locationStack.markRegisterUsed(tmp2)
 
 	// First, we need to check if the offset doesn't exceed the length of table.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset, offset.register)
@@ -800,28 +806,32 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	c.assembler.SetJumpTargetOnNext(jumpIfInitialized)
 
-	// Next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
+	// Next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType's typeID.
 	//
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, compiledFunctionSourceOffset, tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, compiledFunctionInstanceSourceOffset, tmp)
 
-	ti := c.f.Module.Types[o.TypeIndex]
-	targetFunctionType := ti.Type
-	c.assembler.CompileMemoryToConst(amd64.CMPL, tmp, functionInstanceTypeIDOffset, int64(ti.TypeID))
+	// "tmp2 = [&moduleInstance.TypeIDs[0] + index * 4] (== moduleInstance.TypeIDs[index])"
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
+		tmp2)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp2, int64(o.TypeIndex)*4, tmp2)
 
 	// Jump if the type matches.
+	c.assembler.CompileMemoryToRegister(amd64.CMPL, tmp, functionInstanceTypeIDOffset, tmp2)
 	jumpIfTypeMatch := c.assembler.CompileJump(amd64.JEQ)
 
 	// Otherwise, exit with type mismatch status.
 	c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
+	targetFunctionType := c.ir.Types[o.TypeIndex]
 	if err = c.compileCallFunctionImpl(0, offset.register, targetFunctionType); err != nil {
 		return nil
 	}
 
 	// The offset register should be marked as un-used as we consumed in the function call.
-	c.locationStack.markRegisterUnused(offset.register, tmp)
+	c.locationStack.markRegisterUnused(offset.register, tmp, tmp2)
 
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(targetFunctionType.Params); i++ {
@@ -3568,11 +3578,11 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	c.assembler.CompileNoneToMemory(amd64.INCQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConventionModuleInstanceAddressRegister.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, targetCompiledFunctionAddressRegister, compiledFunctionModuleInstanceAddressOffset,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, targetCompiledFunctionAddressRegister, compiledFunctionInstanceModuleInstanceAddressOffset,
 		amd64CallingConventionModuleInstanceAddressRegister)
 
 	// And jump into the initial address of the target function.
-	c.assembler.CompileJumpToMemory(amd64.JMP, targetCompiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset)
+	c.assembler.CompileJumpToMemory(amd64.JMP, targetCompiledFunctionAddressRegister, compiledFunctionInstanceCodeInitialAddressOffset)
 
 	// All the registers used are temporary so we mark them unused.
 	c.locationStack.markRegisterUnused(freeRegs...)
@@ -3691,7 +3701,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 		amd64CallingConventionModuleInstanceAddressRegister,
 	)
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
-		amd64CallingConventionModuleInstanceAddressRegister, compiledFunctionModuleInstanceAddressOffset,
+		amd64CallingConventionModuleInstanceAddressRegister, compiledFunctionInstanceModuleInstanceAddressOffset,
 		amd64CallingConventionModuleInstanceAddressRegister,
 	)
 
@@ -3850,7 +3860,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 }
 
 func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
-	if c.f.Module.Memory != nil {
+	if c.ir.HasMemory {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			amd64ReservedRegisterForMemory,
@@ -3926,13 +3936,14 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// * callEngine.moduleContext.memoryElement0Address
 	// * callEngine.moduleContext.memorySliceLen
 	// * callEngine.moduleContext.compiledFunctionsElement0Address
+	// * callEngine.moduleContext.typeIDsElement0Address
 
 	// Update globalElement0Address.
 	//
 	// Note: if there's global.get or set instruction in the function, the existence of the globals
 	// is ensured by function validation at module instantiation phase, and that's why it is ok to
 	// skip the initialization if the module's globals slice is empty.
-	if len(c.f.Module.Globals) > 0 {
+	if len(c.ir.Globals) > 0 {
 		// Since ModuleInstance.Globals is []*globalInstance, internally
 		// the address of the first item in the underlying array lies exactly on the globals offset.
 		// See https://go.dev/blog/slices-intro if unfamiliar.
@@ -3946,7 +3957,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if c.f.Module.Table != nil {
+	if c.ir.HasTable {
 		// First, we need to read the *wasm.Table.
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64CallingConventionModuleInstanceAddressRegister, moduleInstanceTableOffset, tmpRegister)
 
@@ -3958,13 +3969,18 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset)
 
-		// Finally, read the length of table and update tableSliceLen accordingly.
+		// Next, read the length of table and update tableSliceLen accordingly.
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, tableInstanceTableLenOffset, tmpRegister2)
 
 		// And put the length into tableSliceLen.
-
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset)
+
+		// Finally, we put &ModuleInstance.TypeIDs[0] into moduleContext.typeIDsElement0Address.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+			amd64CallingConventionModuleInstanceAddressRegister, moduleInstanceTypeIDsOffset, tmpRegister)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
+			tmpRegister, amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset)
 	}
 
 	// Update memoryElement0Address and memorySliceLen.
@@ -3972,7 +3988,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.Module.Memory != nil {
+	if c.ir.HasMemory {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64CallingConventionModuleInstanceAddressRegister, moduleInstanceMemoryOffset, tmpRegister)
 
 		// Set length.

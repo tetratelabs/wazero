@@ -444,8 +444,11 @@ func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstan
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *mockEngine) ReleaseCompilationCache(*Module) {}
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *mockEngine) DeleteCompiledModule(*Module) {}
+
+// CompileModule implements the same method as documented on wasm.Engine.
+func (e *mockEngine) CompileModule(module *Module) error { return nil }
 
 // Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {
@@ -466,7 +469,7 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 func (e *mockModuleEngine) Close() {
 }
 
-func TestStore_getTypeInstance(t *testing.T) {
+func TestStore_getFunctionTypeID(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := newStore()
 		const max = 10
@@ -475,7 +478,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 		for i := 0; i < max; i++ {
 			s.typeIDs[strconv.Itoa(i)] = 0
 		}
-		_, err := s.getTypeInstance(&FunctionType{})
+		_, err := s.getFunctionTypeID(&FunctionType{})
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -488,13 +491,12 @@ func TestStore_getTypeInstance(t *testing.T) {
 			tc := tc
 			t.Run(tc.String(), func(t *testing.T) {
 				s := newStore()
-				actual, err := s.getTypeInstance(tc)
+				actual, err := s.getFunctionTypeID(tc)
 				require.NoError(t, err)
 
 				expectedTypeID, ok := s.typeIDs[tc.String()]
 				require.True(t, ok)
-				require.Equal(t, expectedTypeID, actual.TypeID)
-				require.Equal(t, tc, actual.Type)
+				require.Equal(t, expectedTypeID, actual)
 			})
 		}
 	})

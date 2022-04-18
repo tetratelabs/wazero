@@ -1,7 +1,6 @@
 package wazeroir
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -33,6 +32,9 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
+				Functions:    []uint32{0},
+				Types:        []*wasm.FunctionType{{}},
+				Signature:    &wasm.FunctionType{},
 			},
 		},
 		{
@@ -47,6 +49,9 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
+				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
+				Functions:    []uint32{0},
+				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
 			},
 		},
 	}
@@ -59,13 +64,10 @@ func TestCompile(t *testing.T) {
 			if enabledFeatures == 0 {
 				enabledFeatures = wasm.FeaturesFinished
 			}
-			functions, err := compileFunctions(enabledFeatures, tc.module)
-			require.NoError(t, err)
-			require.Equal(t, 1, len(functions))
 
-			res, err := Compile(enabledFeatures, functions[0])
+			res, err := CompileFunctions(enabledFeatures, tc.module)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res)
+			require.Equal(t, tc.expected, res[0])
 		})
 	}
 }
@@ -109,6 +111,9 @@ func TestCompile_Block(t *testing.T) {
 				// shouldn't because the br instruction is stack-polymorphic. In other words, (br 0) substitutes for the
 				// two i32 parameters to add.
 				LabelCallers: map[string]uint32{".L2_cont": 1},
+				Functions:    []uint32{0},
+				Types:        []*wasm.FunctionType{v_v},
+				Signature:    v_v,
 			},
 		},
 	}
@@ -123,6 +128,12 @@ func TestCompile_Block(t *testing.T) {
 }
 
 func TestCompile_MultiValue(t *testing.T) {
+	i32i32_i32i32 := &wasm.FunctionType{Params: []wasm.ValueType{
+		wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+	}
+	_i32i64 := &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64}}
+
 	tests := []struct {
 		name            string
 		module          *wasm.Module
@@ -143,6 +154,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
+				Signature:    i32i32_i32i32,
+				Functions:    []wasm.Index{0},
+				Types:        []*wasm.FunctionType{i32i32_i32i32},
 			},
 		},
 		{
@@ -184,6 +198,9 @@ func TestCompile_MultiValue(t *testing.T) {
 				// Note: f64.add comes after br 0 so is unreachable. This is why neither the add, nor its other operand
 				// are in the above compilation result.
 				LabelCallers: map[string]uint32{".L2_cont": 1}, // arbitrary label
+				Signature:    v_f64f64,
+				Functions:    []wasm.Index{0},
+				Types:        []*wasm.FunctionType{v_f64f64},
 			},
 		},
 		{
@@ -199,6 +216,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}}, // return!
 				},
 				LabelCallers: map[string]uint32{},
+				Signature:    _i32i64,
+				Functions:    []wasm.Index{0},
+				Types:        []*wasm.FunctionType{_i32i64},
 			},
 		},
 		{
@@ -248,6 +268,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
+				Signature: i32_i32,
+				Functions: []wasm.Index{0},
+				Types:     []*wasm.FunctionType{i32_i32},
 			},
 		},
 		{
@@ -301,6 +324,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
+				Signature: i32_i32,
+				Functions: []wasm.Index{0},
+				Types:     []*wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 		{
@@ -354,6 +380,9 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
+				Signature: i32_i32,
+				Functions: []wasm.Index{0},
+				Types:     []*wasm.FunctionType{i32_i32, i32i32_i32},
 			},
 		},
 	}
@@ -366,13 +395,9 @@ func TestCompile_MultiValue(t *testing.T) {
 			if enabledFeatures == 0 {
 				enabledFeatures = wasm.FeaturesFinished
 			}
-			functions, err := compileFunctions(enabledFeatures, tc.module)
+			res, err := CompileFunctions(enabledFeatures, tc.module)
 			require.NoError(t, err)
-			require.Equal(t, 1, len(functions))
-
-			res, err := Compile(enabledFeatures, functions[0])
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, res)
+			require.Equal(t, tc.expected, res[0])
 		})
 	}
 }
@@ -381,13 +406,9 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	if enabledFeatures == 0 {
 		enabledFeatures = wasm.FeaturesFinished
 	}
-	functions, err := compileFunctions(enabledFeatures, module)
+	res, err := CompileFunctions(enabledFeatures, module)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(functions))
-
-	res, err := Compile(enabledFeatures, functions[0])
-	require.NoError(t, err)
-	require.Equal(t, expected, res)
+	require.Equal(t, expected, res[0])
 }
 
 func requireModuleText(t *testing.T, source string) *wasm.Module {
@@ -395,35 +416,3 @@ func requireModuleText(t *testing.T, source string) *wasm.Module {
 	require.NoError(t, err)
 	return m
 }
-
-func compileFunctions(enabledFeatures wasm.Features, module *wasm.Module) ([]*wasm.FunctionInstance, error) {
-	cf := &catchFunctions{}
-	_, err := wasm.NewStore(enabledFeatures, cf).Instantiate(context.Background(), module, "", wasm.DefaultSysContext())
-	return cf.functions, err
-}
-
-type catchFunctions struct {
-	functions []*wasm.FunctionInstance
-}
-
-// NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *catchFunctions) NewModuleEngine(_ string, _ *wasm.Module, _, functions []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
-	e.functions = functions
-	return e, nil
-}
-
-// Name implements the same method as documented on wasm.ModuleEngine.
-func (e *catchFunctions) Name() string {
-	return ""
-}
-
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (e *catchFunctions) Call(_ *wasm.ModuleContext, _ *wasm.FunctionInstance, _ ...uint64) ([]uint64, error) {
-	return nil, nil
-}
-
-// Close implements the same method as documented on wasm.ModuleEngine.
-func (e *catchFunctions) Close() {}
-
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *catchFunctions) ReleaseCompilationCache(*wasm.Module) {}

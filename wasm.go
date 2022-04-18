@@ -164,6 +164,9 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 		return nil, err
 	}
 
+	if err = r.store.Engine.CompileModule(internal); err != nil {
+		return nil, err
+	}
 	return &CompiledCode{module: internal}, nil
 }
 
@@ -207,6 +210,12 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 	}
 
 	module := config.replaceImports(code.module)
+	if module != code.module {
+		// IF the module changed, we have to Compile again before instantiation.
+		if err = r.store.Engine.CompileModule(module); err != nil {
+			return nil, err
+		}
+	}
 
 	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
 	if err != nil {

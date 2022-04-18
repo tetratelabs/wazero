@@ -114,8 +114,17 @@ type compiler struct {
 		depth int
 	}
 	pc     uint64
-	f      *wasm.FunctionInstance
 	result CompilationResult
+
+	// Function information
+	body       []byte
+	sig        *wasm.FunctionType
+	localTypes []wasm.ValueType
+
+	// Module information.
+	types   []*wasm.FunctionType
+	funcs   []uint32
+	globals []*wasm.GlobalType
 }
 
 // For debugging only.
@@ -152,40 +161,92 @@ type CompilationResult struct {
 	//
 	// This example the label corresponding to `(block i32.const 1111)` is never be reached at runtime because `br 0` exits the function before we reach there
 	LabelCallers map[string]uint32
+
+	// Signature is the function type of the compilation target function.
+	Signature *wasm.FunctionType
+	// Globals holds all the declarations of globals in the module from which this function is compiled.
+	Globals []*wasm.GlobalType
+	// Functions holds all the declarations of function in the module from which this function is compiled, including itself.
+	Functions []wasm.Index
+	// Types holds all the types in the module from which this function is compiled.
+	Types []*wasm.FunctionType
+	// HasMemory is true if the module from which this function is compiled has memory declaration.
+	HasMemory bool
+	// HasTable is true if the module from which this function is compiled has table declaration.
+	HasTable bool
+}
+
+func CompileFunctions(enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
+	functions, globals, mem, table, err := module.AllDeclarations()
+	if err != nil {
+		return nil, err
+	}
+
+	hasMemory, hasTable := mem != nil, table != nil
+
+	var ret []*CompilationResult
+	for funcInxdex := range module.FunctionSection {
+		typeID := module.FunctionSection[funcInxdex]
+		sig := module.TypeSection[typeID]
+		code := module.CodeSection[funcInxdex]
+		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcInxdex, len(functions), err)
+		}
+		r.Globals = globals
+		r.Functions = functions
+		r.Types = module.TypeSection
+		r.HasMemory = hasMemory
+		r.HasTable = hasTable
+		r.Signature = sig
+		ret = append(ret, r)
+	}
+	return ret, nil
 }
 
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the JIT compilation engine.
-func Compile(enabledFeatures wasm.Features, f *wasm.FunctionInstance) (*CompilationResult, error) {
+func compile(enabledFeatures wasm.Features,
+	sig *wasm.FunctionType,
+	body []byte,
+	localTypes []wasm.ValueType,
+	types []*wasm.FunctionType,
+	functions []uint32, globals []*wasm.GlobalType,
+) (*CompilationResult, error) {
 	c := compiler{
 		enabledFeatures: enabledFeatures,
 		controlFrames:   &controlFrames{},
-		f:               f,
 		result:          CompilationResult{LabelCallers: map[string]uint32{}},
+		body:            body,
+		localTypes:      localTypes,
+		sig:             sig,
+		globals:         globals,
+		funcs:           functions,
+		types:           types,
 	}
 
 	// Push function arguments.
-	for _, t := range f.Type.Params {
+	for _, t := range sig.Params {
 		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
 	// into account, meaning that callers must push
 	// arguments before entering into the function body.
-	for _, t := range f.LocalTypes {
+	for _, t := range localTypes {
 		c.emitDefaultValue(t)
 	}
 
 	// Insert the function control frame.
 	c.controlFrames.push(&controlFrame{
 		frameID:   c.nextID(),
-		blockType: f.Type,
+		blockType: c.sig,
 		kind:      controlFrameKindFunction,
 	})
 
 	// Now, enter the function body.
-	for !c.controlFrames.empty() {
+	for !c.controlFrames.empty() && c.pc < uint64(len(c.body)) {
 		if err := c.handleInstruction(); err != nil {
 			return nil, fmt.Errorf("handling instruction: %w", err)
 		}
@@ -196,7 +257,7 @@ func Compile(enabledFeatures wasm.Features, f *wasm.FunctionInstance) (*Compilat
 // Translate the current Wasm instruction to wazeroir's operations,
 // and emit the results into c.results.
 func (c *compiler) handleInstruction() error {
-	op := c.f.Body[c.pc]
+	op := c.body[c.pc]
 	if buildoptions.IsDebugMode {
 		fmt.Printf("handling %s, unreachable_state(on=%v,depth=%d)\n",
 			wasm.InstructionName(op),
@@ -223,8 +284,8 @@ operatorSwitch:
 	case wasm.OpcodeNop:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
-		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
-			bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
+		bt, num, err := wasm.DecodeBlockType(c.types,
+			bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
 		}
@@ -247,7 +308,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
-		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types, bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
+		bt, num, err := wasm.DecodeBlockType(c.types, bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
 		}
@@ -282,7 +343,7 @@ operatorSwitch:
 		)
 
 	case wasm.OpcodeIf:
-		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types, bytes.NewReader(c.f.Body[c.pc+1:]), c.enabledFeatures)
+		bt, num, err := wasm.DecodeBlockType(c.types, bytes.NewReader(c.body[c.pc+1:]), c.enabledFeatures)
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)
 		}
@@ -474,7 +535,7 @@ operatorSwitch:
 		}
 
 	case wasm.OpcodeBr:
-		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
@@ -494,7 +555,7 @@ operatorSwitch:
 		// and can be safely removed.
 		c.markUnreachable()
 	case wasm.OpcodeBrIf:
-		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
@@ -519,7 +580,7 @@ operatorSwitch:
 			},
 		)
 	case wasm.OpcodeBrTable:
-		r := bytes.NewReader(c.f.Body[c.pc+1:])
+		r := bytes.NewReader(c.body[c.pc+1:])
 		numTargets, n, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return fmt.Errorf("error reading number of targets in br_table: %w", err)
@@ -591,7 +652,7 @@ operatorSwitch:
 		if index == nil {
 			return fmt.Errorf("index does not exist for indirect function call")
 		}
-		tableIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
+		tableIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
@@ -847,7 +908,7 @@ operatorSwitch:
 			&OperationMemoryGrow{},
 		)
 	case wasm.OpcodeI32Const:
-		val, num, err := leb128.DecodeInt32(bytes.NewReader(c.f.Body[c.pc+1:]))
+		val, num, err := leb128.DecodeInt32(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i32.const value: %v", err)
 		}
@@ -856,7 +917,7 @@ operatorSwitch:
 			&OperationConstI32{Value: uint32(val)},
 		)
 	case wasm.OpcodeI64Const:
-		val, num, err := leb128.DecodeInt64(bytes.NewReader(c.f.Body[c.pc+1:]))
+		val, num, err := leb128.DecodeInt64(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i64.const value: %v", err)
 		}
@@ -865,13 +926,13 @@ operatorSwitch:
 			&OperationConstI64{Value: uint64(val)},
 		)
 	case wasm.OpcodeF32Const:
-		v := math.Float32frombits(binary.LittleEndian.Uint32(c.f.Body[c.pc+1:]))
+		v := math.Float32frombits(binary.LittleEndian.Uint32(c.body[c.pc+1:]))
 		c.pc += 4
 		c.emit(
 			&OperationConstF32{Value: v},
 		)
 	case wasm.OpcodeF64Const:
-		v := math.Float64frombits(binary.LittleEndian.Uint64(c.f.Body[c.pc+1:]))
+		v := math.Float64frombits(binary.LittleEndian.Uint64(c.body[c.pc+1:]))
 		c.pc += 8
 		c.emit(
 			&OperationConstF64{Value: v},
@@ -1418,7 +1479,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 		wasm.OpcodeGlobalGet,
 		wasm.OpcodeGlobalSet:
 		// Assumes that we are at the opcode now so skip it before read immediates.
-		v, num, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
+		v, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 		if err != nil {
 			return nil, fmt.Errorf("reading immediates: %w", err)
 		}
@@ -1437,7 +1498,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 	}
 
 	// Retrieve the signature of the opcode.
-	s, err := wasmOpcodeSignature(c.f, opcode, index)
+	s, err := c.wasmOpcodeSignature(opcode, index)
 	if err != nil {
 		return nil, err
 	}
@@ -1566,7 +1627,7 @@ func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 }
 
 func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {
-	r := bytes.NewReader(c.f.Body[c.pc+1:])
+	r := bytes.NewReader(c.body[c.pc+1:])
 	alignment, num, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("reading alignment for %s: %w", tag, err)

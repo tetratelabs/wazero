@@ -18,10 +18,9 @@ import (
 type (
 	// engine is an JIT implementation of wasm.Engine
 	engine struct {
-		enabledFeatures                  wasm.Features
-		compiledFunctions                map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
-		cachedCompiledFunctionsPerModule map[*wasm.Module][]*compiledFunction         // guarded by mutex.
-		mux                              sync.RWMutex
+		enabledFeatures   wasm.Features
+		compiledFunctions map[*wasm.Module][]*compiledFunction // guarded by mutex.
+		mux               sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer func(obj interface{}, finalizer interface{})
 	}
@@ -35,10 +34,8 @@ type (
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
 		// compiledFunctionsElement0Address.
-		compiledFunctions []*compiledFunction
+		compiledFunctions []*compiledFunctionInstance
 
-		// parentEngine holds *engine from which this module engine is created from.
-		parentEngine          *engine
 		importedFunctionCount uint32
 	}
 
@@ -112,6 +109,9 @@ type (
 
 		// compiledFunctionsElement0Address is &moduleContext.engine.compiledFunctions[0] as uintptr.
 		compiledFunctionsElement0Address uintptr
+
+		// typeIDsElement0Address holds the &ModuleInstance.typeIDs[0] as uintptr.
+		typeIDsElement0Address uintptr
 	}
 
 	// valueStackContext stores the data to access engine.valueStack.
@@ -159,12 +159,12 @@ type (
 		// Set when making function call from this function frame.
 		returnStackBasePointer uint64
 		// Set when making function call to this function frame.
-		compiledFunction *compiledFunction
+		compiledFunction *compiledFunctionInstance
 		// _ is a necessary padding to make the size of callFrame struct a power of 2.
 		_ [8]byte
 	}
 
-	compiledFunction struct {
+	compiledFunctionInstance struct {
 		// The following fields are accessed by JITed code.
 
 		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
@@ -185,6 +185,23 @@ type (
 		codeSegment []byte
 		// See the doc for compiledFunctionStaticData type.
 		staticData compiledFunctionStaticData
+
+		// parent holds compiledFunction from which this is instantiated.
+		parent *compiledFunction
+	}
+
+	compiledFunction struct {
+		// codeSegment is holding the compiled native code as a byte slice.
+		codeSegment []byte
+		// See the doc for compiledFunctionStaticData type.
+		staticData compiledFunctionStaticData
+		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
+		stackPointerCeil uint64
+
+		// indexInModule is the index of this function in the module. For logging purpose.
+		indexInModule wasm.Index
+		// sourceModule is the module from which this function is compiled. For logging purpose.
+		sourceModule *wasm.Module
 	}
 
 	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
@@ -194,16 +211,16 @@ type (
 	compiledFunctionStaticData = [][]byte
 )
 
-func (c *compiledFunction) clone(newSourceInstance *wasm.FunctionInstance) *compiledFunction {
-	// Note: we don't need to set finalizer to munmap the code segment since it is
-	// already a target of munmap by the finalizer set on the original compiledFunction `c`.
-	return &compiledFunction{
-		codeInitialAddress:    c.codeInitialAddress,
+// instantiate creates a new compiledFunctionInstance which uses the native code compiled.
+func (c *compiledFunction) instantiate(f *wasm.FunctionInstance) *compiledFunctionInstance {
+	return &compiledFunctionInstance{
+		codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
 		stackPointerCeil:      c.stackPointerCeil,
-		source:                newSourceInstance,
-		moduleInstanceAddress: uintptr(unsafe.Pointer(newSourceInstance.Module)),
+		source:                f,
+		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
 		codeSegment:           c.codeSegment,
 		staticData:            c.staticData,
+		parent:                c,
 	}
 }
 
@@ -228,14 +245,15 @@ const (
 	callEngineModuleContextTableElement0AddressOffset             = 72
 	callEngineModuleContextTableSliceLenOffset                    = 80
 	callEngineModuleContextCompiledFunctionsElement0AddressOffset = 88
+	callEngineModuleContextTypeIDsElement0AddressOffset           = 96
 
 	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset     = 96
-	callEngineValueStackContextStackBasePointerOffset = 104
+	callEngineValueStackContextStackPointerOffset     = 104
+	callEngineValueStackContextStackBasePointerOffset = 112
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextJITCallStatusCodeOffset          = 112
-	callEngineExitContextBuiltinFunctionCallAddressOffset = 116
+	callEngineExitContextJITCallStatusCodeOffset          = 120
+	callEngineExitContextBuiltinFunctionCallAddressOffset = 124
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -244,17 +262,18 @@ const (
 	callFrameReturnStackBasePointerOffset  = 8
 	callFrameCompiledFunctionOffset        = 16
 
-	// Offsets for compiledFunction.
-	compiledFunctionCodeInitialAddressOffset    = 0
-	compiledFunctionStackPointerCeilOffset      = 8
-	compiledFunctionSourceOffset                = 16
-	compiledFunctionModuleInstanceAddressOffset = 24
+	// Offsets for compiledFunctionInstance.
+	compiledFunctionInstanceCodeInitialAddressOffset    = 0
+	compiledFunctionInstanceStackPointerCeilOffset      = 8
+	compiledFunctionInstanceSourceOffset                = 16
+	compiledFunctionInstanceModuleInstanceAddressOffset = 24
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset = 48
 	moduleInstanceMemoryOffset  = 72
 	moduleInstanceTableOffset   = 80
 	moduleInstanceEngineOffset  = 120
+	moduleInstanceTypeIDsOffset = 136
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -334,6 +353,20 @@ func (s jitCallStatusCode) String() (ret string) {
 		ret = "call_builtin_function"
 	case jitCallStatusCodeUnreachable:
 		ret = "unreachable"
+	case jitCallStatusCodeInvalidFloatToIntConversion:
+		ret = "invalid float to int conversion"
+	case jitCallStatusCodeMemoryOutOfBounds:
+		ret = "memory out of bounds"
+	case jitCallStatusCodeInvalidTableAccess:
+		ret = "invalid table access"
+	case jitCallStatusCodeTypeMismatchOnIndirectCall:
+		ret = "type mismatch on indirect call"
+	case jitCallStatusIntegerOverflow:
+		ret = "integer overflow"
+	case jitCallStatusIntegerDivisionByZero:
+		ret = "integer division by zero"
+	default:
+		panic("BUG")
 	}
 	return
 }
@@ -359,13 +392,63 @@ func releaseCompiledFunction(compiledFn *compiledFunction) {
 		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
 		// functions can return errors, they are ignored. To make these visible for troubleshooting, we panic
 		// with additional context. module+funcidx should be enough, but if not, we can add more later.
-		panic(fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", compiledFn.source.Module.Name, compiledFn.source.Index, err))
+		panic(fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", compiledFn.sourceModule.NameSection.ModuleName,
+			compiledFn.indexInModule, err))
 	}
 }
 
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *engine) ReleaseCompilationCache(module *wasm.Module) {
-	e.deleteCachedCompiledFunctions(module)
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *engine) DeleteCompiledModule(module *wasm.Module) {
+	e.deleteCompiledFunctions(module)
+}
+
+// CompileModule implements the same method as documented on wasm.Engine.
+func (e *engine) CompileModule(module *wasm.Module) error {
+	if _, ok := e.getCompiledFunctions(module); ok { // cache hit!
+		return nil
+	}
+
+	funcs := make([]*compiledFunction, 0, len(module.FunctionSection))
+
+	if module.IsHostMdule() {
+		for funcIndex := range module.HostFunctionSection {
+			compiled, err := compileHostFunction(module.TypeSection[module.FunctionSection[funcIndex]])
+			if err != nil {
+				return fmt.Errorf("function[%d/%d] %w", funcIndex, len(module.FunctionSection)-1, err)
+			}
+
+			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
+			// finalizer due to how moduleEngine.Close is implemented.
+			e.setFinalizer(compiled, releaseCompiledFunction)
+
+			compiled.indexInModule = wasm.Index(funcIndex)
+			compiled.sourceModule = module
+			funcs = append(funcs, compiled)
+		}
+	} else {
+		irs, err := wazeroir.CompileFunctions(e.enabledFeatures, module)
+		if err != nil {
+			return err
+		}
+
+		for funcIndex := range module.FunctionSection {
+			compiled, err := compileWasmFunction(e.enabledFeatures, irs[funcIndex])
+			if err != nil {
+				return fmt.Errorf("function[%d/%d] %w", funcIndex, len(module.FunctionSection)-1, err)
+			}
+
+			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
+			// finalizer due to how moduleEngine.Close is implemented.
+			e.setFinalizer(compiled, releaseCompiledFunction)
+
+			compiled.indexInModule = wasm.Index(funcIndex)
+			compiled.sourceModule = module
+
+			funcs = append(funcs, compiled)
+		}
+	}
+	e.addCompiledFunctions(module, funcs)
+	return nil
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
@@ -373,50 +456,24 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
-		compiledFunctions:     make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
-		parentEngine:          e,
+		compiledFunctions:     make([]*compiledFunctionInstance, 0, imported+uint32(len(moduleFunctions))),
 		importedFunctionCount: imported,
 	}
 
-	for idx, f := range importedFunctions {
-		cf, ok := e.getCompiledFunction(f)
-		if !ok {
-			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
-		}
+	for _, f := range importedFunctions {
+		cf := f.Module.Engine.(*moduleEngine).compiledFunctions[f.Index]
 		me.compiledFunctions = append(me.compiledFunctions, cf)
 	}
 
-	if cached, ok := e.getCachedCompiledFunctions(module); ok { // cache hit.
-		for i, c := range cached[len(importedFunctions):] {
-			cloned := c.clone(moduleFunctions[i])
-			me.compiledFunctions = append(me.compiledFunctions, cloned)
-		}
-	} else { // cache miss.
-		for i, f := range moduleFunctions {
-			var compiled *compiledFunction
-			var err error
-			if f.Kind == wasm.FunctionKindWasm {
-				compiled, err = compileWasmFunction(e.enabledFeatures, f)
-			} else {
-				compiled, err = compileHostFunction(f)
-			}
-			if err != nil {
-				me.Close() // safe because the reference to me was never leaked.
-				return nil, fmt.Errorf("function[%s(%d/%d)] %w", f.DebugName, i, len(moduleFunctions)-1, err)
-			}
+	compiledFunctions, ok := e.getCompiledFunctions(module)
+	if !ok {
+		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
+	}
 
-			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-			// finalizer due to how moduleEngine.Close is implemented.
-			e.setFinalizer(compiled, releaseCompiledFunction)
-
-			me.compiledFunctions = append(me.compiledFunctions, compiled)
-
-			// Add the compiled function to the store-wide engine as well so that
-			// the future importing module can refer the function instance.
-			e.addCompiledFunction(f, compiled)
-		}
-
-		e.addCachedCompiledFunctions(module, me.compiledFunctions)
+	for i, c := range compiledFunctions {
+		f := moduleFunctions[i]
+		insntantiatedCompiledFunction := c.instantiate(f)
+		me.compiledFunctions = append(me.compiledFunctions, insntantiatedCompiledFunction)
 	}
 
 	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
@@ -425,71 +482,22 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	return me, nil
 }
 
-// Close is guarded by the caller with CAS, which means it happens only once. However, there is a race-condition
-// inside the critical section: functions are removed from the parent engine, but there's no guard to prevent this
-// moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
-// and even after it new calls can be made, given a reference to this moduleEngine.
-//
-// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here. So, this
-// relies on the fact that NewModuleEngine already added a finalizer for each compiledFunction,
-//
-// Note that the finalizer is a queue of work to be done at some point (perhaps never). In worst case, the finalizer
-// doesn't run and functions in already closed modules retain memory until exhaustion.
-//
-// Potential future design (possibly faulty, so expect impl to be more complete or better):
-//  * Change this to implement io.Closer and document this is blocking
-//    * This implies adding docs can suggest this is run in a goroutine
-//    * io.Closer allows an error return we can use in case an unrecoverable error happens
-//  * Continue to guard with CAS so that close is only executed once
-//  * Once in the critical section, write a status bit to a fixed memory location.
-//    * End new calls with a Closed Error if this is read.
-//    * This guard allows Close to eventually complete.
-//  * Block exiting the critical section until all in-flight calls complete.
-//    * Knowing which in-flight calls from other modules, that can use this module may be tricky
-//    * Pure wasm functions can be left to complete.
-//    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
-func (me *moduleEngine) Close() {
-	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
-		// NOTE: we still rely on the finalizer of cf until the notes on this function are addressed.
-		me.parentEngine.deleteCompiledFunction(cf.source)
-	}
-}
-
-func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
+func (e *engine) deleteCompiledFunctions(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.compiledFunctions, f)
+	delete(e.compiledFunctions, module)
 }
 
-func (e *engine) addCompiledFunction(f *wasm.FunctionInstance, cf *compiledFunction) {
+func (e *engine) addCompiledFunctions(module *wasm.Module, fs []*compiledFunction) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.compiledFunctions[f] = cf
+	e.compiledFunctions[module] = fs
 }
 
-func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunction, ok bool) {
+func (e *engine) getCompiledFunctions(module *wasm.Module) (fs []*compiledFunction, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	cf, ok = e.compiledFunctions[f]
-	return
-}
-func (e *engine) deleteCachedCompiledFunctions(module *wasm.Module) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	delete(e.cachedCompiledFunctionsPerModule, module)
-}
-
-func (e *engine) addCachedCompiledFunctions(module *wasm.Module, fs []*compiledFunction) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	e.cachedCompiledFunctionsPerModule[module] = fs
-}
-
-func (e *engine) getCachedCompiledFunctions(module *wasm.Module) (fs []*compiledFunction, ok bool) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
-	fs, ok = e.cachedCompiledFunctionsPerModule[module]
+	fs, ok = e.compiledFunctions[module]
 	return
 }
 
@@ -569,10 +577,9 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 
 func newEngine(enabledFeatures wasm.Features) *engine {
 	return &engine{
-		enabledFeatures:                  enabledFeatures,
-		compiledFunctions:                map[*wasm.FunctionInstance]*compiledFunction{},
-		cachedCompiledFunctionsPerModule: map[*wasm.Module][]*compiledFunction{},
-		setFinalizer:                     runtime.SetFinalizer,
+		enabledFeatures:   enabledFeatures,
+		compiledFunctions: map[*wasm.Module][]*compiledFunction{},
+		setFinalizer:      runtime.SetFinalizer,
 	}
 }
 
@@ -721,7 +728,7 @@ func (ce *callEngine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, c
 	}
 }
 
-func (ce *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunctionInstance) {
 	// Push the initial callframe.
 	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
 	ce.globalContext.callFrameStackPointer++
@@ -817,8 +824,8 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
-func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	compiler, err := newCompiler(f, nil)
+func compileHostFunction(sig *wasm.FunctionType) (*compiledFunction, error) {
+	compiler, err := newCompiler(&wazeroir.CompilationResult{Signature: sig})
 	if err != nil {
 		return nil, err
 	}
@@ -832,21 +839,11 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	return &compiledFunction{
-		source:                f,
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-	}, nil
+	return &compiledFunction{codeSegment: code}, nil
 }
 
-func compileWasmFunction(enabledFeatures wasm.Features, f *wasm.FunctionInstance) (*compiledFunction, error) {
-	ir, err := wazeroir.Compile(enabledFeatures, f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
-	}
-
-	compiler, err := newCompiler(f, ir)
+func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.CompilationResult) (*compiledFunction, error) {
+	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
 	}
@@ -1029,12 +1026,5 @@ func compileWasmFunction(enabledFeatures wasm.Features, f *wasm.FunctionInstance
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	return &compiledFunction{
-		source:                f,
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-		stackPointerCeil:      stackPointerCeil,
-		staticData:            staticData,
-	}, nil
+	return &compiledFunction{codeSegment: code, stackPointerCeil: stackPointerCeil, staticData: staticData}, nil
 }

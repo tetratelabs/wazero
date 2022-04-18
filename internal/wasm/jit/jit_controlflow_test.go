@@ -529,13 +529,15 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
 		env.setTable(make([]interface{}, 10))
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+			Signature: &wasm.FunctionType{},
+			Types:     []*wasm.FunctionType{{}},
+			HasTable:  true,
+		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		targetOperation := &wazeroir.OperationCallIndirect{}
-		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
-		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}
 
 		// Place the offset value.
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
@@ -557,18 +559,21 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("uninitialized", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+			Signature: &wasm.FunctionType{},
+			Types:     []*wasm.FunctionType{{}},
+			HasTable:  true,
+		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
-		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table := make([]interface{}, 10)
 		env.setTable(table)
+		env.module().TypeIDs = make([]wasm.FunctionTypeID, 10)
 		table[0] = nil
 
 		// Place the offset value.
@@ -591,19 +596,23 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("type not match", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+			Signature: &wasm.FunctionType{},
+			Types:     []*wasm.FunctionType{{}},
+			HasTable:  true,
+		})
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
-		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
+		env.module().TypeIDs = []wasm.FunctionTypeID{1000}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table := make([]interface{}, 10)
 		env.setTable(table)
 
-		cf := &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
+		cf := &compiledFunctionInstance{source: &wasm.FunctionInstance{TypeID: 50}}
 		table[0] = cf
 
 		// Place the offset value.
@@ -622,7 +631,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
+		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall.String(), env.jitStatus().String())
 	})
 
 	t.Run("ok", func(t *testing.T) {
@@ -641,9 +650,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 				// and the typeID  matches the table[targetOffset]'s type ID.
-				env.module().Types = make([]*wasm.TypeInstance, 100)
-				env.module().Types[operation.TypeIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
-				env.module().Engine = &moduleEngine{compiledFunctions: []*compiledFunction{}}
+				env.module().TypeIDs = make([]wasm.FunctionTypeID, 100)
+				env.module().TypeIDs[operation.TypeIndex] = targetTypeID
+				env.module().Engine = &moduleEngine{compiledFunctions: []*compiledFunctionInstance{}}
 
 				me := env.moduleEngine()
 				for i := 0; i < len(table); i++ {
@@ -666,7 +675,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
-						cf := &compiledFunction{
+						cf := &compiledFunctionInstance{
 							codeSegment:           code,
 							codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
 							moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
@@ -686,7 +695,11 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							env.setCallFrameStackPointerLen(1)
 						}
 
-						compiler := env.requireNewCompiler(t, newCompiler, nil)
+						compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+							Signature: targetType,
+							Types:     []*wasm.FunctionType{targetType},
+							HasTable:  true,
+						})
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
@@ -726,7 +739,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							)
 						}
 
-						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+						require.Equal(t, jitCallStatusCodeReturned.String(), env.jitStatus().String())
 						require.Equal(t, uint64(1), env.stackPointer())
 						require.Equal(t, expectedReturnValue, uint32(env.ce.popValue()))
 					})
@@ -763,7 +776,7 @@ func TestCompiler_compileCall(t *testing.T) {
 				// the mutex lock and must release on the cleanup of each subtest.
 				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
-					compiler := env.requireNewCompiler(t, newCompiler, targetFunctionType)
+					compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: targetFunctionType})
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -779,7 +792,7 @@ func TestCompiler_compileCall(t *testing.T) {
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					index := wasm.Index(i)
-					me.compiledFunctions = append(me.compiledFunctions, &compiledFunction{
+					me.compiledFunctions = append(me.compiledFunctions, &compiledFunctionInstance{
 						codeSegment:           code,
 						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
 						moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
@@ -790,7 +803,12 @@ func TestCompiler_compileCall(t *testing.T) {
 			}
 
 			// Now we start building the caller's code.
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				Signature: &wasm.FunctionType{},
+				Functions: make([]uint32, numCalls),
+				Types:     []*wasm.FunctionType{targetFunctionType},
+			})
+
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
@@ -889,7 +907,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 				require.NoError(t, err)
 
 				// Compiles and adds to the engine.
-				compiledFunction := &compiledFunction{
+				compiledFunction := &compiledFunctionInstance{
 					codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 				}

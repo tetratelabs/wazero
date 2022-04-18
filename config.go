@@ -158,7 +158,7 @@ type CompiledCode struct {
 func (c *CompiledCode) Close() {
 	for engine, modules := range c.cachedEngines {
 		for module := range modules {
-			engine.ReleaseCompilationCache(module)
+			engine.DeleteCompiledModule(module)
 		}
 	}
 }
