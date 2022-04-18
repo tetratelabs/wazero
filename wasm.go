@@ -211,7 +211,8 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 
 	module := config.replaceImports(code.module)
 	if module != code.module {
-		// IF the module changed, we have to Compile again before instantiation.
+		// If replacing imports had an effect, the module changed, so we have to recompile it.
+		// TODO: maybe we should move replaceImports configs into CompileModule.
 		if err = r.store.Engine.CompileModule(module); err != nil {
 			return nil, err
 		}
