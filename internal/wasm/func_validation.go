@@ -729,7 +729,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -741,7 +741,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -761,7 +761,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
+			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1117,22 +1117,12 @@ type controlBlock struct {
 	op Opcode
 }
 
-func decodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
 		if index < 0 || (index >= int64(len(types))) {
 			return nil, fmt.Errorf("type index out of range: %d", index)
 		}
 		return types[index], nil
-	}, r, enabledFeatures)
-}
-
-// DecodeBlockType is exported for use in the compiler
-func DecodeBlockType(types []*TypeInstance, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
-	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
-		if index < 0 || (index >= int64(len(types))) {
-			return nil, fmt.Errorf("type index out of range: %d", index)
-		}
-		return types[index].Type, nil
 	}, r, enabledFeatures)
 }
 

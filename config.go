@@ -155,10 +155,12 @@ type CompiledCode struct {
 }
 
 // Close releases all the allocated resources for this CompiledCode.
+//
+// Note: it is safe to call Close while having outstanding calls from Modules instantiated from this *CompiledCode.
 func (c *CompiledCode) Close() {
 	for engine, modules := range c.cachedEngines {
 		for module := range modules {
-			engine.ReleaseCompilationCache(module)
+			engine.DeleteCompiledModule(module)
 		}
 	}
 }

@@ -167,7 +167,7 @@ func TestModule_allDeclarations(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			functions, globals, memory, table, err := tc.module.allDeclarations()
+			functions, globals, memory, table, err := tc.module.AllDeclarations()
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedFunctions, functions)
 			require.Equal(t, tc.expectedGlobals, globals)

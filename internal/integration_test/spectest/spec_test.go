@@ -267,6 +267,9 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
+	err = store.Engine.CompileModule(mod)
+	require.NoError(t, err)
+
 	_, err = store.Instantiate(context.Background(), mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
 	require.NoError(t, err)
 }
@@ -334,6 +337,8 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 								moduleName = c.Filename
 							}
 						}
+						err = store.Engine.CompileModule(mod)
+						require.NoError(t, err, msg)
 						moduleName = strings.TrimPrefix(moduleName, "$")
 						_, err = store.Instantiate(context.Background(), mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
@@ -454,6 +459,11 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 	}
 
 	err = mod.Validate(store.EnabledFeatures)
+	if err != nil {
+		return
+	}
+
+	err = store.Engine.CompileModule(mod)
 	if err != nil {
 		return
 	}

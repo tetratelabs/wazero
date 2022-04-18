@@ -21,60 +21,39 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
-	enabledFeatures                  wasm.Features
-	compiledFunctions                map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
-	cachedCompiledFunctionsPerModule map[*wasm.Module][]*compiledFunction         // guarded by mutex.
-	mux                              sync.RWMutex
+	enabledFeatures wasm.Features
+	codes           map[*wasm.Module][]*code // guarded by mutex.
+	mux             sync.RWMutex
 }
 
 func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return &engine{
-		enabledFeatures:                  enabledFeatures,
-		compiledFunctions:                make(map[*wasm.FunctionInstance]*compiledFunction),
-		cachedCompiledFunctionsPerModule: map[*wasm.Module][]*compiledFunction{},
+		enabledFeatures: enabledFeatures,
+		codes:           map[*wasm.Module][]*code{},
 	}
 }
 
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *engine) ReleaseCompilationCache(m *wasm.Module) {
-	e.deleteCachedCompiledFunctions(m)
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *engine) DeleteCompiledModule(m *wasm.Module) {
+	e.deleteCodes(m)
 }
 
-func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
+func (e *engine) deleteCodes(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	delete(e.compiledFunctions, f)
+	delete(e.codes, module)
 }
 
-func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunction, ok bool) {
+func (e *engine) addCodes(module *wasm.Module, fs []*code) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.codes[module] = fs
+}
+
+func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	cf, ok = e.compiledFunctions[f]
-	return
-}
-
-func (e *engine) addCompiledFunction(f *wasm.FunctionInstance, cf *compiledFunction) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	e.compiledFunctions[f] = cf
-}
-
-func (e *engine) deleteCachedCompiledFunctions(module *wasm.Module) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	delete(e.cachedCompiledFunctionsPerModule, module)
-}
-
-func (e *engine) addCachedCompiledFunctions(module *wasm.Module, fs []*compiledFunction) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	e.cachedCompiledFunctionsPerModule[module] = fs
-}
-
-func (e *engine) getCachedCompiledFunctions(module *wasm.Module) (fs []*compiledFunction, ok bool) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
-	fs, ok = e.cachedCompiledFunctionsPerModule[module]
+	fs, ok = e.codes[module]
 	return
 }
 
@@ -83,9 +62,9 @@ type moduleEngine struct {
 	// name is the name the module was instantiated with used for error handling.
 	name string
 
-	// compiledFunctions are the compiled functions in a module instances.
+	// codes are the compiled functions in a module instances.
 	// The index is module instance-scoped.
-	compiledFunctions []*compiledFunction
+	functions []*function
 
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine          *engine
@@ -158,25 +137,28 @@ func (ce *callEngine) popFrame() (frame *callFrame) {
 }
 
 type callFrame struct {
-	// pc is the program counter representing the current position in compiledFunction.body.
+	// pc is the program counter representing the current position in code.body.
 	pc uint64
 	// f is the compiled function used in this function frame.
-	f *compiledFunction
+	f *function
 }
 
-type compiledFunction struct {
-	moduleEngine *moduleEngine
-	source       *wasm.FunctionInstance
-	body         []*interpreterOp
-	hostFn       *reflect.Value
+type code struct {
+	body   []*interpreterOp
+	hostFn *reflect.Value
 }
 
-func (c *compiledFunction) clone(me *moduleEngine, newSourceInstance *wasm.FunctionInstance) *compiledFunction {
-	return &compiledFunction{
-		moduleEngine: me,
-		source:       newSourceInstance,
-		body:         c.body,
-		hostFn:       c.hostFn,
+type function struct {
+	source *wasm.FunctionInstance
+	body   []*interpreterOp
+	hostFn *reflect.Value
+}
+
+func (c *code) instantiate(f *wasm.FunctionInstance) *function {
+	return &function{
+		source: f,
+		body:   c.body,
+		hostFn: c.hostFn,
 	}
 }
 
@@ -188,78 +170,73 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
+// CompileModule implements the same method as documented on wasm.Engine.
+func (e *engine) CompileModule(module *wasm.Module) error {
+	if _, ok := e.getCodes(module); ok { // cache hit!
+		return nil
+	}
+
+	funcs := make([]*code, 0, len(module.FunctionSection))
+	if module.IsHostModule() {
+		// If this is the host module, there's nothing to do as the runtime reprsentation of
+		// host function in interpreter is its Go function itself as opposed to Wasm functions,
+		// which need to be compiled down to wazeroir.
+		for _, hf := range module.HostFunctionSection {
+			funcs = append(funcs, &code{hostFn: hf})
+		}
+	} else {
+		irs, err := wazeroir.CompileFunctions(e.enabledFeatures, module)
+		if err != nil {
+			return err
+		}
+		for i, ir := range irs {
+			compiled, err := e.lowerIR(ir)
+			if err != nil {
+				return fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(module.FunctionSection)-1, err)
+			}
+			funcs = append(funcs, compiled)
+		}
+	}
+	e.addCodes(module, funcs)
+	return nil
+
+}
+
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, source *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
-		compiledFunctions:     make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
 		parentEngine:          e,
 		importedFunctionCount: imported,
 	}
 
-	for idx, f := range importedFunctions {
-		cf, ok := e.getCompiledFunction(f)
-		if !ok {
-			return nil, fmt.Errorf("import[%d] func[%s]: uncompiled", idx, f.DebugName)
-		}
-		me.compiledFunctions = append(me.compiledFunctions, cf)
+	for _, f := range importedFunctions {
+		cf := f.Module.Engine.(*moduleEngine).functions[f.Index]
+		me.functions = append(me.functions, cf)
 	}
 
-	if cached, ok := e.getCachedCompiledFunctions(source); ok { // cache hit
-		for i, c := range cached[len(importedFunctions):] {
-			cloned := c.clone(me, moduleFunctions[i])
-			me.compiledFunctions = append(me.compiledFunctions, cloned)
-		}
-	} else { // cache miss
-		for i, f := range moduleFunctions {
-			var compiled *compiledFunction
-			if f.Kind == wasm.FunctionKindWasm {
-				ir, err := wazeroir.Compile(e.enabledFeatures, f)
-				if err != nil {
-					me.Close()
-					// TODO(Adrian): extract Module.funcDesc so that errors here have more context
-					return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
-				}
+	codes, ok := e.getCodes(module)
+	if !ok {
+		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
+	}
 
-				compiled, err = e.lowerIROps(f, ir.Operations)
-				if err != nil {
-					me.Close()
-					return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
-				}
-			} else {
-				compiled = &compiledFunction{hostFn: f.GoFunc, source: f}
-			}
-			compiled.moduleEngine = me
-			me.compiledFunctions = append(me.compiledFunctions, compiled)
-
-			// Add the compiled function to the store-wide engine as well so that
-			// the future importing module can refer the function instance.
-			e.addCompiledFunction(f, compiled)
-		}
-
-		e.addCachedCompiledFunctions(source, me.compiledFunctions)
+	for i, c := range codes {
+		f := moduleFunctions[i]
+		insntantiatedcode := c.instantiate(f)
+		me.functions = append(me.functions, insntantiatedcode)
 	}
 
 	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
-		table.Table[elemIdx] = me.compiledFunctions[funcidx]
+		table.Table[elemIdx] = me.functions[funcidx]
 	}
 	return me, nil
 }
 
-// Release implements wasm.Engine Release
-func (me *moduleEngine) Release() error {
-	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
-		me.parentEngine.deleteCompiledFunction(cf.source)
-	}
-	return nil
-}
-
-// lowerIROps lowers the wazeroir operations to engine friendly struct.
-func (e *engine) lowerIROps(f *wasm.FunctionInstance,
-	ops []wazeroir.Operation) (*compiledFunction, error) {
-	ret := &compiledFunction{source: f}
+// lowerIR lowers the wazeroir operations to engine friendly struct.
+func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
+	ops := ir.Operations
+	ret := &code{}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -352,9 +329,8 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 			op.us = make([]uint64, 1)
 			op.us = []uint64{uint64(o.FunctionIndex)}
 		case *wazeroir.OperationCallIndirect:
-			op.us = make([]uint64, 2)
-			op.us[0] = uint64(o.TableIndex)
-			op.us[1] = uint64(f.Module.Types[o.TypeIndex].TypeID)
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TypeIndex)
 		case *wazeroir.OperationDrop:
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Depth
@@ -538,11 +514,11 @@ func (me *moduleEngine) Name() string {
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
-	// compiledFunctions on close aren't locked, neither is this read.
-	compiled := me.compiledFunctions[f.Index]
+	// codes on close aren't locked, neither is this read.
+	compiled := me.functions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = m.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
+			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", me.name, f.Index))
 		}
 		return
 	}
@@ -588,7 +564,7 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 	return
 }
 
-func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *function) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -642,13 +618,14 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	ce.popFrame()
 }
 
-func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
 	table := moduleInst.Table
-	compiledFunctions := f.moduleEngine.compiledFunctions
+	typeIDs := f.source.Module.TypeIDs
+	functions := f.source.Module.Engine.(*moduleEngine).functions
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -686,7 +663,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindCall:
 			{
-				f := compiledFunctions[op.us[0]]
+				f := functions[op.us[0]]
 				if f.hostFn != nil {
 					ce.callHostFunc(ctx, f)
 				} else {
@@ -700,18 +677,18 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if offset >= uint64(len(table.Table)) {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
-				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
+				targetcode, ok := table.Table[offset].(*function)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-				} else if uint64(targetCompiledFunction.source.TypeID) != op.us[1] {
+				} else if targetcode.source.TypeID != typeIDs[op.us[0]] {
 					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
 				// Call in.
-				if targetCompiledFunction.hostFn != nil {
-					ce.callHostFunc(ctx, targetCompiledFunction)
+				if targetcode.hostFn != nil {
+					ce.callHostFunc(ctx, targetcode)
 				} else {
-					ce.callNativeFunc(ctx, targetCompiledFunction)
+					ce.callNativeFunc(ctx, targetcode)
 				}
 				frame.pc++
 			}
@@ -1620,11 +1597,4 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 		}
 	}
 	ce.popFrame()
-}
-
-// Close releases all the function instances declared in this module.
-func (me *moduleEngine) Close() {
-	for _, cf := range me.compiledFunctions[me.importedFunctionCount:] {
-		me.parentEngine.deleteCompiledFunction(cf.source)
-	}
 }

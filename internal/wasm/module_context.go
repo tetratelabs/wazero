@@ -89,7 +89,6 @@ func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return nil
 	}
-	m.module.Engine.Close()
 	m.store.deleteModule(m.Name())
 	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
 		return sys.Close()

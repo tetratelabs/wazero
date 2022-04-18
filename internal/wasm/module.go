@@ -210,7 +210,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
-	functions, globals, memory, table, err := m.allDeclarations()
+	functions, globals, memory, table, err := m.AllDeclarations()
 	if err != nil {
 		return err
 	}
@@ -692,8 +692,8 @@ type NameMapAssoc struct {
 	NameMap NameMap
 }
 
-// allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
-func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
+// AllDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
+func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
 	for _, imp := range m.ImportSection {
 		switch imp.Type {
 		case ExternTypeFunc:

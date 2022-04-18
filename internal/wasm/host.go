@@ -67,6 +67,10 @@ func NewHostModule(
 	return
 }
 
+func (m *Module) IsHostModule() bool {
+	return len(m.HostFunctionSection) > 0
+}
+
 func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Features) error {
 	funcCount := uint32(len(nameToGoFunc))
 	funcNames := make([]string, 0, funcCount)

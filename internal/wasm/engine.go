@@ -3,6 +3,9 @@ package wasm
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or JIT compiler.
 type Engine interface {
+	// CompileModule implements the same method as documented on wasm.Engine.
+	CompileModule(module *Module) error
+
 	// NewModuleEngine compiles down the function instances in a module, and returns ModuleEngine for the module.
 	//
 	// * name is the name the module was instantiated with used for error handling.
@@ -16,8 +19,10 @@ type Engine interface {
 	// due to reasons such as out-of-bounds.
 	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance, table *TableInstance, tableInit map[Index]Index) (ModuleEngine, error)
 
-	// ReleaseCompilationCache releases compilation caches for the given module (source).
-	ReleaseCompilationCache(module *Module)
+	// DeleteCompiledModule releases compilation caches for the given module (source).
+	// Note: it is safe to call this function for a module from which module instances are instantiated even when these module instances
+	// are having outstanding calls.
+	DeleteCompiledModule(module *Module)
 }
 
 // ModuleEngine implements function calls for a given module.
@@ -29,7 +34,4 @@ type ModuleEngine interface {
 	// Returns the results from the function.
 	// The ctx's context.Context will be the outer-most ancestor of the argument to api.Function.
 	Call(ctx *ModuleContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
-
-	// Close releases all the function instances declared in this module.
-	Close()
 }

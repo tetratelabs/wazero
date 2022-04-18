@@ -247,17 +247,18 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 		}
 	}
 
-	if module, err := wasm.NewHostModule(
-		b.moduleName,
-		b.nameToGoFunc,
-		b.nameToMemory,
-		b.nameToGlobal,
-		b.r.enabledFeatures,
-	); err != nil {
+	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
+	if err != nil {
 		return nil, err
-	} else {
-		return &CompiledCode{module: module}, nil
 	}
+
+	if err = b.r.store.Engine.CompileModule(module); err != nil {
+		return nil, err
+	}
+
+	ret := &CompiledCode{module: module}
+	ret.addCacheEntry(module, b.r.store.Engine)
+	return &CompiledCode{module: module}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
@@ -265,6 +266,9 @@ func (b *moduleBuilder) Instantiate() (api.Module, error) {
 	if module, err := b.Build(); err != nil {
 		return nil, err
 	} else {
+		if err = b.r.store.Engine.CompileModule(module.module); err != nil {
+			return nil, err
+		}
 		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside of this function.
 		defer module.Close()
 		return b.r.InstantiateModuleWithConfig(module, NewModuleConfig().WithName(b.moduleName))

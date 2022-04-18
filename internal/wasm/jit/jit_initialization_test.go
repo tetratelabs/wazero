@@ -8,6 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func TestCompiler_compileModuleContextInitialization(t *testing.T) {
@@ -21,13 +22,15 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
+				TypeIDs: make([]wasm.FunctionTypeID, 10),
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:  &wasm.TableInstance{Table: make([]interface{}, 20)},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
+				TypeIDs: make([]wasm.FunctionTypeID, 10),
 			},
 		},
 		{
@@ -35,19 +38,22 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
+				TypeIDs: make([]wasm.FunctionTypeID, 10),
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:  &wasm.TableInstance{Table: nil},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:   &wasm.TableInstance{Table: nil},
+				TypeIDs: make([]wasm.FunctionTypeID, 10),
 			},
 		},
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				Table: &wasm.TableInstance{Table: make([]interface{}, 0)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 0)},
+				TypeIDs: make([]wasm.FunctionTypeID, 10),
 			},
 		},
 		{
@@ -67,8 +73,15 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			env.moduleInstance = tc.moduleInstance
 			ce := env.callEngine()
 
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
-			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
+			ir := &wazeroir.CompilationResult{
+				HasMemory: tc.moduleInstance.Memory != nil,
+				HasTable:  tc.moduleInstance.Table != nil,
+			}
+			for _, g := range tc.moduleInstance.Globals {
+				ir.Globals = append(ir.Globals, g.Type)
+			}
+			compiler := env.requireNewCompiler(t, newCompiler, ir)
+			me := &moduleEngine{functions: make([]*function, 10)}
 			tc.moduleInstance.Engine = me
 
 			// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
@@ -104,9 +117,10 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
 				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
+				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.TypeIDs[0])), ce.moduleContext.typeIDsElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&me.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.codesElement0Address)
 		})
 	}
 }

@@ -277,8 +277,9 @@ func callReturnImportSource(importedModule, importingModule string) []byte {
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 	tests := []struct {
-		name, function                string
-		closeImporting, closeImported uint32
+		name, function                        string
+		closeImporting, closeImported         uint32
+		closeImportingCode, closeImportedCode bool
 	}{
 		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
 			name:           "importing",
@@ -292,11 +293,33 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			closeImporting: 1,
 			closeImported:  2,
 		},
+		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+			name:              "importing",
+			function:          "call_return_import",
+			closeImporting:    1,
+			closeImportedCode: true,
+		},
+		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+			name:               "importing",
+			function:           "call_return_import",
+			closeImporting:     1,
+			closeImportedCode:  true,
+			closeImportingCode: true,
+		},
+		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
+		{ // Ex. A function that stops the runtime.
+			name:               "both",
+			function:           "call_return_import",
+			closeImporting:     1,
+			closeImported:      2,
+			closeImportingCode: true,
+		},
 	}
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
+			var importingCode, importedCode *wazero.CompiledCode
 			var imported, importing api.Module
 			var err error
 			closeAndReturn := func(x uint32) uint32 {
@@ -306,18 +329,30 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 				if tc.closeImported != 0 {
 					require.NoError(t, imported.CloseWithExitCode(tc.closeImported))
 				}
+				if tc.closeImportedCode {
+					importedCode.Close()
+				}
+				if tc.closeImportingCode {
+					importingCode.Close()
+				}
 				return x
 			}
 
 			// Create the host module, which exports the function that closes the importing module.
-			imported, err = r.NewModuleBuilder(t.Name()+"-imported").
-				ExportFunction("return_input", closeAndReturn).Instantiate()
+			importedCode, err = r.NewModuleBuilder(t.Name()+"-imported").
+				ExportFunction("return_input", closeAndReturn).Build()
+			require.NoError(t, err)
+
+			imported, err = r.InstantiateModule(importedCode)
 			require.NoError(t, err)
 			defer imported.Close()
 
 			// Import that module.
 			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-			importing, err = r.InstantiateModuleFromCode(source)
+			importingCode, err = r.CompileModule(source)
+			require.NoError(t, err)
+
+			importing, err = r.InstantiateModule(importingCode)
 			require.NoError(t, err)
 			defer importing.Close()
 
