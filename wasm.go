@@ -167,7 +167,7 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 	if err = r.store.Engine.CompileModule(internal); err != nil {
 		return nil, err
 	}
-	return &CompiledCode{module: internal, compiledEngine: r.store.Engine}, nil
+	return &CompiledCode{module: internal}, nil
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
@@ -210,6 +210,13 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 	}
 
 	module := config.replaceImports(code.module)
+	if module != code.module {
+		// If replacing imports had an effect, the module changed, so we have to recompile it.
+		// TODO: maybe we should move replaceImports configs into CompileModule.
+		if err = r.store.Engine.CompileModule(module); err != nil {
+			return nil, err
+		}
+	}
 
 	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
 	if err != nil {
@@ -229,5 +236,6 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 			return
 		}
 	}
+	code.addCacheEntry(module, r.store.Engine)
 	return
 }
