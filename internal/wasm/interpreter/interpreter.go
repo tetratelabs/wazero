@@ -35,22 +35,22 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *engine) DeleteCompiledModule(m *wasm.Module) {
-	e.deletecodes(m)
+	e.deleteCodes(m)
 }
 
-func (e *engine) deletecodes(module *wasm.Module) {
+func (e *engine) deleteCodes(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	delete(e.codes, module)
 }
 
-func (e *engine) addcodes(module *wasm.Module, fs []*code) {
+func (e *engine) addCodes(module *wasm.Module, fs []*code) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	e.codes[module] = fs
 }
 
-func (e *engine) getcodes(module *wasm.Module) (fs []*code, ok bool) {
+func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
 	fs, ok = e.codes[module]
@@ -64,7 +64,7 @@ type moduleEngine struct {
 
 	// codes are the compiled functions in a module instances.
 	// The index is module instance-scoped.
-	codes []*function
+	functions []*function
 
 	// parentEngine holds *engine from which this module engine is created from.
 	parentEngine          *engine
@@ -172,7 +172,7 @@ type interpreterOp struct {
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(module *wasm.Module) error {
-	if _, ok := e.getcodes(module); ok { // cache hit!
+	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
 
@@ -194,7 +194,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 			funcs = append(funcs, compiled)
 		}
 	}
-	e.addcodes(module, funcs)
+	e.addCodes(module, funcs)
 	return nil
 
 }
@@ -209,11 +209,11 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for _, f := range importedFunctions {
-		cf := f.Module.Engine.(*moduleEngine).codes[f.Index]
+		cf := f.Module.Engine.(*moduleEngine).functions[f.Index]
 		me.functions = append(me.functions, cf)
 	}
 
-	codes, ok := e.getcodes(module)
+	codes, ok := e.getCodes(module)
 	if !ok {
 		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
 	}
@@ -622,7 +622,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *function) {
 	globals := moduleInst.Globals
 	table := moduleInst.Table
 	typeIDs := f.source.Module.TypeIDs
-	codes := f.source.Module.Engine.(*moduleEngine).codes
+	functions := f.source.Module.Engine.(*moduleEngine).functions
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -660,7 +660,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *function) {
 			}
 		case wazeroir.OperationKindCall:
 			{
-				f := codes[op.us[0]]
+				f := functions[op.us[0]]
 				if f.hostFn != nil {
 					ce.callHostFunc(ctx, f)
 				} else {

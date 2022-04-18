@@ -59,7 +59,7 @@ func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initT
 	table := make([]interface{}, initTableLen)
 	internal := me.(*moduleEngine)
 	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.codes[fnidx]
+		table[idx] = internal.functions[fnidx]
 	}
 	return table
 }
@@ -259,16 +259,16 @@ func TestEngine_CachedcodesPerModule(t *testing.T) {
 	}
 	m := &wasm.Module{}
 
-	e.addcodes(m, exp)
+	e.addCodes(m, exp)
 
-	actual, ok := e.getcodes(m)
+	actual, ok := e.getCodes(m)
 	require.True(t, ok)
 	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
 
-	e.deletecodes(m)
-	_, ok = e.getcodes(m)
+	e.deleteCodes(m)
+	_, ok = e.getCodes(m)
 	require.False(t, ok)
 }

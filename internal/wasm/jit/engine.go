@@ -164,6 +164,7 @@ type (
 		_ [8]byte
 	}
 
+	// Function corresponds to function instance in Wasm, and is created from `code`.
 	function struct {
 		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
@@ -176,10 +177,12 @@ type (
 		source *wasm.FunctionInstance
 		// moduleInstanceAddress holds the address of source.ModuleInstance.
 		moduleInstanceAddress uintptr
-		// parent holds code from which this is instantiated.
+		// parent holds code from which this is crated.
 		parent *code
 	}
 
+	// code corresponds to a function in a module (not insantaited one). This holds the machine code
+	// compiled by Wazero's JIT compiler.
 	code struct {
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
