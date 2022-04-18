@@ -70,7 +70,7 @@ type (
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
 
-		// TypeIDs map type index(wasm.Index) to typeID which is uniquely assigned by store.
+		// TypeIDs is index-correlated with types and holds typeIDs which is uniquely assigned to a type by store.
 		// This is necessary to achieve fast runtime type checking for indirect function calls at runtime.
 		TypeIDs []FunctionTypeID
 	}
