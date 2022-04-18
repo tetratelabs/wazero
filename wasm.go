@@ -167,7 +167,10 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 	if err = r.store.Engine.CompileModule(internal); err != nil {
 		return nil, err
 	}
-	return &CompiledCode{module: internal}, nil
+
+	ret := &CompiledCode{module: internal}
+	ret.addCacheEntry(internal, r.store.Engine)
+	return ret, nil
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
@@ -216,6 +219,7 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 		if err = r.store.Engine.CompileModule(module); err != nil {
 			return nil, err
 		}
+		code.addCacheEntry(module, r.store.Engine)
 	}
 
 	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
@@ -236,6 +240,5 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 			return
 		}
 	}
-	code.addCacheEntry(module, r.store.Engine)
 	return
 }
