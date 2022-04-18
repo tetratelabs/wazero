@@ -116,14 +116,18 @@ type compiler struct {
 	pc     uint64
 	result CompilationResult
 
-	// Function information
-	body       []byte
-	sig        *wasm.FunctionType
+	// body holds the code for the function's body where Wasm instructions are stored.
+	body []byte
+	// sig is the function type of the target function.
+	sig *wasm.FunctionType
+	// localTypes holds the target function locals' value types.
 	localTypes []wasm.ValueType
 
-	// Module information.
-	types   []*wasm.FunctionType
-	funcs   []uint32
+	// types hold all the function types in the module where the targe function exists.
+	types []*wasm.FunctionType
+	// funcs holds the type indexes for all declard functions in the module where the targe function exists.
+	funcs []uint32
+	// globals holds the global types for all declard globas in the module where the targe function exists.
 	globals []*wasm.GlobalType
 }
 
