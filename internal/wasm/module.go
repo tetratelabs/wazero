@@ -177,6 +177,7 @@ const (
 	MaximumFunctionIndex = uint32(1 << 27)
 )
 
+// AssignModuleID calculates a sha256 checksum on `source` and set Module.ID to the result.
 func (m *Module) AssignModuleID(source []byte) {
 	m.ID = sha256.Sum256(source)
 }
