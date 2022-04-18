@@ -401,7 +401,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 
-	if module.IsHostMdule() {
+	if module.IsHostModule() {
 		for funcIndex := range module.HostFunctionSection {
 			compiled, err := compileHostFunction(module.TypeSection[module.FunctionSection[funcIndex]])
 			if err != nil {
@@ -428,8 +428,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 				return fmt.Errorf("function[%d/%d] %w", funcIndex, len(module.FunctionSection)-1, err)
 			}
 
-			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-			// finalizer due to how moduleEngine.Close is implemented.
+			// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
 			e.setFinalizer(compiled, releaseCode)
 
 			compiled.indexInModule = wasm.Index(funcIndex)

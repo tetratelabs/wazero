@@ -67,7 +67,7 @@ func NewHostModule(
 	return
 }
 
-func (m *Module) IsHostMdule() bool {
+func (m *Module) IsHostModule() bool {
 	return len(m.HostFunctionSection) > 0
 }
 
