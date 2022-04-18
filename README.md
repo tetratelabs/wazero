@@ -41,9 +41,34 @@ wondering how to do something more realistic, like read a file. WebAssembly
 Modules (Wasm) are sandboxed similar to containers. They can't read anything
 on your machine unless you explicitly allow it.
 
-System access is defined by an emerging specification called WebAssembly
-System Interface ([WASI](https://github.com/WebAssembly/WASI)). WASI defines
-how WebAssembly programs interact with the host embedding them.
+The WebAssembly Core Specification is a standard, governed by W3C process, but
+it has no scope to specify how system resources like files are accessed.
+Instead, WebAssembly defines "host functions" and the signatures they can use.
+In wazero, "host functions" are written in Go, and let you do anything
+including access files. The main constraint is that WebAssembly only allows
+numeric types.
+
+For example, you can grant WebAssembly code access to your console by exporting
+a function written in Go. The below function can be imported into standard
+WebAssembly as the module "env" and the function name "log_i32".
+```go
+env, err := r.NewModuleBuilder("env").
+	ExportFunction("log_i32", func(v uint32) {
+		fmt.Println("log_i32 >>", v)
+	}).
+	Instantiate()
+if err != nil {
+	log.Fatal(err)
+}
+defer env.Close()
+```
+
+While not a standards body like W3C, there is another dominant community in the
+WebAssembly ecosystem: [The Bytecode Alliance](https://github.com/bytecodealliance/governance).
+The Bytecode Alliance controls the WebAssembly System Interface ([WASI](https://github.com/WebAssembly/WASI)),
+which is a set of function imports similar to Go's [x/sys/unix](https://pkg.go.dev/golang.org/x/sys/unix).
+The "wasi_snapshot_preview1" version of WASI is widely implemented, so wazero
+bundles an implementation. That way, you don't have to write these functions.
 
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
@@ -56,6 +81,10 @@ module, err := r.InstantiateModule(binary, config)
 defer module.Close()
 ...
 ```
+
+While we hope this deeper dive was useful, we also provide [examples](examples)
+to elaborate each point. Please try these before raising usage questions as
+they may answer them for you!
 
 ## Runtime
 
@@ -121,16 +150,38 @@ This approach ensures compatibility with any parent image.
 
 ## Standards Compliance
 
+wazero understands that while no-one desired to create confusion, confusion
+exists both in what is a standard and what in practice is in fact a standard
+feature. To help with this, we created some guidance both on the status quo
+of WebAssembly portability and what we support.
+
 The [WebAssembly Core Specification 1.0 (20191205)](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205)
 is the only part of the WebAssembly ecosystem that is a W3C recommendation.
 
 In practice, this specification is not enough. Most compilers that target Wasm
-rely both on features that are not yet W3C recommendations, such as
-`bulk-memory-operations` and the [WebAssembly System Interface (WASI)](https://github.com/WebAssembly/WASI),
-whose stable point was a snapshot released at the end of 2020. The aim of this
-section is to familiarize you with what wazero complies with, and through that
-understand the current state of interop that considers both standards (W3C
-recommendations) and non-standard features your tooling may use.
+rely on features that have not yet gone through W3C recommendation process,
+such as `bulk-memory-operations`.
+
+Also, most compilers implement system calls using the WebAssembly System
+Interface ([WASI](https://github.com/WebAssembly/WASI)). While WASI aims to be
+a common layer for portability, it is not governed by a standards body, like
+W3C. Moreover, while commonly implemented, WASI is not yet versioned. Its last
+stable point was the "wasi_snapshot_preview1" tag released at the end of 2020.
+
+While this seems scary, the confusion caused by non-standard features and
+non-standard specifications is not as bad as it sounds. The WebAssembly
+ecosystem is generally responsive regardless of where things are written down
+and wazero provides tools, such as built-in support for WASI, to reduce pain.
+
+The goal of this section isn't to promote a W3C recommendation exclusive
+approach, rather to help you understand common language around portable
+features and which of those wazero supports at the moment. While we consider
+features formalized through W3C recommendation status mandatory, we actively
+pursue non-standard features as well interop with commonly used infrastructure
+such as AssemblyScript.
+
+In summary, we hope this section can guide you in terms of what wazero supports
+as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
 wazero supports the only WebAssembly specification which has reached W3C
