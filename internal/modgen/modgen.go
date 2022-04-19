@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strconv"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -270,7 +271,34 @@ func (g *generator) newConstExpr() (*wasm.ConstantExpression, wasm.ValueType) {
 }
 
 func (g *generator) exportSection() {
+	funcs, globals, table, memory, err := g.m.AllDeclarations()
+	if err != nil {
+		panic("BUG:" + err.Error())
+	}
 
+	var possibleExports []wasm.Export
+	for i := range funcs {
+		possibleExports = append(possibleExports, wasm.Export{Type: wasm.ExternTypeFunc, Index: uint32(i)})
+	}
+	for i := range globals {
+		possibleExports = append(possibleExports, wasm.Export{Type: wasm.ExternTypeGlobal, Index: uint32(i)})
+	}
+	if table != nil {
+		possibleExports = append(possibleExports, wasm.Export{Type: wasm.ExternTypeTable, Index: 0})
+	}
+	if memory != nil {
+		possibleExports = append(possibleExports, wasm.Export{Type: wasm.ExternTypeMemory, Index: 0})
+	}
+
+	numExports := g.nextRandom().Intn(g.size)
+	for i := 0; i < numExports; i++ {
+		target := possibleExports[g.nextRandom().Intn(len(possibleExports))]
+		g.m.ExportSection = append(g.m.ExportSection, &wasm.Export{
+			Type:  target.Type,
+			Index: target.Index,
+			Name:  strconv.Itoa(i),
+		})
+	}
 }
 
 func (g *generator) startSection() {

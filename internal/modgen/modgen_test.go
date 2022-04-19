@@ -21,7 +21,7 @@ const (
 )
 
 func TestModGen(t *testing.T) {
-	for _, size := range []int{0, 1, 2, 5, 10} {
+	for _, size := range []int{0, 1, 2, 5, 10, 100} {
 		r := rand.New(rand.NewSource(0))
 		for i := 0; i < 10; i++ {
 			buf := make([]byte, size)
