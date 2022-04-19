@@ -1,6 +1,7 @@
 package multi_value
 
 import (
+	"context"
 	_ "embed"
 	"testing"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func TestMultiValue_JIT(t *testing.T) {
 	if !wazero.JITSupported {
@@ -28,32 +32,32 @@ func testMultiValue(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig)
 	t.Run("disabled", func(t *testing.T) {
 		// multi-value is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		_, err := r.InstantiateModuleFromCode(multiValueWasm)
+		_, err := r.InstantiateModuleFromCode(testCtx, multiValueWasm)
 		require.Error(t, err)
 	})
 	t.Run("enabled", func(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureMultiValue(true))
-		module, err := r.InstantiateModuleFromCode(multiValueWasm)
+		module, err := r.InstantiateModuleFromCode(testCtx, multiValueWasm)
 		require.NoError(t, err)
 		defer module.Close()
 
 		swap := module.ExportedFunction("swap")
-		results, err := swap.Call(nil, 100, 200)
+		results, err := swap.Call(testCtx, 100, 200)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{200, 100}, results)
 
 		add64UWithCarry := module.ExportedFunction("add64_u_with_carry")
-		results, err = add64UWithCarry.Call(nil, 0x8000000000000000, 0x8000000000000000, 0)
+		results, err = add64UWithCarry.Call(testCtx, 0x8000000000000000, 0x8000000000000000, 0)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{0, 1}, results)
 
 		add64USaturated := module.ExportedFunction("add64_u_saturated")
-		results, err = add64USaturated.Call(nil, 1230, 23)
+		results, err = add64USaturated.Call(testCtx, 1230, 23)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{1253}, results)
 
 		fac := module.ExportedFunction("fac")
-		results, err = fac.Call(nil, 25)
+		results, err = fac.Call(testCtx, 25)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{7034535277573963776}, results)
 
@@ -86,7 +90,7 @@ func testMultiValue(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig)
 var brWasm []byte
 
 func testBr(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(brWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, brWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -109,7 +113,7 @@ func testBr(t *testing.T, r wazero.Runtime) {
 var callWasm []byte
 
 func testCall(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(callWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, callWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -130,7 +134,7 @@ func testCall(t *testing.T, r wazero.Runtime) {
 var callIndirectWasm []byte
 
 func testCallIndirect(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(callIndirectWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, callIndirectWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -141,7 +145,7 @@ func testCallIndirect(t *testing.T, r wazero.Runtime) {
 		{name: "type-all-i32-i64", expected: []uint64{2, 1}},
 	})
 
-	_, err = module.ExportedFunction("dispatch").Call(nil, 32, 2)
+	_, err = module.ExportedFunction("dispatch").Call(testCtx, 32, 2)
 	require.EqualError(t, err, `wasm error: invalid table access
 wasm stack trace:
 	call_indirect.wast.[16](i32,i64) i64`)
@@ -152,12 +156,12 @@ wasm stack trace:
 var facWasm []byte
 
 func testFac(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(facWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, facWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
 	fac := module.ExportedFunction("fac-ssa")
-	results, err := fac.Call(nil, 25)
+	results, err := fac.Call(testCtx, 25)
 	require.NoError(t, err)
 	require.Equal(t, []uint64{7034535277573963776}, results)
 }
@@ -167,7 +171,7 @@ func testFac(t *testing.T, r wazero.Runtime) {
 var funcWasm []byte
 
 func testFunc(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(funcWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, funcWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -196,7 +200,7 @@ func testFunc(t *testing.T, r wazero.Runtime) {
 	})
 
 	fac := module.ExportedFunction("large-sig")
-	results, err := fac.Call(nil,
+	results, err := fac.Call(testCtx,
 		0, 1, api.EncodeF32(2), api.EncodeF32(3),
 		4, api.EncodeF64(5), api.EncodeF32(6), 7,
 		8, 9, api.EncodeF32(10), api.EncodeF64(11),
@@ -215,7 +219,7 @@ func testFunc(t *testing.T, r wazero.Runtime) {
 var ifWasm []byte
 
 func testIf(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(ifWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, ifWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -267,7 +271,7 @@ func testIf(t *testing.T, r wazero.Runtime) {
 var loopWasm []byte
 
 func testLoop(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(loopWasm)
+	module, err := r.InstantiateModuleFromCode(testCtx, loopWasm)
 	require.NoError(t, err)
 	defer module.Close()
 
@@ -296,7 +300,7 @@ func testFunctions(t *testing.T, module api.Module, tests []funcTest) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := module.ExportedFunction(tc.name).Call(nil, tc.params...)
+			results, err := module.ExportedFunction(tc.name).Call(testCtx, tc.params...)
 			require.NoError(t, err)
 			if tc.expected == nil {
 				require.Equal(t, 0, len(results), "expected no results")

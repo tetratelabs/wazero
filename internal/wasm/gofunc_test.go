@@ -10,6 +10,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 func TestGetFunctionType(t *testing.T) {
 	var tests = []struct {
 		name         string
@@ -36,6 +39,12 @@ func TestGetFunctionType(t *testing.T) {
 			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
 		},
 		{
+			name:         "context.Context and api.Module void return",
+			inputFunc:    func(context.Context, api.Module) {},
+			expectedKind: FunctionKindGoContextModule,
+			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+		},
+		{
 			name:         "all supported params and i32 result",
 			inputFunc:    func(uint32, uint64, float32, float64) uint32 { return 0 },
 			expectedKind: FunctionKindGoNoContext,
@@ -57,6 +66,12 @@ func TestGetFunctionType(t *testing.T) {
 			name:         "all supported params and i32 result - context.Context",
 			inputFunc:    func(context.Context, uint32, uint64, float32, float64) uint32 { return 0 },
 			expectedKind: FunctionKindGoContext,
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
+		},
+		{
+			name:         "all supported params and i32 result - context.Context and api.Module",
+			inputFunc:    func(context.Context, api.Module, uint32, uint64, float32, float64) uint32 { return 0 },
+			expectedKind: FunctionKindGoContextModule,
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
 		},
 	}
@@ -202,6 +217,10 @@ func TestPopGoFuncParams(t *testing.T) {
 			inputFunc: func(context.Context) {},
 		},
 		{
+			name:      "context.Context and api.Module",
+			inputFunc: func(context.Context, api.Module) {},
+		},
+		{
 			name:      "all supported params",
 			inputFunc: func(uint32, uint64, float32, float64) {},
 			expected:  []uint64{4, 5, 6, 7},
@@ -214,6 +233,11 @@ func TestPopGoFuncParams(t *testing.T) {
 		{
 			name:      "all supported params - context.Context",
 			inputFunc: func(context.Context, uint32, uint64, float32, float64) {},
+			expected:  []uint64{4, 5, 6, 7},
+		},
+		{
+			name:      "all supported params - context.Context and api.Module",
+			inputFunc: func(context.Context, api.Module, uint32, uint64, float32, float64) {},
 			expected:  []uint64{4, 5, 6, 7},
 		},
 	}
@@ -233,9 +257,7 @@ func TestPopGoFuncParams(t *testing.T) {
 }
 
 func TestCallGoFunc(t *testing.T) {
-	expectedCtx, cancel := context.WithCancel(context.Background()) // arbitrary non-default context
-	defer cancel()
-	callCtx := &CallContext{ctx: expectedCtx}
+	callCtx := &CallContext{}
 
 	var tests = []struct {
 		name                         string
@@ -255,7 +277,14 @@ func TestCallGoFunc(t *testing.T) {
 		{
 			name: "context.Context void return",
 			inputFunc: func(ctx context.Context) {
-				require.Equal(t, expectedCtx, ctx)
+				require.Equal(t, testCtx, ctx)
+			},
+		},
+		{
+			name: "context.Context and api.Module void return",
+			inputFunc: func(ctx context.Context, m api.Module) {
+				require.Equal(t, testCtx, ctx)
+				require.Equal(t, callCtx, m)
 			},
 		},
 		{
@@ -318,7 +347,26 @@ func TestCallGoFunc(t *testing.T) {
 		{
 			name: "all supported params and i32 result - context.Context",
 			inputFunc: func(ctx context.Context, w uint32, x uint64, y float32, z float64) uint32 {
-				require.Equal(t, expectedCtx, ctx)
+				require.Equal(t, testCtx, ctx)
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100
+			},
+			inputParams: []uint64{
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{100},
+		},
+		{
+			name: "all supported params and i32 result - context.Context and api.Module",
+			inputFunc: func(ctx context.Context, m api.Module, w uint32, x uint64, y float32, z float64) uint32 {
+				require.Equal(t, testCtx, ctx)
+				require.Equal(t, callCtx, m)
 				require.Equal(t, uint32(math.MaxUint32), w)
 				require.Equal(t, uint64(math.MaxUint64), x)
 				require.Equal(t, float32(math.MaxFloat32), y)
@@ -342,7 +390,7 @@ func TestCallGoFunc(t *testing.T) {
 			fk, _, err := getFunctionType(&goFunc, FeaturesFinished)
 			require.NoError(t, err)
 
-			results := CallGoFunc(callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)
+			results := CallGoFunc(testCtx, callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)
 			require.Equal(t, tc.expectedResults, results)
 		})
 	}

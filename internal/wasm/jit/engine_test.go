@@ -13,6 +13,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var me moduleEngine
@@ -176,11 +179,11 @@ func TestJIT_CompileModule(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		err := e.CompileModule(okModule)
+		err := e.CompileModule(testCtx, okModule)
 		require.NoError(t, err)
 
 		// Compiling same module shouldn't be compiled again, but instead should be cached.
-		err = e.CompileModule(okModule)
+		err = e.CompileModule(testCtx, okModule)
 		require.NoError(t, err)
 
 		compiled, ok := e.codes[okModule.ID]
@@ -206,7 +209,7 @@ func TestJIT_CompileModule(t *testing.T) {
 		}
 
 		e := et.NewEngine(wasm.Features20191205).(*engine)
-		err := e.CompileModule(errModule)
+		err := e.CompileModule(testCtx, errModule)
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
@@ -215,7 +218,7 @@ func TestJIT_CompileModule(t *testing.T) {
 	})
 }
 
-// TestReleasecode_Panic tests that an unexpected panic has some identifying information in it.
+// TestJIT_Releasecode_Panic tests that an unexpected panic has some identifying information in it.
 func TestJIT_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		releaseCode(&code{
@@ -256,10 +259,10 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
 	require.NoError(t, err)
 
-	err = store.Engine.CompileModule(hm)
+	err = store.Engine.CompileModule(testCtx, hm)
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(context.Background(), hm, hostModuleName, nil)
+	_, err = store.Instantiate(testCtx, hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -311,16 +314,16 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 		ID: wasm.ModuleID{1},
 	}
 
-	err = store.Engine.CompileModule(m)
+	err = store.Engine.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
-	mi, err := store.Instantiate(context.Background(), m, t.Name(), nil)
+	mi, err := store.Instantiate(testCtx, m, t.Name(), nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
 		fnName := fnName
 		t.Run(fnName, func(t *testing.T) {
-			ret, err := mi.ExportedFunction(fnName).Call(nil)
+			ret, err := mi.ExportedFunction(fnName).Call(testCtx)
 			require.NoError(t, err)
 
 			require.Equal(t, uint32(expectedReturnValue), uint32(ret[0]))

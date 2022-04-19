@@ -17,16 +17,19 @@ For the impatient, here's how invoking a factorial function looks in wazero:
 
 ```golang
 func main() {
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
 	// Read a WebAssembly binary containing an exported "fac" function.
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
 	source, _ := os.ReadFile("./tests/bench/testdata/fac.wasm")
 
 	// Instantiate the module and return its exported functions
-	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(source)
+	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
 	defer module.Close()
 
 	// Discover 7! is 5040
-	fmt.Println(module.ExportedFunction("fac").Call(nil, 7))
+	fmt.Println(module.ExportedFunction("fac").Call(ctx, 7))
 }
 ```
 
@@ -56,7 +59,7 @@ env, err := r.NewModuleBuilder("env").
 	ExportFunction("log_i32", func(v uint32) {
 		fmt.Println("log_i32 >>", v)
 	}).
-	Instantiate()
+	Instantiate(ctx)
 if err != nil {
 	log.Fatal(err)
 }
@@ -73,11 +76,11 @@ bundles an implementation. That way, you don't have to write these functions.
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
-wm, err := wasi.InstantiateSnapshotPreview1(r)
+wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
 defer wm.Close()
 
 config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
-module, err := r.InstantiateModule(binary, config)
+module, err := r.InstantiateModule(ctx, binary, config)
 defer module.Close()
 ...
 ```

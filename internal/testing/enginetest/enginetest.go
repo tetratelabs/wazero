@@ -29,6 +29,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 type EngineTester interface {
 	NewEngine(enabledFeatures wasm.Features) wasm.Engine
 	InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{}
@@ -44,7 +47,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 
 	t.Run("sets module name", func(t *testing.T) {
 		m := &wasm.Module{}
-		err := e.CompileModule(m)
+		err := e.CompileModule(testCtx, m)
 		require.NoError(t, err)
 		me, err := e.NewModuleEngine(t.Name(), m, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -76,7 +79,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}}},
 	}
 
-	err := e.CompileModule(m)
+	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
@@ -91,17 +94,17 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
-	results, err := me.Call(module.CallCtx, fn, 3)
+	results, err := me.Call(testCtx, module.CallCtx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := me.Call(module.CallCtx, fn)
+		_, err := me.Call(testCtx, module.CallCtx, fn)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := me.Call(module.CallCtx, fn, 1, 2)
+		_, err := me.Call(testCtx, module.CallCtx, fn, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -117,7 +120,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection:     []*wasm.Code{},
 			ID:              wasm.ModuleID{0},
 		}
-		err := e.CompileModule(m)
+		err := e.CompileModule(testCtx, m)
 		require.NoError(t, err)
 
 		// Instantiate the module, which has nothing but an empty table.
@@ -139,7 +142,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			ID: wasm.ModuleID{1},
 		}
 
-		err := e.CompileModule(m)
+		err := e.CompileModule(testCtx, m)
 		require.NoError(t, err)
 
 		moduleFunctions := []*wasm.FunctionInstance{
@@ -170,7 +173,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			ID: wasm.ModuleID{2},
 		}
 
-		err := e.CompileModule(importedModule)
+		err := e.CompileModule(testCtx, importedModule)
 		require.NoError(t, err)
 
 		importedModuleInstance := &wasm.ModuleInstance{}
@@ -194,7 +197,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection:     []*wasm.Code{},
 			ID:              wasm.ModuleID{3},
 		}
-		err = e.CompileModule(importingModule)
+		err = e.CompileModule(testCtx, importingModule)
 		require.NoError(t, err)
 
 		tableInit := map[wasm.Index]wasm.Index{0: 2}
@@ -217,7 +220,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			ID: wasm.ModuleID{4},
 		}
 
-		err := e.CompileModule(importedModule)
+		err := e.CompileModule(testCtx, importedModule)
 		require.NoError(t, err)
 		importedModuleInstance := &wasm.ModuleInstance{}
 		importedFunctions := []*wasm.FunctionInstance{
@@ -241,7 +244,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			ID: wasm.ModuleID{5},
 		}
 
-		err = e.CompileModule(importingModule)
+		err = e.CompileModule(testCtx, importingModule)
 		require.NoError(t, err)
 
 		importingModuleInstance := &wasm.ModuleInstance{}
@@ -284,11 +287,11 @@ func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) 
 		TypeSection:         []*wasm.FunctionType{sig},
 	}
 
-	err := e.CompileModule(m)
+	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewCallContext(context.Background(), wasm.NewStore(features, e), module, nil)
+	modCtx := wasm.NewCallContext(wasm.NewStore(features, e), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
@@ -303,7 +306,7 @@ func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) 
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := me.Call(modCtx, f, 3)
+		results, err := me.Call(testCtx, modCtx, f, 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, ctxMemory)
@@ -351,7 +354,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := tc.module
 			f := tc.fn
-			results, err := f.Module.Engine.Call(m, f, 1)
+			results, err := f.Module.Engine.Call(testCtx, m, f, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -475,11 +478,11 @@ wasm stack trace:
 		t.Run(tc.name, func(t *testing.T) {
 			m := tc.module
 			f := tc.fn
-			_, err := f.Module.Engine.Call(m, f, tc.input...)
+			_, err := f.Module.Engine.Call(testCtx, m, f, tc.input...)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Ensure the module still works
-			results, err := f.Module.Engine.Call(m, f, 1)
+			results, err := f.Module.Engine.Call(testCtx, m, f, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -515,7 +518,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 		ID:                  wasm.ModuleID{0},
 	}
 
-	err := e.CompileModule(hostFnModule)
+	err := e.CompileModule(testCtx, hostFnModule)
 	require.NoError(t, err)
 	hostFn := &wasm.FunctionInstance{GoFunc: &hostFnVal, Kind: wasm.FunctionKindGoNoContext, Type: ft}
 	hostFnModuleInstance := &wasm.ModuleInstance{Name: "host"}
@@ -536,7 +539,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 		ID: wasm.ModuleID{1},
 	}
 
-	err = e.CompileModule(importedModule)
+	err = e.CompileModule(testCtx, importedModule)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
@@ -560,7 +563,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 		ImportSection: []*wasm.Import{{}},
 		ID:            wasm.ModuleID{2},
 	}
-	err = e.CompileModule(importingModule)
+	err = e.CompileModule(testCtx, importingModule)
 	require.NoError(t, err)
 
 	// Add the exported function.
@@ -592,7 +595,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for JIT, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 	// callEngineModuleContextModuleInstanceAddressOffset
-	module.CallCtx = wasm.NewCallContext(context.Background(), nil, module, nil)
+	module.CallCtx = wasm.NewCallContext(nil, module, nil)
 }
 
 // addFunction assigns and adds a function to the module.

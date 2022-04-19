@@ -1,6 +1,7 @@
 package wasi
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -13,10 +14,14 @@ import (
 //
 // See https://github.com/tetratelabs/wazero/tree/main/examples/wasi for another example.
 func Example() {
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
+	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wm, err := InstantiateSnapshotPreview1(r)
+	wm, err := InstantiateSnapshotPreview1(ctx, r)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,7 +31,7 @@ func Example() {
 	config := wazero.NewModuleConfig().WithStdout(os.Stdout)
 
 	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is like a "main" function.
-	_, err = r.InstantiateModuleFromCodeWithConfig([]byte(`
+	_, err = r.InstantiateModuleFromCodeWithConfig(ctx, []byte(`
 (module
   (import "wasi_snapshot_preview1" "proc_exit" (func $wasi.proc_exit (param $rval i32)))
 

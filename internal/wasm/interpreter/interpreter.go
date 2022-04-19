@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -172,7 +173,7 @@ type interpreterOp struct {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(module *wasm.Module) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
@@ -186,7 +187,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 			funcs = append(funcs, &code{hostFn: hf})
 		}
 	} else {
-		irs, err := wazeroir.CompileFunctions(e.enabledFeatures, module)
+		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
 		if err != nil {
 			return err
 		}
@@ -513,7 +514,7 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := me.functions[f.Index]
@@ -554,27 +555,27 @@ func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, para
 		for _, param := range params {
 			ce.pushValue(param)
 		}
-		ce.callNativeFunc(m, compiled)
+		ce.callNativeFunc(ctx, m, compiled)
 		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
 	} else {
-		results = ce.callGoFunc(m, compiled, params)
+		results = ce.callGoFunc(ctx, m, compiled, params)
 	}
 	return
 }
 
-func (ce *callEngine) callGoFunc(ctx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
+func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
 	if len(ce.frames) > 0 {
 		// Use the caller's memory, which might be different from the defining module on an imported function.
-		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
+		callCtx = callCtx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
-	results = wasm.CallGoFunc(ctx, f.source, params)
+	results = wasm.CallGoFunc(ctx, callCtx, f.source, params)
 	ce.popFrame()
 	return
 }
 
-func (ce *callEngine) callNativeFunc(ctx *wasm.CallContext, f *function) {
+func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
@@ -621,9 +622,9 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.CallContext, f *function) {
 			{
 				f := functions[op.us[0]]
 				if f.hostFn != nil {
-					ce.callGoFuncWithStack(ctx, f)
+					ce.callGoFuncWithStack(ctx, callCtx, f)
 				} else {
-					ce.callNativeFunc(ctx, f)
+					ce.callNativeFunc(ctx, callCtx, f)
 				}
 				frame.pc++
 			}
@@ -642,9 +643,9 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.CallContext, f *function) {
 
 				// Call in.
 				if targetcode.hostFn != nil {
-					ce.callGoFuncWithStack(ctx, f)
+					ce.callGoFuncWithStack(ctx, callCtx, f)
 				} else {
-					ce.callNativeFunc(ctx, targetcode)
+					ce.callNativeFunc(ctx, callCtx, targetcode)
 				}
 				frame.pc++
 			}
@@ -1555,9 +1556,9 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.CallContext, f *function) {
 	ce.popFrame()
 }
 
-func (ce *callEngine) callGoFuncWithStack(ctx *wasm.CallContext, f *function) {
+func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	params := wasm.PopGoFuncParams(f.source, ce.popValue)
-	results := ce.callGoFunc(ctx, f, params)
+	results := ce.callGoFunc(ctx, callCtx, f, params)
 	for _, v := range results {
 		ce.pushValue(v)
 	}

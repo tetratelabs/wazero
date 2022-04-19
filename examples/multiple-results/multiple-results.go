@@ -1,6 +1,7 @@
 package multiple_results
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"log"
@@ -24,18 +25,21 @@ import (
 //  * multiValueHostFunctions
 // See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 func main() {
-	// Create a portable WebAssembly Runtime.
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
+	// Create a new WebAssembly Runtime.
 	runtime := wazero.NewRuntime()
 
 	// Add a module that uses offset parameters for multiple results, with functions defined in WebAssembly.
-	wasm, err := resultOffsetWasmFunctions(runtime)
+	wasm, err := resultOffsetWasmFunctions(ctx, runtime)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer wasm.Close()
 
 	// Add a module that uses offset parameters for multiple results, with functions defined in Go.
-	host, err := resultOffsetHostFunctions(runtime)
+	host, err := resultOffsetHostFunctions(ctx, runtime)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,14 +52,14 @@ func main() {
 	)
 
 	// Add a module that uses multiple results values, with functions defined in WebAssembly.
-	wasmWithMultiValue, err := multiValueWasmFunctions(runtimeWithMultiValue)
+	wasmWithMultiValue, err := multiValueWasmFunctions(ctx, runtimeWithMultiValue)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer wasmWithMultiValue.Close()
 
 	// Add a module that uses multiple results values, with functions defined in Go.
-	hostWithMultiValue, err := multiValueHostFunctions(runtimeWithMultiValue)
+	hostWithMultiValue, err := multiValueHostFunctions(ctx, runtimeWithMultiValue)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,7 +68,7 @@ func main() {
 	// Call the same function in all modules and print the results to the console.
 	for _, mod := range []api.Module{wasm, host, wasmWithMultiValue, hostWithMultiValue} {
 		getAge := mod.ExportedFunction("call_get_age")
-		results, err := getAge.Call(nil)
+		results, err := getAge.Call(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -78,8 +82,8 @@ func main() {
 //
 // To return a value in WASM written to a result parameter, you have to define memory and pass a location to write
 // the result. At the end of your function, you load that location.
-func resultOffsetWasmFunctions(r wazero.Runtime) (api.Module, error) {
-	return r.InstantiateModuleFromCode([]byte(`(module $result-offset/wasm
+func resultOffsetWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
+	return r.InstantiateModuleFromCode(ctx, []byte(`(module $result-offset/wasm
   ;; To use result parameters, we need scratch memory. Allocate the least possible: 1 page (64KB).
   (memory 1 1)
 
@@ -112,7 +116,7 @@ func resultOffsetWasmFunctions(r wazero.Runtime) (api.Module, error) {
 //
 // To return a value in WASM written to a result parameter, you have to define memory and pass a location to write
 // the result. At the end of your function, you load that location.
-func resultOffsetHostFunctions(r wazero.Runtime) (api.Module, error) {
+func resultOffsetHostFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	return r.NewModuleBuilder("result-offset/host").
 		// To use result parameters, we need scratch memory. Allocate the least possible: 1 page (64KB).
 		ExportMemoryWithMax("mem", 1, 1).
@@ -125,17 +129,17 @@ func resultOffsetHostFunctions(r wazero.Runtime) (api.Module, error) {
 		}).
 		// Now, define a function that shows the Wasm mechanics returning something written to a result parameter.
 		// The caller provides a memory offset to the callee, so that it knows where to write the second result.
-		ExportFunction("call_get_age", func(m api.Module) (age uint64) {
+		ExportFunction("call_get_age", func(ctx context.Context, m api.Module) (age uint64) {
 			resultOffsetAge := uint32(8) // arbitrary memory offset (in bytes)
-			_, _ = m.ExportedFunction("get_age").Call(m, uint64(resultOffsetAge))
+			_, _ = m.ExportedFunction("get_age").Call(ctx, uint64(resultOffsetAge))
 			age, _ = m.Memory().ReadUint64Le(resultOffsetAge)
 			return
-		}).Instantiate()
+		}).Instantiate(ctx)
 }
 
 // multiValueWasmFunctions defines Wasm functions that illustrate multiple results using the "multiple-results" feature.
-func multiValueWasmFunctions(r wazero.Runtime) (api.Module, error) {
-	return r.InstantiateModuleFromCode([]byte(`(module $multi-value/wasm
+func multiValueWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
+	return r.InstantiateModuleFromCode(ctx, []byte(`(module $multi-value/wasm
 
   ;; Define a function that returns two results
   (func $get_age (result (;age;) i64 (;errno;) i32)
@@ -155,7 +159,7 @@ func multiValueWasmFunctions(r wazero.Runtime) (api.Module, error) {
 }
 
 // multiValueHostFunctions defines Wasm functions that illustrate multiple results using the "multiple-results" feature.
-func multiValueHostFunctions(r wazero.Runtime) (api.Module, error) {
+func multiValueHostFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	return r.NewModuleBuilder("multi-value/host").
 		// Define a function that returns two results
 		ExportFunction("get_age", func() (age uint64, errno uint32) {
@@ -164,8 +168,8 @@ func multiValueHostFunctions(r wazero.Runtime) (api.Module, error) {
 			return
 		}).
 		// Now, define a function that returns only the first result.
-		ExportFunction("call_get_age", func(m api.Module) (age uint64) {
-			results, _ := m.ExportedFunction("get_age").Call(m)
+		ExportFunction("call_get_age", func(ctx context.Context, m api.Module) (age uint64) {
+			results, _ := m.ExportedFunction("get_age").Call(ctx)
 			return results[0]
-		}).Instantiate()
+		}).Instantiate(ctx)
 }

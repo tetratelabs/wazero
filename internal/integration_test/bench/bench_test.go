@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"math/rand"
@@ -11,6 +12,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasi"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // caseWasm was compiled from TinyGo testdata/case.go
 //go:embed testdata/case.wasm
@@ -46,14 +50,14 @@ func BenchmarkInitialization(b *testing.B) {
 }
 
 func runInitializationBench(b *testing.B, r wazero.Runtime) {
-	compiled, err := r.CompileModule(caseWasm)
+	compiled, err := r.CompileModule(testCtx, caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer compiled.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mod, err := r.InstantiateModule(compiled)
+		mod, err := r.InstantiateModule(testCtx, compiled)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -77,7 +81,7 @@ func runBase64Benches(b *testing.B, m api.Module) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := base64.Call(nil, numPerExec); err != nil {
+				if _, err := base64.Call(testCtx, numPerExec); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -93,7 +97,7 @@ func runFibBenches(b *testing.B, m api.Module) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := fibonacci.Call(nil, num); err != nil {
+				if _, err := fibonacci.Call(testCtx, num); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -109,7 +113,7 @@ func runStringManipulationBenches(b *testing.B, m api.Module) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := stringManipulation.Call(nil, initialSize); err != nil {
+				if _, err := stringManipulation.Call(testCtx, initialSize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -125,7 +129,7 @@ func runReverseArrayBenches(b *testing.B, m api.Module) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := reverseArray.Call(nil, arraySize); err != nil {
+				if _, err := reverseArray.Call(testCtx, arraySize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -141,7 +145,7 @@ func runRandomMatMul(b *testing.B, m api.Module) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := randomMatMul.Call(nil, matrixSize); err != nil {
+				if _, err := randomMatMul.Call(testCtx, matrixSize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -153,7 +157,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 	r := createRuntime(b, engine)
 
 	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromCode(caseWasm)
+	m, err := r.InstantiateModuleFromCode(testCtx, caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -161,30 +165,32 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 }
 
 func createRuntime(b *testing.B, engine *wazero.RuntimeConfig) wazero.Runtime {
-	getRandomString := func(ctx api.Module, retBufPtr uint32, retBufSize uint32) {
-		results, err := ctx.ExportedFunction("allocate_buffer").Call(ctx, 10)
+	getRandomString := func(ctx context.Context, m api.Module, retBufPtr uint32, retBufSize uint32) {
+		results, err := m.ExportedFunction("allocate_buffer").Call(ctx, 10)
 		if err != nil {
 			b.Fatal(err)
 		}
 
 		offset := uint32(results[0])
-		ctx.Memory().WriteUint32Le(retBufPtr, offset)
-		ctx.Memory().WriteUint32Le(retBufSize, 10)
+		m.Memory().WriteUint32Le(retBufPtr, offset)
+		m.Memory().WriteUint32Le(retBufSize, 10)
 		b := make([]byte, 10)
 		_, _ = rand.Read(b)
-		ctx.Memory().Write(offset, b)
+		m.Memory().Write(offset, b)
 	}
 
 	r := wazero.NewRuntimeWithConfig(engine)
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Instantiate()
+	_, err := r.NewModuleBuilder("env").
+		ExportFunction("get_random_string", getRandomString).
+		Instantiate(testCtx)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = wasi.InstantiateSnapshotPreview1(r)
+	_, err = wasi.InstantiateSnapshotPreview1(testCtx, r)
 	if err != nil {
 		b.Fatal(err)
 	}

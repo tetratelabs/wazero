@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -42,8 +43,8 @@ type (
 	// function calls originating from the same moduleEngine.Call execution.
 	callEngine struct {
 		// These contexts are read and written by JITed code.
-		// Note: we embed these structs so we can reduce the costs to access fields inside of them.
-		// Also, that eases the calculation of offsets to each field.
+		// Note: structs are embedded to reduce the costs to access fields inside them. Also, this eases field offset
+		// calculation.
 		globalContext
 		moduleContext
 		valueStackContext
@@ -393,7 +394,7 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(module *wasm.Module) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
@@ -416,7 +417,7 @@ func (e *engine) CompileModule(module *wasm.Module) error {
 			funcs = append(funcs, compiled)
 		}
 	} else {
-		irs, err := wazeroir.CompileFunctions(e.enabledFeatures, module)
+		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
 		if err != nil {
 			return err
 		}
@@ -496,12 +497,12 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := me.functions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = m.FailIfClosed(); err == nil {
+		if err = callCtx.FailIfClosed(); err == nil {
 			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", me.name, f.Index))
 		}
 		return
@@ -522,7 +523,7 @@ func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, para
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
-			err = m.FailIfClosed()
+			err = callCtx.FailIfClosed()
 		}
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
@@ -545,10 +546,10 @@ func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, para
 		for _, v := range params {
 			ce.pushValue(v)
 		}
-		ce.execWasmFunction(m, compiled)
+		ce.execWasmFunction(ctx, callCtx, compiled)
 		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
 	} else {
-		results = wasm.CallGoFunc(m, compiled.source, params)
+		results = wasm.CallGoFunc(ctx, callCtx, compiled.source, params)
 	}
 	return
 }
@@ -648,7 +649,7 @@ const (
 	builtinFunctionIndexBreakPoint
 )
 
-func (ce *callEngine) execWasmFunction(ctx *wasm.CallContext, f *function) {
+func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	// Push the initial callframe.
 	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, function: f}
 	ce.globalContext.callFrameStackPointer++
@@ -675,8 +676,9 @@ jitentry:
 			callerFunction := ce.callFrameAt(1).function
 			params := wasm.PopGoFuncParams(calleeHostFunction.source, ce.popValue)
 			results := wasm.CallGoFunc(
+				ctx,
 				// Use the caller's memory, which might be different from the defining module on an imported function.
-				ctx.WithMemory(callerFunction.source.Module.Memory),
+				callCtx.WithMemory(callerFunction.source.Module.Memory),
 				calleeHostFunction.source,
 				params,
 			)

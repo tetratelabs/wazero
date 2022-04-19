@@ -1,6 +1,7 @@
 package wazeroir
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -8,6 +9,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 )
+
+// ctx is an arbitrary, non-default context.
+var ctx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
 	f64, i32   = wasm.ValueTypeF64, wasm.ValueTypeI32
@@ -65,7 +69,7 @@ func TestCompile(t *testing.T) {
 				enabledFeatures = wasm.FeaturesFinished
 			}
 
-			res, err := CompileFunctions(enabledFeatures, tc.module)
+			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
 		})
@@ -395,7 +399,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			if enabledFeatures == 0 {
 				enabledFeatures = wasm.FeaturesFinished
 			}
-			res, err := CompileFunctions(enabledFeatures, tc.module)
+			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
 		})
@@ -406,7 +410,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	if enabledFeatures == 0 {
 		enabledFeatures = wasm.FeaturesFinished
 	}
-	res, err := CompileFunctions(enabledFeatures, module)
+	res, err := CompileFunctions(ctx, enabledFeatures, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }

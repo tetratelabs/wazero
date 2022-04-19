@@ -1,7 +1,6 @@
 package wazero
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,14 +17,12 @@ import (
 type RuntimeConfig struct {
 	enabledFeatures wasm.Features
 	newEngine       func(wasm.Features) wasm.Engine
-	ctx             context.Context
 	memoryMaxPages  uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
 	enabledFeatures: wasm.Features20191205,
-	ctx:             context.Background(),
 	memoryMaxPages:  wasm.MemoryMaxPages,
 }
 
@@ -34,7 +31,6 @@ func (c *RuntimeConfig) clone() *RuntimeConfig {
 	return &RuntimeConfig{
 		enabledFeatures: c.enabledFeatures,
 		newEngine:       c.newEngine,
-		ctx:             c.ctx,
 		memoryMaxPages:  c.memoryMaxPages,
 	}
 }
@@ -53,23 +49,6 @@ func NewRuntimeConfigJIT() *RuntimeConfig {
 func NewRuntimeConfigInterpreter() *RuntimeConfig {
 	ret := engineLessConfig.clone()
 	ret.newEngine = interpreter.NewEngine
-	return ret
-}
-
-// WithContext sets the default context used to initialize the module. Defaults to context.Background if nil.
-//
-// Notes:
-// * If the Module defines a start function, this is used to invoke it.
-// * This is the outer-most ancestor of api.Module Context() during api.Function invocations.
-// * This is the default context of api.Function when callers pass nil.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-function%E2%91%A0
-func (c *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ret := c.clone()
-	ret.ctx = ctx
 	return ret
 }
 

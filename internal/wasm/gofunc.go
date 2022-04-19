@@ -21,8 +21,11 @@ const (
 	// a context.Context.
 	FunctionKindGoContext
 	// FunctionKindGoModule is a function implemented in Go, with a signature matching FunctionType, except arg
-	// zero is a Module.
+	// zero is an api.Module.
 	FunctionKindGoModule
+	// FunctionKindGoContextModule is a function implemented in Go, with a signature matching FunctionType, except arg
+	// zero is a context.Context and arg one is an api.Module.
+	FunctionKindGoContextModule
 )
 
 // Below are reflection code to get the interface type used to parse functions and set values.
@@ -30,22 +33,6 @@ const (
 var moduleType = reflect.TypeOf((*api.Module)(nil)).Elem()
 var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
-
-// getGoFuncCallContextValue returns a reflect.Value for a context param[0], or nil if there isn't one.
-func getGoFuncCallContextValue(fk FunctionKind, ctx *CallContext) *reflect.Value {
-	switch fk {
-	case FunctionKindGoNoContext: // no special param zero
-	case FunctionKindGoContext:
-		val := reflect.New(goContextType).Elem()
-		val.Set(reflect.ValueOf(ctx.Context()))
-		return &val
-	case FunctionKindGoModule:
-		val := reflect.New(moduleType).Elem()
-		val.Set(reflect.ValueOf(ctx))
-		return &val
-	}
-	return nil
-}
 
 // PopGoFuncParams pops the correct number of parameters off the stack into a parameter slice for use in CallGoFunc
 //
@@ -55,7 +42,11 @@ func getGoFuncCallContextValue(fk FunctionKind, ctx *CallContext) *reflect.Value
 func PopGoFuncParams(f *FunctionInstance, popParam func() uint64) []uint64 {
 	// First, determine how many values we need to pop
 	paramCount := f.GoFunc.Type().NumIn()
-	if f.Kind != FunctionKindGoNoContext {
+	switch f.Kind {
+	case FunctionKindGoNoContext:
+	case FunctionKindGoContextModule:
+		paramCount -= 2
+	default:
 		paramCount--
 	}
 
@@ -82,22 +73,30 @@ func PopValues(count int, popper func() uint64) []uint64 {
 // * callCtx is passed to the host function as a first argument.
 //
 // Note: ctx must use the caller's memory, which might be different from the defining module on an imported function.
-func CallGoFunc(callCtx *CallContext, f *FunctionInstance, params []uint64) []uint64 {
+func CallGoFunc(ctx context.Context, callCtx *CallContext, f *FunctionInstance, params []uint64) []uint64 {
 	tp := f.GoFunc.Type()
 
 	var in []reflect.Value
 	if tp.NumIn() != 0 {
 		in = make([]reflect.Value, tp.NumIn())
 
-		wasmParamOffset := 0
-		if f.Kind != FunctionKindGoNoContext {
-			wasmParamOffset = 1
+		i := 0
+		switch f.Kind {
+		case FunctionKindGoContext:
+			in[0] = newContextVal(ctx)
+			i = 1
+		case FunctionKindGoModule:
+			in[0] = newModuleVal(callCtx)
+			i = 1
+		case FunctionKindGoContextModule:
+			in[0] = newContextVal(ctx)
+			in[1] = newModuleVal(callCtx)
+			i = 2
 		}
 
-		for i, raw := range params {
-			inI := i + wasmParamOffset
-			val := reflect.New(tp.In(inI)).Elem()
-			switch tp.In(inI).Kind() {
+		for _, raw := range params {
+			val := reflect.New(tp.In(i)).Elem()
+			switch tp.In(i).Kind() {
 			case reflect.Float32:
 				val.SetFloat(float64(math.Float32frombits(uint32(raw))))
 			case reflect.Float64:
@@ -107,12 +106,8 @@ func CallGoFunc(callCtx *CallContext, f *FunctionInstance, params []uint64) []ui
 			case reflect.Int32, reflect.Int64:
 				val.SetInt(int64(raw))
 			}
-			in[inI] = val
-		}
-
-		// Handle any special parameter zero
-		if val := getGoFuncCallContextValue(f.Kind, callCtx); val != nil {
-			in[0] = *val
+			in[i] = val
+			i++
 		}
 	}
 
@@ -138,6 +133,18 @@ func CallGoFunc(callCtx *CallContext, f *FunctionInstance, params []uint64) []ui
 	return results
 }
 
+func newContextVal(ctx context.Context) reflect.Value {
+	val := reflect.New(goContextType).Elem()
+	val.Set(reflect.ValueOf(ctx))
+	return val
+}
+
+func newModuleVal(m api.Module) reflect.Value {
+	val := reflect.New(moduleType).Elem()
+	val.Set(reflect.ValueOf(m))
+	return val
+}
+
 // getFunctionType returns the function type corresponding to the function signature or errs if invalid.
 func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKind, ft *FunctionType, err error) {
 	p := fn.Type()
@@ -147,8 +154,13 @@ func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKi
 		return
 	}
 
+	fk = kind(p)
 	pOffset := 0
-	if fk = kind(p); fk != FunctionKindGoNoContext {
+	switch fk {
+	case FunctionKindGoNoContext:
+	case FunctionKindGoContextModule:
+		pOffset = 2
+	default:
 		pOffset = 1
 	}
 
@@ -212,6 +224,9 @@ func kind(p reflect.Type) FunctionKind {
 		if p0.Implements(moduleType) {
 			return FunctionKindGoModule
 		} else if p0.Implements(goContextType) {
+			if pCount >= 2 && p.In(1).Implements(moduleType) {
+				return FunctionKindGoContextModule
+			}
 			return FunctionKindGoContext
 		}
 	}

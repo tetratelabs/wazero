@@ -1,7 +1,6 @@
 package wasi
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -59,7 +58,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 }
 
 func newCtx(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
-	return wasm.NewCallContext(context.Background(), nil, &wasm.ModuleInstance{
+	return wasm.NewCallContext(nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)
 }

@@ -245,6 +245,10 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 //
 // Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*CallContext, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
@@ -298,13 +302,13 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.CallCtx = NewCallContext(ctx, s, m, sys)
+	m.CallCtx = NewCallContext(s, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		if _, err = f.Module.Engine.Call(m.CallCtx, f); err != nil {
+		if _, err = f.Module.Engine.Call(ctx, m.CallCtx, f); err != nil {
 			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}

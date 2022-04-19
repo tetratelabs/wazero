@@ -5,6 +5,7 @@
 package vs
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -18,6 +19,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // ensureJITFastest is overridable via ldflags. Ex.
 //	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
@@ -38,7 +42,7 @@ func TestFac(t *testing.T) {
 		defer mod.Close()
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(nil, in)
+			res, err := fn.Call(testCtx, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -50,7 +54,7 @@ func TestFac(t *testing.T) {
 		defer mod.Close()
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(nil, in)
+			res, err := fn.Call(testCtx, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -230,7 +234,7 @@ func interpreterFacInvoke(b *testing.B) {
 	defer mod.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(nil, facArgumentU64); err != nil {
+		if _, err = fn.Call(testCtx, facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -244,7 +248,7 @@ func jitFacInvoke(b *testing.B) {
 	defer mod.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(nil, facArgumentU64); err != nil {
+		if _, err = fn.Call(testCtx, facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -298,7 +302,7 @@ func goWasm3FacInvoke(b *testing.B) {
 func newWazeroFacBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
 	r := wazero.NewRuntimeWithConfig(config)
 
-	m, err := r.InstantiateModuleFromCode(facWasm)
+	m, err := r.InstantiateModuleFromCode(testCtx, facWasm)
 	if err != nil {
 		return nil, nil, err
 	}

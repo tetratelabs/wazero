@@ -3056,8 +3056,8 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 	}
 }
 
-// compileModuleContextInitialization adds instructions to initialize ce.CallContext's fields based on
-// ce.CallContext.ModuleInstanceAddress.
+// compileModuleContextInitialization adds instructions to initialize ce.moduleContext's fields based on
+// ce.moduleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)

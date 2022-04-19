@@ -99,15 +99,12 @@ func TestStore_Instantiate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	type key string
-	ctx := context.WithValue(context.Background(), key("a"), "b") // arbitrary non-default context
 	sys := &SysContext{}
-	mod, err := s.Instantiate(ctx, m, "", sys)
+	mod, err := s.Instantiate(testCtx, m, "", sys)
 	require.NoError(t, err)
 	defer mod.Close()
 
 	t.Run("CallContext defaults", func(t *testing.T) {
-		require.Equal(t, ctx, mod.ctx)
 		require.Equal(t, s.modules[""], mod.module)
 		require.Equal(t, s.modules[""].Memory, mod.memory)
 		require.Equal(t, s, mod.store)
@@ -369,58 +366,6 @@ func TestCallContext_ExportedFunction(t *testing.T) {
 	})
 }
 
-func TestFunctionInstance_Call(t *testing.T) {
-	store := NewStore(Features20191205, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
-
-	// Add the host module
-	functionName := "fn"
-
-	// This is a fake engine, so we don't capture inside the function body.
-	m, err := NewHostModule(
-		"host",
-		map[string]interface{}{functionName: func(api.Module) {}},
-		map[string]*Memory{},
-		map[string]*Global{},
-		Features20191205,
-	)
-	require.NoError(t, err)
-
-	// Add the host module
-	imported, err := store.Instantiate(context.Background(), m, "host", nil)
-	require.NoError(t, err)
-	defer imported.Close()
-
-	// Make a module to import the function
-	importing, err := store.Instantiate(context.Background(), &Module{
-		TypeSection: []*FunctionType{{}},
-		ImportSection: []*Import{{
-			Type:     ExternTypeFunc,
-			Module:   imported.Name(),
-			Name:     functionName,
-			DescFunc: 0,
-		}},
-		MemorySection: &Memory{Min: 1},
-		ExportSection: []*Export{{Type: ExternTypeFunc, Name: functionName, Index: 0}},
-	}, "test", nil)
-	require.NoError(t, err)
-	defer imported.Close()
-
-	fn := importing.ExportedFunction(functionName)
-	// me.ctx will hold the last seen context.
-	me := imported.module.Engine.(*mockModuleEngine)
-	t.Run("nil defaults to current module", func(t *testing.T) {
-		_, err := fn.Call(nil)
-		require.NoError(t, err)
-		require.Equal(t, importing, me.ctx)
-	})
-	t.Run("override current module context", func(t *testing.T) {
-		ctx := importing.WithContext(context.TODO())
-		_, err := fn.Call(ctx)
-		require.NoError(t, err)
-		require.Equal(t, ctx, me.ctx)
-	})
-}
-
 type mockEngine struct {
 	shouldCompileFail bool
 	callFailIndex     int
@@ -428,7 +373,6 @@ type mockEngine struct {
 
 type mockModuleEngine struct {
 	name          string
-	ctx           *CallContext
 	callFailIndex int
 }
 
@@ -448,7 +392,7 @@ func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstan
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(module *Module) error { return nil }
+func (e *mockEngine) CompileModule(_ context.Context, _ *Module) error { return nil }
 
 // Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {
@@ -456,12 +400,11 @@ func (e *mockModuleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) Call(ctx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *mockModuleEngine) Call(ctx context.Context, callCtx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
-	e.ctx = ctx
 	return
 }
 

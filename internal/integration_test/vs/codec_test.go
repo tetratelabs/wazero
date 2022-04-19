@@ -110,17 +110,17 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFinishedFeatures())
 
 		// Add WASI to satisfy import tests
-		wm, err := wasi.InstantiateSnapshotPreview1(r)
+		wm, err := wasi.InstantiateSnapshotPreview1(testCtx, r)
 		require.NoError(t, err)
 		defer wm.Close()
 
 		// Decode and instantiate the module
-		module, err := r.InstantiateModuleFromCode(exampleBinary)
+		module, err := r.InstantiateModuleFromCode(testCtx, exampleBinary)
 		require.NoError(t, err)
 		defer module.Close()
 
 		// Call the swap function as a smoke test
-		results, err := module.ExportedFunction("swap").Call(nil, 1, 2)
+		results, err := module.ExportedFunction("swap").Call(testCtx, 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{2, 1}, results)
 	})
