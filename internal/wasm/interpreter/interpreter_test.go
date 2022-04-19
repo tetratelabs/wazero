@@ -13,6 +13,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 	f1 := &callFrame{}
 	f2 := &callFrame{}
@@ -136,7 +139,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ce.callNativeFunc(context.Background(), &wasm.CallContext{}, f)
+				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
 				require.Equal(t, tc.expected, int32(uint32(ce.popValue())))
 			})
 		}
@@ -188,7 +191,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ce.callNativeFunc(context.Background(), &wasm.CallContext{}, f)
+				ce.callNativeFunc(testCtx, &wasm.CallContext{}, f)
 				require.Equal(t, tc.expected, int64(ce.popValue()))
 			})
 		}
@@ -221,7 +224,7 @@ func TestInterpreter_Compile(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		err := e.CompileModule(context.Background(), errModule)
+		err := e.CompileModule(testCtx, errModule)
 		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -242,7 +245,7 @@ func TestInterpreter_Compile(t *testing.T) {
 			},
 			ID: wasm.ModuleID{},
 		}
-		err := e.CompileModule(context.Background(), okModule)
+		err := e.CompileModule(testCtx, okModule)
 		require.NoError(t, err)
 
 		compiled, ok := e.codes[okModule.ID]
