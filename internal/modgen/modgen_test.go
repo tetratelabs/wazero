@@ -406,3 +406,53 @@ func TestGenerator_newConstExpr(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerator_globalSection(t *testing.T) {
+	g := newGenerator(100,
+		[]int{
+			3, // number of globals.
+			// i32.const 123, mutable
+			0 /* i32.const */, 123, 1 /* non negative */, 0, /* mutable */
+			3 /* f64.const */, 1, /* immutable */
+			4 /* global.get */, 0 /* global index */, 1, /* immutable */
+		},
+		[][]byte{{1, 2, 3, 4, 5, 6, 7, 8}},
+	)
+
+	g.m.ImportSection = []*wasm.Import{{}, {},
+		{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: f32}},
+	}
+
+	g.globalSection()
+
+	expected := []*wasm.Global{
+		{
+			Type: &wasm.GlobalType{ValType: i32, Mutable: true},
+			Init: &wasm.ConstantExpression{
+				Opcode: wasm.OpcodeI32Const,
+				Data:   leb128.EncodeInt32(123),
+			},
+		},
+		{
+			Type: &wasm.GlobalType{ValType: f64, Mutable: false},
+			Init: &wasm.ConstantExpression{
+				Opcode: wasm.OpcodeF64Const,
+				Data:   []byte{1, 2, 3, 4, 5, 6, 7, 8},
+			},
+		},
+		{
+			Type: &wasm.GlobalType{ValType: f32, Mutable: false},
+			Init: &wasm.ConstantExpression{
+				Opcode: wasm.OpcodeGlobalGet,
+				Data:   []byte{0},
+			},
+		},
+	}
+
+	actual := g.m.GlobalSection
+	require.Equal(t, len(expected), len(actual))
+
+	for i := range actual {
+		require.Equal(t, expected[i], actual[i])
+	}
+}
