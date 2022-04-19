@@ -2,7 +2,6 @@ package jit
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"runtime"
 	"sync"
@@ -235,7 +234,7 @@ const (
 	callEngineModuleContextMemorySliceLenOffset         = 64
 	callEngineModuleContextTableElement0AddressOffset   = 72
 	callEngineModuleContextTableSliceLenOffset          = 80
-	callEngineModuleContextcodesElement0AddressOffset   = 88
+	callEngineModuleContextCodesElement0AddressOffset   = 88
 	callEngineModuleContextTypeIDsElement0AddressOffset = 96
 
 	// Offsets for callEngine valueStackContext.
@@ -497,9 +496,9 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (me *moduleEngine) Call(m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
-	// codes on close aren't locked, neither is this read.
+	// code on close aren't locked, neither is this read.
 	compiled := me.functions[f.Index]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = m.FailIfClosed(); err == nil {
@@ -542,21 +541,14 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 		}
 	}()
 
-	for _, v := range params {
-		ce.pushValue(v)
-	}
-
 	if f.Kind == wasm.FunctionKindWasm {
+		for _, v := range params {
+			ce.pushValue(v)
+		}
 		ce.execWasmFunction(m, compiled)
+		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
 	} else {
-		ce.execHostFunction(f.Kind, compiled.source.GoFunc, m)
-	}
-
-	// Note the top value is the tail of the results,
-	// so we assign them in reverse order.
-	results = make([]uint64, len(f.Type.Results))
-	for i := range results {
-		results[len(results)-1-i] = ce.popValue()
+		results = wasm.CallGoFunc(m, compiled.source, params)
 	}
 	return
 }
@@ -656,69 +648,7 @@ const (
 	builtinFunctionIndexBreakPoint
 )
 
-// execHostFunction executes the given host function represented as *reflect.Value.
-//
-// The arguments to the function are popped from the stack following the convention of the Wasm stack machine.
-// For example, if the host function F requires the (x1 uint32, x2 float32) parameters, and
-// the stack is [..., A, B], then the function is called as F(A, B) where A and B are interpreted
-// as uint32 and float32 respectively.
-//
-// After the execution, the result of host function is pushed onto the stack.
-//
-// ctx parameter is passed to the host function as a first argument.
-func (ce *callEngine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.ModuleContext) {
-	// TODO: the signature won't ever change for a host function once instantiated. For this reason, we should be able
-	// to optimize below based on known possible outcomes. This includes knowledge about if it has a context param[0]
-	// and which type (if any) it returns.
-	tp := f.Type()
-	in := make([]reflect.Value, tp.NumIn())
-
-	// We pop the value and pass them as arguments in a reverse order according to the
-	// stack machine convention.
-	wasmParamOffset := 0
-	if fk != wasm.FunctionKindGoNoContext {
-		wasmParamOffset = 1
-	}
-	for i := len(in) - 1; i >= wasmParamOffset; i-- {
-		val := reflect.New(tp.In(i)).Elem()
-		raw := ce.popValue()
-		kind := tp.In(i).Kind()
-		switch kind {
-		case reflect.Float32:
-			val.SetFloat(float64(math.Float32frombits(uint32(raw))))
-		case reflect.Float64:
-			val.SetFloat(math.Float64frombits(raw))
-		case reflect.Uint32, reflect.Uint64:
-			val.SetUint(raw)
-		case reflect.Int32, reflect.Int64:
-			val.SetInt(int64(raw))
-		}
-		in[i] = val
-	}
-
-	// Handle any special parameter zero
-	if val := wasm.GetHostFunctionCallContextValue(fk, ctx); val != nil {
-		in[0] = *val
-	}
-
-	// Execute the host function and push back the call result onto the stack.
-	for _, ret := range f.Call(in) {
-		switch ret.Kind() {
-		case reflect.Float32:
-			ce.pushValue(uint64(math.Float32bits(float32(ret.Float()))))
-		case reflect.Float64:
-			ce.pushValue(math.Float64bits(ret.Float()))
-		case reflect.Uint32, reflect.Uint64:
-			ce.pushValue(ret.Uint())
-		case reflect.Int32, reflect.Int64:
-			ce.pushValue(uint64(ret.Int()))
-		default:
-			panic("invalid return type")
-		}
-	}
-}
-
-func (ce *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *function) {
+func (ce *callEngine) execWasmFunction(ctx *wasm.CallContext, f *function) {
 	// Push the initial callframe.
 	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, function: f}
 	ce.globalContext.callFrameStackPointer++
@@ -739,14 +669,20 @@ jitentry:
 		case jitCallStatusCodeReturned:
 			// Meaning that all the function frames above the previous call frame stack pointer are executed.
 		case jitCallStatusCodeCallHostFunction:
-			calleeHostFunction := ce.callFrameTop().function.source
+			calleeHostFunction := ce.callFrameTop().function
 			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
 			// but when making host function calls, we need to pass the memory instance of host function caller.
-			callercode := ce.callFrameAt(1).function
-			// A host function is invoked with the calling frame's memory, which may be different if in another module.
-			ce.execHostFunction(calleeHostFunction.Kind, calleeHostFunction.GoFunc,
-				ctx.WithMemory(callercode.source.Module.Memory),
+			callerFunction := ce.callFrameAt(1).function
+			params := wasm.PopGoFuncParams(calleeHostFunction.source, ce.popValue)
+			results := wasm.CallGoFunc(
+				// Use the caller's memory, which might be different from the defining module on an imported function.
+				ctx.WithMemory(callerFunction.source.Module.Memory),
+				calleeHostFunction.source,
+				params,
 			)
+			for _, v := range results {
+				ce.pushValue(v)
+			}
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.builtinFunctionCallIndex {

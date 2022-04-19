@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/tetratelabs/wazero/api"
@@ -30,8 +31,8 @@ var moduleType = reflect.TypeOf((*api.Module)(nil)).Elem()
 var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-// GetHostFunctionCallContextValue returns a reflect.Value for a context param[0], or nil if there isn't one.
-func GetHostFunctionCallContextValue(fk FunctionKind, ctx *ModuleContext) *reflect.Value {
+// getGoFuncCallContextValue returns a reflect.Value for a context param[0], or nil if there isn't one.
+func getGoFuncCallContextValue(fk FunctionKind, ctx *CallContext) *reflect.Value {
 	switch fk {
 	case FunctionKindGoNoContext: // no special param zero
 	case FunctionKindGoContext:
@@ -44,6 +45,97 @@ func GetHostFunctionCallContextValue(fk FunctionKind, ctx *ModuleContext) *refle
 		return &val
 	}
 	return nil
+}
+
+// PopGoFuncParams pops the correct number of parameters off the stack into a parameter slice for use in CallGoFunc
+//
+// For example, if the host function F requires the (x1 uint32, x2 float32) parameters, and
+// the stack is [..., A, B], then the function is called as F(A, B) where A and B are interpreted
+// as uint32 and float32 respectively.
+func PopGoFuncParams(f *FunctionInstance, popParam func() uint64) []uint64 {
+	// First, determine how many values we need to pop
+	paramCount := f.GoFunc.Type().NumIn()
+	if f.Kind != FunctionKindGoNoContext {
+		paramCount--
+	}
+
+	return PopValues(paramCount, popParam)
+}
+
+// PopValues pops api.ValueType values from the stack and returns them in reverse order.
+//
+// Note: the popper intentionally doesn't return bool or error because the caller's stack depth is trusted.
+func PopValues(count int, popper func() uint64) []uint64 {
+	if count == 0 {
+		return nil
+	}
+	params := make([]uint64, count)
+	for i := count - 1; i >= 0; i-- {
+		params[i] = popper()
+	}
+	return params
+}
+
+// CallGoFunc executes the FunctionInstance.GoFunc by converting params to Go types. The results of the function call
+// are converted back to api.ValueType.
+//
+// * callCtx is passed to the host function as a first argument.
+//
+// Note: ctx must use the caller's memory, which might be different from the defining module on an imported function.
+func CallGoFunc(callCtx *CallContext, f *FunctionInstance, params []uint64) []uint64 {
+	tp := f.GoFunc.Type()
+
+	var in []reflect.Value
+	if tp.NumIn() != 0 {
+		in = make([]reflect.Value, tp.NumIn())
+
+		wasmParamOffset := 0
+		if f.Kind != FunctionKindGoNoContext {
+			wasmParamOffset = 1
+		}
+
+		for i, raw := range params {
+			inI := i + wasmParamOffset
+			val := reflect.New(tp.In(inI)).Elem()
+			switch tp.In(inI).Kind() {
+			case reflect.Float32:
+				val.SetFloat(float64(math.Float32frombits(uint32(raw))))
+			case reflect.Float64:
+				val.SetFloat(math.Float64frombits(raw))
+			case reflect.Uint32, reflect.Uint64:
+				val.SetUint(raw)
+			case reflect.Int32, reflect.Int64:
+				val.SetInt(int64(raw))
+			}
+			in[inI] = val
+		}
+
+		// Handle any special parameter zero
+		if val := getGoFuncCallContextValue(f.Kind, callCtx); val != nil {
+			in[0] = *val
+		}
+	}
+
+	// Execute the host function and push back the call result onto the stack.
+	var results []uint64
+	if tp.NumOut() > 0 {
+		results = make([]uint64, 0, tp.NumOut())
+	}
+	for _, ret := range f.GoFunc.Call(in) {
+		switch ret.Kind() {
+		case reflect.Float32:
+			results = append(results, uint64(math.Float32bits(float32(ret.Float()))))
+		case reflect.Float64:
+			results = append(results, math.Float64bits(ret.Float()))
+		case reflect.Uint32, reflect.Uint64:
+			results = append(results, ret.Uint())
+		case reflect.Int32, reflect.Int64:
+			results = append(results, uint64(ret.Int()))
+		default:
+			panic("BUG: invalid return type")
+		}
+	}
+	return results
 }
 
 // getFunctionType returns the function type corresponding to the function signature or errs if invalid.

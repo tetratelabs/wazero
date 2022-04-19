@@ -1339,7 +1339,7 @@ func newSnapshotPreview1() *snapshotPreview1 {
 }
 
 func sysCtx(m api.Module) *wasm.SysContext {
-	if internal, ok := m.(*wasm.ModuleContext); !ok {
+	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {
 		return internal.Sys

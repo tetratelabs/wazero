@@ -965,7 +965,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 	// First, we read the address of the first item of ce.codes slice (= &ce.codes[0])
 	// into tmp.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextcodesElement0AddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset,
 		tmp)
 
 	// Next, read the index of the target function (= &ce.codes[offset])
@@ -3056,8 +3056,8 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 	}
 }
 
-// compileModuleContextInitialization adds instructions to initialize ce.ModuleContext's fields based on
-// ce.ModuleContext.ModuleInstanceAddress.
+// compileModuleContextInitialization adds instructions to initialize ce.CallContext's fields based on
+// ce.CallContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
@@ -3232,7 +3232,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextcodesElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset,
 		)
 	}
 

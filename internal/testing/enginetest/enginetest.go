@@ -91,17 +91,17 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
-	results, err := me.Call(module.Ctx, fn, 3)
+	results, err := me.Call(module.CallCtx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := me.Call(module.Ctx, fn)
+		_, err := me.Call(module.CallCtx, fn)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := me.Call(module.Ctx, fn, 1, 2)
+		_, err := me.Call(module.CallCtx, fn, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -262,7 +262,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	})
 }
 
-func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester) {
+func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) {
 	features := wasm.Features20191205
 	e := et.NewEngine(features)
 
@@ -288,7 +288,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(features, e), module, nil)
+	modCtx := wasm.NewCallContext(context.Background(), wasm.NewStore(features, e), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
@@ -311,7 +311,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 }
 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
-	runTestModuleEngine_Call_HostFn_ModuleContext(t, et) // TODO: refactor to use the same test interface.
+	runTestModuleEngine_Call_HostFn_CallContext(t, et) // TODO: refactor to use the same test interface.
 
 	e := et.NewEngine(wasm.Features20191205)
 
@@ -321,27 +321,27 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	tests := []struct {
 		name   string
-		module *wasm.ModuleContext
+		module *wasm.CallContext
 		fn     *wasm.FunctionInstance
 	}{
 		{
 			name:   wasmFnName,
-			module: imported.Ctx,
+			module: imported.CallCtx,
 			fn:     imported.Exports[wasmFnName].Function,
 		},
 		{
 			name:   hostFnName,
-			module: host.Ctx,
+			module: host.CallCtx,
 			fn:     host.Exports[hostFnName].Function,
 		},
 		{
 			name:   callHostFnName,
-			module: imported.Ctx,
+			module: imported.CallCtx,
 			fn:     imported.Exports[callHostFnName].Function,
 		},
 		{
 			name:   callImportCallHostFnName,
-			module: importing.Ctx,
+			module: importing.CallCtx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
 		},
 	}
@@ -366,7 +366,7 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 
 	tests := []struct {
 		name        string
-		module      *wasm.ModuleContext
+		module      *wasm.CallContext
 		fn          *wasm.FunctionInstance
 		input       []uint64
 		expectedErr string
@@ -374,35 +374,35 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 		{
 			name:        "host function not enough parameters",
 			input:       []uint64{},
-			module:      host.Ctx,
+			module:      host.CallCtx,
 			fn:          host.Exports[hostFnName].Function,
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "host function too many parameters",
 			input:       []uint64{1, 2},
-			module:      host.Ctx,
+			module:      host.CallCtx,
 			fn:          host.Exports[hostFnName].Function,
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
 			name:        "wasm function not enough parameters",
 			input:       []uint64{},
-			module:      imported.Ctx,
+			module:      imported.CallCtx,
 			fn:          imported.Exports[wasmFnName].Function,
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "wasm function too many parameters",
 			input:       []uint64{1, 2},
-			module:      imported.Ctx,
+			module:      imported.CallCtx,
 			fn:          imported.Exports[wasmFnName].Function,
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
 			name:   "wasm function panics with wasmruntime.Error",
 			input:  []uint64{0},
-			module: imported.Ctx,
+			module: imported.CallCtx,
 			fn:     imported.Exports[wasmFnName].Function,
 			expectedErr: `wasm error: integer divide by zero
 wasm stack trace:
@@ -411,7 +411,7 @@ wasm stack trace:
 		{
 			name:   "host function that panics",
 			input:  []uint64{math.MaxUint32},
-			module: host.Ctx,
+			module: host.CallCtx,
 			fn:     host.Exports[hostFnName].Function,
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
@@ -420,7 +420,7 @@ wasm stack trace:
 		{
 			name:   "host function panics with runtime.Error",
 			input:  []uint64{0},
-			module: host.Ctx,
+			module: host.CallCtx,
 			fn:     host.Exports[hostFnName].Function,
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
@@ -429,7 +429,7 @@ wasm stack trace:
 		{
 			name:   "wasm calls host function that panics",
 			input:  []uint64{math.MaxUint32},
-			module: imported.Ctx,
+			module: imported.CallCtx,
 			fn:     imported.Exports[callHostFnName].Function,
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
@@ -439,7 +439,7 @@ wasm stack trace:
 		{
 			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
 			input:  []uint64{0},
-			module: importing.Ctx,
+			module: importing.CallCtx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
@@ -450,7 +450,7 @@ wasm stack trace:
 		{
 			name:   "wasm calls imported wasm that calls host function that panics",
 			input:  []uint64{math.MaxUint32},
-			module: importing.Ctx,
+			module: importing.CallCtx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
@@ -461,7 +461,7 @@ wasm stack trace:
 		{
 			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
 			input:  []uint64{0},
-			module: importing.Ctx,
+			module: importing.CallCtx,
 			fn:     importing.Exports[callImportCallHostFnName].Function,
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
@@ -592,7 +592,7 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for JIT, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 	// callEngineModuleContextModuleInstanceAddressOffset
-	module.Ctx = wasm.NewModuleContext(context.Background(), nil, module, nil)
+	module.CallCtx = wasm.NewCallContext(context.Background(), nil, module, nil)
 }
 
 // addFunction assigns and adds a function to the module.

@@ -58,8 +58,8 @@ func Benchmark_EnvironGet(b *testing.B) {
 	})
 }
 
-func newCtx(buf []byte, sys *wasm.SysContext) *wasm.ModuleContext {
-	return wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
+func newCtx(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
+	return wasm.NewCallContext(context.Background(), nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)
 }

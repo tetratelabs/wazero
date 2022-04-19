@@ -2027,7 +2027,7 @@ func instantiateModule(t *testing.T, wasifunction, wasiimport string, sysCtx *wa
 	require.NoError(t, err)
 
 	if sysCtx != nil {
-		mod.(*wasm.ModuleContext).Sys = sysCtx
+		mod.(*wasm.CallContext).Sys = sysCtx
 	}
 
 	fn := mod.ExportedFunction(wasifunction)
