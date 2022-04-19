@@ -138,7 +138,8 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ce.callNativeFunc(&wasm.ModuleContext{}, f)
+				mdlctx := wasm.ModuleContext{}
+				ce.callNativeFunc(&mdlctx, f)
 				require.Equal(t, tc.expected, int32(uint32(ce.pop())))
 			})
 		}

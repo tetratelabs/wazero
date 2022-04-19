@@ -12,6 +12,14 @@ import (
 // compile time check to ensure ModuleContext implements api.Module
 var _ api.Module = &ModuleContext{}
 
+func NewModule(ctx context.Context) *ModuleContext {
+	mdl := ModuleContext{}
+	mdl.ctx = ctx
+	zero := uint64(0)
+	mdl.closed = &zero
+	return &mdl
+}
+
 func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, Sys *SysContext) *ModuleContext {
 	zero := uint64(0)
 	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
@@ -37,6 +45,8 @@ type ModuleContext struct {
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
 	closed *uint64
+
+	opcounter uint64
 }
 
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
@@ -50,6 +60,13 @@ func (m *ModuleContext) FailIfClosed() error {
 // Name implements the same method as documented on api.Module
 func (m *ModuleContext) Name() string {
 	return m.module.Name
+}
+
+// GetIncCounter Increases opcounter on 1 and retruns new value
+func (m *ModuleContext) GetIncCounter() uint64 {
+	atomic.AddUint64(&m.opcounter, 1)
+	return m.opcounter
+
 }
 
 // WithMemory allows overriding memory without re-allocation when the result would be the same.

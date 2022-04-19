@@ -17,6 +17,10 @@ import (
 	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
+const (
+	errContextCheckStep uint64 = 100
+)
+
 var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of wasm.Engine
@@ -577,7 +581,10 @@ func (me *moduleEngine) Call(m *wasm.ModuleContext, f *wasm.FunctionInstance, pa
 		ce.push(param)
 	}
 	if f.Kind == wasm.FunctionKindWasm {
-		ce.callNativeFunc(m, compiled)
+		err = ce.callNativeFunc(m, compiled)
+		if nil != err {
+			return
+		}
 	} else {
 		ce.callHostFunc(m, compiled)
 	}
@@ -642,7 +649,7 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	ce.popFrame()
 }
 
-func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) (err error) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
@@ -650,11 +657,25 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	table := moduleInst.Table
 	compiledFunctions := f.moduleEngine.compiledFunctions
 	ce.pushFrame(frame)
+	err = nil
 	bodyLen := uint64(len(frame.f.body))
+	var opcounter uint64
 	for frame.pc < bodyLen {
+		if nil != ctx {
+			opcounter = ctx.GetIncCounter()
+			if (opcounter % errContextCheckStep) == 0 {
+				if nil != ctx.Context() {
+					err = ctx.Context().Err()
+					if nil != err {
+						return
+					}
+				}
+			}
+
+		}
 		op := frame.f.body[frame.pc]
 		// TODO: add description of each operation/case
-		// on, for example, how many args are used,
+		// on, for example, how many args are used,g
 		// how the stack is modified, etc.
 		switch op.kind {
 		case wazeroir.OperationKindUnreachable:
@@ -690,7 +711,10 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if f.hostFn != nil {
 					ce.callHostFunc(ctx, f)
 				} else {
-					ce.callNativeFunc(ctx, f)
+					err = ce.callNativeFunc(ctx, f)
+					if nil != err {
+						return err
+					}
 				}
 				frame.pc++
 			}
@@ -711,7 +735,10 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if targetCompiledFunction.hostFn != nil {
 					ce.callHostFunc(ctx, targetCompiledFunction)
 				} else {
-					ce.callNativeFunc(ctx, targetCompiledFunction)
+					err := ce.callNativeFunc(ctx, targetCompiledFunction)
+					if nil != err {
+						return err
+					}
 				}
 				frame.pc++
 			}
@@ -1620,6 +1647,7 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 		}
 	}
 	ce.popFrame()
+	return nil
 }
 
 // Close releases all the function instances declared in this module.
