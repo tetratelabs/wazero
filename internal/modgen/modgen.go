@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/rand"
 
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -58,18 +59,22 @@ func (g *generator) nextRandom() (ret random) {
 
 func (g *generator) gen() *wasm.Module {
 	g.m = &wasm.Module{}
-
 	g.typeSection()
 	g.importSection()
+	g.functionSection()
+	g.tableSection()
+	g.memorySection()
+	g.globalSection()
+	g.exportSection()
+	g.startSection()
+	g.elementSection()
+	g.codeSection()
+	g.dataSection()
 	return g.m
 }
 
-func (g *generator) getSectionSize() int {
-	return g.nextRandom().Intn(g.size)
-}
-
 func (g *generator) typeSection() {
-	numTypes := g.getSectionSize()
+	numTypes := g.nextRandom().Intn(g.size)
 	for i := 0; i < numTypes; i++ {
 		ft := g.newFunctionType(g.nextRandom().Intn(g.size), g.nextRandom().Intn(g.size))
 		g.m.TypeSection = append(g.m.TypeSection, ft)
@@ -104,7 +109,7 @@ func (g *generator) newValueType() (ret wasm.ValueType) {
 }
 
 func (g *generator) importSection() {
-	numImports := g.getSectionSize()
+	numImports := g.nextRandom().Intn(g.size)
 	var memoryImported, tableImported int
 	for i := 0; i < numImports; i++ {
 		imp := &wasm.Import{
@@ -130,7 +135,7 @@ func (g *generator) importSection() {
 		}
 
 		if memoryImported == 0 {
-			min := g.nextRandom().Intn(4)
+			min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
 			max := g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min
 
 			imp.Type = wasm.ExternTypeMemory
@@ -144,8 +149,8 @@ func (g *generator) importSection() {
 		}
 
 		if tableImported == 0 {
-			min := g.nextRandom().Intn(4)
-			max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
+			min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
+			max := uint32(g.nextRandom().Intn(int(math.MaxInt32)-min) + min)
 
 			imp.Type = wasm.ExternTypeTable
 			tableImported = 1
@@ -158,4 +163,59 @@ func (g *generator) importSection() {
 
 		panic("BUG")
 	}
+}
+
+func (g *generator) functionSection() {
+	numTypes := len(g.m.TypeSection)
+	if numTypes == 0 {
+		return
+	}
+	numFunctions := g.nextRandom().Intn(g.size)
+	for i := 0; i < numFunctions; i++ {
+		typeIndex := g.nextRandom().Intn(numTypes)
+		g.m.FunctionSection = append(g.m.FunctionSection, uint32(typeIndex))
+	}
+}
+
+func (g *generator) tableSection() {
+	if g.m.ImportTableCount() != 0 {
+		return
+	}
+
+	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
+	max := uint32(g.nextRandom().Intn(int(math.MaxInt32)-min) + min)
+	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
+}
+
+func (g *generator) memorySection() {
+	if g.m.ImportMemoryCount() != 0 {
+		return
+	}
+	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
+	max := g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min
+	g.m.MemorySection = &wasm.Memory{Min: uint32(min), Max: uint32(max), IsMaxEncoded: true}
+}
+
+func (g *generator) globalSection() {
+
+}
+
+func (g *generator) exportSection() {
+
+}
+
+func (g *generator) startSection() {
+
+}
+
+func (g *generator) elementSection() {
+
+}
+
+func (g *generator) codeSection() {
+
+}
+
+func (g *generator) dataSection() {
+
 }

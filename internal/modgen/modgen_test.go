@@ -2,6 +2,7 @@ package modgen
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 
@@ -19,29 +20,23 @@ const (
 )
 
 func TestModGen(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		seed []byte
-	}{
-		{name: "empty", seed: []byte{}},
-		{name: "small", seed: []byte{1}},
-		{name: "small", seed: []byte{2}},
-		{name: "small", seed: []byte{1, 1}},
-		{name: "small", seed: []byte{1, 2}},
-		{name: "small", seed: []byte{1, 3}},
-		{name: "small", seed: []byte{1, 4}},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			m := Gen(tc.seed)
-			// Generating with the same seed must result in the same module.
-			require.Equal(t, m, Gen(tc.seed))
-			buf := binary.EncodeModule(m)
-
-			r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig())
-			_, err := r.CompileModule(buf)
+	for _, size := range []int{0, 1, 2, 5, 10} {
+		r := rand.New(rand.NewSource(0))
+		for i := 0; i < 10; i++ {
+			buf := make([]byte, size)
+			_, err := r.Read(buf)
 			require.NoError(t, err)
-		})
+			t.Run(fmt.Sprintf("%d (size=%d)", i, size), func(t *testing.T) {
+				m := Gen(buf)
+				// Generating with the same seed must result in the same module.
+				require.Equal(t, m, Gen(buf))
+				buf := binary.EncodeModule(m)
+
+				r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
+				_, err := r.CompileModule(buf)
+				require.NoError(t, err)
+			})
+		}
 	}
 }
 
@@ -254,4 +249,43 @@ func TestGenerator_importSection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerator_functionSection(t *testing.T) {
+	t.Run("with types", func(t *testing.T) {
+		types := make([]*wasm.FunctionType, 10)
+		g := newGenerator(100, []int{
+			10, // number of functions.
+			100001, 105, 102, 100000003, 104, 6, 9, 8, 7, 10000,
+		}, nil)
+
+		g.m.TypeSection = types
+		g.functionSection()
+		require.Equal(t, []uint32{1, 5, 2, 3, 4, 6, 9, 8, 7, 0}, g.m.FunctionSection)
+	})
+	t.Run("without types", func(t *testing.T) {
+		g := newGenerator(100, []int{10}, nil)
+		g.functionSection()
+		require.Equal(t, []uint32(nil), g.m.FunctionSection)
+	})
+}
+
+func TestGenerator_tableSection(t *testing.T) {
+	t.Run("with table import", func(t *testing.T) {
+		g := newGenerator(100, []int{10}, nil)
+		g.m.ImportSection = append(g.m.ImportSection, &wasm.Import{Type: wasm.ExternTypeTable})
+
+		g.tableSection()
+		require.Nil(t, g.m.TableSection)
+	})
+}
+
+func TestGenerator_memorySection(t *testing.T) {
+	t.Run("with table import", func(t *testing.T) {
+		g := newGenerator(100, []int{10}, nil)
+		g.m.ImportSection = append(g.m.ImportSection, &wasm.Import{Type: wasm.ExternTypeMemory})
+
+		g.memorySection()
+		require.Nil(t, g.m.MemorySection)
+	})
 }
