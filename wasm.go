@@ -16,9 +16,10 @@ import (
 // Runtime allows embedding of WebAssembly 1.0 (20191205) modules.
 //
 // Ex.
+//	ctx := context.Background()
 //	r := wazero.NewRuntime()
-//	code, _ := r.CompileModule(source)
-//	module, _ := r.InstantiateModule(code)
+//	compiled, _ := r.CompileModule(ctx, source)
+//	module, _ := r.InstantiateModule(ctx, compiled)
 //	defer module.Close()
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
@@ -27,10 +28,11 @@ type Runtime interface {
 	//
 	// Ex. Below defines and instantiates a module named "env" with one function:
 	//
+	//	ctx := context.Background()
 	//	hello := func() {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
-	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
+	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx)
 	NewModuleBuilder(moduleName string) ModuleBuilder
 
 	// Module returns exports from an instantiated module or nil if there aren't any.
@@ -43,38 +45,46 @@ type Runtime interface {
 	//  * Improve performance when the same module is instantiated multiple times under different names
 	//  * Reduce the amount of errors that can occur during InstantiateModule.
 	//
+	// Note: when `ctx` is nil, it defaults to context.Background.
 	// Note: The resulting module name defaults to what was binary from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(source []byte) (*CompiledCode, error)
+	CompileModule(ctx context.Context, source []byte) (*CompiledCode, error)
 
 	// InstantiateModuleFromCode instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
 	// errs if invalid.
 	//
 	// Ex.
-	//	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(source)
+	//	ctx := context.Background()
+	//	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
 	//	defer module.Close()
 	//
+	// Note: when `ctx` is nil, it defaults to context.Background.
 	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
-	InstantiateModuleFromCode(source []byte) (api.Module, error)
+	InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error)
 
 	// InstantiateModuleFromCodeWithConfig is a convenience function that chains CompileModule to
 	// InstantiateModuleWithConfig.
 	//
 	// Ex. To only change the module name:
-	//	wasm, _ := wazero.NewRuntime().InstantiateModuleFromCodeWithConfig(source, wazero.NewModuleConfig().
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime()
+	//	wasm, _ := r.InstantiateModuleFromCodeWithConfig(ctx, source, wazero.NewModuleConfig().
 	//		WithName("wasm")
 	//	)
 	//	defer wasm.Close()
-	InstantiateModuleFromCodeWithConfig(source []byte, config *ModuleConfig) (api.Module, error)
+	//
+	// Note: When `ctx` is nil, it defaults to context.Background.
+	InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config *ModuleConfig) (api.Module, error)
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
 	// Ex.
+	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
-	//	code, _ := r.CompileModule(source)
-	//	defer code.Close()
-	//	module, _ := r.InstantiateModule(code)
+	//	compiled, _ := r.CompileModule(ctx, source)
+	//	defer compiled.Close()
+	//	module, _ := r.InstantiateModule(ctx, compiled)
 	//	defer module.Close()
 	//
 	// While CompiledCode is pre-validated, there are a few situations which can cause an error:
@@ -82,26 +92,28 @@ type Runtime interface {
 	//  * The module has a table element initializer that resolves to an index outside the Table minimum size.
 	//  * The module has a start function, and it failed to execute.
 	//
-	// Note: The last value of RuntimeConfig.WithContext is used for any start function.
-	InstantiateModule(code *CompiledCode) (api.Module, error)
+	// Note: When `ctx` is nil, it defaults to context.Background.
+	InstantiateModule(ctx context.Context, compiled *CompiledCode) (api.Module, error)
 
 	// InstantiateModuleWithConfig is like InstantiateModule, except you can override configuration such as the module
 	// name or ENV variables.
 	//
 	// For example, you can use this to define different args depending on the importing module.
 	//
+	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
-	//	wasi, _ := r.InstantiateModule(wazero.WASISnapshotPreview1())
-	//	code, _ := r.CompileModule(source)
+	//	wasi, _ := wasi.InstantiateSnapshotPreview1(r)
+	//	compiled, _ := r.CompileModule(ctx, source)
 	//
 	//	// Initialize base configuration:
 	//	config := wazero.NewModuleConfig().WithStdout(buf)
 	//
 	//	// Assign different configuration on each instantiation
-	//	module, _ := r.InstantiateModuleWithConfig(code, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
+	//	module, _ := r.InstantiateModuleWithConfig(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 	//
+	// Note: when `ctx` is nil, it defaults to context.Background.
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
-	InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error)
+	InstantiateModuleWithConfig(ctx context.Context, compiled *CompiledCode, config *ModuleConfig) (mod api.Module, err error)
 }
 
 func NewRuntime() Runtime {
@@ -111,7 +123,6 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
-		ctx:             config.ctx,
 		store:           wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
 		enabledFeatures: config.enabledFeatures,
 		memoryMaxPages:  config.memoryMaxPages,
@@ -121,7 +132,6 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
 	enabledFeatures wasm.Features
-	ctx             context.Context
 	store           *wasm.Store
 	memoryMaxPages  uint32
 }
@@ -132,7 +142,7 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
+func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCode, error) {
 	if source == nil {
 		return nil, errors.New("source == nil")
 	}
@@ -166,7 +176,7 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 
 	internal.AssignModuleID(source)
 
-	if err = r.store.Engine.CompileModule(internal); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
 		return nil, err
 	}
 
@@ -174,47 +184,47 @@ func (r *runtime) CompileModule(source []byte) (*CompiledCode, error) {
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
-func (r *runtime) InstantiateModuleFromCode(source []byte) (api.Module, error) {
-	if code, err := r.CompileModule(source); err != nil {
+func (r *runtime) InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error) {
+	if compiled, err := r.CompileModule(ctx, source); err != nil {
 		return nil, err
 	} else {
 		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
-		defer code.Close()
-		return r.InstantiateModule(code)
+		defer compiled.Close()
+		return r.InstantiateModule(ctx, compiled)
 	}
 }
 
 // InstantiateModuleFromCodeWithConfig implements Runtime.InstantiateModuleFromCodeWithConfig
-func (r *runtime) InstantiateModuleFromCodeWithConfig(source []byte, config *ModuleConfig) (api.Module, error) {
-	if code, err := r.CompileModule(source); err != nil {
+func (r *runtime) InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config *ModuleConfig) (api.Module, error) {
+	if compiled, err := r.CompileModule(ctx, source); err != nil {
 		return nil, err
 	} else {
 		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
-		defer code.Close()
-		return r.InstantiateModuleWithConfig(code, config)
+		defer compiled.Close()
+		return r.InstantiateModuleWithConfig(ctx, compiled, config)
 	}
 }
 
 // InstantiateModule implements Runtime.InstantiateModule
-func (r *runtime) InstantiateModule(code *CompiledCode) (mod api.Module, err error) {
-	return r.InstantiateModuleWithConfig(code, NewModuleConfig())
+func (r *runtime) InstantiateModule(ctx context.Context, compiled *CompiledCode) (mod api.Module, err error) {
+	return r.InstantiateModuleWithConfig(ctx, compiled, NewModuleConfig())
 }
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
-func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
+func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
 	var sysCtx *wasm.SysContext
 	if sysCtx, err = config.toSysContext(); err != nil {
 		return
 	}
 
 	name := config.name
-	if name == "" && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
-		name = code.module.NameSection.ModuleName
+	if name == "" && compiled.module.NameSection != nil && compiled.module.NameSection.ModuleName != "" {
+		name = compiled.module.NameSection.ModuleName
 	}
 
-	module := config.replaceImports(code.module)
+	module := config.replaceImports(compiled.module)
 
-	mod, err = r.store.Instantiate(r.ctx, module, name, sysCtx)
+	mod, err = r.store.Instantiate(ctx, module, name, sysCtx)
 	if err != nil {
 		return
 	}
@@ -224,7 +234,7 @@ func (r *runtime) InstantiateModuleWithConfig(code *CompiledCode, config *Module
 		if start == nil {
 			continue
 		}
-		if _, err = start.Call(mod.WithContext(r.ctx)); err != nil {
+		if _, err = start.Call(ctx); err != nil {
 			if _, ok := err.(*sys.ExitError); ok {
 				return
 			}

@@ -84,14 +84,6 @@ type Module interface {
 	// with the exitCode.
 	CloseWithExitCode(exitCode uint32) error
 
-	// Context returns any propagated context from the Runtime or a prior function call.
-	//
-	// The returned context is always non-nil; it defaults to context.Background.
-	Context() context.Context
-
-	// WithContext allows callers to override the propagated context, for example, to add values to it.
-	WithContext(ctx context.Context) Module
-
 	// Memory returns a memory defined in this module or nil if there are none wasn't.
 	Memory() Memory
 
@@ -129,23 +121,11 @@ type Function interface {
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
-	// If `m` is nil, it defaults to the module the function was defined in.
-	//
-	// To override context propagation, use Module.WithContext
-	//	fn = m.ExportedFunction("fib")
-	//	results, err := fn(m.WithContext(ctx), 5)
-	//	--snip--
-	//
-	// To ensure context propagation in a host function body, pass the `ctx` parameter:
-	//	hostFunction := func(m api.Module, offset, byteCount uint32) uint32 {
-	//		fn = m.ExportedFunction("__read")
-	//		results, err := fn(m, offset, byteCount)
-	//	--snip--
-	//
+	// Note: when `ctx` is nil, it defaults to context.Background.
 	// Note: If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
 	// function that exits.
-	Call(m Module, params ...uint64) ([]uint64, error)
+	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
 // Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime InstantiateModule).

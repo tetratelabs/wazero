@@ -1,6 +1,7 @@
 package age_calculator
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"log"
@@ -16,6 +17,10 @@ import (
 //
 // See README.md for a full description.
 func main() {
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
+	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
 
 	// Instantiate a module named "env" that exports functions to get the
@@ -35,7 +40,7 @@ func main() {
 			}
 			return uint32(time.Now().Year())
 		}).
-		Instantiate()
+		Instantiate(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,7 +51,7 @@ func main() {
 	//
 	// Note: The import syntax in both Text and Binary format is the same
 	// regardless of if the function was defined in Go or WebAssembly.
-	ageCalculator, err := r.InstantiateModuleFromCode([]byte(`
+	ageCalculator, err := r.InstantiateModuleFromCode(ctx, []byte(`
 ;; Define the optional module name. '$' prefixing is a part of the text format.
 (module $age-calculator
 
@@ -91,14 +96,14 @@ func main() {
 	}
 
 	// First, try calling the "get_age" function and printing to the console externally.
-	results, err := ageCalculator.ExportedFunction("get_age").Call(nil, birthYear)
+	results, err := ageCalculator.ExportedFunction("get_age").Call(ctx, birthYear)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("println >>", results[0])
 
 	// First, try calling the "log_age" function and printing to the console externally.
-	_, err = ageCalculator.ExportedFunction("log_age").Call(nil, birthYear)
+	_, err = ageCalculator.ExportedFunction("log_age").Call(ctx, birthYear)
 	if err != nil {
 		log.Fatal(err)
 	}

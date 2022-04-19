@@ -12,9 +12,9 @@ import (
 // compile time check to ensure CallContext implements api.Module
 var _ api.Module = &CallContext{}
 
-func NewCallContext(ctx context.Context, store *Store, instance *ModuleInstance, Sys *SysContext) *CallContext {
+func NewCallContext(store *Store, instance *ModuleInstance, Sys *SysContext) *CallContext {
 	zero := uint64(0)
-	return &CallContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
+	return &CallContext{memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
 }
 
 // CallContext is a function call context bound to a module. This is important as one module's functions can call
@@ -24,8 +24,11 @@ func NewCallContext(ctx context.Context, store *Store, instance *ModuleInstance,
 // functionality like trace propagation.
 // Note: this also implements api.Module in order to simplify usage as a host function parameter.
 type CallContext struct {
-	// ctx is returned by Context and overridden WithContext
-	ctx    context.Context // TODO: remove in next PR
+	// TODO: We've never found a great name for this. It is only used for function calls, hence CallContext, but it
+	// moves on a different axis than, for example, the context.Context. context.Context is the same root for the whole
+	// call stack, where the CallContext can change depending on where memory is defined and who defines the calling
+	// function. When we rename this again, we should try to capture as many key points possible on the docs.
+
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory api.Memory
@@ -60,7 +63,7 @@ func (m *CallContext) Name() string {
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *CallContext) WithMemory(memory *MemoryInstance) *CallContext {
 	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
-		return &CallContext{module: m.module, memory: memory, ctx: m.ctx, Sys: m.Sys, closed: m.closed}
+		return &CallContext{module: m.module, memory: memory, Sys: m.Sys, closed: m.closed}
 	}
 	return m
 }
@@ -68,19 +71,6 @@ func (m *CallContext) WithMemory(memory *MemoryInstance) *CallContext {
 // String implements the same method as documented on api.Module
 func (m *CallContext) String() string {
 	return fmt.Sprintf("Module[%s]", m.Name())
-}
-
-// Context implements the same method as documented on api.Module
-func (m *CallContext) Context() context.Context {
-	return m.ctx
-}
-
-// WithContext implements the same method as documented on api.Module
-func (m *CallContext) WithContext(ctx context.Context) api.Module {
-	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
-		return &CallContext{module: m.module, memory: m.memory, ctx: ctx, Sys: m.Sys, closed: m.closed}
-	}
-	return m
 }
 
 // Close implements the same method as documented on api.Module.
@@ -145,11 +135,12 @@ func (f *importedFn) ResultTypes() []api.ValueType {
 }
 
 // Call implements the same method as documented on api.Function
-func (f *importedFn) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
-	if m == nil {
-		return f.importedFn.Call(f.importingModule, params...)
+func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return f.importedFn.Call(m, params...)
+	mod := f.importingModule
+	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
 }
 
 // ParamTypes implements the same method as documented on api.Function
@@ -163,15 +154,12 @@ func (f *FunctionInstance) ResultTypes() []api.ValueType {
 }
 
 // Call implements the same method as documented on api.Function
-func (f *FunctionInstance) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
-	mod := f.Module
-	modCtx, ok := m.(*CallContext)
-	if ok {
-		// TODO: check if the importing context is correct
-	} else { // allow nil to substitute for the defining module
-		modCtx = mod.CallCtx
+func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return mod.Engine.Call(modCtx, f, params...)
+	mod := f.Module
+	return mod.Engine.Call(ctx, mod.CallCtx, f, params...)
 }
 
 // ExportedGlobal implements api.Module ExportedGlobal

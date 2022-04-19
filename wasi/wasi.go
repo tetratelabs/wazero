@@ -5,6 +5,7 @@
 package wasi
 
 import (
+	"context"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
@@ -25,9 +26,9 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 // InstantiateSnapshotPreview1 instantiates ModuleSnapshotPreview1, so that other modules can import them.
 //
 // Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
-func InstantiateSnapshotPreview1(r wazero.Runtime) (api.Module, error) {
+func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	_, fns := snapshotPreview1Functions()
-	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate()
+	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)
 }
 
 const (

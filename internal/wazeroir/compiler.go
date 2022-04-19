@@ -2,6 +2,7 @@ package wazeroir
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -180,7 +181,7 @@ type CompilationResult struct {
 	HasTable bool
 }
 
-func CompileFunctions(enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
+func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
 	functions, globals, mem, table, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err

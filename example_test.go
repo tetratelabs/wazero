@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"log"
@@ -10,11 +11,14 @@ import (
 //
 // See https://github.com/tetratelabs/wazero/tree/main/examples for more examples.
 func Example() {
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
 	// Create a new WebAssembly Runtime.
 	r := NewRuntime()
 
 	// Add a module to the runtime named "wasm/math" which exports one function "add", implemented in WebAssembly.
-	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasm/math
+	mod, err := r.InstantiateModuleFromCode(ctx, []byte(`(module $wasm/math
     (func $add (param i32 i32) (result i32)
         local.get 0
         local.get 1
@@ -31,7 +35,7 @@ func Example() {
 	add := mod.ExportedFunction("add")
 
 	x, y := uint64(1), uint64(2)
-	results, err := add.Call(nil, x, y)
+	results, err := add.Call(ctx, x, y)
 	if err != nil {
 		log.Fatal(err)
 	}

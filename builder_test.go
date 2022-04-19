@@ -344,7 +344,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			b := tc.input(NewRuntime()).(*moduleBuilder)
-			m, err := b.Build()
+			m, err := b.Build(testCtx)
 			require.NoError(t, err)
 
 			requireHostModuleEquals(t, tc.expected, m.module)
@@ -352,7 +352,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			require.Equal(t, b.r.store.Engine, m.compiledEngine)
 
 			// Built module must be instantiable by Engine.
-			_, err = b.r.InstantiateModule(m)
+			_, err = b.r.InstantiateModule(testCtx, m)
 			require.NoError(t, err)
 		})
 	}
@@ -385,7 +385,7 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := tc.input(NewRuntime()).Build()
+			_, e := tc.input(NewRuntime()).Build(testCtx)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}
@@ -394,7 +394,7 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 // TestNewModuleBuilder_Instantiate ensures Runtime.InstantiateModule is called on success.
 func TestNewModuleBuilder_Instantiate(t *testing.T) {
 	r := NewRuntime()
-	m, err := r.NewModuleBuilder("env").Instantiate()
+	m, err := r.NewModuleBuilder("env").Instantiate(testCtx)
 	require.NoError(t, err)
 
 	// If this was instantiated, it would be added to the store under the same name
@@ -404,10 +404,10 @@ func TestNewModuleBuilder_Instantiate(t *testing.T) {
 // TestNewModuleBuilder_Instantiate_Errors ensures errors propagate from Runtime.InstantiateModule
 func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
 	r := NewRuntime()
-	_, err := r.NewModuleBuilder("env").Instantiate()
+	_, err := r.NewModuleBuilder("env").Instantiate(testCtx)
 	require.NoError(t, err)
 
-	_, err = r.NewModuleBuilder("env").Instantiate()
+	_, err = r.NewModuleBuilder("env").Instantiate(testCtx)
 	require.EqualError(t, err, "module env has already been instantiated")
 }
 
