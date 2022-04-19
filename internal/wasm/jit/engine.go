@@ -672,7 +672,7 @@ jitentry:
 			calleeHostFunction := ce.callFrameTop().function
 			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
 			// but when making host function calls, we need to pass the memory instance of host function caller.
-			callercode := ce.callFrameAt(1).function
+			callerFunction := ce.callFrameAt(1).function
 			params := wasm.PopGoFuncParams(calleeHostFunction.source, ce.popValue)
 			results := wasm.CallGoFunc(
 				// Use the caller's memory, which might be different from the defining module on an imported function.
