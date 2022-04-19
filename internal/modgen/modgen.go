@@ -303,7 +303,17 @@ func (g *generator) exportSection() {
 }
 
 func (g *generator) startSection() {
+	funcs, _, _, _, err := g.m.AllDeclarations()
+	if err != nil {
+		panic("BUG:" + err.Error())
+	}
 
+	if len(funcs) == 0 {
+		return
+	}
+
+	index := wasm.Index(g.nextRandom().Intn(len(funcs)))
+	g.m.StartSection = &index
 }
 
 func (g *generator) elementSection() {
