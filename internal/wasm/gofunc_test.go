@@ -146,33 +146,29 @@ func (s *stack) pop() (result uint64) {
 }
 
 func TestPopValues(t *testing.T) {
+	stackVals := []uint64{1, 2, 3, 4, 5, 6, 7}
 	var tests = []struct {
-		name            string
-		count           int
-		stack, expected []uint64
+		name     string
+		count    int
+		expected []uint64
 	}{
 		{
-			name:     "empty",
-			stack:    []uint64{},
-			expected: []uint64{},
+			name: "pop zero doesn't allocate a slice ",
 		},
 		{
-			name:     "pop 1 stack size 1",
+			name:     "pop 1",
 			count:    1,
-			stack:    []uint64{1},
-			expected: []uint64{1},
+			expected: []uint64{7},
 		},
 		{
-			name:     "pop 2 stack size 3",
+			name:     "pop 2",
 			count:    2,
-			stack:    []uint64{1, 2, 3},
-			expected: []uint64{2, 3},
+			expected: []uint64{6, 7},
 		},
 		{
-			name:     "pop 3 stack size 3",
-			stack:    []uint64{1, 2, 3},
+			name:     "pop 3",
 			count:    3,
-			expected: []uint64{1, 2, 3},
+			expected: []uint64{5, 6, 7},
 		},
 	}
 
@@ -180,7 +176,7 @@ func TestPopValues(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			vals := PopValues(tc.count, (&stack{tc.stack}).pop)
+			vals := PopValues(tc.count, (&stack{stackVals}).pop)
 			require.Equal(t, tc.expected, vals)
 		})
 	}
@@ -196,17 +192,14 @@ func TestPopGoFuncParams(t *testing.T) {
 		{
 			name:      "nullary",
 			inputFunc: func() {},
-			expected:  []uint64{},
 		},
 		{
 			name:      "wasm.Module",
 			inputFunc: func(api.Module) {},
-			expected:  []uint64{},
 		},
 		{
 			name:      "context.Context",
 			inputFunc: func(context.Context) {},
-			expected:  []uint64{},
 		},
 		{
 			name:      "all supported params",

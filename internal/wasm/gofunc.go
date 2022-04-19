@@ -66,6 +66,9 @@ func PopGoFuncParams(f *FunctionInstance, popParam func() uint64) []uint64 {
 //
 // Note: the popper intentionally doesn't return bool or error because the caller's stack depth is trusted.
 func PopValues(count int, popper func() uint64) []uint64 {
+	if count == 0 {
+		return nil
+	}
 	params := make([]uint64, count)
 	for i := count - 1; i >= 0; i-- {
 		params[i] = popper()
