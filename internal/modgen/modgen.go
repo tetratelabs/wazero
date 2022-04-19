@@ -21,7 +21,8 @@ func Gen(seed []byte) *wasm.Module {
 	}
 
 	checksum := sha256.Sum256(seed)
-	g := &generator{size: len(seed)}
+	// Use 4 randoms created from the unique sha256 hash value of the seed.
+	g := &generator{size: len(seed), rands: make([]random, 4)}
 	for i := 0; i < 4; i++ {
 		g.rands[i] = rand.New(rand.NewSource(
 			int64(binary.LittleEndian.Uint64(checksum[i*8 : (i+1)*8]))))
@@ -30,8 +31,8 @@ func Gen(seed []byte) *wasm.Module {
 }
 
 type generator struct {
-	// rands holds 4 Rand created from the unique sha256 hash value of the seed.
-	rands         [4]*rand.Rand
+	// rands holds random sources for generating a module.
+	rands         []random
 	nextRandIndex int
 
 	// size holds the original size of the seed.
@@ -41,9 +42,17 @@ type generator struct {
 	m *wasm.Module
 }
 
-func (g *generator) nextRand() (ret *rand.Rand) {
+type random interface {
+	// See rand.Intn.
+	Intn(n int) int
+
+	// See rand.Read
+	Read(p []byte) (n int, err error)
+}
+
+func (g *generator) nextRandom() (ret random) {
 	ret = g.rands[g.nextRandIndex]
-	g.nextRandIndex = (g.nextRandIndex) % 4
+	g.nextRandIndex = (g.nextRandIndex + 1) % len(g.rands)
 	return
 }
 
@@ -56,15 +65,13 @@ func (g *generator) gen() *wasm.Module {
 }
 
 func (g *generator) getSectionSize() int {
-	// TODO comment
-	return g.nextRand().Intn(g.size&0x00ff_ffff) + 1
+	return g.nextRandom().Intn(g.size)
 }
 
 func (g *generator) typeSection() {
 	numTypes := g.getSectionSize()
-	fmt.Println(numTypes)
 	for i := 0; i < numTypes; i++ {
-		ft := g.newFunctionType(g.nextRand().Intn(g.size), g.nextRand().Intn(g.size))
+		ft := g.newFunctionType(g.nextRandom().Intn(g.size), g.nextRandom().Intn(g.size))
 		g.m.TypeSection = append(g.m.TypeSection, ft)
 	}
 }
@@ -81,7 +88,7 @@ func (g *generator) newFunctionType(params, results int) *wasm.FunctionType {
 }
 
 func (g *generator) newValueType() (ret wasm.ValueType) {
-	switch g.nextRand().Intn(4) {
+	switch g.nextRandom().Intn(4) {
 	case 0:
 		ret = wasm.ValueTypeI32
 	case 1:
@@ -100,28 +107,55 @@ func (g *generator) importSection() {
 	numImports := g.getSectionSize()
 	var memoryImported, tableImported int
 	for i := 0; i < numImports; i++ {
-		imp := &wasm.Import{}
-		switch g.nextRand().Intn(4 - memoryImported - tableImported) {
-		case 0:
+		imp := &wasm.Import{
+			Name:   fmt.Sprintf("%d", i),
+			Module: fmt.Sprintf("module-%d", i),
+		}
+		g.m.ImportSection = append(g.m.ImportSection, imp)
+
+		r := g.nextRandom().Intn(4 - memoryImported - tableImported)
+		if r == 0 && len(g.m.TypeSection) > 0 {
 			imp.Type = wasm.ExternTypeFunc
-			imp.DescFunc = uint32(g.nextRand().Intn(len(g.m.TypeSection)))
-		case 1:
+			imp.DescFunc = uint32(g.nextRandom().Intn(len(g.m.TypeSection)))
+			continue
+		}
+
+		if r == 0 || r == 1 {
 			imp.Type = wasm.ExternTypeGlobal
 			imp.DescGlobal = &wasm.GlobalType{
 				ValType: g.newValueType(),
-				Mutable: g.nextRand().Intn(2) == 0,
+				Mutable: g.nextRandom().Intn(2) == 0,
 			}
-		case 2:
+			continue
+		}
+
+		if memoryImported == 0 {
+			min := g.nextRandom().Intn(4)
+			max := g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min
+
+			imp.Type = wasm.ExternTypeMemory
+			imp.DescMem = &wasm.Memory{
+				Min:          uint32(min),
+				Max:          uint32(max),
+				IsMaxEncoded: true,
+			}
+			memoryImported = 1
+			continue
+		}
+
+		if tableImported == 0 {
+			min := g.nextRandom().Intn(4)
+			max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
+
 			imp.Type = wasm.ExternTypeTable
 			tableImported = 1
-			imp.DescTable = &wasm.Table{}
-		case 3:
-			imp.Type = wasm.ExternTypeMemory
-			imp.DescMem = &wasm.Memory{}
-			memoryImported = 1
-		default:
-			panic("BUG")
+			imp.DescTable = &wasm.Table{
+				Min: uint32(min),
+				Max: &max,
+			}
+			continue
 		}
-		g.m.ImportSection = append(g.m.ImportSection, imp)
+
+		panic("BUG")
 	}
 }
