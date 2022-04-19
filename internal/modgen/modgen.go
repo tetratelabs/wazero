@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -150,7 +151,7 @@ func (g *generator) importSection() {
 
 		if tableImported == 0 {
 			min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-			max := uint32(g.nextRandom().Intn(int(math.MaxInt32)-min) + min)
+			max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
 
 			imp.Type = wasm.ExternTypeTable
 			tableImported = 1
@@ -183,7 +184,7 @@ func (g *generator) tableSection() {
 	}
 
 	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-	max := uint32(g.nextRandom().Intn(int(math.MaxInt32)-min) + min)
+	max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
 	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
 }
 
@@ -197,7 +198,75 @@ func (g *generator) memorySection() {
 }
 
 func (g *generator) globalSection() {
+	numGlobals := g.nextRandom().Intn(g.size)
+	for i := 0; i < numGlobals; i++ {
+		expr, t := g.newConstExpr()
+		mutable := g.nextRandom().Intn(2) == 0
+		global := &wasm.Global{
+			Type: &wasm.GlobalType{ValType: t, Mutable: mutable},
+			Init: expr,
+		}
+		g.m.GlobalSection = append(g.m.GlobalSection, global)
+	}
+}
 
+func (g *generator) newConstExpr() (*wasm.ConstantExpression, wasm.ValueType) {
+	importedGlobalCount := g.m.ImportGlobalCount()
+	importedGlobalsNotExist := 1
+	if importedGlobalCount > 0 {
+		importedGlobalsNotExist = 0
+	}
+	var opcode wasm.Opcode
+	var data []byte
+	var valueType wasm.ValueType
+	switch g.nextRandom().Intn(5 - importedGlobalsNotExist) {
+	case 0:
+		opcode = wasm.OpcodeI32Const
+		v := g.nextRandom().Intn(math.MaxInt32)
+		if g.nextRandom().Intn(2) == 0 {
+			v = -v
+		}
+		data = leb128.EncodeInt32(int32(v))
+		valueType = wasm.ValueTypeI32
+	case 1:
+		opcode = wasm.OpcodeI64Const
+		v := g.nextRandom().Intn(math.MaxInt64)
+		if g.nextRandom().Intn(2) == 0 {
+			v = -v
+		}
+		data = leb128.EncodeInt64(int64(v))
+		valueType = wasm.ValueTypeI64
+	case 2:
+		opcode = wasm.OpcodeF32Const
+		data = make([]byte, 4)
+		g.nextRandom().Read(data)
+		valueType = wasm.ValueTypeF32
+	case 3:
+		opcode = wasm.OpcodeF64Const
+		data = make([]byte, 8)
+		g.nextRandom().Read(data)
+		valueType = wasm.ValueTypeF64
+	case 4:
+		opcode = wasm.OpcodeGlobalGet
+		// Constexpr can only reference imported globals.
+		globalIndex := g.nextRandom().Intn(int(importedGlobalCount))
+		data = leb128.EncodeUint32(uint32(globalIndex))
+		// Find the value type of the imported global.
+		var cnt int
+		for _, imp := range g.m.ImportSection {
+			if imp.Type == wasm.ExternTypeGlobal {
+				if cnt == globalIndex {
+					valueType = imp.DescGlobal.ValType
+					break
+				} else {
+					cnt++
+				}
+			}
+		}
+	default:
+		panic("BUG")
+	}
+	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, valueType
 }
 
 func (g *generator) exportSection() {

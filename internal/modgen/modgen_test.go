@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -64,7 +65,7 @@ func (tr *testRand) Read(p []byte) (n int, err error) {
 
 func newGenerator(size int, ints []int, bufs [][]byte) *generator {
 	return &generator{size: size,
-		rands: []random{&testRand{ints: ints}},
+		rands: []random{&testRand{ints: ints, bufs: bufs}},
 		m:     &wasm.Module{},
 	}
 }
@@ -278,14 +279,130 @@ func TestGenerator_tableSection(t *testing.T) {
 		g.tableSection()
 		require.Nil(t, g.m.TableSection)
 	})
+	t.Run("without table import", func(t *testing.T) {
+		g := newGenerator(100, []int{1, 100}, nil)
+		g.tableSection()
+		expMax := uint32(101)
+		require.Equal(t, &wasm.Table{Min: 1, Max: &expMax}, g.m.TableSection)
+	})
 }
 
 func TestGenerator_memorySection(t *testing.T) {
-	t.Run("with table import", func(t *testing.T) {
+	t.Run("with memory import", func(t *testing.T) {
 		g := newGenerator(100, []int{10}, nil)
 		g.m.ImportSection = append(g.m.ImportSection, &wasm.Import{Type: wasm.ExternTypeMemory})
 
 		g.memorySection()
 		require.Nil(t, g.m.MemorySection)
 	})
+	t.Run("without memory import", func(t *testing.T) {
+		g := newGenerator(100, []int{1, 100}, nil)
+		g.memorySection()
+		require.Equal(t, &wasm.Memory{Min: 1, Max: 101}, g.m.MemorySection)
+	})
+}
+
+func TestGenerator_newConstExpr(t *testing.T) {
+	for i, tc := range []struct {
+		ints    []int
+		bufs    [][]byte
+		imports []*wasm.Import
+		exp     *wasm.ConstantExpression
+		expType wasm.ValueType
+	}{
+		{
+			ints: []int{
+				0,   // i32.const
+				100, // 100 literal
+				1,   // non-negative
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+			expType: i32,
+		},
+		{
+			ints: []int{
+				0,   // i2.const
+				100, // 100 literal
+				0,   // negative
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(-100)},
+			expType: i32,
+		},
+		{
+			ints: []int{
+				1,   // i64.const
+				100, // 100 literal
+				1,   // non-negative
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(100)},
+			expType: i64,
+		},
+		{
+			ints: []int{
+				1,   // i64.const
+				100, // 100 literal
+				0,   // negative
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(-100)},
+			expType: i64,
+		},
+		{
+			ints:    []int{2}, // f32.const
+			bufs:    [][]byte{{1, 2, 3, 4}},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{1, 2, 3, 4}},
+			expType: f32,
+		},
+		{
+			ints:    []int{3}, // f64.const
+			bufs:    [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: []byte{1, 2, 3, 4, 5, 6, 7, 8}},
+			expType: f64,
+		},
+		{
+			ints: []int{
+				4, // globa.get
+				1, // 2nd global.
+			},
+			imports: []*wasm.Import{
+				{},
+				{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: i32}},
+				{},
+				{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: f32}},
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeGlobalGet, Data: []byte{1}},
+			expType: f32,
+		},
+		{
+			ints: []int{
+				4, // globa.get
+				0, // 1st global.
+			},
+			imports: []*wasm.Import{
+				{},
+				{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: i32}},
+				{},
+				{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: f32}},
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeGlobalGet, Data: []byte{0}},
+			expType: i32,
+		},
+		{
+			ints: []int{
+				4,   // there's no imports, so this should result in i32.const.
+				100, // 100 literal
+				1,   // non-negative
+			},
+			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
+			expType: i32,
+		},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			g := newGenerator(100, tc.ints, tc.bufs)
+			g.m.ImportSection = tc.imports
+			actualExpr, actualType := g.newConstExpr()
+			require.Equal(t, tc.expType, actualType)
+			require.Equal(t, tc.exp, actualExpr)
+		})
+	}
 }
