@@ -105,7 +105,7 @@ var (
 var (
 	// amd64CallingConventionModuleInstanceAddressRegister holds *wasm.ModuleInstance of the
 	// next executing function instance. The value is set and used when making function calls
-	// or function returns in the CallContextInitialization. See compileModuleContextInitialization.
+	// or function returns in the ModuleContextInitialization. See compileModuleContextInitialization.
 	amd64CallingConventionModuleInstanceAddressRegister = amd64.REG_R12
 )
 
@@ -3895,11 +3895,11 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 	return nil
 }
 
-// compileModuleContextInitialization adds instructions to initialize callEngine.CallContext's fields based on
-// callEngine.CallContext.ModuleInstanceAddress.
+// compileModuleContextInitialization adds instructions to initialize callEngine.ModuleContext's fields based on
+// callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) compileModuleContextInitialization() error {
-	// amd64CallingConventionModuleInstanceAddressRegister holds the module intstance's address
+	// amd64CallingConventionModuleInstanceAddressRegister holds the module instance's address
 	// so mark it used so that it won't be used as a free register until the module context initialization finishes.
 	c.locationStack.markRegisterUsed(amd64CallingConventionModuleInstanceAddressRegister)
 	defer c.locationStack.markRegisterUnused(amd64CallingConventionModuleInstanceAddressRegister)
