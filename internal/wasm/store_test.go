@@ -172,14 +172,14 @@ func TestStore_CloseModule(t *testing.T) {
 			require.True(t, ok)
 
 			// Close the importing module
-			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
+			require.NoError(t, importing.CallCtx.CloseWithExitCode(0))
 			require.Nil(t, s.modules[importingModuleName])
 
 			// Can re-close the importing module
-			require.NoError(t, importing.Ctx.CloseWithExitCode(0))
+			require.NoError(t, importing.CallCtx.CloseWithExitCode(0))
 
 			// Now we close the imported module.
-			require.NoError(t, imported.Ctx.CloseWithExitCode(0))
+			require.NoError(t, imported.CallCtx.CloseWithExitCode(0))
 			require.Nil(t, s.modules[importedModuleName])
 		})
 	}

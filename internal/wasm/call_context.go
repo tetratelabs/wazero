@@ -169,7 +169,7 @@ func (f *FunctionInstance) Call(m api.Module, params ...uint64) (ret []uint64, e
 	if ok {
 		// TODO: check if the importing context is correct
 	} else { // allow nil to substitute for the defining module
-		modCtx = mod.Ctx
+		modCtx = mod.CallCtx
 	}
 	return mod.Engine.Call(modCtx, f, params...)
 }

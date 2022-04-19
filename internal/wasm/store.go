@@ -64,8 +64,8 @@ type (
 		Table  *TableInstance
 		Types  []*FunctionType
 
-		// Ctx holds default function call context from this function instance.
-		Ctx *CallContext
+		// CallCtx holds default function call context from this function instance.
+		CallCtx *CallContext
 
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
@@ -298,13 +298,13 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewCallContext(ctx, s, m, sys)
+	m.CallCtx = NewCallContext(ctx, s, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		if _, err = f.Module.Engine.Call(m.Ctx, f); err != nil {
+		if _, err = f.Module.Engine.Call(m.CallCtx, f); err != nil {
 			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
@@ -312,7 +312,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 
 	// Now that the instantiation is complete without error, add it. This makes it visible for import.
 	s.addModule(m)
-	return m.Ctx, nil
+	return m.CallCtx, nil
 }
 
 // deleteModule makes the moduleName available for instantiation again.
@@ -345,7 +345,7 @@ func (s *Store) addModule(m *ModuleInstance) {
 // Module implements wazero.Runtime Module
 func (s *Store) Module(moduleName string) api.Module {
 	if m := s.module(moduleName); m != nil {
-		return m.Ctx
+		return m.CallCtx
 	} else {
 		return nil
 	}

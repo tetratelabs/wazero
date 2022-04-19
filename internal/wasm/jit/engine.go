@@ -45,7 +45,7 @@ type (
 		// Note: we embed these structs so we can reduce the costs to access fields inside of them.
 		// Also, that eases the calculation of offsets to each field.
 		globalContext
-		callContext
+		moduleContext
 		valueStackContext
 		exitContext
 		archContext
@@ -84,9 +84,9 @@ type (
 		callFrameStackPointer uint64
 	}
 
-	// callContext holds the per-function call specific module information.
+	// moduleContext holds the per-function call specific module information.
 	// This is subject to be manipulated from JITed native code whenever we make function calls.
-	callContext struct {
+	moduleContext struct {
 		// moduleInstanceAddress is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
 		// This is only used by JIT code so mark this as nolint.
@@ -106,7 +106,7 @@ type (
 		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
 		tableSliceLen uint64
 
-		// codesElement0Address is &callContext.engine.codes[0] as uintptr.
+		// codesElement0Address is &moduleContext.engine.codes[0] as uintptr.
 		codesElement0Address uintptr
 
 		// typeIDsElement0Address holds the &ModuleInstance.typeIDs[0] as uintptr.
@@ -227,15 +227,15 @@ const (
 	callEngineGlobalContextCallFrameStackLenOffset             = 24
 	callEngineGlobalContextCallFrameStackPointerOffset         = 32
 
-	// Offsets for callEngine callContext.
-	callEngineCallContextModuleInstanceAddressOffset  = 40
-	callEngineCallContextGlobalElement0AddressOffset  = 48
-	callEngineCallContextMemoryElement0AddressOffset  = 56
-	callEngineCallContextMemorySliceLenOffset         = 64
-	callEngineCallContextTableElement0AddressOffset   = 72
-	callEngineCallContextTableSliceLenOffset          = 80
-	callEngineCallContextcodesElement0AddressOffset   = 88
-	callEngineCallContextTypeIDsElement0AddressOffset = 96
+	// Offsets for callEngine moduleContext.
+	callEngineModuleContextModuleInstanceAddressOffset  = 40
+	callEngineModuleContextGlobalElement0AddressOffset  = 48
+	callEngineModuleContextMemoryElement0AddressOffset  = 56
+	callEngineModuleContextMemorySliceLenOffset         = 64
+	callEngineModuleContextTableElement0AddressOffset   = 72
+	callEngineModuleContextTableSliceLenOffset          = 80
+	callEngineModuleContextCodesElement0AddressOffset   = 88
+	callEngineModuleContextTypeIDsElement0AddressOffset = 96
 
 	// Offsets for callEngine valueStackContext.
 	callEngineValueStackContextStackPointerOffset     = 104
@@ -676,7 +676,7 @@ jitentry:
 			params := wasm.PopGoFuncParams(calleeHostFunction.source, ce.popValue)
 			results := wasm.CallGoFunc(
 				// Use the caller's memory, which might be different from the defining module on an imported function.
-				ctx.WithMemory(callercode.source.Module.Memory),
+				ctx.WithMemory(callerFunction.source.Module.Memory),
 				calleeHostFunction.source,
 				params,
 			)
@@ -744,10 +744,10 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	res := mem.Grow(uint32(newPages))
 	ce.pushValue(uint64(res))
 
-	// Update the callContext fields as they become stale after the update ^^.
+	// Update the moduleContext fields as they become stale after the update ^^.
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
-	ce.callContext.memorySliceLen = uint64(bufSliceHeader.Len)
-	ce.callContext.memoryElement0Address = bufSliceHeader.Data
+	ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
+	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
 func compileHostFunction(sig *wasm.FunctionType) (*code, error) {

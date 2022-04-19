@@ -200,7 +200,7 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
-	if err := c.compileCallContextInitialization(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 
@@ -569,7 +569,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 	// "arm64ReservedRegisterForTemporary = &globals[0]"
 	c.assembler.CompileMemoryToRegister(
 		arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextGlobalElement0AddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset,
 		arm64ReservedRegisterForTemporary,
 	)
 
@@ -965,7 +965,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 	// First, we read the address of the first item of ce.codes slice (= &ce.codes[0])
 	// into tmp.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextcodesElement0AddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset,
 		tmp)
 
 	// Next, read the index of the target function (= &ce.codes[offset])
@@ -1036,7 +1036,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 		}
 	}
 
-	if err := c.compileCallContextInitialization(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 
@@ -1097,7 +1097,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// First, we need to check if the offset doesn't exceed the length of table.
 	// "tmp = len(table)"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextTableSliceLenOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
 		tmp,
 	)
 	// "cmp tmp, offset"
@@ -1114,7 +1114,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// "tmp = &table[0]"
 	c.assembler.CompileMemoryToRegister(
 		arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextTableElement0AddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
 		tmp,
 	)
 	// "offset = tmp + (offset << 4) (== &table[offset])"
@@ -1150,7 +1150,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	)
 	// "tmp2 = ModuleInstance.TypeIDs[index]"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextTypeIDsElement0AddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
 		tmp2)
 	c.assembler.CompileMemoryToRegister(arm64.MOVWU, tmp2, int64(o.TypeIndex)*4, tmp2)
 
@@ -2655,7 +2655,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// "arm64ReservedRegisterForTemporary = len(memory.Buffer)"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextMemorySliceLenOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		arm64ReservedRegisterForTemporary)
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
@@ -2698,7 +2698,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 	// "reg = len(memory.Buffer)"
 	c.assembler.CompileMemoryToRegister(
 		arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextMemorySliceLenOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		reg,
 	)
 
@@ -3050,16 +3050,16 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 		// "arm64ReservedRegisterForMemory = ce.MemoryElement0Address"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextMemoryElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			arm64ReservedRegisterForMemory,
 		)
 	}
 }
 
-// compileCallContextInitialization adds instructions to initialize ce.CallContext's fields based on
+// compileModuleContextInitialization adds instructions to initialize ce.CallContext's fields based on
 // ce.CallContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
-func (c *arm64Compiler) compileCallContextInitialization() error {
+func (c *arm64Compiler) compileModuleContextInitialization() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
@@ -3073,26 +3073,26 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 	tmpX, tmpY := regs[0], regs[1]
 
 	// "tmpX = ce.ModuleInstanceAddress"
-	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, callEngineCallContextModuleInstanceAddressOffset, tmpX)
+	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, tmpX)
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64CallingConventionModuleInstanceAddressRegister, tmpX)
 	brIfModuleUnchanged := c.assembler.CompileJump(arm64.BEQ)
 
-	// Otherwise, update the moduleEngine.callContext.ModuleInstanceAddress.
+	// Otherwise, update the moduleEngine.moduleContext.ModuleInstanceAddress.
 	c.assembler.CompileRegisterToMemory(arm64.MOVD,
 		arm64CallingConventionModuleInstanceAddressRegister,
-		arm64ReservedRegisterForCallEngine, callEngineCallContextModuleInstanceAddressOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset,
 	)
 
 	// Also, we have to update the following fields:
-	// * callEngine.callContext.globalElement0Address
-	// * callEngine.callContext.memoryElement0Address
-	// * callEngine.callContext.memorySliceLen
-	// * callEngine.callContext.tableElement0Address
-	// * callEngine.callContext.tableSliceLen
-	// * callEngine.callContext.codesElement0Address
-	// * callEngine.callContext.typeIDsElement0Address
+	// * callEngine.moduleContext.globalElement0Address
+	// * callEngine.moduleContext.memoryElement0Address
+	// * callEngine.moduleContext.memorySliceLen
+	// * callEngine.moduleContext.tableElement0Address
+	// * callEngine.moduleContext.tableSliceLen
+	// * callEngine.moduleContext.codesElement0Address
+	// * callEngine.moduleContext.typeIDsElement0Address
 
 	// Update globalElement0Address.
 	//
@@ -3109,7 +3109,7 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 		// "ce.GlobalElement0Address = tmpX (== &moduleInstance.Globals[0])"
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD, tmpX,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextGlobalElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset,
 		)
 	}
 
@@ -3138,7 +3138,7 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextMemorySliceLenOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		)
 
 		// Next write ce.memoryElement0Address.
@@ -3153,7 +3153,7 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextMemoryElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 		)
 	}
 
@@ -3181,7 +3181,7 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextTableElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
 		)
 
 		// Update ce.tableSliceLen.
@@ -3195,17 +3195,17 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextTableSliceLenOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
 		)
 
-		// Finally, we put &ModuleInstance.TypeIDs[0] into callContext.typeIDsElement0Address.
+		// Finally, we put &ModuleInstance.TypeIDs[0] into moduleContext.typeIDsElement0Address.
 		c.assembler.CompileMemoryToRegister(arm64.MOVD,
 			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceTypeIDsOffset, tmpX)
 		c.assembler.CompileRegisterToMemory(arm64.MOVD,
-			tmpX, arm64ReservedRegisterForCallEngine, callEngineCallContextTypeIDsElement0AddressOffset)
+			tmpX, arm64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset)
 	}
 
-	// Update callEngine.callContext.codesElement0Address
+	// Update callEngine.moduleContext.codesElement0Address
 	{
 		// "tmpX = [moduleInstanceAddressRegister + moduleInstanceEngineOffset + interfaceDataOffset] (== *moduleEngine)"
 		//
@@ -3228,11 +3228,11 @@ func (c *arm64Compiler) compileCallContextInitialization() error {
 			tmpY,
 		)
 
-		// "callEngine.callContext.codesElement0Address = tmpY".
+		// "callEngine.moduleContext.codesElement0Address = tmpY".
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
 			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineCallContextcodesElement0AddressOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset,
 		)
 	}
 
