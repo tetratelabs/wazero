@@ -500,42 +500,69 @@ func TestGenerator_exportSection(t *testing.T) {
 }
 
 func TestGenerator_startSection(t *testing.T) {
-	m := &wasm.Module{
-		ImportSection: []*wasm.Import{
-			{Type: wasm.ExternTypeFunc, DescFunc: 0},
-			{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
-			{Type: wasm.ExternTypeFunc, DescFunc: 2},
-			{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
-		},
-		FunctionSection: []uint32{
-			0, 0, 1 /* candidate */, 0,
-		},
-		TypeSection: []*wasm.FunctionType{
-			{Params: []wasm.ValueType{i32}},
-			{},
-			{Params: []wasm.ValueType{f32}},
-			{Params: []wasm.ValueType{f64}},
-		},
-	}
+	t.Run("with cand", func(t *testing.T) {
 
-	takePtr := func(v uint32) *uint32 { return &v }
+		m := &wasm.Module{
+			ImportSection: []*wasm.Import{
+				{Type: wasm.ExternTypeFunc, DescFunc: 0},
+				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+				{Type: wasm.ExternTypeFunc, DescFunc: 2},
+				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+			},
+			FunctionSection: []uint32{
+				0, 0, 1 /* candidate */, 0,
+			},
+			TypeSection: []*wasm.FunctionType{
+				{Params: []wasm.ValueType{i32}},
+				{},
+				{Params: []wasm.ValueType{f32}},
+				{Params: []wasm.ValueType{f64}},
+			},
+		}
 
-	for i, tc := range []struct {
-		ints []int
-		exp  *wasm.Index
-	}{
-		{ints: []int{0}, exp: takePtr(1)},
-		{ints: []int{1}, exp: takePtr(3)},
-		{ints: []int{2}, exp: takePtr(6)},
-		{ints: []int{3}, exp: takePtr(1)},
-	} {
-		tc := tc
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			g := newGenerator(100, tc.ints, nil)
-			g.m = m
+		takePtr := func(v uint32) *uint32 { return &v }
 
-			g.startSection()
-			require.Equal(t, tc.exp, g.m.StartSection)
-		})
-	}
+		for i, tc := range []struct {
+			ints []int
+			exp  *wasm.Index
+		}{
+			{ints: []int{0}, exp: takePtr(1)},
+			{ints: []int{1}, exp: takePtr(3)},
+			{ints: []int{2}, exp: takePtr(6)},
+			{ints: []int{3}, exp: takePtr(1)},
+		} {
+			tc := tc
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				g := newGenerator(100, tc.ints, nil)
+				g.m = m
+
+				g.startSection()
+				require.Equal(t, tc.exp, g.m.StartSection)
+			})
+		}
+	})
+
+	t.Run("no cand", func(t *testing.T) {
+		m := &wasm.Module{
+			ImportSection: []*wasm.Import{
+				{Type: wasm.ExternTypeFunc, DescFunc: 0},
+				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+				{Type: wasm.ExternTypeFunc, DescFunc: 2},
+				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+			},
+			FunctionSection: []uint32{
+				0, 1, 2, 0, 1, 2,
+			},
+			TypeSection: []*wasm.FunctionType{
+				{Params: []wasm.ValueType{i32}},
+				{Params: []wasm.ValueType{f32}},
+				{Params: []wasm.ValueType{f64}},
+			},
+		}
+		g := newGenerator(100, []int{0}, nil)
+		g.m = m
+
+		g.startSection()
+		require.Nil(t, g.m.StartSection)
+	})
 }

@@ -317,12 +317,10 @@ func (g *generator) startSection() {
 		}
 	}
 
-	if len(candidates) == 0 {
+	if len(candidates) > 0 {
+		g.m.StartSection = &candidates[g.nextRandom().Intn(len(candidates))]
 		return
 	}
-
-	index := wasm.Index(g.nextRandom().Intn(len(candidates)))
-	g.m.StartSection = &candidates[index]
 }
 
 func (g *generator) elementSection() {
