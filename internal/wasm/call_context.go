@@ -24,6 +24,11 @@ func NewCallContext(store *Store, instance *ModuleInstance, Sys *SysContext) *Ca
 // functionality like trace propagation.
 // Note: this also implements api.Module in order to simplify usage as a host function parameter.
 type CallContext struct {
+	// TODO: We've never found a great name for this. It is only used for function calls, hence CallContext, but it
+	// moves on a different axis than, for example, the context.Context. context.Context is the same root for the whole
+	// call stack, where the CallContext can change depending on where memory is defined and who defines the calling
+	// function. When we rename this again, we should try to capture as many key points possible on the docs.
+
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory api.Memory
