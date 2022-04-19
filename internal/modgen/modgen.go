@@ -308,12 +308,21 @@ func (g *generator) startSection() {
 		panic("BUG:" + err.Error())
 	}
 
-	if len(funcs) == 0 {
+	var candidates []wasm.Index
+	for funcIndex, typeIndex := range funcs {
+		sig := g.m.TypeSection[typeIndex]
+		// Start function must have the empty signature.
+		if sig.EqualsSignature(nil, nil) {
+			candidates = append(candidates, wasm.Index(funcIndex))
+		}
+	}
+
+	if len(candidates) == 0 {
 		return
 	}
 
-	index := wasm.Index(g.nextRandom().Intn(len(funcs)))
-	g.m.StartSection = &index
+	index := wasm.Index(g.nextRandom().Intn(len(candidates)))
+	g.m.StartSection = &candidates[index]
 }
 
 func (g *generator) elementSection() {
