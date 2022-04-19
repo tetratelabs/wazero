@@ -173,7 +173,7 @@ type compilerImpl interface {
 	valueLocationStack() *valueLocationStack
 	setValueLocationStack(*valueLocationStack)
 	compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error
-	compileModuleContextInitialization() error
+	compileCallContextInitialization() error
 	compileNOP()
 }
 

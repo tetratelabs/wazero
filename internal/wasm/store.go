@@ -65,7 +65,7 @@ type (
 		Types  []*FunctionType
 
 		// Ctx holds default function call context from this function instance.
-		Ctx *ModuleContext
+		Ctx *CallContext
 
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
@@ -241,10 +241,10 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 //
 // * ctx: the default context used for function calls.
 // * name: the name of the module.
-// * sys: the system context, which will be closed (SysContext.Close) on ModuleContext.Close.
+// * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*ModuleContext, error) {
+func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*CallContext, error) {
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(ctx, s, m, sys)
+	m.Ctx = NewCallContext(ctx, s, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {

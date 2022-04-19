@@ -26,15 +26,15 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
 
-	// Offsets for callEngine.moduleContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextcodesElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
+	// Offsets for callEngine.callContext.
+	require.Equal(t, int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineCallContextModuleInstanceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.globalElement0Address)), callEngineCallContextGlobalElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineCallContextMemoryElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineCallContextMemorySliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineCallContextTableElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineCallContextTableSliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineCallContextcodesElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineCallContextTypeIDsElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)

@@ -8,35 +8,35 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestModuleContext_WithContext(t *testing.T) {
+func TestCallContext_WithContext(t *testing.T) {
 	type key string
 	tests := []struct {
 		name       string
-		mod        *ModuleContext
+		mod        *CallContext
 		ctx        context.Context
 		expectSame bool
 	}{
 		{
 			name:       "nil->nil: same",
-			mod:        &ModuleContext{},
+			mod:        &CallContext{},
 			ctx:        nil,
 			expectSame: true,
 		},
 		{
 			name:       "nil->ctx: not same",
-			mod:        &ModuleContext{},
+			mod:        &CallContext{},
 			ctx:        context.WithValue(context.Background(), key("a"), "b"),
 			expectSame: false,
 		},
 		{
 			name:       "ctx->nil: same",
-			mod:        &ModuleContext{ctx: context.Background()},
+			mod:        &CallContext{ctx: context.Background()},
 			ctx:        nil,
 			expectSame: true,
 		},
 		{
 			name:       "ctx1->ctx2: not same",
-			mod:        &ModuleContext{ctx: context.Background()},
+			mod:        &CallContext{ctx: context.Background()},
 			ctx:        context.WithValue(context.Background(), key("a"), "b"),
 			expectSame: false,
 		},
@@ -57,34 +57,34 @@ func TestModuleContext_WithContext(t *testing.T) {
 	}
 }
 
-func TestModuleContext_WithMemory(t *testing.T) {
+func TestCallContext_WithMemory(t *testing.T) {
 	tests := []struct {
 		name       string
-		mod        *ModuleContext
+		mod        *CallContext
 		mem        *MemoryInstance
 		expectSame bool
 	}{
 		{
 			name:       "nil->nil: same",
-			mod:        &ModuleContext{},
+			mod:        &CallContext{},
 			mem:        nil,
 			expectSame: true,
 		},
 		{
 			name:       "nil->mem: not same",
-			mod:        &ModuleContext{},
+			mod:        &CallContext{},
 			mem:        &MemoryInstance{},
 			expectSame: false,
 		},
 		{
 			name:       "mem->nil: same",
-			mod:        &ModuleContext{memory: &MemoryInstance{}},
+			mod:        &CallContext{memory: &MemoryInstance{}},
 			mem:        nil,
 			expectSame: true,
 		},
 		{
 			name:       "mem1->mem2: not same",
-			mod:        &ModuleContext{memory: &MemoryInstance{}},
+			mod:        &CallContext{memory: &MemoryInstance{}},
 			mem:        &MemoryInstance{},
 			expectSame: false,
 		},
@@ -105,7 +105,7 @@ func TestModuleContext_WithMemory(t *testing.T) {
 	}
 }
 
-func TestModuleContext_String(t *testing.T) {
+func TestCallContext_String(t *testing.T) {
 	s := newStore()
 
 	tests := []struct {
@@ -138,7 +138,7 @@ func TestModuleContext_String(t *testing.T) {
 	}
 }
 
-func TestModuleContext_Close(t *testing.T) {
+func TestCallContext_Close(t *testing.T) {
 	s := newStore()
 
 	t.Run("calls store.CloseWithExitCode(module.name)", func(t *testing.T) {

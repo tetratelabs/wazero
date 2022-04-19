@@ -106,7 +106,7 @@ func TestStore_Instantiate(t *testing.T) {
 	require.NoError(t, err)
 	defer mod.Close()
 
-	t.Run("ModuleContext defaults", func(t *testing.T) {
+	t.Run("CallContext defaults", func(t *testing.T) {
 		require.Equal(t, ctx, mod.ctx)
 		require.Equal(t, s.modules[""], mod.module)
 		require.Equal(t, s.modules[""].Memory, mod.memory)
@@ -334,7 +334,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	})
 }
 
-func TestModuleContext_ExportedFunction(t *testing.T) {
+func TestCallContext_ExportedFunction(t *testing.T) {
 	host, err := NewHostModule(
 		"host",
 		map[string]interface{}{"host_fn": func(api.Module) {}},
@@ -428,7 +428,7 @@ type mockEngine struct {
 
 type mockModuleEngine struct {
 	name          string
-	ctx           *ModuleContext
+	ctx           *CallContext
 	callFailIndex int
 }
 
@@ -456,7 +456,7 @@ func (e *mockModuleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *mockModuleEngine) Call(ctx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		err = errors.New("call failed")
 		return

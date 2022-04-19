@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"testing"
 
@@ -10,8 +11,6 @@ import (
 )
 
 func TestGetFunctionType(t *testing.T) {
-	i32, i64, f32, f64 := ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64
-
 	var tests = []struct {
 		name         string
 		inputFunc    interface{}
@@ -130,6 +129,228 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 			rVal := reflect.ValueOf(tc.input)
 			_, _, err := getFunctionType(&rVal, Features20191205)
 			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+// stack simulates the value stack in a way easy to be tested.
+type stack struct {
+	vals []uint64
+}
+
+func (s *stack) pop() (result uint64) {
+	stackTopIndex := len(s.vals) - 1
+	result = s.vals[stackTopIndex]
+	s.vals = s.vals[:stackTopIndex]
+	return
+}
+
+func TestPopValues(t *testing.T) {
+	var tests = []struct {
+		name            string
+		count           int
+		stack, expected []uint64
+	}{
+		{
+			name:     "empty",
+			stack:    []uint64{},
+			expected: []uint64{},
+		},
+		{
+			name:     "pop 1 stack size 1",
+			count:    1,
+			stack:    []uint64{1},
+			expected: []uint64{1},
+		},
+		{
+			name:     "pop 2 stack size 3",
+			count:    2,
+			stack:    []uint64{1, 2, 3},
+			expected: []uint64{2, 3},
+		},
+		{
+			name:     "pop 3 stack size 3",
+			stack:    []uint64{1, 2, 3},
+			count:    3,
+			expected: []uint64{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			vals := PopValues(tc.count, (&stack{tc.stack}).pop)
+			require.Equal(t, tc.expected, vals)
+		})
+	}
+}
+
+func TestPopGoFuncParams(t *testing.T) {
+	stackVals := []uint64{1, 2, 3, 4, 5, 6, 7}
+	var tests = []struct {
+		name      string
+		inputFunc interface{}
+		expected  []uint64
+	}{
+		{
+			name:      "nullary",
+			inputFunc: func() {},
+			expected:  []uint64{},
+		},
+		{
+			name:      "wasm.Module",
+			inputFunc: func(api.Module) {},
+			expected:  []uint64{},
+		},
+		{
+			name:      "context.Context",
+			inputFunc: func(context.Context) {},
+			expected:  []uint64{},
+		},
+		{
+			name:      "all supported params",
+			inputFunc: func(uint32, uint64, float32, float64) {},
+			expected:  []uint64{4, 5, 6, 7},
+		},
+		{
+			name:      "all supported params - wasm.Module",
+			inputFunc: func(api.Module, uint32, uint64, float32, float64) {},
+			expected:  []uint64{4, 5, 6, 7},
+		},
+		{
+			name:      "all supported params - context.Context",
+			inputFunc: func(context.Context, uint32, uint64, float32, float64) {},
+			expected:  []uint64{4, 5, 6, 7},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			goFunc := reflect.ValueOf(tc.inputFunc)
+			fk, _, err := getFunctionType(&goFunc, FeaturesFinished)
+			require.NoError(t, err)
+
+			vals := PopGoFuncParams(&FunctionInstance{Kind: fk, GoFunc: &goFunc}, (&stack{stackVals}).pop)
+			require.Equal(t, tc.expected, vals)
+		})
+	}
+}
+
+func TestCallGoFunc(t *testing.T) {
+	expectedCtx, cancel := context.WithCancel(context.Background()) // arbitrary non-default context
+	defer cancel()
+	callCtx := &CallContext{ctx: expectedCtx}
+
+	var tests = []struct {
+		name                         string
+		inputFunc                    interface{}
+		inputParams, expectedResults []uint64
+	}{
+		{
+			name:      "nullary",
+			inputFunc: func() {},
+		},
+		{
+			name: "wasm.Module void return",
+			inputFunc: func(m api.Module) {
+				require.Equal(t, callCtx, m)
+			},
+		},
+		{
+			name: "context.Context void return",
+			inputFunc: func(ctx context.Context) {
+				require.Equal(t, expectedCtx, ctx)
+			},
+		},
+		{
+			name: "all supported params and i32 result",
+			inputFunc: func(w uint32, x uint64, y float32, z float64) uint32 {
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100
+			},
+			inputParams: []uint64{
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{100},
+		},
+		{
+			name: "all supported params and all supported results",
+			inputFunc: func(w uint32, x uint64, y float32, z float64) (uint32, uint64, float32, float64) {
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100, 200, 300, 400
+			},
+			inputParams: []uint64{
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{
+				api.EncodeI32(100),
+				200,
+				api.EncodeF32(300),
+				api.EncodeF64(400),
+			},
+		},
+		{
+			name: "all supported params and i32 result - wasm.Module",
+			inputFunc: func(m api.Module, w uint32, x uint64, y float32, z float64) uint32 {
+				require.Equal(t, callCtx, m)
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100
+			},
+			inputParams: []uint64{
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{100},
+		},
+		{
+			name: "all supported params and i32 result - context.Context",
+			inputFunc: func(ctx context.Context, w uint32, x uint64, y float32, z float64) uint32 {
+				require.Equal(t, expectedCtx, ctx)
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100
+			},
+			inputParams: []uint64{
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{100},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			goFunc := reflect.ValueOf(tc.inputFunc)
+			fk, _, err := getFunctionType(&goFunc, FeaturesFinished)
+			require.NoError(t, err)
+
+			results := CallGoFunc(callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)
+			require.Equal(t, tc.expectedResults, results)
 		})
 	}
 }

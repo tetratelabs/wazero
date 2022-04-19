@@ -262,7 +262,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	})
 }
 
-func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester) {
+func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) {
 	features := wasm.Features20191205
 	e := et.NewEngine(features)
 
@@ -288,7 +288,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(features, e), module, nil)
+	modCtx := wasm.NewCallContext(context.Background(), wasm.NewStore(features, e), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
@@ -311,7 +311,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 }
 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
-	runTestModuleEngine_Call_HostFn_ModuleContext(t, et) // TODO: refactor to use the same test interface.
+	runTestModuleEngine_Call_HostFn_CallContext(t, et) // TODO: refactor to use the same test interface.
 
 	e := et.NewEngine(wasm.Features20191205)
 
@@ -321,7 +321,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	tests := []struct {
 		name   string
-		module *wasm.ModuleContext
+		module *wasm.CallContext
 		fn     *wasm.FunctionInstance
 	}{
 		{
@@ -366,7 +366,7 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 
 	tests := []struct {
 		name        string
-		module      *wasm.ModuleContext
+		module      *wasm.CallContext
 		fn          *wasm.FunctionInstance
 		input       []uint64
 		expectedErr string
@@ -591,8 +591,8 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 // wasm.Store: store isn't used here for unit test precision.
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for JIT, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
-	// callEngineModuleContextModuleInstanceAddressOffset
-	module.Ctx = wasm.NewModuleContext(context.Background(), nil, module, nil)
+	// callEngineCallContextModuleInstanceAddressOffset
+	module.Ctx = wasm.NewCallContext(context.Background(), nil, module, nil)
 }
 
 // addFunction assigns and adds a function to the module.

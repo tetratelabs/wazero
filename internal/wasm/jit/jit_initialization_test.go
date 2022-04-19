@@ -11,7 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-func TestCompiler_compileModuleContextInitialization(t *testing.T) {
+func TestCompiler_compileCallContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -88,7 +88,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			// TODO: delete after #233
 			compiler.compileNOP()
 
-			err := compiler.compileModuleContextInitialization()
+			err := compiler.compileCallContextInitialization()
 			require.NoError(t, err)
 			require.Equal(t, 0, len(compiler.valueLocationStack().usedRegisters), "expected no usedRegisters")
 
@@ -103,24 +103,24 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			// Check the exit status.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
-			// Check if the fields of callEngine.moduleContext are updated.
+			// Check if the fields of callEngine.callContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
-			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
+			require.Equal(t, bufSliceHeader.Data, ce.callContext.globalElement0Address)
 
 			if tc.moduleInstance.Memory != nil {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
-				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
-				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
+				require.Equal(t, uint64(bufSliceHeader.Len), ce.callContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, ce.callContext.memoryElement0Address)
 			}
 
 			if tc.moduleInstance.Table != nil {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
-				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
-				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
-				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.TypeIDs[0])), ce.moduleContext.typeIDsElement0Address)
+				require.Equal(t, uint64(tableHeader.Len), ce.callContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, ce.callContext.tableElement0Address)
+				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.TypeIDs[0])), ce.callContext.typeIDsElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.codesElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.callContext.codesElement0Address)
 		})
 	}
 }

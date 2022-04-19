@@ -135,8 +135,8 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ce.callNativeFunc(&wasm.ModuleContext{}, f)
-				require.Equal(t, tc.expected, int32(uint32(ce.pop())))
+				ce.callNativeFunc(&wasm.CallContext{}, f)
+				require.Equal(t, tc.expected, int32(uint32(ce.popValue())))
 			})
 		}
 	})
@@ -187,8 +187,8 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ce.callNativeFunc(&wasm.ModuleContext{}, f)
-				require.Equal(t, tc.expected, int64(ce.pop()))
+				ce.callNativeFunc(&wasm.CallContext{}, f)
+				require.Equal(t, tc.expected, int64(ce.popValue()))
 			})
 		}
 	})
