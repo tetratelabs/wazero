@@ -293,6 +293,7 @@ func (g *generator) exportSection() {
 	numExports := g.nextRandom().Intn(g.size)
 	for i := 0; i < numExports; i++ {
 		target := possibleExports[g.nextRandom().Intn(len(possibleExports))]
+
 		g.m.ExportSection = append(g.m.ExportSection, &wasm.Export{
 			Type:  target.Type,
 			Index: target.Index,

@@ -456,3 +456,45 @@ func TestGenerator_globalSection(t *testing.T) {
 		require.Equal(t, expected[i], actual[i])
 	}
 }
+
+func TestGenerator_exportSection(t *testing.T) {
+	m := &wasm.Module{
+		FunctionSection: make([]uint32, 10),
+		GlobalSection: []*wasm.Global{
+			{Type: &wasm.GlobalType{}},
+			{Type: &wasm.GlobalType{}},
+			{Type: &wasm.GlobalType{}},
+			{Type: &wasm.GlobalType{}},
+			{Type: &wasm.GlobalType{}},
+		},
+		TableSection:  &wasm.Table{},
+		MemorySection: &wasm.Memory{},
+	}
+
+	g := newGenerator(100, []int{
+		5,  // number of exports
+		2,  // funcs[2]
+		13, // globals[3]
+		15, // table
+		16, // memory
+		7,  // funcs[7]
+	}, nil)
+	g.m = m
+
+	g.exportSection()
+
+	expected := []*wasm.Export{
+		{Type: wasm.ExternTypeFunc, Index: 2, Name: "0"},
+		{Type: wasm.ExternTypeGlobal, Index: 3, Name: "1"},
+		{Type: wasm.ExternTypeTable, Index: 0, Name: "2"},
+		{Type: wasm.ExternTypeMemory, Index: 0, Name: "3"},
+		{Type: wasm.ExternTypeFunc, Index: 7, Name: "4"},
+	}
+
+	actual := g.m.ExportSection
+
+	require.Equal(t, len(expected), len(actual))
+	for i := range actual {
+		require.Equal(t, expected[i], actual[i])
+	}
+}
