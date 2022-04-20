@@ -576,12 +576,12 @@ func TestGenerator_startSection(t *testing.T) {
 
 func TestGenerator_elementSection(t *testing.T) {
 	t.Run("without table", func(t *testing.T) {
-		g := newGenerator(100, []int{0}, nil)
+		g := newGenerator(100, nil, nil)
 		g.elementSection()
 		require.Nil(t, g.m.ElementSection)
 	})
 	t.Run("without function", func(t *testing.T) {
-		g := newGenerator(100, []int{0}, nil)
+		g := newGenerator(100, nil, nil)
 		g.m.TableSection = &wasm.Table{}
 		g.elementSection()
 		require.Nil(t, g.m.ElementSection)
@@ -642,5 +642,86 @@ func TestGenerator_elementSection(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestGenerator_dataSection(t *testing.T) {
+	t.Run("without memory", func(t *testing.T) {
+		g := newGenerator(100, nil, nil)
+		g.dataSection()
+		require.Nil(t, g.m.DataSection)
+	})
+	t.Run("min=0", func(t *testing.T) {
+		g := newGenerator(100, nil, nil)
+		g.m.MemorySection = &wasm.Memory{Min: 0}
+		g.dataSection()
+		require.Nil(t, g.m.DataSection)
+	})
+	t.Run("ok", func(t *testing.T) {
+		for i, tc := range []struct {
+			ints []int
+			bufs [][]byte
+			exps []*wasm.DataSegment
+		}{
+			{
+				ints: []int{
+					1, // number of data segment.
+					5, // offset
+					2, // size of inits
+				},
+				bufs: [][]byte{{0x1, 0x2}},
+				exps: []*wasm.DataSegment{
+					{
+						OffsetExpression: &wasm.ConstantExpression{
+							Opcode: wasm.OpcodeI32Const,
+							Data:   leb128.EncodeUint32(5),
+						},
+						Init: []byte{0x1, 0x2},
+					},
+				},
+			},
+			{
+				ints: []int{
+					1,                            // number of data segment.
+					int(wasm.MemoryMaxPages) - 1, // offset
+					1,                            // size of inits
+				},
+				bufs: [][]byte{{0x1}},
+				exps: []*wasm.DataSegment{
+					{
+						OffsetExpression: &wasm.ConstantExpression{
+							Opcode: wasm.OpcodeI32Const,
+							Data:   leb128.EncodeUint32(uint32(wasm.MemoryMaxPages) - 1),
+						},
+						Init: []byte{0x1},
+					},
+				},
+			},
+		} {
+			tc := tc
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				g := newGenerator(100, tc.ints, tc.bufs)
+				g.m.MemorySection = &wasm.Memory{Min: 1}
+				g.dataSection()
+				actual := g.m.DataSection
+				require.Equal(t, len(tc.exps), len(actual))
+				for i := range actual {
+					require.Equal(t, tc.exps[i], actual[i])
+				}
+			})
+		}
+	})
+}
+
+func FuzzCompiler(f *testing.F) {
+	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
+	f.Fuzz(func(t *testing.T, seed []byte) {
+		// Generate a random WebAssembly module.
+		m := Gen(seed)
+		// Encode the generated module (*wasm.Module) as binary.
+		bin := binary.EncodeModule(m)
+		// Pass the generated binary into our compilers.
+		_, err := r.CompileModule(context.Background(), bin)
+		require.NoError(t, err)
 	})
 }

@@ -16,10 +16,10 @@ import (
 // the generated module corresponds to the size of the seed. For example,
 // the more larger len(seed) is, the more functions the module *likely* has.
 //
-// TODO: make explicitly the size of each section controllable.
+// TODO: make it possible to explicitly control the size of each section.
 // TODO: have an option to have whether or not the result has imports.
 //
-// Note: "Pseudo" here means the determinism of the generated results,
+// Note: "pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
 // the same code base in Gen.
 //
@@ -50,6 +50,9 @@ type generator struct {
 	// m is the resulting module.
 	m *wasm.Module
 }
+
+// random is the interface over methods of rand.Rand which are used by our generator.
+// This is only for testing the generator implmenetation.
 
 type random interface {
 	// See rand.Intn.
@@ -400,7 +403,7 @@ func (g *generator) dataSection() {
 			Data:   leb128.EncodeInt32(int32(offset)),
 		}
 
-		init := make([]byte, g.nextRandom().Intn(min-offset))
+		init := make([]byte, g.nextRandom().Intn(min-offset+1))
 		if len(init) == 0 {
 			continue
 		}
