@@ -17,6 +17,7 @@ import (
 // the more larger len(seed) is, the more functions the module *likely* has.
 //
 // TODO: make explicitly the size of each section controllable.
+// TODO: have an option to have whether or not the result has imports.
 //
 // Note: "Pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
