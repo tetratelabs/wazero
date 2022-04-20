@@ -1,6 +1,7 @@
 package modgen
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -27,7 +28,7 @@ func TestModGen(t *testing.T) {
 			buf := make([]byte, size)
 			_, err := r.Read(buf)
 			require.NoError(t, err)
-			t.Run(fmt.Sprintf("%d (size=%d)", i, size), func(t *testing.T) {
+			t.Run(hex.EncodeToString(buf), func(t *testing.T) {
 				m := Gen(buf)
 				// Generating with the same seed must result in the same module.
 				require.Equal(t, m, Gen(buf))
@@ -546,9 +547,9 @@ func TestGenerator_startSection(t *testing.T) {
 		m := &wasm.Module{
 			ImportSection: []*wasm.Import{
 				{Type: wasm.ExternTypeFunc, DescFunc: 0},
-				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+				{Type: wasm.ExternTypeFunc, DescFunc: 1},
 				{Type: wasm.ExternTypeFunc, DescFunc: 2},
-				{Type: wasm.ExternTypeFunc, DescFunc: 1}, // candidate
+				{Type: wasm.ExternTypeFunc, DescFunc: 1},
 			},
 			FunctionSection: []uint32{
 				0, 1, 2, 0, 1, 2,
@@ -564,5 +565,76 @@ func TestGenerator_startSection(t *testing.T) {
 
 		g.startSection()
 		require.Nil(t, g.m.StartSection)
+	})
+}
+
+func TestGenerator_elementSection(t *testing.T) {
+	t.Run("without table", func(t *testing.T) {
+		g := newGenerator(100, []int{0}, nil)
+		g.elementSection()
+		require.Nil(t, g.m.ElementSection)
+	})
+	t.Run("without function", func(t *testing.T) {
+		g := newGenerator(100, []int{0}, nil)
+		g.m.TableSection = &wasm.Table{}
+		g.elementSection()
+		require.Nil(t, g.m.ElementSection)
+	})
+	t.Run("ok", func(t *testing.T) {
+		for i, tc := range []struct {
+			ints []int
+			exps []*wasm.ElementSegment
+		}{
+			{
+				ints: []int{
+					1,                                    // number of elements
+					2 /* number of inedxes */, 0, 50, 98, /* offset */
+				},
+				exps: []*wasm.ElementSegment{
+					{
+						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(98)},
+						Init:       []wasm.Index{0, 50},
+					},
+				},
+			},
+			{
+				ints: []int{
+					3,                                    // number of elements
+					2 /* number of inedxes */, 25, 75, 0, /* offset */
+					1 /* number of inedxes */, 3, 99, /* offset */
+					10 /* number of inedxes */, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 /* offset */, 90,
+				},
+				exps: []*wasm.ElementSegment{
+					{
+						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
+						Init:       []wasm.Index{25, 75},
+					},
+					{
+						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(99)},
+						Init:       []wasm.Index{3},
+					},
+					{
+						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(90)},
+						Init:       []wasm.Index{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+					},
+				},
+			},
+		} {
+			tc := tc
+			t.Run(strconv.Itoa(i), func(t *testing.T) {
+				g := newGenerator(100, tc.ints, nil)
+				g.m = &wasm.Module{
+					TableSection:    &wasm.Table{Min: 100},
+					FunctionSection: make([]uint32, 100),
+				}
+
+				g.elementSection()
+				actual := g.m.ElementSection
+				require.Equal(t, len(tc.exps), len(actual))
+				for i := range actual {
+					require.Equal(t, tc.exps[i], actual[i])
+				}
+			})
+		}
 	})
 }

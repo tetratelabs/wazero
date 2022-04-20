@@ -324,7 +324,36 @@ func (g *generator) startSection() {
 }
 
 func (g *generator) elementSection() {
+	funcs, _, _, table, err := g.m.AllDeclarations()
+	if err != nil {
+		panic("BUG:" + err.Error())
+	}
 
+	numFuncs := len(funcs)
+	if table == nil || numFuncs == 0 {
+		return
+	}
+
+	min := table.Min
+	numElements := g.nextRandom().Intn(g.size)
+	for i := 0; i < numElements; i++ {
+		// Elements can't exceed min of table.
+		indexes := make([]uint32, g.nextRandom().Intn(int(min)+1))
+		for i := range indexes {
+			indexes[i] = uint32(g.nextRandom().Intn(numFuncs))
+		}
+
+		offset := g.nextRandom().Intn(int(min) - len(indexes) + 1)
+		elem := &wasm.ElementSegment{
+			OffsetExpr: &wasm.ConstantExpression{
+				// TODO: support global.get expression.
+				Opcode: wasm.OpcodeI32Const,
+				Data:   leb128.EncodeInt32(int32(offset)),
+			},
+			Init: indexes,
+		}
+		g.m.ElementSection = append(g.m.ElementSection, elem)
+	}
 }
 
 func (g *generator) codeSection() {
