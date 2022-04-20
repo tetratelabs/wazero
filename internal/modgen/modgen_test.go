@@ -22,13 +22,19 @@ const (
 )
 
 func TestModGen(t *testing.T) {
+	tested := map[string]struct{}{}
 	for _, size := range []int{0, 1, 2, 5, 10, 100} {
 		r := rand.New(rand.NewSource(0))
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 100; i++ {
 			buf := make([]byte, size)
 			_, err := r.Read(buf)
 			require.NoError(t, err)
-			t.Run(hex.EncodeToString(buf), func(t *testing.T) {
+
+			encoded := hex.EncodeToString(buf)
+			if _, ok := tested[encoded]; ok {
+				continue
+			}
+			t.Run(encoded, func(t *testing.T) {
 				m := Gen(buf)
 				// Generating with the same seed must result in the same module.
 				require.Equal(t, m, Gen(buf))
@@ -40,6 +46,20 @@ func TestModGen(t *testing.T) {
 			})
 		}
 	}
+}
+
+func Test_a(t *testing.T) {
+	buf, err := hex.DecodeString("81ac8120c7")
+	if err != nil {
+		panic(err)
+	}
+
+	m := Gen(buf)
+	buf = binary.EncodeModule(m)
+
+	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
+	_, err = r.CompileModule(buf)
+	require.NoError(t, err)
 }
 
 type testRand struct {

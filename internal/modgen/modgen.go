@@ -357,9 +357,18 @@ func (g *generator) elementSection() {
 }
 
 func (g *generator) codeSection() {
-
+	codeSectionSize := len(g.m.FunctionSection)
+	for i := 0; i < codeSectionSize; i++ {
+		g.m.CodeSection = append(g.m.CodeSection, g.newCode())
+	}
 }
 
 func (g *generator) dataSection() {
 
+}
+
+func (g *generator) newCode() *wasm.Code {
+	// TODO: generate random body.
+	return &wasm.Code{Body: []byte{wasm.OpcodeUnreachable, // With unreachable allows us to make this body valid for any signature.
+		wasm.OpcodeEnd}}
 }
