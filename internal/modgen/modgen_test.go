@@ -25,6 +25,7 @@ const (
 func TestModGen(t *testing.T) {
 	tested := map[string]struct{}{}
 	r := rand.New(rand.NewSource(0)) // use deterministic seed source for easy debugging.
+	rand := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
 	for _, size := range []int{0, 1, 2, 5, 10, 50, 100} {
 		for i := 0; i < 100; i++ {
 			seed := make([]byte, size)
@@ -41,9 +42,9 @@ func TestModGen(t *testing.T) {
 				require.Equal(t, m, Gen(seed))
 				buf := binary.EncodeModule(m)
 
-				r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
-				_, err := r.CompileModule(context.Background(), buf)
+				code, err := rand.CompileModule(context.Background(), buf)
 				require.NoError(t, err)
+				code.Close()
 			})
 		}
 	}
