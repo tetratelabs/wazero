@@ -436,7 +436,8 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 	}
 
 	if actualType != expectedType {
-		return fmt.Errorf("const expression type mismatch")
+		return fmt.Errorf("const expression type mismatch expected %s but got %s",
+			ValueTypeName(expectedType), ValueTypeName(actualType))
 	}
 	return nil
 }
