@@ -12,26 +12,35 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Gen generates a pseudo random compilable module based on `seed`. The size of
-// the generated module corresponds to the size of the seed. For example,
-// the more larger len(seed) is, the more functions the module *likely* has.
+// Gen generates a pseudo random compilable module based on `seed`.
 //
-// TODO: make it possible to explicitly control the size of each section.
-// TODO: have an option to have whether or not the result has imports.
 //
 // Note: "pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
 // the same code base in Gen.
 //
 // Note: this is only used for testing wazero runtime.
-func Gen(seed []byte, enabledFeature wasm.Features) *wasm.Module {
+func Gen(seed []byte, enabledFeature wasm.Features,
+	numTypes, numFunctions, numImports, numExports, numGlobals, numElements, numData uint32,
+	needStartSection bool,
+) *wasm.Module {
 	if len(seed) == 0 {
 		return &wasm.Module{}
 	}
 
 	checksum := sha256.Sum256(seed)
 	// Use 4 randoms created from the unique sha256 hash value of the seed.
-	g := &generator{size: len(seed), rands: make([]random, 4), enabledFeature: enabledFeature}
+	g := &generator{
+		size: len(seed), rands: make([]random, 4), enabledFeature: enabledFeature,
+		numTypes:         numTypes,
+		numFunctions:     numFunctions,
+		numImports:       numImports,
+		numExports:       numExports,
+		numGlobals:       numGlobals,
+		numElements:      numElements,
+		numData:          numData,
+		needStartSection: needStartSection,
+	}
 	for i := 0; i < 4; i++ {
 		g.rands[i] = rand.New(rand.NewSource(
 			int64(binary.LittleEndian.Uint64(checksum[i*8 : (i+1)*8]))))
@@ -51,6 +60,9 @@ type generator struct {
 	m *wasm.Module
 
 	enabledFeature wasm.Features
+	numTypes, numFunctions, numImports, numExports,
+	numGlobals, numElements, numData uint32
+	needStartSection bool
 }
 
 // random is the interface over methods of rand.Rand which are used by our generator.
@@ -85,9 +97,9 @@ func (g *generator) gen() *wasm.Module {
 	return g.m
 }
 
+// genTypeSection creates random types each with a random number of parameters and results.
 func (g *generator) genTypeSection() {
-	numTypes := g.nextRandom().Intn(g.size)
-	for i := 0; i < numTypes; i++ {
+	for i := uint32(0); i < g.numTypes; i++ {
 		var resultNumCeil = g.size
 		if !g.enabledFeature.Get(wasm.FeatureMultiValue) {
 			resultNumCeil = 2
@@ -124,10 +136,10 @@ func (g *generator) newValueType() (ret wasm.ValueType) {
 	return
 }
 
+// genImportSection creates a random number of imports, including memory and table.
 func (g *generator) genImportSection() {
-	numImports := g.nextRandom().Intn(g.size)
 	var memoryImported, tableImported int
-	for i := 0; i < numImports; i++ {
+	for i := uint32(0); i < g.numImports; i++ {
 		imp := &wasm.Import{
 			Name:   fmt.Sprintf("%d", i),
 			Module: fmt.Sprintf("module-%d", i),
@@ -186,8 +198,7 @@ func (g *generator) genFunctionSection() {
 	if numTypes == 0 {
 		return
 	}
-	numFunctions := g.nextRandom().Intn(g.size)
-	for i := 0; i < numFunctions; i++ {
+	for i := uint32(0); i < g.numFunctions; i++ {
 		typeIndex := g.nextRandom().Intn(numTypes)
 		g.m.FunctionSection = append(g.m.FunctionSection, uint32(typeIndex))
 	}
@@ -213,8 +224,7 @@ func (g *generator) genMemorySection() {
 }
 
 func (g *generator) genGlobalSection() {
-	numGlobals := g.nextRandom().Intn(g.size)
-	for i := 0; i < numGlobals; i++ {
+	for i := uint32(0); i < g.numGlobals; i++ {
 		expr, t := g.newConstExpr()
 		mutable := g.nextRandom().Intn(2) == 0
 		global := &wasm.Global{
@@ -310,19 +320,21 @@ func (g *generator) genExportSection() {
 		possibleExports = append(possibleExports, wasm.Export{Type: wasm.ExternTypeMemory, Index: 0})
 	}
 
-	numExports := g.nextRandom().Intn(g.size)
-	for i := 0; i < numExports; i++ {
+	for i := uint32(0); i < g.numExports; i++ {
 		target := possibleExports[g.nextRandom().Intn(len(possibleExports))]
 
 		g.m.ExportSection = append(g.m.ExportSection, &wasm.Export{
 			Type:  target.Type,
 			Index: target.Index,
-			Name:  strconv.Itoa(i),
+			Name:  strconv.Itoa(int(i)),
 		})
 	}
 }
 
 func (g *generator) genStartSection() {
+	if !g.needStartSection {
+		return
+	}
 	funcs, _, _, _, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
@@ -355,8 +367,7 @@ func (g *generator) genElementSection() {
 	}
 
 	min := table.Min
-	numElements := g.nextRandom().Intn(g.size)
-	for i := 0; i < numElements; i++ {
+	for i := uint32(0); i < g.numElements; i++ {
 		// Elements can't exceed min of table.
 		indexes := make([]uint32, g.nextRandom().Intn(int(min)+1))
 		for i := range indexes {
@@ -395,13 +406,12 @@ func (g *generator) genDataSection() {
 		panic("BUG:" + err.Error())
 	}
 
-	if mem == nil || mem.Min == 0 {
+	if mem == nil || mem.Min == 0 || g.numData == 0 {
 		return
 	}
 
 	min := int(mem.Min * wasm.MemoryPageSize)
-	dataSectionSize := g.nextRandom().Intn(g.size)
-	for i := 0; i < dataSectionSize; i++ {
+	for i := uint32(0); i < g.numData; i++ {
 		offset := g.nextRandom().Intn(min)
 		expr := &wasm.ConstantExpression{
 			Opcode: wasm.OpcodeI32Const,
