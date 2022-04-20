@@ -389,6 +389,9 @@ func (g *generator) dataSection() {
 		}
 
 		init := make([]byte, g.nextRandom().Intn(min-offset))
+		if len(init) == 0 {
+			continue
+		}
 		_, err := g.nextRandom().Read(init)
 		if err != nil {
 			panic(err)
