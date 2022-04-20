@@ -732,8 +732,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc++
 			miscOpcode := body[pc]
 			if miscOpcode >= OpcodeMiscI32TruncSatF32S && miscOpcode <= OpcodeMiscI64TruncSatF64U {
-				if err := enabledFeatures.Require(FeatureSignExtensionOps); err != nil {
-					return fmt.Errorf("%s invalid as %v", miscInstructionNames[op], err)
+				if err := enabledFeatures.Require(FeatureNonTrappingFloatToIntConversion); err != nil {
+					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
 				}
 				var inType, outType ValueType
 				switch miscOpcode {
@@ -747,7 +747,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					inType, outType = ValueTypeF64, ValueTypeI64
 				}
 				if err := valueTypeStack.popAndVerifyType(inType); err != nil {
-					return fmt.Errorf("cannot pop the operand for %s: %v", instructionNames[op], err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", miscInstructionNames[miscOpcode], err)
 				}
 				valueTypeStack.push(outType)
 			}

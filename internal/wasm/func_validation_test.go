@@ -103,6 +103,83 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 	}
 }
 
+func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
+	tests := []struct {
+		input                Opcode
+		expectedErrOnDisable string
+	}{
+		{
+			input:                OpcodeMiscI32TruncSatF32S,
+			expectedErrOnDisable: "i32.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI32TruncSatF32U,
+			expectedErrOnDisable: "i32.trunc_sat_f32_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI32TruncSatF64S,
+			expectedErrOnDisable: "i32.trunc_sat_f64_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI32TruncSatF64U,
+			expectedErrOnDisable: "i32.trunc_sat_f64_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI64TruncSatF32S,
+			expectedErrOnDisable: "i64.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI64TruncSatF32U,
+			expectedErrOnDisable: "i64.trunc_sat_f32_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI64TruncSatF64S,
+			expectedErrOnDisable: "i64.trunc_sat_f64_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			input:                OpcodeMiscI64TruncSatF64U,
+			expectedErrOnDisable: "i64.trunc_sat_f64_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(InstructionName(tc.input), func(t *testing.T) {
+			t.Run("disabled", func(t *testing.T) {
+				m := &Module{
+					TypeSection:     []*FunctionType{v_v},
+					FunctionSection: []Index{0},
+					CodeSection:     []*Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
+				}
+				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil)
+				require.EqualError(t, err, tc.expectedErrOnDisable)
+			})
+			t.Run("enabled", func(t *testing.T) {
+				var body []byte
+				switch tc.input {
+				case OpcodeMiscI32TruncSatF32S, OpcodeMiscI32TruncSatF32U:
+					body = []byte{OpcodeF32Const, 1, 2, 3, 4}
+				case OpcodeMiscI32TruncSatF64S, OpcodeMiscI32TruncSatF64U:
+					body = []byte{OpcodeF64Const, 1, 2, 3, 4, 5, 6, 7, 8}
+				case OpcodeMiscI64TruncSatF32S, OpcodeMiscI64TruncSatF32U:
+					body = []byte{OpcodeF32Const, 1, 2, 3, 4}
+				case OpcodeMiscI64TruncSatF64S, OpcodeMiscI64TruncSatF64U:
+					body = []byte{OpcodeF64Const, 1, 2, 3, 4, 5, 6, 7, 8}
+				}
+				body = append(body, OpcodeMiscPrefix, tc.input, OpcodeDrop, OpcodeEnd)
+
+				m := &Module{
+					TypeSection:     []*FunctionType{v_v},
+					FunctionSection: []Index{0},
+					CodeSection:     []*Code{{Body: body}},
+				}
+				err := m.validateFunction(FeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil)
+				require.NoError(t, err)
+			})
+		})
+	}
+}
+
 // TestModule_ValidateFunction_MultiValue only tests what can't yet be detected during compilation. These examples are
 // from test/core/if.wast from the commit that added "multi-value" support.
 //

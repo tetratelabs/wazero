@@ -96,6 +96,9 @@ func featureName(f Features) string {
 	case FeatureMultiValue:
 		// match https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 		return "multi-value"
+	case FeatureNonTrappingFloatToIntConversion:
+		// match https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+		return "nontrapping-float-to-int-conversion"
 	}
 	return ""
 }
