@@ -1,20 +1,16 @@
-package main
+package wasi_example
 
-import "os"
+import (
+	"testing"
 
-// Example_main ensures the following will work:
+	"github.com/heeus/hwazero/internal/testing/maintester"
+	"github.com/heeus/hwazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
-//	go build cat.go
-//	./cat ./test.txt
-func Example_main() {
-
-	// Save the old os.Args and replace with our example input.
-	oldArgs := os.Args
-	os.Args = []string{"cat", "./test.txt"}
-	defer func() { os.Args = oldArgs }()
-
-	main()
-
-	// Output:
-	// hello filesystem
+//	go run cat.go ./test.txt
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "cat", "./test.txt")
+	require.Equal(t, "hello filesystem\n", stdout)
 }

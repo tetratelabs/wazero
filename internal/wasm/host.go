@@ -64,7 +64,15 @@ func NewHostModule(
 			return
 		}
 	}
+
+	// Assins the ModuleID by calculating sha256 on inputs as host modules do not have `source` to hash.
+	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v:%v:%v",
+		moduleName, nameToGoFunc, nameToMemory, nameToGlobal, enabledFeatures)))
 	return
+}
+
+func (m *Module) IsHostModule() bool {
+	return len(m.HostFunctionSection) > 0
 }
 
 func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Features) error {

@@ -1,17 +1,17 @@
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 
 .PHONY: bench
 bench:
-	@go test -run=NONE -benchmem -bench=. ./tests/...
-	@cd vs && go test -benchmem -bench=. .
+	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
+	@cd ./internal/integration_test/vs && go test -benchmem -bench=. .
 
 .PHONY: bench.check
 bench.check:
-	@go test -run=NONE -benchmem -bench=. ./tests/...
-	@cd vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
+	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 
-bench_testdata_dir := tests/bench/testdata
+bench_testdata_dir := internal/integration_test/bench/testdata
 
 .PHONY: build.bench
 build.bench:
@@ -22,7 +22,7 @@ wasi_testdata_dir := ./examples/*/testdata
 build.examples:
 	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
-spectest_testdata_dir := tests/spectest/testdata
+spectest_testdata_dir := internal/integration_test/spectest/testdata
 spec_version := wg-1.0
 
 .PHONY: build.spectest
@@ -49,6 +49,7 @@ build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags m
 .PHONY: test
 test:
 	@go test ./... -timeout 120s
+	@cd internal/integration_test/asm && go test ./... -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 

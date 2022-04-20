@@ -49,6 +49,20 @@ func TestFuncParser(t *testing.T) {
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeI32Const, 0xb2, 0x02, wasm.OpcodeEnd}},
 		},
 		{
+			name:   "i32.add",
+			source: "(func i32.const 2 i32.const 1 i32.add)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 0x02, wasm.OpcodeI32Const, 0x01, wasm.OpcodeI32Add, wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i32.sub",
+			source: "(func i32.const 2 i32.const 1 i32.sub)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 0x02, wasm.OpcodeI32Const, 0x01, wasm.OpcodeI32Sub, wasm.OpcodeEnd,
+			}},
+		},
+		{
 			name:     "i64.const",
 			source:   "(func i64.const 356)",
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeI64Const, 0xe4, 0x02, wasm.OpcodeEnd}},

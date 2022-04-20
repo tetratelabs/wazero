@@ -9,32 +9,32 @@ import (
 	"github.com/heeus/hwazero/sys"
 )
 
-// compile time check to ensure ModuleContext implements api.Module
-var _ api.Module = &ModuleContext{}
+// compile time check to ensure CallContext implements api.Module
+var _ api.Module = &CallContext{}
 
-func NewModule(ctx context.Context) *ModuleContext {
-	mdl := ModuleContext{}
-	mdl.ctx = ctx
+func NewCallContext(store *Store, instance *ModuleInstance, Sys *SysContext) *CallContext {
 	zero := uint64(0)
-	mdl.closed = &zero
-	return &mdl
+	return &CallContext{memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
 }
 
-func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, Sys *SysContext) *ModuleContext {
-	zero := uint64(0)
-	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
-}
+// CallContext is a function call context bound to a module. This is important as one module's functions can call
+// imported functions, but all need to effect the same memory.
+//
+// Note: This does not include the context.Context because doing so risks caching the wrong context which can break
+// functionality like trace propagation.
+// Note: this also implements api.Module in order to simplify usage as a host function parameter.
+type CallContext struct {
+	// TODO: We've never found a great name for this. It is only used for function calls, hence CallContext, but it
+	// moves on a different axis than, for example, the context.Context. context.Context is the same root for the whole
+	// call stack, where the CallContext can change depending on where memory is defined and who defines the calling
+	// function. When we rename this again, we should try to capture as many key points possible on the docs.
 
-// ModuleContext implements api.Module
-type ModuleContext struct {
-	// ctx is returned by Context and overridden WithContext
-	ctx    context.Context
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory api.Memory
 	store  *Store
 
-	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
+	// Note: This is a part of CallContext so that scope is correct and Close is coherent.
 	// Sys is exposed only for WASI
 	Sys *SysContext
 
@@ -44,13 +44,18 @@ type ModuleContext struct {
 	//
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
-	closed *uint64
-
+	closed    *uint64
 	opcounter uint64
 }
 
+// GetIncCounter Increases opcounter on 1 and retruns new value
+func (m *CallContext) GetIncCounter() uint64 {
+	m.opcounter++
+	return m.opcounter
+}
+
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
-func (m *ModuleContext) FailIfClosed() error {
+func (m *CallContext) FailIfClosed() error {
 	if closed := atomic.LoadUint64(m.closed); closed != 0 {
 		return sys.NewExitError(m.module.Name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
 	}
@@ -58,55 +63,34 @@ func (m *ModuleContext) FailIfClosed() error {
 }
 
 // Name implements the same method as documented on api.Module
-func (m *ModuleContext) Name() string {
+func (m *CallContext) Name() string {
 	return m.module.Name
 }
 
-// GetIncCounter Increases opcounter on 1 and retruns new value
-func (m *ModuleContext) GetIncCounter() uint64 {
-	atomic.AddUint64(&m.opcounter, 1)
-	return m.opcounter
-
-}
-
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
-func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
+func (m *CallContext) WithMemory(memory *MemoryInstance) *CallContext {
 	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
-		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, Sys: m.Sys, closed: m.closed}
+		return &CallContext{module: m.module, memory: memory, Sys: m.Sys, closed: m.closed}
 	}
 	return m
 }
 
 // String implements the same method as documented on api.Module
-func (m *ModuleContext) String() string {
+func (m *CallContext) String() string {
 	return fmt.Sprintf("Module[%s]", m.Name())
 }
 
-// Context implements the same method as documented on api.Module
-func (m *ModuleContext) Context() context.Context {
-	return m.ctx
-}
-
-// WithContext implements the same method as documented on api.Module
-func (m *ModuleContext) WithContext(ctx context.Context) api.Module {
-	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
-		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, Sys: m.Sys, closed: m.closed}
-	}
-	return m
-}
-
 // Close implements the same method as documented on api.Module.
-func (m *ModuleContext) Close() (err error) {
+func (m *CallContext) Close() (err error) {
 	return m.CloseWithExitCode(0)
 }
 
 // CloseWithExitCode implements the same method as documented on api.Module.
-func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
+func (m *CallContext) CloseWithExitCode(exitCode uint32) (err error) {
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return nil
 	}
-	m.module.Engine.Close()
 	m.store.deleteModule(m.Name())
 	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
 		return sys.Close()
@@ -115,12 +99,12 @@ func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
 }
 
 // Memory implements api.Module Memory
-func (m *ModuleContext) Memory() api.Memory {
+func (m *CallContext) Memory() api.Memory {
 	return m.module.Memory
 }
 
 // ExportedMemory implements api.Module ExportedMemory
-func (m *ModuleContext) ExportedMemory(name string) api.Memory {
+func (m *CallContext) ExportedMemory(name string) api.Memory {
 	exp, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
@@ -129,7 +113,7 @@ func (m *ModuleContext) ExportedMemory(name string) api.Memory {
 }
 
 // ExportedFunction implements api.Module ExportedFunction
-func (m *ModuleContext) ExportedFunction(name string) api.Function {
+func (m *CallContext) ExportedFunction(name string) api.Function {
 	exp, err := m.module.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
@@ -143,7 +127,7 @@ func (m *ModuleContext) ExportedFunction(name string) api.Function {
 
 // importedFn implements api.Function and ensures the call context of an imported function is the importing module.
 type importedFn struct {
-	importingModule *ModuleContext
+	importingModule *CallContext
 	importedFn      *FunctionInstance
 }
 
@@ -158,11 +142,12 @@ func (f *importedFn) ResultTypes() []api.ValueType {
 }
 
 // Call implements the same method as documented on api.Function
-func (f *importedFn) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
-	if m == nil {
-		return f.importedFn.Call(f.importingModule, params...)
+func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return f.importedFn.Call(m, params...)
+	mod := f.importingModule
+	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
 }
 
 // ParamTypes implements the same method as documented on api.Function
@@ -176,19 +161,16 @@ func (f *FunctionInstance) ResultTypes() []api.ValueType {
 }
 
 // Call implements the same method as documented on api.Function
-func (f *FunctionInstance) Call(m api.Module, params ...uint64) (ret []uint64, err error) {
-	mod := f.Module
-	modCtx, ok := m.(*ModuleContext)
-	if ok {
-		// TODO: check if the importing context is correct
-	} else { // allow nil to substitute for the defining module
-		modCtx = mod.Ctx
+func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return mod.Engine.Call(modCtx, f, params...)
+	mod := f.Module
+	return mod.Engine.Call(ctx, mod.CallCtx, f, params...)
 }
 
 // ExportedGlobal implements api.Module ExportedGlobal
-func (m *ModuleContext) ExportedGlobal(name string) api.Global {
+func (m *CallContext) ExportedGlobal(name string) api.Global {
 	exp, err := m.module.getExport(name, ExternTypeGlobal)
 	if err != nil {
 		return nil

@@ -8,14 +8,14 @@ import (
 	"github.com/heeus/hwazero/internal/testing/require"
 )
 
-var code, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
+var testCode, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
 func Test_mmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
-	newCode, err := mmapCodeSegment(code)
+	newCode, err := mmapCodeSegment(testCode)
 	require.NoError(t, err)
 	// Verify that the mmap is the same as the original.
-	require.Equal(t, code, newCode)
+	require.Equal(t, testCode, newCode)
 	// TODO: test newCode can executed.
 
 	t.Run("panic on zero length", func(t *testing.T) {
@@ -30,9 +30,9 @@ func Test_munmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
 
 	// Errors if never mapped
-	require.Error(t, munmapCodeSegment(code))
+	require.Error(t, munmapCodeSegment(testCode))
 
-	newCode, err := mmapCodeSegment(code)
+	newCode, err := mmapCodeSegment(testCode)
 	require.NoError(t, err)
 	// First munmap should succeed.
 	require.NoError(t, munmapCodeSegment(newCode))

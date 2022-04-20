@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/heeus/hwazero/internal/wasm"
 	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
@@ -14,6 +13,6 @@ import (
 type archContext struct{}
 
 // newCompiler returns an unsupported error.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return nil, fmt.Errorf("unsupported GOARCH %s", runtime.GOARCH)
 }

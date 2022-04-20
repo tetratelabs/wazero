@@ -1,7 +1,6 @@
 package wazero
 
 import (
-	"context"
 	"io"
 	"math"
 	"testing"
@@ -17,24 +16,6 @@ func TestRuntimeConfig(t *testing.T) {
 		with     func(*RuntimeConfig) *RuntimeConfig
 		expected *RuntimeConfig
 	}{
-		{
-			name: "WithContext",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
-				return c.WithContext(context.TODO())
-			},
-			expected: &RuntimeConfig{
-				ctx: context.TODO(),
-			},
-		},
-		{
-			name: "WithContext - nil",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
-				return c.WithContext(nil) //nolint
-			},
-			expected: &RuntimeConfig{
-				ctx: context.Background(),
-			},
-		},
 		{
 			name: "WithMemoryMaxPages",
 			with: func(c *RuntimeConfig) *RuntimeConfig {

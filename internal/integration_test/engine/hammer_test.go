@@ -35,7 +35,7 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 
 		// Prove a module can be redefined even with in-flight calls.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err := r.InstantiateModuleFromCode(source)
+		importing, err := r.InstantiateModuleFromCode(testCtx, source)
 		require.NoError(t, err)
 		return imported, importing
 	})
@@ -50,12 +50,12 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 		// Redefine the imported module, with a function that no longer blocks.
 		imported, err := r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
 			return x
-		}).Instantiate()
+		}).Instantiate(testCtx)
 		require.NoError(t, err)
 
 		// Redefine the importing module, which should link to the redefined host module.
 		source := callReturnImportSource(imported.Name(), importing.Name())
-		importing, err = r.InstantiateModuleFromCode(source)
+		importing, err = r.InstantiateModuleFromCode(testCtx, source)
 		require.NoError(t, err)
 
 		return imported, importing
@@ -78,13 +78,13 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// Create the host module, which exports the blocking function.
 	imported, err := r.NewModuleBuilder(t.Name()+"-imported").
-		ExportFunction("return_input", blockAndReturn).Instantiate()
+		ExportFunction("return_input", blockAndReturn).Instantiate(testCtx)
 	require.NoError(t, err)
 	defer imported.Close()
 
 	// Import that module.
 	source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-	importing, err := r.InstantiateModuleFromCode(source)
+	importing, err := r.InstantiateModuleFromCode(testCtx, source)
 	require.NoError(t, err)
 	defer importing.Close()
 
@@ -110,12 +110,12 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 }
 
 func requireFunctionCall(t *testing.T, fn api.Function) {
-	res, err := fn.Call(nil, 3)
+	res, err := fn.Call(testCtx, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), res[0])
 }
 
 func requireFunctionCallExits(t *testing.T, moduleName string, fn api.Function) {
-	_, err := fn.Call(nil, 3)
+	_, err := fn.Call(testCtx, 3)
 	require.Equal(t, sys.NewExitError(moduleName, 0), err)
 }

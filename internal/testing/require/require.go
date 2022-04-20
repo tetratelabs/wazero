@@ -291,7 +291,7 @@ func fail(t TestingT, m1, m2 string, formatWithArgs ...interface{}) {
 
 	// Don't write the failStack in our own package!
 	if fs := failStack(); len(fs) > 0 {
-		t.Fatal(failure, "\n", strings.Join(fs, "\n\t\t\t"))
+		t.Fatal(failure + "\n" + strings.Join(fs, "\n"))
 	} else {
 		t.Fatal(failure)
 	}
@@ -323,7 +323,7 @@ func failStack() (fs []string) {
 		// Ensure we don't add functions in the require package to the failure stack.
 		dir := path.Dir(file)
 		if path.Base(dir) != "require" {
-			fs = append(fs, fmt.Sprintf("%s:%d", path.Base(file), line))
+			fs = append(fs, fmt.Sprintf("%s:%d", file, line))
 		}
 
 		// Stop the stack when we get to a test. Strip off any leading package name first!

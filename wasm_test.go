@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
-	"strconv"
 	"testing"
 
 	"github.com/heeus/hwazero/api"
@@ -13,7 +12,11 @@ import (
 	"github.com/heeus/hwazero/internal/testing/require"
 	"github.com/heeus/hwazero/internal/wasm"
 	"github.com/heeus/hwazero/internal/wasm/binary"
+	"github.com/heeus/hwazero/sys"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func TestRuntime_DecodeModule(t *testing.T) {
 	tests := []struct {
@@ -54,12 +57,13 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			code, err := r.CompileModule(tc.source)
+			code, err := r.CompileModule(testCtx, tc.source)
 			require.NoError(t, err)
 			defer code.Close()
 			if tc.expectedName != "" {
 				require.Equal(t, tc.expectedName, code.module.NameSection.ModuleName)
 			}
+			require.Equal(t, r.(*runtime).store.Engine, code.compiledEngine)
 		})
 	}
 }
@@ -114,7 +118,7 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.runtime.CompileModule(tc.source)
+			_, err := tc.runtime.CompileModule(testCtx, tc.source)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -150,7 +154,7 @@ func TestModule_Memory(t *testing.T) {
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above memory
-			module, err := tc.builder(r).Instantiate()
+			module, err := tc.builder(r).Instantiate(testCtx)
 			require.NoError(t, err)
 			defer module.Close()
 
@@ -217,17 +221,20 @@ func TestModule_Global(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		r := NewRuntime()
+		r := NewRuntime().(*runtime)
 		t.Run(tc.name, func(t *testing.T) {
 			var code *CompiledCode
 			if tc.module != nil {
 				code = &CompiledCode{module: tc.module}
 			} else {
-				code, _ = tc.builder(r).Build()
+				code, _ = tc.builder(r).Build(testCtx)
 			}
 
+			err := r.store.Engine.CompileModule(testCtx, code.module)
+			require.NoError(t, err)
+
 			// Instantiate the module and get the export of the above global
-			module, err := r.InstantiateModule(code)
+			module, err := r.InstantiateModule(testCtx, code)
 			require.NoError(t, err)
 			defer module.Close()
 
@@ -249,26 +256,20 @@ func TestModule_Global(t *testing.T) {
 }
 
 func TestFunction_Context(t *testing.T) {
-	type key string
-	runtimeCtx := context.WithValue(context.Background(), key("wa"), "zero")
-	config := NewRuntimeConfig().WithContext(runtimeCtx)
-
-	notStoreCtx := context.WithValue(context.Background(), key("wazer"), "o")
-
 	tests := []struct {
 		name     string
 		ctx      context.Context
 		expected context.Context
 	}{
 		{
-			name:     "nil defaults to runtime context",
+			name:     "nil defaults to context.Background",
 			ctx:      nil,
-			expected: runtimeCtx,
+			expected: context.Background(),
 		},
 		{
-			name:     "set overrides runtime context",
-			ctx:      notStoreCtx,
-			expected: notStoreCtx,
+			name:     "set context",
+			ctx:      testCtx,
+			expected: testCtx,
 		},
 	}
 
@@ -276,49 +277,48 @@ func TestFunction_Context(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntimeWithConfig(config)
+			r := NewRuntime()
 
 			// Define a host function so that we can catch the context propagated from a module function call
 			functionName := "fn"
 			expectedResult := uint64(math.MaxUint64)
-			hostFn := func(ctx api.Module) uint64 {
-				require.Equal(t, tc.expected, ctx.Context())
+			hostFn := func(ctx context.Context) uint64 {
+				require.Equal(t, tc.expected, ctx)
 				return expectedResult
 			}
 			source, closer := requireImportAndExportFunction(t, r, hostFn, functionName)
 			defer closer() // nolint
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModuleFromCodeWithConfig(source, NewModuleConfig().WithName(t.Name()))
+			module, err := r.InstantiateModuleFromCodeWithConfig(tc.ctx, source, NewModuleConfig().WithName(t.Name()))
 			require.NoError(t, err)
 			defer module.Close()
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := module.ExportedFunction(functionName).Call(module.WithContext(tc.ctx))
+			results, err := module.ExportedFunction(functionName).Call(tc.ctx)
 			require.NoError(t, err)
 			require.Equal(t, expectedResult, results[0])
 		})
 	}
 }
 
-func TestRuntime_NewModule_UsesConfiguredContext(t *testing.T) {
-	type key string
-	runtimeCtx := context.WithValue(context.Background(), key("wa"), "zero")
-	config := NewRuntimeConfig().WithContext(runtimeCtx)
-	r := NewRuntimeWithConfig(config)
+func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
+	r := NewRuntime()
 
 	// Define a function that will be set as the start function
 	var calledStart bool
-	start := func(ctx api.Module) {
+	start := func(ctx context.Context) {
 		calledStart = true
-		require.Equal(t, runtimeCtx, ctx.Context())
+		require.Equal(t, testCtx, ctx)
 	}
 
-	env, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
+	env, err := r.NewModuleBuilder("env").
+		ExportFunction("start", start).
+		Instantiate(testCtx)
 	require.NoError(t, err)
 	defer env.Close()
 
-	code, err := r.CompileModule([]byte(`(module $runtime_test.go
+	code, err := r.CompileModule(testCtx, []byte(`(module $runtime_test.go
 	(import "env" "start" (func $start))
 	(start $start)
 )`))
@@ -326,7 +326,7 @@ func TestRuntime_NewModule_UsesConfiguredContext(t *testing.T) {
 	defer code.Close()
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	m, err := r.InstantiateModule(code)
+	m, err := r.InstantiateModule(testCtx, code)
 	require.NoError(t, err)
 	defer m.Close()
 
@@ -337,7 +337,7 @@ func TestRuntime_NewModule_UsesConfiguredContext(t *testing.T) {
 func TestInstantiateModuleFromCode_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime()
 
-	mod, err := r.InstantiateModuleFromCode([]byte(`(module $wasi_test.go
+	mod, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $wasi_test.go
 	(memory 1)
 	(export "memory" (memory 0))
 )`))
@@ -345,24 +345,24 @@ func TestInstantiateModuleFromCode_DoesntEnforce_Start(t *testing.T) {
 	require.NoError(t, mod.Close())
 }
 
-func TestInstantiateModuleFromCode_UsesRuntimeContext(t *testing.T) {
-	type key string
-	config := NewRuntimeConfig().WithContext(context.WithValue(context.Background(), key("wa"), "zero"))
-	r := NewRuntimeWithConfig(config)
+func TestRuntime_InstantiateModuleFromCode_UsesContext(t *testing.T) {
+	r := NewRuntime()
 
 	// Define a function that will be re-exported as the WASI function: _start
 	var calledStart bool
-	start := func(ctx api.Module) {
+	start := func(ctx context.Context) {
 		calledStart = true
-		require.Equal(t, config.ctx, ctx.Context())
+		require.Equal(t, testCtx, ctx)
 	}
 
-	host, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
+	host, err := r.NewModuleBuilder("").
+		ExportFunction("start", start).
+		Instantiate(testCtx)
 	require.NoError(t, err)
 	defer host.Close()
 
 	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	mod, err := r.InstantiateModuleFromCode([]byte(`(module $start
+	mod, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $start
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))
@@ -378,7 +378,7 @@ func TestInstantiateModuleFromCode_UsesRuntimeContext(t *testing.T) {
 // different names. This pattern is used in wapc-go.
 func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	r := NewRuntime()
-	base, err := r.CompileModule([]byte(`(module $0 (memory 1))`))
+	base, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`))
 	require.NoError(t, err)
 	defer base.Close()
 
@@ -386,14 +386,14 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 
 	// Use the same runtime to instantiate multiple modules
 	internal := r.(*runtime).store
-	m1, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("1"))
+	m1, err := r.InstantiateModuleWithConfig(testCtx, base, NewModuleConfig().WithName("1"))
 	require.NoError(t, err)
 	defer m1.Close()
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("1"), m1)
 
-	m2, err := r.InstantiateModuleWithConfig(base, NewModuleConfig().WithName("2"))
+	m2, err := r.InstantiateModuleWithConfig(testCtx, base, NewModuleConfig().WithName("2"))
 	require.NoError(t, err)
 	defer m2.Close()
 
@@ -401,9 +401,22 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	require.Equal(t, internal.Module("2"), m2)
 }
 
+func TestInstantiateModuleWithConfig_ExitError(t *testing.T) {
+	r := NewRuntime()
+
+	start := func(m api.Module) {
+		require.NoError(t, m.CloseWithExitCode(2))
+	}
+
+	_, err := r.NewModuleBuilder("env").ExportFunction("_start", start).Instantiate(testCtx)
+
+	// Ensure the exit error propagated and didn't wrap.
+	require.Equal(t, err, sys.NewExitError("env", 2))
+}
+
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx api.Module) uint64, functionName string) ([]byte, func() error) {
-	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate()
+func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx context.Context) uint64, functionName string) ([]byte, func() error) {
+	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx)
 	require.NoError(t, err)
 
 	return []byte(fmt.Sprintf(
@@ -411,57 +424,26 @@ func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx api
 	)), mod.Close
 }
 
-func TestCompiledCode_addCacheEntry(t *testing.T) {
-	c := &CompiledCode{}
-
-	m1, e1 := &wasm.Module{}, &mockEngine{name: "1"}
-	for i := 0; i < 5; i++ {
-		c.addCacheEntry(m1, e1)
-	}
-
-	require.NotNil(t, c.cachedEngines[e1])
-	require.NotNil(t, c.cachedEngines[e1][m1])
-	require.Equal(t, 1, len(c.cachedEngines[e1]))
-
-	m2, e2 := &wasm.Module{}, &mockEngine{name: "2"}
-	for i := 0; i < 5; i++ {
-		c.addCacheEntry(m2, e2)
-	}
-
-	require.NotNil(t, c.cachedEngines[e1])
-	require.NotNil(t, c.cachedEngines[e2])
-	require.NotNil(t, c.cachedEngines[e1][m1])
-	require.NotNil(t, c.cachedEngines[e2][m2])
-	require.Equal(t, 1, len(c.cachedEngines[e1]))
-	require.Equal(t, 1, len(c.cachedEngines[e2]))
-}
-
 func TestCompiledCode_Close(t *testing.T) {
-	e1, e2 := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}},
-		&mockEngine{name: "2", cachedModules: map[*wasm.Module]struct{}{}}
+	e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 
-	c := &CompiledCode{}
-	for _, e := range []wasm.Engine{e1, e2} {
-		for i := 0; i < 10; i++ {
-			m := &wasm.Module{}
-			_, _ = e.NewModuleEngine(strconv.Itoa(i), m, nil, nil, nil, nil)
-			c.addCacheEntry(m, e)
-		}
+	var cs []*CompiledCode
+	for i := 0; i < 10; i++ {
+		m := &wasm.Module{}
+		err := e.CompileModule(testCtx, m)
+		require.NoError(t, err)
+		cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
 	}
 
 	// Before Close.
-	require.Equal(t, 10, len(e1.cachedModules))
-	require.Equal(t, 10, len(e2.cachedModules))
-	require.Equal(t, 2, len(c.cachedEngines))
-	for _, modules := range c.cachedEngines {
-		require.Equal(t, 10, len(modules))
+	require.Equal(t, 10, len(e.cachedModules))
+
+	for _, c := range cs {
+		c.Close()
 	}
 
-	c.Close()
-
 	// After Close.
-	require.Zero(t, len(e1.cachedModules))
-	require.Zero(t, len(e2.cachedModules))
+	require.Zero(t, len(e.cachedModules))
 }
 
 type mockEngine struct {
@@ -470,12 +452,16 @@ type mockEngine struct {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, module *wasm.Module, _, _ []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
-	e.cachedModules[module] = struct{}{}
+func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _, _ []*wasm.FunctionInstance, _ *wasm.TableInstance, _ map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	return nil, nil
 }
 
-// ReleaseCompilationCache implements the same method as documented on wasm.Engine.
-func (e *mockEngine) ReleaseCompilationCache(module *wasm.Module) {
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 	delete(e.cachedModules, module)
+}
+
+func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module) error {
+	e.cachedModules[module] = struct{}{}
+	return nil
 }

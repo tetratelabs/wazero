@@ -23,6 +23,9 @@ import (
 	"github.com/heeus/hwazero/internal/wasmruntime"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 //go:embed testdata/*.wasm
 //go:embed testdata/*.json
 var testcases embed.FS
@@ -267,7 +270,10 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
-	_, err = store.Instantiate(context.Background(), mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
+	err = store.Engine.CompileModule(testCtx, mod)
+	require.NoError(t, err)
+
+	_, err = store.Instantiate(testCtx, mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
 	require.NoError(t, err)
 }
 
@@ -323,6 +329,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemoryMaxPages)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
+						mod.AssignModuleID(buf)
 
 						moduleName := c.Name
 						if moduleName == "" { // When "(module ...) directive doesn't have name.
@@ -334,8 +341,12 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 								moduleName = c.Filename
 							}
 						}
+
+						err = store.Engine.CompileModule(testCtx, mod)
+						require.NoError(t, err, msg)
+
 						moduleName = strings.TrimPrefix(moduleName, "$")
-						_, err = store.Instantiate(context.Background(), mod, moduleName, nil)
+						_, err = store.Instantiate(testCtx, mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -458,7 +469,14 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 		return
 	}
 
-	_, err = store.Instantiate(context.Background(), mod, t.Name(), nil)
+	mod.AssignModuleID(buf)
+
+	err = store.Engine.CompileModule(testCtx, mod)
+	if err != nil {
+		return
+	}
+
+	_, err = store.Instantiate(testCtx, mod, t.Name(), nil)
 	require.Error(t, err, msg)
 }
 
@@ -506,6 +524,6 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 // TODO: This is likely already covered with unit tests!
 func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
 	fn := s.Module(moduleName).ExportedFunction(funcName)
-	results, err := fn.Call(nil, params...)
+	results, err := fn.Call(testCtx, params...)
 	return results, fn.ResultTypes(), err
 }

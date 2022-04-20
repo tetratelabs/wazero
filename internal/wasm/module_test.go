@@ -167,7 +167,7 @@ func TestModule_allDeclarations(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			functions, globals, memory, table, err := tc.module.allDeclarations()
+			functions, globals, memory, table, err := tc.module.AllDeclarations()
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedFunctions, functions)
 			require.Equal(t, tc.expectedGlobals, globals)
@@ -330,6 +330,21 @@ func TestModule_validateStartSection(t *testing.T) {
 				require.Error(t, err)
 			})
 		}
+	})
+	t.Run("imported valid func", func(t *testing.T) {
+		index := Index(1)
+		m := Module{
+			StartSection: &index,
+			TypeSection:  []*FunctionType{{}, {Results: []ValueType{ValueTypeI32}}},
+			ImportSection: []*Import{
+				{Type: ExternTypeFunc, DescFunc: 1},
+				// import with index 1 is global but this should be skipped when searching imported functions.
+				{Type: ExternTypeGlobal},
+				{Type: ExternTypeFunc, DescFunc: 0}, // This one must be selected.
+			},
+		}
+		err := m.validateStartSection()
+		require.NoError(t, err)
 	})
 }
 

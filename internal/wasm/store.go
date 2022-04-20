@@ -62,13 +62,17 @@ type (
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		Memory *MemoryInstance
 		Table  *TableInstance
-		Types  []*TypeInstance
+		Types  []*FunctionType
 
-		// Ctx holds default function call context from this function instance.
-		Ctx *ModuleContext
+		// CallCtx holds default function call context from this function instance.
+		CallCtx *CallContext
 
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
+
+		// TypeIDs is index-correlated with types and holds typeIDs which is uniquely assigned to a type by store.
+		// This is necessary to achieve fast runtime type checking for indirect function calls at runtime.
+		TypeIDs []FunctionTypeID
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -119,14 +123,6 @@ type (
 		Index Index
 	}
 
-	// TypeInstance is a store-specific representation of FunctionType where the function type
-	// is coupled with TypeID which is specific in a store.
-	TypeInstance struct {
-		Type *FunctionType
-		// TypeID is assigned by a store for FunctionType.
-		TypeID FunctionTypeID
-	}
-
 	// GlobalInstance represents a global instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
 	GlobalInstance struct {
@@ -150,15 +146,16 @@ const (
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, table *TableInstance, memory, importedMemory *MemoryInstance,
-	typeInstances []*TypeInstance) {
+	types []*FunctionType, typeIDs []FunctionTypeID) {
 
-	m.Types = typeInstances
+	m.Types = types
+	m.TypeIDs = typeIDs
 
 	m.Functions = append(m.Functions, importedFunctions...)
 	for i, f := range functions {
 		// Associate each function with the type instance and the module instance's pointer.
 		f.Module = m
-		f.TypeID = typeInstances[module.FunctionSection[i]].TypeID
+		f.TypeID = typeIDs[module.FunctionSection[i]]
 		m.Functions = append(m.Functions, f)
 	}
 
@@ -244,15 +241,19 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 //
 // * ctx: the default context used for function calls.
 // * name: the name of the module.
-// * sys: the system context, which will be closed (SysContext.Close) on ModuleContext.Close.
+// * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*ModuleContext, error) {
+func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*CallContext, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
 
-	types, err := s.getTypes(module.TypeSection)
+	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, err
@@ -284,7 +285,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m := &ModuleInstance{Name: name}
-	m.addSections(module, importedFunctions, functions, importedGlobals, globals, table, importedMemory, memory, types)
+	m.addSections(module, importedFunctions, functions, importedGlobals, globals, table, importedMemory, memory, module.TypeSection, typeIDs)
 
 	if err = m.validateData(module.DataSection); err != nil {
 		s.deleteModule(name)
@@ -301,13 +302,13 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(ctx, s, m, sys)
+	m.CallCtx = NewCallContext(s, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		if _, err = f.Module.Engine.Call(m.Ctx, f); err != nil {
+		if _, err = f.Module.Engine.Call(ctx, m.CallCtx, f); err != nil {
 			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
@@ -315,7 +316,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 
 	// Now that the instantiation is complete without error, add it. This makes it visible for import.
 	s.addModule(m)
-	return m.Ctx, nil
+	return m.CallCtx, nil
 }
 
 // deleteModule makes the moduleName available for instantiation again.
@@ -348,7 +349,7 @@ func (s *Store) addModule(m *ModuleInstance) {
 // Module implements wazero.Runtime Module
 func (s *Store) Module(moduleName string) api.Module {
 	if m := s.module(moduleName); m != nil {
-		return m.Ctx
+		return m.CallCtx
 	} else {
 		return nil
 	}
@@ -500,13 +501,13 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	return
 }
 
-func (s *Store) getTypes(ts []*FunctionType) ([]*TypeInstance, error) {
+func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
 	// We take write-lock here as the following might end up mutating typeIDs map.
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	ret := make([]*TypeInstance, len(ts))
+	ret := make([]FunctionTypeID, len(ts))
 	for i, t := range ts {
-		inst, err := s.getTypeInstance(t)
+		inst, err := s.getFunctionTypeID(t)
 		if err != nil {
 			return nil, err
 		}
@@ -515,16 +516,16 @@ func (s *Store) getTypes(ts []*FunctionType) ([]*TypeInstance, error) {
 	return ret, nil
 }
 
-func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
+func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 	key := t.String()
 	id, ok := s.typeIDs[key]
 	if !ok {
 		l := uint32(len(s.typeIDs))
 		if l >= s.functionMaxTypes {
-			return nil, fmt.Errorf("too many function types in a store")
+			return 0, fmt.Errorf("too many function types in a store")
 		}
 		id = FunctionTypeID(len(s.typeIDs))
 		s.typeIDs[key] = id
 	}
-	return &TypeInstance{Type: t, TypeID: id}, nil
+	return id, nil
 }

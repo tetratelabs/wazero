@@ -1,6 +1,7 @@
-package main
+package add
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"log"
@@ -13,11 +14,14 @@ import (
 
 // main implements a basic function in both Go and WebAssembly.
 func main() {
+	// Choose the context to use for function calls.
+	ctx := context.Background()
+
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
 
 	// Add a module to the runtime named "wasm/math" which exports one function "add", implemented in WebAssembly.
-	wasm, err := r.InstantiateModuleFromCode([]byte(`(module $wasm/math
+	wasm, err := r.InstantiateModuleFromCode(ctx, []byte(`(module $wasm/math
     (func $add (param i32 i32) (result i32)
         local.get 0
         local.get 1
@@ -34,7 +38,7 @@ func main() {
 	host, err := r.NewModuleBuilder("host/math").
 		ExportFunction("add", func(v1, v2 uint32) uint32 {
 			return v1 + v2
-		}).Instantiate()
+		}).Instantiate(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,7 +50,7 @@ func main() {
 	// Call the same function in both modules and print the results to the console.
 	for _, mod := range []api.Module{wasm, host} {
 		add := mod.ExportedFunction("add")
-		results, err := add.Call(nil, x, y)
+		results, err := add.Call(ctx, x, y)
 		if err != nil {
 			log.Fatal(err)
 		}

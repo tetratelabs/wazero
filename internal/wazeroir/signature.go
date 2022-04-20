@@ -147,7 +147,7 @@ var (
 // the function instance (for example, local types).
 // "index" parameter is not used by most of opcodes.
 // The returned signature is used for stack validation when lowering Wasm's opcodes to wazeroir.
-func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32) (*signature, error) {
+func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature, error) {
 	switch op {
 	case wasm.OpcodeUnreachable, wasm.OpcodeNop, wasm.OpcodeBlock, wasm.OpcodeLoop:
 		return signature_None_None, nil
@@ -160,9 +160,9 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 	case wasm.OpcodeReturn:
 		return signature_None_None, nil
 	case wasm.OpcodeCall:
-		return funcTypeToSignature(f.Module.Functions[index].Type), nil
+		return funcTypeToSignature(c.types[c.funcs[index]]), nil
 	case wasm.OpcodeCallIndirect:
-		ret := funcTypeToSignature(f.Module.Types[index].Type)
+		ret := funcTypeToSignature(c.types[index])
 		ret.in = append(ret.in, UnsignedTypeI32)
 		return ret, nil
 	case wasm.OpcodeDrop:
@@ -170,54 +170,54 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 	case wasm.OpcodeSelect:
 		return signature_UnknownUnknownI32_Unknown, nil
 	case wasm.OpcodeLocalGet:
-		inputLen := uint32(len(f.Type.Params))
-		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+		inputLen := uint32(len(c.sig.Params))
+		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Type.Params[index])
+			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
-			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
+			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
 		return &signature{out: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalSet:
-		inputLen := uint32(len(f.Type.Params))
-		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+		inputLen := uint32(len(c.sig.Params))
+		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Type.Params[index])
+			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
-			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
+			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
 		return &signature{in: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalTee:
-		inputLen := uint32(len(f.Type.Params))
-		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+		inputLen := uint32(len(c.sig.Params))
+		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Type.Params[index])
+			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
-			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
+			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
 		return &signature{in: []UnsignedType{t}, out: []UnsignedType{t}}, nil
 	case wasm.OpcodeGlobalGet:
-		if len(f.Module.Globals) <= int(index) {
-			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.Module.Globals))
+		if len(c.globals) <= int(index) {
+			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
 		return &signature{
-			out: []UnsignedType{wasmValueTypeToUnsignedType(f.Module.Globals[index].Type.ValType)},
+			out: []UnsignedType{wasmValueTypeToUnsignedType(c.globals[index].ValType)},
 		}, nil
 	case wasm.OpcodeGlobalSet:
-		if len(f.Module.Globals) <= int(index) {
-			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.Module.Globals))
+		if len(c.globals) <= int(index) {
+			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
 		return &signature{
-			in: []UnsignedType{wasmValueTypeToUnsignedType(f.Module.Globals[index].Type.ValType)},
+			in: []UnsignedType{wasmValueTypeToUnsignedType(c.globals[index].ValType)},
 		}, nil
 	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil

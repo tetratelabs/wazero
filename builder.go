@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/heeus/hwazero/api"
@@ -13,19 +14,20 @@ import (
 //
 // Ex. Below defines and instantiates a module named "env" with one function:
 //
+//	ctx := context.Background()
 //	hello := func() {
 //		fmt.Fprintln(stdout, "hello!")
 //	}
-//	env, _ := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
+//	env, _ := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx)
 //
 // If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
 //
-//	env, _ := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build()
+//	env, _ := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build(ctx)
 //
-//	env1, _ := r.InstantiateModuleWithConfig(env, NewModuleConfig().WithName("env.1"))
+//	env1, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.1"))
 //	defer env1.Close()
 //
-//	env2, _ := r.InstantiateModuleWithConfig(env, NewModuleConfig().WithName("env.2"))
+//	env2, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.2"))
 //	defer env2.Close()
 //
 // Note: Builder methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
@@ -56,17 +58,22 @@ type ModuleBuilder interface {
 	//		return x + y + m.Value(extraKey).(uint32)
 	//	}
 	//
-	// The most sophisticated context is api.Module, which allows access to the Go context, but also
-	// allows writing to memory. This is important because there are only numeric types in Wasm. The only way to share other
-	// data is via writing memory and sharing offsets.
-	//
-	// Ex. This reads the parameters from!
+	// Ex. This uses an api.Module to reads the parameters from memory. This is important because there are only numeric
+	// types in Wasm. The only way to share other data is via writing memory and sharing offsets.
 	//
 	//	addInts := func(m api.Module, offset uint32) uint32 {
 	//		x, _ := m.Memory().ReadUint32Le(offset)
 	//		y, _ := m.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
 	//		return x + y
 	//	}
+	//
+	// If both parameters exist, they must be in order at positions zero and one.
+	//
+	// Ex. This uses propagates context properly when calling other functions exported in the api.Module:
+	//	callRead := func(ctx context.Context, m api.Module, offset, byteCount uint32) uint32 {
+	//		fn = m.ExportedFunction("__read")
+	//		results, err := fn(ctx, offset, byteCount)
+	//	--snip--
 	//
 	// Note: If a function is already exported with the same name, this overwrites it.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
@@ -144,12 +151,12 @@ type ModuleBuilder interface {
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
-	Build() (*CompiledCode, error)
+	Build(ctx context.Context) (*CompiledCode, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
-	Instantiate() (api.Module, error)
+	Instantiate(ctx context.Context) (api.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder
@@ -237,7 +244,7 @@ func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 }
 
 // Build implements ModuleBuilder.Build
-func (b *moduleBuilder) Build() (*CompiledCode, error) {
+func (b *moduleBuilder) Build(ctx context.Context) (*CompiledCode, error) {
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
 	maxLimit := b.r.memoryMaxPages
 	for name, mem := range b.nameToMemory {
@@ -247,26 +254,28 @@ func (b *moduleBuilder) Build() (*CompiledCode, error) {
 		}
 	}
 
-	if module, err := wasm.NewHostModule(
-		b.moduleName,
-		b.nameToGoFunc,
-		b.nameToMemory,
-		b.nameToGlobal,
-		b.r.enabledFeatures,
-	); err != nil {
+	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
+	if err != nil {
 		return nil, err
-	} else {
-		return &CompiledCode{module: module}, nil
 	}
+
+	if err = b.r.store.Engine.CompileModule(ctx, module); err != nil {
+		return nil, err
+	}
+
+	return &CompiledCode{module: module, compiledEngine: b.r.store.Engine}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
-func (b *moduleBuilder) Instantiate() (api.Module, error) {
-	if module, err := b.Build(); err != nil {
+func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
+	if module, err := b.Build(ctx); err != nil {
 		return nil, err
 	} else {
+		if err = b.r.store.Engine.CompileModule(ctx, module.module); err != nil {
+			return nil, err
+		}
 		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside of this function.
 		defer module.Close()
-		return b.r.InstantiateModuleWithConfig(module, NewModuleConfig().WithName(b.moduleName))
+		return b.r.InstantiateModuleWithConfig(ctx, module, NewModuleConfig().WithName(b.moduleName))
 	}
 }

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"reflect"
@@ -161,7 +162,13 @@ type Module struct {
 	// preservation ensures a consistent initialization result.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	validatedElementSegments []*validatedElementSegment
+
+	// ID is the sha256 value of the source code (text/binary) and is used for caching.
+	ID ModuleID
 }
+
+// ModuleID represents sha256 hash value uniquely assigned to Module.
+type ModuleID = [sha256.Size]byte
 
 // The wazero specific limitation described at RATIONALE.md.
 // TL;DR; We multiply by 8 (to get offsets in bytes) and the multiplication result must be less than 32bit max
@@ -169,6 +176,11 @@ const (
 	MaximumGlobals       = uint32(1 << 27)
 	MaximumFunctionIndex = uint32(1 << 27)
 )
+
+// AssignModuleID calculates a sha256 checksum on `source` and set Module.ID to the result.
+func (m *Module) AssignModuleID(source []byte) {
+	m.ID = sha256.Sum256(source)
+}
 
 // TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
@@ -179,9 +191,9 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 		return nil
 	}
 	funcImportCount := Index(0)
-	for i, im := range m.ImportSection {
+	for _, im := range m.ImportSection {
 		if im.Type == ExternTypeFunc {
-			if funcIdx == Index(i) {
+			if funcIdx == funcImportCount {
 				if im.DescFunc >= typeSectionLength {
 					return nil
 				}
@@ -210,7 +222,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
-	functions, globals, memory, table, err := m.allDeclarations()
+	functions, globals, memory, table, err := m.AllDeclarations()
 	if err != nil {
 		return err
 	}
@@ -424,7 +436,8 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 	}
 
 	if actualType != expectedType {
-		return fmt.Errorf("const expression type mismatch")
+		return fmt.Errorf("const expression type mismatch expected %s but got %s",
+			ValueTypeName(expectedType), ValueTypeName(actualType))
 	}
 	return nil
 }
@@ -692,8 +705,8 @@ type NameMapAssoc struct {
 	NameMap NameMap
 }
 
-// allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
-func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
+// AllDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
+func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
 	for _, imp := range m.ImportSection {
 		switch imp.Type {
 		case ExternTypeFunc:

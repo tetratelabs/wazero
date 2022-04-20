@@ -51,7 +51,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 
 func TestCompiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := env.requireNewCompiler(t, newCompiler, nil)
+	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -370,7 +370,7 @@ func TestCompiler_compileStore(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

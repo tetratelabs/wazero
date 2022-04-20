@@ -3,7 +3,6 @@ package jit
 import (
 	"math"
 
-	"github.com/heeus/hwazero/internal/wasm"
 	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
@@ -49,6 +48,6 @@ func init() {
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	return newArm64Compiler(f, ir)
+func newCompiler(ir *wazeroir.CompilationResult) (compiler, error) {
+	return newArm64Compiler(ir)
 }

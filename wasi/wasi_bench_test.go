@@ -1,7 +1,6 @@
 package wasi
 
 import (
-	"context"
 	"testing"
 
 	"github.com/heeus/hwazero/internal/testing/require"
@@ -26,7 +25,7 @@ func Test_EnvironGet(t *testing.T) {
 	require.NoError(t, err)
 
 	testCtx := newCtx(make([]byte, 20), sys)
-	environGet := newAPI().EnvironGet
+	environGet := newSnapshotPreview1().EnvironGet
 
 	require.Equal(t, ErrnoSuccess, environGet(testCtx, 11, 1))
 	require.Equal(t, testCtx.Memory(), testMem)
@@ -48,7 +47,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 		0,
 	}, sys)
 
-	environGet := newAPI().EnvironGet
+	environGet := newSnapshotPreview1().EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			if environGet(testCtx, 0, 4) != ErrnoSuccess {
@@ -58,8 +57,8 @@ func Benchmark_EnvironGet(b *testing.B) {
 	})
 }
 
-func newCtx(buf []byte, sys *wasm.SysContext) *wasm.ModuleContext {
-	return wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
+func newCtx(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
+	return wasm.NewCallContext(nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)
 }

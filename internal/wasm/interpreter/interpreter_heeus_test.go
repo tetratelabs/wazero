@@ -55,28 +55,28 @@ func TestInterpreter_Call_WithContextTimeout(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
-				f := &compiledFunction{
-					moduleEngine: &moduleEngine{},
-					source:       &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
+				f := &function{
+					source: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{Engine: &moduleEngine{}}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
 						{kind: translateToIROperationKind(tc.opcode)},
 						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
 					},
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-				defer cancel()
-
 				var err error
-				mdlctx := wasm.NewModule(ctx)
-				for i := 0; i < 100000000; i++ {
-					err = ce.callNativeFunc(mdlctx, f)
+				ctx, cancel := context.WithTimeout(testCtx, 10*time.Millisecond)
+				defer cancel()
+				mdlctx := wasm.CallContext{}
+				for i := 0; i < 10000000; i++ {
+					err = ce.callNativeFunc(ctx, &mdlctx, f)
 					if nil != err {
 						break
 					}
-					require.Equal(t, tc.expected, int32(uint32(ce.pop())))
 				}
-				errstr := err.Error()
+				var errstr string
+				if nil != err {
+					errstr = err.Error()
+				}
 				require.Equal(t, errstr, "context deadline exceeded")
 			})
 		}

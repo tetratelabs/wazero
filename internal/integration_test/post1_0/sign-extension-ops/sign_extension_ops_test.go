@@ -1,6 +1,7 @@
 package sign_extension_ops
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"testing"
@@ -8,6 +9,9 @@ import (
 	"github.com/heeus/hwazero"
 	"github.com/heeus/hwazero/internal/testing/require"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func TestSignExtensionOps_JIT(t *testing.T) {
 	if !wazero.JITSupported {
@@ -45,12 +49,12 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 	t.Run("disabled", func(t *testing.T) {
 		// Sign-extension is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		_, err := r.InstantiateModuleFromCode(signExtend)
+		_, err := r.InstantiateModuleFromCode(testCtx, signExtend)
 		require.Error(t, err)
 	})
 	t.Run("enabled", func(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureSignExtensionOps(true))
-		module, err := r.InstantiateModuleFromCode(signExtend)
+		module, err := r.InstantiateModuleFromCode(testCtx, signExtend)
 		require.NoError(t, err)
 
 		signExtend32from8Name, signExtend32from16Name := "i32.extend8_s", "i32.extend16_s"
@@ -83,7 +87,7 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 					fn := module.ExportedFunction(tc.funcname)
 					require.NotNil(t, fn)
 
-					actual, err := fn.Call(nil, uint64(uint32(tc.in)))
+					actual, err := fn.Call(testCtx, uint64(uint32(tc.in)))
 					require.NoError(t, err)
 					require.Equal(t, tc.expected, int32(actual[0]))
 				})
@@ -131,7 +135,7 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 					fn := module.ExportedFunction(tc.funcname)
 					require.NotNil(t, fn)
 
-					actual, err := fn.Call(nil, uint64(tc.in))
+					actual, err := fn.Call(testCtx, uint64(tc.in))
 					require.NoError(t, err)
 					require.Equal(t, tc.expected, int64(actual[0]))
 				})

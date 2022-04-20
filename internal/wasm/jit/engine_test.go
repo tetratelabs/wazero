@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"strconv"
 	"testing"
 	"unsafe"
 
@@ -14,10 +13,13 @@ import (
 	"github.com/heeus/hwazero/internal/wasm"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var me moduleEngine
-	require.Equal(t, int(unsafe.Offsetof(me.compiledFunctions)), moduleEngineCompiledFunctionsOffset)
+	require.Equal(t, int(unsafe.Offsetof(me.functions)), moduleEngineFunctionsOffset)
 
 	var ce callEngine
 	// Offsets for callEngine.globalContext.
@@ -34,7 +36,8 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.compiledFunctionsElement0Address)), callEngineModuleContextCompiledFunctionsElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextCodesElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
@@ -52,14 +55,14 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(frame.compiledFunction)), callFrameCompiledFunctionOffset)
+	require.Equal(t, int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset)
 
-	// Offsets for compiledFunction.
-	var compiledFunc compiledFunction
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionCodeInitialAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), compiledFunctionStackPointerCeilOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), compiledFunctionSourceOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), compiledFunctionModuleInstanceAddressOffset)
+	// Offsets for code.
+	var compiledFunc function
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), functionStackPointerCeilOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset)
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
@@ -67,6 +70,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset)
 
 	var functionInstance wasm.FunctionInstance
 	require.Equal(t, int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset)
@@ -111,7 +115,7 @@ func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, init
 	table := make([]interface{}, initTableLen)
 	internal := me.(*moduleEngine)
 	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.compiledFunctions[fnidx]
+		table[idx] = internal.functions[fnidx]
 	}
 	return table
 }
@@ -147,219 +151,83 @@ func requireSupportedOSArch(t *testing.T) {
 	}
 }
 
-func TestJIT_EngineCompile_Errors(t *testing.T) {
-	t.Run("invalid import", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205)
-		_, err := e.NewModuleEngine(
-			t.Name(),
-			&wasm.Module{},
-			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, DebugName: "uncompiled.fn"}},
-			nil, // moduleFunctions
-			nil, // table
-			nil, // tableInit
-		)
-		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
-	})
-
-	t.Run("release on compilation error", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205).(*engine)
-
-		importedFunctions := []*wasm.FunctionInstance{
-			{DebugName: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{DebugName: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{DebugName: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{DebugName: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-		}
-		_, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
-		require.NoError(t, err)
-
-		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
-
-		moduleFunctions := []*wasm.FunctionInstance{
-			{DebugName: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{DebugName: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{DebugName: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
-				wasm.OpcodeCall, // Call instruction without immediate for call target index is invalid and should fail to compile.
-			}, Module: &wasm.ModuleInstance{}},
-		}
-
-		_, err = e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, nil, nil)
-		require.EqualError(t, err, "function[invalid code(2/2)] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
-
-		// On the compilation failure, all the compiled functions including succeeded ones must be released.
-		require.Equal(t, len(importedFunctions), len(e.compiledFunctions))
-		for _, f := range moduleFunctions {
-			require.Nil(t, e.compiledFunctions[f])
-		}
-	})
-}
-
-type fakeFinalizer map[*compiledFunction]func(*compiledFunction)
+type fakeFinalizer map[*code]func(*code)
 
 func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
-	cf := obj.(*compiledFunction)
+	cf := obj.(*code)
 	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
 		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
 	}
-	f[cf] = finalizer.(func(*compiledFunction))
+	f[cf] = finalizer.(func(*code))
 }
 
-func TestJIT_NewModuleEngine_CompiledFunctions(t *testing.T) {
-	e := et.NewEngine(wasm.Features20191205).(*engine)
+func TestJIT_CompileModule(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		e := et.NewEngine(wasm.Features20191205).(*engine)
+		ff := fakeFinalizer{}
+		e.setFinalizer = ff.setFinalizer
 
-	importedFinalizer := fakeFinalizer{}
-	e.setFinalizer = importedFinalizer.setFinalizer
+		okModule := &wasm.Module{
+			TypeSection:     []*wasm.FunctionType{{}},
+			FunctionSection: []wasm.Index{0, 0, 0, 0},
+			CodeSection: []*wasm.Code{
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+			},
+			ID: wasm.ModuleID{},
+		}
 
-	importedFunctions := []*wasm.FunctionInstance{
-		newFunctionInstance(10),
-		newFunctionInstance(20),
-	}
-	modE, err := e.NewModuleEngine(t.Name(), &wasm.Module{}, nil, importedFunctions, nil, nil)
-	require.NoError(t, err)
-	defer modE.Close()
-	imported := modE.(*moduleEngine)
+		err := e.CompileModule(testCtx, okModule)
+		require.NoError(t, err)
 
-	importingFinalizer := fakeFinalizer{}
-	e.setFinalizer = importingFinalizer.setFinalizer
+		// Compiling same module shouldn't be compiled again, but instead should be cached.
+		err = e.CompileModule(testCtx, okModule)
+		require.NoError(t, err)
 
-	moduleFunctions := []*wasm.FunctionInstance{
-		newFunctionInstance(100),
-		newFunctionInstance(200),
-		newFunctionInstance(300),
-	}
+		compiled, ok := e.codes[okModule.ID]
+		require.True(t, ok)
+		require.Equal(t, len(okModule.FunctionSection), len(compiled))
 
-	modE, err = e.NewModuleEngine(t.Name(), &wasm.Module{}, importedFunctions, moduleFunctions, nil, nil)
-	require.NoError(t, err)
-	defer modE.Close()
-	importing := modE.(*moduleEngine)
+		// Pretend the finalizer executed, by invoking them one-by-one.
+		for k, v := range ff {
+			v(k)
+		}
+	})
 
-	// Ensure the importing module didn't try to finalize the imported functions.
-	require.Equal(t, len(importedFunctions), len(imported.compiledFunctions))
-	for _, f := range importedFunctions {
-		require.NotNil(t, e.compiledFunctions[f], f)
-		cf := e.compiledFunctions[f]
-		require.NotNil(t, importedFinalizer[cf], cf)
-		require.Nil(t, importingFinalizer[cf], cf)
-	}
+	t.Run("fail", func(t *testing.T) {
+		errModule := &wasm.Module{
+			TypeSection:     []*wasm.FunctionType{{}},
+			FunctionSection: []wasm.Index{0, 0, 0},
+			CodeSection: []*wasm.Code{
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeCall}}, // Call instruction without immediate for call target index is invalid and should fail to compile.
+			},
+			ID: wasm.ModuleID{},
+		}
 
-	// The importing module's compiled functions include ones it compiled (module-defined) and imported ones).
-	require.Equal(t, len(importedFunctions)+len(moduleFunctions), len(importing.compiledFunctions))
+		e := et.NewEngine(wasm.Features20191205).(*engine)
+		err := e.CompileModule(testCtx, errModule)
+		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
-	// Ensure the importing module only tried to finalize its own functions.
-	for _, f := range moduleFunctions {
-		require.NotNil(t, e.compiledFunctions[f], f)
-		cf := e.compiledFunctions[f]
-		require.Nil(t, importedFinalizer[cf], cf)
-		require.NotNil(t, importingFinalizer[cf], cf)
-	}
-
-	// Pretend the finalizer executed, by invoking them one-by-one.
-	for k, v := range importingFinalizer {
-		v(k)
-	}
-	for k, v := range importedFinalizer {
-		v(k)
-	}
-	for _, f := range e.compiledFunctions {
-		require.Nil(t, f.codeSegment) // Set to nil if the correct finalizer was associated.
-	}
+		// On the compilation failure, the compiled functions must not be cached.
+		_, ok := e.codes[errModule.ID]
+		require.False(t, ok)
+	})
 }
 
-// TestReleaseCompiledFunction_Panic tests that an unexpected panic has some identifying information in it.
-func TestJIT_ReleaseCompiledFunction_Panic(t *testing.T) {
+// TestJIT_Releasecode_Panic tests that an unexpected panic has some identifying information in it.
+func TestJIT_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
-		releaseCompiledFunction(&compiledFunction{
-			codeSegment: []byte{wasm.OpcodeEnd},                                                         // never compiled means it was never mapped.
-			source:      &wasm.FunctionInstance{Index: 2, Module: &wasm.ModuleInstance{Name: t.Name()}}, // for error string
+		releaseCode(&code{
+			indexInModule: 2,
+			sourceModule:  &wasm.Module{NameSection: &wasm.NameSection{ModuleName: t.Name()}},
+			codeSegment:   []byte{wasm.OpcodeEnd}, // never compiled means it was never mapped.
 		})
 	})
-	require.Contains(t, captured.Error(), fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]:", t.Name()))
-}
-
-func TestJIT_ModuleEngine_Close(t *testing.T) {
-	newFunctionInstance := func(id int) *wasm.FunctionInstance {
-		return &wasm.FunctionInstance{
-			DebugName: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
-	}
-
-	for _, tc := range []struct {
-		name                               string
-		importedFunctions, moduleFunctions []*wasm.FunctionInstance
-	}{
-		{
-			name:            "no imports",
-			moduleFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
-		},
-		{
-			name:              "only imports",
-			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
-		},
-		{
-			name:              "mix",
-			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
-			moduleFunctions:   []*wasm.FunctionInstance{newFunctionInstance(100), newFunctionInstance(200), newFunctionInstance(300)},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			e := et.NewEngine(wasm.Features20191205).(*engine)
-			var imported *moduleEngine
-			if len(tc.importedFunctions) > 0 {
-				// Instantiate the imported module
-				modEngine, err := e.NewModuleEngine(
-					fmt.Sprintf("%s - imported functions", t.Name()),
-					&wasm.Module{},
-					nil, // moduleFunctions
-					tc.importedFunctions,
-					nil, // table
-					nil, // tableInit
-				)
-				require.NoError(t, err)
-				imported = modEngine.(*moduleEngine)
-				require.Equal(t, len(tc.importedFunctions), len(imported.compiledFunctions))
-			}
-
-			importing, err := e.NewModuleEngine(
-				fmt.Sprintf("%s - module-defined functions", t.Name()),
-				&wasm.Module{},
-				tc.importedFunctions,
-				tc.moduleFunctions,
-				nil, // table
-				nil, // tableInit
-			)
-			require.NoError(t, err)
-			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(importing.(*moduleEngine).compiledFunctions))
-
-			require.Equal(t, len(tc.importedFunctions)+len(tc.moduleFunctions), len(e.compiledFunctions))
-
-			for _, f := range tc.importedFunctions {
-				require.NotNil(t, e.compiledFunctions[f], f)
-			}
-			for _, f := range tc.moduleFunctions {
-				require.NotNil(t, e.compiledFunctions[f], f)
-			}
-
-			importing.Close()
-
-			// Closing the importing module shouldn't delete the imported functions from the engine.
-			require.Equal(t, len(tc.importedFunctions), len(e.compiledFunctions))
-			for _, f := range tc.importedFunctions {
-				require.NotNil(t, e.compiledFunctions[f], f)
-			}
-
-			// However, closing the importing module should delete its own functions from the engine.
-			for i, f := range tc.moduleFunctions {
-				require.Nil(t, e.compiledFunctions[f], i)
-			}
-
-			if len(tc.importedFunctions) > 0 {
-				imported.Close()
-			}
-
-			// When all modules are closed, the engine should be empty.
-			require.Equal(t, 0, len(e.compiledFunctions), "expected no compiledFunctions")
-		})
-	}
+	require.Contains(t, captured.Error(), fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]", t.Name()))
 }
 
 // Ensures that value stack and call-frame stack are allocated on heap which
@@ -391,7 +259,10 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(context.Background(), hm, hostModuleName, nil)
+	err = store.Engine.CompileModule(testCtx, hm)
+	require.NoError(t, err)
+
+	_, err = store.Instantiate(testCtx, hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -440,15 +311,19 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 			{Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
 			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
+		ID: wasm.ModuleID{1},
 	}
 
-	mi, err := store.Instantiate(context.Background(), m, t.Name(), nil)
+	err = store.Engine.CompileModule(testCtx, m)
+	require.NoError(t, err)
+
+	mi, err := store.Instantiate(testCtx, m, t.Name(), nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
 		fnName := fnName
 		t.Run(fnName, func(t *testing.T) {
-			ret, err := mi.ExportedFunction(fnName).Call(nil)
+			ret, err := mi.ExportedFunction(fnName).Call(testCtx)
 			require.NoError(t, err)
 
 			require.Equal(t, uint32(expectedReturnValue), uint32(ret[0]))
@@ -457,114 +332,24 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 }
 
 // TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
-func TestEngine_CachedCompiledFunctionsPerModule(t *testing.T) {
+func TestEngine_Cachedcodes(t *testing.T) {
 	e := newEngine(wasm.Features20191205)
-	exp := []*compiledFunction{
-		{source: &wasm.FunctionInstance{DebugName: "1"}},
-		{source: &wasm.FunctionInstance{DebugName: "2"}},
+	exp := []*code{
+		{codeSegment: []byte{0x0}},
+		{codeSegment: []byte{0x0}},
 	}
 	m := &wasm.Module{}
 
-	e.addCachedCompiledFunctions(m, exp)
+	e.addCodes(m, exp)
 
-	actual, ok := e.getCachedCompiledFunctions(m)
+	actual, ok := e.getCodes(m)
 	require.True(t, ok)
 	require.Equal(t, len(exp), len(actual))
 	for i := range actual {
 		require.Equal(t, exp[i], actual[i])
 	}
 
-	e.deleteCachedCompiledFunctions(m)
-	_, ok = e.getCachedCompiledFunctions(m)
+	e.deleteCodes(m)
+	_, ok = e.getCodes(m)
 	require.False(t, ok)
-}
-
-// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
-func TestEngine_NewModuleEngine_cache(t *testing.T) {
-	e := newEngine(wasm.Features20191205)
-	importedModuleSource := &wasm.Module{}
-
-	// No cache.
-	importedME, err := e.NewModuleEngine("1", importedModuleSource, nil, []*wasm.FunctionInstance{
-		newFunctionInstance(1),
-		newFunctionInstance(2),
-	}, nil, nil)
-	require.NoError(t, err)
-
-	// Cached.
-	importedMEFromCache, err := e.NewModuleEngine("2", importedModuleSource, nil, []*wasm.FunctionInstance{
-		newFunctionInstance(1),
-		newFunctionInstance(2),
-	}, nil, nil)
-	require.NoError(t, err)
-
-	require.NotEqual(t, importedME, importedMEFromCache)
-	require.NotEqual(t, importedME.Name(), importedMEFromCache.Name())
-
-	// Check compiled functions.
-	ime, imeCache := importedME.(*moduleEngine), importedMEFromCache.(*moduleEngine)
-	require.Equal(t, len(ime.compiledFunctions), len(imeCache.compiledFunctions))
-
-	for i, fn := range ime.compiledFunctions {
-		// Compiled functions must be cloend.
-		fnCached := imeCache.compiledFunctions[i]
-		require.NotEqual(t, fn, fnCached)
-		require.NotEqual(t, fn.moduleInstanceAddress, fnCached.moduleInstanceAddress)
-		require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
-		// But the code segment stays the same.
-		require.Equal(t, fn.codeSegment, fnCached.codeSegment)
-	}
-
-	// Next is to veirfy the caching works for modules with imports.
-	importedFunc := ime.compiledFunctions[0].source
-	moduleSource := &wasm.Module{}
-
-	// No cache.
-	modEng, err := e.NewModuleEngine("3", moduleSource,
-		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
-		[]*wasm.FunctionInstance{
-			newFunctionInstance(10),
-			newFunctionInstance(20),
-		}, nil, nil)
-	require.NoError(t, err)
-
-	// Cached.
-	modEngCache, err := e.NewModuleEngine("4", moduleSource,
-		[]*wasm.FunctionInstance{importedFunc}, // Import one function.
-		[]*wasm.FunctionInstance{
-			newFunctionInstance(10),
-			newFunctionInstance(20),
-		}, nil, nil)
-	require.NoError(t, err)
-
-	require.NotEqual(t, modEng, modEngCache)
-	require.NotEqual(t, modEng.Name(), modEngCache.Name())
-
-	me, meCache := modEng.(*moduleEngine), modEngCache.(*moduleEngine)
-	require.Equal(t, len(me.compiledFunctions), len(meCache.compiledFunctions))
-
-	for i, fn := range me.compiledFunctions {
-		fnCached := meCache.compiledFunctions[i]
-		if i == 0 {
-			// This case the function is imported, so it must be the same for both module engines.
-			require.Equal(t, fn, fnCached)
-			require.Equal(t, importedFunc, fn.source)
-		} else {
-			// Compiled functions must be cloend.
-			require.NotEqual(t, fn, fnCached)
-			require.NotEqual(t, fn.moduleInstanceAddress, fnCached.moduleInstanceAddress)
-			require.NotEqual(t, unsafe.Pointer(fn.source), unsafe.Pointer(fnCached.source)) // unsafe.Pointer to compare the actual address.
-			// But the code segment stays the same.
-			require.Equal(t, fn.codeSegment, fnCached.codeSegment)
-		}
-	}
-}
-
-func newFunctionInstance(id int) *wasm.FunctionInstance {
-	return &wasm.FunctionInstance{
-		DebugName: strconv.Itoa(id),
-		Type:      &wasm.FunctionType{},
-		Body:      []byte{wasm.OpcodeEnd},
-		Module:    &wasm.ModuleInstance{},
-	}
 }

@@ -1,13 +1,16 @@
-package main
+package replace_import
 
-// Example_main ensures the following will work:
+import (
+	"testing"
+
+	"github.com/heeus/hwazero/internal/testing/maintester"
+	"github.com/heeus/hwazero/internal/testing/require"
+)
+
+// Test_main ensures the following will work:
 //
-//	go build replace-import.go
-//	./replace-import
-func Example_main() {
-
-	main()
-
-	// Output:
-	// module "needs-import" closed with exit_code(255)
+//	go run replace-import.go
+func Test_main(t *testing.T) {
+	stdout, _ := maintester.TestMain(t, main, "replace-import")
+	require.Equal(t, "module \"needs-import\" closed with exit_code(255)\n", stdout)
 }
