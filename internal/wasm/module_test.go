@@ -331,6 +331,21 @@ func TestModule_validateStartSection(t *testing.T) {
 			})
 		}
 	})
+	t.Run("imported valid func", func(t *testing.T) {
+		index := Index(1)
+		m := Module{
+			StartSection: &index,
+			TypeSection:  []*FunctionType{{}, {Results: []ValueType{ValueTypeI32}}},
+			ImportSection: []*Import{
+				{Type: ExternTypeFunc, DescFunc: 1},
+				// import with index 1 is global but this should be skipped when searching imported functions.
+				{Type: ExternTypeGlobal},
+				{Type: ExternTypeFunc, DescFunc: 0}, // This one must be selected.
+			},
+		}
+		err := m.validateStartSection()
+		require.NoError(t, err)
+	})
 }
 
 func TestModule_validateGlobals(t *testing.T) {
