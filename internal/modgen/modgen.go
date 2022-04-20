@@ -243,12 +243,18 @@ func (g *generator) newConstExpr() (*wasm.ConstantExpression, wasm.ValueType) {
 	case 2:
 		opcode = wasm.OpcodeF32Const
 		data = make([]byte, 4)
-		g.nextRandom().Read(data)
+		_, err := g.nextRandom().Read(data)
+		if err != nil {
+			panic(err)
+		}
 		valueType = wasm.ValueTypeF32
 	case 3:
 		opcode = wasm.OpcodeF64Const
 		data = make([]byte, 8)
-		g.nextRandom().Read(data)
+		_, err := g.nextRandom().Read(data)
+		if err != nil {
+			panic(err)
+		}
 		valueType = wasm.ValueTypeF64
 	case 4:
 		opcode = wasm.OpcodeGlobalGet
