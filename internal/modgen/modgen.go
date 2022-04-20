@@ -375,11 +375,11 @@ func (g *generator) dataSection() {
 		panic("BUG:" + err.Error())
 	}
 
-	min := int(mem.Min * wasm.MemoryPageSize)
-	if mem == nil || min == 0 {
+	if mem == nil || mem.Min == 0 {
 		return
 	}
 
+	min := int(mem.Min * wasm.MemoryPageSize)
 	dataSectionSize := g.nextRandom().Intn(g.size)
 	for i := 0; i < dataSectionSize; i++ {
 		offset := g.nextRandom().Intn(min)

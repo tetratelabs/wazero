@@ -23,7 +23,7 @@ const (
 
 func TestModGen(t *testing.T) {
 	tested := map[string]struct{}{}
-	for _, size := range []int{0, 1, 2, 5, 10, 100} {
+	for _, size := range []int{0, 1, 2, 5, 10, 50, 100} {
 		r := rand.New(rand.NewSource(0))
 		for i := 0; i < 100; i++ {
 			buf := make([]byte, size)
