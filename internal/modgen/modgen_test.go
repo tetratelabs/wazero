@@ -712,16 +712,3 @@ func TestGenerator_dataSection(t *testing.T) {
 		}
 	})
 }
-
-func FuzzCompiler(f *testing.F) {
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
-	f.Fuzz(func(t *testing.T, seed []byte) {
-		// Generate a random WebAssembly module.
-		m := Gen(seed)
-		// Encode the generated module (*wasm.Module) as binary.
-		bin := binary.EncodeModule(m)
-		// Pass the generated binary into our compilers.
-		_, err := r.CompileModule(context.Background(), bin)
-		require.NoError(t, err)
-	})
-}
