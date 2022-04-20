@@ -13,6 +13,8 @@ import (
 )
 
 // Gen generates a pseudo random compilable module based on `seed`.
+// The size of each section is controlled by the corresponding params.
+// For example, `numImports` controls the number of segment in the import section.
 //
 // Note: "pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
