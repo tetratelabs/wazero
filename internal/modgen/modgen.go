@@ -363,12 +363,40 @@ func (g *generator) codeSection() {
 	}
 }
 
-func (g *generator) dataSection() {
-
-}
-
 func (g *generator) newCode() *wasm.Code {
 	// TODO: generate random body.
 	return &wasm.Code{Body: []byte{wasm.OpcodeUnreachable, // With unreachable allows us to make this body valid for any signature.
 		wasm.OpcodeEnd}}
+}
+
+func (g *generator) dataSection() {
+	_, _, mem, _, err := g.m.AllDeclarations()
+	if err != nil {
+		panic("BUG:" + err.Error())
+	}
+
+	min := int(mem.Min * wasm.MemoryPageSize)
+	if mem == nil || min == 0 {
+		return
+	}
+
+	dataSectionSize := g.nextRandom().Intn(g.size)
+	for i := 0; i < dataSectionSize; i++ {
+		offset := g.nextRandom().Intn(min)
+		expr := &wasm.ConstantExpression{
+			Opcode: wasm.OpcodeI32Const,
+			Data:   leb128.EncodeInt32(int32(offset)),
+		}
+
+		init := make([]byte, g.nextRandom().Intn(min-offset))
+		_, err := g.nextRandom().Read(init)
+		if err != nil {
+			panic(err)
+		}
+
+		g.m.DataSection = append(g.m.DataSection, &wasm.DataSegment{
+			OffsetExpression: expr,
+			Init:             init,
+		})
+	}
 }

@@ -48,20 +48,6 @@ func TestModGen(t *testing.T) {
 	}
 }
 
-func Test_a(t *testing.T) {
-	buf, err := hex.DecodeString("81ac8120c7")
-	if err != nil {
-		panic(err)
-	}
-
-	m := Gen(buf)
-	buf = binary.EncodeModule(m)
-
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
-	_, err = r.CompileModule(buf)
-	require.NoError(t, err)
-}
-
 type testRand struct {
 	ints   []int
 	intPos int
