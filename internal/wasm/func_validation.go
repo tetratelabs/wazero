@@ -738,7 +738,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				var inType, outType ValueType
 				switch miscOpcode {
 				case OpcodeMiscI32TruncSatF32S, OpcodeMiscI32TruncSatF32U:
-					inType, outType = api.ValueTypeF32, ValueTypeI32
+					inType, outType = ValueTypeF32, ValueTypeI32
 				case OpcodeMiscI32TruncSatF64S, OpcodeMiscI32TruncSatF64U:
 					inType, outType = ValueTypeF64, ValueTypeI32
 				case OpcodeMiscI64TruncSatF32S, OpcodeMiscI64TruncSatF32U:
