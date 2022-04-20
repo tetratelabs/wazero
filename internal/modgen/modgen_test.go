@@ -1,8 +1,8 @@
 package modgen
 
 import (
+	"context"
 	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -41,13 +41,14 @@ func TestModGen(t *testing.T) {
 				buf := binary.EncodeModule(m)
 
 				r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
-				_, err := r.CompileModule(buf)
+				_, err := r.CompileModule(context.Background(), buf)
 				require.NoError(t, err)
 			})
 		}
 	}
 }
 
+// testRand implements randm for testing.
 type testRand struct {
 	ints   []int
 	intPos int
@@ -251,8 +252,6 @@ func TestGenerator_importSection(t *testing.T) {
 			require.Equal(t, len(tc.exp), len(g.m.ImportSection))
 
 			for i := range tc.exp {
-				fmt.Println(tc.exp[i].DescTable)
-				fmt.Println(g.m.ImportSection[i].DescTable)
 				require.Equal(t, tc.exp[i], g.m.ImportSection[i])
 			}
 		})
@@ -305,7 +304,7 @@ func TestGenerator_memorySection(t *testing.T) {
 	t.Run("without memory import", func(t *testing.T) {
 		g := newGenerator(100, []int{1, 100}, nil)
 		g.memorySection()
-		require.Equal(t, &wasm.Memory{Min: 1, Max: 101}, g.m.MemorySection)
+		require.Equal(t, &wasm.Memory{Min: 1, Max: 101, IsMaxEncoded: true}, g.m.MemorySection)
 	})
 }
 
