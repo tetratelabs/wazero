@@ -16,6 +16,8 @@ import (
 // the generated module corresponds to the size of the seed. For example,
 // the more larger len(seed) is, the more functions the module *likely* has.
 //
+// TODO: make explicitly the size of each section controllable.
+//
 // Note: "Pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
 // the same code base in Gen.

@@ -21,23 +21,24 @@ const (
 	f64 = wasm.ValueTypeF64
 )
 
+// TestModGen is like a end-to-end test and verifies that our module generator only generates valid compilable modules.
 func TestModGen(t *testing.T) {
 	tested := map[string]struct{}{}
+	r := rand.New(rand.NewSource(0)) // use deterministic seed source for easy debugging.
 	for _, size := range []int{0, 1, 2, 5, 10, 50, 100} {
-		r := rand.New(rand.NewSource(0))
 		for i := 0; i < 100; i++ {
-			buf := make([]byte, size)
-			_, err := r.Read(buf)
+			seed := make([]byte, size)
+			_, err := r.Read(seed)
 			require.NoError(t, err)
 
-			encoded := hex.EncodeToString(buf)
+			encoded := hex.EncodeToString(seed)
 			if _, ok := tested[encoded]; ok {
 				continue
 			}
 			t.Run(encoded, func(t *testing.T) {
-				m := Gen(buf)
+				m := Gen(seed)
 				// Generating with the same seed must result in the same module.
-				require.Equal(t, m, Gen(buf))
+				require.Equal(t, m, Gen(seed))
 				buf := binary.EncodeModule(m)
 
 				r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
