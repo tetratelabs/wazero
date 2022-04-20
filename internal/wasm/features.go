@@ -44,6 +44,8 @@ const (
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	FeatureMultiValue
+
+	FeatureNonTrappingFloatToIntConversion
 )
 
 // Set assigns the value for the given feature.

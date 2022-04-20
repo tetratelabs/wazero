@@ -515,7 +515,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			for _, exp := range funcType.Results {
 				valueTypeStack.push(exp)
 			}
-		} else if OpcodeI32Eqz <= op && op <= LastOpcode {
+		} else if OpcodeI32Eqz <= op && op <= OpcodeI64Extend32S {
 			switch op {
 			case OpcodeI32Eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
@@ -727,6 +727,29 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeI64)
 			default:
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
+			}
+		} else if op == OpcodeMiscPrefix {
+			pc++
+			miscOpcode := body[pc]
+			if miscOpcode >= OpcodeMiscI32TruncSatF32S && miscOpcode <= OpcodeMiscI64TruncSatF64U {
+				if err := enabledFeatures.Require(FeatureSignExtensionOps); err != nil {
+					return fmt.Errorf("%s invalid as %v", miscInstructionNames[op], err)
+				}
+				var inType, outType ValueType
+				switch miscOpcode {
+				case OpcodeMiscI32TruncSatF32S, OpcodeMiscI32TruncSatF32U:
+					inType, outType = api.ValueTypeF32, ValueTypeI32
+				case OpcodeMiscI32TruncSatF64S, OpcodeMiscI32TruncSatF64U:
+					inType, outType = ValueTypeF64, ValueTypeI32
+				case OpcodeMiscI64TruncSatF32S, OpcodeMiscI64TruncSatF32U:
+					inType, outType = ValueTypeF32, ValueTypeI64
+				case OpcodeMiscI64TruncSatF64S, OpcodeMiscI64TruncSatF64U:
+					inType, outType = ValueTypeF64, ValueTypeI64
+				}
+				if err := valueTypeStack.popAndVerifyType(inType); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", instructionNames[op], err)
+				}
+				valueTypeStack.push(outType)
 			}
 		} else if op == OpcodeBlock {
 			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
