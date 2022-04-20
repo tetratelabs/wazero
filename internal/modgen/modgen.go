@@ -12,8 +12,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Gen generates a pseudo random compilable module based on `seed`.
-// "Pseudo" here means the determinism of the generated results,
+// Gen generates a pseudo random compilable module based on `seed`. The size of
+// the generated module corresponds to the size of the seed. For example,
+// the more larger len(seed) is, the more functions the module *likely* has.
+//
+// Note: "Pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
 // the same code base in Gen.
 //
