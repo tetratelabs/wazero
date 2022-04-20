@@ -45,6 +45,19 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 	require.Equal(t, max, m.PageSize())
 }
 
+func TestIndexByte(t *testing.T) {
+	var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+	v, ok := mem.IndexByte(4, 16)
+	require.True(t, ok)
+	require.Equal(t, uint32(4), v)
+
+	_, ok = mem.IndexByte(5, 16)
+	require.False(t, ok)
+
+	_, ok = mem.IndexByte(9, 16)
+	require.False(t, ok)
+}
+
 func TestReadByte(t *testing.T) {
 	var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
 	v, ok := mem.ReadByte(7)

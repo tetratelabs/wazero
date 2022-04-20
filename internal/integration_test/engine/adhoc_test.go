@@ -27,6 +27,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"host function with numeric parameter":    testHostFunctionNumericParameter,
 	"close module with in-flight calls":       testCloseInFlight,
 	"multiple instantiation from same source": testMultipleInstantiation,
+	"exported function that grows memory":     testMemOps,
 }
 
 func TestEngineJIT(t *testing.T) {
@@ -372,6 +373,42 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			require.Equal(t, expectedErr, err)
 		})
 	}
+}
+
+func testMemOps(t *testing.T, r wazero.Runtime) {
+	// Instantiate a module that manages its memory
+	memory, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $memory
+  (func $grow (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
+  (func $size (result (;size;) i32) memory.size)
+
+  (memory 0)
+
+  (export "size" (func $size))
+  (export "grow" (func $grow))
+  (export "memory" (memory 0))
+)`))
+	require.NoError(t, err)
+	defer memory.Close()
+
+	// Check the export worked
+	require.Equal(t, memory.Memory(), memory.ExportedMemory("memory"))
+
+	// Check the size command worked
+	results, err := memory.ExportedFunction("size").Call(testCtx)
+	require.NoError(t, err)
+	require.Zero(t, results[0])
+	require.Zero(t, memory.ExportedMemory("memory").Size())
+
+	// Try to grow the memory by one page
+	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
+	require.NoError(t, err)
+	require.Zero(t, results[0]) // should succeed and return the old size in pages.
+
+	// Check the size command works!
+	results, err = memory.ExportedFunction("size").Call(testCtx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), results[0])                 // 1 page
+	require.Equal(t, uint32(65536), memory.Memory().Size()) // 64KB
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {

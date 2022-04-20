@@ -179,7 +179,11 @@ type Memory interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size() uint32
 
-	// ReadByte reads a single byte from the underlying buffer at the offset in or returns false if out of range.
+	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
+	// not found or out of range.
+	IndexByte(offset uint32, c byte) (uint32, bool)
+
+	// ReadByte reads a single byte from the underlying buffer at the offset or returns false if out of range.
 	ReadByte(offset uint32) (byte, bool)
 
 	// ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
