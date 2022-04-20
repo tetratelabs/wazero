@@ -193,7 +193,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	funcImportCount := Index(0)
 	for _, im := range m.ImportSection {
 		if im.Type == ExternTypeFunc {
-			if funcIdx == Index(funcImportCount) {
+			if funcIdx == funcImportCount {
 				if im.DescFunc >= typeSectionLength {
 					return nil
 				}
