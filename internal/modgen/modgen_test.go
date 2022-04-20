@@ -23,9 +23,10 @@ const (
 
 // TestModGen is like a end-to-end test and verifies that our module generator only generates valid compilable modules.
 func TestModGen(t *testing.T) {
+	const feature = wasm.FeaturesFinished
 	tested := map[string]struct{}{}
 	r := rand.New(rand.NewSource(0)) // use deterministic seed source for easy debugging.
-	rand := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureMultiValue(true))
+	rand := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFinishedFeatures())
 	for _, size := range []int{0, 1, 2, 5, 10, 50, 100} {
 		for i := 0; i < 100; i++ {
 			seed := make([]byte, size)
@@ -37,9 +38,9 @@ func TestModGen(t *testing.T) {
 				continue
 			}
 			t.Run(encoded, func(t *testing.T) {
-				m := Gen(seed)
+				m := Gen(seed, feature)
 				// Generating with the same seed must result in the same module.
-				require.Equal(t, m, Gen(seed))
+				require.Equal(t, m, Gen(seed, feature))
 				buf := binary.EncodeModule(m)
 
 				code, err := rand.CompileModule(context.Background(), buf)
@@ -127,7 +128,8 @@ func TestGenerator_typeSection(t *testing.T) {
 		// Params = 0, Results = 4, f64f32i64i32
 		0, 4, 3, 2, 1, 0,
 	}, nil)
-	g.typeSection()
+	g.enabledFeature = wasm.FeatureMultiValue
+	g.genTypeSection()
 
 	expected := []*wasm.FunctionType{
 		{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}},
@@ -250,7 +252,7 @@ func TestGenerator_importSection(t *testing.T) {
 			g := newGenerator(100, tc.ints, nil)
 			g.m.TypeSection = tc.types
 
-			g.importSection()
+			g.genImportSection()
 			require.Equal(t, len(tc.exp), len(g.m.ImportSection))
 
 			for i := range tc.exp {
@@ -269,12 +271,12 @@ func TestGenerator_functionSection(t *testing.T) {
 		}, nil)
 
 		g.m.TypeSection = types
-		g.functionSection()
+		g.genFunctionSection()
 		require.Equal(t, []uint32{1, 5, 2, 3, 4, 6, 9, 8, 7, 0}, g.m.FunctionSection)
 	})
 	t.Run("without types", func(t *testing.T) {
 		g := newGenerator(100, []int{10}, nil)
-		g.functionSection()
+		g.genFunctionSection()
 		require.Equal(t, []uint32(nil), g.m.FunctionSection)
 	})
 }
@@ -284,12 +286,12 @@ func TestGenerator_tableSection(t *testing.T) {
 		g := newGenerator(100, []int{10}, nil)
 		g.m.ImportSection = append(g.m.ImportSection, &wasm.Import{Type: wasm.ExternTypeTable})
 
-		g.tableSection()
+		g.genTableSection()
 		require.Nil(t, g.m.TableSection)
 	})
 	t.Run("without table import", func(t *testing.T) {
 		g := newGenerator(100, []int{1, 100}, nil)
-		g.tableSection()
+		g.genTableSection()
 		expMax := uint32(101)
 		require.Equal(t, &wasm.Table{Min: 1, Max: &expMax}, g.m.TableSection)
 	})
@@ -300,12 +302,12 @@ func TestGenerator_memorySection(t *testing.T) {
 		g := newGenerator(100, []int{10}, nil)
 		g.m.ImportSection = append(g.m.ImportSection, &wasm.Import{Type: wasm.ExternTypeMemory})
 
-		g.memorySection()
+		g.genMemorySection()
 		require.Nil(t, g.m.MemorySection)
 	})
 	t.Run("without memory import", func(t *testing.T) {
 		g := newGenerator(100, []int{1, 100}, nil)
-		g.memorySection()
+		g.genMemorySection()
 		require.Equal(t, &wasm.Memory{Min: 1, Max: 101, IsMaxEncoded: true}, g.m.MemorySection)
 	})
 }
@@ -431,7 +433,7 @@ func TestGenerator_globalSection(t *testing.T) {
 		{Type: wasm.ExternTypeGlobal, DescGlobal: &wasm.GlobalType{ValType: f32}},
 	}
 
-	g.globalSection()
+	g.genGlobalSection()
 
 	expected := []*wasm.Global{
 		{
@@ -489,7 +491,7 @@ func TestGenerator_exportSection(t *testing.T) {
 	}, nil)
 	g.m = m
 
-	g.exportSection()
+	g.genExportSection()
 
 	expected := []*wasm.Export{
 		{Type: wasm.ExternTypeFunc, Index: 2, Name: "0"},
@@ -544,7 +546,7 @@ func TestGenerator_startSection(t *testing.T) {
 				g := newGenerator(100, tc.ints, nil)
 				g.m = m
 
-				g.startSection()
+				g.genStartSection()
 				require.Equal(t, tc.exp, g.m.StartSection)
 			})
 		}
@@ -570,7 +572,7 @@ func TestGenerator_startSection(t *testing.T) {
 		g := newGenerator(100, []int{0}, nil)
 		g.m = m
 
-		g.startSection()
+		g.genStartSection()
 		require.Nil(t, g.m.StartSection)
 	})
 }
@@ -578,13 +580,13 @@ func TestGenerator_startSection(t *testing.T) {
 func TestGenerator_elementSection(t *testing.T) {
 	t.Run("without table", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
-		g.elementSection()
+		g.genElementSection()
 		require.Nil(t, g.m.ElementSection)
 	})
 	t.Run("without function", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
 		g.m.TableSection = &wasm.Table{}
-		g.elementSection()
+		g.genElementSection()
 		require.Nil(t, g.m.ElementSection)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -635,7 +637,7 @@ func TestGenerator_elementSection(t *testing.T) {
 					FunctionSection: make([]uint32, 100),
 				}
 
-				g.elementSection()
+				g.genElementSection()
 				actual := g.m.ElementSection
 				require.Equal(t, len(tc.exps), len(actual))
 				for i := range actual {
@@ -649,13 +651,13 @@ func TestGenerator_elementSection(t *testing.T) {
 func TestGenerator_dataSection(t *testing.T) {
 	t.Run("without memory", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
-		g.dataSection()
+		g.genDataSection()
 		require.Nil(t, g.m.DataSection)
 	})
 	t.Run("min=0", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
 		g.m.MemorySection = &wasm.Memory{Min: 0}
-		g.dataSection()
+		g.genDataSection()
 		require.Nil(t, g.m.DataSection)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -703,7 +705,7 @@ func TestGenerator_dataSection(t *testing.T) {
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				g := newGenerator(100, tc.ints, tc.bufs)
 				g.m.MemorySection = &wasm.Memory{Min: 1}
-				g.dataSection()
+				g.genDataSection()
 				actual := g.m.DataSection
 				require.Equal(t, len(tc.exps), len(actual))
 				for i := range actual {

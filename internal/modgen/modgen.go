@@ -24,14 +24,14 @@ import (
 // the same code base in Gen.
 //
 // Note: this is only used for testing wazero runtime.
-func Gen(seed []byte) *wasm.Module {
+func Gen(seed []byte, enabledFeature wasm.Features) *wasm.Module {
 	if len(seed) == 0 {
 		return &wasm.Module{}
 	}
 
 	checksum := sha256.Sum256(seed)
 	// Use 4 randoms created from the unique sha256 hash value of the seed.
-	g := &generator{size: len(seed), rands: make([]random, 4)}
+	g := &generator{size: len(seed), rands: make([]random, 4), enabledFeature: enabledFeature}
 	for i := 0; i < 4; i++ {
 		g.rands[i] = rand.New(rand.NewSource(
 			int64(binary.LittleEndian.Uint64(checksum[i*8 : (i+1)*8]))))
@@ -49,11 +49,12 @@ type generator struct {
 
 	// m is the resulting module.
 	m *wasm.Module
+
+	enabledFeature wasm.Features
 }
 
 // random is the interface over methods of rand.Rand which are used by our generator.
 // This is only for testing the generator implmenetation.
-
 type random interface {
 	// See rand.Intn.
 	Intn(n int) int
@@ -70,24 +71,28 @@ func (g *generator) nextRandom() (ret random) {
 
 func (g *generator) gen() *wasm.Module {
 	g.m = &wasm.Module{}
-	g.typeSection()
-	g.importSection()
-	g.functionSection()
-	g.tableSection()
-	g.memorySection()
-	g.globalSection()
-	g.exportSection()
-	g.startSection()
-	g.elementSection()
-	g.codeSection()
-	g.dataSection()
+	g.genTypeSection()
+	g.genImportSection()
+	g.genFunctionSection()
+	g.genTableSection()
+	g.genMemorySection()
+	g.genGlobalSection()
+	g.genExportSection()
+	g.genStartSection()
+	g.genElementSection()
+	g.genCodeSection()
+	g.genDataSection()
 	return g.m
 }
 
-func (g *generator) typeSection() {
+func (g *generator) genTypeSection() {
 	numTypes := g.nextRandom().Intn(g.size)
 	for i := 0; i < numTypes; i++ {
-		ft := g.newFunctionType(g.nextRandom().Intn(g.size), g.nextRandom().Intn(g.size))
+		var resultNumCeil = g.size
+		if !g.enabledFeature.Get(wasm.FeatureMultiValue) {
+			resultNumCeil = 2
+		}
+		ft := g.newFunctionType(g.nextRandom().Intn(g.size), g.nextRandom().Intn(resultNumCeil))
 		g.m.TypeSection = append(g.m.TypeSection, ft)
 	}
 }
@@ -119,7 +124,7 @@ func (g *generator) newValueType() (ret wasm.ValueType) {
 	return
 }
 
-func (g *generator) importSection() {
+func (g *generator) genImportSection() {
 	numImports := g.nextRandom().Intn(g.size)
 	var memoryImported, tableImported int
 	for i := 0; i < numImports; i++ {
@@ -176,7 +181,7 @@ func (g *generator) importSection() {
 	}
 }
 
-func (g *generator) functionSection() {
+func (g *generator) genFunctionSection() {
 	numTypes := len(g.m.TypeSection)
 	if numTypes == 0 {
 		return
@@ -188,7 +193,7 @@ func (g *generator) functionSection() {
 	}
 }
 
-func (g *generator) tableSection() {
+func (g *generator) genTableSection() {
 	if g.m.ImportTableCount() != 0 {
 		return
 	}
@@ -198,7 +203,7 @@ func (g *generator) tableSection() {
 	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
 }
 
-func (g *generator) memorySection() {
+func (g *generator) genMemorySection() {
 	if g.m.ImportMemoryCount() != 0 {
 		return
 	}
@@ -207,7 +212,7 @@ func (g *generator) memorySection() {
 	g.m.MemorySection = &wasm.Memory{Min: uint32(min), Max: uint32(max), IsMaxEncoded: true}
 }
 
-func (g *generator) globalSection() {
+func (g *generator) genGlobalSection() {
 	numGlobals := g.nextRandom().Intn(g.size)
 	for i := 0; i < numGlobals; i++ {
 		expr, t := g.newConstExpr()
@@ -285,7 +290,7 @@ func (g *generator) newConstExpr() (*wasm.ConstantExpression, wasm.ValueType) {
 	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, valueType
 }
 
-func (g *generator) exportSection() {
+func (g *generator) genExportSection() {
 	funcs, globals, table, memory, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
@@ -317,7 +322,7 @@ func (g *generator) exportSection() {
 	}
 }
 
-func (g *generator) startSection() {
+func (g *generator) genStartSection() {
 	funcs, _, _, _, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
@@ -338,7 +343,7 @@ func (g *generator) startSection() {
 	}
 }
 
-func (g *generator) elementSection() {
+func (g *generator) genElementSection() {
 	funcs, _, _, table, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
@@ -371,7 +376,7 @@ func (g *generator) elementSection() {
 	}
 }
 
-func (g *generator) codeSection() {
+func (g *generator) genCodeSection() {
 	codeSectionSize := len(g.m.FunctionSection)
 	for i := 0; i < codeSectionSize; i++ {
 		g.m.CodeSection = append(g.m.CodeSection, g.newCode())
@@ -384,7 +389,7 @@ func (g *generator) newCode() *wasm.Code {
 		wasm.OpcodeEnd}}
 }
 
-func (g *generator) dataSection() {
+func (g *generator) genDataSection() {
 	_, _, mem, _, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
