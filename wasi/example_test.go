@@ -6,13 +6,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/sys"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/sys"
 )
 
 // This is an example of how to use WebAssembly System Interface (WASI) with its simplest function: "proc_exit".
 //
-// See https://github.com/tetratelabs/wazero/tree/main/examples/wasi for another example.
+// See https://github.com/heeus/hwazero/tree/main/examples/wasi for another example.
 func Example() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()

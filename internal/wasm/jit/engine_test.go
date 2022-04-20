@@ -8,9 +8,9 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/testing/enginetest"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/testing/enginetest"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wasm"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.

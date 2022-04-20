@@ -5,9 +5,9 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 func TestCompiler_compileHostFunction(t *testing.T) {
@@ -662,7 +662,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 					// We have to do compilation in a separate subtest since each compilation takes
 					// the mutex lock and must release on the cleanup of each subtest.
-					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+					// TODO: delete after https://github.com/heeus/hwazero/issues/233
 					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
 						compiler := env.requireNewCompiler(t, newCompiler, nil)
 						err := compiler.compilePreamble()
@@ -774,7 +774,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 				// We have to do compilation in a separate subtest since each compilation takes
 				// the mutex lock and must release on the cleanup of each subtest.
-				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+				// TODO: delete after https://github.com/heeus/hwazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
 					compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: targetFunctionType})
 
@@ -888,7 +888,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 		for funcIndex := wasm.Index(0); funcIndex < callFrameNums; funcIndex++ {
 			// We have to do compilation in a separate subtest since each compilation takes
 			// the mutex lock and must release on the cleanup of each subtest.
-			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+			// TODO: delete after https://github.com/heeus/hwazero/issues/233
 			t.Run(fmt.Sprintf("compiling existing callframe %d", funcIndex), func(t *testing.T) {
 				// Each function pushes its funcaddr and soon returns.
 				compiler := env.requireNewCompiler(t, newCompiler, nil)

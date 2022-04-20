@@ -11,16 +11,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/u64"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
-	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/u64"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasm/binary"
+	"github.com/heeus/hwazero/internal/wasm/interpreter"
+	"github.com/heeus/hwazero/internal/wasm/jit"
+	"github.com/heeus/hwazero/internal/wasm/text"
+	"github.com/heeus/hwazero/internal/wasmruntime"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -301,7 +301,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 	}
 
 	// If the go:embed path resolution was wrong, this fails.
-	// https://github.com/tetratelabs/wazero/issues/247
+	// https://github.com/heeus/hwazero/issues/247
 	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
 
 	for _, f := range jsonfiles {

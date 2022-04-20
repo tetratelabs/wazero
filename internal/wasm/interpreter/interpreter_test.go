@@ -6,11 +6,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/buildoptions"
-	"github.com/tetratelabs/wazero/internal/testing/enginetest"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/buildoptions"
+	"github.com/heeus/hwazero/internal/testing/enginetest"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.

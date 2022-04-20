@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/asm"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {

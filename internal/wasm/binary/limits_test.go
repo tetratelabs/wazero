@@ -6,7 +6,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 func TestLimitsType(t *testing.T) {

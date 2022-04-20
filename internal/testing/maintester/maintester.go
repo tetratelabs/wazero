@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 func TestMain(t *testing.T, main func(), args ...string) (stdout, stderr string) {

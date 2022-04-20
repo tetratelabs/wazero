@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasm/binary"
 )
 
 const (

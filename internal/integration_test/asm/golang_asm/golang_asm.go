@@ -7,7 +7,7 @@ import (
 	goasm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 
-	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/heeus/hwazero/internal/asm"
 )
 
 // GolangAsmNode implements Node for golang-asm library.

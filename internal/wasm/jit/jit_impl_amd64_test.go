@@ -3,10 +3,10 @@ package jit
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/asm"
+	amd64 "github.com/heeus/hwazero/internal/asm/amd64"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {

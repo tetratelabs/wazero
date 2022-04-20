@@ -11,12 +11,12 @@ import (
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/wasm/binary"
+	"github.com/heeus/hwazero/internal/wasm/text"
+	"github.com/heeus/hwazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText

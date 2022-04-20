@@ -5,9 +5,9 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.

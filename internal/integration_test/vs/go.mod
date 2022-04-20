@@ -1,11 +1,11 @@
-module github.com/tetratelabs/wazero/internal/integration_test/vs
+module github.com/heeus/hwazero/internal/integration_test/vs
 
 go 1.17
 
 require (
 	github.com/birros/go-wasm3 v0.0.0-20220320175540-c625eebef38c
 	github.com/bytecodealliance/wasmtime-go v0.35.0
-	github.com/tetratelabs/wazero v0.0.0
+	github.com/heeus/hwazero v0.0.0
 	github.com/wasmerio/wasmer-go v1.0.4
 )
 
@@ -14,4 +14,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace github.com/tetratelabs/wazero => ../../..
+replace github.com/heeus/hwazero => ../../..

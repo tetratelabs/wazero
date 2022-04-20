@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 // archContext is empty on an unsupported architecture.

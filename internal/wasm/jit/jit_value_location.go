@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/heeus/hwazero/internal/asm"
 )
 
 var (

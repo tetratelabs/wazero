@@ -6,9 +6,9 @@ import (
 	"math/bits"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/moremath"
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/heeus/hwazero/internal/moremath"
+	"github.com/heeus/hwazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
 func TestCompiler_compileConsts(t *testing.T) {

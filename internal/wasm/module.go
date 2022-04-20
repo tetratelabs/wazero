@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/ieee754"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/ieee754"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/wasmdebug"
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or

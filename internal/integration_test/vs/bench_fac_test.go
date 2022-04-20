@@ -15,16 +15,16 @@ import (
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/api"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // ensureJITFastest is overridable via ldflags. Ex.
-//	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+//	-ldflags '-X github.com/heeus/hwazero/vs.ensureJITFastest=true'
 var ensureJITFastest = "false"
 
 // facWasm is compiled from testdata/fac.wat
@@ -163,7 +163,7 @@ var facArgumentU64 = uint64(30)
 var facArgumentI64 = int64(facArgumentU64)
 
 // TestFac_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
-// This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
+// This is disabled by default, and can be run with -ldflags '-X github.com/heeus/hwazero/vs.ensureJITFastest=true'.
 func TestFac_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
 		t.Skip()

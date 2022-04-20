@@ -7,9 +7,9 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	asm_amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/integration_test/asm/golang_asm"
+	"github.com/heeus/hwazero/internal/asm"
+	asm_amd64 "github.com/heeus/hwazero/internal/asm/amd64"
+	"github.com/heeus/hwazero/internal/integration_test/asm/golang_asm"
 )
 
 // assemblerGoAsmImpl implements asm_amd64.Assembler for golang-asm library.

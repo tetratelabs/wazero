@@ -3,8 +3,8 @@ package age_calculator
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/testing/maintester"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/testing/maintester"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 // Test_main ensures the following will work:

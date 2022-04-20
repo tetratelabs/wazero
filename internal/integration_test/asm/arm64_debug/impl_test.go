@@ -6,9 +6,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/asm"
-	asm_arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/heeus/hwazero/internal/asm"
+	asm_arm64 "github.com/heeus/hwazero/internal/asm/arm64"
+	"github.com/heeus/hwazero/internal/testing/require"
 )
 
 // TODO: Comment why tmpReg is unused.

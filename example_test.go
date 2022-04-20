@@ -9,7 +9,7 @@ import (
 
 // This is an example of how to use WebAssembly via adding two numbers.
 //
-// See https://github.com/tetratelabs/wazero/tree/main/examples for more examples.
+// See https://github.com/heeus/hwazero/tree/main/examples for more examples.
 func Example() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()

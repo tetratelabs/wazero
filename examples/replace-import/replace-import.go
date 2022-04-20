@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
+	"github.com/heeus/hwazero"
+	"github.com/heeus/hwazero/api"
 )
 
 // main shows how you can replace a module import when it doesn't match instantiated modules.

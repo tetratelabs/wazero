@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/ieee754"
-	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/heeus/hwazero/internal/ieee754"
+	"github.com/heeus/hwazero/internal/leb128"
+	"github.com/heeus/hwazero/internal/wasm"
 )
 
 func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error) {
