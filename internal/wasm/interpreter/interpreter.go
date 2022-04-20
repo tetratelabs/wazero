@@ -18,6 +18,10 @@ import (
 	"github.com/heeus/hwazero/internal/wazeroir"
 )
 
+const (
+	errContextCheckStep uint64 = 100
+)
+
 var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of wasm.Engine
@@ -555,7 +559,10 @@ func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.F
 		for _, param := range params {
 			ce.pushValue(param)
 		}
-		ce.callNativeFunc(ctx, m, compiled)
+		err = ce.callNativeFunc(ctx, m, compiled)
+		if nil != err {
+			return
+		}
 		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
 	} else {
 		results = ce.callGoFunc(ctx, m, compiled, params)
@@ -575,7 +582,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	return
 }
 
-func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) (err error) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
@@ -584,11 +591,24 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	typeIDs := f.source.Module.TypeIDs
 	functions := f.source.Module.Engine.(*moduleEngine).functions
 	ce.pushFrame(frame)
+	err = nil
 	bodyLen := uint64(len(frame.f.body))
+	var opcounter uint64
 	for frame.pc < bodyLen {
+		if nil != ctx {
+			opcounter = callCtx.GetIncCounter()
+			if (opcounter % errContextCheckStep) == 0 {
+				if nil != ctx {
+					err = ctx.Err()
+					if nil != err {
+						return
+					}
+				}
+			}
+		}
 		op := frame.f.body[frame.pc]
 		// TODO: add description of each operation/case
-		// on, for example, how many args are used,
+		// on, for example, how many args are used,g
 		// how the stack is modified, etc.
 		switch op.kind {
 		case wazeroir.OperationKindUnreachable:
@@ -624,7 +644,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if f.hostFn != nil {
 					ce.callGoFuncWithStack(ctx, callCtx, f)
 				} else {
-					ce.callNativeFunc(ctx, callCtx, f)
+					err = ce.callNativeFunc(ctx, callCtx, f)
+					if nil != err {
+						return err
+					}
 				}
 				frame.pc++
 			}
@@ -645,7 +668,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if targetcode.hostFn != nil {
 					ce.callGoFuncWithStack(ctx, callCtx, f)
 				} else {
-					ce.callNativeFunc(ctx, callCtx, targetcode)
+					err := ce.callNativeFunc(ctx, callCtx, targetcode)
+					if nil != err {
+						return err
+					}
 				}
 				frame.pc++
 			}
@@ -1554,6 +1580,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+	return nil
 }
 
 func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {

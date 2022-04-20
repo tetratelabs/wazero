@@ -44,7 +44,14 @@ type CallContext struct {
 	//
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
-	closed *uint64
+	closed    *uint64
+	opcounter uint64
+}
+
+// GetIncCounter Increases opcounter on 1 and retruns new value
+func (m *CallContext) GetIncCounter() uint64 {
+	atomic.AddUint64(&m.opcounter, 1)
+	return m.opcounter
 }
 
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
