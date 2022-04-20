@@ -14,7 +14,6 @@ import (
 
 // Gen generates a pseudo random compilable module based on `seed`.
 //
-//
 // Note: "pseudo" here means the determinism of the generated results,
 // e.g. giving same seed returns exactly the same module for
 // the same code base in Gen.
@@ -29,8 +28,8 @@ func Gen(seed []byte, enabledFeature wasm.Features,
 	}
 
 	checksum := sha256.Sum256(seed)
-	// Use 4 randoms created from the unique sha256 hash value of the seed.
 	g := &generator{
+		// Use 4 randoms created from the unique sha256 hash value of the seed.
 		size: len(seed), rands: make([]random, 4), enabledFeature: enabledFeature,
 		numTypes:         numTypes,
 		numFunctions:     numFunctions,
@@ -81,6 +80,7 @@ func (g *generator) nextRandom() (ret random) {
 	return
 }
 
+// gen generates a random Wasm module.
 func (g *generator) gen() *wasm.Module {
 	g.m = &wasm.Module{}
 	g.genTypeSection()
@@ -136,7 +136,7 @@ func (g *generator) newValueType() (ret wasm.ValueType) {
 	return
 }
 
-// genImportSection creates a random number of imports, including memory and table.
+// genImportSection creates random import descriptions, including memory and table.
 func (g *generator) genImportSection() {
 	var memoryImported, tableImported int
 	for i := uint32(0); i < g.numImports; i++ {
@@ -193,6 +193,8 @@ func (g *generator) genImportSection() {
 	}
 }
 
+// genFunctionSection generates random function declarations whose type is randomly chosen
+// from already generated type section.
 func (g *generator) genFunctionSection() {
 	numTypes := len(g.m.TypeSection)
 	if numTypes == 0 {
@@ -204,6 +206,7 @@ func (g *generator) genFunctionSection() {
 	}
 }
 
+// genTableSection generates random table definition if there's no import fot table.
 func (g *generator) genTableSection() {
 	if g.m.ImportTableCount() != 0 {
 		return
@@ -214,6 +217,7 @@ func (g *generator) genTableSection() {
 	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
 }
 
+// genTableSection generates random memory definition if there's no import fot table.
 func (g *generator) genMemorySection() {
 	if g.m.ImportMemoryCount() != 0 {
 		return
@@ -223,6 +227,7 @@ func (g *generator) genMemorySection() {
 	g.m.MemorySection = &wasm.Memory{Min: uint32(min), Max: uint32(max), IsMaxEncoded: true}
 }
 
+// genTableSection generates random globals.
 func (g *generator) genGlobalSection() {
 	for i := uint32(0); i < g.numGlobals; i++ {
 		expr, t := g.newConstExpr()
@@ -300,6 +305,7 @@ func (g *generator) newConstExpr() (*wasm.ConstantExpression, wasm.ValueType) {
 	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, valueType
 }
 
+// genTableSection generates random export descriptions from previously generated functions, globals, table and memory declarations.
 func (g *generator) genExportSection() {
 	funcs, globals, table, memory, err := g.m.AllDeclarations()
 	if err != nil {
@@ -331,6 +337,7 @@ func (g *generator) genExportSection() {
 	}
 }
 
+// genStartSection generates start section whose function is randomly chosen from previously declared function.
 func (g *generator) genStartSection() {
 	if !g.needStartSection {
 		return
@@ -355,6 +362,7 @@ func (g *generator) genStartSection() {
 	}
 }
 
+// genStartSection generates random element section if table and functions exist.
 func (g *generator) genElementSection() {
 	funcs, _, _, table, err := g.m.AllDeclarations()
 	if err != nil {
@@ -387,6 +395,7 @@ func (g *generator) genElementSection() {
 	}
 }
 
+// genCodeSection generates random code section for functions defined in this module.
 func (g *generator) genCodeSection() {
 	codeSectionSize := len(g.m.FunctionSection)
 	for i := 0; i < codeSectionSize; i++ {
@@ -400,6 +409,7 @@ func (g *generator) newCode() *wasm.Code {
 		wasm.OpcodeEnd}}
 }
 
+// genDataSection generates random data section if memory is declared and its minums is not zero.
 func (g *generator) genDataSection() {
 	_, _, mem, _, err := g.m.AllDeclarations()
 	if err != nil {
