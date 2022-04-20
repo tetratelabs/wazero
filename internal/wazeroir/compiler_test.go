@@ -58,6 +58,24 @@ func TestCompile(t *testing.T) {
 				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
 			},
 		},
+		{
+			name: "memory.grow", // Ex to expose ops to grow memory
+			module: requireModuleText(t, `(module
+  (func (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
+)`),
+			expected: &CompilationResult{
+				Operations: []Operation{ // begin with params: [$delta]
+					&OperationPick{Depth: 0},                                 // [$delta, $delta]
+					&OperationMemoryGrow{},                                   // [$delta, $old_size]
+					&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [$old_size]
+					&OperationBr{Target: &BranchTarget{}},                    // return!
+				},
+				LabelCallers: map[string]uint32{},
+				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
+				Functions:    []uint32{0},
+				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

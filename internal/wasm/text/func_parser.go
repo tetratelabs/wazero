@@ -158,16 +158,26 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case wasm.OpcodeI32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Const
 		next = p.parseI32
+	case wasm.OpcodeI32LoadName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeMemArgOp(wasm.OpcodeI32Load, alignment32)
+	case wasm.OpcodeI32StoreName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
+		return p.encodeMemArgOp(wasm.OpcodeI32Store, alignment32)
 	case wasm.OpcodeI64ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI64Const
 		next = p.parseI64
 	case wasm.OpcodeI64LoadName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
-		return p.encodeI64Instruction(wasm.OpcodeI64Load)
+		return p.encodeMemArgOp(wasm.OpcodeI64Load, alignment64)
 	case wasm.OpcodeI64StoreName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A8
-		return p.encodeI64Instruction(wasm.OpcodeI64Store)
+		return p.encodeMemArgOp(wasm.OpcodeI64Store, alignment64)
 	case wasm.OpcodeLocalGetName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#variable-instructions%E2%91%A0
 		opCode = wasm.OpcodeLocalGet
 		next = p.parseLocalIndex
+	case wasm.OpcodeMemoryGrowName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A6
+		p.currentBody = append(p.currentBody, wasm.OpcodeMemoryGrow, 0x00) // reserved arg0
+		return p.beginFieldOrInstruction, nil
+	case wasm.OpcodeMemorySizeName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A6
+		p.currentBody = append(p.currentBody, wasm.OpcodeMemorySize, 0x00) // reserved arg0
+		return p.beginFieldOrInstruction, nil
 
 		// Next are sign-extension-ops
 		// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
@@ -202,13 +212,16 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	return next, nil
 }
 
-func (p *funcParser) encodeI64Instruction(oc wasm.Opcode) (tokenParser, error) {
-	p.currentBody = append(
-		p.currentBody,
-		oc,
-		3, // alignment=3 (natural alignment) because 2^3 = size of I64 (8 bytes)
-		0, // offset=0 because that's the default
-	)
+const (
+	// alignment32 is because it is 32bit is 2^2 bytes
+	alignment32 = 2
+	// alignment64 is because it is 64bit is 2^3 bytes
+	alignment64 = 3
+)
+
+func (p *funcParser) encodeMemArgOp(oc wasm.Opcode, alignment byte) (tokenParser, error) {
+	offset := byte(0) // offset=0 because that's the default
+	p.currentBody = append(p.currentBody, oc, alignment, offset)
 	return p.beginFieldOrInstruction, nil
 }
 

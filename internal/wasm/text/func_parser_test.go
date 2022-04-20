@@ -63,6 +63,25 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
+			name:   "i32.load",
+			source: "(func i32.const 8 i32.load)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to load
+				wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i32.store",
+			source: "(func i32.const 8 i32.const 37 i32.store)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 8, // dynamic memory offset to store
+				wasm.OpcodeI32Const, 37, // value to store
+				wasm.OpcodeI32Store, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
 			name:     "i64.const",
 			source:   "(func i64.const 356)",
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeI64Const, 0xe4, 0x02, wasm.OpcodeEnd}},
@@ -83,6 +102,25 @@ func TestFuncParser(t *testing.T) {
 				wasm.OpcodeI32Const, 8, // dynamic memory offset to store
 				wasm.OpcodeI64Const, 37, // value to store
 				wasm.OpcodeI64Store, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "memory.grow",
+			source: "(func i32.const 2 memory.grow drop)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeI32Const, 2, // how many pages to grow
+				wasm.OpcodeMemoryGrow, 0, // memory index zero
+				wasm.OpcodeDrop, // drop the previous page count (or -1 if grow failed)
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "memory.size",
+			source: "(func memory.size drop)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeMemorySize, 0, // memory index zero
+				wasm.OpcodeDrop, // drop the page count
 				wasm.OpcodeEnd,
 			}},
 		},
