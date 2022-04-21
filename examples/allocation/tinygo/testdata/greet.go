@@ -9,12 +9,12 @@ import (
 // main is required for TinyGo to compile to Wasm.
 func main() {}
 
-/// greet prints a greeting to the console.
+// greet prints a greeting to the console.
 func greet(name string) {
 	log(fmt.Sprint("wasm >> ", greeting(name)))
 }
 
-/// log a message to the console using _log.
+// log a message to the console using _log.
 func log(message string) {
 	ptr, size := stringToPtr(message)
 	_log(ptr, size)
