@@ -10,7 +10,7 @@ Hello, wazero!
 ```
 
 Under the covers, [lib.rs](testdata/src/lib.rs) does a few things of interest:
-* Uses a WebAssembly-tuned memory allocator: [we_alloc](https://github.com/rustwasm/wee_alloc).
+* Uses a WebAssembly-tuned memory allocator: [wee_alloc](https://github.com/rustwasm/wee_alloc).
 * Exports wrapper functions to allocate and deallocate memory.
 * Uses `&str` instead of CString (NUL-terminated strings).
 
