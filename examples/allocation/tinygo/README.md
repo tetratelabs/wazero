@@ -24,7 +24,3 @@ Note: While folks here are familiar with TinyGo, wazero isn't a TinyGo project.
 We hope this gets you started. For next steps, consider reading the
 [TinyGo Using WebAssembly Guide](https://tinygo.org/docs/guides/webassembly/)
 or joining the [#TinyGo channel on the Gophers Slack](https://github.com/tinygo-org/tinygo#getting-help).
-
-
-
-
