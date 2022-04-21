@@ -2090,17 +2090,17 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	c.assembler.CompileRegisterToRegister(convinst, source.register, destinationReg)
 	c.pushValueLocationOnRegister(destinationReg)
 
-	// Obtain the floating point status register value into the general purpose register,
-	// so that we can check if the conversion resulted in undefined behavior.
-	c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.REG_FPSR, arm64ReservedRegisterForTemporary)
-	// Check if the conversion was undefined by comparing the status with 1.
-	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
-	c.assembler.CompileRegisterAndConstToNone(arm64.CMP, arm64ReservedRegisterForTemporary, 1)
-
-	brOK := c.assembler.CompileJump(arm64.BNE)
-
-	// If so, exit the execution with errors depending on whether or not the source value is NaN.
 	if !o.NonTrapping {
+		// Obtain the floating point status register value into the general purpose register,
+		// so that we can check if the conversion resulted in undefined behavior.
+		c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.REG_FPSR, arm64ReservedRegisterForTemporary)
+		// Check if the conversion was undefined by comparing the status with 1.
+		// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
+		c.assembler.CompileRegisterAndConstToNone(arm64.CMP, arm64ReservedRegisterForTemporary, 1)
+
+		brOK := c.assembler.CompileJump(arm64.BNE)
+
+		// If so, exit the execution with errors depending on whether or not the source value is NaN.
 		var floatcmp asm.Instruction
 		if is32bitFloat {
 			floatcmp = arm64.FCMPS
@@ -2118,10 +2118,10 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
 		c.assembler.SetJumpTargetOnNext(brIfSourceNaN)
 		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
-	}
 
-	// Otherwise, we branch into the next instruction.
-	c.assembler.SetJumpTargetOnNext(brOK)
+		// Otherwise, we branch into the next instruction.
+		c.assembler.SetJumpTargetOnNext(brOK)
+	}
 	return nil
 }
 
