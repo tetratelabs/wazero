@@ -64,7 +64,7 @@ func main() {
 	defer deallocate.Call(ctx, pointer, byteCount)
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	hello.Memory().Write(uint32(pointer), append([]byte(name), 0))
+	hello.Memory().Write(uint32(pointer), []byte(name))
 
 	// Now, we can call "say_hello", which reads the string we wrote to memory!
 	_, err = sayHello.Call(ctx, pointer, byteCount)
