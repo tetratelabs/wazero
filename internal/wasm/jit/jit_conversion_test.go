@@ -149,18 +149,18 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64},
 		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32},
 		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64},
-		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32},
-		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
 		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float32, nonTrapping: true},
 		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64, nonTrapping: true},
 		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32, nonTrapping: true},
 		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64, nonTrapping: true},
-		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32, nonTrapping: true},
-		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64, nonTrapping: true},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32, nonTrapping: true},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64, nonTrapping: true},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32, nonTrapping: true},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64, nonTrapping: true},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%s from %s (non-trapping=%v)", tc.outputType, tc.inputType, tc.nonTrapping), func(t *testing.T) {
@@ -293,65 +293,69 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
 						f32 := float32(v)
+						exp := uint32(math.Trunc(float64(f32)))
 						if f32 < 0 || f32 >= math.MaxUint32 {
 							if tc.nonTrapping {
 								if v < 0 {
-									f32 = 0
+									exp = 0
 								} else {
-									f32 = math.MaxUint32
+									exp = math.MaxUint32
 								}
 							} else {
 								expStatus = jitCallStatusIntegerOverflow
 							}
 						}
 						if expStatus == jitCallStatusCodeReturned {
-							require.Equal(t, uint32(math.Trunc(float64(f32))), env.stackTopAsUint32())
+							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
+						exp := uint32(math.Trunc(v))
 						if v < 0 || v > math.MaxUint32 {
 							if tc.nonTrapping {
 								if v < 0 {
-									v = 0
+									exp = 0
 								} else {
-									v = math.MaxUint32
+									exp = math.MaxUint32
 								}
 							} else {
 								expStatus = jitCallStatusIntegerOverflow
 							}
 						}
 						if expStatus == jitCallStatusCodeReturned {
-							require.Equal(t, uint32(math.Trunc(v)), env.stackTopAsUint32())
+							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
 						f32 := float32(v)
+						exp := uint64(math.Trunc(float64(f32)))
 						if f32 < 0 || f32 >= math.MaxUint64 {
 							if tc.nonTrapping {
 								if v < 0 {
-									f32 = 0
+									exp = 0
 								} else {
-									f32 = math.MaxUint64
+									exp = math.MaxUint64
 								}
 							} else {
 								expStatus = jitCallStatusIntegerOverflow
 							}
 						}
 						if expStatus == jitCallStatusCodeReturned {
-							require.Equal(t, uint64(math.Trunc(float64(f32))), env.stackTopAsUint64())
+							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
+						exp := uint64(math.Trunc(v))
 						if v < 0 || v >= math.MaxUint64 {
 							if tc.nonTrapping {
 								if v < 0 {
-									v = 0
+									exp = 0
 								} else {
-									v = math.MaxUint64
+									exp = math.MaxUint64
 								}
 							} else {
 								expStatus = jitCallStatusIntegerOverflow
 							}
 						}
 						if expStatus == jitCallStatusCodeReturned {
-							require.Equal(t, uint64(math.Trunc(v)), env.stackTopAsUint64())
+							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					}
 					require.Equal(t, expStatus, env.jitStatus())
