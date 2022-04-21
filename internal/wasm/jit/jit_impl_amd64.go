@@ -28,7 +28,7 @@ var (
 	maximum32BitSignedIntAddress                  uintptr
 	minimum64BitSignedInt                         int64 = math.MinInt64
 	minimum64BitSignedIntAddress                  uintptr
-	maximum64BitSignedInt                         int64 = math.MinInt64
+	maximum64BitSignedInt                         int64 = math.MaxInt64
 	maximum64BitSignedIntAddress                  uintptr
 	float32SignBitMask                            uint32 = 1 << 31
 	float32RestBitMask                            uint32 = ^float32SignBitMask
@@ -2021,11 +2021,11 @@ func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (er
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
 		err = c.emitSignedI32TruncFromFloat(true, o.NonTrapping)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
-		err = c.emitSignedI64TruncFromFloat(true)
+		err = c.emitSignedI64TruncFromFloat(true, o.NonTrapping)
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
 		err = c.emitSignedI32TruncFromFloat(false, o.NonTrapping)
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
-		err = c.emitSignedI64TruncFromFloat(false)
+		err = c.emitSignedI64TruncFromFloat(false, o.NonTrapping)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
 		err = c.emitUnsignedI32TruncFromFloat(true)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
@@ -2257,7 +2257,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool, nonTrappi
 		// If the value is NaN, we return the function with jitCallStatusCodeInvalidFloatToIntConversion.
 		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 	} else {
-		// in non trapping case, NaN is casted as zero.
+		// In non trapping case, NaN is casted as zero.
 		// Zero out the result register by XOR itsself.
 		c.assembler.CompileRegisterToRegister(amd64.XORL, result, result)
 		nontrappingNanJump = c.assembler.CompileJump(amd64.JMP)
@@ -2319,8 +2319,8 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool, nonTrappi
 		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 32-bit int).
 
 		// If the value exceeds signed 32-bit maximum, we saturate it to the maximum.
-		// c.assembler.CompileStandAlone(amd64.UD2)
 		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(maximum32BitSignedIntAddress), result)
+
 		c.assembler.SetJumpTargetOnNext(okJmp, nontrappingNanJump, nonTrappingSaturatedMinimumJump, jmpIfMinimumSignedInt)
 	}
 
@@ -2332,7 +2332,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool, nonTrappi
 }
 
 // emitSignedI64TruncFromFloat implements compileITruncFromF when the destination type is a 64-bit signed integer.
-func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
+func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool, nonTrapping bool) error {
 	source := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(source); err != nil {
 		return err
@@ -2370,7 +2370,15 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNotNaN := c.assembler.CompileJump(amd64.JPC) // jump if parity is not set.
 
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+	var nontrappingNanJump asm.Node
+	if !nonTrapping {
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+	} else {
+		// In non trapping case, NaN is casted as zero.
+		// Zero out the result register by XOR itsself.
+		c.assembler.CompileRegisterToRegister(amd64.XORQ, result, result)
+		nontrappingNanJump = c.assembler.CompileJump(amd64.JMP)
+	}
 
 	// Check if the value is larger than or equal the minimum 64-bit integer value,
 	// meaning that the value exceeds the lower bound of 64-bit signed integer range.
@@ -2381,24 +2389,49 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(float64ForMinimumSigned64bitIntegerAddress), source.register)
 	}
 
-	// Jump if the value is -Inf.
-	jmpIfExceedsLowerBound := c.assembler.CompileJump(amd64.JCS)
+	if !nonTrapping {
+		// Jump if the value is -Inf.
+		jmpIfExceedsLowerBound := c.assembler.CompileJump(amd64.JCS)
 
-	// At this point, the value is the minimum signed 64-bit int (=-9223372036854775808.0) or larger than 64-bit maximum.
-	// So, check if the value equals the minimum signed 64-bit int.
-	if isFloat32Bit {
-		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(zero64BitAddress), source.register)
+		// At this point, the value is the minimum signed 64-bit int (=-9223372036854775808.0) or larger than 64-bit maximum.
+		// So, check if the value equals the minimum signed 64-bit int.
+		if isFloat32Bit {
+			c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(zero64BitAddress), source.register)
+		} else {
+			c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(zero64BitAddress), source.register)
+		}
+
+		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
+
+		c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
+		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+
+		// We jump to the next instructions for valid cases.
+		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
 	} else {
-		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(zero64BitAddress), source.register)
+		// Jump if the value is not -Inf.
+		jmpIfNotExceedsLowerBound := c.assembler.CompileJump(amd64.JCC)
+
+		// If the value exceeds the lower bound, we "staturate" it to the minimum.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(minimum64BitSignedIntAddress), result)
+		nonTrappingSaturatedMinimumJump := c.assembler.CompileJump(amd64.JMP)
+
+		// Otherwise, the value is the minimum signed 64-bit int (=-9223372036854775808.0) or larger than 64-bit maximum.
+		// So, check if the value equals the minimum signed 64-bit int.
+		c.assembler.SetJumpTargetOnNext(jmpIfNotExceedsLowerBound)
+		if isFloat32Bit {
+			c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(zero64BitAddress), source.register)
+		} else {
+			c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(zero64BitAddress), source.register)
+		}
+
+		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
+
+		// If the value exceeds signed 64-bit maximum, we saturate it to the maximum.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(maximum64BitSignedIntAddress), result)
+
+		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt, nonTrappingSaturatedMinimumJump, nontrappingNanJump)
 	}
-
-	jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
-
-	c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
-	c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
-
-	// We jump to the next instructions for valid cases.
-	c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
