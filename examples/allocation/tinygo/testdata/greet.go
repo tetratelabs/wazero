@@ -14,12 +14,10 @@ func greet(name string) {
 	log(fmt.Sprint("wasm >> ", greeting(name)))
 }
 
-/// Logs a message to the console using _log.
+/// log a message to the console using _log.
 func log(message string) {
-	buf := []byte(message)
-	ptr := &buf[0]
-	unsafePtr := uintptr(unsafe.Pointer(ptr))
-	_log(uint32(unsafePtr), uint32(len(buf)))
+	ptr, size := stringToPtr(message)
+	_log(ptr, size)
 }
 
 // _log is a WebAssembly import which prints a string (linear memory offset,

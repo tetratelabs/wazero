@@ -11,7 +11,7 @@ fn greet(name: &String) {
     log(&["wasm >> ", &greeting(name)].concat());
 }
 
-/// gets a greeting for the name.
+/// Gets a greeting for the name.
 fn greeting(name: &String) -> String {
     return ["Hello, ", &name, "!"].concat();
 }
