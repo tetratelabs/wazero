@@ -2100,7 +2100,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	brOK := c.assembler.CompileJump(arm64.BNE)
 
 	// If so, exit the execution with errors depending on whether or not the source value is NaN.
-	{
+	if !o.NonTrapping {
 		var floatcmp asm.Instruction
 		if is32bitFloat {
 			floatcmp = arm64.FCMPS
