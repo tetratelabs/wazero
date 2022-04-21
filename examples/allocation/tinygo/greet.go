@@ -12,7 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 )
 
-// greetWasm was compiled using `tinygo build -o greet.wasm -scheduler=none -target=wasi greet.go`
+// greetWasm was compiled using `tinygo build -o greet.wasm -scheduler=none --no-debug -target=wasi greet.go`
 //go:embed testdata/greet.wasm
 var greetWasm []byte
 
@@ -47,44 +47,62 @@ func main() {
 
 	// Instantiate a module named "greet" that imports the "log" function
 	// defined in "env".
-	greet, err := r.InstantiateModuleFromCodeWithConfig(ctx, greetWasm, wazero.NewModuleConfig().WithName("greet"))
+	mod, err := r.InstantiateModuleFromCode(ctx, greetWasm)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer greet.Close()
+	defer mod.Close()
 
 	// Get a references to functions we'll use in this example.
-	greet := greet.ExportedFunction("greet")
+	greet := mod.ExportedFunction("greet")
+	greeting := mod.ExportedFunction("greeting")
 	// These are undocumented, but exported. See tinygo-org/tinygo#2788
-	malloc := greet.ExportedFunction("malloc")
-	free := greet.ExportedFunction("free")
+	malloc := mod.ExportedFunction("malloc")
+	free := mod.ExportedFunction("free")
 
 	// Let's use the argument to this main function in Wasm.
 	name := os.Args[1]
-	byteCount := uint64(len(name))
+	nameSize := uint64(len(name))
 
 	// Instead of an arbitrary memory offset, use TinyGo's allocator. Notice
 	// there is nothing string-specific in this allocation function. The same
 	// function could be used to pass binary serialized data to Wasm.
-	results, err := malloc.Call(ctx, byteCount)
+	results, err := malloc.Call(ctx, nameSize)
 	if err != nil {
 		log.Fatal(err)
 	}
-	pointer := results[0]
+	namePtr := results[0]
 	// This pointer is managed by TinyGo, but TinyGo is unaware of external usage.
 	// So, we have to free it when finished
-	defer free.Call(ctx, pointer)
+	defer free.Call(ctx, namePtr)
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	if !greet.Memory().Write(uint32(pointer), []byte(name)) {
+	if !mod.Memory().Write(uint32(namePtr), []byte(name)) {
 		log.Fatalf("Memory.Write(%d, %d) out of range of memory size %d",
-			pointer, byteCount, greet.Memory().Size())
+			namePtr, nameSize, mod.Memory().Size())
 	}
 
 	// Now, we can call "greet", which reads the string we wrote to memory!
-	_, err = greet.Call(ctx, pointer, byteCount)
+	_, err = greet.Call(ctx, namePtr, nameSize)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Finally, we get the greeting message "greet" printed. This shows how to
+	// read-back something allocated by TinyGo.
+	ptrSize, err := greeting.Call(ctx, namePtr, nameSize)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Note: This pointer is still owned by TinyGo, so don't try to free it!
+	greetingPtr := uint32(ptrSize[0] >> 32)
+	greetingSize := uint32(ptrSize[0])
+	// The pointer is a linear memory offset, which is where we write the name.
+	if bytes, ok := mod.Memory().Read(greetingPtr, greetingSize); !ok {
+		log.Fatalf("Memory.Read(%d, %d) out of range of memory size %d",
+			greetingPtr, greetingSize, mod.Memory().Size())
+	} else {
+		fmt.Println("go >>", string(bytes))
 	}
 }
 

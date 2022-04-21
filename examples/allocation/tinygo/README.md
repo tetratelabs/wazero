@@ -6,12 +6,14 @@ in TinyGo, built with `tinygo build -o greet.wasm -scheduler=none -target=wasi g
 Ex.
 ```bash
 $ go run greet.go wazero
-Hello, wazero!
+wasm >> Hello, wazero!
+go >> Hello, wazero!
 ```
 
 Under the covers, [greet.go](testdata/greet.go) does a few things of interest:
 * Uses `unsafe.Pointer` to change a Go pointer to a numeric type.
 * Uses `reflect.StringHeader` to build back a string from a pointer, len pair.
+* Packs a pointer, size pair into a uint64 for WebAssembly 1.0 compatibility.
 
 Go does not export allocation functions, but when TinyGo generates WebAssembly,
 it exports "malloc" and "free", which we use for that purpose. These are not

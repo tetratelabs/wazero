@@ -13,6 +13,7 @@ Under the covers, [lib.rs](testdata/src/lib.rs) does a few things of interest:
 * Uses a WebAssembly-tuned memory allocator: [wee_alloc](https://github.com/rustwasm/wee_alloc).
 * Exports wrapper functions to allocate and deallocate memory.
 * Uses `&str` instead of CString (NUL-terminated strings).
+* Packs a pointer, size pair into a uint64 for WebAssembly 1.0 compatibility.
 
 Note: We chose to not use CString because it keeps the example similar to how
 you would track memory for arbitrary blobs. We also watched function signatures
