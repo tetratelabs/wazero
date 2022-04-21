@@ -63,8 +63,9 @@ func testRtFac(t *testing.T, rt runtimeTester, in int, expValue uint64) {
 	require.NoError(t, err)
 	defer rt.Close()
 
+	// Large loop in test is only to show the function is stable (ex doesn't leak or crash on Nth use).
 	for i := 0; i < 10000; i++ {
-		res, err := rt.Call(testCtx, "fac", uint64(in))
+		res, err := rt.CallI64_I64(testCtx, "fac", uint64(in))
 		require.NoError(t, err)
 		require.Equal(t, expValue, res)
 	}
@@ -239,7 +240,7 @@ func rtFacInvoke(b *testing.B, err error, rt runtimeTester) {
 	defer rt.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = rt.Call(testCtx, "fac", facArgumentU64); err != nil {
+		if _, err = rt.CallI64_I64(testCtx, "fac", facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}

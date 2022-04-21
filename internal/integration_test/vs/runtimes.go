@@ -17,7 +17,7 @@ import (
 
 type runtimeTester interface {
 	Init(ctx context.Context, wasm []byte, funcNames ...string) error
-	Call(ctx context.Context, funcName string, params ...uint64) (uint64, error)
+	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
 	io.Closer
 }
 
@@ -50,8 +50,8 @@ func (w *wazeroTester) Init(ctx context.Context, wasm []byte, funcNames ...strin
 	return
 }
 
-func (w *wazeroTester) Call(ctx context.Context, funcName string, params ...uint64) (uint64, error) {
-	if results, err := w.funcs[funcName].Call(ctx, params...); err != nil {
+func (w *wazeroTester) CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error) {
+	if results, err := w.funcs[funcName].Call(ctx, param); err != nil {
 		return 0, err
 	} else if len(results) > 0 {
 		return results[0], nil
@@ -106,28 +106,13 @@ func (w *wasmerTester) Init(_ context.Context, wasm []byte, funcNames ...string)
 	return
 }
 
-func (w *wasmerTester) Call(_ context.Context, funcName string, params ...uint64) (uint64, error) {
+func (w *wasmerTester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
 	fn := w.funcs[funcName]
-	iParams := make([]interface{}, len(params))
-	for i := range params {
-		switch fn.Type().Params()[i].Kind() {
-		case wasmer.I32:
-			iParams[i] = int32(params[i])
-		case wasmer.I64:
-			iParams[i] = int64(params[i])
-		}
-	}
-	if result, err := fn.Call(iParams...); err != nil {
+	if result, err := fn.Call(int64(param)); err != nil {
 		return 0, err
-	} else if fn.ResultArity() == 1 {
-		if i, ok := result.(int32); ok {
-			return uint64(i), nil
-		}
-		if i, ok := result.(int64); ok {
-			return uint64(i), nil
-		}
+	} else {
+		return uint64(result.(int64)), nil
 	}
-	return 0, nil
 }
 
 func (w *wasmerTester) Close() error {
@@ -172,29 +157,13 @@ func (w *wasmtimeTester) Init(_ context.Context, wasm []byte, funcNames ...strin
 	return
 }
 
-func (w *wasmtimeTester) Call(_ context.Context, funcName string, params ...uint64) (uint64, error) {
+func (w *wasmtimeTester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
 	fn := w.funcs[funcName]
-	iParams := make([]interface{}, len(params))
-	for i := range params {
-		switch fn.Type(w.store).Params()[i].Kind() {
-		case wasmtime.KindI32:
-			iParams[i] = int32(params[i])
-		case wasmtime.KindI64:
-			iParams[i] = int64(params[i])
-		}
-		iParams[i] = int(params[i])
-	}
-	if result, err := fn.Call(w.store, iParams...); err != nil {
+	if result, err := fn.Call(w.store, int64(param)); err != nil {
 		return 0, err
-	} else if result != nil {
-		if i, ok := result.(int32); ok {
-			return uint64(i), nil
-		}
-		if i, ok := result.(int64); ok {
-			return uint64(i), nil
-		}
+	} else {
+		return uint64(result.(int64)), nil
 	}
-	return 0, nil
 }
 
 func (w *wasmtimeTester) Close() error {
@@ -239,23 +208,14 @@ func (w *wasm3Tester) Init(_ context.Context, wasm []byte, funcNames ...string) 
 	return
 }
 
-func (w *wasm3Tester) Call(_ context.Context, funcName string, params ...uint64) (uint64, error) {
+func (w *wasm3Tester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
 	fn := w.funcs[funcName]
-	iParams := make([]interface{}, len(params))
-	for i := range params {
-		iParams[i] = int(params[i]) // go-wasm3 only maps the int type
-	}
-	if results, err := fn(iParams...); err != nil {
+	// Note: go-wasm3 only maps the int type on input, though output params map based on value type
+	if results, err := fn(int(param)); err != nil {
 		return 0, err
-	} else if len(results) == 1 {
-		if i, ok := results[0].(int32); ok {
-			return uint64(i), nil
-		}
-		if i, ok := results[0].(int64); ok {
-			return uint64(i), nil
-		}
+	} else {
+		return uint64(results[0].(int64)), nil
 	}
-	return 0, nil
 }
 
 func (w *wasm3Tester) Close() error {
