@@ -7,16 +7,10 @@ package vs
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/birros/go-wasm3"
-	"github.com/bytecodealliance/wasmtime-go"
-	"github.com/wasmerio/wasmer-go/wasmer"
-
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -37,68 +31,43 @@ func TestFac(t *testing.T) {
 	expValue := uint64(0x865df5dd54000000)
 
 	t.Run("Interpreter", func(t *testing.T) {
-		mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
-		require.NoError(t, err)
-		defer mod.Close()
-
-		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(testCtx, in)
-			require.NoError(t, err)
-			require.Equal(t, expValue, res[0])
-		}
+		config := wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures()
+		rt := newWazeroTester(config)
+		testRtFac(t, rt, in, expValue)
 	})
 
 	t.Run("JIT", func(t *testing.T) {
-		mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
-		require.NoError(t, err)
-		defer mod.Close()
-
-		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(testCtx, in)
-			require.NoError(t, err)
-			require.Equal(t, expValue, res[0])
-		}
+		config := wazero.NewRuntimeConfigJIT().WithFinishedFeatures()
+		rt := newWazeroTester(config)
+		testRtFac(t, rt, in, expValue)
 	})
 
 	t.Run("wasmer-go", func(t *testing.T) {
-		store, instance, fn, err := newWasmerForFacBench()
-		require.NoError(t, err)
-		defer store.Close()
-		defer instance.Close()
-
-		for i := 0; i < 10000; i++ {
-			res, err := fn(in)
-			require.NoError(t, err)
-			require.Equal(t, int64(expValue), res)
-		}
+		rt := newWasmerTester()
+		testRtFac(t, rt, in, expValue)
 	})
 
 	t.Run("wasmtime-go", func(t *testing.T) {
-		store, run, err := newWasmtimeForFacBench()
-		require.NoError(t, err)
-		for i := 0; i < 10000; i++ {
-			res, err := run.Call(store, in)
-			if err != nil {
-				panic(err)
-			}
-			require.Equal(t, int64(expValue), res)
-		}
+		rt := newWasmtimeTester()
+		testRtFac(t, rt, in, expValue)
 	})
 
 	t.Run("go-wasm3", func(t *testing.T) {
-		env, runtime, run, err := newGoWasm3ForFacBench()
-		require.NoError(t, err)
-		defer env.Destroy()
-		defer runtime.Destroy()
-
-		for i := 0; i < 10000; i++ {
-			res, err := run(in)
-			if err != nil {
-				panic(err)
-			}
-			require.Equal(t, int64(expValue), res[0].(int64))
-		}
+		rt := newWasm3Tester()
+		testRtFac(t, rt, in, expValue)
 	})
+}
+
+func testRtFac(t *testing.T, rt runtimeTester, in int, expValue uint64) {
+	err := rt.Init(testCtx, facWasm, "fac")
+	require.NoError(t, err)
+	defer rt.Close()
+
+	for i := 0; i < 10000; i++ {
+		res, err := rt.Call(testCtx, "fac", uint64(in))
+		require.NoError(t, err)
+		require.Equal(t, expValue, res)
+	}
 }
 
 // BenchmarkFac_Init tracks the time spent readying a function for use
@@ -106,42 +75,47 @@ func BenchmarkFac_Init(b *testing.B) {
 	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mod, _, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
-			if err != nil {
+			rt := newWazeroTester(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
+			if err := rtFacInit(rt); err != nil {
 				b.Fatal(err)
+			} else {
+				rt.Close()
 			}
-			mod.Close()
 		}
 	})
 
 	b.Run("JIT", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			mod, _, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
-			if err != nil {
+			rt := newWazeroTester(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
+			if err := rtFacInit(rt); err != nil {
 				b.Fatal(err)
+			} else {
+				rt.Close()
 			}
-			mod.Close()
 		}
 	})
 
 	b.Run("wasmer-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			store, instance, _, err := newWasmerForFacBench()
-			if err != nil {
+			rt := newWasmerTester()
+			if err := rtFacInit(rt); err != nil {
 				b.Fatal(err)
+			} else {
+				rt.Close()
 			}
-			store.Close()
-			instance.Close()
 		}
 	})
 
 	b.Run("wasmtime-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, _, err := newWasmtimeForFacBench(); err != nil {
+			rt := newWasmtimeTester()
+			if err := rtFacInit(rt); err != nil {
 				b.Fatal(err)
+			} else {
+				rt.Close()
 			}
 		}
 	})
@@ -149,12 +123,12 @@ func BenchmarkFac_Init(b *testing.B) {
 	b.Run("go-wasm3", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			env, runtime, _, err := newGoWasm3ForFacBench()
-			if err != nil {
+			rt := newWasm3Tester()
+			if err := rtFacInit(rt); err != nil {
 				b.Fatal(err)
+			} else {
+				rt.Close()
 			}
-			runtime.Destroy()
-			env.Destroy()
 		}
 	})
 }
@@ -181,15 +155,15 @@ func TestFac_JIT_Fastest(t *testing.T) {
 		},
 		{
 			runtimeName: "wasmer-go",
-			result:      testing.Benchmark(wasmerGoFacInvoke),
+			result:      testing.Benchmark(wasmerFacInvoke),
 		},
 		{
 			runtimeName: "wasmtime-go",
-			result:      testing.Benchmark(wasmtimeGoFacInvoke),
+			result:      testing.Benchmark(wasmtimeFacInvoke),
 		},
 		{
 			runtimeName: "go-wasm3",
-			result:      testing.Benchmark(goWasm3FacInvoke),
+			result:      testing.Benchmark(wasm3FacInvoke),
 		},
 	}
 
@@ -221,157 +195,56 @@ func BenchmarkFac_Invoke(b *testing.B) {
 	}
 	b.Run("Interpreter", interpreterFacInvoke)
 	b.Run("JIT", jitFacInvoke)
-	b.Run("wasmer-go", wasmerGoFacInvoke)
-	b.Run("wasmtime-go", wasmtimeGoFacInvoke)
-	b.Run("go-wasm3", goWasm3FacInvoke)
+	b.Run("wasmer-go", wasmerFacInvoke)
+	b.Run("wasmtime-go", wasmtimeFacInvoke)
+	b.Run("go-wasm3", wasm3FacInvoke)
 }
 
 func interpreterFacInvoke(b *testing.B) {
-	mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer mod.Close()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(testCtx, facArgumentU64); err != nil {
-			b.Fatal(err)
-		}
-	}
+	wazeroFacInvoke(b, wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
 }
 
 func jitFacInvoke(b *testing.B) {
-	mod, fn, err := newWazeroFacBench(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
+	wazeroFacInvoke(b, wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
+}
+
+func wazeroFacInvoke(b *testing.B, config *wazero.RuntimeConfig) {
+	rt := newWazeroTester(config)
+	err := rtFacInit(rt)
+	rtFacInvoke(b, err, rt)
+}
+
+func wasmerFacInvoke(b *testing.B) {
+	rt := newWasmerTester()
+	err := rtFacInit(rt)
+	rtFacInvoke(b, err, rt)
+}
+
+func wasmtimeFacInvoke(b *testing.B) {
+	rt := newWasmtimeTester()
+	err := rtFacInit(rt)
+	rtFacInvoke(b, err, rt)
+}
+
+func wasm3FacInvoke(b *testing.B) {
+	rt := newWasm3Tester()
+	err := rtFacInit(rt)
+	rtFacInvoke(b, err, rt)
+}
+
+func rtFacInvoke(b *testing.B, err error, rt runtimeTester) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer mod.Close()
+	defer rt.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(testCtx, facArgumentU64); err != nil {
+		if _, err = rt.Call(testCtx, "fac", facArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func wasmerGoFacInvoke(b *testing.B) {
-	store, instance, fn, err := newWasmerForFacBench()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer store.Close()
-	defer instance.Close()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err = fn(facArgumentI64); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func wasmtimeGoFacInvoke(b *testing.B) {
-	store, run, err := newWasmtimeForFacBench()
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// go-wasm3 only maps the int type
-		if _, err = run.Call(store, int(facArgumentI64)); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func goWasm3FacInvoke(b *testing.B) {
-	env, runtime, run, err := newGoWasm3ForFacBench()
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// go-wasm3 only maps the int type
-		if _, err = run(int(facArgumentI64)); err != nil {
-			b.Fatal(err)
-		}
-	}
-	runtime.Destroy()
-	env.Destroy()
-}
-
-func newWazeroFacBench(config *wazero.RuntimeConfig) (api.Module, api.Function, error) {
-	r := wazero.NewRuntimeWithConfig(config)
-
-	m, err := r.InstantiateModuleFromCode(testCtx, facWasm)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return m, m.ExportedFunction("fac"), nil
-}
-
-// newWasmerForFacBench returns the store and instance that scope the factorial function.
-// Note: these should be closed
-func newWasmerForFacBench() (*wasmer.Store, *wasmer.Instance, wasmer.NativeFunction, error) {
-	store := wasmer.NewStore(wasmer.NewEngine())
-	importObject := wasmer.NewImportObject()
-	module, err := wasmer.NewModule(store, facWasm)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	instance, err := wasmer.NewInstance(module, importObject)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	f, err := instance.Exports.GetFunction("fac")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if f == nil {
-		return nil, nil, nil, errors.New("not a function")
-	}
-	return store, instance, f, nil
-}
-
-func newWasmtimeForFacBench() (*wasmtime.Store, *wasmtime.Func, error) {
-	store := wasmtime.NewStore(wasmtime.NewEngine())
-	module, err := wasmtime.NewModule(store.Engine, facWasm)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	instance, err := wasmtime.NewInstance(store, module, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	run := instance.GetFunc(store, "fac")
-	if run == nil {
-		return nil, nil, errors.New("not a function")
-	}
-	return store, run, nil
-}
-
-func newGoWasm3ForFacBench() (*wasm3.Environment, *wasm3.Runtime, wasm3.FunctionWrapper, error) {
-	env := wasm3.NewEnvironment()
-	runtime := wasm3.NewRuntime(&wasm3.Config{
-		Environment: wasm3.NewEnvironment(),
-		StackSize:   64 * 1024, // from example
-	})
-
-	module, err := runtime.ParseModule(facWasm)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	_, err = runtime.LoadModule(module)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	run, err := runtime.FindFunction("fac")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return env, runtime, run, nil
+func rtFacInit(rt runtimeTester) error {
+	return rt.Init(testCtx, facWasm, "fac")
 }
