@@ -5,12 +5,14 @@ on:
     paths:
       - '.github/workflows/examples.yaml'
       - 'examples/*/testdata/*.go'
+      - 'examples/*/*/testdata/*.go'
       - 'Makefile'
   push:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
       - 'examples/*/testdata/*.go'
+      - 'examples/*/*/testdata/*.go'
       - 'Makefile'
 
 jobs:
