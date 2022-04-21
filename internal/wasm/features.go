@@ -45,6 +45,18 @@ const (
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	FeatureMultiValue
 
+	// FeatureNonTrappingFloatToIntConversion decides if parsing should succeed on the following instructions:
+	//
+	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32S]
+	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32U]
+	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32S]
+	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32U]
+	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64S]
+	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64U]
+	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64S]
+	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64U]
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	FeatureNonTrappingFloatToIntConversion
 )
 

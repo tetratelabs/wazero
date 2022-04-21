@@ -730,6 +730,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeMiscPrefix {
 			pc++
+			// Miscellaneous instructions come with two bytes which starts with OpcodeMiscPrefix,
+			// and the second byte determines the actual instruction.
 			miscOpcode := body[pc]
 			if miscOpcode >= OpcodeMiscI32TruncSatF32S && miscOpcode <= OpcodeMiscI64TruncSatF64U {
 				if err := enabledFeatures.Require(FeatureNonTrappingFloatToIntConversion); err != nil {
