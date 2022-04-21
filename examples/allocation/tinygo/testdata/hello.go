@@ -34,6 +34,8 @@ func _log(ptr uint32, size uint32)
 // memory offset) and calls [`say_hello`].
 //export say_hello
 func _sayHello(ptr, size uint32) {
+	// Here, we want to get a string represented by the ptr and size. If we
+	// wanted a []byte, we'd use reflect.SliceHeader instead.
 	var name string
 	strHdr := (*reflect.StringHeader)(unsafe.Pointer(&name))
 	strHdr.Data = uintptr(ptr)
