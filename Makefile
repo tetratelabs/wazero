@@ -15,12 +15,12 @@ bench_testdata_dir := internal/integration_test/bench/testdata
 
 .PHONY: build.bench
 build.bench:
-	tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none -target=wasi $(bench_testdata_dir)/case.go
+	@tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none --no-debug -target=wasi $(bench_testdata_dir)/case.go
 
-wasi_testdata_dir := ./examples/*/testdata
+tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go)
 .PHONY: build.examples
-build.examples:
-	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
+build.examples: $(tinygo_sources)
+	@echo $< | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi p'
 
 spectest_testdata_dir := internal/integration_test/spectest/testdata
 spec_version := wg-1.0
