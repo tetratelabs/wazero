@@ -2,6 +2,7 @@
 
 The following example projects can help you practice WebAssembly with wazero:
 
+* [allocation](allocation) - how to pass strings in and out of WebAssembly functions defined in Rust or TinyGo.
 * [basic](basic) - how to use both WebAssembly and Go-defined functions.
 * [import-go](import-go) - how to define, import and call a Go-defined function from a WebAssembly-defined function.
 * [multiple-results](multiple-results) - how to return more than one result from WebAssembly or Go-defined functions.

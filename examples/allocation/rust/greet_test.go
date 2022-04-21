@@ -1,4 +1,4 @@
-package wasi_example
+package main
 
 import (
 	"testing"
@@ -9,8 +9,10 @@ import (
 
 // Test_main ensures the following will work:
 //
-//	go run cat.go ./test.txt
+//	go run greet.go wazero
 func Test_main(t *testing.T) {
-	stdout, _ := maintester.TestMain(t, main, "cat", "./test.txt")
-	require.Equal(t, "greet filesystem\n", stdout)
+	stdout, _ := maintester.TestMain(t, main, "greet", "wazero")
+	require.Equal(t, `wasm >> Hello, wazero!
+go >> Hello, wazero!
+`, stdout)
 }
