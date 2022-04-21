@@ -9,7 +9,7 @@ Hello, wazero!
 ```
 
 While the below examples use strings, they are written in a way that would work
-for other types of serialization, such as JSON.
+for binary serialization.
 
 * [Rust](rust) - Calls Wasm built with `cargo build --release --target wasm32-unknown-unknown`
 * [TinyGo](tinygo) - Calls Wasm built with `tinygo build -o X.wasm -scheduler=none -target=wasi X.go`

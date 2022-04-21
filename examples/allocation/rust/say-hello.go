@@ -55,7 +55,7 @@ func main() {
 
 	// Instead of an arbitrary memory offset, use Rust's allocator. Notice
 	// there is nothing string-specific in this allocation function. The same
-	// function could be used to pass serialized data like JSON to Wasm.
+	// function could be used to pass binary serialized data to Wasm.
 	results, err := allocate.Call(ctx, byteCount)
 	if err != nil {
 		log.Fatal(err)
