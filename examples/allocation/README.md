@@ -15,8 +15,11 @@ for binary serialization.
 * [Rust](rust) - Calls Wasm built with `cargo build --release --target wasm32-unknown-unknown`
 * [TinyGo](tinygo) - Calls Wasm built with `tinygo build -o X.wasm -scheduler=none --no-debug -target=wasi X.go`
 
-Note: The above are language-specific because there's no WebAssembly
-specification for memory allocation. This mean exported functions are different
-and how pointers map to parameters are different. That said, the examples are
-as close to the same as possible with subtle differences and gotchas mentioned
-in the respective README files.
+Note: Each of the above languages differ in both terms of exports and runtime
+behavior around allocation, because there is no WebAssembly specification for
+it. For example, TinyGo exports allocation functions while Rust does not. Also,
+Rust eagerly collects memory before returning from a Wasm function while TinyGo
+does not.
+
+We still try to keep the examples as close to the same as possible, and
+highlight things to be aware of in the respective source and README files.

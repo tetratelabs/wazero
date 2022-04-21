@@ -13,7 +13,7 @@ go >> Hello, wazero!
 Under the covers, [greet.go](testdata/greet.go) does a few things of interest:
 * Uses `unsafe.Pointer` to change a Go pointer to a numeric type.
 * Uses `reflect.StringHeader` to build back a string from a pointer, len pair.
-* Packs a pointer, size pair into a uint64 for WebAssembly 1.0 compatibility.
+* Relies on TinyGo not eagerly freeing pointers returned.
 
 Go does not export allocation functions, but when TinyGo generates WebAssembly,
 it exports "malloc" and "free", which we use for that purpose. These are not
