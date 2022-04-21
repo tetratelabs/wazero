@@ -74,7 +74,10 @@ func main() {
 	defer free.Call(ctx, pointer)
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	hello.Memory().Write(uint32(pointer), []byte(name))
+	if !hello.Memory().Write(uint32(pointer), []byte(name)) {
+		log.Fatalf("Memory.Write(%d, %d) out of range of memory size %d",
+			pointer, byteCount, hello.Memory().Size())
+	}
 
 	// Now, we can call "say_hello", which reads the string we wrote to memory!
 	_, err = sayHello.Call(ctx, pointer, byteCount)
