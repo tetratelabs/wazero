@@ -4,7 +4,7 @@ The examples in this directory deal with memory allocation concerns in
 WebAssembly, e.g. How to pass strings in and out of WebAssembly functions.
 
 ```bash
-$ go run say-hello.go wazero
+$ go run greet.go wazero
 Hello, wazero!
 ```
 

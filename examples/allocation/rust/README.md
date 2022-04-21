@@ -5,7 +5,7 @@ in Rust, built with `cargo build --release --target wasm32-unknown-unknown`
 
 Ex.
 ```bash
-$ go run say-hello.go wazero
+$ go run greet.go wazero
 Hello, wazero!
 ```
 

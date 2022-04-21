@@ -1,15 +1,15 @@
 ## TinyGo allocation example
 
 This example shows how to pass strings in and out of a Wasm function defined
-in TinyGo, built with `tinygo build -o hello.wasm -scheduler=none -target=wasi hello.go`
+in TinyGo, built with `tinygo build -o greet.wasm -scheduler=none -target=wasi greet.go`
 
 Ex.
 ```bash
-$ go run say-hello.go wazero
+$ go run greet.go wazero
 Hello, wazero!
 ```
 
-Under the covers, [hello.go](testdata/hello.go) does a few things of interest:
+Under the covers, [greet.go](testdata/greet.go) does a few things of interest:
 * Uses `unsafe.Pointer` to change a Go pointer to a numeric type.
 * Uses `reflect.StringHeader` to build back a string from a pointer, len pair.
 

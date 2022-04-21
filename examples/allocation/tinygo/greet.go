@@ -9,14 +9,15 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
-// helloWasm was compiled using `cargo build --release --target wasm32-unknown-unknown`
-//go:embed testdata/hello.wasm
-var helloWasm []byte
+// greetWasm was compiled using `tinygo build -o greet.wasm -scheduler=none -target=wasi greet.go`
+//go:embed testdata/greet.wasm
+var greetWasm []byte
 
 // main shows how to interact with a WebAssembly function that was compiled
-// from Rust.
+// from TinyGo.
 //
 // See README.md for a full description.
 func main() {
@@ -36,43 +37,52 @@ func main() {
 	}
 	defer env.Close()
 
-	// Instantiate a module named "hello" that imports the "log" function
-	// defined in "env".
-	hello, err := r.InstantiateModuleFromCodeWithConfig(ctx, helloWasm, wazero.NewModuleConfig().WithName("hello"))
+	// Note: testdata/greet.go doesn't use WASI, but TinyGo needs it to
+	// implement functions such as panic.
+	wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer hello.Close()
+	defer wm.Close()
+
+	// Instantiate a module named "greet" that imports the "log" function
+	// defined in "env".
+	greet, err := r.InstantiateModuleFromCodeWithConfig(ctx, greetWasm, wazero.NewModuleConfig().WithName("greet"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer greet.Close()
 
 	// Get a references to functions we'll use in this example.
-	sayHello := hello.ExportedFunction("say_hello")
-	allocate := hello.ExportedFunction("allocate")
-	deallocate := hello.ExportedFunction("deallocate")
+	greet := greet.ExportedFunction("greet")
+	// These are undocumented, but exported. See tinygo-org/tinygo#2788
+	malloc := greet.ExportedFunction("malloc")
+	free := greet.ExportedFunction("free")
 
 	// Let's use the argument to this main function in Wasm.
 	name := os.Args[1]
 	byteCount := uint64(len(name))
 
-	// Instead of an arbitrary memory offset, use Rust's allocator. Notice
+	// Instead of an arbitrary memory offset, use TinyGo's allocator. Notice
 	// there is nothing string-specific in this allocation function. The same
 	// function could be used to pass binary serialized data to Wasm.
-	results, err := allocate.Call(ctx, byteCount)
+	results, err := malloc.Call(ctx, byteCount)
 	if err != nil {
 		log.Fatal(err)
 	}
 	pointer := results[0]
-	// This pointer is managed by Rust, but Rust is unaware of external usage.
-	// So, we have to deallocate it when finished
-	defer deallocate.Call(ctx, pointer, byteCount)
+	// This pointer is managed by TinyGo, but TinyGo is unaware of external usage.
+	// So, we have to free it when finished
+	defer free.Call(ctx, pointer)
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	if !hello.Memory().Write(uint32(pointer), []byte(name)) {
+	if !greet.Memory().Write(uint32(pointer), []byte(name)) {
 		log.Fatalf("Memory.Write(%d, %d) out of range of memory size %d",
-			pointer, byteCount, hello.Memory().Size())
+			pointer, byteCount, greet.Memory().Size())
 	}
 
-	// Now, we can call "say_hello", which reads the string we wrote to memory!
-	_, err = sayHello.Call(ctx, pointer, byteCount)
+	// Now, we can call "greet", which reads the string we wrote to memory!
+	_, err = greet.Call(ctx, pointer, byteCount)
 	if err != nil {
 		log.Fatal(err)
 	}

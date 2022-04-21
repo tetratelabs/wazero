@@ -7,8 +7,13 @@ use std::mem::MaybeUninit;
 use std::slice;
 
 /// Prints a greeting to the console using [`log`].
-fn say_hello(name: &String) {
-    log(&["Hello, ", &name, "!"].concat());
+fn greet(name: &String) {
+    log(&["Greet, ", &name, "!"].concat());
+}
+
+/// gets a greeting for the name.
+fn greeting(name: &String) -> &String {
+    return &["Greet, ", &name, "!"].concat();
 }
 
 /// Logs a message to the console using [`_log`].
@@ -30,20 +35,20 @@ extern "C" {
 }
 
 /// WebAssembly export that accepts a string (linear memory offset, byteCount)
-/// and calls [`say_hello`].
+/// and calls [`greet`].
 ///
 /// Note: The input parameters were returned by [`allocate`]. This is not an
 /// ownership transfer, so the inputs can be reused after this call.
 #[cfg_attr(
 all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "say_hello"
+export_name = "greet"
 )]
 #[no_mangle]
-pub unsafe extern "C" fn _say_hello(ptr: *mut u8, size: usize) {
+pub unsafe extern "C" fn _greet(ptr: *mut u8, size: usize) {
     // Borrow
     let slice = slice::from_raw_parts_mut(ptr, size);
     let name = std::str::from_utf8_unchecked_mut(slice);
-    say_hello(&String::from(name));
+    greet(&String::from(name));
 }
 
 /// Set the global allocator to the WebAssembly optimized one.

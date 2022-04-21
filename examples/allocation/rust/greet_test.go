@@ -9,9 +9,9 @@ import (
 
 // Test_main ensures the following will work:
 //
-//	go run say-hello.go wazero
+//	go run greet.go wazero
 func Test_main(t *testing.T) {
-	stdout, _ := maintester.TestMain(t, main, "say-hello", "wazero")
+	stdout, _ := maintester.TestMain(t, main, "greet", "wazero")
 	require.Equal(t, `Hello, wazero!
 `, stdout)
 }
