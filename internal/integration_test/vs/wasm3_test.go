@@ -10,50 +10,65 @@ import (
 )
 
 func init() {
-	runtimeTesters["wasm3-go"] = newWasm3Tester
+	runtimes["wasm3-go"] = newWasm3Runtime
 }
 
-func newWasm3Tester() runtimeTester {
-	return &wasm3Tester{funcs: map[string]wasm3.FunctionWrapper{}}
+func newWasm3Runtime() runtime {
+	return &wasm3Runtime{}
 }
 
-type wasm3Tester struct {
+type wasm3Runtime struct {
 	runtime *wasm3.Runtime
-	funcs   map[string]wasm3.FunctionWrapper
+}
+type wasm3Module struct {
+	module *wasm3.Module
+	funcs  map[string]wasm3.FunctionWrapper
 }
 
-func (w *wasm3Tester) Init(_ context.Context, cfg *runtimeConfig) (err error) {
-	w.runtime = wasm3.NewRuntime(&wasm3.Config{
+func (r *wasm3Runtime) Compile(_ context.Context, _ *runtimeConfig) (err error) {
+	r.runtime = wasm3.NewRuntime(&wasm3.Config{
 		Environment: wasm3.NewEnvironment(),
 		StackSize:   64 * 1024, // from example
 	})
+	// There's currently no way to clone a parsed module, so we have to do it on instantiate.
+	return
+}
 
-	module, err := w.runtime.ParseModule(cfg.moduleWasm)
-	if err != nil {
-		return err
-	}
+func (r *wasm3Runtime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod module, err error) {
+	m := &wasm3Module{funcs: map[string]wasm3.FunctionWrapper{}}
+
+	m.module, err = r.runtime.ParseModule(cfg.moduleWasm)
 
 	// TODO: not sure we can set cfg.moduleName in wasm3-go
-	_, err = w.runtime.LoadModule(module)
-	if err != nil {
-		return err
+	if _, err = r.runtime.LoadModule(m.module); err != nil {
+		return
 	}
 
 	for _, funcName := range cfg.funcNames {
 		var fn wasm3.FunctionWrapper
-		if fn, err = w.runtime.FindFunction(funcName); err != nil {
+		if fn, err = r.runtime.FindFunction(funcName); err != nil {
 			return
 		} else if fn == nil {
-			return fmt.Errorf("%s is not an exported function", funcName)
+			err = fmt.Errorf("%s is not an exported function", funcName)
+			return
 		} else {
-			w.funcs[funcName] = fn
+			m.funcs[funcName] = fn
 		}
 	}
+	mod = m
 	return
 }
 
-func (w *wasm3Tester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
-	fn := w.funcs[funcName]
+func (r *wasm3Runtime) Close() error {
+	if r := r.runtime; r != nil {
+		r.Destroy()
+	}
+	r.runtime = nil
+	return nil
+}
+
+func (m *wasm3Module) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
+	fn := m.funcs[funcName]
 	// Note: go-wasm3 only maps the int type on input, though output params map based on value type
 	if results, err := fn(int(param)); err != nil {
 		return 0, err
@@ -62,13 +77,9 @@ func (w *wasm3Tester) CallI64_I64(_ context.Context, funcName string, param uint
 	}
 }
 
-func (w *wasm3Tester) Close() error {
-	for _, closer := range []func(){w.runtime.Destroy} {
-		if closer == nil {
-			continue
-		}
-		closer()
-	}
-	w.runtime = nil
+func (m *wasm3Module) Close() error {
+	// module can't be destroyed
+	m.module = nil
+	m.funcs = nil
 	return nil
 }

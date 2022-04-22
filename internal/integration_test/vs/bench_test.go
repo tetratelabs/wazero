@@ -3,16 +3,12 @@ package vs
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"testing"
 	"text/tabwriter"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/wasi"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -24,27 +20,31 @@ var ensureJITFastest = "false"
 
 const jitRuntime = "wazero-jit"
 
-var jitFastestBench = benchFacInvoke
+var jitFastestBench = func(rt runtime) func(b *testing.B) {
+	return func(b *testing.B) {
+		benchmarkFn(rt, facConfig, facCall)
+	}
+}
 
-var runtimeTesters = map[string]func() runtimeTester{
-	"wazero-interpreter": newWazeroInterpreterTester,
-	jitRuntime:           newWazeroJITTester,
+var runtimes = map[string]func() runtime{
+	"wazero-interpreter": newWazeroInterpreterRuntime,
+	jitRuntime:           newWazeroJITRuntime,
 }
 
 // TestFac_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
 func TestFac_JIT_Fastest(t *testing.T) {
-	//if ensureJITFastest != "true" {
-	//	t.Skip()
-	//}
+	if ensureJITFastest != "true" {
+		t.Skip()
+	}
 
 	type benchResult struct {
 		name string
 		nsOp float64
 	}
-	results := make([]benchResult, 0, len(runtimeTesters))
+	results := make([]benchResult, 0, len(runtimes))
 
-	for name, rtFn := range runtimeTesters {
+	for name, rtFn := range runtimes {
 		result := testing.Benchmark(jitFastestBench(rtFn()))
 		// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
 		nsOp := float64(result.T.Nanoseconds()) / float64(result.N)
@@ -64,79 +64,108 @@ func TestFac_JIT_Fastest(t *testing.T) {
 
 	// Fail if jit wasn't fastest!
 	require.Equal(t, jitRuntime, results[0].name, "%s is faster than %s. "+
-		"Run BenchmarkFac_Invoke with ensureJITFastest=false instead to see the detailed result",
+		"Run BenchmarkFac_Call with ensureJITFastest=false instead to see the detailed result",
 		results[0].name, jitRuntime)
 }
 
-type runtimeConfig struct {
-	moduleName string
-	moduleWasm []byte
-	funcNames  []string
-}
-
-type runtimeTester interface {
-	Init(ctx context.Context, cfg *runtimeConfig) error
-	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
-	io.Closer
-}
-
-func newWazeroInterpreterTester() runtimeTester {
-	return newWazeroTester(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
-}
-
-func newWazeroJITTester() runtimeTester {
-	return newWazeroTester(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
-}
-
-func newWazeroTester(config *wazero.RuntimeConfig) runtimeTester {
-	return &wazeroTester{config: config, funcs: map[string]api.Function{}}
-}
-
-type wazeroTester struct {
-	config    *wazero.RuntimeConfig
-	wasi, mod api.Module
-	funcs     map[string]api.Function
-}
-
-func (w *wazeroTester) Init(ctx context.Context, cfg *runtimeConfig) (err error) {
-	r := wazero.NewRuntimeWithConfig(w.config)
-
-	if w.wasi, err = wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
-		return
+func benchmarkCompile(b *testing.B, rtCfg *runtimeConfig) {
+	for name, rtFn := range runtimes {
+		rt := rtFn()
+		b.Run(name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				if err := rt.Compile(testCtx, rtCfg); err != nil {
+					b.Fatal(err)
+				}
+				if err := rt.Close(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	wazeroCfg := wazero.NewModuleConfig().WithName(cfg.moduleName)
-	if w.mod, err = r.InstantiateModuleFromCodeWithConfig(ctx, cfg.moduleWasm, wazeroCfg); err != nil {
-		return
+}
+
+func benchmarkInstantiate(b *testing.B, rtCfg *runtimeConfig) {
+	for name, rtFn := range runtimes {
+		rt := rtFn()
+		b.Run(name, func(b *testing.B) {
+			// Compile outside the benchmark loop
+			if err := rt.Compile(testCtx, rtCfg); err != nil {
+				b.Fatal(err)
+			}
+			defer rt.Close()
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				mod, err := rt.Instantiate(testCtx, rtCfg)
+				if err != nil {
+					b.Fatal(err)
+				}
+				err = mod.Close()
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	for _, funcName := range cfg.funcNames {
-		if fn := w.mod.ExportedFunction(funcName); fn == nil {
-			return fmt.Errorf("%s is not an exported function", fn)
-		} else {
-			w.funcs[funcName] = fn
+}
+
+func benchmarkCall(b *testing.B, rtCfg *runtimeConfig, call func(module) (uint64, error)) {
+	if ensureJITFastest == "true" {
+		// If ensureJITFastest == "true", the benchmark for invocation will be run by
+		// TestFac_JIT_Fastest so skip here.
+		b.Skip()
+	}
+	for name, rtFn := range runtimes {
+		rt := rtFn()
+		b.Run(name, benchmarkFn(rt, rtCfg, call))
+	}
+}
+
+func benchmarkFn(rt runtime, rtCfg *runtimeConfig, call func(module) (uint64, error)) func(b *testing.B) {
+	return func(b *testing.B) {
+		// Initialize outside the benchmark loop
+		if err := rt.Compile(testCtx, rtCfg); err != nil {
+			b.Fatal(err)
+		}
+		defer rt.Close()
+		mod, err := rt.Instantiate(testCtx, rtCfg)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer mod.Close()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if _, err := call(mod); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
-	return
 }
 
-func (w *wazeroTester) CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error) {
-	if results, err := w.funcs[funcName].Call(ctx, param); err != nil {
-		return 0, err
-	} else if len(results) > 0 {
-		return results[0], nil
+func testCall(t *testing.T, rtCfg *runtimeConfig, call func(*testing.T, module)) {
+	for name, rtFn := range runtimes {
+		rt := rtFn()
+		t.Run(name, testCallFn(rt, rtCfg, call))
 	}
-	return 0, nil
 }
 
-func (w *wazeroTester) Close() (err error) {
-	for _, closer := range []io.Closer{w.mod, w.wasi} {
-		if closer == nil {
-			continue
-		}
-		if nextErr := closer.Close(); nextErr != nil {
-			err = nextErr
+func testCallFn(rt runtime, rtCfg *runtimeConfig, testCall func(*testing.T, module)) func(t *testing.T) {
+	return func(t *testing.T) {
+		err := rt.Compile(testCtx, rtCfg)
+		require.NoError(t, err)
+		defer rt.Close()
+
+		// Ensure the module can be re-instantiated times, even if not all runtimes allow renaming.
+		for i := 0; i < 10; i++ {
+			m, err := rt.Instantiate(testCtx, rtCfg)
+			require.NoError(t, err)
+
+			// Large loop in test is only to show the function is stable (ex doesn't leak or crash on Nth use).
+			for j := 0; j < 10000; j++ {
+				testCall(t, m)
+			}
+
+			require.NoError(t, m.Close())
 		}
 	}
-	w.mod = nil
-	w.wasi = nil
-	return
 }

@@ -12,61 +12,77 @@ import (
 )
 
 func init() {
-	runtimeTesters["WasmEdge-go"] = newWasmedgeTester
+	runtimes["WasmEdge-go"] = newWasmedgeRuntime
 }
 
-func newWasmedgeTester() runtimeTester {
-	return &wasmedgeTester{}
+func newWasmedgeRuntime() runtime {
+	return &wasmedgeRuntime{}
 }
 
-type wasmedgeTester struct {
-	conf  *wasmedge.Configure
+type wasmedgeRuntime struct {
+	conf *wasmedge.Configure
+}
+
+type wasmedgeModule struct {
 	store *wasmedge.Store
 	vm    *wasmedge.VM
 }
 
-func (w *wasmedgeTester) Init(_ context.Context, cfg *runtimeConfig) (err error) {
-	w.conf = wasmedge.NewConfigure()
-	w.store = wasmedge.NewStore()
-	w.vm = wasmedge.NewVMWithConfigAndStore(w.conf, w.store)
-
-	if err = w.vm.RegisterWasmBuffer(cfg.moduleName, cfg.moduleWasm); err != nil {
-		return
-	}
-	if err = w.vm.LoadWasmBuffer(cfg.moduleWasm); err != nil {
-		return
-	}
-	if err = w.vm.Validate(); err != nil {
-		return
-	}
-	if err = w.vm.Instantiate(); err != nil {
-		return
-	}
-	for _, funcName := range cfg.funcNames {
-		if fn := w.vm.GetFunctionType(funcName); fn == nil {
-			return fmt.Errorf("%s is not an exported function", funcName)
-		}
-	}
+func (r *wasmedgeRuntime) Compile(_ context.Context, _ *runtimeConfig) (err error) {
+	r.conf = wasmedge.NewConfigure()
+	// We can't re-use a store because "module name conflict" occurs even after releasing a VM
 	return
 }
 
-func (w *wasmedgeTester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
-	if result, err := w.vm.Execute(funcName, int64(param)); err != nil {
+func (r *wasmedgeRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod module, err error) {
+	m := &wasmedgeModule{store: wasmedge.NewStore()}
+	m.vm = wasmedge.NewVMWithConfigAndStore(r.conf, m.store)
+	if err = m.vm.RegisterWasmBuffer(cfg.moduleName, cfg.moduleWasm); err != nil {
+		return
+	}
+	if err = m.vm.LoadWasmBuffer(cfg.moduleWasm); err != nil {
+		return
+	}
+	if err = m.vm.Validate(); err != nil {
+		return
+	}
+	if err = m.vm.Instantiate(); err != nil {
+		return
+	}
+	for _, funcName := range cfg.funcNames {
+		if fn := m.vm.GetFunctionType(funcName); fn == nil {
+			err = fmt.Errorf("%s is not an exported function", funcName)
+			return
+		}
+	}
+	mod = m
+	return
+}
+
+func (r *wasmedgeRuntime) Close() error {
+	if conf := r.conf; conf != nil {
+		conf.Release()
+	}
+	r.conf = nil
+	return nil
+}
+
+func (m *wasmedgeModule) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
+	if result, err := m.vm.Execute(funcName, int64(param)); err != nil {
 		return 0, err
 	} else {
 		return uint64(result[0].(int64)), nil
 	}
 }
 
-func (w *wasmedgeTester) Close() error {
-	for _, closer := range []func(){w.vm.Release, w.store.Release, w.conf.Release} {
-		if closer == nil {
-			continue
-		}
-		closer()
+func (m *wasmedgeModule) Close() error {
+	if vm := m.vm; vm != nil {
+		vm.Release()
 	}
-	w.vm = nil
-	w.store = nil
-	w.conf = nil
+	m.vm = nil
+	if store := m.store; store != nil {
+		store.Release()
+	}
+	m.store = nil
 	return nil
 }

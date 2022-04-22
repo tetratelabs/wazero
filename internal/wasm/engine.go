@@ -28,8 +28,8 @@ type Engine interface {
 	) (ModuleEngine, error)
 
 	// DeleteCompiledModule releases compilation caches for the given module (source).
-	// Note: it is safe to call this function for a module from which module instances are instantiated even when these module instances
-	// are having outstanding calls.
+	// Note: it is safe to call this function for a module from which module instances are instantiated even when these
+	// module instances have outstanding calls.
 	DeleteCompiledModule(module *Module)
 }
 
