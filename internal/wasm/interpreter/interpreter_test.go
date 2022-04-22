@@ -56,7 +56,7 @@ type engineTester struct {
 }
 
 func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
-	return NewEngine(enabledFeatures)
+	return NewEngine(wasm.EngineConfig{EnabledFeatures: enabledFeatures})
 }
 
 func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {

@@ -15,23 +15,27 @@ import (
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	enabledFeatures wasm.Features
-	newEngine       func(wasm.Features) wasm.Engine
-	memoryMaxPages  uint32
+	engineConfig   wasm.EngineConfig
+	newEngine      func(config wasm.EngineConfig) wasm.Engine
+	memoryMaxPages uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
-	enabledFeatures: wasm.Features20191205,
-	memoryMaxPages:  wasm.MemoryMaxPages,
+	engineConfig: wasm.EngineConfig{
+		EnabledFeatures: wasm.Features20191205,
+	},
+	memoryMaxPages: wasm.MemoryMaxPages,
 }
 
 // clone ensures all fields are coped even if nil.
 func (c *RuntimeConfig) clone() *RuntimeConfig {
 	return &RuntimeConfig{
-		enabledFeatures: c.enabledFeatures,
-		newEngine:       c.newEngine,
-		memoryMaxPages:  c.memoryMaxPages,
+		engineConfig: wasm.EngineConfig{
+			EnabledFeatures: c.engineConfig.EnabledFeatures,
+		},
+		newEngine:      c.newEngine,
+		memoryMaxPages: c.memoryMaxPages,
 	}
 }
 
@@ -77,7 +81,7 @@ func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig
 // See https://github.com/WebAssembly/spec/tree/main/proposals
 func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = wasm.FeaturesFinished
+	ret.engineConfig.EnabledFeatures = wasm.FeaturesFinished
 	return ret
 }
 
@@ -88,7 +92,7 @@ func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
 // will fail to parse.
 func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
+	ret.engineConfig.EnabledFeatures = ret.engineConfig.EnabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
 	return ret
 }
 
@@ -101,7 +105,7 @@ func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
+	ret.engineConfig.EnabledFeatures = ret.engineConfig.EnabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
 	return ret
 }
 
@@ -115,7 +119,7 @@ func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig
 // See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
+	ret.engineConfig.EnabledFeatures = ret.engineConfig.EnabledFeatures.Set(wasm.FeatureMultiValue, enabled)
 	return ret
 }
 

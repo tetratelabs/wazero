@@ -31,7 +31,9 @@ func TestRuntimeConfig(t *testing.T) {
 				return c.WithFeatureMutableGlobal(true)
 			},
 			expected: &RuntimeConfig{
-				enabledFeatures: wasm.FeatureMutableGlobal,
+				engineConfig: wasm.EngineConfig{
+					EnabledFeatures: wasm.FeatureMutableGlobal,
+				},
 			},
 		},
 		{
@@ -40,7 +42,9 @@ func TestRuntimeConfig(t *testing.T) {
 				return c.WithFeatureSignExtensionOps(true)
 			},
 			expected: &RuntimeConfig{
-				enabledFeatures: wasm.FeatureSignExtensionOps,
+				engineConfig: wasm.EngineConfig{
+					EnabledFeatures: wasm.FeatureSignExtensionOps,
+				},
 			},
 		},
 	}
@@ -87,19 +91,19 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			c := NewRuntimeConfig()
-			require.Equal(t, tc.expectDefault, c.enabledFeatures.Get(tc.feature))
+			require.Equal(t, tc.expectDefault, c.engineConfig.EnabledFeatures.Get(tc.feature))
 
 			// Set to false even if it was initially false.
 			c = tc.setFeature(c, false)
-			require.False(t, c.enabledFeatures.Get(tc.feature))
+			require.False(t, c.engineConfig.EnabledFeatures.Get(tc.feature))
 
 			// Set true makes it true
 			c = tc.setFeature(c, true)
-			require.True(t, c.enabledFeatures.Get(tc.feature))
+			require.True(t, c.engineConfig.EnabledFeatures.Get(tc.feature))
 
 			// Set false makes it false again
 			c = tc.setFeature(c, false)
-			require.False(t, c.enabledFeatures.Get(tc.feature))
+			require.False(t, c.engineConfig.EnabledFeatures.Get(tc.feature))
 		})
 	}
 }

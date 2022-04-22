@@ -123,8 +123,8 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
-		store:           wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
-		enabledFeatures: config.enabledFeatures,
+		store:           wasm.NewStore(config.engineConfig.EnabledFeatures, config.newEngine(config.engineConfig)),
+		enabledFeatures: config.engineConfig.EnabledFeatures,
 		memoryMaxPages:  config.memoryMaxPages,
 	}
 }

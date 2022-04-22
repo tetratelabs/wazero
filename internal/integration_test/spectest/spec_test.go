@@ -288,7 +288,7 @@ func TestInterpreter(t *testing.T) {
 	runTest(t, interpreter.NewEngine)
 }
 
-func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
+func runTest(t *testing.T, newEngine func(config wasm.EngineConfig) wasm.Engine) {
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -315,7 +315,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 
 		t.Run(wastName, func(t *testing.T) {
 			enabledFeatures := wasm.Features20191205
-			store := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
+			store := wasm.NewStore(enabledFeatures, newEngine(wasm.EngineConfig{EnabledFeatures: enabledFeatures}))
 			addSpectestModule(t, store)
 
 			var lastInstantiatedModuleName string

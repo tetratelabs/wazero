@@ -554,8 +554,8 @@ func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *
 	return
 }
 
-func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
-	return newEngine(enabledFeatures)
+func NewEngine(config wasm.EngineConfig) wasm.Engine {
+	return newEngine(config.EnabledFeatures)
 }
 
 func newEngine(enabledFeatures wasm.Features) *engine {

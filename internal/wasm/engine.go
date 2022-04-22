@@ -1,6 +1,8 @@
 package wasm
 
-import "context"
+import (
+	"context"
+)
 
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or JIT compiler.
@@ -40,4 +42,10 @@ type ModuleEngine interface {
 
 	// Call invokes a function instance f with given parameters.
 	Call(ctx context.Context, m *CallContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
+}
+
+// EngineConfig is the configuration for an Engine
+type EngineConfig struct {
+	// EnabledFeatures are the wasm features enabled for the Engine.
+	EnabledFeatures Features
 }

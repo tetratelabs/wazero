@@ -27,9 +27,9 @@ type engine struct {
 	mux             sync.RWMutex
 }
 
-func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+func NewEngine(config wasm.EngineConfig) wasm.Engine {
 	return &engine{
-		enabledFeatures: enabledFeatures,
+		enabledFeatures: config.EnabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 	}
 }
