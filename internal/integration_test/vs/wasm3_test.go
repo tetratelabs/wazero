@@ -22,23 +22,24 @@ type wasm3Tester struct {
 	funcs   map[string]wasm3.FunctionWrapper
 }
 
-func (w *wasm3Tester) Init(_ context.Context, wasm []byte, funcNames ...string) (err error) {
+func (w *wasm3Tester) Init(_ context.Context, cfg *runtimeConfig) (err error) {
 	w.runtime = wasm3.NewRuntime(&wasm3.Config{
 		Environment: wasm3.NewEnvironment(),
 		StackSize:   64 * 1024, // from example
 	})
 
-	module, err := w.runtime.ParseModule(wasm)
+	module, err := w.runtime.ParseModule(cfg.moduleWasm)
 	if err != nil {
 		return err
 	}
 
+	// TODO: not sure we can set cfg.moduleName in wasm3-go
 	_, err = w.runtime.LoadModule(module)
 	if err != nil {
 		return err
 	}
 
-	for _, funcName := range funcNames {
+	for _, funcName := range cfg.funcNames {
 		var fn wasm3.FunctionWrapper
 		if fn, err = w.runtime.FindFunction(funcName); err != nil {
 			return

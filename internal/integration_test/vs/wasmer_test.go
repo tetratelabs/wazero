@@ -24,16 +24,17 @@ type wasmerTester struct {
 	funcs    map[string]*wasmer.Function
 }
 
-func (w *wasmerTester) Init(_ context.Context, wasm []byte, funcNames ...string) (err error) {
+func (w *wasmerTester) Init(_ context.Context, cfg *runtimeConfig) (err error) {
 	w.store = wasmer.NewStore(wasmer.NewEngine())
 	importObject := wasmer.NewImportObject()
-	if w.module, err = wasmer.NewModule(w.store, wasm); err != nil {
+	if w.module, err = wasmer.NewModule(w.store, cfg.moduleWasm); err != nil {
 		return
 	}
+	// TODO: not sure we can set cfg.moduleName in wasmer-go
 	if w.instance, err = wasmer.NewInstance(w.module, importObject); err != nil {
 		return
 	}
-	for _, funcName := range funcNames {
+	for _, funcName := range cfg.funcNames {
 		var fn *wasmer.Function
 		if fn, err = w.instance.Exports.GetRawFunction(funcName); err != nil {
 			return

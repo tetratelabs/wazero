@@ -17,7 +17,11 @@ const (
 var facWasm []byte
 
 func facInit(rt runtimeTester) error {
-	return rt.Init(testCtx, facWasm, "fac")
+	return rt.Init(testCtx, &runtimeConfig{
+		moduleName: "math",
+		moduleWasm: facWasm,
+		funcNames:  []string{"fac"},
+	})
 }
 
 func facInvoke(rt runtimeTester) (uint64, error) {

@@ -22,17 +22,18 @@ type wasmtimeTester struct {
 	funcs map[string]*wasmtime.Func
 }
 
-func (w *wasmtimeTester) Init(_ context.Context, wasm []byte, funcNames ...string) (err error) {
+func (w *wasmtimeTester) Init(_ context.Context, cfg *runtimeConfig) (err error) {
 	w.store = wasmtime.NewStore(wasmtime.NewEngine())
-	module, err := wasmtime.NewModule(w.store.Engine, wasm)
+	module, err := wasmtime.NewModule(w.store.Engine, cfg.moduleWasm)
 	if err != nil {
 		return
 	}
+	// TODO: not sure we can set cfg.moduleName in wasmtime-go
 	instance, err := wasmtime.NewInstance(w.store, module, nil)
 	if err != nil {
 		return
 	}
-	for _, funcName := range funcNames {
+	for _, funcName := range cfg.funcNames {
 		if fn := instance.GetFunc(w.store, funcName); fn == nil {
 			return fmt.Errorf("%s is not an exported function", funcName)
 		} else {

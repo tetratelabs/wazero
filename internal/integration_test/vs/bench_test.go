@@ -22,21 +22,21 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 //	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 var ensureJITFastest = "false"
 
-const jitRuntime = "wazero/jit"
+const jitRuntime = "wazero-jit"
 
 var jitFastestBench = benchFacInvoke
 
 var runtimeTesters = map[string]func() runtimeTester{
-	"wazero/interpreter": newWazeroInterpreterTester,
+	"wazero-interpreter": newWazeroInterpreterTester,
 	jitRuntime:           newWazeroJITTester,
 }
 
 // TestFac_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
 func TestFac_JIT_Fastest(t *testing.T) {
-	if ensureJITFastest != "true" {
-		t.Skip()
-	}
+	//if ensureJITFastest != "true" {
+	//	t.Skip()
+	//}
 
 	type benchResult struct {
 		name string
@@ -68,8 +68,14 @@ func TestFac_JIT_Fastest(t *testing.T) {
 		results[0].name, jitRuntime)
 }
 
+type runtimeConfig struct {
+	moduleName string
+	moduleWasm []byte
+	funcNames  []string
+}
+
 type runtimeTester interface {
-	Init(ctx context.Context, wasm []byte, funcNames ...string) error
+	Init(ctx context.Context, cfg *runtimeConfig) error
 	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
 	io.Closer
 }
@@ -92,16 +98,17 @@ type wazeroTester struct {
 	funcs     map[string]api.Function
 }
 
-func (w *wazeroTester) Init(ctx context.Context, wasm []byte, funcNames ...string) (err error) {
+func (w *wazeroTester) Init(ctx context.Context, cfg *runtimeConfig) (err error) {
 	r := wazero.NewRuntimeWithConfig(w.config)
 
 	if w.wasi, err = wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
 		return
 	}
-	if w.mod, err = r.InstantiateModuleFromCode(ctx, wasm); err != nil {
+	wazeroCfg := wazero.NewModuleConfig().WithName(cfg.moduleName)
+	if w.mod, err = r.InstantiateModuleFromCodeWithConfig(ctx, cfg.moduleWasm, wazeroCfg); err != nil {
 		return
 	}
-	for _, funcName := range funcNames {
+	for _, funcName := range cfg.funcNames {
 		if fn := w.mod.ExportedFunction(funcName); fn == nil {
 			return fmt.Errorf("%s is not an exported function", fn)
 		} else {

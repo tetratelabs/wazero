@@ -8,8 +8,8 @@ bench:
 
 .PHONY: bench.check
 bench.check:
-	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
-	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+	@go build ./internal/integration_test/bench/...
+	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -tags='wasmedge' -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 
 bench_testdata_dir := internal/integration_test/bench/testdata
 
