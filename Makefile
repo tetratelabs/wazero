@@ -20,7 +20,9 @@ build.bench:
 tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go)
 .PHONY: build.examples
 build.examples: $(tinygo_sources)
-	@echo $< | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi p'
+	@for f in $^; do \
+	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
+	done
 
 spectest_testdata_dir := internal/integration_test/spectest/testdata
 spec_version := wg-1.0
