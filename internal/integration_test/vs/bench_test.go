@@ -15,14 +15,14 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // ensureJITFastest is overridable via ldflags. Ex.
-//	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+//	-ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
 var ensureJITFastest = "false"
 
 const jitRuntime = "wazero-jit"
 
 var jitFastestBench = func(rt runtime) func(b *testing.B) {
 	return func(b *testing.B) {
-		benchmarkFn(rt, facConfig, facCall)
+		benchmarkFn(rt, facConfig, facCall)(b)
 	}
 }
 
@@ -58,7 +58,7 @@ func TestFac_JIT_Fastest(t *testing.T) {
 	// Print results before deciding if this failed
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, result := range results {
-		w.Write([]byte(fmt.Sprintf("%s:\t%.2f\n", result.name, result.nsOp)))
+		w.Write([]byte(fmt.Sprintf("%s\t%.2f\tns/call\n", result.name, result.nsOp)))
 	}
 	w.Flush()
 
