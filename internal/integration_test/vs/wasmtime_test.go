@@ -10,47 +10,78 @@ import (
 )
 
 func init() {
-	runtimeTesters["wasmtime-go"] = newWasmtimeTester
+	runtimes["wasmtime-go"] = newWasmtimeRuntime
 }
 
-func newWasmtimeTester() runtimeTester {
-	return &wasmtimeTester{funcs: map[string]*wasmtime.Func{}}
+func newWasmtimeRuntime() runtime {
+	return &wasmtimeRuntime{}
 }
 
-type wasmtimeTester struct {
+type wasmtimeRuntime struct {
+	engine *wasmtime.Engine
+}
+
+type wasmtimeModule struct {
 	store *wasmtime.Store
-	funcs map[string]*wasmtime.Func
+	// instance is here because there's no close/destroy function. The only thing is garbage collection.
+	instance *wasmtime.Instance
+	funcs    map[string]*wasmtime.Func
 }
 
-func (w *wasmtimeTester) Init(_ context.Context, wasm []byte, funcNames ...string) (err error) {
-	w.store = wasmtime.NewStore(wasmtime.NewEngine())
-	module, err := wasmtime.NewModule(w.store.Engine, wasm)
-	if err != nil {
-		return
-	}
-	instance, err := wasmtime.NewInstance(w.store, module, nil)
-	if err != nil {
-		return
-	}
-	for _, funcName := range funcNames {
-		if fn := instance.GetFunc(w.store, funcName); fn == nil {
-			return fmt.Errorf("%s is not an exported function", funcName)
-		} else {
-			w.funcs[funcName] = fn
-		}
-	}
+func (r *wasmtimeRuntime) Compile(_ context.Context, _ *runtimeConfig) (err error) {
+	r.engine = wasmtime.NewEngine()
+	// We can't reuse a store because even if we call close, re-instantiating too many times leads to:
+	// >> resource limit exceeded: instance count too high at 10001
 	return
 }
 
-func (w *wasmtimeTester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
-	fn := w.funcs[funcName]
-	if result, err := fn.Call(w.store, int64(param)); err != nil {
+func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod module, err error) {
+	wm := &wasmtimeModule{funcs: map[string]*wasmtime.Func{}}
+	wm.store = wasmtime.NewStore(r.engine)
+	var m *wasmtime.Module
+	if m, err = wasmtime.NewModule(wm.store.Engine, cfg.moduleWasm); err != nil {
+		return
+	}
+
+	// Set the module name
+	linker := wasmtime.NewLinker(wm.store.Engine)
+	if err = linker.DefineModule(wm.store, cfg.moduleName, m); err != nil {
+		return
+	}
+	instance, err := linker.Instantiate(wm.store, m)
+	if err != nil {
+		return
+	}
+
+	for _, funcName := range cfg.funcNames {
+		if fn := instance.GetFunc(wm.store, funcName); fn == nil {
+			err = fmt.Errorf("%s is not an exported function", funcName)
+			return
+		} else {
+			wm.funcs[funcName] = fn
+		}
+	}
+	mod = wm
+	return
+}
+
+func (r *wasmtimeRuntime) Close() error {
+	r.engine = nil
+	return nil // wasmtime only closes via finalizer
+}
+
+func (m *wasmtimeModule) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
+	fn := m.funcs[funcName]
+	if result, err := fn.Call(m.store, int64(param)); err != nil {
 		return 0, err
 	} else {
 		return uint64(result.(int64)), nil
 	}
 }
 
-func (w *wasmtimeTester) Close() error {
-	return nil
+func (m *wasmtimeModule) Close() error {
+	m.store = nil
+	m.instance = nil
+	m.funcs = nil
+	return nil // wasmtime only closes via finalizer
 }

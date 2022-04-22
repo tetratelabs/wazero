@@ -10,44 +10,64 @@ import (
 )
 
 func init() {
-	runtimeTesters["wasmer-go"] = newWasmerTester
+	runtimes["wasmer-go"] = newWasmerRuntime
 }
 
-func newWasmerTester() runtimeTester {
-	return &wasmerTester{funcs: map[string]*wasmer.Function{}}
+func newWasmerRuntime() runtime {
+	return &wasmerRuntime{}
 }
 
-type wasmerTester struct {
+type wasmerRuntime struct {
+	engine *wasmer.Engine
+}
+
+type wasmerModule struct {
 	store    *wasmer.Store
 	module   *wasmer.Module
 	instance *wasmer.Instance
 	funcs    map[string]*wasmer.Function
 }
 
-func (w *wasmerTester) Init(_ context.Context, wasm []byte, funcNames ...string) (err error) {
-	w.store = wasmer.NewStore(wasmer.NewEngine())
-	importObject := wasmer.NewImportObject()
-	if w.module, err = wasmer.NewModule(w.store, wasm); err != nil {
-		return
-	}
-	if w.instance, err = wasmer.NewInstance(w.module, importObject); err != nil {
-		return
-	}
-	for _, funcName := range funcNames {
-		var fn *wasmer.Function
-		if fn, err = w.instance.Exports.GetRawFunction(funcName); err != nil {
-			return
-		} else if fn == nil {
-			return fmt.Errorf("%s is not an exported function", funcName)
-		} else {
-			w.funcs[funcName] = fn
-		}
-	}
+func (r *wasmerRuntime) Compile(_ context.Context, _ *runtimeConfig) (err error) {
+	r.engine = wasmer.NewEngine()
+	// We can't reuse a store because even if we call close, re-instantiating too many times leads to:
+	// >> resource limit exceeded: instance count too high at 10001
 	return
 }
 
-func (w *wasmerTester) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
-	fn := w.funcs[funcName]
+func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod module, err error) {
+	wm := &wasmerModule{funcs: map[string]*wasmer.Function{}}
+	wm.store = wasmer.NewStore(r.engine)
+	if wm.module, err = wasmer.NewModule(wm.store, cfg.moduleWasm); err != nil {
+		return
+	}
+	importObject := wasmer.NewImportObject()
+
+	// TODO: wasmer_module_set_name is not exposed in wasmer-go
+	if wm.instance, err = wasmer.NewInstance(wm.module, importObject); err != nil {
+		return
+	}
+	for _, funcName := range cfg.funcNames {
+		var fn *wasmer.Function
+		if fn, err = wm.instance.Exports.GetRawFunction(funcName); err != nil {
+			return
+		} else if fn == nil {
+			return nil, fmt.Errorf("%s is not an exported function", funcName)
+		} else {
+			wm.funcs[funcName] = fn
+		}
+	}
+	mod = wm
+	return
+}
+
+func (r *wasmerRuntime) Close() error {
+	r.engine = nil
+	return nil
+}
+
+func (m *wasmerModule) CallI64_I64(_ context.Context, funcName string, param uint64) (uint64, error) {
+	fn := m.funcs[funcName]
 	if result, err := fn.Call(int64(param)); err != nil {
 		return 0, err
 	} else {
@@ -55,15 +75,19 @@ func (w *wasmerTester) CallI64_I64(_ context.Context, funcName string, param uin
 	}
 }
 
-func (w *wasmerTester) Close() error {
-	for _, closer := range []func(){w.instance.Close, w.module.Close, w.store.Close} {
-		if closer == nil {
-			continue
-		}
-		closer()
+func (m *wasmerModule) Close() error {
+	if instance := m.instance; instance != nil {
+		instance.Close()
 	}
-	w.instance = nil
-	w.module = nil
-	w.store = nil
+	m.instance = nil
+	if mod := m.module; mod != nil {
+		mod.Close()
+	}
+	m.module = nil
+	if store := m.store; store != nil {
+		store.Close()
+	}
+	m.store = nil
+	m.funcs = nil
 	return nil
 }
