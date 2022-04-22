@@ -9,7 +9,7 @@ bench:
 .PHONY: bench.check
 bench.check:
 	@go build ./internal/integration_test/bench/...
-	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -tags='wasmedge' -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -tags='wasmedge' -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
 
 bench_testdata_dir := internal/integration_test/bench/testdata
 
