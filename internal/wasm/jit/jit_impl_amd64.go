@@ -2366,7 +2366,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 			jmpIfNotExceedsLowerBound = c.assembler.CompileJump(amd64.JHI)
 		}
 
-		// If the value exceeds the lower bound, we "staturate" it to the minimum.
+		// If the value exceeds the lower bound, we "saturate" it to the minimum.
 		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(minimum32BitSignedIntAddress), result)
 		nonTrappingSaturatedMinimumJump := c.assembler.CompileJump(amd64.JMP)
 
@@ -2473,7 +2473,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 		// Jump if the value is not -Inf.
 		jmpIfNotExceedsLowerBound := c.assembler.CompileJump(amd64.JCC)
 
-		// If the value exceeds the lower bound, we "staturate" it to the minimum.
+		// If the value exceeds the lower bound, we "saturate" it to the minimum.
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(minimum64BitSignedIntAddress), result)
 		nonTrappingSaturatedMinimumJump := c.assembler.CompileJump(amd64.JMP)
 
