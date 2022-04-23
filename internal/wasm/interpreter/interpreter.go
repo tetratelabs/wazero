@@ -1487,7 +1487,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 								panic(wasmruntime.ErrRuntimeIntegerOverflow)
 							}
 						}
-						ce.pushValue(uint64(int32(v)))
+						ce.pushValue(uint64(uint32(int32(v))))
 					case wazeroir.SignedInt64:
 						v := math.Trunc(math.Float64frombits(ce.popValue()))
 						res := int64(v)
