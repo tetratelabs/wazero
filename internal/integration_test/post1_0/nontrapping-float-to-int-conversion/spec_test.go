@@ -89,10 +89,9 @@ func testNonTrappingFloatToIntConversion(t *testing.T, newRuntimeConfig func() *
 			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.Inf(1))), expected: 0x7fffffff},
 			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.Inf(-11))), expected: 0x80000000},
 			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.NaN())), expected: 0},
-			// TODO: Can go represent these?
-			//{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(nan:0x200000), expected: 0},
-			//{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(-nan), expected: 0},
-			//{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(-nan:0x200000), expected: 0},
+			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.NaN())), expected: 0},
+			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.NaN())), expected: 0},
+			{name: "i32.trunc_sat_f32_s", param: api.EncodeF32(float32(math.NaN())), expected: 0},
 		})
 	})
 }
