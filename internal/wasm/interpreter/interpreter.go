@@ -168,6 +168,7 @@ func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 type interpreterOp struct {
 	kind   wazeroir.OperationKind
 	b1, b2 byte
+	b3     bool
 	us     []uint64
 	rs     []*wazeroir.InclusiveRange
 }
@@ -472,6 +473,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationITruncFromF:
 			op.b1 = byte(o.InputType)
 			op.b2 = byte(o.OutputType)
+			op.b3 = o.NonTrapping
 		case *wazeroir.OperationFConvertFromI:
 			op.b1 = byte(o.InputType)
 			op.b2 = byte(o.OutputType)
@@ -1369,39 +1371,95 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					case wazeroir.SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								v = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing sources.
+								if v < 0 {
+									v = math.MinInt32
+								} else {
+									v = math.MaxInt32
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
-						ce.pushValue(uint64(int32(v)))
+						ce.pushValue(uint64(uint32(int32(v))))
 					case wazeroir.SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								res = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing sources.
+								if v < 0 {
+									res = math.MinInt64
+								} else {
+									res = math.MaxInt64
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								v = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < 0 || v > math.MaxUint32 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									v = 0
+								} else {
+									v = math.MaxUint32
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								res = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									res = 0
+								} else {
+									res = math.MaxUint64
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(res)
 					}
@@ -1411,39 +1469,95 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					case wazeroir.SignedInt32:
 						v := math.Trunc(math.Float64frombits(ce.popValue()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								v = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									v = math.MinInt32
+								} else {
+									v = math.MaxInt32
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
-						ce.pushValue(uint64(int32(v)))
+						ce.pushValue(uint64(uint32(int32(v))))
 					case wazeroir.SignedInt64:
 						v := math.Trunc(math.Float64frombits(ce.popValue()))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								res = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									res = math.MinInt64
+								} else {
+									res = math.MaxInt64
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(math.Float64frombits(ce.popValue()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								v = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < 0 || v > math.MaxUint32 {
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									v = 0
+								} else {
+									v = math.MaxUint32
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
 						v := math.Trunc(math.Float64frombits(ce.popValue()))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
-							panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							if op.b3 {
+								// non-trapping conversion must cast nan to zero.
+								res = 0
+							} else {
+								panic(wasmruntime.ErrRuntimeInvalidConversionToInteger)
+							}
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
 							// and that's why we use '>=' not '>' to check overflow.
-							panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							if op.b3 {
+								// non-trapping conversion must "saturate" the value for overflowing source.
+								if v < 0 {
+									res = 0
+								} else {
+									res = math.MaxUint64
+								}
+							} else {
+								panic(wasmruntime.ErrRuntimeIntegerOverflow)
+							}
 						}
 						ce.pushValue(res)
 					}

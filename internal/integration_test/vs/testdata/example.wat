@@ -42,6 +42,10 @@
     ;; https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
     (func (param i64) (result i64) local.get 0 i64.extend16_s)
 
+    ;; add function using "nontrapping-float-to-int-conversion"
+    ;; https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+    (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+
     ;; add function using "multi-value"
     ;; https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
     (func $swap (param i32 i32) (result i32 i32) local.get 1 local.get 0)

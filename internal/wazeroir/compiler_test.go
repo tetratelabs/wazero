@@ -14,11 +14,12 @@ import (
 var ctx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
-	f64, i32   = wasm.ValueTypeF64, wasm.ValueTypeI32
-	i32_i32    = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
-	i32i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	v_v        = &wasm.FunctionType{}
-	v_f64f64   = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}}
+	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
+	f32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}}
+	i32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	i32i32_i32    = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
+	v_v           = &wasm.FunctionType{}
+	v_f64f64      = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}}
 )
 
 func TestCompile(t *testing.T) {
@@ -147,6 +148,58 @@ func TestCompile_Block(t *testing.T) {
 			requireCompilationResult(t, tc.enabledFeatures, tc.expected, tc.module)
 		})
 	}
+}
+
+// TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
+func TestCompile_SignExtensionOps(t *testing.T) {
+	module := requireModuleText(t, `(module
+  (func (param i32) (result i32) local.get 0 i32.extend8_s)
+)`)
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: [$0]
+			&OperationPick{Depth: 0},                                 // [$0, $0]
+			&OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
+			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
+			&OperationBr{Target: &BranchTarget{}},                    // return!
+		},
+		LabelCallers: map[string]uint32{},
+		Signature:    i32_i32,
+		Functions:    []wasm.Index{0},
+		Types:        []*wasm.FunctionType{i32_i32},
+	}
+
+	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
+	require.NoError(t, err)
+	require.Equal(t, expected, res[0])
+}
+
+// TestCompile_NonTrappingFloatToIntConversion picks an arbitrary operator from "nontrapping-float-to-int-conversion".
+func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
+	module := requireModuleText(t, `(module
+  (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+)`)
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: [$0]
+			&OperationPick{Depth: 0}, // [$0, $0]
+			&OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
+				InputType:   Float32,
+				OutputType:  SignedInt32,
+				NonTrapping: true,
+			},
+			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
+			&OperationBr{Target: &BranchTarget{}},                    // return!
+		},
+		LabelCallers: map[string]uint32{},
+		Signature:    f32_i32,
+		Functions:    []wasm.Index{0},
+		Types:        []*wasm.FunctionType{f32_i32},
+	}
+
+	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
+	require.NoError(t, err)
+	require.Equal(t, expected, res[0])
 }
 
 func TestCompile_MultiValue(t *testing.T) {

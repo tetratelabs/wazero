@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -149,6 +151,14 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case wasm.OpcodeDropName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
 		opCode = wasm.OpcodeDrop
 		next = p.beginFieldOrInstruction
+
+	case wasm.OpcodeF32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeF32Const
+		next = p.parseF32
+	case wasm.OpcodeF64ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
+		opCode = wasm.OpcodeF64Const
+		next = p.parseF64
+
 	case wasm.OpcodeI32AddName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
@@ -197,6 +207,35 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case wasm.OpcodeI64Extend32SName:
 		opCode = wasm.OpcodeI64Extend32S
 		next = p.beginFieldOrInstruction
+
+		// Next are nontrapping-float-to-int-conversion
+		// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+
+	case wasm.OpcodeI32TruncSatF32SName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI32TruncSatF32S)
+	case wasm.OpcodeI32TruncSatF32UName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI32TruncSatF32U)
+	case wasm.OpcodeI32TruncSatF64SName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI32TruncSatF64S)
+	case wasm.OpcodeI32TruncSatF64UName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI32TruncSatF64U)
+	case wasm.OpcodeI64TruncSatF32SName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI64TruncSatF32S)
+	case wasm.OpcodeI64TruncSatF32UName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI64TruncSatF32U)
+	case wasm.OpcodeI64TruncSatF64SName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI64TruncSatF64S)
+	case wasm.OpcodeI64TruncSatF64UName:
+		opCode = wasm.OpcodeMiscPrefix
+		p.currentBody = append(p.currentBody, opCode, wasm.OpcodeMiscI64TruncSatF64U)
+
 	default:
 		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
@@ -206,6 +245,14 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 		if err = p.enabledFeatures.Require(wasm.FeatureSignExtensionOps); err != nil {
 			return nil, fmt.Errorf("%s invalid as %v", tokenBytes, err)
 		}
+	}
+
+	// Guard >1.0 feature nontrapping-float-to-int-conversion
+	if opCode == wasm.OpcodeMiscPrefix {
+		if err = p.enabledFeatures.Require(wasm.FeatureNonTrappingFloatToIntConversion); err != nil {
+			return nil, fmt.Errorf("%s invalid as %v", tokenBytes, err)
+		}
+		return p.beginFieldOrInstruction, nil
 	}
 
 	p.currentBody = append(p.currentBody, opCode)
@@ -236,8 +283,36 @@ func (p *funcParser) end() (tokenParser, error) {
 	return p.onFunc(p.currentTypeIdx, code, p.currentName, p.currentParamNames)
 }
 
+// parseF32 parses a wasm.ValueTypeF32 and appends it to the currentBody.
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#floating-point%E2%91%A4
+func (p *funcParser) parseF32(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint32(tokenBytes); overflow { // TODO: negative hex nan inf and actual float!
+		return nil, fmt.Errorf("f32 outside range of uint32: %s", tokenBytes)
+	} else {
+		p.currentBody = append(p.currentBody, u64.LeBytes(api.EncodeF32(float32(i)))...)
+	}
+	return p.beginFieldOrInstruction, nil
+}
+
+// parseF64 parses a wasm.ValueTypeF64 and appends it to the currentBody.
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#floating-point%E2%91%A4
+func (p *funcParser) parseF64(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+	if tok != tokenUN {
+		return nil, unexpectedToken(tok, tokenBytes)
+	}
+	if i, overflow := decodeUint64(tokenBytes); overflow { // TODO: negative hex nan inf and actual float!
+		return nil, fmt.Errorf("f64 outside range of uint64: %s", tokenBytes)
+	} else {
+		p.currentBody = append(p.currentBody, u64.LeBytes(api.EncodeF64(float64(i)))...)
+	}
+	return p.beginFieldOrInstruction, nil
+}
+
 // parseI32 parses a wasm.ValueTypeI32 and appends it to the currentBody.
-func (p *funcParser) parseI32(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) parseI32(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenUN {
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
@@ -250,7 +325,7 @@ func (p *funcParser) parseI32(tok tokenType, tokenBytes []byte, line, col uint32
 }
 
 // parseI64 parses a wasm.ValueTypeI64 and appends it to the currentBody.
-func (p *funcParser) parseI64(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) parseI64(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenUN {
 		return nil, unexpectedToken(tok, tokenBytes)
 	}

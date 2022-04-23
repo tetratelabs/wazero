@@ -251,7 +251,28 @@ const (
 	// Note: This is dependent on the flag FeatureSignExtensionOps
 	OpcodeI64Extend32S Opcode = 0xc4
 
-	LastOpcode = OpcodeI64Extend32S
+	// OpcodeMiscPrefix is the prefix of various multi-byte opcodes.
+	// Introduced in nontrapping float to int conversion proposal.
+	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
+	OpcodeMiscPrefix Opcode = 0xfc
+)
+
+// OpcodeMisc represents opcodes of the miscellaneous operations.
+// Such an operations has multi-byte encoding which is prefixed by OpcodeMiscPrefix.
+type OpcodeMisc = byte
+
+const (
+	// Below are toggled with FeatureNonTrappingFloatToIntConversion.
+	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
+
+	OpcodeMiscI32TruncSatF32S OpcodeMisc = 0x00
+	OpcodeMiscI32TruncSatF32U OpcodeMisc = 0x01
+	OpcodeMiscI32TruncSatF64S OpcodeMisc = 0x02
+	OpcodeMiscI32TruncSatF64U OpcodeMisc = 0x03
+	OpcodeMiscI64TruncSatF32S OpcodeMisc = 0x04
+	OpcodeMiscI64TruncSatF32U OpcodeMisc = 0x05
+	OpcodeMiscI64TruncSatF64S OpcodeMisc = 0x06
+	OpcodeMiscI64TruncSatF64U OpcodeMisc = 0x07
 )
 
 const (
@@ -435,6 +456,8 @@ const (
 	OpcodeI64Extend8SName  = "i64.extend8_s"
 	OpcodeI64Extend16SName = "i64.extend16_s"
 	OpcodeI64Extend32SName = "i64.extend32_s"
+
+	OpcodeMiscPrefixName = "misc_prefix"
 )
 
 var instructionNames = [256]string{
@@ -623,4 +646,31 @@ var instructionNames = [256]string{
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#a7-index-of-instructions
 func InstructionName(oc Opcode) string {
 	return instructionNames[oc]
+}
+
+const (
+	OpcodeI32TruncSatF32SName = "i32.trunc_sat_f32_s"
+	OpcodeI32TruncSatF32UName = "i32.trunc_sat_f32_u"
+	OpcodeI32TruncSatF64SName = "i32.trunc_sat_f64_s"
+	OpcodeI32TruncSatF64UName = "i32.trunc_sat_f64_u"
+	OpcodeI64TruncSatF32SName = "i64.trunc_sat_f32_s"
+	OpcodeI64TruncSatF32UName = "i64.trunc_sat_f32_u"
+	OpcodeI64TruncSatF64SName = "i64.trunc_sat_f64_s"
+	OpcodeI64TruncSatF64UName = "i64.trunc_sat_f64_u"
+)
+
+var miscInstructionNames = [256]string{
+	OpcodeMiscI32TruncSatF32S: OpcodeI32TruncSatF32SName,
+	OpcodeMiscI32TruncSatF32U: OpcodeI32TruncSatF32UName,
+	OpcodeMiscI32TruncSatF64S: OpcodeI32TruncSatF64SName,
+	OpcodeMiscI32TruncSatF64U: OpcodeI32TruncSatF64UName,
+	OpcodeMiscI64TruncSatF32S: OpcodeI64TruncSatF32SName,
+	OpcodeMiscI64TruncSatF32U: OpcodeI64TruncSatF32UName,
+	OpcodeMiscI64TruncSatF64S: OpcodeI64TruncSatF64SName,
+	OpcodeMiscI64TruncSatF64U: OpcodeI64TruncSatF64UName,
+}
+
+// MiscInstructionName returns the instruction corresponding to this miscellaneous Opcode.
+func MiscInstructionName(oc OpcodeMisc) string {
+	return miscInstructionNames[oc]
 }

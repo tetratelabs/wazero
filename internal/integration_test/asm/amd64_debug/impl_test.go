@@ -620,7 +620,7 @@ func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 			t.Run(fmt.Sprintf("is_short_jump=%v", isShortJump), func(t *testing.T) {
 				for _, inst := range []asm.Instruction{
 					amd64.JCC, amd64.JCS, amd64.JEQ, amd64.JGE, amd64.JGT, amd64.JHI, amd64.JLE, amd64.JLS, amd64.JLT, amd64.JMI,
-					amd64.JMP, amd64.JNE, amd64.JPC, amd64.JPS,
+					amd64.JMP, amd64.JNE, amd64.JPC, amd64.JPS, amd64.JPL,
 				} {
 					inst := inst
 					t.Run(amd64.InstructionName(inst), func(t *testing.T) {
@@ -658,7 +658,7 @@ func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 			t.Run(fmt.Sprintf("is_short_jump=%v", isShortJump), func(t *testing.T) {
 				for _, inst := range []asm.Instruction{
 					amd64.JCC, amd64.JCS, amd64.JEQ, amd64.JGE, amd64.JGT, amd64.JHI, amd64.JLE, amd64.JLS, amd64.JLT,
-					amd64.JMI, amd64.JMP, amd64.JNE, amd64.JPC, amd64.JPS,
+					amd64.JMI, amd64.JMP, amd64.JNE, amd64.JPC, amd64.JPS, amd64.JPL,
 				} {
 					inst := inst
 					t.Run(amd64.InstructionName(inst), func(t *testing.T) {

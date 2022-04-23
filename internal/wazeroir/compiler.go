@@ -1454,6 +1454,44 @@ operatorSwitch:
 		c.emit(
 			&OperationSignExtend64From32{},
 		)
+	case wasm.OpcodeMiscPrefix:
+		c.pc++
+		switch miscOp := c.body[c.pc]; miscOp {
+		case wasm.OpcodeMiscI32TruncSatF32S:
+			c.emit(
+				&OperationITruncFromF{InputType: Float32, OutputType: SignedInt32, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI32TruncSatF32U:
+			c.emit(
+				&OperationITruncFromF{InputType: Float32, OutputType: SignedUint32, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI32TruncSatF64S:
+			c.emit(
+				&OperationITruncFromF{InputType: Float64, OutputType: SignedInt32, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI32TruncSatF64U:
+			c.emit(
+				&OperationITruncFromF{InputType: Float64, OutputType: SignedUint32, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI64TruncSatF32S:
+			c.emit(
+				&OperationITruncFromF{InputType: Float32, OutputType: SignedInt64, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI64TruncSatF32U:
+			c.emit(
+				&OperationITruncFromF{InputType: Float32, OutputType: SignedUint64, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI64TruncSatF64S:
+			c.emit(
+				&OperationITruncFromF{InputType: Float64, OutputType: SignedInt64, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscI64TruncSatF64U:
+			c.emit(
+				&OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
+			)
+		default:
+			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
+		}
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}

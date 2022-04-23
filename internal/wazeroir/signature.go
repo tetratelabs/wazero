@@ -350,6 +350,19 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		return signature_I32_I32, nil
 	case wasm.OpcodeI64Extend8S, wasm.OpcodeI64Extend16S, wasm.OpcodeI64Extend32S:
 		return signature_I64_I64, nil
+	case wasm.OpcodeMiscPrefix:
+		switch miscOp := c.body[c.pc+1]; miscOp {
+		case wasm.OpcodeMiscI32TruncSatF32S, wasm.OpcodeMiscI32TruncSatF32U:
+			return signature_F32_I32, nil
+		case wasm.OpcodeMiscI32TruncSatF64S, wasm.OpcodeMiscI32TruncSatF64U:
+			return signature_F64_I32, nil
+		case wasm.OpcodeMiscI64TruncSatF32S, wasm.OpcodeMiscI64TruncSatF32U:
+			return signature_F32_I64, nil
+		case wasm.OpcodeMiscI64TruncSatF64S, wasm.OpcodeMiscI64TruncSatF64U:
+			return signature_F64_I64, nil
+		default:
+			return nil, fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}

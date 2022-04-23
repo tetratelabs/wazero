@@ -211,7 +211,7 @@ default. However, the following status covers what's currently possible with
 | Feature                               | Status |
 |:-------------------------------------:|:------:|
 | mutable-global                        |   ✅   |
-| nontrapping-float-to-int-conversions  |   ❌   |
+| nontrapping-float-to-int-conversions  |   ✅   |
 | sign-extension-ops                    |   ✅   |
 | multi-value                           |   ✅   |
 | JS-BigInt-integration                 |  N/A   |

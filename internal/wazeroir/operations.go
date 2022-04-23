@@ -831,6 +831,9 @@ func (o *OperationI32WrapFromI64) Kind() OperationKind {
 type OperationITruncFromF struct {
 	InputType  Float
 	OutputType SignedInt
+	// NonTrapping true if this conversion is "nontrapping" in the sense of the
+	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
+	NonTrapping bool
 }
 
 func (o *OperationITruncFromF) Kind() OperationKind {

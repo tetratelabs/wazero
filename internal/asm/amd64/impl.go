@@ -870,6 +870,7 @@ var relativeJumpOpcodes = map[asm.Instruction]relativeJumpOpcode{
 	JLS: {short: []byte{0x76}, long: []byte{0x0f, 0x86}},
 	JLT: {short: []byte{0x7c}, long: []byte{0x0f, 0x8c}},
 	JMI: {short: []byte{0x78}, long: []byte{0x0f, 0x88}},
+	JPL: {short: []byte{0x79}, long: []byte{0x0f, 0x89}},
 	JNE: {short: []byte{0x75}, long: []byte{0x0f, 0x85}},
 	JPC: {short: []byte{0x7b}, long: []byte{0x0f, 0x8b}},
 	JPS: {short: []byte{0x7a}, long: []byte{0x0f, 0x8a}},
