@@ -93,7 +93,7 @@ func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 }
 
 // WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
-// feature was not finished in WebAssembly 1.0 (20191205).
+// feature was not in WebAssembly 1.0 (20191205).
 //
 // This has the following effects:
 // * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
@@ -116,6 +116,26 @@ func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig
 func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
+	return ret
+}
+
+// WithFeatureNonTrappingFloatToIntConversion enables non-trapping float-to-int conversions.
+// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0 (20191205).
+//
+// The only effect of enabling this is allowing the following instructions, which return 0 on NaN instead of panicking.
+// * `i32.trunc_sat_f32_s`
+// * `i32.trunc_sat_f32_u`
+// * `i32.trunc_sat_f64_s`
+// * `i32.trunc_sat_f64_u`
+// * `i64.trunc_sat_f32_s`
+// * `i64.trunc_sat_f32_u`
+// * `i64.trunc_sat_f64_s`
+// * `i64.trunc_sat_f64_u`
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+func (c *RuntimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
 	return ret
 }
 

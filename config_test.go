@@ -43,6 +43,15 @@ func TestRuntimeConfig(t *testing.T) {
 				enabledFeatures: wasm.FeatureSignExtensionOps,
 			},
 		},
+		{
+			name: "nontrapping-float-to-int-conversion",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureNonTrappingFloatToIntConversion(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: wasm.FeatureNonTrappingFloatToIntConversion,
+			},
+		},
 	}
 	for _, tt := range tests {
 		tc := tt
@@ -78,6 +87,14 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			expectDefault: false,
 			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
 				return c.WithFeatureSignExtensionOps(v)
+			},
+		},
+		{
+			name:          "nontrapping-float-to-int-conversion",
+			feature:       wasm.FeatureNonTrappingFloatToIntConversion,
+			expectDefault: false,
+			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+				return c.WithFeatureNonTrappingFloatToIntConversion(v)
 			},
 		},
 	}
