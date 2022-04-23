@@ -233,6 +233,21 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "func nontrapping-float-to-int-conversions",
+			input: `(module
+			(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{f32_i32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeLocalGet, 0x00,
+					wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S,
+					wasm.OpcodeEnd,
+				}}},
+			},
+		},
+		{
 			// Spec says expand abbreviations first. It doesn't explicitly say you can't mix forms.
 			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A0
 			name: "import func inlined type - mixed abbreviated",
@@ -1974,6 +1989,13 @@ func TestParseModule_Errors(t *testing.T) {
 			(func (param i64) (result i64) local.get 0 i64.extend16_s)
 		)`,
 			expectedErr: "2:47: i64.extend16_s invalid as feature \"sign-extension-ops\" is disabled in module.func[0]",
+		},
+		{
+			name: "func nontrapping-float-to-int-conversions disabled",
+			input: `(module
+			(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+		)`,
+			expectedErr: "2:47: i32.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled in module.func[0]",
 		},
 		{
 			name:           "memory over max",

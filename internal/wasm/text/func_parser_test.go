@@ -44,6 +44,16 @@ func TestFuncParser(t *testing.T) {
 			}},
 		},
 		{
+			name:     "f32.const",
+			source:   "(func f32.const 306)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeF32Const, 0x0, 0x0, 0x99, 0x43, 0x0, 0x0, 0x0, 0x0, wasm.OpcodeEnd}},
+		},
+		{
+			name:     "f64.const",
+			source:   "(func f64.const 356)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeF64Const, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x76, 0x40, wasm.OpcodeEnd}},
+		},
+		{
 			name:     "i32.const",
 			source:   "(func i32.const 306)",
 			expected: &wasm.Code{Body: []byte{wasm.OpcodeI32Const, 0xb2, 0x02, wasm.OpcodeEnd}},
@@ -170,6 +180,82 @@ func TestFuncParser(t *testing.T) {
 			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeI64Extend32S,
+				wasm.OpcodeEnd,
+			}},
+		},
+
+		// Below are changes to test/core/conversions.wast from the commit that added "nontrapping-float-to-int-conversions" support.
+		// See https://github.com/WebAssembly/spec/commit/c8fd933fa51eb0b511bce027b573aef7ee373726
+
+		{
+			name:   "i32.trunc_sat_f32_s",
+			source: "(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i32.trunc_sat_f32_u",
+			source: "(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_u)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32U,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i32.trunc_sat_f64_s",
+			source: "(func (param f64) (result i32) local.get 0 i32.trunc_sat_f64_s)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF64S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i32.trunc_sat_f64_u",
+			source: "(func (param f64) (result i32) local.get 0 i32.trunc_sat_f64_u)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF64U,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.trunc_sat_f32_s",
+			source: "(func (param f32) (result i64) local.get 0 i64.trunc_sat_f32_s)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF32S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.trunc_sat_f32_u",
+			source: "(func (param f32) (result i64) local.get 0 i64.trunc_sat_f32_u)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF32U,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.trunc_sat_f64_s",
+			source: "(func (param f64) (result i64) local.get 0 i64.trunc_sat_f64_s)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF64S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:   "i64.trunc_sat_f64_u",
+			source: "(func (param f64) (result i64) local.get 0 i64.trunc_sat_f64_u)",
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF64U,
 				wasm.OpcodeEnd,
 			}},
 		},
@@ -337,6 +423,16 @@ func TestFuncParser_Errors(t *testing.T) {
 			expectedErr: "1:17: index outside range of uint32: 4294967296",
 		},
 		{
+			name:        "f32.const overflow",
+			source:      "(func f32.const 4294967296)",
+			expectedErr: "1:17: f32 outside range of uint32: 4294967296",
+		},
+		{
+			name:        "f64.const overflow",
+			source:      "(func f64.const 18446744073709551616)",
+			expectedErr: "1:17: f64 outside range of uint64: 18446744073709551616",
+		},
+		{
 			name:        "i32.const overflow",
 			source:      "(func i32.const 4294967296)",
 			expectedErr: "1:17: i32 outside range of uint32: 4294967296",
@@ -348,13 +444,13 @@ func TestFuncParser_Errors(t *testing.T) {
 		},
 		{
 			name:        "instruction not yet supported",
-			source:      "(func f32.const 1.1)",
-			expectedErr: "1:7: unsupported instruction: f32.const",
+			source:      "(func loop)",
+			expectedErr: "1:7: unsupported instruction: loop",
 		},
 		{
 			name:        "s-expressions not yet supported",
-			source:      "(func (f32.const 1.1))",
-			expectedErr: "1:8: TODO: s-expressions are not yet supported: f32.const",
+			source:      "(func (f64.const 1.1))",
+			expectedErr: "1:8: TODO: s-expressions are not yet supported: f64.const",
 		},
 		{
 			name:        "param after result",
@@ -390,6 +486,46 @@ func TestFuncParser_Errors(t *testing.T) {
 			name:        "i64.extend32_s disabled",
 			source:      "(func (param i64) local.get 0 i64.extend32_s)",
 			expectedErr: "1:31: i64.extend32_s invalid as feature \"sign-extension-ops\" is disabled",
+		},
+		{
+			name:        "i32.trunc_sat_f32_s disabled",
+			source:      "(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)",
+			expectedErr: "1:44: i32.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i32.trunc_sat_f32_u disabled",
+			source:      "(func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_u)",
+			expectedErr: "1:44: i32.trunc_sat_f32_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i32.trunc_sat_f64_s disabled",
+			source:      "(func (param f64) (result i32) local.get 0 i32.trunc_sat_f64_s)",
+			expectedErr: "1:44: i32.trunc_sat_f64_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i32.trunc_sat_f64_u disabled",
+			source:      "(func (param f64) (result i32) local.get 0 i32.trunc_sat_f64_u)",
+			expectedErr: "1:44: i32.trunc_sat_f64_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i64.trunc_sat_f32_s disabled",
+			source:      "(func (param f32) (result i64) local.get 0 i64.trunc_sat_f32_s)",
+			expectedErr: "1:44: i64.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i64.trunc_sat_f32_u disabled",
+			source:      "(func (param f32) (result i64) local.get 0 i64.trunc_sat_f32_u)",
+			expectedErr: "1:44: i64.trunc_sat_f32_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i64.trunc_sat_f64_s disabled",
+			source:      "(func (param f64) (result i64) local.get 0 i64.trunc_sat_f64_s)",
+			expectedErr: "1:44: i64.trunc_sat_f64_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
+		},
+		{
+			name:        "i64.trunc_sat_f64_u disabled",
+			source:      "(func (param f64) (result i64) local.get 0 i64.trunc_sat_f64_u)",
+			expectedErr: "1:44: i64.trunc_sat_f64_u invalid as feature \"nontrapping-float-to-int-conversion\" is disabled",
 		},
 	}
 

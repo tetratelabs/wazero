@@ -264,6 +264,7 @@ type OpcodeMisc = byte
 const (
 	// Below are toggled with FeatureNonTrappingFloatToIntConversion.
 	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
+
 	OpcodeMiscI32TruncSatF32S OpcodeMisc = 0x00
 	OpcodeMiscI32TruncSatF32U OpcodeMisc = 0x01
 	OpcodeMiscI32TruncSatF64S OpcodeMisc = 0x02
@@ -648,25 +649,25 @@ func InstructionName(oc Opcode) string {
 }
 
 const (
-	OpcodeMiscI32TruncSatF32SName = "i32.trunc_sat_f32_s"
-	OpcodeMiscI32TruncSatF32UName = "i32.trunc_sat_f32_u"
-	OpcodeMiscI32TruncSatF64SName = "i32.trunc_sat_f64_s"
-	OpcodeMiscI32TruncSatF64UName = "i32.trunc_sat_f64_u"
-	OpcodeMiscI64TruncSatF32SName = "i64.trunc_sat_f32_s"
-	OpcodeMiscI64TruncSatF32UName = "i64.trunc_sat_f32_u"
-	OpcodeMiscI64TruncSatF64SName = "i64.trunc_sat_f64_s"
-	OpcodeMiscI64TruncSatF64UName = "i64.trunc_sat_f64_u"
+	OpcodeI32TruncSatF32SName = "i32.trunc_sat_f32_s"
+	OpcodeI32TruncSatF32UName = "i32.trunc_sat_f32_u"
+	OpcodeI32TruncSatF64SName = "i32.trunc_sat_f64_s"
+	OpcodeI32TruncSatF64UName = "i32.trunc_sat_f64_u"
+	OpcodeI64TruncSatF32SName = "i64.trunc_sat_f32_s"
+	OpcodeI64TruncSatF32UName = "i64.trunc_sat_f32_u"
+	OpcodeI64TruncSatF64SName = "i64.trunc_sat_f64_s"
+	OpcodeI64TruncSatF64UName = "i64.trunc_sat_f64_u"
 )
 
 var miscInstructionNames = [256]string{
-	OpcodeMiscI32TruncSatF32S: OpcodeMiscI32TruncSatF32SName,
-	OpcodeMiscI32TruncSatF32U: OpcodeMiscI32TruncSatF32UName,
-	OpcodeMiscI32TruncSatF64S: OpcodeMiscI32TruncSatF64SName,
-	OpcodeMiscI32TruncSatF64U: OpcodeMiscI32TruncSatF64UName,
-	OpcodeMiscI64TruncSatF32S: OpcodeMiscI64TruncSatF32SName,
-	OpcodeMiscI64TruncSatF32U: OpcodeMiscI64TruncSatF32UName,
-	OpcodeMiscI64TruncSatF64S: OpcodeMiscI64TruncSatF64SName,
-	OpcodeMiscI64TruncSatF64U: OpcodeMiscI64TruncSatF64UName,
+	OpcodeMiscI32TruncSatF32S: OpcodeI32TruncSatF32SName,
+	OpcodeMiscI32TruncSatF32U: OpcodeI32TruncSatF32UName,
+	OpcodeMiscI32TruncSatF64S: OpcodeI32TruncSatF64SName,
+	OpcodeMiscI32TruncSatF64U: OpcodeI32TruncSatF64UName,
+	OpcodeMiscI64TruncSatF32S: OpcodeI64TruncSatF32SName,
+	OpcodeMiscI64TruncSatF32U: OpcodeI64TruncSatF32UName,
+	OpcodeMiscI64TruncSatF64S: OpcodeI64TruncSatF64SName,
+	OpcodeMiscI64TruncSatF64U: OpcodeI64TruncSatF64UName,
 }
 
 // MiscInstructionName returns the instruction corresponding to this miscellaneous Opcode.

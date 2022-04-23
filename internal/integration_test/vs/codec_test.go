@@ -31,13 +31,14 @@ var exampleBinary = binary.EncodeModule(example)
 
 func newExample() *wasm.Module {
 	three := wasm.Index(3)
-	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
+	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 			{},
 			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
+			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}},
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
 		},
 		ImportSection: []*wasm.Import{
@@ -51,12 +52,17 @@ func newExample() *wasm.Module {
 				DescFunc: 2,
 			},
 		},
-		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0), wasm.Index(3), wasm.Index(4)},
+		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0), wasm.Index(3), wasm.Index(4), wasm.Index(5)},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeI64Extend16S, wasm.OpcodeEnd}},
+			{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S,
+				wasm.OpcodeEnd,
+			}},
 			{Body: []byte{wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
 		},
 		MemorySection: &wasm.Memory{Min: 1, Max: three, IsMaxEncoded: true},
@@ -64,7 +70,7 @@ func newExample() *wasm.Module {
 			{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
 			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
 			{Name: "mem", Type: wasm.ExternTypeMemory, Index: wasm.Index(0)},
-			{Name: "swap", Type: wasm.ExternTypeFunc, Index: wasm.Index(6)},
+			{Name: "swap", Type: wasm.ExternTypeFunc, Index: wasm.Index(7)},
 		},
 		StartSection: &three,
 		NameSection: &wasm.NameSection{
@@ -75,7 +81,7 @@ func newExample() *wasm.Module {
 				{Index: wasm.Index(2), Name: "call_hello"},
 				{Index: wasm.Index(3), Name: "hello"},
 				{Index: wasm.Index(4), Name: "addInt"},
-				{Index: wasm.Index(6), Name: "swap"},
+				{Index: wasm.Index(7), Name: "swap"},
 			},
 			LocalNames: wasm.IndirectNameMap{
 				{Index: wasm.Index(1), NameMap: wasm.NameMap{
