@@ -264,7 +264,6 @@ type OpcodeMisc = byte
 const (
 	// Below are toggled with FeatureNonTrappingFloatToIntConversion.
 	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
-
 	OpcodeMiscI32TruncSatF32S OpcodeMisc = 0x00
 	OpcodeMiscI32TruncSatF32U OpcodeMisc = 0x01
 	OpcodeMiscI32TruncSatF64S OpcodeMisc = 0x02
@@ -273,6 +272,16 @@ const (
 	OpcodeMiscI64TruncSatF32U OpcodeMisc = 0x05
 	OpcodeMiscI64TruncSatF64S OpcodeMisc = 0x06
 	OpcodeMiscI64TruncSatF64U OpcodeMisc = 0x07
+
+	// Below are toggled with FeatureBulkMemoryOperations.
+	// https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	OpcodeMiscMemoryInit OpcodeMisc = 0x08
+	OpcodeMiscDataDrop   OpcodeMisc = 0x09
+	OpcodeMiscMemoryCopy OpcodeMisc = 0x0a
+	OpcodeMiscMemoryFill OpcodeMisc = 0x0b
+	OpcodeMiscTableInit  OpcodeMisc = 0x0c
+	OpcodeMiscElemDrop   OpcodeMisc = 0x0d
+	OpcodeMiscTableCopy  OpcodeMisc = 0x0e
 )
 
 const (
@@ -657,6 +666,14 @@ const (
 	OpcodeI64TruncSatF32UName = "i64.trunc_sat_f32_u"
 	OpcodeI64TruncSatF64SName = "i64.trunc_sat_f64_s"
 	OpcodeI64TruncSatF64UName = "i64.trunc_sat_f64_u"
+
+	OpcodeMiscMemoryInitName = "memory.init"
+	OpcodeMiscDataDropName   = "data.drop"
+	OpcodeMiscMemoryCopyName = "memory.copy"
+	OpcodeMiscMemoryFillName = "memory.fill"
+	OpcodeMiscTableInitName  = "table.init"
+	OpcodeMiscElemDropName   = "elem.drop"
+	OpcodeMiscTableCopyName  = "table.copy"
 )
 
 var miscInstructionNames = [256]string{
@@ -668,6 +685,13 @@ var miscInstructionNames = [256]string{
 	OpcodeMiscI64TruncSatF32U: OpcodeI64TruncSatF32UName,
 	OpcodeMiscI64TruncSatF64S: OpcodeI64TruncSatF64SName,
 	OpcodeMiscI64TruncSatF64U: OpcodeI64TruncSatF64UName,
+	OpcodeMiscMemoryInit:      OpcodeMiscMemoryInitName,
+	OpcodeMiscDataDrop:        OpcodeMiscDataDropName,
+	OpcodeMiscMemoryCopy:      OpcodeMiscMemoryCopyName,
+	OpcodeMiscMemoryFill:      OpcodeMiscMemoryFillName,
+	OpcodeMiscTableInit:       OpcodeMiscTableInitName,
+	OpcodeMiscElemDrop:        OpcodeMiscElemDropName,
+	OpcodeMiscTableCopy:       OpcodeMiscTableCopyName,
 }
 
 // MiscInstructionName returns the instruction corresponding to this miscellaneous Opcode.

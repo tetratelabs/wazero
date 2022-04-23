@@ -110,6 +110,12 @@ func TestDecodeModule(t *testing.T) {
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "simple"}}, m)
 	})
+	t.Run("data count section disabled", func(t *testing.T) {
+		input := append(append(Magic, version...),
+			wasm.SectionIDDataCount, 1, 0)
+		_, e := DecodeModule(input, wasm.Features20191205, wasm.MemoryMaxPages)
+		require.EqualError(t, e, `data count section not supported as feature "bulk-memory-operations" is disabled`)
+	})
 }
 
 func TestDecodeModule_Errors(t *testing.T) {

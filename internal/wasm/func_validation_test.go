@@ -257,6 +257,381 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 	}
 }
 
+func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		for _, op := range []OpcodeMisc{
+			OpcodeMiscMemoryInit, OpcodeMiscDataDrop, OpcodeMiscMemoryCopy,
+			OpcodeMiscMemoryFill, OpcodeMiscTableInit, OpcodeMiscElemDrop, OpcodeMiscTableCopy,
+		} {
+			t.Run(MiscInstructionName(op), func(t *testing.T) {
+				var body []byte
+				if op != OpcodeMiscDataDrop && op != OpcodeMiscElemDrop {
+					body = append(body, OpcodeI32Const, 1, OpcodeI32Const, 2, OpcodeI32Const, 3)
+				}
+
+				body = append(body, OpcodeMiscPrefix, op)
+				if op != OpcodeMiscDataDrop && op != OpcodeMiscMemoryFill && op != OpcodeMiscElemDrop {
+					body = append(body, 0, 0)
+				} else {
+					body = append(body, 0)
+				}
+
+				body = append(body, OpcodeEnd)
+
+				c := uint32(0)
+				m := &Module{
+					TypeSection:      []*FunctionType{v_v},
+					FunctionSection:  []Index{0},
+					CodeSection:      []*Code{{Body: body}},
+					DataSection:      []*DataSegment{{}},
+					ElementSection:   []*ElementSegment{{}},
+					DataCountSection: &c,
+				}
+				err := m.validateFunction(FeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, &Table{})
+				require.NoError(t, err)
+			})
+		}
+	})
+	t.Run("errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			body                []byte
+			dataSection         []*DataSegment
+			elementSection      []*ElementSegment
+			dataCountSectionNil bool
+			memory              *Memory
+			table               *Table
+			flag                Features
+			expectedErr         string
+		}{
+			// memory.init
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      nil,
+				expectedErr: "memory must exist for memory.init",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
+				flag:        Features20191205,
+				expectedErr: `memory.init invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:                []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
+				flag:                FeatureBulkMemoryOperations,
+				dataCountSectionNil: true,
+				expectedErr:         `memory must exist for memory.init`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "failed to read data segment index for memory.init: EOF",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 100 /* data section out of range */},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "index 100 out of range of data section(len=1)",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "failed to read memory index for memory.init: EOF",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 1},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "memory.init reserved byte must be zero encoded with 1 byte",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "cannot pop the operand for memory.init: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "cannot pop the operand for memory.init: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "cannot pop the operand for memory.init: i32 missing",
+			},
+			// data.drop
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      nil,
+				expectedErr: "memory must exist for data.drop",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
+				flag:        Features20191205,
+				expectedErr: `data.drop invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:                []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
+				dataCountSectionNil: true,
+				memory:              &Memory{},
+				flag:                FeatureBulkMemoryOperations,
+				expectedErr:         `data.drop requires data count section`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "failed to read data segment index for data.drop: EOF",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop, 100 /* data section out of range */},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				dataSection: []*DataSegment{{}},
+				expectedErr: "index 100 out of range of data section(len=1)",
+			},
+			// memory.copy
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      nil,
+				expectedErr: "memory must exist for memory.copy",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
+				flag:        Features20191205,
+				expectedErr: `memory.copy invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: `failed to read memory index for memory.copy: EOF`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "failed to read memory index for memory.copy: EOF",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 1},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "memory.copy reserved byte must be zero encoded with 1 byte",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
+			},
+			// memory.fill
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      nil,
+				expectedErr: "memory must exist for memory.fill",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
+				flag:        Features20191205,
+				expectedErr: `memory.fill invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: `failed to read memory index for memory.fill: EOF`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill, 1},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: `memory.fill reserved byte must be zero encoded with 1 byte`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      &Memory{},
+				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
+			},
+			// table.init
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableInit},
+				flag:        FeatureBulkMemoryOperations,
+				expectedErr: "table must exist for table.init",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableInit},
+				flag:        Features20191205,
+				table:       &Table{},
+				expectedErr: `table.init invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableInit},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "failed to read element segment index for table.init: EOF",
+			},
+			{
+				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 100 /* data section out of range */},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "index 100 out of range of element section(len=1)",
+			},
+			{
+				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "failed to read table index for table.init: EOF",
+			},
+			{
+				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "cannot pop the operand for table.init: i32 missing",
+			},
+			{
+				body:           []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "cannot pop the operand for table.init: i32 missing",
+			},
+			{
+				body:           []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "cannot pop the operand for table.init: i32 missing",
+			},
+			// elem.drop
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
+				flag:        FeatureBulkMemoryOperations,
+				expectedErr: "table must exist for elem.drop",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
+				flag:        Features20191205,
+				table:       &Table{},
+				expectedErr: `elem.drop invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "failed to read element segment index for elem.drop: EOF",
+			},
+			{
+				body:           []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop, 100 /* element section out of range */},
+				flag:           FeatureBulkMemoryOperations,
+				table:          &Table{},
+				elementSection: []*ElementSegment{{}},
+				expectedErr:    "index 100 out of range of element section(len=1)",
+			},
+			// table.copy
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy},
+				flag:        FeatureBulkMemoryOperations,
+				memory:      nil,
+				expectedErr: "table must exist for table.copy",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy},
+				flag:        Features20191205,
+				table:       &Table{},
+				expectedErr: `table.copy invalid as feature "bulk-memory-operations" is disabled`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: `failed to read table index for table.copy: EOF`,
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 0},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "failed to read table index for table.copy: EOF",
+			},
+			{
+				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "cannot pop the operand for table.copy: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "cannot pop the operand for table.copy: i32 missing",
+			},
+			{
+				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
+				flag:        FeatureBulkMemoryOperations,
+				table:       &Table{},
+				expectedErr: "cannot pop the operand for table.copy: i32 missing",
+			},
+		} {
+			t.Run(tc.expectedErr, func(t *testing.T) {
+				m := &Module{
+					TypeSection:     []*FunctionType{v_v},
+					FunctionSection: []Index{0},
+					CodeSection:     []*Code{{Body: tc.body}},
+					ElementSection:  tc.elementSection,
+					DataSection:     tc.dataSection,
+				}
+				if !tc.dataCountSectionNil {
+					c := uint32(0)
+					m.DataCountSection = &c
+				}
+				err := m.validateFunction(tc.flag, 0, []Index{0}, nil, tc.memory, tc.table)
+				require.EqualError(t, err, tc.expectedErr)
+			})
+		}
+	})
+}
+
 var (
 	f32, f64, i32, i64 = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64
 	f32i32_v           = &FunctionType{Params: []ValueType{f32, i32}}

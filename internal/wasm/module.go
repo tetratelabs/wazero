@@ -163,6 +163,12 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	validatedElementSegments []*validatedElementSegment
 
+	// dataCountSection is the optional section and holds the number of data segments in the data section.
+	//
+	// This is introduced in the bulk-memory-operations proposal.
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	DataCountSection *uint32
+
 	// ID is the sha256 value of the source code (text/binary) and is used for caching.
 	ID ModuleID
 }
@@ -253,6 +259,9 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if err := m.validateDataCountSection(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -440,6 +449,14 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 			ValueTypeName(expectedType), ValueTypeName(actualType))
 	}
 	return nil
+}
+
+func (m *Module) validateDataCountSection() (err error) {
+	if m.DataCountSection != nil && int(*m.DataCountSection) != len(m.DataSection) {
+		err = fmt.Errorf("data count section (%d) doesn't match the length of data section (%d)",
+			*m.DataCountSection, len(m.DataSection))
+	}
+	return
 }
 
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
@@ -763,6 +780,9 @@ const (
 	SectionIDElement
 	SectionIDCode
 	SectionIDData
+	// Introduced in the bulk-memory-operations proposal.
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	SectionIDDataCount
 )
 
 // SectionIDHostFunction is a pseudo-section ID for host functions.
@@ -800,6 +820,8 @@ func SectionIDName(sectionID SectionID) string {
 		return "data"
 	case SectionIDHostFunction:
 		return "host_function"
+	case SectionIDDataCount:
+		return "data count"
 	}
 	return "unknown"
 }

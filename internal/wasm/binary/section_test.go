@@ -204,3 +204,16 @@ func TestEncodeFunctionSection(t *testing.T) {
 func TestEncodeStartSection(t *testing.T) {
 	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
 }
+
+func TestDecodeDataCountSection(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		v, err := decodeDataCountSection(bytes.NewReader([]byte{0x1}))
+		require.NoError(t, err)
+		require.Equal(t, uint32(1), *v)
+	})
+	t.Run("eof", func(t *testing.T) {
+		// EOF is fine as the datacount is optional.
+		_, err := decodeDataCountSection(bytes.NewReader([]byte{}))
+		require.NoError(t, err)
+	})
+}
