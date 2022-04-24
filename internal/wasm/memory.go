@@ -241,6 +241,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 	return uint32(bytesNum >> MemoryPageSizeInBits)
 }
 
+// size returns the size in bytes of the buffer.
 func (m *MemoryInstance) size() uint32 {
 	return uint32(len(m.Buffer))
 }
@@ -250,6 +251,8 @@ func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
 	return uint64(offset)+uint64(sizeInBytes) <= uint64(len(m.Buffer)) // uint64 prevents overflow on add
 }
 
+// readUint32Le implements ReadUint32Le without using a context. This is extracted as both ints and floats are stored in
+// memory as uint32le.
 func (m *MemoryInstance) readUint32Le(offset uint32) (uint32, bool) {
 	if !m.hasSize(offset, 4) {
 		return 0, false
@@ -257,6 +260,8 @@ func (m *MemoryInstance) readUint32Le(offset uint32) (uint32, bool) {
 	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
 }
 
+// readUint64Le implements ReadUint64Le without using a context. This is extracted as both ints and floats are stored in
+// memory as uint64le.
 func (m *MemoryInstance) readUint64Le(offset uint32) (uint64, bool) {
 	if !m.hasSize(offset, 8) {
 		return 0, false
@@ -264,6 +269,8 @@ func (m *MemoryInstance) readUint64Le(offset uint32) (uint64, bool) {
 	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
 }
 
+// writeUint32Le implements WriteUint32Le without using a context. This is extracted as both ints and floats are stored
+// in memory as uint32le.
 func (m *MemoryInstance) writeUint32Le(offset uint32, v uint32) bool {
 	if !m.hasSize(offset, 4) {
 		return false
@@ -272,6 +279,8 @@ func (m *MemoryInstance) writeUint32Le(offset uint32, v uint32) bool {
 	return true
 }
 
+// writeUint64Le implements WriteUint64Le without using a context. This is extracted as both ints and floats are stored
+// in memory as uint64le.
 func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
 	if !m.hasSize(offset, 8) {
 		return false
