@@ -123,7 +123,7 @@ func TestExampleUpToDate(t *testing.T) {
 		// Decode and instantiate the module
 		module, err := r.InstantiateModuleFromCode(testCtx, exampleBinary)
 		require.NoError(t, err)
-		defer module.Close()
+		defer module.Close(testCtx)
 
 		// Call the swap function as a smoke test
 		results, err := module.ExportedFunction("swap").Call(testCtx, 1, 2)
