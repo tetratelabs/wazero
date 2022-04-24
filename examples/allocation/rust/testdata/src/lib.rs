@@ -80,8 +80,8 @@ unsafe fn ptr_to_string(ptr: u32, len: u32) -> String {
     return String::from(utf8);
 }
 
-/// Returns a pointer and size pair for the given string in a way that is
-/// compatible with WebAssembly numeric types.
+/// Returns a pointer and size pair for the given string in a way compatible
+/// with WebAssembly numeric types.
 ///
 /// Note: This doesn't change the ownership of the String. To intentionally
 /// leak it, use [`std::mem::forget`] on the input after calling this.
