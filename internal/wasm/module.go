@@ -163,9 +163,10 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	validatedElementSegments []*validatedElementSegment
 
-	// dataCountSection is the optional section and holds the number of data segments in the data section.
+	// DataCountSection is the optional section and holds the number of data segments in the data section.
 	//
-	// This is introduced in the bulk-memory-operations proposal.
+	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations.
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
 	DataCountSection *uint32
 
@@ -780,7 +781,10 @@ const (
 	SectionIDElement
 	SectionIDCode
 	SectionIDData
-	// Introduced in the bulk-memory-operations proposal.
+
+	// SectionIDDataCount may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations enabled.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
 	SectionIDDataCount
 )
@@ -821,7 +825,7 @@ func SectionIDName(sectionID SectionID) string {
 	case SectionIDHostFunction:
 		return "host_function"
 	case SectionIDDataCount:
-		return "data count"
+		return "data_count"
 	}
 	return "unknown"
 }
