@@ -23,8 +23,8 @@ func main() {
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
 
-	// Instantiate a module named "env" that exports functions to get the
-	// current year and log to the console.
+	// Instantiate a Go-defined module named "env" that exports functions to
+	// get the current year and log to the console.
 	//
 	// Note: As noted on ExportFunction documentation, function signatures are
 	// constrained to a subset of numeric types.
@@ -46,8 +46,8 @@ func main() {
 	}
 	defer env.Close()
 
-	// Instantiate a module named "age-calculator" that imports functions
-	// defined in "env".
+	// Instantiate a WebAssembly module named "age-calculator" that imports
+	// functions defined in "env".
 	//
 	// Note: The import syntax in both Text and Binary format is the same
 	// regardless of if the function was defined in Go or WebAssembly.

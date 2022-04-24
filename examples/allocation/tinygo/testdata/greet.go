@@ -33,19 +33,19 @@ func greeting(name string) string {
 	return fmt.Sprint("Hello, ", name, "!")
 }
 
-// _greet is a WebAssembly export that accepts a string pointer (linear
-// memory offset) and calls greet.
+// _greet is a WebAssembly export that accepts a string pointer (linear memory
+// offset) and calls greet.
 //export greet
 func _greet(ptr, size uint32) {
 	name := ptrToString(ptr, size)
 	greet(name)
 }
 
-// _greet is a WebAssembly export that accepts a string pointer (linear
-// memory offset) and returns a pointer/size pair packed into a uint64.
+// _greet is a WebAssembly export that accepts a string pointer (linear memory
+// offset) and returns a pointer/size pair packed into a uint64.
 //
-// Note: This uses a uint64 instead of two result values for compatibility
-// with WebAssembly 1.0.
+// Note: This uses a uint64 instead of two result values for compatibility with
+// WebAssembly 1.0.
 //export greeting
 func _greeting(ptr, size uint32) (ptrSize uint64) {
 	name := ptrToString(ptr, size)
@@ -54,8 +54,8 @@ func _greeting(ptr, size uint32) (ptrSize uint64) {
 	return (uint64(ptr) << uint64(32)) | uint64(size)
 }
 
-// ptrToString returns a string from WebAssembly compatible numeric
-// types representing its pointer and length.
+// ptrToString returns a string from WebAssembly compatible numeric types
+// representing its pointer and length.
 func ptrToString(ptr uint32, size uint32) (ret string) {
 	// Here, we want to get a string represented by the ptr and size. If we
 	// wanted a []byte, we'd use reflect.SliceHeader instead.
@@ -65,8 +65,8 @@ func ptrToString(ptr uint32, size uint32) (ret string) {
 	return
 }
 
-// stringToPtr returns a pointer and size pair for the given string
-// in a way that is compatible with WebAssembly numeric types.
+// stringToPtr returns a pointer and size pair for the given string in a way
+// compatible with WebAssembly numeric types.
 func stringToPtr(s string) (uint32, uint32) {
 	buf := []byte(s)
 	ptr := &buf[0]

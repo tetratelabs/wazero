@@ -27,8 +27,8 @@ func main() {
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
 
-	// Instantiate a module named "env" that exports a function to log a string
-	// to the console.
+	// Instantiate a Go-defined module named "env" that exports a function to
+	// log to the console.
 	env, err := r.NewModuleBuilder("env").
 		ExportFunction("log", logString).
 		Instantiate(ctx)
@@ -45,15 +45,15 @@ func main() {
 	}
 	defer wm.Close()
 
-	// Instantiate a module named "greet" that imports the "log" function
-	// defined in "env".
+	// Instantiate a WebAssembly module that imports the "log" function defined
+	// in "env" and exports "memory" and functions we'll use in this example.
 	mod, err := r.InstantiateModuleFromCode(ctx, greetWasm)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer mod.Close()
 
-	// Get a references to functions we'll use in this example.
+	// Get references to WebAssembly functions we'll use in this example.
 	greet := mod.ExportedFunction("greet")
 	greeting := mod.ExportedFunction("greeting")
 	// These are undocumented, but exported. See tinygo-org/tinygo#2788
