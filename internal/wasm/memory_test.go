@@ -190,6 +190,55 @@ func TestMemoryInstance_HasSize(t *testing.T) {
 	}
 }
 
+func TestMemoryInstance_ReadUint16Le(t *testing.T) {
+	tests := []struct {
+		name       string
+		memory     []byte
+		offset     uint32
+		expected   uint16
+		expectedOk bool
+	}{
+		{
+			name:       "valid offset with an endian-insensitive v",
+			memory:     []byte{0xff, 0xff},
+			offset:     0, // arbitrary valid offset.
+			expected:   math.MaxUint16,
+			expectedOk: true,
+		},
+		{
+			name:       "valid offset with an endian-sensitive v",
+			memory:     []byte{0xfe, 0xff},
+			offset:     0, // arbitrary valid offset.
+			expected:   math.MaxUint16 - 1,
+			expectedOk: true,
+		},
+		{
+			name:       "maximum boundary valid offset",
+			offset:     1,
+			memory:     []byte{0x00, 0x1, 0x00},
+			expected:   1, // arbitrary valid v
+			expectedOk: true,
+		},
+		{
+			name:   "offset exceeds the maximum valid offset by 1",
+			memory: []byte{0xff, 0xff},
+			offset: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			memory := &MemoryInstance{Buffer: tc.memory}
+
+			v, ok := memory.ReadUint16Le(testCtx, tc.offset)
+			require.Equal(t, tc.expectedOk, ok)
+			require.Equal(t, tc.expected, v)
+		})
+	}
+}
+
 func TestMemoryInstance_ReadUint32Le(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -382,6 +431,57 @@ func TestMemoryInstance_ReadFloat64Le(t *testing.T) {
 			v, ok := memory.ReadFloat64Le(testCtx, tc.offset)
 			require.Equal(t, tc.expectedOk, ok)
 			require.Equal(t, tc.expected, v)
+		})
+	}
+}
+
+func TestMemoryInstance_WriteUint16Le(t *testing.T) {
+	memory := &MemoryInstance{Buffer: make([]byte, 100)}
+
+	tests := []struct {
+		name          string
+		offset        uint32
+		v             uint16
+		expectedOk    bool
+		expectedBytes []byte
+	}{
+		{
+			name:          "valid offset with an endian-insensitive v",
+			offset:        0, // arbitrary valid offset.
+			v:             math.MaxUint16,
+			expectedOk:    true,
+			expectedBytes: []byte{0xff, 0xff},
+		},
+		{
+			name:          "valid offset with an endian-sensitive v",
+			offset:        0, // arbitrary valid offset.
+			v:             math.MaxUint16 - 1,
+			expectedOk:    true,
+			expectedBytes: []byte{0xfe, 0xff},
+		},
+		{
+			name:          "maximum boundary valid offset",
+			offset:        memory.Size(testCtx) - 2, // 2 is the size of uint16
+			v:             1,                        // arbitrary valid v
+			expectedOk:    true,
+			expectedBytes: []byte{0x1, 0x00},
+		},
+		{
+			name:          "offset exceeds the maximum valid offset by 1",
+			offset:        memory.Size(testCtx) - 2 + 1, // 2 is the size of uint16
+			v:             1,                            // arbitrary valid v
+			expectedBytes: []byte{0xff, 0xff},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedOk, memory.WriteUint16Le(testCtx, tc.offset, tc.v))
+			if tc.expectedOk {
+				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+2]) // 2 is the size of uint16
+			}
 		})
 	}
 }

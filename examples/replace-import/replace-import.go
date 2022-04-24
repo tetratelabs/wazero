@@ -22,7 +22,7 @@ func main() {
 	// Instantiate a Go-defined module named "assemblyscript" that exports a
 	// function to close the module that calls "abort".
 	host, err := r.NewModuleBuilder("assemblyscript").
-		ExportFunction("abort", func(m api.Module, messageOffset, fileNameOffset, line, col uint32) {
+		ExportFunction("abort", func(ctx context.Context, m api.Module, messageOffset, fileNameOffset, line, col uint32) {
 			_ = m.CloseWithExitCode(ctx, 255)
 		}).Instantiate(ctx)
 	if err != nil {
