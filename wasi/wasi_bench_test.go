@@ -24,11 +24,11 @@ func Test_EnvironGet(t *testing.T) {
 	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	testCtx := newCtx(make([]byte, 20), sys)
+	m := newModule(make([]byte, 20), sys)
 	environGet := newSnapshotPreview1().EnvironGet
 
-	require.Equal(t, ErrnoSuccess, environGet(testCtx, 11, 1))
-	require.Equal(t, testCtx.Memory(), testMem)
+	require.Equal(t, ErrnoSuccess, environGet(testCtx, m, 11, 1))
+	require.Equal(t, m.Memory(), testMem)
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
@@ -37,7 +37,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	testCtx := newCtx([]byte{
+	m := newModule([]byte{
 		0,                // environBuf is after this
 		'a', '=', 'b', 0, // null terminated "a=b",
 		'b', '=', 'c', 'd', 0, // null terminated "b=cd"
@@ -50,14 +50,14 @@ func Benchmark_EnvironGet(b *testing.B) {
 	environGet := newSnapshotPreview1().EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if environGet(testCtx, 0, 4) != ErrnoSuccess {
+			if environGet(testCtx, m, 0, 4) != ErrnoSuccess {
 				b.Fatal()
 			}
 		}
 	})
 }
 
-func newCtx(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
+func newModule(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
 	return wasm.NewCallContext(nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)

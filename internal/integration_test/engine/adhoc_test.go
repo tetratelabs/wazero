@@ -64,7 +64,7 @@ var (
 func testHugeStack(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, hugestackWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
@@ -83,7 +83,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 
 	module, err := r.InstantiateModuleFromCode(testCtx, unreachableWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	_, err = module.ExportedFunction("main").Call(testCtx)
 	exp := `panic in host function (recovered by wazero)
@@ -106,7 +106,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 
 	module, err := r.InstantiateModuleFromCode(testCtx, recursiveWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	_, err = module.ExportedFunction("main").Call(testCtx, 1)
 	require.NoError(t, err)
@@ -121,8 +121,8 @@ func TestImportedAndExportedFunc(t *testing.T) {
 // Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
-	storeInt := func(m api.Module, offset uint32, val uint64) uint32 {
-		if !m.Memory().WriteUint64Le(offset, val) {
+	storeInt := func(ctx context.Context, m api.Module, offset uint32, val uint64) uint32 {
+		if !m.Memory().WriteUint64Le(ctx, offset, val) {
 			return 1
 		}
 		// sneak a reference to the memory, so we can check it later
@@ -132,7 +132,7 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 
 	host, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate(testCtx)
 	require.NoError(t, err)
-	defer host.Close()
+	defer host.Close(testCtx)
 
 	module, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $test
 		(import "" "store_int"
@@ -143,7 +143,7 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 		(export "store_int" (func $store_int))
 		)`))
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	// Call store_int and ensure it didn't return an error code.
 	fn := module.ExportedFunction("store_int")
@@ -177,7 +177,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 
 	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx)
 	require.NoError(t, err)
-	defer imported.Close()
+	defer imported.Close(testCtx)
 
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
@@ -188,7 +188,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	(export "call->%[3]s" (func $call_%[3]s))
 )`, importingName, importedName, test)))
 			require.NoError(t, err)
-			defer importing.Close()
+			defer importing.Close(testCtx)
 
 			results, err := importing.ExportedFunction("call->"+test).Call(testCtx, math.MaxUint32-1)
 			require.NoError(t, err)
@@ -219,7 +219,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 
 	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx)
 	require.NoError(t, err)
-	defer imported.Close()
+	defer imported.Close(testCtx)
 
 	for _, test := range []struct {
 		name            string
@@ -254,7 +254,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	(export "call->%[3]s" (func $call_%[3]s))
 )`, importingName, importedName, test.name)))
 			require.NoError(t, err)
-			defer importing.Close()
+			defer importing.Close(testCtx)
 
 			results, err := importing.ExportedFunction("call->"+test.name).Call(testCtx, test.input)
 			require.NoError(t, err)
@@ -322,18 +322,18 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			var importingCode, importedCode *wazero.CompiledCode
 			var imported, importing api.Module
 			var err error
-			closeAndReturn := func(x uint32) uint32 {
+			closeAndReturn := func(ctx context.Context, x uint32) uint32 {
 				if tc.closeImporting != 0 {
-					require.NoError(t, importing.CloseWithExitCode(tc.closeImporting))
+					require.NoError(t, importing.CloseWithExitCode(ctx, tc.closeImporting))
 				}
 				if tc.closeImported != 0 {
-					require.NoError(t, imported.CloseWithExitCode(tc.closeImported))
+					require.NoError(t, imported.CloseWithExitCode(ctx, tc.closeImported))
 				}
 				if tc.closeImportedCode {
-					importedCode.Close()
+					importedCode.Close(testCtx)
 				}
 				if tc.closeImportingCode {
-					importingCode.Close()
+					importingCode.Close(testCtx)
 				}
 				return x
 			}
@@ -345,7 +345,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			imported, err = r.InstantiateModule(testCtx, importedCode)
 			require.NoError(t, err)
-			defer imported.Close()
+			defer imported.Close(testCtx)
 
 			// Import that module.
 			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
@@ -354,7 +354,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			importing, err = r.InstantiateModule(testCtx, importingCode)
 			require.NoError(t, err)
-			defer importing.Close()
+			defer importing.Close(testCtx)
 
 			var expectedErr error
 			if tc.closeImported != 0 && tc.closeImporting != 0 {
@@ -388,7 +388,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
   (export "memory" (memory 0))
 )`))
 	require.NoError(t, err)
-	defer memory.Close()
+	defer memory.Close(testCtx)
 
 	// Check the export worked
 	require.Equal(t, memory.Memory(), memory.ExportedMemory("memory"))
@@ -397,7 +397,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	results, err := memory.ExportedFunction("size").Call(testCtx)
 	require.NoError(t, err)
 	require.Zero(t, results[0])
-	require.Zero(t, memory.ExportedMemory("memory").Size())
+	require.Zero(t, memory.ExportedMemory("memory").Size(testCtx))
 
 	// Try to grow the memory by one page
 	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
@@ -407,8 +407,8 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Check the size command works!
 	results, err = memory.ExportedFunction("size").Call(testCtx)
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), results[0])                 // 1 page
-	require.Equal(t, uint32(65536), memory.Memory().Size()) // 64KB
+	require.Equal(t, uint64(1), results[0])                        // 1 page
+	require.Equal(t, uint32(65536), memory.Memory().Size(testCtx)) // 64KB
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
@@ -422,16 +422,16 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		(export "store" (func $store))
 	  )`))
 	require.NoError(t, err)
-	defer compiled.Close()
+	defer compiled.Close(testCtx)
 
 	// Instantiate multiple modules with the same source (*CompiledCode).
 	for i := 0; i < 100; i++ {
 		module, err := r.InstantiateModuleWithConfig(testCtx, compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
 		require.NoError(t, err)
-		defer module.Close()
+		defer module.Close(testCtx)
 
 		// Ensure that compilation cache doesn't cause race on memory instance.
-		before, ok := module.Memory().ReadUint64Le(1)
+		before, ok := module.Memory().ReadUint64Le(testCtx, 1)
 		require.True(t, ok)
 		// Value must be zero as the memory must not be affected by the previously instantiated modules.
 		require.Zero(t, before)
@@ -443,7 +443,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, err)
 
 		// After the call, the value must be set properly.
-		after, ok := module.Memory().ReadUint64Le(1)
+		after, ok := module.Memory().ReadUint64Le(testCtx, 1)
 		require.True(t, ok)
 		require.Equal(t, uint64(1000), after)
 	}

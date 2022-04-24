@@ -14,6 +14,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
 const (
 	i32 = wasm.ValueTypeI32
 	i64 = wasm.ValueTypeI64
@@ -46,9 +49,10 @@ func TestModGen(t *testing.T) {
 				// Encode the generated module (*wasm.Module) as binary.
 				bin := binary.EncodeModule(m)
 				// Pass the generated binary into our compilers.
-				code, err := runtime.CompileModule(context.Background(), bin)
+				code, err := runtime.CompileModule(testCtx, bin)
 				require.NoError(t, err)
-				code.Close()
+				err = code.Close(testCtx)
+				require.NoError(t, err)
 			})
 		}
 	}

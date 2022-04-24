@@ -118,7 +118,7 @@ func TestExampleUpToDate(t *testing.T) {
 		// Add WASI to satisfy import tests
 		wm, err := wasi.InstantiateSnapshotPreview1(testCtx, r)
 		require.NoError(t, err)
-		defer wm.Close()
+		defer wm.Close(testCtx)
 
 		// Decode and instantiate the module
 		module, err := r.InstantiateModuleFromCode(testCtx, exampleBinary)

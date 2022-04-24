@@ -29,7 +29,7 @@ func Example() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mod.Close()
+	defer mod.Close(ctx)
 
 	// Get a function that can be reused until its module is closed:
 	add := mod.ExportedFunction("add")

@@ -39,7 +39,7 @@ func testMultiValue(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig)
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureMultiValue(true))
 		module, err := r.InstantiateModuleFromCode(testCtx, multiValueWasm)
 		require.NoError(t, err)
-		defer module.Close()
+		defer module.Close(testCtx)
 
 		swap := module.ExportedFunction("swap")
 		results, err := swap.Call(testCtx, 100, 200)
@@ -92,7 +92,7 @@ var brWasm []byte
 func testBr(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, brWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "type-i32-i32"}, {name: "type-i64-i64"}, {name: "type-f32-f32"}, {name: "type-f64-f64"},
@@ -115,7 +115,7 @@ var callWasm []byte
 func testCall(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, callWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "type-i32-i64", expected: []uint64{0x132, 0x164}},
@@ -136,7 +136,7 @@ var callIndirectWasm []byte
 func testCallIndirect(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, callIndirectWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "type-f64-i32", expected: []uint64{api.EncodeF64(0xf64), 32}},
@@ -158,7 +158,7 @@ var facWasm []byte
 func testFac(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, facWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	fac := module.ExportedFunction("fac-ssa")
 	results, err := fac.Call(testCtx, 25)
@@ -173,7 +173,7 @@ var funcWasm []byte
 func testFunc(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, funcWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "value-i32-f64", expected: []uint64{77, api.EncodeF64(7)}},
@@ -221,7 +221,7 @@ var ifWasm []byte
 func testIf(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, ifWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "multi", params: []uint64{0}, expected: []uint64{9, api.EncodeI32(-1)}},
@@ -273,7 +273,7 @@ var loopWasm []byte
 func testLoop(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, loopWasm)
 	require.NoError(t, err)
-	defer module.Close()
+	defer module.Close(testCtx)
 
 	testFunctions(t, module, []funcTest{
 		{name: "as-binary-operands", expected: []uint64{12}},

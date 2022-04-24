@@ -165,7 +165,7 @@ func testCallFn(rt runtime, rtCfg *runtimeConfig, testCall func(*testing.T, modu
 				testCall(t, m)
 			}
 
-			require.NoError(t, m.Close())
+			require.NoError(t, m.Close(testCtx))
 		}
 	}
 }

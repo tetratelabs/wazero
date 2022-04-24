@@ -36,14 +36,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer wasm.Close()
+	defer wasm.Close(ctx)
 
 	// Add a module that uses offset parameters for multiple results, with functions defined in Go.
 	host, err := resultOffsetHostFunctions(ctx, runtime)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer host.Close()
+	defer host.Close(ctx)
 
 	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
 	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
@@ -56,14 +56,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer wasmWithMultiValue.Close()
+	defer wasmWithMultiValue.Close(ctx)
 
 	// Add a module that uses multiple results values, with functions defined in Go.
 	hostWithMultiValue, err := multiValueHostFunctions(ctx, runtimeWithMultiValue)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer hostWithMultiValue.Close()
+	defer hostWithMultiValue.Close(ctx)
 
 	// Call the same function in all modules and print the results to the console.
 	for _, mod := range []api.Module{wasm, host, wasmWithMultiValue, hostWithMultiValue} {
@@ -121,8 +121,8 @@ func resultOffsetHostFunctions(ctx context.Context, r wazero.Runtime) (api.Modul
 		// To use result parameters, we need scratch memory. Allocate the least possible: 1 page (64KB).
 		ExportMemoryWithMax("mem", 1, 1).
 		// Define a function that returns a result, while a second result is written to memory.
-		ExportFunction("get_age", func(m api.Module, resultOffsetAge uint32) (errno uint32) {
-			if m.Memory().WriteUint64Le(resultOffsetAge, 37) {
+		ExportFunction("get_age", func(ctx context.Context, m api.Module, resultOffsetAge uint32) (errno uint32) {
+			if m.Memory().WriteUint64Le(ctx, resultOffsetAge, 37) {
 				return 0
 			}
 			return 1 // overflow
@@ -132,7 +132,7 @@ func resultOffsetHostFunctions(ctx context.Context, r wazero.Runtime) (api.Modul
 		ExportFunction("call_get_age", func(ctx context.Context, m api.Module) (age uint64) {
 			resultOffsetAge := uint32(8) // arbitrary memory offset (in bytes)
 			_, _ = m.ExportedFunction("get_age").Call(ctx, uint64(resultOffsetAge))
-			age, _ = m.Memory().ReadUint64Le(resultOffsetAge)
+			age, _ = m.Memory().ReadUint64Le(ctx, resultOffsetAge)
 			return
 		}).Instantiate(ctx)
 }

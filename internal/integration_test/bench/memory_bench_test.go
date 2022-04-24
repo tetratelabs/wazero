@@ -8,13 +8,13 @@ import (
 
 func BenchmarkMemory(b *testing.B) {
 	var mem = &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1}
-	if !mem.WriteByte(10, 16) {
+	if !mem.WriteByte(testCtx, 10, 16) {
 		b.Fail()
 	}
 
 	b.Run("ReadByte", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if v, ok := mem.ReadByte(10); !ok || v != 16 {
+			if v, ok := mem.ReadByte(testCtx, 10); !ok || v != 16 {
 				b.Fail()
 			}
 		}
@@ -22,7 +22,7 @@ func BenchmarkMemory(b *testing.B) {
 
 	b.Run("ReadUint32Le", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if v, ok := mem.ReadUint32Le(10); !ok || v != 16 {
+			if v, ok := mem.ReadUint32Le(testCtx, 10); !ok || v != 16 {
 				b.Fail()
 			}
 		}
@@ -30,7 +30,7 @@ func BenchmarkMemory(b *testing.B) {
 
 	b.Run("WriteByte", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if !mem.WriteByte(10, 16) {
+			if !mem.WriteByte(testCtx, 10, 16) {
 				b.Fail()
 			}
 		}
@@ -38,7 +38,7 @@ func BenchmarkMemory(b *testing.B) {
 
 	b.Run("WriteUint32Le", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if !mem.WriteUint32Le(10, 16) {
+			if !mem.WriteUint32Le(testCtx, 10, 16) {
 				b.Fail()
 			}
 		}

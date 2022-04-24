@@ -80,7 +80,7 @@ func TestCallContext_String(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
 			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil)
-			defer m.Close() //nolint
+			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
@@ -102,13 +102,13 @@ func TestCallContext_Close(t *testing.T) {
 		require.Equal(t, s.Module(moduleName), m)
 
 		// Closing should not err.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		require.Nil(t, s.Module(moduleName))
 
 		// Verify no error closing again.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 	})
 
 	t.Run("calls SysContext.Close()", func(t *testing.T) {
@@ -139,12 +139,12 @@ func TestCallContext_Close(t *testing.T) {
 		require.True(t, len(sys.openedFiles) > 0, "sys.openedFiles was empty")
 
 		// Closing should not err.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
 
 		// Verify no error closing again.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 	})
 }

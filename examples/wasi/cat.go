@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer wm.Close()
+	defer wm.Close(ctx)
 
 	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "wasi" and add args to write "test.txt" to stdout twice.
@@ -54,5 +54,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cat.Close()
+	defer cat.Close(ctx)
 }

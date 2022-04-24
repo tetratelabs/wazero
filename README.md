@@ -26,7 +26,7 @@ func main() {
 
 	// Instantiate the module and return its exported functions
 	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
-	defer module.Close()
+	defer module.Close(ctx)
 
 	// Discover 7! is 5040
 	fmt.Println(module.ExportedFunction("fac").Call(ctx, 7))
@@ -63,7 +63,7 @@ env, err := r.NewModuleBuilder("env").
 if err != nil {
 	log.Fatal(err)
 }
-defer env.Close()
+defer env.Close(ctx)
 ```
 
 While not a standards body like W3C, there is another dominant community in the
@@ -77,11 +77,11 @@ For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
 wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
-defer wm.Close()
+defer wm.Close(ctx)
 
 config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
 module, err := r.InstantiateModule(ctx, binary, config)
-defer module.Close()
+defer module.Close(ctx)
 ...
 ```
 
@@ -302,7 +302,7 @@ top-level project. That said, Takeshi's original motivation is as relevant
 today as when he started the project, and worthwhile reading:
 
 If you want to provide Wasm host environments in your Go programs, currently
-there's no other choice than using CGO andleveraging the state-of-the-art
+there's no other choice than using CGO leveraging the state-of-the-art
 runtimes written in C++/Rust (e.g. V8, Wasmtime, Wasmer, WAVM, etc.), and
 there's no pure Go Wasm runtime out there. (There's only one exception named
 [wagon](https://github.com/go-interpreter/wagon), but it was archived with the
@@ -313,7 +313,7 @@ plugin systems in your Go project and want these plugin systems to be
 safe/fast/flexible, and enable users to write plugins in their favorite
 languages. That's where Wasm comes into play. You write your own Wasm host
 environments and embed Wasm runtime in your projects, and now users are able to
-write plugins in their own favorite lanugages (AssembyScript, C, C++, Rust,
+write plugins in their own favorite languages (AssemblyScript, C, C++, Rust,
 Zig, etc.). As a specific example, you maybe write proxy severs in Go and want
 to allow users to extend the proxy via [Proxy-Wasm ABI](https://github.com/proxy-wasm/spec).
 Maybe you are writing server-side rendering applications via Wasm, or

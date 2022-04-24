@@ -127,14 +127,14 @@ func TestGlobalTypes(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expectedType, tc.global.Type())
-			require.Equal(t, tc.expectedVal, tc.global.Get())
+			require.Equal(t, tc.expectedVal, tc.global.Get(testCtx))
 			require.Equal(t, tc.expectedString, tc.global.String())
 
 			mutable, ok := tc.global.(api.MutableGlobal)
 			require.Equal(t, tc.expectedMutable, ok)
 			if ok {
-				mutable.Set(2)
-				require.Equal(t, uint64(2), tc.global.Get())
+				mutable.Set(testCtx, 2)
+				require.Equal(t, uint64(2), tc.global.Get(testCtx))
 			}
 		})
 	}

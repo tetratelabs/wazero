@@ -22,11 +22,11 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithStdout(stdout)
 	wm, err := InstantiateSnapshotPreview1(testCtx, r)
 	require.NoError(t, err)
-	defer wm.Close()
+	defer wm.Close(testCtx)
 
 	compiled, err := r.CompileModule(testCtx, wasiArg)
 	require.NoError(t, err)
-	defer compiled.Close()
+	defer compiled.Close(testCtx)
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {
@@ -37,6 +37,6 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
 
 		stdout.Reset()
-		require.NoError(t, mod.Close())
+		require.NoError(t, mod.Close(testCtx))
 	}
 }

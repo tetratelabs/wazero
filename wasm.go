@@ -45,7 +45,7 @@ type Runtime interface {
 	//  * Improve performance when the same module is instantiated multiple times under different names
 	//  * Reduce the amount of errors that can occur during InstantiateModule.
 	//
-	// Note: when `ctx` is nil, it defaults to context.Background.
+	// Note: When `ctx` is nil, it defaults to context.Background.
 	// Note: The resulting module name defaults to what was binary from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, source []byte) (*CompiledCode, error)
@@ -58,7 +58,7 @@ type Runtime interface {
 	//	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
 	//	defer module.Close()
 	//
-	// Note: when `ctx` is nil, it defaults to context.Background.
+	// Note: When `ctx` is nil, it defaults to context.Background.
 	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error)
@@ -111,7 +111,7 @@ type Runtime interface {
 	//	// Assign different configuration on each instantiation
 	//	module, _ := r.InstantiateModuleWithConfig(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 	//
-	// Note: when `ctx` is nil, it defaults to context.Background.
+	// Note: When `ctx` is nil, it defaults to context.Background.
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
 	InstantiateModuleWithConfig(ctx context.Context, compiled *CompiledCode, config *ModuleConfig) (mod api.Module, err error)
 }
@@ -188,8 +188,8 @@ func (r *runtime) InstantiateModuleFromCode(ctx context.Context, source []byte) 
 	if compiled, err := r.CompileModule(ctx, source); err != nil {
 		return nil, err
 	} else {
-		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
-		defer compiled.Close()
+		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside this function.
+		defer compiled.Close(ctx)
 		return r.InstantiateModule(ctx, compiled)
 	}
 }
@@ -199,8 +199,8 @@ func (r *runtime) InstantiateModuleFromCodeWithConfig(ctx context.Context, sourc
 	if compiled, err := r.CompileModule(ctx, source); err != nil {
 		return nil, err
 	} else {
-		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside of this function.
-		defer compiled.Close()
+		// *wasm.ModuleInstance for the source cannot be tracked, so we release the cache inside this function.
+		defer compiled.Close(ctx)
 		return r.InstantiateModuleWithConfig(ctx, compiled, config)
 	}
 }
