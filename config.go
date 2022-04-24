@@ -156,6 +156,8 @@ type CompiledCode struct {
 //
 // Note: It is safe to call Close while having outstanding calls from Modules instantiated from this *CompiledCode.
 func (c *CompiledCode) Close(_ context.Context) error {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	c.compiledEngine.DeleteCompiledModule(c.module)
 	// It is possible the underlying may need to return an error later, but in any case this matches api.Module.Close.
 	return nil

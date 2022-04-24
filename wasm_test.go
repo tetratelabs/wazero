@@ -425,25 +425,27 @@ func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx con
 }
 
 func TestCompiledCode_Close(t *testing.T) {
-	e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 
-	var cs []*CompiledCode
-	for i := 0; i < 10; i++ {
-		m := &wasm.Module{}
-		err := e.CompileModule(testCtx, m)
-		require.NoError(t, err)
-		cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
+		var cs []*CompiledCode
+		for i := 0; i < 10; i++ {
+			m := &wasm.Module{}
+			err := e.CompileModule(ctx, m)
+			require.NoError(t, err)
+			cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
+		}
+
+		// Before Close.
+		require.Equal(t, 10, len(e.cachedModules))
+
+		for _, c := range cs {
+			require.NoError(t, c.Close(ctx))
+		}
+
+		// After Close.
+		require.Zero(t, len(e.cachedModules))
 	}
-
-	// Before Close.
-	require.Equal(t, 10, len(e.cachedModules))
-
-	for _, c := range cs {
-		c.Close(testCtx)
-	}
-
-	// After Close.
-	require.Zero(t, len(e.cachedModules))
 }
 
 type mockEngine struct {

@@ -182,6 +182,8 @@ type CompilationResult struct {
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	functions, globals, mem, table, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err

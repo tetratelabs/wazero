@@ -70,8 +70,8 @@ type Module interface {
 	Name() string
 
 	// Close is a convenience that invokes CloseWithExitCode with zero.
-	// Note: When `ctx` is nil, it defaults to context.Background.
-	Close(ctx context.Context) error
+	// Note: When the context is nil, it defaults to context.Background.
+	Close(context.Context) error
 
 	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
 	// failure to ExportedFunction callers.
@@ -82,7 +82,7 @@ type Module interface {
 	//
 	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
 	// with the exitCode.
-	// Note: When `ctx` is nil, it defaults to context.Background.
+	// Note: When the context is nil, it defaults to context.Background.
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
 	// Memory returns a memory defined in this module or nil if there are none wasn't.
@@ -122,7 +122,7 @@ type Function interface {
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
-	// Note: When `ctx` is nil, it defaults to context.Background.
+	// Note: When the context is nil, it defaults to context.Background.
 	// Note: If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
 	// function that exits.
@@ -155,8 +155,8 @@ type Global interface {
 	// Get returns the last known value of this global.
 	// See Type for how to encode this value from a Go type.
 	//
-	// Note: When `ctx` is nil, it defaults to context.Background.
-	Get(ctx context.Context) uint64
+	// Note: When the context is nil, it defaults to context.Background.
+	Get(context.Context) uint64
 }
 
 // MutableGlobal is a Global whose value can be updated at runtime (variable).
@@ -166,7 +166,7 @@ type MutableGlobal interface {
 	// Set updates the value of this global.
 	// See Global.Type for how to decode this value to a Go type.
 	//
-	// Note: When `ctx` is nil, it defaults to context.Background.
+	// Note: When the context is nil, it defaults to context.Background.
 	Set(ctx context.Context, v uint64)
 }
 
@@ -183,7 +183,7 @@ type Memory interface {
 	// memory has min 0 and max 2 pages, this returns zero.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
-	Size(ctx context.Context) uint32
+	Size(context.Context) uint32
 
 	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
 	// not found or out of range.

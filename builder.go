@@ -151,12 +151,12 @@ type ModuleBuilder interface {
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
-	Build(ctx context.Context) (*CompiledCode, error)
+	Build(context.Context) (*CompiledCode, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
-	Instantiate(ctx context.Context) (api.Module, error)
+	Instantiate(context.Context) (api.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder

@@ -80,6 +80,8 @@ func (m *CallContext) Close(ctx context.Context) (err error) {
 
 // CloseWithExitCode implements the same method as documented on api.Module.
 func (m *CallContext) CloseWithExitCode(_ context.Context, exitCode uint32) (err error) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return nil
