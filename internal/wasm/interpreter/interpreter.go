@@ -1669,7 +1669,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	ce.popFrame()
 }
 
+// popMemoryOffset takes a memory offset off the stack for use in load and store instructions.
+// As the top of stack value is 64-bit, this ensures it is in range before returning it.
 func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
+	// TODO: Document what 'us' is and why we expect to look at value 1.
 	offset := op.us[1] + ce.popValue()
 	if offset > math.MaxUint32 {
 		panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
