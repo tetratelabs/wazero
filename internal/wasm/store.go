@@ -121,6 +121,9 @@ type (
 
 		// Index holds the index of this function instance in the function index namespace (beginning with imports).
 		Index Index
+
+		// FunctionListener holds a listener to notify when this function is called.
+		FunctionListener FunctionListener
 	}
 
 	// GlobalInstance represents a global instance in a store.
@@ -244,7 +247,7 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 // * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*CallContext, error) {
+func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext, functionListenerFactory FunctionListenerFactory) (*CallContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -277,10 +280,10 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 	var funcSection SectionID
 	if module.HostFunctionSection == nil {
 		funcSection = SectionIDFunction
-		functions = module.buildFunctions(name)
+		functions = module.buildFunctions(name, functionListenerFactory)
 	} else {
 		funcSection = SectionIDHostFunction
-		functions = module.buildHostFunctions(name)
+		functions = module.buildHostFunctions(name, functionListenerFactory)
 	}
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.

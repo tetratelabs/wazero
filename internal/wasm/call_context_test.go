@@ -80,7 +80,7 @@ func TestCallContext_String(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
-			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil)
+			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil, nil)
 			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestCallContext_Close(t *testing.T) {
 		t.Run(fmt.Sprintf("%s calls store.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
 			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil)
+				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil, nil)
 				require.NoError(t, err)
 
 				// We use side effects to see if Close called store.CloseWithExitCode (without repeating store_test.go).
@@ -160,7 +160,7 @@ func TestCallContext_Close(t *testing.T) {
 		require.NoError(t, err)
 
 		moduleName := t.Name()
-		m, err := s.Instantiate(context.Background(), &Module{}, moduleName, sys)
+		m, err := s.Instantiate(context.Background(), &Module{}, moduleName, sys, nil)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called SysContext.Close (without repeating sys_test.go).

@@ -273,7 +273,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	err = store.Engine.CompileModule(testCtx, mod)
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(testCtx, mod, mod.NameSection.ModuleName, wasm.DefaultSysContext())
+	_, err = store.Instantiate(testCtx, mod, mod.NameSection.ModuleName, wasm.DefaultSysContext(), nil)
 	require.NoError(t, err)
 }
 
@@ -346,7 +346,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 						require.NoError(t, err, msg)
 
 						moduleName = strings.TrimPrefix(moduleName, "$")
-						_, err = store.Instantiate(testCtx, mod, moduleName, nil)
+						_, err = store.Instantiate(testCtx, mod, moduleName, nil, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -476,7 +476,7 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 		return
 	}
 
-	_, err = store.Instantiate(testCtx, mod, t.Name(), nil)
+	_, err = store.Instantiate(testCtx, mod, t.Name(), nil, nil)
 	require.Error(t, err, msg)
 }
 

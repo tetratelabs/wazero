@@ -576,14 +576,23 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 		// Use the caller's memory, which might be different from the defining module on an imported function.
 		callCtx = callCtx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
 	}
+	if f.source.FunctionListener != nil {
+		ctx = f.source.FunctionListener.Before(ctx)
+	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
 	results = wasm.CallGoFunc(ctx, callCtx, f.source, params)
 	ce.popFrame()
+	if f.source.FunctionListener != nil {
+		f.source.FunctionListener.After(ctx)
+	}
 	return
 }
 
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+	if f.source.FunctionListener != nil {
+		ctx = f.source.FunctionListener.Before(ctx)
+	}
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
@@ -1674,6 +1683,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+	if f.source.FunctionListener != nil {
+		f.source.FunctionListener.After(ctx)
+	}
 }
 
 // popMemoryOffset takes a memory offset off the stack for use in load and store instructions.

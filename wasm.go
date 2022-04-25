@@ -131,9 +131,10 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	enabledFeatures wasm.Features
-	store           *wasm.Store
-	memoryMaxPages  uint32
+	enabledFeatures         wasm.Features
+	store                   *wasm.Store
+	memoryMaxPages          uint32
+	functionListenerFactory wasm.FunctionListenerFactory
 }
 
 // Module implements Runtime.Module
@@ -224,7 +225,7 @@ func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *Com
 
 	module := config.replaceImports(compiled.module)
 
-	mod, err = r.store.Instantiate(ctx, module, name, sysCtx)
+	mod, err = r.store.Instantiate(ctx, module, name, sysCtx, r.functionListenerFactory)
 	if err != nil {
 		return
 	}
@@ -243,4 +244,8 @@ func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *Com
 		}
 	}
 	return
+}
+
+func (r *runtime) WithFunctionListenerFactory(factory wasm.FunctionListenerFactory) {
+	r.functionListenerFactory = factory
 }

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -480,7 +481,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 	return
 }
 
-func (m *Module) buildFunctions(moduleName string) (functions []*FunctionInstance) {
+func (m *Module) buildFunctions(moduleName string, functionListenerFactory FunctionListenerFactory) (functions []*FunctionInstance) {
 	var functionNames NameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
@@ -511,6 +512,10 @@ func (m *Module) buildFunctions(moduleName string) (functions []*FunctionInstanc
 			Index:      funcIdx,
 		}
 		f.DebugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
+		if functionListenerFactory != nil {
+			info := m.resolveFunction(moduleName, f, funcIdx)
+			f.FunctionListener = functionListenerFactory.NewListener(info)
+		}
 		functions = append(functions, f)
 	}
 	return
@@ -526,6 +531,39 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 		}
 	}
 	return
+}
+
+func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx uint32) FunctionInfo {
+	params := make([]ValueInfo, len(f.ParamTypes()))
+	for i, p := range f.ParamTypes() {
+		params[i].Type = p
+	}
+	results := make([]ValueInfo, len(f.ResultTypes()))
+	for i, r := range f.ResultTypes() {
+		results[i].Type = r
+	}
+
+	for _, nm := range m.NameSection.LocalNames {
+		if nm.Index == funcIdx {
+			for _, n := range nm.NameMap {
+				if int(n.Index) < len(params) {
+					params[n.Index].Name = n.Name
+				} else {
+					resIdx := int(n.Index) - len(params)
+					// Only malformed program would have an index out of bounds here.
+					if resIdx < len(results) {
+						results[resIdx].Name = n.Name
+					}
+				}
+			}
+		}
+	}
+	return FunctionInfo{
+		ModuleName: moduleName,
+		Name:       f.DebugName,
+		Params:     params,
+		Returns:    results,
+	}
 }
 
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
@@ -894,4 +932,67 @@ func ExternTypeName(et ExternType) string {
 		return ExternTypeGlobalName
 	}
 	return fmt.Sprintf("%#x", et)
+}
+
+// A FunctionListener can be registered for any function via FunctionListenerFactory to
+// be notified when the function is called.
+type FunctionListener interface {
+	// Before is invoked before a function is called. ctx is the context of the caller function.
+	// The returned context will be used as the context of this function call. To add context
+	// information for this function call, add it to ctx and return the updated context. If
+	// no context informationis needed, return ctx as is.
+	Before(ctx context.Context) context.Context
+	// After is invoked after a function is called. ctx is the context of this function call.
+	After(ctx context.Context)
+}
+
+// Information about the definition of a parameter or return value.
+type ValueInfo struct {
+	// The name of the value. Empty if name is not available.
+	Name string
+
+	// The type of the value.
+	Type api.ValueType
+}
+
+func (info ValueInfo) String() string {
+	n := info.Name
+	if len(n) == 0 {
+		n = "<unknown>"
+	}
+	return fmt.Sprintf("%v: %v", n, api.ValueTypeName(info.Type))
+}
+
+// Information about a defined function.
+type FunctionInfo struct {
+	// The name of the module the function is defined in.
+	ModuleName string
+
+	// The name of the function. This will be the name of the export for an exported function.
+	// Empty if name is not available.
+	Name string
+
+	// The function parameters.
+	Params []ValueInfo
+
+	// The function return values.
+	Returns []ValueInfo
+}
+
+// FunctionListenerFactory returns FunctionListeners to be notified when a function is called.
+type FunctionListenerFactory interface {
+	// NewListener returns a FunctionListener for a defined function. If nil is returned, no
+	// listener will be notified.
+	NewListener(info FunctionInfo) FunctionListener
+}
+
+// Internal interface to allow setting FunctionListenerFactory before exposing in public API.
+// Internal code can type assert on this interface to set a factory.
+//
+// r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+// if s, ok := r.(wasm.FunctionListenerFactorySetter); ok {
+// 	s.WithFunctionListenerFactory(&listenerFactory{})
+// }
+type FunctionListenerFactorySetter interface {
+	WithFunctionListenerFactory(FunctionListenerFactory)
 }

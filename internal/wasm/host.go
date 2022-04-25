@@ -163,7 +163,7 @@ func (m *Module) maybeAddType(ft *FunctionType) Index {
 	return result
 }
 
-func (m *Module) buildHostFunctions(moduleName string) (functions []*FunctionInstance) {
+func (m *Module) buildHostFunctions(moduleName string, functionListenerFactory FunctionListenerFactory) (functions []*FunctionInstance) {
 	// ModuleBuilder has no imports, which means the FunctionSection index is the same as the position in the function
 	// index namespace. Also, it ensures every function has a name. That's why there is less error checking here.
 	var functionNames = m.NameSection.FunctionNames
@@ -176,6 +176,26 @@ func (m *Module) buildHostFunctions(moduleName string) (functions []*FunctionIns
 			Index:  Index(idx),
 		}
 		f.DebugName = wasmdebug.FuncName(moduleName, functionNames[f.Index].Name, f.Index)
+		if functionListenerFactory != nil {
+			params := make([]ValueInfo, len(f.ParamTypes()))
+			for i, p := range f.ParamTypes() {
+				params[i].Type = p
+			}
+			results := make([]ValueInfo, len(f.ResultTypes()))
+			for i, r := range f.ResultTypes() {
+				results[i].Type = r
+			}
+
+			// Cannot access parameter names for host functions.
+			// https://stackoverflow.com/questions/31377433/getting-method-parameter-names
+
+			f.FunctionListener = functionListenerFactory.NewListener(FunctionInfo{
+				ModuleName: moduleName,
+				Name:       f.DebugName,
+				Params:     params,
+				Returns:    results,
+			})
+		}
 		functions = append(functions, f)
 	}
 	return
