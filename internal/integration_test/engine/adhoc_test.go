@@ -24,6 +24,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"recursive entry":                         testRecursiveEntry,
 	"imported-and-exported func":              testImportedAndExportedFunc,
 	"host function with context parameter":    testHostFunctionContextParameter,
+	"host function with nested context":       testNestedGoContext,
 	"host function with numeric parameter":    testHostFunctionNumericParameter,
 	"close module with in-flight calls":       testCloseInFlight,
 	"multiple instantiation from same source": testMultipleInstantiation,
@@ -153,6 +154,50 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 
 	// Since offset=1 and val=math.MaxUint64, we expect to have written exactly 8 bytes, with all bits set, at index 1.
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, memory.Buffer[0:10])
+}
+
+// testNestedGoContext ensures context is updated when a function calls another.
+func testNestedGoContext(t *testing.T, r wazero.Runtime) {
+	var nestedCtx = context.WithValue(context.Background(), struct{}{}, "nested")
+
+	importedName := t.Name() + "-imported"
+	importingName := t.Name() + "-importing"
+
+	var importing api.Module
+	fns := map[string]interface{}{
+		"inner": func(ctx context.Context, p uint32) uint32 {
+			// We expect the initial context, testCtx, to be overwritten by "outer" when it called this.
+			require.Equal(t, nestedCtx, ctx)
+			return p + 1
+		},
+		"outer": func(ctx context.Context, module api.Module, p uint32) uint32 {
+			require.Equal(t, testCtx, ctx)
+			results, err := module.ExportedFunction("inner").Call(nestedCtx, uint64(p))
+			require.NoError(t, err)
+			return uint32(results[0]) + 1
+		},
+	}
+
+	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx)
+	require.NoError(t, err)
+	defer imported.Close(testCtx)
+
+	// Instantiate a module that uses Wasm code to call the host function.
+	importing, err = r.InstantiateModuleFromCode(testCtx, []byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "outer" (func $outer (param i32) (result i32)))
+	(import "%[2]s" "inner" (func $inner (param i32) (result i32)))
+	(func $call_outer (param i32) (result i32) local.get 0 call $outer)
+	(export "call->outer" (func $call_outer))
+	(func $call_inner (param i32) (result i32) local.get 0 call $inner)
+	(export "inner" (func $call_inner))
+)`, importingName, importedName)))
+	require.NoError(t, err)
+	defer importing.Close(testCtx)
+
+	input := uint64(math.MaxUint32 - 2) // We expect two calls where each increment by one.
+	results, err := importing.ExportedFunction("call->outer").Call(testCtx, input)
+	require.NoError(t, err)
+	require.Equal(t, uint64(math.MaxUint32), results[0])
 }
 
 // testHostFunctionContextParameter ensures arg0 is optionally a context.

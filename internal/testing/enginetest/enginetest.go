@@ -265,7 +265,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	})
 }
 
-func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) {
+func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester) {
 	features := wasm.Features20191205
 	e := et.NewEngine(features)
 
@@ -275,9 +275,9 @@ func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) 
 	}
 
 	memory := &wasm.MemoryInstance{}
-	var ctxMemory api.Memory
-	hostFn := reflect.ValueOf(func(ctx api.Module, v uint64) uint64 {
-		ctxMemory = ctx.Memory()
+	var mMemory api.Memory
+	hostFn := reflect.ValueOf(func(m api.Module, v uint64) uint64 {
+		mMemory = m.Memory()
 		return v
 	})
 
@@ -309,12 +309,12 @@ func runTestModuleEngine_Call_HostFn_CallContext(t *testing.T, et EngineTester) 
 		results, err := me.Call(testCtx, modCtx, f, 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
-		require.Same(t, memory, ctxMemory)
+		require.Same(t, memory, mMemory)
 	})
 }
 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
-	runTestModuleEngine_Call_HostFn_CallContext(t, et) // TODO: refactor to use the same test interface.
+	runTestModuleEngine_Call_HostFn_ModuleContext(t, et) // TODO: refactor to use the same test interface.
 
 	e := et.NewEngine(wasm.Features20191205)
 
