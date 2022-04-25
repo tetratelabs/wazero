@@ -61,7 +61,7 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod 
 	return
 }
 
-func (r *wasmerRuntime) Close() error {
+func (r *wasmerRuntime) Close(_ context.Context) error {
 	r.engine = nil
 	return nil
 }
@@ -75,7 +75,7 @@ func (m *wasmerModule) CallI64_I64(_ context.Context, funcName string, param uin
 	}
 }
 
-func (m *wasmerModule) Close() error {
+func (m *wasmerModule) Close(_ context.Context) error {
 	if instance := m.instance; instance != nil {
 		instance.Close()
 	}

@@ -25,10 +25,10 @@ import (
 //	env, _ := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build(ctx)
 //
 //	env1, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.1"))
-//	defer env1.Close()
+//	defer env1.Close(ctx)
 //
 //	env2, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.2"))
-//	defer env2.Close()
+//	defer env2.Close(ctx)
 //
 // Note: Builder methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
 // Note: Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
@@ -53,17 +53,17 @@ type ModuleBuilder interface {
 	//
 	// Ex. This uses a Go Context:
 	//
-	//	addInts := func(m context.Context, x uint32, uint32) uint32 {
+	//	addInts := func(ctx context.Context, x uint32, uint32) uint32 {
 	//		// add a little extra if we put some in the context!
-	//		return x + y + m.Value(extraKey).(uint32)
+	//		return x + y + ctx.Value(extraKey).(uint32)
 	//	}
 	//
 	// Ex. This uses an api.Module to reads the parameters from memory. This is important because there are only numeric
 	// types in Wasm. The only way to share other data is via writing memory and sharing offsets.
 	//
-	//	addInts := func(m api.Module, offset uint32) uint32 {
-	//		x, _ := m.Memory().ReadUint32Le(offset)
-	//		y, _ := m.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
+	//	addInts := func(ctx context.Context, m api.Module, offset uint32) uint32 {
+	//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
+	//		y, _ := m.Memory().ReadUint32Le(ctx, offset + 4) // 32 bits == 4 bytes!
 	//		return x + y
 	//	}
 	//
@@ -151,12 +151,12 @@ type ModuleBuilder interface {
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
-	Build(ctx context.Context) (*CompiledCode, error)
+	Build(context.Context) (*CompiledCode, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
-	Instantiate(ctx context.Context) (api.Module, error)
+	Instantiate(context.Context) (api.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder
@@ -274,8 +274,8 @@ func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
 		if err = b.r.store.Engine.CompileModule(ctx, module.module); err != nil {
 			return nil, err
 		}
-		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside of this function.
-		defer module.Close()
+		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside this function.
+		defer module.Close(ctx)
 		return b.r.InstantiateModuleWithConfig(ctx, module, NewModuleConfig().WithName(b.moduleName))
 	}
 }

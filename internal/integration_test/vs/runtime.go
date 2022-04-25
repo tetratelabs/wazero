@@ -3,7 +3,6 @@ package vs
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -16,14 +15,14 @@ type runtimeConfig struct {
 }
 
 type runtime interface {
-	Compile(ctx context.Context, cfg *runtimeConfig) error
-	Instantiate(ctx context.Context, cfg *runtimeConfig) (module, error)
-	io.Closer
+	Compile(context.Context, *runtimeConfig) error
+	Instantiate(context.Context, *runtimeConfig) (module, error)
+	Close(context.Context) error
 }
 
 type module interface {
 	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
-	io.Closer
+	Close(context.Context) error
 }
 
 func newWazeroInterpreterRuntime() runtime {
@@ -72,9 +71,9 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *runtimeConfig) (mo
 	return
 }
 
-func (r *wazeroRuntime) Close() (err error) {
+func (r *wazeroRuntime) Close(ctx context.Context) (err error) {
 	if compiled := r.compiled; compiled != nil {
-		err = compiled.Close()
+		err = compiled.Close(ctx)
 	}
 	r.compiled = nil
 	return
@@ -89,9 +88,9 @@ func (m *wazeroModule) CallI64_I64(ctx context.Context, funcName string, param u
 	return 0, nil
 }
 
-func (m *wazeroModule) Close() (err error) {
+func (m *wazeroModule) Close(ctx context.Context) (err error) {
 	if mod := m.mod; mod != nil {
-		err = mod.Close()
+		err = mod.Close(ctx)
 	}
 	m.mod = nil
 	return

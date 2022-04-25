@@ -59,7 +59,7 @@ func (r *wasm3Runtime) Instantiate(_ context.Context, cfg *runtimeConfig) (mod m
 	return
 }
 
-func (r *wasm3Runtime) Close() error {
+func (r *wasm3Runtime) Close(_ context.Context) error {
 	if r := r.runtime; r != nil {
 		r.Destroy()
 	}
@@ -77,7 +77,7 @@ func (m *wasm3Module) CallI64_I64(_ context.Context, funcName string, param uint
 	}
 }
 
-func (m *wasm3Module) Close() error {
+func (m *wasm3Module) Close(_ context.Context) error {
 	// module can't be destroyed
 	m.module = nil
 	m.funcs = nil

@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer wasm.Close()
+	defer wasm.Close(ctx)
 
 	// Add a module to the runtime named "host/math" which exports one function "add", implemented in Go.
 	host, err := r.NewModuleBuilder("host/math").
@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer host.Close()
+	defer host.Close(ctx)
 
 	// Read two args to add.
 	x, y := readTwoArgs()

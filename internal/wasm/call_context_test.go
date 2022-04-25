@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"testing"
 
@@ -80,7 +81,7 @@ func TestCallContext_String(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
 			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil)
-			defer m.Close() //nolint
+			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
@@ -92,24 +93,52 @@ func TestCallContext_String(t *testing.T) {
 func TestCallContext_Close(t *testing.T) {
 	s := newStore()
 
-	t.Run("calls store.CloseWithExitCode(module.name)", func(t *testing.T) {
-		moduleName := t.Name()
-		m, err := s.Instantiate(context.Background(), &Module{}, moduleName, nil)
-		require.NoError(t, err)
+	tests := []struct {
+		name           string
+		closer         func(context.Context, *CallContext) error
+		expectedClosed uint64
+	}{
+		{
+			name: "Close()",
+			closer: func(ctx context.Context, callContext *CallContext) error {
+				return callContext.Close(ctx)
+			},
+			expectedClosed: uint64(1),
+		},
+		{
+			name: "CloseWithExitCode(255)",
+			closer: func(ctx context.Context, callContext *CallContext) error {
+				return callContext.CloseWithExitCode(ctx, 255)
+			},
+			expectedClosed: uint64(255)<<32 + 1,
+		},
+	}
 
-		// We use side effects to determine if Close in fact called store.CloseWithExitCode (without repeating store_test.go).
-		// One side effect of store.CloseWithExitCode is that the moduleName can no longer be looked up. Verify our base case.
-		require.Equal(t, s.Module(moduleName), m)
+	for _, tt := range tests {
+		tc := tt
+		t.Run(fmt.Sprintf("%s calls store.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
+			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+				moduleName := t.Name()
+				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil)
+				require.NoError(t, err)
 
-		// Closing should not err.
-		require.NoError(t, m.Close())
+				// We use side effects to see if Close called store.CloseWithExitCode (without repeating store_test.go).
+				// One side effect of store.CloseWithExitCode is that the moduleName can no longer be looked up.
+				require.Equal(t, s.Module(moduleName), m)
 
-		// Verify our intended side-effect
-		require.Nil(t, s.Module(moduleName))
+				// Closing should not err.
+				require.NoError(t, tc.closer(ctx, m))
 
-		// Verify no error closing again.
-		require.NoError(t, m.Close())
-	})
+				require.Equal(t, tc.expectedClosed, *m.closed)
+
+				// Verify our intended side-effect
+				require.Nil(t, s.Module(moduleName))
+
+				// Verify no error closing again.
+				require.NoError(t, tc.closer(ctx, m))
+			}
+		})
+	}
 
 	t.Run("calls SysContext.Close()", func(t *testing.T) {
 		tempDir := t.TempDir()
@@ -139,12 +168,12 @@ func TestCallContext_Close(t *testing.T) {
 		require.True(t, len(sys.openedFiles) > 0, "sys.openedFiles was empty")
 
 		// Closing should not err.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
 		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
 
 		// Verify no error closing again.
-		require.NoError(t, m.Close())
+		require.NoError(t, m.Close(testCtx))
 	})
 }

@@ -70,8 +70,8 @@ type Module interface {
 	Name() string
 
 	// Close is a convenience that invokes CloseWithExitCode with zero.
-	Close() error
-	// ^^ not io.Closer as the rationale (static analysis of leaks) is invalid when there are multiple close methods.
+	// Note: When the context is nil, it defaults to context.Background.
+	Close(context.Context) error
 
 	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
 	// failure to ExportedFunction callers.
@@ -82,7 +82,8 @@ type Module interface {
 	//
 	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
 	// with the exitCode.
-	CloseWithExitCode(exitCode uint32) error
+	// Note: When the context is nil, it defaults to context.Background.
+	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
 	// Memory returns a memory defined in this module or nil if there are none wasn't.
 	Memory() Memory
@@ -121,7 +122,7 @@ type Function interface {
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
-	// Note: when `ctx` is nil, it defaults to context.Background.
+	// Note: When the context is nil, it defaults to context.Background.
 	// Note: If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
 	// function that exits.
@@ -153,7 +154,9 @@ type Global interface {
 
 	// Get returns the last known value of this global.
 	// See Type for how to encode this value from a Go type.
-	Get() uint64
+	//
+	// Note: When the context is nil, it defaults to context.Background.
+	Get(context.Context) uint64
 }
 
 // MutableGlobal is a Global whose value can be updated at runtime (variable).
@@ -162,11 +165,14 @@ type MutableGlobal interface {
 
 	// Set updates the value of this global.
 	// See Global.Type for how to decode this value to a Go type.
-	Set(v uint64)
+	//
+	// Note: When the context is nil, it defaults to context.Background.
+	Set(ctx context.Context, v uint64)
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
+// Note: All functions accept a context.Context, which when nil, default to context.Background.
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 // Note: This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
@@ -177,59 +183,67 @@ type Memory interface {
 	// memory has min 0 and max 2 pages, this returns zero.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
-	Size() uint32
+	Size(context.Context) uint32
 
 	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
 	// not found or out of range.
-	IndexByte(offset uint32, c byte) (uint32, bool)
+	IndexByte(ctx context.Context, offset uint32, c byte) (uint32, bool)
 
 	// ReadByte reads a single byte from the underlying buffer at the offset or returns false if out of range.
-	ReadByte(offset uint32) (byte, bool)
+	ReadByte(ctx context.Context, offset uint32) (byte, bool)
+
+	// ReadUint16Le reads a uint16 in little-endian encoding from the underlying buffer at the offset in or returns
+	// false if out of range.
+	ReadUint16Le(ctx context.Context, offset uint32) (uint16, bool)
 
 	// ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
 	// false if out of range.
-	ReadUint32Le(offset uint32) (uint32, bool)
+	ReadUint32Le(ctx context.Context, offset uint32) (uint32, bool)
 
 	// ReadFloat32Le reads a float32 from 32 IEEE 754 little-endian encoded bits in the underlying buffer at the offset
 	// or returns false if out of range.
 	// See math.Float32bits
-	ReadFloat32Le(offset uint32) (float32, bool)
+	ReadFloat32Le(ctx context.Context, offset uint32) (float32, bool)
 
 	// ReadUint64Le reads a uint64 in little-endian encoding from the underlying buffer at the offset or returns false
 	// if out of range.
-	ReadUint64Le(offset uint32) (uint64, bool)
+	ReadUint64Le(ctx context.Context, offset uint32) (uint64, bool)
 
 	// ReadFloat64Le reads a float64 from 64 IEEE 754 little-endian encoded bits in the underlying buffer at the offset
 	// or returns false if out of range.
 	// See math.Float64bits
-	ReadFloat64Le(offset uint32) (float64, bool)
+	ReadFloat64Le(ctx context.Context, offset uint32) (float64, bool)
 
 	// Read reads byteCount bytes from the underlying buffer at the offset or returns false if out of range.
-	Read(offset, byteCount uint32) ([]byte, bool)
+	Read(ctx context.Context, offset, byteCount uint32) ([]byte, bool)
 
 	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.
-	WriteByte(offset uint32, v byte) bool
+	WriteByte(ctx context.Context, offset uint32, v byte) bool
+
+	// WriteUint16Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
+	// false if out of range.
+	WriteUint16Le(ctx context.Context, offset uint32, v uint16) bool
 
 	// WriteUint32Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
 	// false if out of range.
-	WriteUint32Le(offset, v uint32) bool
+	WriteUint32Le(ctx context.Context, offset, v uint32) bool
 
 	// WriteFloat32Le writes the value in 32 IEEE 754 little-endian encoded bits to the underlying buffer at the offset
 	// or returns false if out of range.
 	// See math.Float32bits
-	WriteFloat32Le(offset uint32, v float32) bool
+	WriteFloat32Le(ctx context.Context, offset uint32, v float32) bool
 
 	// WriteUint64Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
 	// false if out of range.
-	WriteUint64Le(offset uint32, v uint64) bool
+	WriteUint64Le(ctx context.Context, offset uint32, v uint64) bool
 
 	// WriteFloat64Le writes the value in 64 IEEE 754 little-endian encoded bits to the underlying buffer at the offset
 	// or returns false if out of range.
 	// See math.Float64bits
-	WriteFloat64Le(offset uint32, v float64) bool
+	WriteFloat64Le(ctx context.Context, offset uint32, v float64) bool
 
 	// Write writes the slice to the underlying buffer at the offset or returns false if out of range.
-	Write(offset uint32, v []byte) bool
+	Write(ctx context.Context, offset uint32, v []byte) bool
 }
 
 // EncodeI32 encodes the input as a ValueTypeI32.

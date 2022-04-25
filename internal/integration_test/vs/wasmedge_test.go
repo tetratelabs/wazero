@@ -59,7 +59,7 @@ func (r *wasmedgeRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mo
 	return
 }
 
-func (r *wasmedgeRuntime) Close() error {
+func (r *wasmedgeRuntime) Close(_ context.Context) error {
 	if conf := r.conf; conf != nil {
 		conf.Release()
 	}
@@ -75,7 +75,7 @@ func (m *wasmedgeModule) CallI64_I64(_ context.Context, funcName string, param u
 	}
 }
 
-func (m *wasmedgeModule) Close() error {
+func (m *wasmedgeModule) Close(_ context.Context) error {
 	if vm := m.vm; vm != nil {
 		vm.Release()
 	}

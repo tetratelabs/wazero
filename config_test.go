@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	"io"
 	"math"
 	"testing"
@@ -776,4 +777,28 @@ func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin i
 	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, openedFiles)
 	require.NoError(t, err)
 	return sys
+}
+
+func TestCompiledCode_Close(t *testing.T) {
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
+
+		var cs []*CompiledCode
+		for i := 0; i < 10; i++ {
+			m := &wasm.Module{}
+			err := e.CompileModule(ctx, m)
+			require.NoError(t, err)
+			cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
+		}
+
+		// Before Close.
+		require.Equal(t, 10, len(e.cachedModules))
+
+		for _, c := range cs {
+			require.NoError(t, c.Close(ctx))
+		}
+
+		// After Close.
+		require.Zero(t, len(e.cachedModules))
+	}
 }

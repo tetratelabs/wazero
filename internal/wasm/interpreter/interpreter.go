@@ -2,7 +2,6 @@ package interpreter
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -164,8 +163,15 @@ func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 	}
 }
 
-// Non-interface union of all the wazeroir operations.
+// interpreterOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
+//
+// Not all operations result in an interpreterOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
+// more complex than others, e.g. wazeroir.OperationBrTable.
+//
+// Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
+// only relevant when in context of its kind.
 type interpreterOp struct {
+	// kind determines how to interpret the other fields in this struct.
 	kind   wazeroir.OperationKind
 	b1, b2 byte
 	b3     bool
@@ -181,7 +187,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 	if module.IsHostModule() {
-		// If this is the host module, there's nothing to do as the runtime reprsentation of
+		// If this is the host module, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
 		for _, hf := range module.HostFunctionSection {
@@ -679,131 +685,131 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 		case wazeroir.OperationKindGlobalGet:
 			{
-				g := globals[op.us[0]]
+				g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
 				ce.pushValue(g.Val)
 				frame.pc++
 			}
 		case wazeroir.OperationKindGlobalSet:
 			{
-				g := globals[op.us[0]]
+				g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
 				g.Val = ce.popValue()
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad:
 			{
-				base := op.us[1] + ce.popValue()
+				offset := ce.popMemoryOffset(op)
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-					if uint64(len(memoryInst.Buffer)) < base+4 {
+					if val, ok := memoryInst.ReadUint32Le(ctx, offset); !ok {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+					} else {
+						ce.pushValue(uint64(val))
 					}
-					ce.pushValue(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-					if uint64(len(memoryInst.Buffer)) < base+8 {
+					if val, ok := memoryInst.ReadUint64Le(ctx, offset); !ok {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+					} else {
+						ce.pushValue(val)
 					}
-					ce.pushValue(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad8:
 			{
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+1 {
+				val, ok := memoryInst.ReadByte(ctx, ce.popMemoryOffset(op))
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
+
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
-					ce.pushValue(uint64(int8(memoryInst.Buffer[base])))
+					ce.pushValue(uint64(int8(val)))
 				case wazeroir.SignedUint32, wazeroir.SignedUint64:
-					ce.pushValue(uint64(uint8(memoryInst.Buffer[base])))
+					ce.pushValue(uint64(val))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad16:
 			{
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+2 {
+				val, ok := memoryInst.ReadUint16Le(ctx, ce.popMemoryOffset(op))
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
+
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
-					ce.pushValue(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
+					ce.pushValue(uint64(int16(val)))
 				case wazeroir.SignedUint32, wazeroir.SignedUint64:
-					ce.pushValue(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
+					ce.pushValue(uint64(val))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad32:
 			{
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+4 {
+				val, ok := memoryInst.ReadUint32Le(ctx, ce.popMemoryOffset(op))
+				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				if op.b1 == 1 {
-					ce.pushValue(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
+
+				if op.b1 == 1 { // Signed
+					ce.pushValue(uint64(int32(val)))
 				} else {
-					ce.pushValue(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
+					ce.pushValue(uint64(val))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindStore:
 			{
 				val := ce.popValue()
-				base := op.us[1] + ce.popValue()
+				offset := ce.popMemoryOffset(op)
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-					if uint64(len(memoryInst.Buffer)) < base+4 {
+					if !memoryInst.WriteUint32Le(ctx, offset, uint32(val)) {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
 				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-					if uint64(len(memoryInst.Buffer)) < base+8 {
+					if !memoryInst.WriteUint64Le(ctx, offset, val) {
 						panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindStore8:
 			{
 				val := byte(ce.popValue())
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+1 {
+				offset := ce.popMemoryOffset(op)
+				if !memoryInst.WriteByte(ctx, offset, val) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				memoryInst.Buffer[base] = val
 				frame.pc++
 			}
 		case wazeroir.OperationKindStore16:
 			{
 				val := uint16(ce.popValue())
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+2 {
+				offset := ce.popMemoryOffset(op)
+				if !memoryInst.WriteUint16Le(ctx, offset, val) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
 		case wazeroir.OperationKindStore32:
 			{
 				val := uint32(ce.popValue())
-				base := op.us[1] + ce.popValue()
-				if uint64(len(memoryInst.Buffer)) < base+4 {
+				offset := ce.popMemoryOffset(op)
+				if !memoryInst.WriteUint32Le(ctx, offset, val) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
-				binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
 		case wazeroir.OperationKindMemorySize:
 			{
-				ce.pushValue(uint64(memoryInst.PageSize()))
+				ce.pushValue(uint64(memoryInst.PageSize(ctx)))
 				frame.pc++
 			}
 		case wazeroir.OperationKindMemoryGrow:
 			{
 				n := ce.popValue()
-				res := memoryInst.Grow(uint32(n))
+				res := memoryInst.Grow(ctx, uint32(n))
 				ce.pushValue(uint64(res))
 				frame.pc++
 			}
@@ -1668,6 +1674,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+}
+
+// popMemoryOffset takes a memory offset off the stack for use in load and store instructions.
+// As the top of stack value is 64-bit, this ensures it is in range before returning it.
+func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
+	// TODO: Document what 'us' is and why we expect to look at value 1.
+	offset := op.us[1] + ce.popValue()
+	if offset > math.MaxUint32 {
+		panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+	}
+	return uint32(offset)
 }
 
 func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {

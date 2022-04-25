@@ -22,13 +22,13 @@ func main() {
 	// Instantiate a Go-defined module named "assemblyscript" that exports a
 	// function to close the module that calls "abort".
 	host, err := r.NewModuleBuilder("assemblyscript").
-		ExportFunction("abort", func(m api.Module, messageOffset, fileNameOffset, line, col uint32) {
-			_ = m.CloseWithExitCode(255)
+		ExportFunction("abort", func(ctx context.Context, m api.Module, messageOffset, fileNameOffset, line, col uint32) {
+			_ = m.CloseWithExitCode(ctx, 255)
 		}).Instantiate(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer host.Close()
+	defer host.Close(ctx)
 
 	// Compile WebAssembly code that needs the function "env.abort".
 	code, err := r.CompileModule(ctx, []byte(`(module $needs-import
@@ -39,7 +39,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer code.Close()
+	defer code.Close(ctx)
 
 	// Instantiate the WebAssembly module, replacing the import "env.abort"
 	// with "assemblyscript.abort".
@@ -48,7 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer mod.Close()
+	defer mod.Close(ctx)
 
 	// Since the above worked, the exported function closes the module.
 	_, err = mod.ExportedFunction("abort").Call(ctx, 0, 0, 0, 0)

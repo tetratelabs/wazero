@@ -44,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer env.Close()
+	defer env.Close(ctx)
 
 	// Instantiate a WebAssembly module named "age-calculator" that imports
 	// functions defined in "env".
@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ageCalculator.Close()
+	defer ageCalculator.Close(ctx)
 
 	// Read the birthYear from the arguments to main
 	birthYear, err := strconv.ParseUint(os.Args[1], 10, 64)

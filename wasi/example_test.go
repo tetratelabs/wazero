@@ -25,7 +25,7 @@ func Example() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer wm.Close()
+	defer wm.Close(testCtx)
 
 	// Override default configuration (which discards stdout).
 	config := wazero.NewModuleConfig().WithStdout(os.Stdout)

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -35,18 +36,17 @@ type MemoryInstance struct {
 }
 
 // Size implements the same method as documented on api.Memory.
-func (m *MemoryInstance) Size() uint32 {
-	return uint32(len(m.Buffer))
-}
+func (m *MemoryInstance) Size(_ context.Context) uint32 {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
-// hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
-func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
-	return uint64(offset)+uint64(sizeInBytes) <= uint64(m.Size()) // uint64 prevents overflow on add
+	return m.size()
 }
 
 // IndexByte implements the same method as documented on api.Memory.
-func (m *MemoryInstance) IndexByte(offset uint32, c byte) (uint32, bool) {
-	if offset >= m.Size() {
+func (m *MemoryInstance) IndexByte(_ context.Context, offset uint32, c byte) (uint32, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	if offset >= uint32(len(m.Buffer)) {
 		return 0, false
 	}
 	b := m.Buffer[offset:]
@@ -58,24 +58,37 @@ func (m *MemoryInstance) IndexByte(offset uint32, c byte) (uint32, bool) {
 }
 
 // ReadByte implements the same method as documented on api.Memory.
-func (m *MemoryInstance) ReadByte(offset uint32) (byte, bool) {
-	if offset >= m.Size() {
+func (m *MemoryInstance) ReadByte(_ context.Context, offset uint32) (byte, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	if offset >= m.size() {
 		return 0, false
 	}
 	return m.Buffer[offset], true
 }
 
-// ReadUint32Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) ReadUint32Le(offset uint32) (uint32, bool) {
-	if !m.hasSize(offset, 4) {
+// ReadUint16Le implements the same method as documented on api.Memory.
+func (m *MemoryInstance) ReadUint16Le(_ context.Context, offset uint32) (uint16, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	if !m.hasSize(offset, 2) {
 		return 0, false
 	}
-	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
+	return binary.LittleEndian.Uint16(m.Buffer[offset : offset+2]), true
+}
+
+// ReadUint32Le implements the same method as documented on api.Memory.
+func (m *MemoryInstance) ReadUint32Le(_ context.Context, offset uint32) (uint32, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	return m.readUint32Le(offset)
 }
 
 // ReadFloat32Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) ReadFloat32Le(offset uint32) (float32, bool) {
-	v, ok := m.ReadUint32Le(offset)
+func (m *MemoryInstance) ReadFloat32Le(_ context.Context, offset uint32) (float32, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	v, ok := m.readUint32Le(offset)
 	if !ok {
 		return 0, false
 	}
@@ -83,16 +96,17 @@ func (m *MemoryInstance) ReadFloat32Le(offset uint32) (float32, bool) {
 }
 
 // ReadUint64Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) ReadUint64Le(offset uint32) (uint64, bool) {
-	if !m.hasSize(offset, 8) {
-		return 0, false
-	}
-	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
+func (m *MemoryInstance) ReadUint64Le(_ context.Context, offset uint32) (uint64, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	return m.readUint64Le(offset)
 }
 
 // ReadFloat64Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
-	v, ok := m.ReadUint64Le(offset)
+func (m *MemoryInstance) ReadFloat64Le(_ context.Context, offset uint32) (float64, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	v, ok := m.readUint64Le(offset)
 	if !ok {
 		return 0, false
 	}
@@ -100,7 +114,9 @@ func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
 }
 
 // Read implements the same method as documented on api.Memory.
-func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
+func (m *MemoryInstance) Read(_ context.Context, offset, byteCount uint32) ([]byte, bool) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	if !m.hasSize(offset, byteCount) {
 		return nil, false
 	}
@@ -108,44 +124,58 @@ func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 }
 
 // WriteByte implements the same method as documented on api.Memory.
-func (m *MemoryInstance) WriteByte(offset uint32, v byte) bool {
-	if offset >= m.Size() {
+func (m *MemoryInstance) WriteByte(_ context.Context, offset uint32, v byte) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	if offset >= m.size() {
 		return false
 	}
 	m.Buffer[offset] = v
 	return true
 }
 
-// WriteUint32Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) WriteUint32Le(offset, v uint32) bool {
-	if !m.hasSize(offset, 4) {
+// WriteUint16Le implements the same method as documented on api.Memory.
+func (m *MemoryInstance) WriteUint16Le(_ context.Context, offset uint32, v uint16) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	if !m.hasSize(offset, 2) {
 		return false
 	}
-	binary.LittleEndian.PutUint32(m.Buffer[offset:], v)
+	binary.LittleEndian.PutUint16(m.Buffer[offset:], v)
 	return true
+}
+
+// WriteUint32Le implements the same method as documented on api.Memory.
+func (m *MemoryInstance) WriteUint32Le(_ context.Context, offset, v uint32) bool {
+
+	return m.writeUint32Le(offset, v)
 }
 
 // WriteFloat32Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) WriteFloat32Le(offset uint32, v float32) bool {
-	return m.WriteUint32Le(offset, math.Float32bits(v))
+func (m *MemoryInstance) WriteFloat32Le(_ context.Context, offset uint32, v float32) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	return m.writeUint32Le(offset, math.Float32bits(v))
 }
 
 // WriteUint64Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) WriteUint64Le(offset uint32, v uint64) bool {
-	if !m.hasSize(offset, 8) {
-		return false
-	}
-	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
-	return true
+func (m *MemoryInstance) WriteUint64Le(_ context.Context, offset uint32, v uint64) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	return m.writeUint64Le(offset, v)
 }
 
 // WriteFloat64Le implements the same method as documented on api.Memory.
-func (m *MemoryInstance) WriteFloat64Le(offset uint32, v float64) bool {
-	return m.WriteUint64Le(offset, math.Float64bits(v))
+func (m *MemoryInstance) WriteFloat64Le(_ context.Context, offset uint32, v float64) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	return m.writeUint64Le(offset, math.Float64bits(v))
 }
 
 // Write implements the same method as documented on api.Memory.
-func (m *MemoryInstance) Write(offset uint32, val []byte) bool {
+func (m *MemoryInstance) Write(_ context.Context, offset uint32, val []byte) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	if !m.hasSize(offset, uint32(len(val))) {
 		return false
 	}
@@ -158,17 +188,14 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 	return uint64(pages) << MemoryPageSizeInBits
 }
 
-// memoryBytesNumToPages converts the given number of bytes into the number of pages.
-func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
-	return uint32(bytesNum >> MemoryPageSizeInBits)
-}
-
 // Grow extends the memory buffer by "newPages" * memoryPageSize.
 // The logic here is described in https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem.
 //
 // Returns -1 if the operation resulted in exceeding the maximum memory pages.
 // Otherwise, returns the prior memory size after growing the memory buffer.
-func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
+func (m *MemoryInstance) Grow(_ context.Context, newPages uint32) (result uint32) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 
 	// If exceeds the max of memory size, we push -1 according to the spec.
@@ -182,7 +209,9 @@ func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 }
 
 // PageSize returns the current memory buffer size in pages.
-func (m *MemoryInstance) PageSize() (result uint32) {
+func (m *MemoryInstance) PageSize(_ context.Context) (result uint32) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
 }
 
@@ -203,4 +232,59 @@ func PagesToUnitOfBytes(pages uint32) string {
 		return fmt.Sprintf("%d Gi", g)
 	}
 	return fmt.Sprintf("%d Ti", g/1024)
+}
+
+// Below are raw functions used to implement the api.Memory API:
+
+// memoryBytesNumToPages converts the given number of bytes into the number of pages.
+func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
+	return uint32(bytesNum >> MemoryPageSizeInBits)
+}
+
+// size returns the size in bytes of the buffer.
+func (m *MemoryInstance) size() uint32 {
+	return uint32(len(m.Buffer))
+}
+
+// hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
+func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
+	return uint64(offset)+uint64(sizeInBytes) <= uint64(len(m.Buffer)) // uint64 prevents overflow on add
+}
+
+// readUint32Le implements ReadUint32Le without using a context. This is extracted as both ints and floats are stored in
+// memory as uint32le.
+func (m *MemoryInstance) readUint32Le(offset uint32) (uint32, bool) {
+	if !m.hasSize(offset, 4) {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
+}
+
+// readUint64Le implements ReadUint64Le without using a context. This is extracted as both ints and floats are stored in
+// memory as uint64le.
+func (m *MemoryInstance) readUint64Le(offset uint32) (uint64, bool) {
+	if !m.hasSize(offset, 8) {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
+}
+
+// writeUint32Le implements WriteUint32Le without using a context. This is extracted as both ints and floats are stored
+// in memory as uint32le.
+func (m *MemoryInstance) writeUint32Le(offset uint32, v uint32) bool {
+	if !m.hasSize(offset, 4) {
+		return false
+	}
+	binary.LittleEndian.PutUint32(m.Buffer[offset:], v)
+	return true
+}
+
+// writeUint64Le implements WriteUint64Le without using a context. This is extracted as both ints and floats are stored
+// in memory as uint64le.
+func (m *MemoryInstance) writeUint64Le(offset uint32, v uint64) bool {
+	if !m.hasSize(offset, 8) {
+		return false
+	}
+	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
+	return true
 }

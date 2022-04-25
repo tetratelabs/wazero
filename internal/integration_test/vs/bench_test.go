@@ -76,7 +76,7 @@ func benchmarkCompile(b *testing.B, rtCfg *runtimeConfig) {
 				if err := rt.Compile(testCtx, rtCfg); err != nil {
 					b.Fatal(err)
 				}
-				if err := rt.Close(); err != nil {
+				if err := rt.Close(testCtx); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -92,7 +92,7 @@ func benchmarkInstantiate(b *testing.B, rtCfg *runtimeConfig) {
 			if err := rt.Compile(testCtx, rtCfg); err != nil {
 				b.Fatal(err)
 			}
-			defer rt.Close()
+			defer rt.Close(testCtx)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -100,7 +100,7 @@ func benchmarkInstantiate(b *testing.B, rtCfg *runtimeConfig) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				err = mod.Close()
+				err = mod.Close(testCtx)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -127,12 +127,12 @@ func benchmarkFn(rt runtime, rtCfg *runtimeConfig, call func(module) (uint64, er
 		if err := rt.Compile(testCtx, rtCfg); err != nil {
 			b.Fatal(err)
 		}
-		defer rt.Close()
+		defer rt.Close(testCtx)
 		mod, err := rt.Instantiate(testCtx, rtCfg)
 		if err != nil {
 			b.Fatal(err)
 		}
-		defer mod.Close()
+		defer mod.Close(testCtx)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if _, err := call(mod); err != nil {
@@ -153,7 +153,7 @@ func testCallFn(rt runtime, rtCfg *runtimeConfig, testCall func(*testing.T, modu
 	return func(t *testing.T) {
 		err := rt.Compile(testCtx, rtCfg)
 		require.NoError(t, err)
-		defer rt.Close()
+		defer rt.Close(testCtx)
 
 		// Ensure the module can be re-instantiated times, even if not all runtimes allow renaming.
 		for i := 0; i < 10; i++ {
@@ -165,7 +165,7 @@ func testCallFn(rt runtime, rtCfg *runtimeConfig, testCall func(*testing.T, modu
 				testCall(t, m)
 			}
 
-			require.NoError(t, m.Close())
+			require.NoError(t, m.Close(testCtx))
 		}
 	}
 }

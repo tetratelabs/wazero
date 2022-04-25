@@ -31,7 +31,7 @@ func TestEngineInterpreter_hammer(t *testing.T) {
 func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 	closeModuleWhileInUse(t, r, func(imported, importing api.Module) (api.Module, api.Module) {
 		// Close the importing module, despite calls being in-flight.
-		require.NoError(t, importing.Close())
+		require.NoError(t, importing.Close(testCtx))
 
 		// Prove a module can be redefined even with in-flight calls.
 		source := callReturnImportSource(imported.Name(), importing.Name())
@@ -44,8 +44,8 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 	closeModuleWhileInUse(t, r, func(imported, importing api.Module) (api.Module, api.Module) {
 		// Close the importing and imported module, despite calls being in-flight.
-		require.NoError(t, importing.Close())
-		require.NoError(t, imported.Close())
+		require.NoError(t, importing.Close(testCtx))
+		require.NoError(t, imported.Close(testCtx))
 
 		// Redefine the imported module, with a function that no longer blocks.
 		imported, err := r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
@@ -80,13 +80,13 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	imported, err := r.NewModuleBuilder(t.Name()+"-imported").
 		ExportFunction("return_input", blockAndReturn).Instantiate(testCtx)
 	require.NoError(t, err)
-	defer imported.Close()
+	defer imported.Close(testCtx)
 
 	// Import that module.
 	source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
 	importing, err := r.InstantiateModuleFromCode(testCtx, source)
 	require.NoError(t, err)
-	defer importing.Close()
+	defer importing.Close(testCtx)
 
 	// As this is a blocking function call, only run 1 per goroutine.
 	i := importing // pin the module used inside goroutines
@@ -99,8 +99,8 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 		calls.Add(-P)
 	})
 	// As references may have changed, ensure we close both.
-	defer imported.Close()
-	defer importing.Close()
+	defer imported.Close(testCtx)
+	defer importing.Close(testCtx)
 	if t.Failed() {
 		return // At least one test failed, so return now.
 	}

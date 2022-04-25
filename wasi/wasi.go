@@ -515,9 +515,9 @@ func snapshotPreview1Functions() (a *snapshotPreview1, nameToGoFunc map[string]i
 // See ArgsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (a *snapshotPreview1) ArgsGet(m api.Module, argv, argvBuf uint32) Errno {
+func (a *snapshotPreview1) ArgsGet(ctx context.Context, m api.Module, argv, argvBuf uint32) Errno {
 	sys := sysCtx(m)
-	return writeOffsetsAndNullTerminatedValues(m.Memory(), sys.Args(), argv, argvBuf)
+	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), sys.Args(), argv, argvBuf)
 }
 
 // ArgsSizesGet is the WASI function named functionArgsSizesGet that reads command-line argument data (WithArgs)
@@ -546,14 +546,14 @@ func (a *snapshotPreview1) ArgsGet(m api.Module, argv, argvBuf uint32) Errno {
 // See ArgsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (a *snapshotPreview1) ArgsSizesGet(m api.Module, resultArgc, resultArgvBufSize uint32) Errno {
+func (a *snapshotPreview1) ArgsSizesGet(ctx context.Context, m api.Module, resultArgc, resultArgvBufSize uint32) Errno {
 	sys := sysCtx(m)
 	mem := m.Memory()
 
-	if !mem.WriteUint32Le(resultArgc, uint32(len(sys.Args()))) {
+	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sys.Args()))) {
 		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(resultArgvBufSize, sys.ArgsSize()) {
+	if !mem.WriteUint32Le(ctx, resultArgvBufSize, sys.ArgsSize()) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -585,9 +585,9 @@ func (a *snapshotPreview1) ArgsSizesGet(m api.Module, resultArgc, resultArgvBufS
 // See EnvironSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (a *snapshotPreview1) EnvironGet(m api.Module, environ uint32, environBuf uint32) Errno {
+func (a *snapshotPreview1) EnvironGet(ctx context.Context, m api.Module, environ uint32, environBuf uint32) Errno {
 	sys := sysCtx(m)
-	return writeOffsetsAndNullTerminatedValues(m.Memory(), sys.Environ(), environ, environBuf)
+	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), sys.Environ(), environ, environBuf)
 }
 
 // EnvironSizesGet is the WASI function named functionEnvironSizesGet that reads environment variable
@@ -617,14 +617,14 @@ func (a *snapshotPreview1) EnvironGet(m api.Module, environ uint32, environBuf u
 // See EnvironGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (a *snapshotPreview1) EnvironSizesGet(m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
+func (a *snapshotPreview1) EnvironSizesGet(ctx context.Context, m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
 	sys := sysCtx(m)
 	mem := m.Memory()
 
-	if !mem.WriteUint32Le(resultEnvironc, uint32(len(sys.Environ()))) {
+	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sys.Environ()))) {
 		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(resultEnvironBufSize, sys.EnvironSize()) {
+	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sys.EnvironSize()) {
 		return ErrnoFault
 	}
 
@@ -632,7 +632,7 @@ func (a *snapshotPreview1) EnvironSizesGet(m api.Module, resultEnvironc uint32, 
 }
 
 // ClockResGet is the WASI function named functionClockResGet and is stubbed for GrainLang per #271
-func (a *snapshotPreview1) ClockResGet(m api.Module, id uint32, resultResolution uint32) Errno {
+func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -656,21 +656,21 @@ func (a *snapshotPreview1) ClockResGet(m api.Module, id uint32, resultResolution
 // Note: This is similar to `clock_gettime` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
-func (a *snapshotPreview1) ClockTimeGet(m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
+func (a *snapshotPreview1) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: id and precision are currently ignored.
-	if !m.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
+	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, a.timeNowUnixNano()) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
 }
 
 // FdAdvise is the WASI function named functionFdAdvise and is stubbed for GrainLang per #271
-func (a *snapshotPreview1) FdAdvise(m api.Module, fd uint32, offset, len uint64, resultAdvice uint32) Errno {
+func (a *snapshotPreview1) FdAdvise(ctx context.Context, m api.Module, fd uint32, offset, len uint64, resultAdvice uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdAllocate is the WASI function named functionFdAllocate and is stubbed for GrainLang per #271
-func (a *snapshotPreview1) FdAllocate(m api.Module, fd uint32, offset, len uint64) Errno {
+func (a *snapshotPreview1) FdAllocate(ctx context.Context, m api.Module, fd uint32, offset, len uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -682,7 +682,7 @@ func (a *snapshotPreview1) FdAllocate(m api.Module, fd uint32, offset, len uint6
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // See https://linux.die.net/man/3/close
-func (a *snapshotPreview1) FdClose(m api.Module, fd uint32) Errno {
+func (a *snapshotPreview1) FdClose(ctx context.Context, m api.Module, fd uint32) Errno {
 	sys := sysCtx(m)
 
 	if ok, err := sys.CloseFile(fd); err != nil {
@@ -695,7 +695,7 @@ func (a *snapshotPreview1) FdClose(m api.Module, fd uint32) Errno {
 }
 
 // FdDatasync is the WASI function named functionFdDatasync and is stubbed for GrainLang per #271
-func (a *snapshotPreview1) FdDatasync(m api.Module, fd uint32) Errno {
+func (a *snapshotPreview1) FdDatasync(ctx context.Context, m api.Module, fd uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -731,7 +731,7 @@ func (a *snapshotPreview1) FdDatasync(m api.Module, fd uint32) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
 // See https://linux.die.net/man/3/fsync
-func (a *snapshotPreview1) FdFdstatGet(m api.Module, fd uint32, resultStat uint32) Errno {
+func (a *snapshotPreview1) FdFdstatGet(ctx context.Context, m api.Module, fd uint32, resultStat uint32) Errno {
 	sys := sysCtx(m)
 
 	if _, ok := sys.OpenedFile(fd); !ok {
@@ -767,7 +767,7 @@ func (a *snapshotPreview1) FdFdstatGet(m api.Module, fd uint32, resultStat uint3
 // See FdPrestatDirName
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
-func (a *snapshotPreview1) FdPrestatGet(m api.Module, fd uint32, resultPrestat uint32) Errno {
+func (a *snapshotPreview1) FdPrestatGet(ctx context.Context, m api.Module, fd uint32, resultPrestat uint32) Errno {
 	sys := sysCtx(m)
 
 	entry, ok := sys.OpenedFile(fd)
@@ -776,11 +776,11 @@ func (a *snapshotPreview1) FdPrestatGet(m api.Module, fd uint32, resultPrestat u
 	}
 
 	// Zero-value 8-bit tag, and 3-byte zero-value paddings, which is uint32le(0) in short.
-	if !m.Memory().WriteUint32Le(resultPrestat, uint32(0)) {
+	if !m.Memory().WriteUint32Le(ctx, resultPrestat, uint32(0)) {
 		return ErrnoFault
 	}
 	// Write the length of the directory name at offset 4.
-	if !m.Memory().WriteUint32Le(resultPrestat+4, uint32(len(entry.Path))) {
+	if !m.Memory().WriteUint32Le(ctx, resultPrestat+4, uint32(len(entry.Path))) {
 		return ErrnoFault
 	}
 
@@ -788,33 +788,33 @@ func (a *snapshotPreview1) FdPrestatGet(m api.Module, fd uint32, resultPrestat u
 }
 
 // FdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags and is stubbed for GrainLang per #271
-func (a *snapshotPreview1) FdFdstatSetFlags(m api.Module, fd uint32, flags uint32) Errno {
+func (a *snapshotPreview1) FdFdstatSetFlags(ctx context.Context, m api.Module, fd uint32, flags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFdstatSetRights implements snapshotPreview1.FdFdstatSetRights
 // Note: This will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-func (a *snapshotPreview1) FdFdstatSetRights(m api.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) Errno {
+func (a *snapshotPreview1) FdFdstatSetRights(ctx context.Context, m api.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatGet is the WASI function named functionFdFilestatGet
-func (a *snapshotPreview1) FdFilestatGet(m api.Module, fd uint32, resultBuf uint32) Errno {
+func (a *snapshotPreview1) FdFilestatGet(ctx context.Context, m api.Module, fd uint32, resultBuf uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatSetSize is the WASI function named functionFdFilestatSetSize
-func (a *snapshotPreview1) FdFilestatSetSize(m api.Module, fd uint32, size uint64) Errno {
+func (a *snapshotPreview1) FdFilestatSetSize(ctx context.Context, m api.Module, fd uint32, size uint64) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes
-func (a *snapshotPreview1) FdFilestatSetTimes(m api.Module, fd uint32, atim, mtim uint64, fstFlags uint32) Errno {
+func (a *snapshotPreview1) FdFilestatSetTimes(ctx context.Context, m api.Module, fd uint32, atim, mtim uint64, fstFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdPread is the WASI function named functionFdPread
-func (a *snapshotPreview1) FdPread(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) Errno {
+func (a *snapshotPreview1) FdPread(ctx context.Context, m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -842,7 +842,7 @@ func (a *snapshotPreview1) FdPread(m api.Module, fd, iovs, iovsCount uint32, off
 // Note: importFdPrestatDirName shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 // See FdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
-func (a *snapshotPreview1) FdPrestatDirName(m api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
+func (a *snapshotPreview1) FdPrestatDirName(ctx context.Context, m api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
 	sys := sysCtx(m)
 
 	f, ok := sys.OpenedFile(fd)
@@ -856,14 +856,14 @@ func (a *snapshotPreview1) FdPrestatDirName(m api.Module, fd uint32, pathPtr uin
 	}
 
 	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
-	if !m.Memory().Write(pathPtr, []byte(f.Path)[:pathLen]) {
+	if !m.Memory().Write(ctx, pathPtr, []byte(f.Path)[:pathLen]) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
 }
 
 // FdPwrite is the WASI function named functionFdPwrite
-func (a *snapshotPreview1) FdPwrite(m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) Errno {
+func (a *snapshotPreview1) FdPwrite(ctx context.Context, m api.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -910,7 +910,7 @@ func (a *snapshotPreview1) FdPwrite(m api.Module, fd, iovs, iovsCount uint32, of
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
 // See https://linux.die.net/man/3/readv
-func (a *snapshotPreview1) FdRead(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+func (a *snapshotPreview1) FdRead(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sys := sysCtx(m)
 
 	var reader io.Reader
@@ -926,15 +926,15 @@ func (a *snapshotPreview1) FdRead(m api.Module, fd, iovs, iovsCount, resultSize 
 	var nread uint32
 	for i := uint32(0); i < iovsCount; i++ {
 		iovPtr := iovs + i*8
-		offset, ok := m.Memory().ReadUint32Le(iovPtr)
+		offset, ok := m.Memory().ReadUint32Le(ctx, iovPtr)
 		if !ok {
 			return ErrnoFault
 		}
-		l, ok := m.Memory().ReadUint32Le(iovPtr + 4)
+		l, ok := m.Memory().ReadUint32Le(ctx, iovPtr+4)
 		if !ok {
 			return ErrnoFault
 		}
-		b, ok := m.Memory().Read(offset, l)
+		b, ok := m.Memory().Read(ctx, offset, l)
 		if !ok {
 			return ErrnoFault
 		}
@@ -946,19 +946,19 @@ func (a *snapshotPreview1) FdRead(m api.Module, fd, iovs, iovsCount, resultSize 
 			return ErrnoIo
 		}
 	}
-	if !m.Memory().WriteUint32Le(resultSize, nread) {
+	if !m.Memory().WriteUint32Le(ctx, resultSize, nread) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
 }
 
 // FdReaddir is the WASI function named functionFdReaddir
-func (a *snapshotPreview1) FdReaddir(m api.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) Errno {
+func (a *snapshotPreview1) FdReaddir(ctx context.Context, m api.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdRenumber is the WASI function named functionFdRenumber
-func (a *snapshotPreview1) FdRenumber(m api.Module, fd, to uint32) Errno {
+func (a *snapshotPreview1) FdRenumber(ctx context.Context, m api.Module, fd, to uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -993,7 +993,7 @@ func (a *snapshotPreview1) FdRenumber(m api.Module, fd, to uint32) Errno {
 // Note: This is similar to `lseek` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
 // See https://linux.die.net/man/3/lseek
-func (a *snapshotPreview1) FdSeek(m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
+func (a *snapshotPreview1) FdSeek(ctx context.Context, m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
 	sys := sysCtx(m)
 
 	var seeker io.Seeker
@@ -1013,7 +1013,7 @@ func (a *snapshotPreview1) FdSeek(m api.Module, fd uint32, offset uint64, whence
 		return ErrnoIo
 	}
 
-	if !m.Memory().WriteUint32Le(resultNewoffset, uint32(newOffset)) {
+	if !m.Memory().WriteUint32Le(ctx, resultNewoffset, uint32(newOffset)) {
 		return ErrnoFault
 	}
 
@@ -1021,12 +1021,12 @@ func (a *snapshotPreview1) FdSeek(m api.Module, fd uint32, offset uint64, whence
 }
 
 // FdSync is the WASI function named functionFdSync
-func (a *snapshotPreview1) FdSync(m api.Module, fd uint32) Errno {
+func (a *snapshotPreview1) FdSync(ctx context.Context, m api.Module, fd uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdTell is the WASI function named functionFdTell
-func (a *snapshotPreview1) FdTell(m api.Module, fd, resultOffset uint32) Errno {
+func (a *snapshotPreview1) FdTell(ctx context.Context, m api.Module, fd, resultOffset uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1079,7 +1079,7 @@ func (a *snapshotPreview1) FdTell(m api.Module, fd, resultOffset uint32) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 // See https://linux.die.net/man/3/writev
-func (a *snapshotPreview1) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+func (a *snapshotPreview1) FdWrite(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sys := sysCtx(m)
 
 	var writer io.Writer
@@ -1102,15 +1102,15 @@ func (a *snapshotPreview1) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize
 	var nwritten uint32
 	for i := uint32(0); i < iovsCount; i++ {
 		iovPtr := iovs + i*8
-		offset, ok := m.Memory().ReadUint32Le(iovPtr)
+		offset, ok := m.Memory().ReadUint32Le(ctx, iovPtr)
 		if !ok {
 			return ErrnoFault
 		}
-		l, ok := m.Memory().ReadUint32Le(iovPtr + 4)
+		l, ok := m.Memory().ReadUint32Le(ctx, iovPtr+4)
 		if !ok {
 			return ErrnoFault
 		}
-		b, ok := m.Memory().Read(offset, l)
+		b, ok := m.Memory().Read(ctx, offset, l)
 		if !ok {
 			return ErrnoFault
 		}
@@ -1120,29 +1120,29 @@ func (a *snapshotPreview1) FdWrite(m api.Module, fd, iovs, iovsCount, resultSize
 		}
 		nwritten += uint32(n)
 	}
-	if !m.Memory().WriteUint32Le(resultSize, nwritten) {
+	if !m.Memory().WriteUint32Le(ctx, resultSize, nwritten) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
 }
 
 // PathCreateDirectory is the WASI function named functionPathCreateDirectory
-func (a *snapshotPreview1) PathCreateDirectory(m api.Module, fd, path, pathLen uint32) Errno {
+func (a *snapshotPreview1) PathCreateDirectory(ctx context.Context, m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathFilestatGet is the WASI function named functionPathFilestatGet
-func (a *snapshotPreview1) PathFilestatGet(m api.Module, fd, flags, path, pathLen, resultBuf uint32) Errno {
+func (a *snapshotPreview1) PathFilestatGet(ctx context.Context, m api.Module, fd, flags, path, pathLen, resultBuf uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
-func (a *snapshotPreview1) PathFilestatSetTimes(m api.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) Errno {
+func (a *snapshotPreview1) PathFilestatSetTimes(ctx context.Context, m api.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathLink is the WASI function named functionPathLink
-func (a *snapshotPreview1) PathLink(m api.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
+func (a *snapshotPreview1) PathLink(ctx context.Context, m api.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1191,7 +1191,7 @@ func (a *snapshotPreview1) PathLink(m api.Module, oldFd, oldFlags, oldPath, oldP
 // Note: Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 // See https://linux.die.net/man/3/openat
-func (a *snapshotPreview1) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
+func (a *snapshotPreview1) PathOpen(ctx context.Context, m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
 	sys := sysCtx(m)
 
@@ -1200,7 +1200,7 @@ func (a *snapshotPreview1) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen
 		return ErrnoBadf
 	}
 
-	b, ok := m.Memory().Read(pathPtr, pathLen)
+	b, ok := m.Memory().Read(ctx, pathPtr, pathLen)
 	if !ok {
 		return ErrnoFault
 	}
@@ -1216,7 +1216,7 @@ func (a *snapshotPreview1) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen
 	if newFD, ok := sys.OpenFile(entry); !ok {
 		_ = entry.File.Close()
 		return ErrnoIo
-	} else if !m.Memory().WriteUint32Le(resultOpenedFd, newFD) {
+	} else if !m.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
 		_ = entry.File.Close()
 		return ErrnoFault
 	}
@@ -1224,32 +1224,32 @@ func (a *snapshotPreview1) PathOpen(m api.Module, fd, dirflags, pathPtr, pathLen
 }
 
 // PathReadlink is the WASI function named functionPathReadlink
-func (a *snapshotPreview1) PathReadlink(m api.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) Errno {
+func (a *snapshotPreview1) PathReadlink(ctx context.Context, m api.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathRemoveDirectory is the WASI function named functionPathRemoveDirectory
-func (a *snapshotPreview1) PathRemoveDirectory(m api.Module, fd, path, pathLen uint32) Errno {
+func (a *snapshotPreview1) PathRemoveDirectory(ctx context.Context, m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathRename is the WASI function named functionPathRename
-func (a *snapshotPreview1) PathRename(m api.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
+func (a *snapshotPreview1) PathRename(ctx context.Context, m api.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathSymlink is the WASI function named functionPathSymlink
-func (a *snapshotPreview1) PathSymlink(m api.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) Errno {
+func (a *snapshotPreview1) PathSymlink(ctx context.Context, m api.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathUnlinkFile is the WASI function named functionPathUnlinkFile
-func (a *snapshotPreview1) PathUnlinkFile(m api.Module, fd, path, pathLen uint32) Errno {
+func (a *snapshotPreview1) PathUnlinkFile(ctx context.Context, m api.Module, fd, path, pathLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PollOneoff is the WASI function named functionPollOneoff
-func (a *snapshotPreview1) PollOneoff(m api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
+func (a *snapshotPreview1) PollOneoff(ctx context.Context, m api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1262,12 +1262,12 @@ func (a *snapshotPreview1) PollOneoff(m api.Module, in, out, nsubscriptions, res
 //
 // Note: importProcExit shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-func (a *snapshotPreview1) ProcExit(m api.Module, exitCode uint32) {
-	_ = m.CloseWithExitCode(exitCode)
+func (a *snapshotPreview1) ProcExit(ctx context.Context, m api.Module, exitCode uint32) {
+	_ = m.CloseWithExitCode(ctx, exitCode)
 }
 
 // ProcRaise is the WASI function named functionProcRaise
-func (a *snapshotPreview1) ProcRaise(m api.Module, sig uint32) Errno {
+func (a *snapshotPreview1) ProcRaise(ctx context.Context, m api.Module, sig uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1276,7 +1276,7 @@ func (a *snapshotPreview1) SchedYield(m api.Module) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
-// RandomGet is the WASI function named functionRandomGet that write random data in buffer (rand.Read()).
+// RandomGet is the WASI function named functionRandomGet that write random data in buffer (rand.Read(ctx, )).
 //
 // * buf - is the m.Memory offset to write random values
 // * bufLen - size of random data in bytes
@@ -1291,7 +1291,7 @@ func (a *snapshotPreview1) SchedYield(m api.Module) Errno {
 //
 // Note: importRandomGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-func (a *snapshotPreview1) RandomGet(m api.Module, buf uint32, bufLen uint32) (errno Errno) {
+func (a *snapshotPreview1) RandomGet(ctx context.Context, m api.Module, buf uint32, bufLen uint32) (errno Errno) {
 	randomBytes := make([]byte, bufLen)
 	err := a.randSource(randomBytes)
 	if err != nil {
@@ -1299,7 +1299,7 @@ func (a *snapshotPreview1) RandomGet(m api.Module, buf uint32, bufLen uint32) (e
 		return ErrnoIo
 	}
 
-	if !m.Memory().Write(buf, randomBytes) {
+	if !m.Memory().Write(ctx, buf, randomBytes) {
 		return ErrnoFault
 	}
 
@@ -1307,17 +1307,17 @@ func (a *snapshotPreview1) RandomGet(m api.Module, buf uint32, bufLen uint32) (e
 }
 
 // SockRecv is the WASI function named functionSockRecv
-func (a *snapshotPreview1) SockRecv(m api.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) Errno {
+func (a *snapshotPreview1) SockRecv(ctx context.Context, m api.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // SockSend is the WASI function named functionSockSend
-func (a *snapshotPreview1) SockSend(m api.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) Errno {
+func (a *snapshotPreview1) SockSend(ctx context.Context, m api.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // SockShutdown is the WASI function named functionSockShutdown
-func (a *snapshotPreview1) SockShutdown(m api.Module, fd, how uint32) Errno {
+func (a *snapshotPreview1) SockShutdown(ctx context.Context, m api.Module, fd, how uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1366,20 +1366,20 @@ func openFileEntry(rootFS fs.FS, pathName string) (*wasm.FileEntry, Errno) {
 	return &wasm.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
 }
 
-func writeOffsetsAndNullTerminatedValues(mem api.Memory, values []string, offsets, bytes uint32) Errno {
+func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {
 	for _, value := range values {
 		// Write current offset and advance it.
-		if !mem.WriteUint32Le(offsets, bytes) {
+		if !mem.WriteUint32Le(ctx, offsets, bytes) {
 			return ErrnoFault
 		}
 		offsets += 4 // size of uint32
 
 		// Write the next value to memory with a NUL terminator
-		if !mem.Write(bytes, []byte(value)) {
+		if !mem.Write(ctx, bytes, []byte(value)) {
 			return ErrnoFault
 		}
 		bytes += uint32(len(value))
-		if !mem.WriteByte(bytes, 0) {
+		if !mem.WriteByte(ctx, bytes, 0) {
 			return ErrnoFault
 		}
 		bytes++

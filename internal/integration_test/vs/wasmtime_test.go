@@ -65,7 +65,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *runtimeConfig) (mo
 	return
 }
 
-func (r *wasmtimeRuntime) Close() error {
+func (r *wasmtimeRuntime) Close(_ context.Context) error {
 	r.engine = nil
 	return nil // wasmtime only closes via finalizer
 }
@@ -79,7 +79,7 @@ func (m *wasmtimeModule) CallI64_I64(_ context.Context, funcName string, param u
 	}
 }
 
-func (m *wasmtimeModule) Close() error {
+func (m *wasmtimeModule) Close(_ context.Context) error {
 	m.store = nil
 	m.instance = nil
 	m.funcs = nil

@@ -389,7 +389,7 @@ func runTest(t *testing.T, newEngine func(wasm.Features) wasm.Engine) {
 								expType = wasm.ValueTypeF64
 							}
 							require.Equal(t, expType, global.Type(), msg)
-							require.Equal(t, exps[0], global.Get(), msg)
+							require.Equal(t, exps[0], global.Get(testCtx), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

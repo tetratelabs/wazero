@@ -74,12 +74,14 @@ func (m *CallContext) String() string {
 }
 
 // Close implements the same method as documented on api.Module.
-func (m *CallContext) Close() (err error) {
-	return m.CloseWithExitCode(0)
+func (m *CallContext) Close(ctx context.Context) (err error) {
+	return m.CloseWithExitCode(ctx, 0)
 }
 
 // CloseWithExitCode implements the same method as documented on api.Module.
-func (m *CallContext) CloseWithExitCode(exitCode uint32) (err error) {
+func (m *CallContext) CloseWithExitCode(_ context.Context, exitCode uint32) (err error) {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return nil
@@ -91,12 +93,12 @@ func (m *CallContext) CloseWithExitCode(exitCode uint32) (err error) {
 	return
 }
 
-// Memory implements api.Module Memory
+// Memory implements the same method as documented on api.Module.
 func (m *CallContext) Memory() api.Memory {
 	return m.module.Memory
 }
 
-// ExportedMemory implements api.Module ExportedMemory
+// ExportedMemory implements the same method as documented on api.Module.
 func (m *CallContext) ExportedMemory(name string) api.Memory {
 	exp, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
@@ -105,7 +107,7 @@ func (m *CallContext) ExportedMemory(name string) api.Memory {
 	return exp.Memory
 }
 
-// ExportedFunction implements api.Module ExportedFunction
+// ExportedFunction implements the same method as documented on api.Module.
 func (m *CallContext) ExportedFunction(name string) api.Function {
 	exp, err := m.module.getExport(name, ExternTypeFunc)
 	if err != nil {
@@ -124,17 +126,17 @@ type importedFn struct {
 	importedFn      *FunctionInstance
 }
 
-// ParamTypes implements the same method as documented on api.Function
+// ParamTypes implements the same method as documented on api.Function.
 func (f *importedFn) ParamTypes() []api.ValueType {
 	return f.importedFn.ParamTypes()
 }
 
-// ResultTypes implements the same method as documented on api.Function
+// ResultTypes implements the same method as documented on api.Function.
 func (f *importedFn) ResultTypes() []api.ValueType {
 	return f.importedFn.ResultTypes()
 }
 
-// Call implements the same method as documented on api.Function
+// Call implements the same method as documented on api.Function.
 func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -143,17 +145,17 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
 }
 
-// ParamTypes implements the same method as documented on api.Function
+// ParamTypes implements the same method as documented on api.Function.
 func (f *FunctionInstance) ParamTypes() []api.ValueType {
 	return f.Type.Params
 }
 
-// ResultTypes implements the same method as documented on api.Function
+// ResultTypes implements the same method as documented on api.Function.
 func (f *FunctionInstance) ResultTypes() []api.ValueType {
 	return f.Type.Results
 }
 
-// Call implements the same method as documented on api.Function
+// Call implements the same method as documented on api.Function.
 func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -162,7 +164,7 @@ func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []ui
 	return mod.Engine.Call(ctx, mod.CallCtx, f, params...)
 }
 
-// ExportedGlobal implements api.Module ExportedGlobal
+// ExportedGlobal implements the same method as documented on api.Module.
 func (m *CallContext) ExportedGlobal(name string) api.Global {
 	exp, err := m.module.getExport(name, ExternTypeGlobal)
 	if err != nil {

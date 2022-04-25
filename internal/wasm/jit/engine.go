@@ -690,7 +690,7 @@ jitentry:
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
 				callercode := ce.callFrameTop().function
-				ce.builtinFunctionMemoryGrow(callercode.source.Module.Memory)
+				ce.builtinFunctionMemoryGrow(ctx, callercode.source.Module.Memory)
 			case builtinFunctionIndexGrowValueStack:
 				callercode := ce.callFrameTop().function
 				ce.builtinFunctionGrowValueStack(callercode.stackPointerCeil)
@@ -740,10 +740,10 @@ func (ce *callEngine) builtinFunctionGrowCallFrameStack() {
 	ce.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
 }
 
-func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
+func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.MemoryInstance) {
 	newPages := ce.popValue()
 
-	res := mem.Grow(uint32(newPages))
+	res := mem.Grow(ctx, uint32(newPages))
 	ce.pushValue(uint64(res))
 
 	// Update the moduleContext fields as they become stale after the update ^^.
@@ -782,7 +782,7 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 
 	var skip bool
 	for _, op := range ir.Operations {
-		// Compiler determines whether or not skip the entire label.
+		// Compiler determines whether skip the entire label.
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
 		if op.Kind() == wazeroir.OperationKindLabel {

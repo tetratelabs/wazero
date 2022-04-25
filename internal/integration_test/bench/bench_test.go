@@ -23,13 +23,13 @@ var caseWasm []byte
 func BenchmarkInvocation(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
 		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
-		defer m.Close()
+		defer m.Close(testCtx)
 		runAllInvocationBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("jit", func(b *testing.B) {
 			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
-			defer m.Close()
+			defer m.Close(testCtx)
 			runAllInvocationBenches(b, m)
 		})
 	}
@@ -54,14 +54,14 @@ func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer compiled.Close()
+	defer compiled.Close(testCtx)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mod, err := r.InstantiateModule(testCtx, compiled)
 		if err != nil {
 			b.Fatal(err)
 		}
-		mod.Close()
+		mod.Close(testCtx)
 	}
 }
 
@@ -172,11 +172,11 @@ func createRuntime(b *testing.B, engine *wazero.RuntimeConfig) wazero.Runtime {
 		}
 
 		offset := uint32(results[0])
-		m.Memory().WriteUint32Le(retBufPtr, offset)
-		m.Memory().WriteUint32Le(retBufSize, 10)
+		m.Memory().WriteUint32Le(ctx, retBufPtr, offset)
+		m.Memory().WriteUint32Le(ctx, retBufSize, 10)
 		b := make([]byte, 10)
 		_, _ = rand.Read(b)
-		m.Memory().Write(offset, b)
+		m.Memory().Write(ctx, offset, b)
 	}
 
 	r := wazero.NewRuntimeWithConfig(engine)
