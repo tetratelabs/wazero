@@ -180,7 +180,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 
 	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx)
 	require.NoError(t, err)
-	defer imported.Close()
+	defer imported.Close(testCtx)
 
 	// Instantiate a module that uses Wasm code to call the host function.
 	importing, err = r.InstantiateModuleFromCode(testCtx, []byte(fmt.Sprintf(`(module $%[1]s
@@ -192,7 +192,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 	(export "inner" (func $call_inner))
 )`, importingName, importedName)))
 	require.NoError(t, err)
-	defer importing.Close()
+	defer importing.Close(testCtx)
 
 	input := uint64(math.MaxUint32 - 2) // We expect two calls where each increment by one.
 	results, err := importing.ExportedFunction("call->outer").Call(testCtx, input)
