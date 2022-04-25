@@ -163,8 +163,15 @@ func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 	}
 }
 
-// Non-interface union of all the wazeroir operations.
+// interpreterOp is the compilation (engine.lowerIR) result of a wazeroir.Operation.
+//
+// Not all operations result in an interpreterOp, e.g. wazeroir.OperationI32ReinterpretFromF32, and some operations are
+// more complex than others, e.g. wazeroir.OperationBrTable.
+//
+// Note: This is a form of union type as it can store fields needed for any operation. Hence, most fields are opaque and
+// only relevant when in context of its kind.
 type interpreterOp struct {
+	// kind determines how to interpret the other fields in this struct.
 	kind   wazeroir.OperationKind
 	b1, b2 byte
 	b3     bool
@@ -180,7 +187,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 	if module.IsHostModule() {
-		// If this is the host module, there's nothing to do as the runtime reprsentation of
+		// If this is the host module, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
 		for _, hf := range module.HostFunctionSection {
