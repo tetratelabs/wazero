@@ -163,6 +163,13 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	validatedElementSegments []*validatedElementSegment
 
+	// DataCountSection is the optional section and holds the number of data segments in the data section.
+	//
+	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations.
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	DataCountSection *uint32
+
 	// ID is the sha256 value of the source code (text/binary) and is used for caching.
 	ID ModuleID
 }
@@ -253,6 +260,9 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if err := m.validateDataCountSection(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -440,6 +450,14 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 			ValueTypeName(expectedType), ValueTypeName(actualType))
 	}
 	return nil
+}
+
+func (m *Module) validateDataCountSection() (err error) {
+	if m.DataCountSection != nil && int(*m.DataCountSection) != len(m.DataSection) {
+		err = fmt.Errorf("data count section (%d) doesn't match the length of data section (%d)",
+			*m.DataCountSection, len(m.DataSection))
+	}
+	return
 }
 
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
@@ -763,6 +781,12 @@ const (
 	SectionIDElement
 	SectionIDCode
 	SectionIDData
+
+	// SectionIDDataCount may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations enabled.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	SectionIDDataCount
 )
 
 // SectionIDHostFunction is a pseudo-section ID for host functions.
@@ -800,6 +824,8 @@ func SectionIDName(sectionID SectionID) string {
 		return "data"
 	case SectionIDHostFunction:
 		return "host_function"
+	case SectionIDDataCount:
+		return "data_count"
 	}
 	return "unknown"
 }

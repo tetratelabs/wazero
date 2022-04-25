@@ -47,17 +47,32 @@ const (
 
 	// FeatureNonTrappingFloatToIntConversion decides if parsing should succeed on the following instructions:
 	//
-	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32S]
-	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32U]
-	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32S]
-	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32U]
-	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64S]
-	// * [OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64U]
-	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64S]
-	// * [OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64U]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32S]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI32TruncSatF32U]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32S]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF32U]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64S]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI32TruncSatF64U]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64S]
+	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64U]
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	FeatureNonTrappingFloatToIntConversion
+
+	// FeatureBulkMemoryOperations decides if parsing should succeed on the following instructions:
+	//
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryInit]
+	// * [ OpcodeMiscPrefix, OpcodeMiscDataDrop]
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryCopy]
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryFill]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableInit]
+	// * [ OpcodeMiscPrefix, OpcodeMiscElemDrop]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableCopy]
+	//
+	// Also, if the parsing should succeed with the presence of SectionIDDataCount.
+	//
+	//See  https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	FeatureBulkMemoryOperations
 )
 
 // Set assigns the value for the given feature.
@@ -111,6 +126,8 @@ func featureName(f Features) string {
 	case FeatureNonTrappingFloatToIntConversion:
 		// match https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 		return "nontrapping-float-to-int-conversion"
+	case FeatureBulkMemoryOperations:
+		return "bulk-memory-operations"
 	}
 	return ""
 }

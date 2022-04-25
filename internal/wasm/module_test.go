@@ -736,3 +736,37 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 		require.Equal(t, max, mem.Max)
 	})
 }
+
+func TestModule_validateDataCountSection(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		for _, m := range []*Module{
+			{
+				DataSection:      []*DataSegment{},
+				DataCountSection: nil,
+			},
+			{
+				DataSection:      []*DataSegment{{}, {}},
+				DataCountSection: nil,
+			},
+		} {
+			err := m.validateDataCountSection()
+			require.NoError(t, err)
+		}
+	})
+	t.Run("error", func(t *testing.T) {
+		count := uint32(1)
+		for _, m := range []*Module{
+			{
+				DataSection:      []*DataSegment{},
+				DataCountSection: &count,
+			},
+			{
+				DataSection:      []*DataSegment{{}, {}},
+				DataCountSection: &count,
+			},
+		} {
+			err := m.validateDataCountSection()
+			require.Error(t, err)
+		}
+	})
+}

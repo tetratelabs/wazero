@@ -3,6 +3,7 @@ package binary
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -166,6 +167,15 @@ func decodeDataSection(r *bytes.Reader) ([]*wasm.DataSegment, error) {
 		}
 	}
 	return result, nil
+}
+
+func decodeDataCountSection(r *bytes.Reader) (count *uint32, err error) {
+	v, _, err := leb128.DecodeUint32(r)
+	if err != nil && err != io.EOF {
+		// data count is optional, so EOF is fine.
+		return nil, err
+	}
+	return &v, nil
 }
 
 // encodeSection encodes the sectionID, the size of its contents in bytes, followed by the contents.

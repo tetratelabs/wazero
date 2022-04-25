@@ -752,6 +752,99 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", miscInstructionNames[miscOpcode], err)
 				}
 				valueTypeStack.push(outType)
+			} else if miscOpcode >= OpcodeMiscMemoryInit && miscOpcode <= OpcodeMiscTableCopy {
+				if err := enabledFeatures.Require(FeatureBulkMemoryOperations); err != nil {
+					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
+				}
+				var params []ValueType
+				switch miscOpcode {
+				case OpcodeMiscMemoryInit, OpcodeMiscMemoryCopy, OpcodeMiscMemoryFill, OpcodeMiscDataDrop:
+					if memory == nil {
+						return fmt.Errorf("memory must exist for %s", MiscInstructionName(miscOpcode))
+					}
+					if miscOpcode != OpcodeMiscDataDrop {
+						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
+					}
+
+					if miscOpcode == OpcodeMiscMemoryInit || miscOpcode == OpcodeMiscDataDrop {
+						if m.DataCountSection == nil {
+							return fmt.Errorf("%s requires data count section", MiscInstructionName(miscOpcode))
+						}
+
+						// We need to read the index to the data section.
+						pc++
+						index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						if err != nil {
+							return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
+						}
+						if int(index) >= len(m.DataSection) {
+							return fmt.Errorf("index %d out of range of data section(len=%d)", index, len(m.DataSection))
+						}
+						pc += num - 1
+					}
+
+					if miscOpcode != OpcodeMiscDataDrop {
+						pc++
+						val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						if err != nil {
+							return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
+						}
+						if val != 0 || num != 1 {
+							return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
+						}
+						if miscOpcode == OpcodeMiscMemoryCopy {
+							pc++
+							// memory.copy needs two memory index which are reserved as zero.
+							val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+							if err != nil {
+								return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
+							}
+							if val != 0 || num != 1 {
+								return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
+							}
+						}
+					}
+				case OpcodeMiscTableInit, OpcodeMiscElemDrop, OpcodeMiscTableCopy:
+					if table == nil {
+						return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
+					}
+					if miscOpcode != OpcodeMiscElemDrop {
+						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
+					}
+					if miscOpcode == OpcodeMiscTableInit || miscOpcode == OpcodeMiscElemDrop {
+						pc++
+						index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						if err != nil {
+							return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
+						}
+						if int(index) >= len(m.ElementSection) {
+							return fmt.Errorf("index %d out of range of element section(len=%d)", index, len(m.ElementSection))
+						}
+						pc += num - 1
+					}
+
+					if miscOpcode != OpcodeMiscElemDrop {
+						pc++
+						_, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						if err != nil {
+							return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
+						}
+						if miscOpcode == OpcodeMiscTableCopy {
+							pc += num
+							// table.copy needs two table index which are reserved as zero.
+							_, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+							if err != nil {
+								return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
+							}
+							pc += num - 1
+						}
+					}
+				}
+				for _, p := range params {
+					if err := valueTypeStack.popAndVerifyType(p); err != nil {
+						return fmt.Errorf("cannot pop the operand for %s: %v", miscInstructionNames[miscOpcode], err)
+					}
+				}
 			}
 		} else if op == OpcodeBlock {
 			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
