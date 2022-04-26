@@ -1,18 +1,23 @@
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 
+ensureJITFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
 .PHONY: bench
 bench:
 	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
-	@cd ./internal/integration_test/vs && go test -benchmem -bench=. .
+	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureJITFastest)
 
 .PHONY: bench.check
 bench.check:
 	@go build ./internal/integration_test/bench/...
-	@cd ./internal/integration_test/vs && go test -benchmem -bench=. . -tags='wasmedge' -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
+	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
+	@for d in vs/wasm3 vs/wasmedge vs/wasmer vs/wasmtime ; do \
+		cd ./internal/integration_test/$$d ; \
+		go test -bench=. . -tags='wasmedge' $(ensureJITFastest) ; \
+		cd - ;\
+	done
 
 bench_testdata_dir := internal/integration_test/bench/testdata
-
 .PHONY: build.bench
 build.bench:
 	@tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none --no-debug -target=wasi $(bench_testdata_dir)/case.go

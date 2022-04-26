@@ -6,63 +6,116 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/wasi"
 )
 
-type runtimeConfig struct {
-	moduleName string
-	moduleWasm []byte
-	funcNames  []string
+type RuntimeConfig struct {
+	Name       string
+	ModuleName string
+	ModuleWasm []byte
+	FuncNames  []string
+	NeedsWASI  bool
+	// LogFn requires the implementation to export a function "env.log" which accepts i32i32_v.
+	// The implementation invoke this with a byte slice allocated from the offset, length pair.
+	// This function simulates a host function that logs a message.
+	LogFn func([]byte) error
 }
 
-type runtime interface {
-	Compile(context.Context, *runtimeConfig) error
-	Instantiate(context.Context, *runtimeConfig) (module, error)
+type Runtime interface {
+	Name() string
+	Compile(context.Context, *RuntimeConfig) error
+	Instantiate(context.Context, *RuntimeConfig) (Module, error)
 	Close(context.Context) error
 }
 
-type module interface {
+type Module interface {
+	CallI32_I32(ctx context.Context, funcName string, param uint32) (uint32, error)
+	CallI32I32_V(ctx context.Context, funcName string, x, y uint32) error
+	CallI32_V(ctx context.Context, funcName string, param uint32) error
 	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
+	WriteMemory(ctx context.Context, offset uint32, bytes []byte) error
 	Close(context.Context) error
 }
 
-func newWazeroInterpreterRuntime() runtime {
-	return newWazeroRuntime(wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
+func NewWazeroInterpreterRuntime() Runtime {
+	return newWazeroRuntime("wazero-interpreter", wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
 }
 
-func newWazeroJITRuntime() runtime {
-	return newWazeroRuntime(wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
+func NewWazeroJITRuntime() Runtime {
+	return newWazeroRuntime(jitRuntime, wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
 }
 
-func newWazeroRuntime(config *wazero.RuntimeConfig) runtime {
-	return &wazeroRuntime{config: config}
+func newWazeroRuntime(name string, config *wazero.RuntimeConfig) *wazeroRuntime {
+	return &wazeroRuntime{name: name, config: config}
 }
 
 type wazeroRuntime struct {
-	config   *wazero.RuntimeConfig
-	runtime  wazero.Runtime
-	compiled *wazero.CompiledCode
+	name          string
+	config        *wazero.RuntimeConfig
+	runtime       wazero.Runtime
+	logFn         func([]byte) error
+	env, compiled *wazero.CompiledCode
 }
 
 type wazeroModule struct {
-	mod   api.Module
-	funcs map[string]api.Function
+	wasi, env, mod api.Module
+	funcs          map[string]api.Function
 }
 
-func (r *wazeroRuntime) Compile(ctx context.Context, cfg *runtimeConfig) (err error) {
+func (r *wazeroRuntime) Name() string {
+	return r.name
+}
+
+func (r *wazeroRuntime) log(ctx context.Context, m api.Module, offset, byteCount uint32) {
+	buf, ok := m.Memory().Read(ctx, offset, byteCount)
+	if !ok {
+		panic(fmt.Errorf("Memory.Read(%d, %d) out of range", offset, byteCount))
+	}
+	if err := r.logFn(buf); err != nil {
+		panic(err)
+	}
+}
+
+func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err error) {
 	r.runtime = wazero.NewRuntimeWithConfig(r.config)
-	r.compiled, err = r.runtime.CompileModule(ctx, cfg.moduleWasm)
+	if cfg.LogFn != nil {
+		r.logFn = cfg.LogFn
+		if r.env, err = r.runtime.NewModuleBuilder("env").
+			ExportFunction("log", r.log).Build(ctx); err != nil {
+			return err
+		}
+	}
+	r.compiled, err = r.runtime.CompileModule(ctx, cfg.ModuleWasm)
 	return
 }
 
-func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *runtimeConfig) (mod module, err error) {
-	wazeroCfg := wazero.NewModuleConfig().WithName(cfg.moduleName)
+func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mod Module, err error) {
+	wazeroCfg := wazero.NewModuleConfig().WithName(cfg.ModuleName)
 	m := &wazeroModule{funcs: map[string]api.Function{}}
+
+	// Instantiate WASI, if configured.
+	if cfg.NeedsWASI {
+		if m.wasi, err = wasi.InstantiateSnapshotPreview1(ctx, r.runtime); err != nil {
+			return
+		}
+	}
+
+	// Instantiate the host module, "env", if configured.
+	if env := r.env; env != nil {
+		if m.env, err = r.runtime.InstantiateModule(ctx, env); err != nil {
+			return
+		}
+	}
+
+	// Instantiate the module.
 	if m.mod, err = r.runtime.InstantiateModuleWithConfig(ctx, r.compiled, wazeroCfg); err != nil {
 		return
 	}
-	for _, funcName := range cfg.funcNames {
+
+	// Ensure function exports exist.
+	for _, funcName := range cfg.FuncNames {
 		if fn := m.mod.ExportedFunction(funcName); fn == nil {
-			return nil, fmt.Errorf("%s is not an exported function", fn)
+			return nil, fmt.Errorf("%s is not an exported function", funcName)
 		} else {
 			m.funcs[funcName] = fn
 		}
@@ -76,6 +129,29 @@ func (r *wazeroRuntime) Close(ctx context.Context) (err error) {
 		err = compiled.Close(ctx)
 	}
 	r.compiled = nil
+	if env := r.env; env != nil {
+		err = env.Close(ctx)
+	}
+	r.env = nil
+	return
+}
+
+func (m *wazeroModule) CallI32_I32(ctx context.Context, funcName string, param uint32) (uint32, error) {
+	if results, err := m.funcs[funcName].Call(ctx, uint64(param)); err != nil {
+		return 0, err
+	} else if len(results) > 0 {
+		return uint32(results[0]), nil
+	}
+	return 0, nil
+}
+
+func (m *wazeroModule) CallI32I32_V(ctx context.Context, funcName string, x, y uint32) (err error) {
+	_, err = m.funcs[funcName].Call(ctx, uint64(x), uint64(y))
+	return
+}
+
+func (m *wazeroModule) CallI32_V(ctx context.Context, funcName string, param uint32) (err error) {
+	_, err = m.funcs[funcName].Call(ctx, uint64(param))
 	return
 }
 
@@ -88,10 +164,25 @@ func (m *wazeroModule) CallI64_I64(ctx context.Context, funcName string, param u
 	return 0, nil
 }
 
+func (m *wazeroModule) WriteMemory(ctx context.Context, offset uint32, bytes []byte) error {
+	if !m.mod.Memory().Write(ctx, offset, bytes) {
+		return fmt.Errorf("Memory.Write(%d, %d) out of range of memory size %d",
+			offset, len(bytes), m.mod.Memory().Size(ctx))
+	}
+	return nil
+}
 func (m *wazeroModule) Close(ctx context.Context) (err error) {
 	if mod := m.mod; mod != nil {
 		err = mod.Close(ctx)
 	}
 	m.mod = nil
+	if env := m.env; env != nil {
+		err = env.Close(ctx)
+	}
+	m.env = nil
+	if wasi := m.wasi; wasi != nil {
+		err = wasi.Close(ctx)
+	}
+	m.wasi = nil
 	return
 }

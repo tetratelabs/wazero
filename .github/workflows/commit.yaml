@@ -99,7 +99,8 @@ jobs:
           key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
-        run: go list -f '{{.Dir}}' ./... | xargs -Ipkg go test pkg -c -o pkg.test
+        # Exclude benchmarks as we don't run those in Docker
+        run: go list -f '{{.Dir}}' ./... | egrep -v '(bench|vs)' | xargs -Ipkg go test pkg -c -o pkg.test
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
