@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	experimental_api "github.com/tetratelabs/wazero/internal/experimental/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -480,7 +481,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 	return
 }
 
-func (m *Module) buildFunctions(moduleName string) (functions []*FunctionInstance) {
+func (m *Module) buildFunctions(moduleName string, functionListenerFactory experimental_api.FunctionListenerFactory) (functions []*FunctionInstance) {
 	var functionNames NameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
@@ -511,6 +512,10 @@ func (m *Module) buildFunctions(moduleName string) (functions []*FunctionInstanc
 			Index:      funcIdx,
 		}
 		f.DebugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
+		if functionListenerFactory != nil {
+			info := m.resolveFunction(moduleName, f, funcIdx)
+			f.FunctionListener = functionListenerFactory.NewListener(info)
+		}
 		functions = append(functions, f)
 	}
 	return
@@ -526,6 +531,39 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 		}
 	}
 	return
+}
+
+func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx uint32) experimental_api.FunctionInfo {
+	params := make([]experimental_api.ValueInfo, len(f.ParamTypes()))
+	for i, p := range f.ParamTypes() {
+		params[i].Type = p
+	}
+	results := make([]experimental_api.ValueInfo, len(f.ResultTypes()))
+	for i, r := range f.ResultTypes() {
+		results[i].Type = r
+	}
+
+	for _, nm := range m.NameSection.LocalNames {
+		if nm.Index == funcIdx {
+			for _, n := range nm.NameMap {
+				if int(n.Index) < len(params) {
+					params[n.Index].Name = n.Name
+				} else {
+					resIdx := int(n.Index) - len(params)
+					// Only malformed program would have an index out of bounds here.
+					if resIdx < len(results) {
+						results[resIdx].Name = n.Name
+					}
+				}
+			}
+		}
+	}
+	return experimental_api.FunctionInfo{
+		ModuleName: moduleName,
+		Name:       f.DebugName,
+		Params:     params,
+		Returns:    results,
+	}
 }
 
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because

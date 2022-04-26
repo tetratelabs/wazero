@@ -713,7 +713,7 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 	}
 
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
-	actual := m.buildFunctions("counter")
+	actual := m.buildFunctions("counter", nil)
 	expectedNames := []string{"counter.[1]", "counter.two", "counter.[3]", "counter.four", "counter.five"}
 	for i, f := range actual {
 		require.Equal(t, expectedNames[i], f.DebugName)

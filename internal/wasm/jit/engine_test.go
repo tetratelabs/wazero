@@ -262,7 +262,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	err = store.Engine.CompileModule(testCtx, hm)
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(testCtx, hm, hostModuleName, nil)
+	_, err = store.Instantiate(testCtx, hm, hostModuleName, nil, nil)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -317,7 +317,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	err = store.Engine.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
-	mi, err := store.Instantiate(testCtx, m, t.Name(), nil)
+	mi, err := store.Instantiate(testCtx, m, t.Name(), nil, nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
