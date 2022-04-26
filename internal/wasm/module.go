@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	experimental_api "github.com/tetratelabs/wazero/internal/experimental/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -481,7 +481,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 	return
 }
 
-func (m *Module) buildFunctions(moduleName string, functionListenerFactory FunctionListenerFactory) (functions []*FunctionInstance) {
+func (m *Module) buildFunctions(moduleName string, functionListenerFactory experimental_api.FunctionListenerFactory) (functions []*FunctionInstance) {
 	var functionNames NameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
@@ -533,12 +533,12 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	return
 }
 
-func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx uint32) FunctionInfo {
-	params := make([]ValueInfo, len(f.ParamTypes()))
+func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx uint32) experimental_api.FunctionInfo {
+	params := make([]experimental_api.ValueInfo, len(f.ParamTypes()))
 	for i, p := range f.ParamTypes() {
 		params[i].Type = p
 	}
-	results := make([]ValueInfo, len(f.ResultTypes()))
+	results := make([]experimental_api.ValueInfo, len(f.ResultTypes()))
 	for i, r := range f.ResultTypes() {
 		results[i].Type = r
 	}
@@ -558,7 +558,7 @@ func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx
 			}
 		}
 	}
-	return FunctionInfo{
+	return experimental_api.FunctionInfo{
 		ModuleName: moduleName,
 		Name:       f.DebugName,
 		Params:     params,
@@ -932,67 +932,4 @@ func ExternTypeName(et ExternType) string {
 		return ExternTypeGlobalName
 	}
 	return fmt.Sprintf("%#x", et)
-}
-
-// A FunctionListener can be registered for any function via FunctionListenerFactory to
-// be notified when the function is called.
-type FunctionListener interface {
-	// Before is invoked before a function is called. ctx is the context of the caller function.
-	// The returned context will be used as the context of this function call. To add context
-	// information for this function call, add it to ctx and return the updated context. If
-	// no context informationis needed, return ctx as is.
-	Before(ctx context.Context) context.Context
-	// After is invoked after a function is called. ctx is the context of this function call.
-	After(ctx context.Context)
-}
-
-// Information about the definition of a parameter or return value.
-type ValueInfo struct {
-	// The name of the value. Empty if name is not available.
-	Name string
-
-	// The type of the value.
-	Type api.ValueType
-}
-
-func (info ValueInfo) String() string {
-	n := info.Name
-	if len(n) == 0 {
-		n = "<unknown>"
-	}
-	return fmt.Sprintf("%v: %v", n, api.ValueTypeName(info.Type))
-}
-
-// Information about a defined function.
-type FunctionInfo struct {
-	// The name of the module the function is defined in.
-	ModuleName string
-
-	// The name of the function. This will be the name of the export for an exported function.
-	// Empty if name is not available.
-	Name string
-
-	// The function parameters.
-	Params []ValueInfo
-
-	// The function return values.
-	Returns []ValueInfo
-}
-
-// FunctionListenerFactory returns FunctionListeners to be notified when a function is called.
-type FunctionListenerFactory interface {
-	// NewListener returns a FunctionListener for a defined function. If nil is returned, no
-	// listener will be notified.
-	NewListener(info FunctionInfo) FunctionListener
-}
-
-// Internal interface to allow setting FunctionListenerFactory before exposing in public API.
-// Internal code can type assert on this interface to set a factory.
-//
-// r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
-// if s, ok := r.(wasm.FunctionListenerFactorySetter); ok {
-// 	s.WithFunctionListenerFactory(&listenerFactory{})
-// }
-type FunctionListenerFactorySetter interface {
-	WithFunctionListenerFactory(FunctionListenerFactory)
 }

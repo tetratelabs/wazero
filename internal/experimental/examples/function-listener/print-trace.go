@@ -8,7 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/wasm"
+	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
 )
 
 type stackKey struct{}
@@ -28,7 +28,7 @@ func (l *callListener) After(_ context.Context) {
 type callListenerFactory struct {
 }
 
-func (f *callListenerFactory) NewListener(info wasm.FunctionInfo) wasm.FunctionListener {
+func (f *callListenerFactory) NewListener(info experimentalapi.FunctionInfo) experimentalapi.FunctionListener {
 	return &callListener{
 		message: fmt.Sprintf("%v(%v) %v", info.Name, info.Params, info.Returns),
 	}
@@ -39,16 +39,13 @@ func (f *callListenerFactory) NewListener(info wasm.FunctionInfo) wasm.FunctionL
 //
 // See README.md for a full description.
 func main() {
-	// Choose the context to use for function calls.
-	ctx := context.Background()
+	// FunctionListenerFactory is an experimental API, so the only way to configure it is via context key.
+	ctx := context.WithValue(context.Background(),
+		experimentalapi.FunctionListenerFactoryKey{}, &callListenerFactory{})
 
 	// Create a new WebAssembly Runtime.
+	// Note: This is interpreter-only for now!
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
-
-	// Sets the FunctionListenerFactory using an internal accessor.
-	if s, ok := r.(wasm.FunctionListenerFactorySetter); ok {
-		s.WithFunctionListenerFactory(&callListenerFactory{})
-	}
 
 	// Instantiate a Go-defined module named "env" that exports functions to
 	// get the current year and log to the console.

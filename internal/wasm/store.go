@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
@@ -123,7 +124,7 @@ type (
 		Index Index
 
 		// FunctionListener holds a listener to notify when this function is called.
-		FunctionListener FunctionListener
+		FunctionListener experimentalapi.FunctionListener
 	}
 
 	// GlobalInstance represents a global instance in a store.
@@ -247,7 +248,13 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 // * sys: the system context, which will be closed (SysContext.Close) on CallContext.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext, functionListenerFactory FunctionListenerFactory) (*CallContext, error) {
+func (s *Store) Instantiate(
+	ctx context.Context,
+	module *Module,
+	name string,
+	sys *SysContext,
+	functionListenerFactory experimentalapi.FunctionListenerFactory,
+) (*CallContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

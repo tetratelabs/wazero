@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
@@ -131,10 +132,9 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	enabledFeatures         wasm.Features
-	store                   *wasm.Store
-	memoryMaxPages          uint32
-	functionListenerFactory wasm.FunctionListenerFactory
+	enabledFeatures wasm.Features
+	store           *wasm.Store
+	memoryMaxPages  uint32
 }
 
 // Module implements Runtime.Module
@@ -225,7 +225,14 @@ func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *Com
 
 	module := config.replaceImports(compiled.module)
 
-	mod, err = r.store.Instantiate(ctx, module, name, sysCtx, r.functionListenerFactory)
+	var functionListenerFactory experimentalapi.FunctionListenerFactory
+	if ctx != nil { // Test to see if internal code are using an experimental feature.
+		if fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{}); fnlf != nil {
+			functionListenerFactory = fnlf.(experimentalapi.FunctionListenerFactory)
+		}
+	}
+
+	mod, err = r.store.Instantiate(ctx, module, name, sysCtx, functionListenerFactory)
 	if err != nil {
 		return
 	}
@@ -244,8 +251,4 @@ func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *Com
 		}
 	}
 	return
-}
-
-func (r *runtime) WithFunctionListenerFactory(factory wasm.FunctionListenerFactory) {
-	r.functionListenerFactory = factory
 }

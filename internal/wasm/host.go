@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	experimental_api "github.com/tetratelabs/wazero/internal/experimental/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
@@ -163,7 +164,10 @@ func (m *Module) maybeAddType(ft *FunctionType) Index {
 	return result
 }
 
-func (m *Module) buildHostFunctions(moduleName string, functionListenerFactory FunctionListenerFactory) (functions []*FunctionInstance) {
+func (m *Module) buildHostFunctions(
+	moduleName string,
+	functionListenerFactory experimental_api.FunctionListenerFactory,
+) (functions []*FunctionInstance) {
 	// ModuleBuilder has no imports, which means the FunctionSection index is the same as the position in the function
 	// index namespace. Also, it ensures every function has a name. That's why there is less error checking here.
 	var functionNames = m.NameSection.FunctionNames
@@ -177,19 +181,18 @@ func (m *Module) buildHostFunctions(moduleName string, functionListenerFactory F
 		}
 		f.DebugName = wasmdebug.FuncName(moduleName, functionNames[f.Index].Name, f.Index)
 		if functionListenerFactory != nil {
-			params := make([]ValueInfo, len(f.ParamTypes()))
+			params := make([]experimental_api.ValueInfo, len(f.ParamTypes()))
 			for i, p := range f.ParamTypes() {
 				params[i].Type = p
 			}
-			results := make([]ValueInfo, len(f.ResultTypes()))
+			results := make([]experimental_api.ValueInfo, len(f.ResultTypes()))
 			for i, r := range f.ResultTypes() {
 				results[i].Type = r
 			}
 
-			// Cannot access parameter names for host functions.
-			// https://stackoverflow.com/questions/31377433/getting-method-parameter-names
+			// TODO: add parameter names for host functions (vararg strings that must match arity with param length)
 
-			f.FunctionListener = functionListenerFactory.NewListener(FunctionInfo{
+			f.FunctionListener = functionListenerFactory.NewListener(experimental_api.FunctionInfo{
 				ModuleName: moduleName,
 				Name:       f.DebugName,
 				Params:     params,
