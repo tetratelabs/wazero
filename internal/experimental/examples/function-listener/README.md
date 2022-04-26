@@ -3,13 +3,6 @@
 This example shows how to define a function listener to trace function calls. Function listeners are currently
 only implemented for interpreter mode.
 
-If the current year is 2022, and we give the argument 2000, [age-calculator.go](age-calculator.go) should output 22.
-```bash
-$ go run age-calculator.go 2000
-println >> 21
-log_i32 >> 21
-```
-
 ### Background
 
 As WebAssembly has become a target bytecode for many different languages and runtimes, we end up with binaries
