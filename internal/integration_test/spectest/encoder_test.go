@@ -1,4 +1,4 @@
-package spectests
+package spectest
 
 import (
 	"bytes"

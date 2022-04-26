@@ -388,7 +388,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		for _, inst := range []asm.Instruction{
 			amd64.JMP, amd64.SETCC, amd64.SETCS, amd64.SETEQ, amd64.SETGE, amd64.SETGT, amd64.SETHI, amd64.SETLE,
-			amd64.SETLS, amd64.SETLT, amd64.SETNE, amd64.SETPC, amd64.SETPS,
+			amd64.SETLS, amd64.SETLT, amd64.SETNE, amd64.SETPC, amd64.SETPS, amd64.NEGQ, amd64.INCQ, amd64.DECQ,
 		} {
 			inst := inst
 			t.Run(amd64.InstructionName(inst), func(t *testing.T) {
@@ -733,7 +733,7 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 
 						a := amd64.NewAssemblerImpl()
 						err = a.EncodeRegisterToNone(&amd64.NodeImpl{Instruction: inst,
-							Types: amd64.OperandTypesNoneToRegister, SrcReg: reg})
+							Types: amd64.OperandTypesRegisterToNone, SrcReg: reg})
 						require.NoError(t, err)
 						require.Equal(t, bs, a.Buf.Bytes())
 					})
@@ -977,7 +977,9 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("non shift", func(t *testing.T) {
 		scales := []byte{1, 4}
 		for _, instruction := range []asm.Instruction{amd64.CMPL, amd64.CMPQ, amd64.MOVB, amd64.MOVL, amd64.MOVQ, amd64.MOVW} {
-			regs := []asm.Register{amd64.REG_AX, amd64.REG_R8}
+			regs := []asm.Register{
+				amd64.REG_AX, amd64.REG_BP, amd64.REG_SI,
+			}
 			srcRegs := regs
 			if instruction == amd64.MOVL || instruction == amd64.MOVQ {
 				srcRegs = append(srcRegs, amd64.REG_X0, amd64.REG_X10)
@@ -1209,7 +1211,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
 		require.EqualError(t, a.EncodeMemoryToRegister(n), "JMP is unsupported for from:memory,to:register type")
 	})
-	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_R8}
+	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI, amd64.REG_R8}
 	floatRegs := []asm.Register{amd64.REG_X0, amd64.REG_X8}
 	scales := []byte{1, 4}
 	for _, tc := range []struct {

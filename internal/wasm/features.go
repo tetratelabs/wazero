@@ -22,20 +22,20 @@ const Features20191205 = FeatureMutableGlobal
 const FeaturesFinished = 0xffffffffffffffff
 
 const (
-	// FeatureMutableGlobal decides if global vars are allowed to be imported or exported (ExternTypeGlobal)
-	// See https://github.com/WebAssembly/mutable-global
-	FeatureMutableGlobal Features = 1 << iota
-
-	// FeatureSignExtensionOps decides if parsing should succeed on the following instructions:
+	// FeatureBulkMemoryOperations decides if parsing should succeed on the following instructions:
 	//
-	// * OpcodeI32Extend8S
-	// * OpcodeI32Extend16S
-	// * OpcodeI64Extend8S
-	// * OpcodeI64Extend16S
-	// * OpcodeI64Extend32S
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryInit]
+	// * [ OpcodeMiscPrefix, OpcodeMiscDataDrop]
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryCopy]
+	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryFill]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableInit]
+	// * [ OpcodeMiscPrefix, OpcodeMiscElemDrop]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableCopy]
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-	FeatureSignExtensionOps
+	// Also, if the parsing should succeed with the presence of SectionIDDataCount.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
+	FeatureBulkMemoryOperations Features = 1 << iota
 
 	// FeatureMultiValue decides if parsing should succeed on the following:
 	//
@@ -44,6 +44,10 @@ const (
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	FeatureMultiValue
+
+	// FeatureMutableGlobal decides if global vars are allowed to be imported or exported (ExternTypeGlobal)
+	// See https://github.com/WebAssembly/mutable-global
+	FeatureMutableGlobal
 
 	// FeatureNonTrappingFloatToIntConversion decides if parsing should succeed on the following instructions:
 	//
@@ -59,20 +63,16 @@ const (
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	FeatureNonTrappingFloatToIntConversion
 
-	// FeatureBulkMemoryOperations decides if parsing should succeed on the following instructions:
+	// FeatureSignExtensionOps decides if parsing should succeed on the following instructions:
 	//
-	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryInit]
-	// * [ OpcodeMiscPrefix, OpcodeMiscDataDrop]
-	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryCopy]
-	// * [ OpcodeMiscPrefix, OpcodeMiscMemoryFill]
-	// * [ OpcodeMiscPrefix, OpcodeMiscTableInit]
-	// * [ OpcodeMiscPrefix, OpcodeMiscElemDrop]
-	// * [ OpcodeMiscPrefix, OpcodeMiscTableCopy]
+	// * OpcodeI32Extend8S
+	// * OpcodeI32Extend16S
+	// * OpcodeI64Extend8S
+	// * OpcodeI64Extend16S
+	// * OpcodeI64Extend32S
 	//
-	// Also, if the parsing should succeed with the presence of SectionIDDataCount.
-	//
-	//See  https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-	FeatureBulkMemoryOperations
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+	FeatureSignExtensionOps
 )
 
 // Set assigns the value for the given feature.

@@ -261,6 +261,20 @@ func (o OperationKind) String() (ret string) {
 		ret = "F64ReinterpretFromI64"
 	case OperationKindExtend:
 		ret = "Extend"
+	case OperationKindMemoryInit:
+		ret = "MemoryInit"
+	case OperationKindDataDrop:
+		ret = "DataDrop"
+	case OperationKindMemoryCopy:
+		ret = "MemoryCopy"
+	case OperationKindMemoryFill:
+		ret = "MemoryFill"
+	case OperationKindTableInit:
+		ret = "TableInit"
+	case OperationKindElemDrop:
+		ret = "ElemDrop"
+	case OperationKindTableCopy:
+		ret = "TableCopy"
 	}
 	return
 }
@@ -340,6 +354,13 @@ const (
 	OperationKindSignExtend64From8
 	OperationKindSignExtend64From16
 	OperationKindSignExtend64From32
+	OperationKindMemoryInit
+	OperationKindDataDrop
+	OperationKindMemoryCopy
+	OperationKindMemoryFill
+	OperationKindTableInit
+	OperationKindElemDrop
+	OperationKindTableCopy
 )
 
 type Label struct {
@@ -919,4 +940,63 @@ type OperationSignExtend64From32 struct{}
 
 func (o *OperationSignExtend64From32) Kind() OperationKind {
 	return OperationKindSignExtend64From32
+}
+
+type OperationMemoryInit struct {
+	// DataIndex is the index of the data instance in ModuleInstance.DataInstances
+	// by which this operation inisiates a part of the memory.
+	DataIndex uint32
+}
+
+func (o *OperationMemoryInit) Kind() OperationKind {
+	return OperationKindMemoryInit
+}
+
+type OperationDataDrop struct {
+	// DataIndex is the index of the data instance in ModuleInstance.DataInstances
+	// which this operation drops.
+	DataIndex uint32
+}
+
+func (o *OperationDataDrop) Kind() OperationKind {
+	return OperationKindDataDrop
+}
+
+type OperationMemoryCopy struct{}
+
+func (o *OperationMemoryCopy) Kind() OperationKind {
+	return OperationKindMemoryCopy
+}
+
+type OperationMemoryFill struct{}
+
+func (o *OperationMemoryFill) Kind() OperationKind {
+	return OperationKindMemoryFill
+}
+
+type OperationTableInit struct {
+	// ElemIndex is the index of the element by which this operation inisiates a part of the table.
+	ElemIndex uint32
+	// TODO: add table index in reference type proposal.
+}
+
+func (o *OperationTableInit) Kind() OperationKind {
+	return OperationKindTableInit
+}
+
+type OperationElemDrop struct {
+	// ElemIndex is the index of the element which this operation drops.
+	ElemIndex uint32
+}
+
+func (o *OperationElemDrop) Kind() OperationKind {
+	return OperationKindElemDrop
+}
+
+type OperationTableCopy struct {
+	// TODO: add table index in reference type proposal.
+}
+
+func (o *OperationTableCopy) Kind() OperationKind {
+	return OperationKindTableInit
 }

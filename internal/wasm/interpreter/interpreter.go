@@ -500,6 +500,20 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			}
 		case *wazeroir.OperationSignExtend32From8, *wazeroir.OperationSignExtend32From16, *wazeroir.OperationSignExtend64From8,
 			*wazeroir.OperationSignExtend64From16, *wazeroir.OperationSignExtend64From32:
+		case *wazeroir.OperationMemoryInit:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.DataIndex)
+		case *wazeroir.OperationDataDrop:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.DataIndex)
+		case *wazeroir.OperationMemoryCopy:
+		case *wazeroir.OperationMemoryFill:
+		case *wazeroir.OperationTableInit:
+			panic("TODO: table.init unimplemented")
+		case *wazeroir.OperationElemDrop:
+			panic("TODO: elem.drop unimplemented")
+		case *wazeroir.OperationTableCopy:
+			panic("TODO: table.copy unimplemented")
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -600,6 +614,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	table := moduleInst.Table
 	typeIDs := f.source.Module.TypeIDs
 	functions := f.source.Module.Engine.(*moduleEngine).functions
+	dataInstances := f.source.Module.DataInstances
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -1680,6 +1695,49 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(uint64(v))
 				frame.pc++
 			}
+		case wazeroir.OperationKindMemoryInit:
+			dataInstance := dataInstances[op.us[0]]
+			copySize := ce.popValue()
+			inDataOffset := ce.popValue()
+			inMemoryOffset := ce.popValue()
+			if inDataOffset+copySize > uint64(len(dataInstance)) ||
+				inMemoryOffset+copySize > uint64(len(memoryInst.Buffer)) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			} else if copySize != 0 {
+				copy(memoryInst.Buffer[inMemoryOffset:inMemoryOffset+copySize], dataInstance[inDataOffset:])
+			}
+			frame.pc++
+		case wazeroir.OperationKindDataDrop:
+			dataInstances[op.us[0]] = nil
+			frame.pc++
+		case wazeroir.OperationKindMemoryCopy:
+			memLen := uint64(len(memoryInst.Buffer))
+			copySize := ce.popValue()
+			sourceOffset := ce.popValue()
+			destinationOffset := ce.popValue()
+			if sourceOffset+copySize > memLen || destinationOffset+copySize > memLen {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			} else if copySize != 0 {
+				copy(memoryInst.Buffer[destinationOffset:],
+					memoryInst.Buffer[sourceOffset:sourceOffset+copySize])
+			}
+			frame.pc++
+		case wazeroir.OperationKindMemoryFill:
+			fillSize := ce.popValue()
+			value := byte(ce.popValue())
+			offset := ce.popValue()
+			if fillSize+offset > uint64(len(memoryInst.Buffer)) {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			} else if fillSize != 0 {
+				// Uses the copy trick for faster filling buffer.
+				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				buf := memoryInst.Buffer[offset : offset+fillSize]
+				buf[0] = value
+				for i := 1; i < len(buf); i *= 2 {
+					copy(buf[i:], buf[:i])
+				}
+			}
+			frame.pc++
 		}
 	}
 	ce.popFrame()

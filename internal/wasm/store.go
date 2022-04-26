@@ -74,6 +74,12 @@ type (
 		// TypeIDs is index-correlated with types and holds typeIDs which is uniquely assigned to a type by store.
 		// This is necessary to achieve fast runtime type checking for indirect function calls at runtime.
 		TypeIDs []FunctionTypeID
+
+		// DataInstances holds data segments bytes of the module.
+		// This is only used by bulk memory operations.
+		//
+		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#data-instances
+		DataInstances [][]byte
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -175,6 +181,13 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	}
 
 	m.buildExports(module.ExportSection)
+	m.buildDataInstances(module.DataSection)
+}
+
+func (m *ModuleInstance) buildDataInstances(segments []*DataSegment) {
+	for _, d := range segments {
+		m.DataInstances = append(m.DataInstances, d.Init)
+	}
 }
 
 func (m *ModuleInstance) buildExports(exports []*Export) {
@@ -200,20 +213,24 @@ func (m *ModuleInstance) buildExports(exports []*Export) {
 
 func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 	for _, d := range data {
-		offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
-
-		ceil := offset + len(d.Init)
-		if offset < 0 || ceil > len(m.Memory.Buffer) {
-			return fmt.Errorf("out of bounds memory access")
+		if !d.IsPassive() {
+			offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
+			ceil := offset + len(d.Init)
+			if offset < 0 || ceil > len(m.Memory.Buffer) {
+				return fmt.Errorf("out of bounds memory access")
+			}
 		}
+
 	}
 	return
 }
 
 func (m *ModuleInstance) applyData(data []*DataSegment) {
 	for _, d := range data {
-		offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
-		copy(m.Memory.Buffer[offset:], d.Init)
+		if !d.IsPassive() {
+			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
+			copy(m.Memory.Buffer[offset:], d.Init)
+		}
 	}
 }
 

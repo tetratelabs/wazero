@@ -102,6 +102,7 @@ const (
 	MULQ
 	MULSD
 	MULSS
+	NEGQ
 	ORL
 	ORPD
 	ORPS

@@ -19,10 +19,21 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
-				TypeIDs: make([]wasm.FunctionTypeID, 10),
+				Globals:       []*wasm.GlobalInstance{{Val: 100}},
+				Memory:        &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:         &wasm.TableInstance{Table: make([]interface{}, 20)},
+				TypeIDs:       make([]wasm.FunctionTypeID, 10),
+				DataInstances: make([][]byte, 10),
+			},
+		},
+		{
+			name: "data instances",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals:       []*wasm.GlobalInstance{{Val: 100}},
+				Memory:        &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:         &wasm.TableInstance{Table: make([]interface{}, 20)},
+				TypeIDs:       make([]wasm.FunctionTypeID, 10),
+				DataInstances: nil,
 			},
 		},
 		{
@@ -74,8 +85,9 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			ce := env.callEngine()
 
 			ir := &wazeroir.CompilationResult{
-				HasMemory: tc.moduleInstance.Memory != nil,
-				HasTable:  tc.moduleInstance.Table != nil,
+				HasMemory:                  tc.moduleInstance.Memory != nil,
+				HasTable:                   tc.moduleInstance.Table != nil,
+				NeedsAccessToDataInstances: len(tc.moduleInstance.DataInstances) > 0,
 			}
 			for _, g := range tc.moduleInstance.Globals {
 				ir.Globals = append(ir.Globals, g.Type)
@@ -118,6 +130,12 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.TypeIDs[0])), ce.moduleContext.typeIDsElement0Address)
+			}
+
+			if len(tc.moduleInstance.DataInstances) > 0 {
+				dataInstancesHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.DataInstances))
+				require.Equal(t, dataInstancesHeader.Data, ce.moduleContext.dataInstancesElement0Address)
+				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.DataInstances[0])), ce.moduleContext.dataInstancesElement0Address)
 			}
 
 			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.codesElement0Address)

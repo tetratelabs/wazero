@@ -9,19 +9,50 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+// dataSegmentPrefix represents three types of data segments.
+//
+// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
+type dataSegmentPrefix = byte
+
+const (
+	// dataSegmentPrefixActive is the prefix for the version 1.0 compatible data segment, which is classified as "active" in 2.0.
+	dataSegmentPrefixActive dataSegmentPrefix = 0x0
+	// dataSegmentPrefixPassive prefixes the "passive" data segment as in version 2.0 specification.
+	dataSegmentPrefixPassive dataSegmentPrefix = 0x1
+	// dataSegmentPrefixActiveWithMemoryIndex is the active prefix with memory index encoded which is defined for futur use as of 2.0.
+	dataSegmentPrefixActiveWithMemoryIndex dataSegmentPrefix = 0x2
+)
+
 func decodeDataSegment(r *bytes.Reader) (*wasm.DataSegment, error) {
-	d, _, err := leb128.DecodeUint32(r)
+	dataSegmentPrefx, err := r.ReadByte()
 	if err != nil {
-		return nil, fmt.Errorf("read memory index: %v", err)
+		return nil, fmt.Errorf("read data segment prefix: %w", err)
 	}
 
-	if d != 0 {
-		return nil, fmt.Errorf("invalid memory index: %d", d)
-	}
+	var expr *wasm.ConstantExpression
+	switch dataSegmentPrefx {
+	case dataSegmentPrefixActive,
+		dataSegmentPrefixActiveWithMemoryIndex:
+		// Active data segment as in
+		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
+		if dataSegmentPrefx == 0x2 {
+			d, _, err := leb128.DecodeUint32(r)
+			if err != nil {
+				return nil, fmt.Errorf("read memory index: %v", err)
+			} else if d != 0 {
+				return nil, fmt.Errorf("memory index must be zero but was %d", d)
+			}
+		}
 
-	expr, err := decodeConstantExpression(r)
-	if err != nil {
-		return nil, fmt.Errorf("read offset expression: %v", err)
+		expr, err = decodeConstantExpression(r)
+		if err != nil {
+			return nil, fmt.Errorf("read offset expression: %v", err)
+		}
+	case dataSegmentPrefixPassive:
+		// Passive data segment doesn't need const expr nor memory index encoded.
+		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
+	default:
+		return nil, fmt.Errorf("invalid data segment prefix: 0x%x", dataSegmentPrefx)
 	}
 
 	vs, _, err := leb128.DecodeUint32(r)

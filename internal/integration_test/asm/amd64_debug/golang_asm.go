@@ -416,6 +416,7 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_amd64.LEAQ:      x86.ALEAQ,
 	asm_amd64.LZCNTL:    x86.ALZCNTL,
 	asm_amd64.LZCNTQ:    x86.ALZCNTQ,
+	asm_amd64.NEGQ:      x86.ANEGQ,
 	asm_amd64.MAXSD:     x86.AMAXSD,
 	asm_amd64.MAXSS:     x86.AMAXSS,
 	asm_amd64.MINSD:     x86.AMINSD,

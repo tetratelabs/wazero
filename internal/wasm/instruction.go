@@ -275,7 +275,7 @@ const (
 	OpcodeMiscI64TruncSatF64U OpcodeMisc = 0x07
 
 	// Below are toggled with FeatureBulkMemoryOperations.
-	// https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 
 	OpcodeMiscMemoryInit OpcodeMisc = 0x08
 	OpcodeMiscDataDrop   OpcodeMisc = 0x09

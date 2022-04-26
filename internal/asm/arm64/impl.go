@@ -609,7 +609,7 @@ func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 	switch n.Instruction {
-	case B, BEQ, BGE, BGT, BHI, BHS, BLE, BLO, BLS, BLT, BMI, BNE, BVS:
+	case B, BEQ, BGE, BGT, BHI, BHS, BLE, BLO, BLS, BLT, BMI, BNE, BVS, BPL:
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -649,6 +649,8 @@ func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 			condBits = 0b1011
 		case BMI:
 			condBits = 0b0100
+		case BPL:
+			condBits = 0b0101
 		case BNE:
 			condBits = 0b0001
 		case BVS:
@@ -1866,12 +1868,16 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 	}
 
 	switch inst := n.Instruction; inst {
-	case ADD, SUB, SUBS:
-		var sfops byte = 0b100 // ADD
-		if inst == SUB {
-			sfops = 0b110 // SUB
+	case ADD, ADDS, SUB, SUBS:
+		var sfops byte
+		if inst == ADD {
+			sfops = 0b100
+		} else if inst == ADDS {
+			sfops = 0b101
+		} else if inst == SUB {
+			sfops = 0b110
 		} else if inst == SUBS {
-			sfops = 0b111 // SUBS
+			sfops = 0b111
 		}
 
 		if c == 0 {
@@ -1941,7 +1947,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		}
 
 		// If the value fits within 24-bit, then we emit two add instructions
-		if 0 <= c && c <= 0xffffff && inst != SUBS {
+		if 0 <= c && c <= 0xffffff && inst != SUBS && inst != ADDS {
 			// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3849-L3862
 			a.Buf.Write([]byte{
 				(dstRegBits << 5) | dstRegBits,

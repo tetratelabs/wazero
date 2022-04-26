@@ -53,6 +53,41 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI64TruncSatF64U},
 			exp:  signature_F64_I64,
 		},
+		{
+			name: "memory.init",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryInit},
+			exp:  signature_I32I32I32_None,
+		},
+		{
+			name: "data.drop",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscDataDrop},
+			exp:  signature_None_None,
+		},
+		{
+			name: "memory.copy",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryCopy},
+			exp:  signature_I32I32I32_None,
+		},
+		{
+			name: "memory.fill",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryFill},
+			exp:  signature_I32I32I32_None,
+		},
+		{
+			name: "table.init",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableInit},
+			exp:  signature_I32I32I32_None,
+		},
+		{
+			name: "elem.drop",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscElemDrop},
+			exp:  signature_None_None,
+		},
+		{
+			name: "table.copy",
+			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableCopy},
+			exp:  signature_I32I32I32_None,
+		},
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {

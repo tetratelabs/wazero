@@ -7,8 +7,8 @@ TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-24
         MOVD ce+8(FP),R0
         // In arm64, return address is stored in R30 after jumping into the code.
         // We save the return address value into archContext.jitReturnAddress in Engine.
-        // Note that the const 128 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
-        MOVD R30,128(R0)
+        // Note that the const 136 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
+        MOVD R30,136(R0)
         // Load the address of *wasm.ModuleInstance into arm64CallingConventionModuleInstanceAddressRegister.
         MOVD moduleInstanceAddress+16(FP),R29
         // Load the address of native code.

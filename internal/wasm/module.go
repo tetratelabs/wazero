@@ -168,7 +168,7 @@ type Module struct {
 	//
 	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations.
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	DataCountSection *uint32
 
 	// ID is the sha256 value of the source code (text/binary) and is used for caching.
@@ -350,8 +350,10 @@ func (m *Module) validateMemory(memory *Memory, globals []*GlobalType) error {
 	}
 
 	for _, d := range m.DataSection {
-		if err := validateConstExpression(globals, d.OffsetExpression, ValueTypeI32); err != nil {
-			return fmt.Errorf("calculate offset: %w", err)
+		if !d.IsPassive() {
+			if err := validateConstExpression(globals, d.OffsetExpression, ValueTypeI32); err != nil {
+				return fmt.Errorf("calculate offset: %w", err)
+			}
 		}
 	}
 	return nil
@@ -700,6 +702,15 @@ type DataSegment struct {
 	Init             []byte
 }
 
+// IsPassive returns true if this data segment is "passive" in the sense that memory offset and
+// index is determined at runtime and used by OpcodeMemoryInitName instruction in the bulk memory
+// operations proposal.
+//
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
+func (d *DataSegment) IsPassive() bool {
+	return d.OffsetExpression == nil
+}
+
 // NameSection represent the known custom name subsections defined in the WebAssembly Binary Format
 //
 // Note: This can be nil if no names were decoded for any reason including configuration.
@@ -823,7 +834,7 @@ const (
 	// SectionIDDataCount may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations enabled.
 	//
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	SectionIDDataCount
 )
 

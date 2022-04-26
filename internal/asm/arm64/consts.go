@@ -346,6 +346,7 @@ const (
 	NOP asm.Instruction = iota
 	RET
 	ADD
+	ADDS
 	ADDW
 	ADR
 	AND
@@ -363,6 +364,7 @@ const (
 	BLS
 	BLT
 	BMI
+	BPL
 	BNE
 	BVS
 	CLZ
@@ -472,6 +474,8 @@ func InstructionName(i asm.Instruction) string {
 		return "RET"
 	case ADD:
 		return "ADD"
+	case ADDS:
+		return "ADDS"
 	case ADDW:
 		return "ADDW"
 	case ADR:
@@ -506,6 +510,8 @@ func InstructionName(i asm.Instruction) string {
 		return "BLT"
 	case BMI:
 		return "BMI"
+	case BPL:
+		return "BPL"
 	case BNE:
 		return "BNE"
 	case BVS:
