@@ -944,7 +944,7 @@ func (o *OperationSignExtend64From32) Kind() OperationKind {
 
 type OperationMemoryInit struct {
 	// DataIndex is the index of the data instance in ModuleInstance.DataInstances
-	// by which this operation inisiates a part of the memory.
+	// by which this operation instantiates a part of the memory.
 	DataIndex uint32
 }
 
