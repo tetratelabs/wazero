@@ -1,7 +1,6 @@
 package arm64debug
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"testing"
@@ -645,6 +644,10 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			consts: consts64,
 		},
 		{
+			inst:   asm_arm64.ADDS,
+			consts: consts64,
+		},
+		{
 			inst:   asm_arm64.SUB,
 			consts: consts64,
 		},
@@ -704,9 +707,6 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 								a := asm_arm64.NewAssemblerImpl(asm_arm64.REG_R27)
 								err = a.EncodeConstToRegister(&asm_arm64.NodeImpl{Instruction: tc.inst, SrcConst: c, DstReg: r})
 								require.NoError(t, err)
-
-								fmt.Println(hex.EncodeToString(expected))
-								fmt.Println(hex.EncodeToString(a.Bytes()))
 
 								actual := a.Bytes()
 								require.Equal(t, expected, actual)
@@ -1072,6 +1072,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	for _, inst := range []asm.Instruction{
 		asm_arm64.B, asm_arm64.BEQ, asm_arm64.BGE, asm_arm64.BGT, asm_arm64.BHI, asm_arm64.BHS,
 		asm_arm64.BLE, asm_arm64.BLO, asm_arm64.BLS, asm_arm64.BLT, asm_arm64.BMI, asm_arm64.BNE, asm_arm64.BVS,
+		asm_arm64.BPL,
 	} {
 		inst := inst
 		t.Run(asm_arm64.InstructionName(inst), func(t *testing.T) {

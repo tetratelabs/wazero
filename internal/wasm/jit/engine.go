@@ -112,6 +112,9 @@ type (
 
 		// typeIDsElement0Address holds the &ModuleInstance.typeIDs[0] as uintptr.
 		typeIDsElement0Address uintptr
+
+		// dataInstancesElement0Address holds the &ModuleInstance.dataIntances[0] as uintptr.
+		dataInstancesElement0Address uintptr
 	}
 
 	// valueStackContext stores the data to access engine.valueStack.
@@ -229,22 +232,23 @@ const (
 	callEngineGlobalContextCallFrameStackPointerOffset         = 32
 
 	// Offsets for callEngine moduleContext.
-	callEngineModuleContextModuleInstanceAddressOffset  = 40
-	callEngineModuleContextGlobalElement0AddressOffset  = 48
-	callEngineModuleContextMemoryElement0AddressOffset  = 56
-	callEngineModuleContextMemorySliceLenOffset         = 64
-	callEngineModuleContextTableElement0AddressOffset   = 72
-	callEngineModuleContextTableSliceLenOffset          = 80
-	callEngineModuleContextCodesElement0AddressOffset   = 88
-	callEngineModuleContextTypeIDsElement0AddressOffset = 96
+	callEngineModuleContextModuleInstanceAddressOffset        = 40
+	callEngineModuleContextGlobalElement0AddressOffset        = 48
+	callEngineModuleContextMemoryElement0AddressOffset        = 56
+	callEngineModuleContextMemorySliceLenOffset               = 64
+	callEngineModuleContextTableElement0AddressOffset         = 72
+	callEngineModuleContextTableSliceLenOffset                = 80
+	callEngineModuleContextCodesElement0AddressOffset         = 88
+	callEngineModuleContextTypeIDsElement0AddressOffset       = 96
+	callEngineModuleContextDataInstancesElement0AddressOffset = 104
 
 	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset     = 104
-	callEngineValueStackContextStackBasePointerOffset = 112
+	callEngineValueStackContextStackPointerOffset     = 112
+	callEngineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextJITCallStatusCodeOffset          = 120
-	callEngineExitContextBuiltinFunctionCallAddressOffset = 124
+	callEngineExitContextJITCallStatusCodeOffset          = 128
+	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -260,11 +264,12 @@ const (
 	functionModuleInstanceAddressOffset = 24
 
 	// Offsets for wasm.ModuleInstance.
-	moduleInstanceGlobalsOffset = 48
-	moduleInstanceMemoryOffset  = 72
-	moduleInstanceTableOffset   = 80
-	moduleInstanceEngineOffset  = 120
-	moduleInstanceTypeIDsOffset = 136
+	moduleInstanceGlobalsOffset       = 48
+	moduleInstanceMemoryOffset        = 72
+	moduleInstanceTableOffset         = 80
+	moduleInstanceEngineOffset        = 120
+	moduleInstanceTypeIDsOffset       = 136
+	moduleInstanceDataInstancesOffset = 160
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -288,7 +293,7 @@ const (
 
 // jitCallStatusCode represents the result of `jitcall`.
 // This is set by the jitted native code.
-type jitCallStatusCode byte
+type jitCallStatusCode uint32
 
 const (
 	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
@@ -943,6 +948,14 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 			err = compiler.compileSignExtend64From16()
 		case *wazeroir.OperationSignExtend64From32:
 			err = compiler.compileSignExtend64From32()
+		case *wazeroir.OperationDataDrop:
+			err = compiler.compileDataDrop(o)
+		case *wazeroir.OperationMemoryInit:
+			err = compiler.compileMemoryInit(o)
+		case *wazeroir.OperationMemoryCopy:
+			err = compiler.compileMemoryCopy()
+		case *wazeroir.OperationMemoryFill:
+			err = compiler.compileMemoryFill()
 		}
 		if err != nil {
 			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)

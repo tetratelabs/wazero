@@ -2,9 +2,11 @@ package jit
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -140,4 +142,297 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestCompiler_compileMemoryCopy(t *testing.T) {
+	const checkCeil = 100
+	for i, tc := range []struct {
+		sourceOffset, destOffset, size uint32
+		requireOutOfBoundsError        bool
+	}{
+		{sourceOffset: 0, destOffset: 0, size: 0},
+		{sourceOffset: 10, destOffset: 5, size: 10},
+		{sourceOffset: 10, destOffset: 9, size: 1},
+		{sourceOffset: 10, destOffset: 9, size: 2},
+		{sourceOffset: 0, destOffset: 10, size: 10},
+		{sourceOffset: 0, destOffset: 5, size: 10},
+		{sourceOffset: 9, destOffset: 10, size: 10},
+		{sourceOffset: 11, destOffset: 13, size: 4},
+		{sourceOffset: 0, destOffset: 10, size: 5},
+		{sourceOffset: 1, destOffset: 10, size: 5},
+		{sourceOffset: 0, destOffset: 10, size: 1},
+		{sourceOffset: 0, destOffset: 10, size: 0},
+		{sourceOffset: 5, destOffset: 10, size: 10},
+		{sourceOffset: 5, destOffset: 10, size: 5},
+		{sourceOffset: 5, destOffset: 10, size: 1},
+		{sourceOffset: 5, destOffset: 10, size: 0},
+		{sourceOffset: 10, destOffset: 0, size: 10},
+		{sourceOffset: 1, destOffset: 0, size: 2},
+		{sourceOffset: 1, destOffset: 0, size: 20},
+		{sourceOffset: 10, destOffset: 0, size: 5},
+		{sourceOffset: 10, destOffset: 0, size: 1},
+		{sourceOffset: 10, destOffset: 0, size: 0},
+		{sourceOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, destOffset: 0, size: 1, requireOutOfBoundsError: true},
+		{sourceOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize + 1, destOffset: 0, size: 0, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, size: 1, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize + 1, size: 0, requireOutOfBoundsError: true},
+		{sourceOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 99, destOffset: 0, size: 100, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 99, size: 100, requireOutOfBoundsError: true},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Compile operands.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			require.NoError(t, err)
+
+			err = compiler.compileMemoryCopy()
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Setup the source memory region.
+			mem := env.memory()
+			for i := 0; i < checkCeil; i++ {
+				mem[i] = byte(i)
+			}
+
+			// Run code.
+			env.exec(code)
+
+			if !tc.requireOutOfBoundsError {
+				exp := make([]byte, checkCeil)
+				for i := 0; i < checkCeil; i++ {
+					exp[i] = byte(i)
+				}
+				copy(exp[tc.destOffset:],
+					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
+
+				// Check the status code and the destination memory region.
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, exp, mem[:checkCeil])
+			} else {
+				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+			}
+		})
+	}
+}
+
+func TestCompiler_compileMemoryFill(t *testing.T) {
+	const checkCeil = 50
+
+	for i, tc := range []struct {
+		v, destOffset           uint32
+		size                    uint32
+		requireOutOfBoundsError bool
+	}{
+		{v: 0, destOffset: 10, size: 10},
+		{v: 0, destOffset: 10, size: 5},
+		{v: 0, destOffset: 10, size: 1},
+		{v: 0, destOffset: 10, size: 0},
+		{v: 5, destOffset: 10, size: 10},
+		{v: 5, destOffset: 10, size: 5},
+		{v: 5, destOffset: 10, size: 1},
+		{v: 5, destOffset: 10, size: 0},
+		{v: 10, destOffset: 0, size: 10},
+		{v: 10, destOffset: 0, size: 5},
+		{v: 10, destOffset: 0, size: 1},
+		{v: 10, destOffset: 0, size: 0},
+		{v: 10, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 99, size: 100, requireOutOfBoundsError: true},
+		{v: 10, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, size: 5, requireOutOfBoundsError: true},
+		{v: 10, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, size: 1, requireOutOfBoundsError: true},
+		{v: 10, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize + 1, size: 0, requireOutOfBoundsError: true},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Compile operands.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.v})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			require.NoError(t, err)
+
+			err = compiler.compileMemoryFill()
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Setup the memory region.
+			mem := env.memory()
+			for i := 0; i < checkCeil; i++ {
+				mem[i] = byte(i)
+			}
+
+			// Run code.
+			env.exec(code)
+
+			if !tc.requireOutOfBoundsError {
+				exp := make([]byte, checkCeil)
+				for i := 0; i < checkCeil; i++ {
+					if i >= int(tc.destOffset) && i < int(tc.destOffset+tc.size) {
+						exp[i] = byte(tc.v)
+					} else {
+						exp[i] = byte(i)
+					}
+				}
+
+				// Check the status code and the destination memory region.
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, exp, mem[:checkCeil])
+			} else {
+				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+			}
+		})
+	}
+}
+
+func TestCompiler_compileDataDrop(t *testing.T) {
+	origins := [][]byte{
+		{1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10},
+	}
+
+	for i := 0; i < len(origins); i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+
+			env.module().DataInstances = make([][]byte, len(origins))
+			copy(env.module().DataInstances, origins)
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				NeedsAccessToDataInstances: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileDataDrop(&wazeroir.OperationDataDrop{
+				DataIndex: uint32(i),
+			})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+			// Check if the target data instance is dropped from the dataInstances slice.
+			for j := 0; j < len(origins); j++ {
+				if i == j {
+					require.Nil(t, env.module().DataInstances[j])
+				} else {
+					require.NotNil(t, env.module().DataInstances[j])
+				}
+			}
+		})
+	}
+}
+
+func TestCompiler_compileMemoryInit(t *testing.T) {
+	dataInstances := [][]byte{
+		nil, {1, 2, 3, 4, 5},
+	}
+
+	for i, tc := range []struct {
+		sourceOffset, destOffset uint32
+		dataIndex                uint32
+		copySize                 uint32
+		expOutOfBounds           bool
+	}{
+		{sourceOffset: 0, destOffset: 0, copySize: 0, dataIndex: 0},
+		{sourceOffset: 0, destOffset: 0, copySize: 1, dataIndex: 0, expOutOfBounds: true},
+		{sourceOffset: 1, destOffset: 0, copySize: 0, dataIndex: 0, expOutOfBounds: true},
+		{sourceOffset: 0, destOffset: 0, copySize: 0, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 5, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 1, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 3, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 1, copySize: 3, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 7, copySize: 4, dataIndex: 1},
+		{sourceOffset: 1, destOffset: 7, copySize: 4, dataIndex: 1},
+		{sourceOffset: 4, destOffset: 7, copySize: 1, dataIndex: 1},
+		{sourceOffset: 5, destOffset: 7, copySize: 0, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 7, copySize: 5, dataIndex: 1},
+		{sourceOffset: 1, destOffset: 0, copySize: 3, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 1, copySize: 4, dataIndex: 1},
+		{sourceOffset: 1, destOffset: 1, copySize: 3, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 10, copySize: 5, dataIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 6, dataIndex: 1, expOutOfBounds: true},
+		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, copySize: 5, dataIndex: 1, expOutOfBounds: true},
+		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 3, copySize: 5, dataIndex: 1, expOutOfBounds: true},
+		{sourceOffset: 6, destOffset: 0, copySize: 0, dataIndex: 1, expOutOfBounds: true},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+			env.module().DataInstances = dataInstances
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				NeedsAccessToDataInstances: true, HasMemory: true,
+				Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Compile operands.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.copySize})
+			require.NoError(t, err)
+
+			err = compiler.compileMemoryInit(&wazeroir.OperationMemoryInit{
+				DataIndex: tc.dataIndex,
+			})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			if !tc.expOutOfBounds {
+				mem := env.memory()
+				exp := make([]byte, defaultMemoryPageNumInTest*wasm.MemoryPageSize)
+				if dataInst := dataInstances[tc.dataIndex]; dataInst != nil {
+					copy(exp[tc.destOffset:], dataInst[tc.sourceOffset:tc.sourceOffset+tc.copySize])
+				}
+				require.Equal(t, exp[:20], mem[:20])
+			} else {
+				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+			}
+		})
+	}
 }

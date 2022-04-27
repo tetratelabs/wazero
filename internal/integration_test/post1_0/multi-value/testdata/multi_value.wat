@@ -8,7 +8,7 @@
 ;;      --disable-simd \
 ;;      --disable-bulk-memory  \
 ;;      --disable-reference-types  \
-;;      --debug-names multi_value.wat
+;;      multi_value.wat
 ;;
 ;; See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 (module $multi-value

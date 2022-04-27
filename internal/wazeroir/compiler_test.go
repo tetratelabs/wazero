@@ -150,54 +150,73 @@ func TestCompile_Block(t *testing.T) {
 	}
 }
 
-// TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
-func TestCompile_SignExtensionOps(t *testing.T) {
-	module := requireModuleText(t, `(module
-  (func (param i32) (result i32) local.get 0 i32.extend8_s)
-)`)
-
-	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: [$0]
-			&OperationPick{Depth: 0},                                 // [$0, $0]
-			&OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
-			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
-			&OperationBr{Target: &BranchTarget{}},                    // return!
-		},
-		LabelCallers: map[string]uint32{},
-		Signature:    i32_i32,
-		Functions:    []wasm.Index{0},
-		Types:        []*wasm.FunctionType{i32_i32},
-	}
-
-	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
-	require.NoError(t, err)
-	require.Equal(t, expected, res[0])
-}
-
-// TestCompile_NonTrappingFloatToIntConversion picks an arbitrary operator from "nontrapping-float-to-int-conversion".
-func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
-	module := requireModuleText(t, `(module
-  (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
-)`)
-
-	expected := &CompilationResult{
-		Operations: []Operation{ // begin with params: [$0]
-			&OperationPick{Depth: 0}, // [$0, $0]
-			&OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
-				InputType:   Float32,
-				OutputType:  SignedInt32,
-				NonTrapping: true,
+// TestCompile_BulkMemoryOperations uses the example from the "bulk-memory-operations" overview.
+func TestCompile_BulkMemoryOperations(t *testing.T) {
+	// Set manually until the text compiler supports this:
+	// (module
+	//  (memory 1)
+	//  (data (i32.const 0) "hello")   ;; data segment 0, is active so always copied
+	//  (data "goodbye")               ;; data segment 1, is passive
+	//
+	//  (func $start
+	//    ;; copy data segment 1 into memory 0 (the 0 is implicit)
+	//    (memory.init 1
+	//      (i32.const 16)    ;; target offset
+	//      (i32.const 0)     ;; source offset
+	//      (i32.const 7))    ;; length
+	//
+	//    ;; The memory used by this segment is no longer needed, so this segment can
+	//    ;; be dropped.
+	//    (data.drop 1)
+	//  )
+	//  (start $start)
+	// )
+	two := uint32(2)
+	module := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0},
+		MemorySection:   &wasm.Memory{Min: 1},
+		DataSection: []*wasm.DataSegment{
+			{
+				OffsetExpression: &wasm.ConstantExpression{
+					Opcode: wasm.OpcodeI32Const,
+					Data:   []byte{0x00},
+				},
+				Init: []byte("hello"),
 			},
-			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
-			&OperationBr{Target: &BranchTarget{}},                    // return!
+			{
+				OffsetExpression: nil, // passive
+				Init:             []byte("goodbye"),
+			},
 		},
-		LabelCallers: map[string]uint32{},
-		Signature:    f32_i32,
-		Functions:    []wasm.Index{0},
-		Types:        []*wasm.FunctionType{f32_i32},
+		DataCountSection: &two,
+		CodeSection: []*wasm.Code{{Body: []byte{
+			wasm.OpcodeI32Const, 16,
+			wasm.OpcodeI32Const, 0,
+			wasm.OpcodeI32Const, 7,
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryInit, 1, 0, // segment 1, memory 0
+			wasm.OpcodeMiscPrefix, wasm.OpcodeMiscDataDrop, 1,
+			wasm.OpcodeEnd,
+		}}}}
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: []
+			&OperationConstI32{16},                // [16]
+			&OperationConstI32{0},                 // [16, 0]
+			&OperationConstI32{7},                 // [16, 0, 7]
+			&OperationMemoryInit{1},               // []
+			&OperationDataDrop{1},                 // []
+			&OperationBr{Target: &BranchTarget{}}, // return!
+		},
+		HasMemory:                  true,
+		NeedsAccessToDataInstances: true,
+		LabelCallers:               map[string]uint32{},
+		Signature:                  v_v,
+		Functions:                  []wasm.Index{0},
+		Types:                      []*wasm.FunctionType{v_v},
 	}
 
-	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
+	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -475,6 +494,58 @@ func TestCompile_MultiValue(t *testing.T) {
 			require.Equal(t, tc.expected, res[0])
 		})
 	}
+}
+
+// TestCompile_NonTrappingFloatToIntConversion picks an arbitrary operator from "nontrapping-float-to-int-conversion".
+func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
+	module := requireModuleText(t, `(module
+  (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+)`)
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: [$0]
+			&OperationPick{Depth: 0}, // [$0, $0]
+			&OperationITruncFromF{ // [$0, i32.trunc_sat_f32_s($0)]
+				InputType:   Float32,
+				OutputType:  SignedInt32,
+				NonTrapping: true,
+			},
+			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.trunc_sat_f32_s($0)]
+			&OperationBr{Target: &BranchTarget{}},                    // return!
+		},
+		LabelCallers: map[string]uint32{},
+		Signature:    f32_i32,
+		Functions:    []wasm.Index{0},
+		Types:        []*wasm.FunctionType{f32_i32},
+	}
+
+	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
+	require.NoError(t, err)
+	require.Equal(t, expected, res[0])
+}
+
+// TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
+func TestCompile_SignExtensionOps(t *testing.T) {
+	module := requireModuleText(t, `(module
+  (func (param i32) (result i32) local.get 0 i32.extend8_s)
+)`)
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: [$0]
+			&OperationPick{Depth: 0},                                 // [$0, $0]
+			&OperationSignExtend32From8{},                            // [$0, i32.extend8_s($0)]
+			&OperationDrop{Depth: &InclusiveRange{Start: 1, End: 1}}, // [i32.extend8_s($0)]
+			&OperationBr{Target: &BranchTarget{}},                    // return!
+		},
+		LabelCallers: map[string]uint32{},
+		Signature:    i32_i32,
+		Functions:    []wasm.Index{0},
+		Types:        []*wasm.FunctionType{i32_i32},
+	}
+
+	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
+	require.NoError(t, err)
+	require.Equal(t, expected, res[0])
 }
 
 func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expected *CompilationResult, module *wasm.Module) {

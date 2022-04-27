@@ -82,6 +82,40 @@ func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
 	return ret
 }
 
+// WithFeatureBulkMemoryOperations adds instructions modify ranges of memory or table entries
+// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0 (20191205).
+//
+// Here are the notable effects:
+// * Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
+// * Adds `table.fill`, `table.init`, `table.copy` and `elem.drop` instructions.
+// * Introduces a "passive" form of element and data segments.
+// * Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+//
+// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
+// due to the WebAssembly Working Group merging them "mutually dependent".
+// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+// See https://github.com/WebAssembly/spec/pull/1287
+func (c *RuntimeConfig) WithFeatureBulkMemoryOperations(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
+	return ret
+}
+
+// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not finished
+// in WebAssembly 1.0 (20191205).
+//
+// Here are the notable effects:
+// * Function (`func`) types allow more than one result
+// * Block types (`block`, `loop` and `if`) can be arbitrary function types
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
+	return ret
+}
+
 // WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
 // WebAssembly 1.0 (20191205).
 //
@@ -90,33 +124,6 @@ func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
 func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
-	return ret
-}
-
-// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
-// feature was not in WebAssembly 1.0 (20191205).
-//
-// This has the following effects:
-// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
-//
-// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
-	return ret
-}
-
-// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not finished
-// in WebAssembly 1.0 (20191205).
-//
-// This has the following effects:
-// * Function (`func`) types allow more than one result
-// * Block types (`block`, `loop` and `if`) can be arbitrary function types
-//
-// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
-func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
 	return ret
 }
 
@@ -137,6 +144,19 @@ func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
 func (c *RuntimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) *RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
+	return ret
+}
+
+// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
+// feature was not in WebAssembly 1.0 (20191205).
+//
+// Here are the notable effects:
+// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
 	return ret
 }
 

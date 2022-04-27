@@ -27,6 +27,24 @@ func TestRuntimeConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "bulk-memory-operations",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureBulkMemoryOperations(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: wasm.FeatureBulkMemoryOperations,
+			},
+		},
+		{
+			name: "multi-value",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureMultiValue(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: wasm.FeatureMultiValue,
+			},
+		},
+		{
 			name: "mutable-global",
 			with: func(c *RuntimeConfig) *RuntimeConfig {
 				return c.WithFeatureMutableGlobal(true)
@@ -36,21 +54,21 @@ func TestRuntimeConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "sign-extension-ops",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
-				return c.WithFeatureSignExtensionOps(true)
-			},
-			expected: &RuntimeConfig{
-				enabledFeatures: wasm.FeatureSignExtensionOps,
-			},
-		},
-		{
 			name: "nontrapping-float-to-int-conversion",
 			with: func(c *RuntimeConfig) *RuntimeConfig {
 				return c.WithFeatureNonTrappingFloatToIntConversion(true)
 			},
 			expected: &RuntimeConfig{
 				enabledFeatures: wasm.FeatureNonTrappingFloatToIntConversion,
+			},
+		},
+		{
+			name: "sign-extension-ops",
+			with: func(c *RuntimeConfig) *RuntimeConfig {
+				return c.WithFeatureSignExtensionOps(true)
+			},
+			expected: &RuntimeConfig{
+				enabledFeatures: wasm.FeatureSignExtensionOps,
 			},
 		},
 	}
@@ -75,6 +93,22 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 		setFeature    func(*RuntimeConfig, bool) *RuntimeConfig
 	}{
 		{
+			name:          "bulk-memory-operations",
+			feature:       wasm.FeatureBulkMemoryOperations,
+			expectDefault: false,
+			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+				return c.WithFeatureBulkMemoryOperations(v)
+			},
+		},
+		{
+			name:          "multi-value",
+			feature:       wasm.FeatureMultiValue,
+			expectDefault: false,
+			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+				return c.WithFeatureMultiValue(v)
+			},
+		},
+		{
 			name:          "mutable-global",
 			feature:       wasm.FeatureMutableGlobal,
 			expectDefault: true,
@@ -83,19 +117,19 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			},
 		},
 		{
-			name:          "sign-extension-ops",
-			feature:       wasm.FeatureSignExtensionOps,
-			expectDefault: false,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
-				return c.WithFeatureSignExtensionOps(v)
-			},
-		},
-		{
 			name:          "nontrapping-float-to-int-conversion",
 			feature:       wasm.FeatureNonTrappingFloatToIntConversion,
 			expectDefault: false,
 			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
 				return c.WithFeatureNonTrappingFloatToIntConversion(v)
+			},
+		},
+		{
+			name:          "sign-extension-ops",
+			feature:       wasm.FeatureSignExtensionOps,
+			expectDefault: false,
+			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+				return c.WithFeatureSignExtensionOps(v)
 			},
 		},
 	}

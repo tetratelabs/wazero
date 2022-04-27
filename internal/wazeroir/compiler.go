@@ -179,6 +179,8 @@ type CompilationResult struct {
 	HasMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
+	// NeedsAccessToDataInstances is true if the function needs access to data instances via memory.init or data.drop instructions.
+	NeedsAccessToDataInstances bool
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
@@ -1490,6 +1492,77 @@ operatorSwitch:
 		case wasm.OpcodeMiscI64TruncSatF64U:
 			c.emit(
 				&OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
+			)
+		case wasm.OpcodeMiscMemoryInit:
+			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num + 1 // +1 to skip the memory index which is fixed to zero.
+			c.emit(
+				&OperationMemoryInit{DataIndex: dataIndex},
+			)
+			c.result.NeedsAccessToDataInstances = true
+		case wasm.OpcodeMiscDataDrop:
+			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationDataDrop{DataIndex: dataIndex},
+			)
+			c.result.NeedsAccessToDataInstances = true
+		case wasm.OpcodeMiscMemoryCopy:
+			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
+			c.emit(
+				&OperationMemoryCopy{},
+			)
+		case wasm.OpcodeMiscMemoryFill:
+			c.pc += 1 // +1 to skip the memory index which is fixed to zero.
+			c.emit(
+				&OperationMemoryFill{},
+			)
+		case wasm.OpcodeMiscTableInit:
+			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationTableInit{ElemIndex: elemIndex},
+			)
+		case wasm.OpcodeMiscElemDrop:
+			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			// Read the table index which is not used for now (until reference type proposal impl.)
+			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationElemDrop{ElemIndex: elemIndex},
+			)
+		case wasm.OpcodeMiscTableCopy:
+			// Read the source table index which is not used for now (until reference type proposal impl.)
+			_, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			// Read the destination table index which is not used for now (until reference type proposal impl.)
+			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationTableCopy{},
 			)
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)

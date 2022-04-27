@@ -746,6 +746,14 @@ func (a *AssemblerImpl) EncodeNoneToRegister(n *NodeImpl) (err error) {
 		// JMP's Opcode is defined as "FF /4" meaning that we have to have "4"
 		// in 4-6th bits in the ModRM byte. https://www.felixcloutier.com/x86/jmp
 		modRM |= 0b00_100_000
+	} else if n.Instruction == NEGQ {
+		prefix |= RexPrefixW
+		modRM |= 0b00_011_000
+	} else if n.Instruction == INCQ {
+		prefix |= RexPrefixW
+	} else if n.Instruction == DECQ {
+		prefix |= RexPrefixW
+		modRM |= 0b00_001_000
 	} else {
 		if REG_SP <= n.DstReg && n.DstReg <= REG_DI {
 			// If the destination is one byte length register, we need to have the default prefix.
@@ -801,6 +809,15 @@ func (a *AssemblerImpl) EncodeNoneToRegister(n *NodeImpl) (err error) {
 	case SETPS:
 		// https://www.felixcloutier.com/x86/setcc
 		_, err = a.Buf.Write([]byte{0x0f, 0x9a, modRM})
+	case NEGQ:
+		// https://www.felixcloutier.com/x86/neg
+		_, err = a.Buf.Write([]byte{0xf7, modRM})
+	case INCQ:
+		// https://www.felixcloutier.com/x86/inc
+		_, err = a.Buf.Write([]byte{0xff, modRM})
+	case DECQ:
+		// https://www.felixcloutier.com/x86/dec
+		_, err = a.Buf.Write([]byte{0xff, modRM})
 	default:
 		err = errorEncodingUnsupported(n)
 	}
@@ -1298,6 +1315,10 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 	case MOVB:
 		// https://www.felixcloutier.com/x86/mov
 		opcode = []byte{0x88}
+		// 1 byte register operands need default prefix for the following registers.
+		if n.SrcReg >= REG_SP && n.SrcReg <= REG_DI {
+			rexPrefix |= RexPrefixDefault
+		}
 	case MOVL:
 		if IsFloatRegister(n.SrcReg) {
 			// https://www.felixcloutier.com/x86/movd:movq

@@ -275,7 +275,9 @@ const (
 	OpcodeMiscI64TruncSatF64U OpcodeMisc = 0x07
 
 	// Below are toggled with FeatureBulkMemoryOperations.
-	// https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// Opcodes are those new in document/core/appendix/index-instructions.rst (the commit that merged the feature).
+	// See https://github.com/WebAssembly/spec/commit/7fa2f20a6df4cf1c114582c8cb60f5bfcdbf1be1
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 
 	OpcodeMiscMemoryInit OpcodeMisc = 0x08
 	OpcodeMiscDataDrop   OpcodeMisc = 0x09
@@ -284,6 +286,9 @@ const (
 	OpcodeMiscTableInit  OpcodeMisc = 0x0c
 	OpcodeMiscElemDrop   OpcodeMisc = 0x0d
 	OpcodeMiscTableCopy  OpcodeMisc = 0x0e
+	OpcodeMiscTableGrow  OpcodeMisc = 0x0f
+	OpcodeMiscTableSize  OpcodeMisc = 0x10
+	OpcodeMiscTableFill  OpcodeMisc = 0x11
 )
 
 const (
@@ -678,6 +683,9 @@ const (
 	OpcodeTableInitName  = "table.init"
 	OpcodeElemDropName   = "elem.drop"
 	OpcodeTableCopyName  = "table.copy"
+	OpcodeTableGrowName  = "table.grow"
+	OpcodeTableSizeName  = "table.size"
+	OpcodeTableFillName  = "table.fill"
 )
 
 var miscInstructionNames = [256]string{
@@ -697,6 +705,9 @@ var miscInstructionNames = [256]string{
 	OpcodeMiscTableInit:  OpcodeTableInitName,
 	OpcodeMiscElemDrop:   OpcodeElemDropName,
 	OpcodeMiscTableCopy:  OpcodeTableCopyName,
+	OpcodeMiscTableGrow:  OpcodeTableGrowName,
+	OpcodeMiscTableSize:  OpcodeTableSizeName,
+	OpcodeMiscTableFill:  OpcodeTableFillName,
 }
 
 // MiscInstructionName returns the instruction corresponding to this miscellaneous Opcode.

@@ -7,7 +7,7 @@
 ;;      --disable-simd \
 ;;      --disable-bulk-memory  \
 ;;      --disable-reference-types  \
-;;      --debug-names br.wat
+;;      br.wat
 ;;
 ;; See https://github.com/WebAssembly/spec/commit/484180ba3d9d7638ba1cb400b699ffede796927c
 (module $br.wast

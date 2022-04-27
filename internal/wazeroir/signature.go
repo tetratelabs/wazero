@@ -136,6 +136,9 @@ var (
 		in:  []UnsignedType{UnsignedTypeF64, UnsignedTypeF64},
 		out: []UnsignedType{UnsignedTypeF64},
 	}
+	signature_I32I32I32_None = &signature{
+		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI32, UnsignedTypeI32},
+	}
 	signature_UnknownUnknownI32_Unknown = &signature{
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeUnknown},
@@ -360,6 +363,11 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 			return signature_F32_I64, nil
 		case wasm.OpcodeMiscI64TruncSatF64S, wasm.OpcodeMiscI64TruncSatF64U:
 			return signature_F64_I64, nil
+		case wasm.OpcodeMiscMemoryInit, wasm.OpcodeMiscMemoryCopy, wasm.OpcodeMiscMemoryFill,
+			wasm.OpcodeMiscTableInit, wasm.OpcodeMiscTableCopy:
+			return signature_I32I32I32_None, nil
+		case wasm.OpcodeMiscDataDrop, wasm.OpcodeMiscElemDrop:
+			return signature_None_None, nil
 		default:
 			return nil, fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}

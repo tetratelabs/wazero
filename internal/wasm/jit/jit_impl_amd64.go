@@ -3257,7 +3257,8 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	}
 
 	// Now we compare the value with the memory length which is held by callEngine.
-	c.assembler.CompileMemoryToRegister(amd64.CMPQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, result)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, result)
 
 	// Jump if the value is within the memory length.
 	okJmp := c.assembler.CompileJump(amd64.JCC)
@@ -3354,6 +3355,305 @@ func (c *amd64Compiler) compileMemorySize() error {
 	// That is equivalent to divide the len of memory slice by 65536 and
 	// that can be calculated as SHR by 16 bits as 65536 = 2^16.
 	c.assembler.CompileConstToRegister(amd64.SHRQ, wasm.MemoryPageSizeInBits, loc.register)
+	return nil
+}
+
+// compileMemoryInit implements compiler.compileMemoryInit for the amd64 architecture.
+func (c *amd64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error {
+	copySize := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+		return err
+	}
+
+	sourceOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(sourceOffset); err != nil {
+		return err
+	}
+
+	destinationOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+		return err
+	}
+
+	dataInstanceAddr, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	c.locationStack.markRegisterUsed(dataInstanceAddr)
+	c.compileLoadDataInstanceAddress(o.DataIndex, dataInstanceAddr)
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	c.locationStack.markRegisterUsed(tmp)
+
+	// sourceOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, sourceOffset.register)
+	// destinationOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
+
+	// Check data instance bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		dataInstanceAddr, 8, // DataInstance is []byte therefore the length is stored at offset 8.
+		sourceOffset.register)
+	sourceBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.assembler.SetJumpTargetOnNext(sourceBoundOKJump)
+
+	// Check destination memory bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+		destinationOffset.register)
+	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
+
+	// Otherwise, ready to copy the value from source to destination.
+	//
+	// If the copy size equal zero, we skip the entire instructions below.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	skipJump := c.assembler.CompileJump(amd64.JEQ)
+
+	// destinationOffset += memory buffer's absolute address.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+
+	// sourceOffset += data buffer's absolute address.
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ, dataInstanceAddr, 0, sourceOffset.register)
+
+	// Negate the counter.
+	c.assembler.CompileNoneToRegister(amd64.NEGQ, copySize.register)
+
+	beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
+
+	c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVBQZX,
+		sourceOffset.register, 0, copySize.register, 1,
+		tmp)
+	// [destinationOffset + (size.register)] = tmp.
+	c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVB,
+		tmp,
+		destinationOffset.register, 0, copySize.register, 1,
+	)
+
+	// size += 1
+	c.assembler.CompileNoneToRegister(amd64.INCQ, copySize.register)
+	c.assembler.CompileJump(amd64.JMI).AssignJumpTarget(beginCopyLoop)
+
+	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
+		destinationOffset.register, dataInstanceAddr, tmp)
+	c.assembler.SetJumpTargetOnNext(skipJump)
+	return nil
+}
+
+// compileDataDrop implements compiler.compileDataDrop for the amd64 architecture.
+func (c *amd64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	c.compileLoadDataInstanceAddress(o.DataIndex, tmp)
+
+	// Clears the content of DataInstance[o.DataIndex] (== []byte type).
+	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 0)
+	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 8)
+	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 16)
+	return nil
+}
+
+func (c *amd64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm.Register) {
+	// dst = dataIndex * 24
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(dataIndex)*24, dst)
+
+	// dst = &moduleInstance.DataInstances[0] + dst
+	//     = &moduleInstance.DataInstances[0] + dataIndex*24
+	//     = &moduleInstance.DataInstances[dataIndex]
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextDataInstancesElement0AddressOffset,
+		dst,
+	)
+}
+
+// compileMemoryCopy implements compiler.compileMemoryCopy for the amd64 architecture.
+//
+// TODO: the compiled code in this function should be reused and compile at once as
+// the code is independent of any module.
+func (c *amd64Compiler) compileMemoryCopy() error {
+	copySize := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+		return err
+	}
+
+	sourceOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(sourceOffset); err != nil {
+		return err
+	}
+
+	destinationOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// sourceOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, sourceOffset.register)
+	// destinationOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
+
+	// Check source memory bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+		sourceOffset.register)
+	sourceBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.assembler.SetJumpTargetOnNext(sourceBoundOKJump)
+
+	// Check destination memory bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+		destinationOffset.register)
+	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
+
+	// Otherwise, ready to copy the value from source to destination.
+	//
+	// If the copy size equal zero, we skip the entire instructions below.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	skipJump := c.assembler.CompileJump(amd64.JEQ)
+
+	// destinationOffset += memory buffer's absolute address.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+	// sourceOffset += memory buffer's absolute address.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, sourceOffset.register)
+
+	// If source offet < destination offset: for (i = size-1; i >= 0; i--) dst[i] = src[i];
+
+	c.assembler.CompileRegisterToRegister(amd64.CMPQ, destinationOffset.register, sourceOffset.register)
+	destLowerThanSourceJump := c.assembler.CompileJump(amd64.JLS)
+
+	// If source offet < destination offset: for (i = size-1; i >= 0; i--) dst[i] = src[i];
+	var endJump asm.Node
+	{
+		// sourceOffset -= size.
+		c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, sourceOffset.register)
+		// destinationOffset -= size.
+		c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, destinationOffset.register)
+
+		beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
+
+		// size -= 1
+		c.assembler.CompileNoneToRegister(amd64.DECQ, copySize.register)
+
+		c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVBQZX,
+			sourceOffset.register, 0, copySize.register, 1,
+			tmp)
+		c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVB,
+			tmp,
+			destinationOffset.register, 0, copySize.register, 1,
+		)
+
+		c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+		c.assembler.CompileJump(amd64.JNE).AssignJumpTarget(beginCopyLoop)
+
+		endJump = c.assembler.CompileJump(amd64.JMP)
+	}
+
+	// Else (destination offet < source offset): for (i = 0; i < size; i++) dst[counter-1-i] = src[counter-1-i];
+	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
+	{
+		// Negate the counter.
+		c.assembler.CompileNoneToRegister(amd64.NEGQ, copySize.register)
+
+		beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
+
+		c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVBQZX,
+			sourceOffset.register, 0, copySize.register, 1,
+			tmp)
+		c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVB,
+			tmp,
+			destinationOffset.register, 0, copySize.register, 1,
+		)
+
+		// size += 1
+		c.assembler.CompileNoneToRegister(amd64.INCQ, copySize.register)
+		c.assembler.CompileJump(amd64.JMI).AssignJumpTarget(beginCopyLoop)
+	}
+
+	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
+		destinationOffset.register, tmp)
+	c.assembler.SetJumpTargetOnNext(skipJump, endJump)
+	return nil
+}
+
+// compileMemoryFill implements compiler.compileMemoryFill for the amd64 architecture.
+//
+// TODO: the compiled code in this function should be reused and compile at once as
+// the code is independent of any module.
+func (c *amd64Compiler) compileMemoryFill() error {
+	copySize := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+		return err
+	}
+
+	value := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(value); err != nil {
+		return err
+	}
+
+	destinationOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	c.locationStack.markRegisterUsed(tmp)
+
+	// destinationOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
+
+	// Check destination memory bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+		destinationOffset.register)
+	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
+
+	// Otherwise, ready to copy the value from source to destination.
+	//
+	// If the copy size equal zero, we skip the entire instructions below.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	skipJump := c.assembler.CompileJump(amd64.JEQ)
+
+	// destinationOffset += memory buffer's absolute address.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+
+	// Negate the counter.
+	c.assembler.CompileNoneToRegister(amd64.NEGQ, copySize.register)
+
+	beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
+
+	// [destinationOffset + (size.register)] = tmp.
+	c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVB,
+		value.register,
+		destinationOffset.register, 0, copySize.register, 1,
+	)
+
+	// size += 1
+	c.assembler.CompileNoneToRegister(amd64.INCQ, copySize.register)
+	c.assembler.CompileJump(amd64.JMI).AssignJumpTarget(beginCopyLoop)
+
+	c.locationStack.markRegisterUnused(copySize.register, value.register,
+		destinationOffset.register, tmp)
+	c.assembler.SetJumpTargetOnNext(skipJump)
 	return nil
 }
 
@@ -4072,6 +4372,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// * callEngine.moduleContext.memorySliceLen
 	// * callEngine.moduleContext.codesElement0Address
 	// * callEngine.moduleContext.typeIDsElement0Address
+	// * callEngine.moduleContext.dataInstancesElement0Address
 
 	// Update globalElement0Address.
 	//
@@ -4154,6 +4455,22 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 
 		// "callEngine.moduleContext.codesElement0Address = tmpRegister".
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset)
+	}
+
+	// Update dataInstancesElement0Address.
+	if c.ir.NeedsAccessToDataInstances {
+		// "tmpRegister = &moduleInstance.DataInstances[0]"
+		c.assembler.CompileMemoryToRegister(
+			amd64.MOVQ,
+			amd64CallingConventionModuleInstanceAddressRegister, moduleInstanceDataInstancesOffset,
+			tmpRegister,
+		)
+		// "callEngine.moduleContext.dataInstancesElement0Address = tmpRegister".
+		c.assembler.CompileRegisterToMemory(
+			amd64.MOVQ,
+			tmpRegister,
+			amd64ReservedRegisterForCallEngine, callEngineModuleContextDataInstancesElement0AddressOffset,
+		)
 	}
 
 	c.locationStack.markRegisterUnused(regs...)

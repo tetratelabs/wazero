@@ -38,6 +38,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextCodesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
@@ -71,6 +72,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.DataInstances)), moduleInstanceDataInstancesOffset)
 
 	var functionInstance wasm.FunctionInstance
 	require.Equal(t, int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset)
