@@ -31,6 +31,9 @@ const (
 	// * [ OpcodeMiscPrefix, OpcodeMiscTableInit]
 	// * [ OpcodeMiscPrefix, OpcodeMiscElemDrop]
 	// * [ OpcodeMiscPrefix, OpcodeMiscTableCopy]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableGrow]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableSize]
+	// * [ OpcodeMiscPrefix, OpcodeMiscTableFill]
 	//
 	// Also, if the parsing should succeed with the presence of SectionIDDataCount.
 	//
