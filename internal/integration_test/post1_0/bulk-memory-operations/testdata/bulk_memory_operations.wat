@@ -30,4 +30,5 @@
       ;; be dropped.
       (data.drop 1))
   )
+  (start $start)
 )

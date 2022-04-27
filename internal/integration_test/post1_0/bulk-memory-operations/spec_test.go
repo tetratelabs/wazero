@@ -78,8 +78,7 @@ func testBulkMemoryOperations(t *testing.T, newRuntimeConfig func() *wazero.Runt
 			// As the value of the global was one, we expect "memory.init" to have copied the passive segment.
 			bytes, ok = mod.Memory().Read(testCtx, 16, 7)
 			require.True(t, ok)
-			// TODO: require.Equal(t, "goodbye", string(bytes))
-			require.Equal(t, make([]byte, 7), bytes)
+			require.Equal(t, "goodbye", string(bytes))
 		})
 	})
 }
