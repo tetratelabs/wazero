@@ -338,37 +338,37 @@ type compiler interface {
 	// See wasm.OpcodeI64Extend32S
 	compileSignExtend64From32() error
 	// compileMemoryInit adds instructions to perform operations corresponding to the wasm.OpcodeMemoryInitName instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileMemoryInit(*wazeroir.OperationMemoryInit) error
 	// compileDataDrop adds instructions to perform operations corresponding to the wasm.OpcodeDataDropName instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileDataDrop(*wazeroir.OperationDataDrop) error
 	// compileMemoryCopy adds instructions to perform operations corresponding to the wasm.OpcodeMemoryCopylName instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileMemoryCopy() error
 	// compileMemoryCopy adds instructions to perform operations corresponding to the wasm.OpcodeMemoryFillName instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileMemoryFill() error
 	// compileTableInit adds instructions to perform operations corresponding to the wasm.OpcodeTableInit instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileTableInit(*wazeroir.OperationTableInit) error
 	// compileTableCopy adds instructions to perform operations corresponding to the wasm.OpcodeTableCopy instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileTableCopy(*wazeroir.OperationTableCopy) error
 	// compileElemDrop adds instructions to perform operations corresponding to the wasm.OpcodeElemDrop instruction in
-	// FeatureBulkMemoryOperations.
+	// wasm.FeatureBulkMemoryOperations.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileElemDrop(*wazeroir.OperationElemDrop) error
