@@ -513,8 +513,8 @@ func (me *moduleEngine) Name() string {
 	return me.name
 }
 
-// CreateFuncElementInstnace implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) CreateFuncElementInstnace(indexes []*wasm.Index) *wasm.ElementInstance {
+// CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
+func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.ElementInstance {
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {

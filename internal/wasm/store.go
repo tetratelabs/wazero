@@ -203,7 +203,7 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 	m.ElementInstances = make([]ElementInstance, len(elements))
 	for i, elm := range elements {
 		if elm.Type == RefTypeFuncref {
-			m.ElementInstances[i] = *m.Engine.CreateFuncElementInstnace(elm.Init)
+			m.ElementInstances[i] = *m.Engine.CreateFuncElementInstance(elm.Init)
 		}
 	}
 }

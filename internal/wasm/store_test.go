@@ -394,8 +394,8 @@ func (e *mockEngine) DeleteCompiledModule(*Module) {}
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *mockEngine) CompileModule(_ context.Context, _ *Module) error { return nil }
 
-// CreateFuncElementInstnace implements the same method as documented on wasm.ModuleEngine.
-func (me *mockModuleEngine) CreateFuncElementInstnace([]*Index) *ElementInstance {
+// CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
+func (me *mockModuleEngine) CreateFuncElementInstance([]*Index) *ElementInstance {
 	return nil
 }
 
