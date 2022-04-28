@@ -113,7 +113,7 @@ type (
 		// typeIDsElement0Address holds the &ModuleInstance.TypeIDs[0] as uintptr.
 		typeIDsElement0Address uintptr
 
-		// dataInstancesElement0Address holds the &ModuleInstance.DataIntances[0] as uintptr.
+		// dataInstancesElement0Address holds the &ModuleInstance.DataInstances[0] as uintptr.
 		dataInstancesElement0Address uintptr
 
 		// elementInstancesElemen0Address holds the &ModuleInstance.ElementInstances[0] as uintptr.
@@ -293,7 +293,8 @@ const (
 	// Offsets for Go's interface.
 	// https://research.swtch.com/interfaces
 	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
-	interfaceDataOffset   = 8
+	interfaceDataOffset = 8
+	// Interface consists of two pointers therefore 16 bytes = 2^4.
 	interfaceDataSizeLog2 = 4
 
 	// Consts for DataInstance.
