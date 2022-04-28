@@ -39,6 +39,11 @@ type FunctionListener interface {
 
 // TODO: Errors aren't handled, and the After hook should accept one along with the result values.
 
+// TODO: The context parameter of the After hook is not the same as the Before hook. This means interceptor patterns
+// are awkward. Ex. something like timing is difficult as it requires propagating a stack. Otherwise, nested calls will
+// overwrite each other's "since" time. Propagating a stack is further awkward as the After hook needs to know the
+// position to read from which might be subtle.
+
 // FunctionDefinition includes information about a function available pre-instantiation.
 type FunctionDefinition interface {
 	// ModuleName is the possibly empty name of the module defining this function.
