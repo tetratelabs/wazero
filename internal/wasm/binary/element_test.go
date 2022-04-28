@@ -42,12 +42,14 @@ func Test_decodeElementInitValueVector(t *testing.T) {
 
 func Test_decodeElementConstExprVector(t *testing.T) {
 	for i, tc := range []struct {
-		in  []byte
-		exp []*wasm.Index
+		in       []byte
+		exp      []*wasm.Index
+		features wasm.Features
 	}{
 		{
-			in:  []byte{0},
-			exp: []*wasm.Index{},
+			in:       []byte{0},
+			exp:      []*wasm.Index{},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
@@ -55,7 +57,8 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc, 100, wasm.OpcodeEnd,
 			},
-			exp: []*wasm.Index{nil, uint32Ptr(100)},
+			exp:      []*wasm.Index{nil, uint32Ptr(100)},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
@@ -66,11 +69,12 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeEnd,
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
-			exp: []*wasm.Index{nil, uint32Ptr(165675008), nil},
+			exp:      []*wasm.Index{nil, uint32Ptr(165675008), nil},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 	} {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeElementConstExprVector(bytes.NewReader(tc.in))
+			actual, err := decodeElementConstExprVector(bytes.NewReader(tc.in), tc.features)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -79,9 +83,10 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 
 func TestDecodeElementSegment(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		in   []byte
-		exp  *wasm.ElementSegment
+		name     string
+		in       []byte
+		exp      *wasm.ElementSegment
+		features wasm.Features
 	}{
 		{
 			name: "legacy",
@@ -98,6 +103,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "legacy multi byte const expr data",
@@ -114,6 +120,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 
@@ -129,6 +136,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 
@@ -148,6 +156,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "declarative",
@@ -162,6 +171,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "active const expr vector",
@@ -183,6 +193,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "passive const expr vector - funcref",
@@ -202,6 +213,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "active with table index and const expr vector",
@@ -225,6 +237,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "declarative const expr vector",
@@ -243,13 +256,19 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := decodeElementSegment(bytes.NewReader(tc.in))
+			actual, err := decodeElementSegment(bytes.NewReader(tc.in), tc.features)
 			require.NoError(t, err)
 			require.Equal(t, actual, tc.exp)
 		})
 	}
+}
+
+func TestDecodeElementSegment_errors(t *testing.T) {
+	_, err := decodeElementSegment(bytes.NewReader([]byte{1}), wasm.FeatureMultiValue)
+	require.EqualError(t, err, `non-zero prefix for element segment is invalid as feature "bulk-memory-operations" is disabled`)
 }

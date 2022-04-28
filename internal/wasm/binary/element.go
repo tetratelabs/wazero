@@ -37,14 +37,14 @@ func decodeElementInitValueVector(r *bytes.Reader) ([]*wasm.Index, error) {
 	return vec, nil
 }
 
-func decodeElementConstExprVector(r *bytes.Reader) ([]*wasm.Index, error) {
+func decodeElementConstExprVector(r *bytes.Reader, enabledFeatures wasm.Features) ([]*wasm.Index, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
 	}
 	vec := make([]*wasm.Index, vs)
 	for i := range vec {
-		expr, err := decodeConstantExpression(r)
+		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -74,17 +74,23 @@ func decodeElementRefType(r *bytes.Reader) (ret wasm.RefType, err error) {
 	return
 }
 
-func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
+func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.ElementSegment, error) {
 	prefix, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read element prefix: %w", err)
+	}
+
+	if prefix != 0 {
+		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+			return nil, fmt.Errorf("non-zero prefix for element segment is invalid as %w", err)
+		}
 	}
 
 	// Encoding depends on the prefix and described at https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#element-section
 	switch prefix {
 	case 0:
 		// Legacy prefix which is WebAssembly 1.0 compatible.
-		expr, err := decodeConstantExpression(r)
+		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read expr for offset: %w", err)
 		}
@@ -126,7 +132,7 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 			return nil, fmt.Errorf("table index must be zero but was %d", tableIndex)
 		}
 
-		expr, err := decodeConstantExpression(r)
+		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read expr for offset: %w", err)
 		}
@@ -161,12 +167,12 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 			Mode: wasm.ElementModeDeclarative,
 		}, nil
 	case 4:
-		expr, err := decodeConstantExpression(r)
+		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read expr for offset: %w", err)
 		}
 
-		init, err := decodeElementConstExprVector(r)
+		init, err := decodeElementConstExprVector(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +188,7 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 		if err != nil {
 			return nil, err
 		}
-		init, err := decodeElementConstExprVector(r)
+		init, err := decodeElementConstExprVector(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +207,7 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 			// TODO: this will be relaxed after reference type proposal impl.
 			return nil, fmt.Errorf("table index must be zero but was %d", tableIndex)
 		}
-		expr, err := decodeConstantExpression(r)
+		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read expr for offset: %w", err)
 		}
@@ -211,7 +217,7 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 			return nil, err
 		}
 
-		init, err := decodeElementConstExprVector(r)
+		init, err := decodeElementConstExprVector(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +233,7 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 		if err != nil {
 			return nil, err
 		}
-		init, err := decodeElementConstExprVector(r)
+		init, err := decodeElementConstExprVector(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}

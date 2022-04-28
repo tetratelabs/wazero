@@ -757,6 +757,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
 				}
 				var params []ValueType
+				// Handle opcodes added in bulk-memory-operations/WebAssembly 2.0.
 				switch miscOpcode {
 				case OpcodeMiscDataDrop:
 					if m.DataCountSection == nil {

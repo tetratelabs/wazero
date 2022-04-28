@@ -81,7 +81,7 @@ func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryMaxPages u
 		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r, memoryMaxPages)
 		case wasm.SectionIDGlobal:
-			if m.GlobalSection, err = decodeGlobalSection(r); err != nil {
+			if m.GlobalSection, err = decodeGlobalSection(r, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDExport:
@@ -89,11 +89,11 @@ func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryMaxPages u
 		case wasm.SectionIDStart:
 			m.StartSection, err = decodeStartSection(r)
 		case wasm.SectionIDElement:
-			m.ElementSection, err = decodeElementSection(r)
+			m.ElementSection, err = decodeElementSection(r, enabledFeatures)
 		case wasm.SectionIDCode:
 			m.CodeSection, err = decodeCodeSection(r)
 		case wasm.SectionIDData:
-			m.DataSection, err = decodeDataSection(r)
+			m.DataSection, err = decodeDataSection(r, enabledFeatures)
 		case wasm.SectionIDDataCount:
 			if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
 				return nil, fmt.Errorf("data count section not supported as %v", err)

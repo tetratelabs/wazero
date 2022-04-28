@@ -23,10 +23,16 @@ const (
 	dataSegmentPrefixActiveWithMemoryIndex dataSegmentPrefix = 0x2
 )
 
-func decodeDataSegment(r *bytes.Reader) (*wasm.DataSegment, error) {
+func decodeDataSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.DataSegment, error) {
 	dataSegmentPrefx, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read data segment prefix: %w", err)
+	}
+
+	if dataSegmentPrefx != dataSegmentPrefixActive {
+		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+			return nil, fmt.Errorf("non-zero prefix for data segment is invalid as %w", err)
+		}
 	}
 
 	var expr *wasm.ConstantExpression
@@ -44,7 +50,7 @@ func decodeDataSegment(r *bytes.Reader) (*wasm.DataSegment, error) {
 			}
 		}
 
-		expr, err = decodeConstantExpression(r)
+		expr, err = decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read offset expression: %v", err)
 		}

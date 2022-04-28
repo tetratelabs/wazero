@@ -11,9 +11,10 @@ import (
 
 func Test_decodeDataSegment(t *testing.T) {
 	for i, tc := range []struct {
-		in     []byte
-		exp    *wasm.DataSegment
-		expErr string
+		in       []byte
+		exp      *wasm.DataSegment
+		features wasm.Features
+		expErr   string
 	}{
 		{
 			in: []byte{0xf,
@@ -22,7 +23,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			expErr: "invalid data segment prefix: 0xf",
+			features: wasm.FeatureBulkMemoryOperations,
+			expErr:   "invalid data segment prefix: 0xf",
 		},
 		{
 			in: []byte{0x0,
@@ -38,6 +40,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				},
 				Init: []byte{0xf, 0xf},
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x0,
@@ -45,7 +48,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				wasm.OpcodeI32Const, 0x1,
 				0x2, 0xf, 0xf,
 			},
-			expErr: "read offset expression: constant expression has been not terminated",
+			expErr:   "read offset expression: constant expression has been not terminated",
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x1, // Passive data segment without memory index and const expr.
@@ -56,6 +60,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				OffsetExpression: nil,
 				Init:             []byte{0xf, 0xf},
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -72,6 +77,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				},
 				Init: []byte{0xf, 0xf},
 			},
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -81,7 +87,8 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			expErr: "memory index must be zero but was 1",
+			expErr:   "memory index must be zero but was 1",
+			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -91,12 +98,24 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			expErr: "read offset expression: constant expression has been not terminated",
+			expErr:   "read offset expression: constant expression has been not terminated",
+			features: wasm.FeatureBulkMemoryOperations,
+		},
+		{
+			in: []byte{0x2,
+				0x0, // Memory index.
+				// Const expression.
+				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
+				// Two initial data.
+				0x2, 0xf, 0xf,
+			},
+			features: wasm.FeatureMutableGlobal,
+			expErr:   "non-zero prefix for data segment is invalid as feature \"bulk-memory-operations\" is disabled",
 		},
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeDataSegment(bytes.NewReader(tc.in))
+			actual, err := decodeDataSegment(bytes.NewReader(tc.in), tc.features)
 			if tc.expErr == "" {
 				require.NoError(t, err)
 				require.Equal(t, tc.exp, actual)
