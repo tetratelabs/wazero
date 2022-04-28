@@ -2062,6 +2062,25 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			0b01_000000 | byte(c),
 			0b110_10011,
 		})
+	case LSL:
+		if c == 0 {
+			err = errors.New("LSL with zero constant should be optimized out")
+			return
+		} else if c < 0 || c > 63 {
+			err = fmt.Errorf("LSL requires immediate to be within 0 to 63, but got %d", c)
+			return
+		}
+
+		// LSL(immediate) is an alias of UBFM
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LSL--immediate---Logical-Shift-Left--immediate---an-alias-of-UBFM-
+		cb := byte(c)
+		a.Buf.Write([]byte{
+			(dstRegBits << 5) | dstRegBits,
+			(0b111111-cb)<<2 | dstRegBits>>3,
+			0b01_000000 | (64 - cb),
+			0b110_10011,
+		})
+
 	default:
 		return errorEncodingUnsupported(n)
 	}

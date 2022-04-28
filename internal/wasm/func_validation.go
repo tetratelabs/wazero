@@ -757,16 +757,30 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
 				}
 				var params []ValueType
+				// Handle opcodes added in bulk-memory-operations/WebAssembly 2.0.
 				switch miscOpcode {
-				case OpcodeMiscMemoryInit, OpcodeMiscMemoryCopy, OpcodeMiscMemoryFill, OpcodeMiscDataDrop:
+				case OpcodeMiscDataDrop:
+					if m.DataCountSection == nil {
+						return fmt.Errorf("%s requires data count section", MiscInstructionName(miscOpcode))
+					}
+
+					// We need to read the index to the data section.
+					pc++
+					index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
+					}
+					if int(index) >= len(m.DataSection) {
+						return fmt.Errorf("index %d out of range of data section(len=%d)", index, len(m.DataSection))
+					}
+					pc += num - 1
+				case OpcodeMiscMemoryInit, OpcodeMiscMemoryCopy, OpcodeMiscMemoryFill:
 					if memory == nil {
 						return fmt.Errorf("memory must exist for %s", MiscInstructionName(miscOpcode))
 					}
-					if miscOpcode != OpcodeMiscDataDrop {
-						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
-					}
+					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 
-					if miscOpcode == OpcodeMiscMemoryInit || miscOpcode == OpcodeMiscDataDrop {
+					if miscOpcode == OpcodeMiscMemoryInit {
 						if m.DataCountSection == nil {
 							return fmt.Errorf("%s requires data count section", MiscInstructionName(miscOpcode))
 						}
@@ -783,8 +797,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 						pc += num - 1
 					}
 
-					if miscOpcode != OpcodeMiscDataDrop {
+					pc++
+					val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
+					}
+					if val != 0 || num != 1 {
+						return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
+					}
+					if miscOpcode == OpcodeMiscMemoryCopy {
 						pc++
+						// memory.copy needs two memory index which are reserved as zero.
 						val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 						if err != nil {
 							return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
@@ -792,23 +815,12 @@ func (m *Module) validateFunctionWithMaxStackValues(
 						if val != 0 || num != 1 {
 							return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
 						}
-						if miscOpcode == OpcodeMiscMemoryCopy {
-							pc++
-							// memory.copy needs two memory index which are reserved as zero.
-							val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
-							if err != nil {
-								return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
-							}
-							if val != 0 || num != 1 {
-								return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
-							}
-						}
 					}
 				case OpcodeMiscTableInit, OpcodeMiscElemDrop, OpcodeMiscTableCopy:
-					if table == nil {
-						return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
-					}
 					if miscOpcode != OpcodeMiscElemDrop {
+						if table == nil {
+							return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
+						}
 						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					}
 					if miscOpcode == OpcodeMiscTableInit || miscOpcode == OpcodeMiscElemDrop {

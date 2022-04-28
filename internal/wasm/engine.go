@@ -40,4 +40,8 @@ type ModuleEngine interface {
 
 	// Call invokes a function instance f with given parameters.
 	Call(ctx context.Context, m *CallContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
+
+	// CreateFuncElementInstance creates an ElementInstance whose references are engine-specific function pointers
+	// corresponding to the given `indexes`.
+	CreateFuncElementInstance(indexes []*Index) *ElementInstance
 }

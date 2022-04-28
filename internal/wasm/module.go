@@ -162,7 +162,7 @@ type Module struct {
 	// Note: elementSegments retain Module.ElementSection order. Since an ElementSegment can overlap with another, order
 	// preservation ensures a consistent initialization result.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
-	validatedElementSegments []*validatedElementSegment
+	validatedActiveElementSegments []*validatedActiveElementSegment
 
 	// DataCountSection is the optional section and holds the number of data segments in the data section.
 	//
@@ -243,7 +243,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
-	if err = m.validateMemory(memory, globals); err != nil {
+	if err = m.validateMemory(memory, globals, enabledFeatures); err != nil {
 		return err
 	}
 
@@ -253,7 +253,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		}
 	} // No need to validate host functions as NewHostModule validates
 
-	if _, err = m.validateTable(); err != nil {
+	if _, err = m.validateTable(enabledFeatures); err != nil {
 		return err
 	}
 
@@ -344,9 +344,12 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
-func (m *Module) validateMemory(memory *Memory, globals []*GlobalType) error {
-	if len(m.DataSection) > 0 && memory == nil {
-		return fmt.Errorf("unknown memory")
+func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFeatures Features) error {
+	if !enabledFeatures.Get(FeatureBulkMemoryOperations) {
+		// As of bulk memory operations, data segments can exist without memory declarations.
+		if len(m.DataSection) > 0 && memory == nil {
+			return fmt.Errorf("unknown memory")
+		}
 	}
 
 	for _, d := range m.DataSection {
@@ -893,13 +896,6 @@ const (
 func ValueTypeName(t ValueType) string {
 	return api.ValueTypeName(t)
 }
-
-// ElemType is fixed to ElemTypeFuncref until post 20191205 reference type is implemented.
-type ElemType = byte
-
-const (
-	ElemTypeFuncref ElemType = 0x70
-)
 
 // ExternType classifies imports and exports with their respective types.
 //

@@ -113,7 +113,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	e := et.NewEngine(wasm.Features20191205)
 
 	t.Run("no table elements", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
 		m := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{},
 			FunctionSection: []uint32{},
@@ -128,10 +128,10 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		require.NoError(t, err)
 
 		// Since there are no elements to initialize, we expect the table to be nil.
-		require.Equal(t, table.Table, make([]interface{}, 2))
+		require.Equal(t, table.References, make([]wasm.Reference, 2))
 	})
 	t.Run("module-defined function", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
 
 		m := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{{}},
@@ -158,11 +158,11 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		require.NoError(t, err)
 
 		// The functions mapped to the table are defined in the same moduleEngine
-		require.Equal(t, table.Table, et.InitTable(me, table.Min, tableInit))
+		require.Equal(t, table.References, et.InitTable(me, table.Min, tableInit))
 	})
 
 	t.Run("imported function", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
 
 		importedModule := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{{}},
@@ -205,11 +205,11 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
+		require.Equal(t, table.References, et.InitTable(importing, table.Min, tableInit))
 	})
 
 	t.Run("mixed functions", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
 
 		importedModule := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{{}},
@@ -261,7 +261,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
+		require.Equal(t, table.References, et.InitTable(importing, table.Min, tableInit))
 	})
 }
 

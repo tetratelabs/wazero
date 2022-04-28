@@ -79,8 +79,17 @@ type (
 		// This is only used by bulk memory operations.
 		//
 		// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#data-instances
-		DataInstances [][]byte
+		DataInstances []DataInstance
+
+		// ElementInstances holds the element instance, and each holds the references to either functions
+		// or external objects (unimplemented).
+		ElementInstances []ElementInstance
 	}
+
+	// DataInstance holds bytes corresponding to the data segment in a module.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#data-instances
+	DataInstance = []byte
 
 	// ExportInstance represents an exported instance in a Store.
 	// The difference from the spec is that in wazero, a ExportInstance holds pointers
@@ -187,6 +196,15 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 func (m *ModuleInstance) buildDataInstances(segments []*DataSegment) {
 	for _, d := range segments {
 		m.DataInstances = append(m.DataInstances, d.Init)
+	}
+}
+
+func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
+	m.ElementInstances = make([]ElementInstance, len(elements))
+	for i, elm := range elements {
+		if elm.Type == RefTypeFuncref {
+			m.ElementInstances[i] = *m.Engine.CreateFuncElementInstance(elm.Init)
+		}
 	}
 }
 
@@ -324,6 +342,9 @@ func (s *Store) Instantiate(
 	if err != nil {
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
+
+	// After engine creation, we can create the funcref element instances.
+	m.buildElementInstances(module.ElementSection)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	m.applyData(module.DataSection)

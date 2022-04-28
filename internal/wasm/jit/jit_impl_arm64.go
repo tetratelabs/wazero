@@ -85,11 +85,11 @@ var (
 
 const (
 	// arm64CallEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	arm64CallEngineArchContextJITCallReturnAddressOffset = 136
+	arm64CallEngineArchContextJITCallReturnAddressOffset = 144
 	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 144
+	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 152
 	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 152
+	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 160
 )
 
 func isZeroRegister(r asm.Register) bool {
@@ -2861,8 +2861,21 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 	return nil
 }
 
-// compileMemoryInit implements compiler.compileMemoryInit for the amd64 architecture.
+// compileMemoryInit implements compiler.compileMemoryInit for the arm64 architecture.
 func (c *arm64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error {
+	return c.compileInitImpl(false, o.DataIndex)
+}
+
+// compileInitImpl implements compileTableInit and compileMemoryInit.
+//
+// TODO: the compiled code in this function should be reused and compile at once as
+// the code is independent of any module.
+func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
+	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
+	if isTable {
+		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
+	}
+
 	copySize, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -2902,76 +2915,115 @@ func (c *arm64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error
 		c.assembler.CompileRegisterToRegister(arm64.ADD, copySize.register, destinationOffset.register)
 	}
 
-	dataInstanceAddr, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	instanceAddr, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
-	c.compileLoadDataInstanceAddress(o.DataIndex, dataInstanceAddr)
+
+	if isTable {
+		c.compileLoadElemInstanceAddress(index, instanceAddr)
+	} else {
+		c.compileLoadDataInstanceAddress(index, instanceAddr)
+	}
 
 	// Check data instance bounds.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		dataInstanceAddr, 8, // DataInstance is []byte therefore the length is stored at offset 8.
+		instanceAddr, 8, // DataInstance and Element instance holds the length is stored at offset 8.
 		arm64ReservedRegisterForTemporary)
 
-	// Check memory len >= destinationOffset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, sourceOffset.register)
 	sourceBoundsOK := c.assembler.CompileJump(arm64.BLS)
 
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
 
 	c.assembler.SetJumpTargetOnNext(sourceBoundsOK)
 
 	// Check destination bounds.
-	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-		arm64ReservedRegisterForTemporary)
+	if isTable {
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+			arm64ReservedRegisterForTemporary)
+	} else {
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+			arm64ReservedRegisterForTemporary)
+	}
 
-	// Check memory len >= destinationOffset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
 	destinationBoundsOK := c.assembler.CompileJump(arm64.BLS)
 
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from source to destination.
 	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
 
-	// If the size equals zero, we can skip the entire instructions beflow.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
-	skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
+	if !isZeroRegister(copySize.register) {
+		// If the size equals zero, we can skip the entire instructions beflow.
+		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
+		skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
 
-	// destinationOffset += memory buffer's absolute address.
-	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, destinationOffset.register)
+		var movInst asm.Instruction
+		var movSize int64
+		if isTable {
+			movInst = arm64.MOVD
+			movSize = 8
 
-	// sourceOffset += data buffer's absolute address.
-	c.assembler.CompileMemoryToRegister(arm64.MOVD, dataInstanceAddr, 0, arm64ReservedRegisterForTemporary)
-	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, sourceOffset.register)
+			// arm64ReservedRegisterForTemporary = &Table[0]
+			c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
+				callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
+			// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + arm64ReservedRegisterForTemporary
+			c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+				destinationOffset.register, interfaceDataSizeLog2,
+				arm64ReservedRegisterForTemporary, destinationOffset.register)
 
-	// Negate the counter.
-	c.assembler.CompileRegisterToRegister(arm64.NEG, copySize.register, copySize.register)
+			// arm64ReservedRegisterForTemporary = &ElementInstance.References[0]
+			c.assembler.CompileMemoryToRegister(arm64.MOVD, instanceAddr, 0, arm64ReservedRegisterForTemporary)
+			// sourceOffset = (sourceOffset<< interfaceDataSizeLog2) + arm64ReservedRegisterForTemporary
+			c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+				sourceOffset.register, interfaceDataSizeLog2,
+				arm64ReservedRegisterForTemporary, sourceOffset.register)
 
-	beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
+			// copySize = copySize << interfaceDataSizeLog2
+			c.assembler.CompileConstToRegister(arm64.LSL, interfaceDataSizeLog2, copySize.register)
+		} else {
+			movInst = arm64.MOVBU
+			movSize = 1
 
-	// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
-	c.assembler.CompileMemoryWithRegisterOffsetToRegister(arm64.MOVBU,
-		sourceOffset.register, copySize.register,
-		arm64ReservedRegisterForTemporary)
-	// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
-	c.assembler.CompileRegisterToMemoryWithRegisterOffset(arm64.MOVBU,
-		arm64ReservedRegisterForTemporary,
-		destinationOffset.register, copySize.register,
-	)
+			// destinationOffset += memory buffer's absolute address.
+			c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, destinationOffset.register)
 
-	// Decrement the size coutner and if the value is still negative, continue the loop.
-	c.assembler.CompileConstToRegister(arm64.ADDS, 1, copySize.register)
-	c.assembler.CompileJump(arm64.BMI).AssignJumpTarget(beginCopyLoop)
+			// sourceOffset += data buffer's absolute address.
+			c.assembler.CompileMemoryToRegister(arm64.MOVD, instanceAddr, 0, arm64ReservedRegisterForTemporary)
+			c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, sourceOffset.register)
+
+		}
+
+		// Negate the counter.
+		c.assembler.CompileRegisterToRegister(arm64.NEG, copySize.register, copySize.register)
+
+		beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
+
+		// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
+		c.assembler.CompileMemoryWithRegisterOffsetToRegister(movInst,
+			sourceOffset.register, copySize.register,
+			arm64ReservedRegisterForTemporary)
+		// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
+		c.assembler.CompileRegisterToMemoryWithRegisterOffset(movInst,
+			arm64ReservedRegisterForTemporary,
+			destinationOffset.register, copySize.register,
+		)
+
+		// Decrement the size counter and if the value is still negative, continue the loop.
+		c.assembler.CompileConstToRegister(arm64.ADDS, movSize, copySize.register)
+		c.assembler.CompileJump(arm64.BMI).AssignJumpTarget(beginCopyLoop)
+
+		c.assembler.SetJumpTargetOnNext(skipCopyJump)
+	}
 
 	c.markRegisterUnused(copySize.register, sourceOffset.register,
-		destinationOffset.register, dataInstanceAddr)
-
-	c.assembler.SetJumpTargetOnNext(skipCopyJump)
-
+		destinationOffset.register, instanceAddr)
 	return nil
 }
 
@@ -2992,8 +3044,8 @@ func (c *arm64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
 }
 
 func (c *arm64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm.Register) {
-	// dst = dataIndex * 24
-	c.assembler.CompileConstToRegister(arm64.MOVD, int64(dataIndex)*24, dst)
+	// dst = dataIndex * dataInstanceStructSize
+	c.assembler.CompileConstToRegister(arm64.MOVD, int64(dataIndex)*dataInstanceStructSize, dst)
 
 	// arm64ReservedRegisterForTemporary = &moduleInstance.DataInstances[0]
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
@@ -3002,16 +3054,26 @@ func (c *arm64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm
 	)
 
 	// dst = arm64ReservedRegisterForTemporary + dst
-	//     = &moduleInstance.DataInstances[0] + dataIndex*24
+	//     = &moduleInstance.DataInstances[0] + dataIndex*dataInstanceStructSize
 	//     = &moduleInstance.DataInstances[dataIndex]
 	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, dst)
 }
 
 // compileMemoryCopy implements compiler.compileMemoryCopy for the arm64 architecture.
+func (c *arm64Compiler) compileMemoryCopy() error {
+	return c.compileCopyImpl(false)
+}
+
+// compileCopyImpl implements compileTableCopy and compileMemoryCopy.
 //
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
-func (c *arm64Compiler) compileMemoryCopy() error {
+func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
+	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
+	if isTable {
+		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
+	}
+
 	copySize, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -3051,17 +3113,24 @@ func (c *arm64Compiler) compileMemoryCopy() error {
 		c.assembler.CompileRegisterToRegister(arm64.ADD, copySize.register, destinationOffset.register)
 	}
 
-	// arm64ReservedRegisterForTemporary = len(memoryInst.Buffer).
-	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-		arm64ReservedRegisterForTemporary)
+	if isTable {
+		// arm64ReservedRegisterForTemporary = len(table.Table).
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+			arm64ReservedRegisterForTemporary)
+	} else {
+		// arm64ReservedRegisterForTemporary = len(memoryInst.Buffer).
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+			arm64ReservedRegisterForTemporary)
+	}
 
 	// Check memory len >= sourceOffset.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, sourceOffset.register)
 	sourceBoundsOK := c.assembler.CompileJump(arm64.BLS)
 
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
 
 	// Otherwise, check memory len >= destinationOffset.
 	c.assembler.SetJumpTargetOnNext(sourceBoundsOK)
@@ -3070,79 +3139,132 @@ func (c *arm64Compiler) compileMemoryCopy() error {
 	destinationBoundsOK := c.assembler.CompileJump(arm64.BLS)
 
 	// If not, raise out of bounds memory access error.
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
 
 	// Otherwise, ready to copy the value from source to destination.
 	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
 
-	// If the size equals zero, we can skip the entire instructions beflow.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
-	skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
+	var movInst asm.Instruction
+	var movSize int64
+	if isTable {
+		movInst = arm64.MOVD
+		movSize = 8
+	} else {
+		movInst = arm64.MOVBU
+		movSize = 1
 
-	// sourceOffset += memory buffer's absolute address.
-	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, sourceOffset.register)
-	// destinationOffset += memory buffer's absolute address.
-	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, destinationOffset.register)
-
-	// If source offet < destination offset: for (i = size-1; i >= 0; i--) dst[i] = src[i];
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, sourceOffset.register, destinationOffset.register)
-	destLowerThanSourceJump := c.assembler.CompileJump(arm64.BLS)
-	var endJump asm.Node
-	{
-		// sourceOffset -= size.
-		c.assembler.CompileRegisterToRegister(arm64.SUB, copySize.register, sourceOffset.register)
-		// destinationOffset -= size.
-		c.assembler.CompileRegisterToRegister(arm64.SUB, copySize.register, destinationOffset.register)
-
-		beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
-
-		// size -= 1
-		c.assembler.CompileConstToRegister(arm64.SUBS, 1, copySize.register)
-
-		// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
-		c.assembler.CompileMemoryWithRegisterOffsetToRegister(arm64.MOVBU,
-			sourceOffset.register, copySize.register,
-			arm64ReservedRegisterForTemporary)
-		// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
-		c.assembler.CompileRegisterToMemoryWithRegisterOffset(arm64.MOVBU,
-			arm64ReservedRegisterForTemporary,
-			destinationOffset.register, copySize.register,
-		)
-
-		// If the value on the copySize.register is not equal zero, continue the loop.
-		c.assembler.CompileJump(arm64.BNE).AssignJumpTarget(beginCopyLoop)
-
-		// Otherwise, exit the loop.
-		endJump = c.assembler.CompileJump(arm64.B)
 	}
 
-	// Else (destination offet < source offset): for (i = 0; i < size; i++) dst[counter-1-i] = src[counter-1-i];
-	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
-	{
-		// Negate the counter.
-		c.assembler.CompileRegisterToRegister(arm64.NEG, copySize.register, copySize.register)
+	// If the size equals zero, we can skip the entire instructions beflow.
+	if !isZeroRegister(copySize.register) {
+		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
+		skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
 
-		beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
+		// If source offet < destination offset: for (i = size-1; i >= 0; i--) dst[i] = src[i];
+		c.assembler.CompileTwoRegistersToNone(arm64.CMP, sourceOffset.register, destinationOffset.register)
+		destLowerThanSourceJump := c.assembler.CompileJump(arm64.BLS)
+		var endJump asm.Node
+		{
+			// sourceOffset -= size.
+			c.assembler.CompileRegisterToRegister(arm64.SUB, copySize.register, sourceOffset.register)
+			// destinationOffset -= size.
+			c.assembler.CompileRegisterToRegister(arm64.SUB, copySize.register, destinationOffset.register)
 
-		// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
-		c.assembler.CompileMemoryWithRegisterOffsetToRegister(arm64.MOVBU,
-			sourceOffset.register, copySize.register,
-			arm64ReservedRegisterForTemporary)
-		// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
-		c.assembler.CompileRegisterToMemoryWithRegisterOffset(arm64.MOVBU,
-			arm64ReservedRegisterForTemporary,
-			destinationOffset.register, copySize.register,
-		)
+			if isTable {
+				// arm64ReservedRegisterForTemporary = &Table[0]
+				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
+					callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[0]
+				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+					destinationOffset.register, interfaceDataSizeLog2,
+					arm64ReservedRegisterForTemporary, destinationOffset.register)
+				// sourceOffset = (sourceOffset<< interfaceDataySizeLog2) + &Table[0]
+				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+					sourceOffset.register, interfaceDataSizeLog2,
+					arm64ReservedRegisterForTemporary, sourceOffset.register)
 
-		// size += 1
-		c.assembler.CompileConstToRegister(arm64.ADDS, 1, copySize.register)
-		c.assembler.CompileJump(arm64.BMI).AssignJumpTarget(beginCopyLoop)
+				// copySize = copySize << interfaceDataSizeLog2
+				c.assembler.CompileConstToRegister(arm64.LSL, interfaceDataSizeLog2, copySize.register)
+			} else {
+				// sourceOffset += memory buffer's absolute address.
+				c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, sourceOffset.register)
+				// destinationOffset += memory buffer's absolute address.
+				c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, destinationOffset.register)
+			}
+
+			beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
+
+			// size -= 1
+			c.assembler.CompileConstToRegister(arm64.SUBS, movSize, copySize.register)
+
+			// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
+			c.assembler.CompileMemoryWithRegisterOffsetToRegister(movInst,
+				sourceOffset.register, copySize.register,
+				arm64ReservedRegisterForTemporary)
+			// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
+			c.assembler.CompileRegisterToMemoryWithRegisterOffset(movInst,
+				arm64ReservedRegisterForTemporary,
+				destinationOffset.register, copySize.register,
+			)
+
+			// If the value on the copySize.register is not equal zero, continue the loop.
+			c.assembler.CompileJump(arm64.BNE).AssignJumpTarget(beginCopyLoop)
+
+			// Otherwise, exit the loop.
+			endJump = c.assembler.CompileJump(arm64.B)
+		}
+
+		// Else (destination offet < source offset): for (i = 0; i < size; i++) dst[counter-1-i] = src[counter-1-i];
+		c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
+		{
+
+			if isTable {
+				// arm64ReservedRegisterForTemporary = &Table[0]
+				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
+					callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[0]
+				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+					destinationOffset.register, interfaceDataSizeLog2,
+					arm64ReservedRegisterForTemporary, destinationOffset.register)
+				// sourceOffset = (sourceOffset<< interfaceDataySizeLog2) + &Table[0]
+				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
+					sourceOffset.register, interfaceDataSizeLog2,
+					arm64ReservedRegisterForTemporary, sourceOffset.register)
+
+				// copySize = copySize << interfaceDataSizeLog2
+				c.assembler.CompileConstToRegister(arm64.LSL, interfaceDataSizeLog2, copySize.register)
+			} else {
+				// sourceOffset += memory buffer's absolute address.
+				c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, sourceOffset.register)
+				// destinationOffset += memory buffer's absolute address.
+				c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, destinationOffset.register)
+			}
+
+			// Negate the counter.
+			c.assembler.CompileRegisterToRegister(arm64.NEG, copySize.register, copySize.register)
+
+			beginCopyLoop := c.assembler.CompileStandAlone(arm64.NOP)
+
+			// arm64ReservedRegisterForTemporary = [sourceOffset + (size.register)]
+			c.assembler.CompileMemoryWithRegisterOffsetToRegister(movInst,
+				sourceOffset.register, copySize.register,
+				arm64ReservedRegisterForTemporary)
+			// [destinationOffset + (size.register)] = arm64ReservedRegisterForTemporary.
+			c.assembler.CompileRegisterToMemoryWithRegisterOffset(movInst,
+				arm64ReservedRegisterForTemporary,
+				destinationOffset.register, copySize.register,
+			)
+
+			// size += 1
+			c.assembler.CompileConstToRegister(arm64.ADDS, movSize, copySize.register)
+			c.assembler.CompileJump(arm64.BMI).AssignJumpTarget(beginCopyLoop)
+		}
+		c.assembler.SetJumpTargetOnNext(skipCopyJump, endJump)
 	}
 
 	// Mark all of the operand registers.
 	c.markRegisterUnused(copySize.register, sourceOffset.register, destinationOffset.register)
 
-	c.assembler.SetJumpTargetOnNext(skipCopyJump, endJump)
 	return nil
 }
 
@@ -3225,6 +3347,48 @@ func (c *arm64Compiler) compileMemoryFill() error {
 
 	c.assembler.SetJumpTargetOnNext(skipCopyJump)
 	return nil
+}
+
+// compileTableInit implements compiler.compileTableInit for the arm64 architecture.
+func (c *arm64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
+	return c.compileInitImpl(true, o.ElemIndex)
+}
+
+// compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.
+func (c *arm64Compiler) compileTableCopy(*wazeroir.OperationTableCopy) error {
+	return c.compileCopyImpl(true)
+}
+
+// compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
+func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
+
+	// Clears the content of ElementInstances[o.ElemIndex] (== []interface{} type).
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 0)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 8)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 16)
+	return nil
+}
+
+func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm.Register) {
+	// dst = dataIndex * elementInstanceStructSize
+	c.assembler.CompileConstToRegister(arm64.MOVD, int64(elemIndex)*elementInstanceStructSize, dst)
+
+	// arm64ReservedRegisterForTemporary = &moduleInstance.ElementInstances[0]
+	c.assembler.CompileMemoryToRegister(arm64.MOVD,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextElementInstancesElement0AddressOffset,
+		arm64ReservedRegisterForTemporary,
+	)
+
+	// dst = arm64ReservedRegisterForTemporary + dst
+	//     = &moduleInstance.ElementInstances[0] + elemIndex*elementInstanceStructSize
+	//     = &moduleInstance.ElementInstances[elemIndex]
+	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, dst)
 }
 
 func (c *arm64Compiler) pushZeroValue() {
@@ -3460,6 +3624,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// * callEngine.moduleContext.codesElement0Address
 	// * callEngine.moduleContext.typeIDsElement0Address
 	// * callEngine.moduleContext.dataInstancesElement0Address
+	// * callEngine.moduleContext.elementInstancesElement0Address
 
 	// Update globalElement0Address.
 	//
@@ -3616,6 +3781,22 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			arm64.MOVD,
 			tmpX,
 			arm64ReservedRegisterForCallEngine, callEngineModuleContextDataInstancesElement0AddressOffset,
+		)
+	}
+
+	// Update callEngine.moduleContext.elementInstancesElement0Address
+	if c.ir.NeedsAccessToElementInstances {
+		// "tmpX = &moduleInstance.DataInstances[0]"
+		c.assembler.CompileMemoryToRegister(
+			arm64.MOVD,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceElementInstancesOffset,
+			tmpX,
+		)
+		// "callEngine.moduleContext.dataInstancesElement0Address = tmpX".
+		c.assembler.CompileRegisterToMemory(
+			arm64.MOVD,
+			tmpX,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextElementInstancesElement0AddressOffset,
 		)
 	}
 

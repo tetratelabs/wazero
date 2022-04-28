@@ -229,6 +229,22 @@ const (
 	OpcodeF32ReinterpretI32 Opcode = 0xbe
 	OpcodeF64ReinterpretI64 Opcode = 0xbf
 
+	// OpcodeRefNull pushes a null reference value whose type is specified by immediate to this opcode.
+	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	//
+	// Currently only supported in the constant expression in element segments.
+	OpcodeRefNull = 0xd0
+	// OpcodeRefIsNull pops a reference value, and pushes 1 if it is null, 0 otherwise.
+	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	//
+	// Currently not supported.
+	OpcodeRefIsNull = 0xd1
+	// OpcodeRefFunc pushes a funcref value whose index equals the immediate to this opcode.
+	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	//
+	// Currently only supported in the constant expression in element segments.
+	OpcodeRefFunc = 0xd2
+
 	// Below are toggled with FeatureSignExtensionOps
 
 	// OpcodeI32Extend8S extends a signed 8-bit integer to a 32-bit integer.
@@ -465,6 +481,10 @@ const (
 	OpcodeF32ReinterpretI32Name = "f32.reinterpret_i32"
 	OpcodeF64ReinterpretI64Name = "f64.reinterpret_i64"
 
+	OpcodeRefNullName   = "ref.null"
+	OpcodeRefIsNullName = "ref.is_null"
+	OpcodeRefFuncName   = "ref.func"
+
 	// Below are toggled with FeatureSignExtensionOps
 
 	OpcodeI32Extend8SName  = "i32.extend8_s"
@@ -649,6 +669,10 @@ var instructionNames = [256]string{
 	OpcodeI64ReinterpretF64: OpcodeI64ReinterpretF64Name,
 	OpcodeF32ReinterpretI32: OpcodeF32ReinterpretI32Name,
 	OpcodeF64ReinterpretI64: OpcodeF64ReinterpretI64Name,
+
+	OpcodeRefNull:   OpcodeRefNullName,
+	OpcodeRefIsNull: OpcodeRefIsNullName,
+	OpcodeRefFunc:   OpcodeRefFuncName,
 
 	// Below are toggled with FeatureSignExtensionOps
 	OpcodeI32Extend8S:  OpcodeI32Extend8SName,

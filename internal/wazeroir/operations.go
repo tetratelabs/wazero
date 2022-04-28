@@ -998,5 +998,5 @@ type OperationTableCopy struct {
 }
 
 func (o *OperationTableCopy) Kind() OperationKind {
-	return OperationKindTableInit
+	return OperationKindTableCopy
 }

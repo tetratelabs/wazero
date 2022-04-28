@@ -587,6 +587,10 @@ func TestGenerator_startSection(t *testing.T) {
 }
 
 func TestGenerator_elementSection(t *testing.T) {
+	uint32Ptr := func(in uint32) *uint32 {
+		return &in
+	}
+
 	t.Run("without table", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
 		g.genElementSection()
@@ -612,7 +616,7 @@ func TestGenerator_elementSection(t *testing.T) {
 				exps: []*wasm.ElementSegment{
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(98)},
-						Init:       []wasm.Index{0, 50},
+						Init:       []*wasm.Index{uint32Ptr(0), uint32Ptr(50)},
 					},
 				},
 			},
@@ -626,15 +630,16 @@ func TestGenerator_elementSection(t *testing.T) {
 				exps: []*wasm.ElementSegment{
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
-						Init:       []wasm.Index{25, 75},
+						Init:       []*wasm.Index{uint32Ptr(25), uint32Ptr(75)},
 					},
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(99)},
-						Init:       []wasm.Index{3},
+						Init:       []*wasm.Index{uint32Ptr(3)},
 					},
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(90)},
-						Init:       []wasm.Index{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+						Init: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4),
+							uint32Ptr(5), uint32Ptr(6), uint32Ptr(7), uint32Ptr(8), uint32Ptr(9), uint32Ptr(10)},
 					},
 				},
 			},

@@ -581,6 +581,14 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_R0},
 				expErr: "ADR is unsupported for from:const,to:register type",
 			},
+			{
+				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.LSR, Types: asm_arm64.OperandTypesConstToRegister, DstReg: asm_arm64.REG_R0},
+				expErr: "LSR with zero constant should be optimized out",
+			},
+			{
+				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.LSL, Types: asm_arm64.OperandTypesConstToRegister, DstReg: asm_arm64.REG_R0},
+				expErr: "LSL with zero constant should be optimized out",
+			},
 		} {
 			a := asm_arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeConstToRegister(tc.n)
@@ -680,6 +688,10 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			consts: consts64,
 		},
 		{
+			inst:   asm_arm64.LSL,
+			consts: []int64{1, 2, 4, 16, 31, 32, 63},
+		},
+		{
 			inst:   asm_arm64.LSR,
 			consts: []int64{1, 2, 4, 16, 31, 32, 63},
 		},
@@ -694,7 +706,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 				t.Run(asm_arm64.RegisterName(r), func(t *testing.T) {
 					for _, c := range tc.consts {
 						var cs = []int64{c}
-						if tc.inst != asm_arm64.LSR && c != 0 {
+						if tc.inst != asm_arm64.LSR && tc.inst != asm_arm64.LSL && c != 0 {
 							cs = append(cs, -c)
 						}
 						for _, c := range cs {

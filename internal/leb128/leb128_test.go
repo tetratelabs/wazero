@@ -106,6 +106,7 @@ func TestDecodeUint32(t *testing.T) {
 		{bytes: []byte{0x00}, exp: 0},
 		{bytes: []byte{0x04}, exp: 4},
 		{bytes: []byte{0x01}, exp: 1},
+		{bytes: []byte{0x80, 0}, exp: 0},
 		{bytes: []byte{0x80, 0x7f}, exp: 16256},
 		{bytes: []byte{0xe5, 0x8e, 0x26}, exp: 624485},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},

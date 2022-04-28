@@ -379,9 +379,10 @@ func (g *generator) genElementSection() {
 	min := table.Min
 	for i := uint32(0); i < g.numElements; i++ {
 		// Elements can't exceed min of table.
-		indexes := make([]uint32, g.nextRandom().Intn(int(min)+1))
+		indexes := make([]*wasm.Index, g.nextRandom().Intn(int(min)+1))
 		for i := range indexes {
-			indexes[i] = uint32(g.nextRandom().Intn(numFuncs))
+			v := uint32(g.nextRandom().Intn(numFuncs))
+			indexes[i] = &v
 		}
 
 		offset := g.nextRandom().Intn(int(min) - len(indexes) + 1)

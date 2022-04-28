@@ -215,8 +215,8 @@ default. However, the following status covers what's currently possible with
 | sign-extension-ops                    |   ✅   |
 | multi-value                           |   ✅   |
 | JS-BigInt-integration                 |  N/A   |
-| reference-types                       |   ❌   |
-| bulk-memory-operations                |   ❌   |
+| reference-types                       |   👷‍♂️   |
+| bulk-memory-operations                |   ✅   |
 | simd                                  |   ❌   |
 
 Note: While the above are specified in a WebAssembly GitHub repository, they

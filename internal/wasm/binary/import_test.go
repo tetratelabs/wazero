@@ -114,7 +114,7 @@ func TestEncodeImport(t *testing.T) {
 				0x02, 'm', 'y',
 				0x05, 't', 'a', 'b', 'l', 'e',
 				wasm.ExternTypeTable,
-				wasm.ElemTypeFuncref,
+				wasm.RefTypeFuncref,
 				0x1, 0x1, 0x2, // Limit with max.
 			},
 		},

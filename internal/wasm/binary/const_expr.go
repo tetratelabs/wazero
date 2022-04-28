@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error) {
+func decodeConstantExpression(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.ConstantExpression, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read opcode: %v", err)
@@ -31,6 +31,21 @@ func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error)
 	case wasm.OpcodeF64Const:
 		_, err = ieee754.DecodeFloat64(r)
 	case wasm.OpcodeGlobalGet:
+		_, _, err = leb128.DecodeUint32(r)
+	case wasm.OpcodeRefNull:
+		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+			return nil, fmt.Errorf("ref.null is not supported as %w", err)
+		}
+		var reftype byte
+		reftype, err = r.ReadByte()
+		if reftype != wasm.RefTypeFuncref {
+			return nil, fmt.Errorf("ref.null instruction in constant expression must be of funcref type but was 0x%x", reftype)
+		}
+	case wasm.OpcodeRefFunc:
+		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+			return nil, fmt.Errorf("ref.func is not supported as %w", err)
+		}
+		// Parsing index.
 		_, _, err = leb128.DecodeUint32(r)
 	default:
 		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b)

@@ -39,6 +39,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextCodesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.elementInstancesElemen0Address)), callEngineModuleContextElementInstancesElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
@@ -73,16 +74,17 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.DataInstances)), moduleInstanceDataInstancesOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.ElementInstances)), moduleInstanceElementInstancesOffset)
 
 	var functionInstance wasm.FunctionInstance
 	require.Equal(t, int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset)
 
 	// Offsets for wasm.Table.
 	var tableInstance wasm.TableInstance
-	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)), tableInstanceTableOffset)
+	require.Equal(t, int(unsafe.Offsetof(tableInstance.References)), tableInstanceTableOffset)
 	// We add "+8" to get the length of Tables[0].Table
 	// since the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
-	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)+8), tableInstanceTableLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(tableInstance.References)+8), tableInstanceTableLenOffset)
 
 	// Offsets for wasm.Memory
 	var memoryInstance wasm.MemoryInstance
@@ -102,6 +104,13 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 		data  unsafe.Pointer
 	}
 	require.Equal(t, int(unsafe.Offsetof(eface.data)), interfaceDataOffset)
+	require.Equal(t, int(unsafe.Sizeof(eface)), 1<<interfaceDataSizeLog2)
+
+	var dataInstance wasm.DataInstance
+	require.Equal(t, int(unsafe.Sizeof(dataInstance)), dataInstanceStructSize)
+
+	var elementInstance wasm.ElementInstance
+	require.Equal(t, int(unsafe.Sizeof(elementInstance)), elementInstanceStructSize)
 }
 
 // et is used for tests defined in the enginetest package.

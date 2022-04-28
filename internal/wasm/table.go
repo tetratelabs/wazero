@@ -11,25 +11,63 @@ import (
 // Table describes the limits of (function) elements in a table.
 type Table = limitsType
 
+// RefType is fixed to RefTypeFuncref until post 20191205 reference type is implemented.
+type RefType = byte
+
+const (
+	// RefTypeFuncref represents a reference to a function.
+	RefTypeFuncref RefType = 0x70
+	// RefTypeExternref represents a reference to a host object, which is not currently supported in wazero.
+	RefTypeExternref RefType = 0x6f
+)
+
+// ElementMode represents a mode of element segment which is either active, passive or declarative.
+//
+// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#element-segments
+type ElementMode = byte
+
+const (
+	// ElementModeActive is the mode which requires the runtime to initialize table with the contents in .Init field combined with OffsetExpr.
+	ElementModeActive ElementMode = iota
+	// ElementModePassive is the mode which doesn't require the runtime to initialize table, and only used with OpcodeTableInitName.
+	ElementModePassive
+	// ElementModeDeclarative is introduced in reference-types proposal, but currently not used.
+	ElementModeDeclarative
+)
+
 // ElementSegment are initialization instructions for a TableInstance
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-elem
 type ElementSegment struct {
 	// OffsetExpr returns the table element offset to apply to Init indices.
 	// Note: This can be validated prior to instantiation unless it includes OpcodeGlobalGet (an imported global).
+	// Note: This is nil if the Mode is either passive or declarative.
 	OffsetExpr *ConstantExpression
 
-	// Init indices are table elements relative to the result of OffsetExpr. The values are positions in the function
-	// index namespace that initialize the corresponding element.
-	Init []Index
+	// Init indices are (nullable) table elements where each index is the function index by which the module initialize the table.
+	Init []*Index
+
+	// Type holds the type of this element segment, which is the RefType in WebAssembly 2.0.
+	Type RefType
+
+	// Mode is the mode of this element segment.
+	Mode ElementMode
 }
 
-// TableInstance represents a table of (ElemTypeFuncref) elements in a module.
+// IsActive returns true if the element segment is "active" mode which requires the runtime to initialize table
+// with the contents in .Init field.
+func (e *ElementSegment) IsActive() bool {
+	return e.Mode == ElementModeActive
+}
+
+// TableInstance represents a table of (RefTypeFuncref) elements in a module.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 type TableInstance struct {
-	// Table holds the Engine-specific compiled functions mapped by element index.
-	Table []interface{}
+	// References holds references whose type is either RefTypeFuncref or RefTypeExternref (unsupported).
+	//
+	// Currently only function references are supported.
+	References []Reference
 
 	// Min is the minimum (function) elements in this table and cannot grow to accommodate ElementSegment.
 	Min uint32
@@ -38,10 +76,25 @@ type TableInstance struct {
 	Max *uint32
 }
 
-// validatedElementSegment is like ElementSegment except the inputs are expanded and validated based on defining module.
+// ElementInstance represents an element instance in a module.
+//
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#element-instances
+type ElementInstance struct {
+	// References holds references whose type is either RefTypeFuncref or RefTypeExternref (unsupported).
+	References []Reference
+	// Type is the RefType of the references in this instance's References.
+	Type RefType
+}
+
+// Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref (unsupported).
+//
+// Currently the content is a (possively nil) pointer to the engine-specific struct which can be only used in indirect function calls.
+type Reference = interface{}
+
+// validatedActiveElementSegment is like ElementSegment of active mode except the inputs are expanded and validated based on defining module.
 //
 // Note: The global imported at globalIdx may have an offset value that is out-of-bounds for the corresponding table.
-type validatedElementSegment struct {
+type validatedActiveElementSegment struct {
 	// opcode is OpcodeGlobalGet or OpcodeI32Const
 	opcode Opcode
 
@@ -53,14 +106,14 @@ type validatedElementSegment struct {
 	// init are a range of table elements whose values are positions in the function index namespace. This range
 	// replaces any values in TableInstance.Table at an offset arg which is a constant if opcode == OpcodeI32Const or
 	// derived from a globalIdx if opcode == OpcodeGlobalGet
-	init []Index
+	init []*Index
 }
 
-// validateTable ensures any ElementSegment is valid. This caches results via Module.validatedElementSegments.
+// validateTable ensures any ElementSegment is valid. This caches results via Module.validatedActiveElementSegments.
 // Note: limitsType are validated by decoders, so not re-validated here.
-func (m *Module) validateTable() ([]*validatedElementSegment, error) {
-	if m.validatedElementSegments != nil {
-		return m.validatedElementSegments, nil
+func (m *Module) validateTable(enabledFeatures Features) ([]*validatedActiveElementSegment, error) {
+	if m.validatedActiveElementSegments != nil {
+		return m.validatedActiveElementSegments, nil
 	}
 
 	t := m.TableSection
@@ -74,11 +127,11 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 	}
 
 	elementCount := m.SectionElementCount(SectionIDElement)
-	if elementCount > 0 && t == nil {
+	if !enabledFeatures.Get(FeatureBulkMemoryOperations) && elementCount > 0 && t == nil {
 		return nil, fmt.Errorf("%s was defined, but not table", SectionIDName(SectionIDElement))
 	}
 
-	ret := make([]*validatedElementSegment, 0, elementCount)
+	ret := make([]*validatedActiveElementSegment, 0, elementCount)
 
 	// Create bounds checks as these can err prior to instantiation
 	funcCount := m.importCount(ExternTypeFunc) + m.SectionElementCount(SectionIDFunction)
@@ -92,54 +145,56 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 
 		// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
 		for ei, funcIdx := range elem.Init {
-			if funcIdx >= funcCount {
-				return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, funcIdx)
+			if funcIdx != nil && *funcIdx >= funcCount {
+				return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
 			}
 		}
 
-		// global.get needs to be discovered during initialization
-		oc := elem.OffsetExpr.Opcode
-		if oc == OpcodeGlobalGet {
-			globalIdx, _, err := leb128.DecodeUint32(bytes.NewReader(elem.OffsetExpr.Data))
-			if err != nil {
-				return nil, fmt.Errorf("%s[%d] couldn't read global.get parameter: %w", SectionIDName(SectionIDElement), idx, err)
-			} else if err = m.verifyImportGlobalI32(SectionIDElement, idx, globalIdx); err != nil {
-				return nil, err
-			}
-
-			if initCount == 0 {
-				continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
-			}
-
-			ret = append(ret, &validatedElementSegment{oc, globalIdx, elem.Init})
-		} else if oc == OpcodeI32Const {
-			// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-			o, _, err := leb128.DecodeInt32(bytes.NewReader(elem.OffsetExpr.Data))
-			if err != nil {
-				return nil, fmt.Errorf("%s[%d] couldn't read i32.const parameter: %w", SectionIDName(SectionIDElement), idx, err)
-			}
-			offset := Index(o)
-
-			// Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L117 we must pass if imported
-			// table has set its min=0. Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L142, we
-			// have to do fail if module-defined min=0.
-			if !imported {
-				if err = checkSegmentBounds(t.Min, uint64(initCount)+uint64(offset), idx); err != nil {
+		if elem.IsActive() {
+			// global.get needs to be discovered during initialization
+			oc := elem.OffsetExpr.Opcode
+			if oc == OpcodeGlobalGet {
+				globalIdx, _, err := leb128.DecodeUint32(bytes.NewReader(elem.OffsetExpr.Data))
+				if err != nil {
+					return nil, fmt.Errorf("%s[%d] couldn't read global.get parameter: %w", SectionIDName(SectionIDElement), idx, err)
+				} else if err = m.verifyImportGlobalI32(SectionIDElement, idx, globalIdx); err != nil {
 					return nil, err
 				}
-			}
 
-			if initCount == 0 {
-				continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
-			}
+				if initCount == 0 {
+					continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
+				}
 
-			ret = append(ret, &validatedElementSegment{oc, offset, elem.Init})
-		} else {
-			return nil, fmt.Errorf("%s[%d] has an invalid const expression: %s", SectionIDName(SectionIDElement), idx, InstructionName(oc))
+				ret = append(ret, &validatedActiveElementSegment{oc, globalIdx, elem.Init})
+			} else if oc == OpcodeI32Const {
+				// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
+				o, _, err := leb128.DecodeInt32(bytes.NewReader(elem.OffsetExpr.Data))
+				if err != nil {
+					return nil, fmt.Errorf("%s[%d] couldn't read i32.const parameter: %w", SectionIDName(SectionIDElement), idx, err)
+				}
+				offset := Index(o)
+
+				// Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L117 we must pass if imported
+				// table has set its min=0. Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L142, we
+				// have to do fail if module-defined min=0.
+				if !imported {
+					if err = checkSegmentBounds(t.Min, uint64(initCount)+uint64(offset), idx); err != nil {
+						return nil, err
+					}
+				}
+
+				if initCount == 0 {
+					continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
+				}
+
+				ret = append(ret, &validatedActiveElementSegment{oc, offset, elem.Init})
+			} else {
+				return nil, fmt.Errorf("%s[%d] has an invalid const expression: %s", SectionIDName(SectionIDElement), idx, InstructionName(oc))
+			}
 		}
 	}
 
-	m.validatedElementSegments = ret
+	m.validatedActiveElementSegments = ret
 	return ret, nil
 }
 
@@ -154,7 +209,7 @@ func (m *Module) buildTable(importedTable *TableInstance, importedGlobals []*Glo
 	// The module defining the table is the one that sets its Min/Max etc.
 	if m.TableSection != nil {
 		t := m.TableSection
-		table = &TableInstance{Table: make([]interface{}, t.Min), Min: t.Min, Max: t.Max}
+		table = &TableInstance{References: make([]Reference, t.Min), Min: t.Min, Max: t.Max}
 	} else {
 		table = importedTable
 	}
@@ -162,7 +217,7 @@ func (m *Module) buildTable(importedTable *TableInstance, importedGlobals []*Glo
 		return // no table
 	}
 
-	elementSegments := m.validatedElementSegments
+	elementSegments := m.validatedActiveElementSegments
 	if len(elementSegments) == 0 {
 		return
 	}
@@ -184,7 +239,10 @@ func (m *Module) buildTable(importedTable *TableInstance, importedGlobals []*Glo
 		}
 
 		for i, funcidx := range elem.init {
-			init[offset+uint32(i)] = funcidx
+			if funcidx != nil {
+				// Null Index can be ignored.
+				init[offset+uint32(i)] = *funcidx
+			}
 		}
 	}
 	return

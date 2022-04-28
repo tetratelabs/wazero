@@ -86,7 +86,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 }
 
 func (j *jitEnv) setTable(table []interface{}) {
-	j.moduleInstance.Table = &wasm.TableInstance{Table: table}
+	j.moduleInstance.Table = &wasm.TableInstance{References: table}
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
