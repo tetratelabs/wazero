@@ -496,7 +496,7 @@ func TestModule_validateFunctions(t *testing.T) {
 func TestModule_validateMemory(t *testing.T) {
 	t.Run("data section exits but memory not declared", func(t *testing.T) {
 		m := Module{DataSection: make([]*DataSegment, 1)}
-		err := m.validateMemory(nil, nil)
+		err := m.validateMemory(nil, nil, Features20191205)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
 	})
@@ -506,7 +506,7 @@ func TestModule_validateMemory(t *testing.T) {
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
 		}}}
-		err := m.validateMemory(&Memory{}, nil)
+		err := m.validateMemory(&Memory{}, nil, Features20191205)
 		require.EqualError(t, err, "calculate offset: invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -517,7 +517,7 @@ func TestModule_validateMemory(t *testing.T) {
 				Data:   leb128.EncodeInt32(1),
 			},
 		}}}
-		err := m.validateMemory(&Memory{}, nil)
+		err := m.validateMemory(&Memory{}, nil, Features20191205)
 		require.NoError(t, err)
 	})
 }

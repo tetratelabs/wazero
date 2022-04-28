@@ -372,12 +372,6 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			// data.drop
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
-				flag:        FeatureBulkMemoryOperations,
-				memory:      nil,
-				expectedErr: "memory must exist for data.drop",
-			},
-			{
-				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
 				flag:        Features20191205,
 				expectedErr: `data.drop invalid as feature "bulk-memory-operations" is disabled`,
 			},
@@ -545,11 +539,6 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			// elem.drop
-			{
-				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
-				flag:        FeatureBulkMemoryOperations,
-				expectedErr: "table must exist for elem.drop",
-			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
 				flag:        Features20191205,

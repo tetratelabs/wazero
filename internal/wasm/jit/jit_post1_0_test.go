@@ -357,7 +357,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 }
 
 func TestCompiler_compileMemoryInit(t *testing.T) {
-	dataInstances := [][]byte{
+	dataInstances := []wasm.DataInstance{
 		nil, {1, 2, 3, 4, 5},
 	}
 
@@ -432,6 +432,238 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 				require.Equal(t, exp[:20], mem[:20])
 			} else {
 				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+			}
+		})
+	}
+}
+
+func TestCompiler_compileElemDrop(t *testing.T) {
+	origins := []wasm.ElementInstance{
+		{References: []wasm.Reference{1}},
+		{References: []wasm.Reference{2}},
+		{References: []wasm.Reference{3}},
+		{References: []wasm.Reference{4}},
+		{References: []wasm.Reference{5}},
+	}
+
+	for i := 0; i < len(origins); i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+
+			insts := make([]wasm.ElementInstance, len(origins))
+			copy(insts, origins)
+			env.module().ElementInstances = insts
+
+			// Verify assumption that before Drop instruction, all the element instances are not empty.
+			for _, inst := range insts {
+				require.NotEqual(t, 0, len(inst.References))
+			}
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				NeedsAccessToElementInstances: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileElemDrop(&wazeroir.OperationElemDrop{
+				ElemIndex: uint32(i),
+			})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+			for j := 0; j < len(insts); j++ {
+				if i == j {
+					require.Equal(t, 0, len(env.module().ElementInstances[j].References))
+				} else {
+					require.NotEqual(t, 0, len(env.module().ElementInstances[j].References))
+				}
+			}
+		})
+	}
+}
+
+func TestCompiler_compileTableCopy(t *testing.T) {
+	const tableSize = 100
+	for i, tc := range []struct {
+		sourceOffset, destOffset, size uint32
+		requireOutOfBoundsError        bool
+	}{
+		{sourceOffset: 0, destOffset: 0, size: 0},
+		{sourceOffset: 10, destOffset: 5, size: 10},
+		{sourceOffset: 10, destOffset: 9, size: 1},
+		{sourceOffset: 10, destOffset: 9, size: 2},
+		{sourceOffset: 0, destOffset: 10, size: 10},
+		{sourceOffset: 0, destOffset: 5, size: 10},
+		{sourceOffset: 9, destOffset: 10, size: 10},
+		{sourceOffset: 11, destOffset: 13, size: 4},
+		{sourceOffset: 0, destOffset: 10, size: 5},
+		{sourceOffset: 1, destOffset: 10, size: 5},
+		{sourceOffset: 0, destOffset: 10, size: 1},
+		{sourceOffset: 0, destOffset: 10, size: 0},
+		{sourceOffset: 5, destOffset: 10, size: 10},
+		{sourceOffset: 5, destOffset: 10, size: 5},
+		{sourceOffset: 5, destOffset: 10, size: 1},
+		{sourceOffset: 5, destOffset: 10, size: 0},
+		{sourceOffset: 10, destOffset: 0, size: 10},
+		{sourceOffset: 1, destOffset: 0, size: 2},
+		{sourceOffset: 1, destOffset: 0, size: 20},
+		{sourceOffset: 10, destOffset: 0, size: 5},
+		{sourceOffset: 10, destOffset: 0, size: 1},
+		{sourceOffset: 10, destOffset: 0, size: 0},
+		{sourceOffset: tableSize, destOffset: 0, size: 1, requireOutOfBoundsError: true},
+		{sourceOffset: tableSize + 1, destOffset: 0, size: 0, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: tableSize, size: 1, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: tableSize + 1, size: 0, requireOutOfBoundsError: true},
+		{sourceOffset: tableSize - 99, destOffset: 0, size: 100, requireOutOfBoundsError: true},
+		{sourceOffset: 0, destOffset: tableSize - 99, size: 100, requireOutOfBoundsError: true},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasTable: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Compile operands.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.size})
+			require.NoError(t, err)
+
+			err = compiler.compileTableCopy(&wazeroir.OperationTableCopy{})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Setup the table.
+			table := make([]wasm.Reference, tableSize)
+			env.setTable(table)
+			for i := 0; i < tableSize; i++ {
+				table[i] = byte(i)
+			}
+
+			// Run code.
+			env.exec(code)
+
+			if !tc.requireOutOfBoundsError {
+				exp := make([]wasm.Reference, tableSize)
+				for i := 0; i < tableSize; i++ {
+					exp[i] = byte(i)
+				}
+				copy(exp[tc.destOffset:],
+					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
+
+				// Check the status code and the destination memory region.
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, exp, table)
+			} else {
+				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+			}
+		})
+	}
+}
+
+func TestCompiler_compileTableInit(t *testing.T) {
+	elementInstances := []wasm.ElementInstance{
+		{}, {References: []wasm.Reference{1, 2, 3, 4, 5}},
+	}
+
+	const tableSize = 100
+	for i, tc := range []struct {
+		sourceOffset, destOffset uint32
+		elemIndex                uint32
+		copySize                 uint32
+		expOutOfBounds           bool
+	}{
+		{sourceOffset: 0, destOffset: 0, copySize: 0, elemIndex: 0},
+		{sourceOffset: 0, destOffset: 0, copySize: 1, elemIndex: 0, expOutOfBounds: true},
+		{sourceOffset: 1, destOffset: 0, copySize: 0, elemIndex: 0, expOutOfBounds: true},
+		{sourceOffset: 0, destOffset: 0, copySize: 0, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 5, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 1, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 3, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 1, copySize: 3, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 7, copySize: 4, elemIndex: 1},
+		{sourceOffset: 1, destOffset: 7, copySize: 4, elemIndex: 1},
+		{sourceOffset: 4, destOffset: 7, copySize: 1, elemIndex: 1},
+		{sourceOffset: 5, destOffset: 7, copySize: 0, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 7, copySize: 5, elemIndex: 1},
+		{sourceOffset: 1, destOffset: 0, copySize: 3, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 1, copySize: 4, elemIndex: 1},
+		{sourceOffset: 1, destOffset: 1, copySize: 3, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 10, copySize: 5, elemIndex: 1},
+		{sourceOffset: 0, destOffset: 0, copySize: 6, elemIndex: 1, expOutOfBounds: true},
+		{sourceOffset: 6, destOffset: 0, copySize: 0, elemIndex: 1, expOutOfBounds: true},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			env := newJITEnvironment()
+			env.module().ElementInstances = elementInstances
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				NeedsAccessToElementInstances: true, HasTable: true,
+				Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Compile operands.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.destOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.sourceOffset})
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.copySize})
+			require.NoError(t, err)
+
+			err = compiler.compileTableInit(&wazeroir.OperationTableInit{
+				ElemIndex: tc.elemIndex,
+			})
+			require.NoError(t, err)
+
+			// Setup the table.
+			table := make([]wasm.Reference, tableSize)
+			env.setTable(table)
+			for i := 0; i < tableSize; i++ {
+				table[i] = byte(i)
+			}
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			if !tc.expOutOfBounds {
+				exp := make([]wasm.Reference, tableSize)
+				for i := 0; i < tableSize; i++ {
+					exp[i] = byte(i)
+				}
+				if inst := elementInstances[tc.elemIndex]; inst.References != nil {
+					copy(exp[tc.destOffset:], inst.References[tc.sourceOffset:tc.sourceOffset+tc.copySize])
+				}
+				require.Equal(t, exp, table)
+			} else {
+				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
 			}
 		})
 	}

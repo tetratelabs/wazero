@@ -21,27 +21,27 @@ func TestTableType(t *testing.T) {
 		{
 			name:     "min 0",
 			input:    &wasm.Table{},
-			expected: []byte{wasm.ElemTypeFuncref, 0x0, 0},
+			expected: []byte{wasm.RefTypeFuncref, 0x0, 0},
 		},
 		{
 			name:     "min 0, max 0",
 			input:    &wasm.Table{Max: &zero},
-			expected: []byte{wasm.ElemTypeFuncref, 0x1, 0, 0},
+			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0},
 		},
 		{
 			name:     "min largest",
 			input:    &wasm.Table{Min: max},
-			expected: []byte{wasm.ElemTypeFuncref, 0x0, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref, 0x0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min 0, max largest",
 			input:    &wasm.Table{Max: &max},
-			expected: []byte{wasm.ElemTypeFuncref, 0x1, 0, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref, 0x1, 0, 0x80, 0x80, 0x80, 0x40},
 		},
 		{
 			name:     "min largest max largest",
 			input:    &wasm.Table{Min: max, Max: &max},
-			expected: []byte{wasm.ElemTypeFuncref, 0x1, 0x80, 0x80, 0x80, 0x40, 0x80, 0x80, 0x80, 0x40},
+			expected: []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x80, 0x40, 0x80, 0x80, 0x80, 0x40},
 		},
 	}
 
@@ -74,17 +74,17 @@ func TestDecodeTableType_Errors(t *testing.T) {
 		},
 		{
 			name:        "max < min",
-			input:       []byte{wasm.ElemTypeFuncref, 0x1, 0x80, 0x80, 0x4, 0},
+			input:       []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x4, 0},
 			expectedErr: "table size minimum must not be greater than maximum",
 		},
 		{
 			name:        "min > limit",
-			input:       []byte{wasm.ElemTypeFuncref, 0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
+			input:       []byte{wasm.RefTypeFuncref, 0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "table min must be at most 134217728",
 		},
 		{
 			name:        "max > limit",
-			input:       []byte{wasm.ElemTypeFuncref, 0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
+			input:       []byte{wasm.RefTypeFuncref, 0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "table max must be at most 134217728",
 		},
 	}

@@ -680,6 +680,10 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			consts: consts64,
 		},
 		{
+			inst:   asm_arm64.LSL,
+			consts: []int64{1, 2, 4, 16, 31, 32, 63},
+		},
+		{
 			inst:   asm_arm64.LSR,
 			consts: []int64{1, 2, 4, 16, 31, 32, 63},
 		},
@@ -694,7 +698,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 				t.Run(asm_arm64.RegisterName(r), func(t *testing.T) {
 					for _, c := range tc.consts {
 						var cs = []int64{c}
-						if tc.inst != asm_arm64.LSR && c != 0 {
+						if tc.inst != asm_arm64.LSR && tc.inst != asm_arm64.LSL && c != 0 {
 							cs = append(cs, -c)
 						}
 						for _, c := range cs {

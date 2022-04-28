@@ -110,11 +110,14 @@ type (
 		// codesElement0Address is &moduleContext.engine.codes[0] as uintptr.
 		codesElement0Address uintptr
 
-		// typeIDsElement0Address holds the &ModuleInstance.typeIDs[0] as uintptr.
+		// typeIDsElement0Address holds the &ModuleInstance.TypeIDs[0] as uintptr.
 		typeIDsElement0Address uintptr
 
-		// dataInstancesElement0Address holds the &ModuleInstance.dataIntances[0] as uintptr.
+		// dataInstancesElement0Address holds the &ModuleInstance.DataIntances[0] as uintptr.
 		dataInstancesElement0Address uintptr
+
+		// elementInstancesElemen0Address holds the &ModuleInstance.ElementInstances[0] as uintptr.
+		elementInstancesElemen0Address uintptr
 	}
 
 	// valueStackContext stores the data to access engine.valueStack.
@@ -232,23 +235,24 @@ const (
 	callEngineGlobalContextCallFrameStackPointerOffset         = 32
 
 	// Offsets for callEngine moduleContext.
-	callEngineModuleContextModuleInstanceAddressOffset        = 40
-	callEngineModuleContextGlobalElement0AddressOffset        = 48
-	callEngineModuleContextMemoryElement0AddressOffset        = 56
-	callEngineModuleContextMemorySliceLenOffset               = 64
-	callEngineModuleContextTableElement0AddressOffset         = 72
-	callEngineModuleContextTableSliceLenOffset                = 80
-	callEngineModuleContextCodesElement0AddressOffset         = 88
-	callEngineModuleContextTypeIDsElement0AddressOffset       = 96
-	callEngineModuleContextDataInstancesElement0AddressOffset = 104
+	callEngineModuleContextModuleInstanceAddressOffset           = 40
+	callEngineModuleContextGlobalElement0AddressOffset           = 48
+	callEngineModuleContextMemoryElement0AddressOffset           = 56
+	callEngineModuleContextMemorySliceLenOffset                  = 64
+	callEngineModuleContextTableElement0AddressOffset            = 72
+	callEngineModuleContextTableSliceLenOffset                   = 80
+	callEngineModuleContextCodesElement0AddressOffset            = 88
+	callEngineModuleContextTypeIDsElement0AddressOffset          = 96
+	callEngineModuleContextDataInstancesElement0AddressOffset    = 104
+	callEngineModuleContextElementInstancesElement0AddressOffset = 112
 
 	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset     = 112
-	callEngineValueStackContextStackBasePointerOffset = 120
+	callEngineValueStackContextStackPointerOffset     = 120
+	callEngineValueStackContextStackBasePointerOffset = 128
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextJITCallStatusCodeOffset          = 128
-	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
+	callEngineExitContextJITCallStatusCodeOffset          = 136
+	callEngineExitContextBuiltinFunctionCallAddressOffset = 140
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -264,12 +268,13 @@ const (
 	functionModuleInstanceAddressOffset = 24
 
 	// Offsets for wasm.ModuleInstance.
-	moduleInstanceGlobalsOffset       = 48
-	moduleInstanceMemoryOffset        = 72
-	moduleInstanceTableOffset         = 80
-	moduleInstanceEngineOffset        = 120
-	moduleInstanceTypeIDsOffset       = 136
-	moduleInstanceDataInstancesOffset = 160
+	moduleInstanceGlobalsOffset          = 48
+	moduleInstanceMemoryOffset           = 72
+	moduleInstanceTableOffset            = 80
+	moduleInstanceEngineOffset           = 120
+	moduleInstanceTypeIDsOffset          = 136
+	moduleInstanceDataInstancesOffset    = 160
+	moduleInstanceElementInstancesOffset = 184
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -288,7 +293,14 @@ const (
 	// Offsets for Go's interface.
 	// https://research.swtch.com/interfaces
 	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
-	interfaceDataOffset = 8
+	interfaceDataOffset   = 8
+	interfaceDataSizeLog2 = 4
+
+	// Consts for DataInstance.
+	dataInstanceStructSize = 24
+
+	// Consts for ElementInstance.
+	elementInsanceStructSize = 32
 )
 
 // jitCallStatusCode represents the result of `jitcall`.
@@ -472,7 +484,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
-		table.Table[elemIdx] = me.functions[funcidx]
+		table.References[elemIdx] = me.functions[funcidx]
 	}
 	return me, nil
 }
@@ -502,7 +514,22 @@ func (me *moduleEngine) Name() string {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
+func (me *moduleEngine) CreateFuncElementInstnace(indexes []*wasm.Index) *wasm.ElementInstance {
+	refs := make([]wasm.Reference, len(indexes))
+	for i, index := range indexes {
+		if index != nil {
+			refs[i] = me.functions[*index]
+		}
+	}
+	return &wasm.ElementInstance{
+		References: refs,
+		Type:       wasm.RefTypeFuncref,
+	}
+}
+
+// Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+	// runtime.Breakpoint()
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := me.functions[f.Index]
@@ -956,6 +983,12 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 			err = compiler.compileMemoryCopy()
 		case *wazeroir.OperationMemoryFill:
 			err = compiler.compileMemoryFill()
+		case *wazeroir.OperationTableInit:
+			err = compiler.compileTableInit(o)
+		case *wazeroir.OperationTableCopy:
+			err = compiler.compileTableCopy(o)
+		case *wazeroir.OperationElemDrop:
+			err = compiler.compileElemDrop(o)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)

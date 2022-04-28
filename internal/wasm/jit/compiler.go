@@ -357,4 +357,19 @@ type compiler interface {
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileMemoryFill() error
+	// compileTableInit adds instructions to perform operations corresponding to the wasm.OpcodeTableInit instruction in
+	// the bulk-memory-operations proposal.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
+	compileTableInit(*wazeroir.OperationTableInit) error
+	// compileTableCopy adds instructions to perform operations corresponding to the wasm.OpcodeTableCopy instruction in
+	// the bulk-memory-operations proposal.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
+	compileTableCopy(*wazeroir.OperationTableCopy) error
+	// compileElemDrop adds instructions to perform operations corresponding to the wasm.OpcodeElemDrop instruction in
+	// the bulk-memory-operations proposal.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
+	compileElemDrop(*wazeroir.OperationElemDrop) error
 }

@@ -180,7 +180,7 @@ func (c command) expectedError() (err error) {
 		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
 	case "indirect call type mismatch", "indirect call":
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
-	case "undefined element", "undefined":
+	case "undefined element", "undefined", "out of bounds table access":
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
 	case "integer overflow":
 		err = wasmruntime.ErrRuntimeIntegerOverflow

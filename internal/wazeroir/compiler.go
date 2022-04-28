@@ -181,6 +181,8 @@ type CompilationResult struct {
 	HasTable bool
 	// NeedsAccessToDataInstances is true if the function needs access to data instances via memory.init or data.drop instructions.
 	NeedsAccessToDataInstances bool
+	// NeedsAccessToDataInstances is true if the function needs access to element instances via table.init or elem.drop instructions.
+	NeedsAccessToElementInstances bool
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
@@ -1529,17 +1531,18 @@ operatorSwitch:
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
-			c.emit(
-				&OperationTableInit{ElemIndex: elemIndex},
-			)
-		case wasm.OpcodeMiscElemDrop:
-			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			// Read table index which is fixed to zero currently.
+			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
-			// Read the table index which is not used for now (until reference type proposal impl.)
-			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			c.emit(
+				&OperationTableInit{ElemIndex: elemIndex},
+			)
+			c.result.NeedsAccessToElementInstances = true
+		case wasm.OpcodeMiscElemDrop:
+			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
@@ -1547,6 +1550,7 @@ operatorSwitch:
 			c.emit(
 				&OperationElemDrop{ElemIndex: elemIndex},
 			)
+			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table index which is not used for now (until reference type proposal impl.)
 			_, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1564,6 +1568,7 @@ operatorSwitch:
 			c.emit(
 				&OperationTableCopy{},
 			)
+			c.result.NeedsAccessToElementInstances = true
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}

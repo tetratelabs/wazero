@@ -16,8 +16,8 @@ func decodeTable(r *bytes.Reader) (*wasm.Table, error) {
 		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
-	if b != wasm.ElemTypeFuncref {
-		return nil, fmt.Errorf("invalid element type %#x != funcref(%#x)", b, wasm.ElemTypeFuncref)
+	if b != wasm.RefTypeFuncref {
+		return nil, fmt.Errorf("invalid element type %#x != funcref(%#x)", b, wasm.RefTypeFuncref)
 	}
 
 	min, max, err := decodeLimitsType(r)
@@ -41,5 +41,5 @@ func decodeTable(r *bytes.Reader) (*wasm.Table, error) {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-table
 func encodeTable(i *wasm.Table) []byte {
-	return append([]byte{wasm.ElemTypeFuncref}, encodeLimitsType(i.Min, i.Max)...)
+	return append([]byte{wasm.RefTypeFuncref}, encodeLimitsType(i.Min, i.Max)...)
 }

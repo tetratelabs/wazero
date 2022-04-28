@@ -759,7 +759,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				var params []ValueType
 				switch miscOpcode {
 				case OpcodeMiscMemoryInit, OpcodeMiscMemoryCopy, OpcodeMiscMemoryFill, OpcodeMiscDataDrop:
-					if memory == nil {
+					if miscOpcode != OpcodeMiscDataDrop && memory == nil {
 						return fmt.Errorf("memory must exist for %s", MiscInstructionName(miscOpcode))
 					}
 					if miscOpcode != OpcodeMiscDataDrop {
@@ -805,10 +805,10 @@ func (m *Module) validateFunctionWithMaxStackValues(
 						}
 					}
 				case OpcodeMiscTableInit, OpcodeMiscElemDrop, OpcodeMiscTableCopy:
-					if table == nil {
-						return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
-					}
 					if miscOpcode != OpcodeMiscElemDrop {
+						if table == nil {
+							return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
+						}
 						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					}
 					if miscOpcode == OpcodeMiscTableInit || miscOpcode == OpcodeMiscElemDrop {

@@ -113,8 +113,8 @@ func TestModule_Encode(t *testing.T) {
 			},
 			expected: append(append(Magic, version...),
 				wasm.SectionIDTable, 0x04, // 4 bytes in this section
-				0x01,                            // 1 table
-				wasm.ElemTypeFuncref, 0x0, 0x03, // func, only min: 3
+				0x01,                           // 1 table
+				wasm.RefTypeFuncref, 0x0, 0x03, // func, only min: 3
 				wasm.SectionIDMemory, 0x04, // 4 bytes in this section
 				0x01,             // 1 memory
 				0x01, 0x01, 0x01, // min and max = 1

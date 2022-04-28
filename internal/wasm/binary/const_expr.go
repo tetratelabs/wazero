@@ -32,6 +32,15 @@ func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error)
 		_, err = ieee754.DecodeFloat64(r)
 	case wasm.OpcodeGlobalGet:
 		_, _, err = leb128.DecodeUint32(r)
+	case wasm.OpcodeRefNull:
+		var reftype byte
+		reftype, err = r.ReadByte()
+		if reftype != wasm.RefTypeFuncref {
+			return nil, fmt.Errorf("ref.null instruction in constant expression must be of funcref type but was 0x%x", reftype)
+		}
+	case wasm.OpcodeRefFunc:
+		// Parsing index.
+		_, _, err = leb128.DecodeUint32(r)
 	default:
 		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b)
 	}
