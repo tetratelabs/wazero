@@ -229,10 +229,10 @@ const (
 	OpcodeF32ReinterpretI32 Opcode = 0xbe
 	OpcodeF64ReinterpretI64 Opcode = 0xbf
 
-	// OpcodeRefNull pushes a null reference value whose type is specified by immediate.
+	// OpcodeRefNull pushes a null reference value whose type is specified by immediate to this opcode.
 	// This is defined in the reference types proposal, but necessary for bulk-memory proposal as well.
 	//
-	// Currently only supported in the constant expression in element segments to this opcode.
+	// Currently only supported in the constant expression in element segments.
 	OpcodeRefNull = 0xd0
 	// OpcodeRefIsNull pops a reference value, and pushes 1 if it is null, 0 otherwise.
 	// This is defined in the reference types proposal, but necessary for bulk-memory proposal as well.
