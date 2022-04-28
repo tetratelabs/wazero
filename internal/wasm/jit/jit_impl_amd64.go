@@ -3774,14 +3774,17 @@ func (c *amd64Compiler) compileMemoryFill() error {
 	return nil
 }
 
+// compileTableInit implements compiler.compileTableInit for the amd64 architecture.
 func (c *amd64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
 	return c.compileInitImpl(true, o.ElemIndex)
 }
 
+// compileTableCopy implements compiler.compileTableCopy for the amd64 architecture.
 func (c *amd64Compiler) compileTableCopy(*wazeroir.OperationTableCopy) error {
 	return c.compileCopyImpl(true)
 }
 
+// compileElemDrop implements compiler.compileElemDrop for the amd64 architecture.
 func (c *amd64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
@@ -3798,11 +3801,11 @@ func (c *amd64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 }
 
 func (c *amd64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm.Register) {
-	// dst = elemIndex * elementInsanceStructSize
-	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(elemIndex)*elementInsanceStructSize, dst)
+	// dst = elemIndex * elementInstanceStructSize
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(elemIndex)*elementInstanceStructSize, dst)
 
 	// dst = &moduleInstance.ElementInstances[0] + dst
-	//     = &moduleInstance.ElementInstances[0] + elemIndex*elementInsanceStructSize
+	//     = &moduleInstance.ElementInstances[0] + elemIndex*elementInstanceStructSize
 	//     = &moduleInstance.ElementInstances[elemIndex]
 	c.assembler.CompileMemoryToRegister(amd64.ADDQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextElementInstancesElement0AddressOffset,

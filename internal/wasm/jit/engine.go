@@ -300,7 +300,7 @@ const (
 	dataInstanceStructSize = 24
 
 	// Consts for ElementInstance.
-	elementInsanceStructSize = 32
+	elementInstanceStructSize = 32
 )
 
 // jitCallStatusCode represents the result of `jitcall`.
@@ -513,7 +513,7 @@ func (me *moduleEngine) Name() string {
 	return me.name
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
+// CreateFuncElementInstnace implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) CreateFuncElementInstnace(indexes []*wasm.Index) *wasm.ElementInstance {
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
@@ -529,7 +529,6 @@ func (me *moduleEngine) CreateFuncElementInstnace(indexes []*wasm.Index) *wasm.E
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	// runtime.Breakpoint()
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := me.functions[f.Index]

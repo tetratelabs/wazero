@@ -3015,7 +3015,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
 			destinationOffset.register, copySize.register,
 		)
 
-		// Decrement the size coutner and if the value is still negative, continue the loop.
+		// Decrement the size counter and if the value is still negative, continue the loop.
 		c.assembler.CompileConstToRegister(arm64.ADDS, movSize, copySize.register)
 		c.assembler.CompileJump(arm64.BMI).AssignJumpTarget(beginCopyLoop)
 
@@ -3349,14 +3349,17 @@ func (c *arm64Compiler) compileMemoryFill() error {
 	return nil
 }
 
+// compileTableInit implements compiler.compileTableInit for the arm64 architecture.
 func (c *arm64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
 	return c.compileInitImpl(true, o.ElemIndex)
 }
 
+// compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.
 func (c *arm64Compiler) compileTableCopy(*wazeroir.OperationTableCopy) error {
 	return c.compileCopyImpl(true)
 }
 
+// compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
 func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
@@ -3373,8 +3376,8 @@ func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 }
 
 func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm.Register) {
-	// dst = dataIndex * elementInsanceStructSize
-	c.assembler.CompileConstToRegister(arm64.MOVD, int64(elemIndex)*elementInsanceStructSize, dst)
+	// dst = dataIndex * elementInstanceStructSize
+	c.assembler.CompileConstToRegister(arm64.MOVD, int64(elemIndex)*elementInstanceStructSize, dst)
 
 	// arm64ReservedRegisterForTemporary = &moduleInstance.ElementInstances[0]
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
@@ -3383,7 +3386,7 @@ func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 	)
 
 	// dst = arm64ReservedRegisterForTemporary + dst
-	//     = &moduleInstance.ElementInstances[0] + elemIndex*elementInsanceStructSize
+	//     = &moduleInstance.ElementInstances[0] + elemIndex*elementInstanceStructSize
 	//     = &moduleInstance.ElementInstances[elemIndex]
 	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, dst)
 }

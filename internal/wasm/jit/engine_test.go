@@ -110,7 +110,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Sizeof(dataInstance)), dataInstanceStructSize)
 
 	var elementInstance wasm.ElementInstance
-	require.Equal(t, int(unsafe.Sizeof(elementInstance)), elementInsanceStructSize)
+	require.Equal(t, int(unsafe.Sizeof(elementInstance)), elementInstanceStructSize)
 }
 
 // et is used for tests defined in the enginetest package.
