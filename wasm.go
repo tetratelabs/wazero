@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
+	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"

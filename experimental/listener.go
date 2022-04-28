@@ -1,20 +1,20 @@
-package experimentalapi
+package experimental
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 )
 
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
+// Note: This is interpreter-only for now!
 type FunctionListenerFactoryKey struct{}
 
 // FunctionListenerFactory returns FunctionListeners to be notified when a function is called.
 type FunctionListenerFactory interface {
 	// NewListener returns a FunctionListener for a defined function. If nil is returned, no
 	// listener will be notified.
-	NewListener(info FunctionInfo) FunctionListener
+	NewListener(FunctionDefinition) FunctionListener
 }
 
 // FunctionListener can be registered for any function via FunctionListenerFactory to
@@ -24,41 +24,32 @@ type FunctionListener interface {
 	// The returned context will be used as the context of this function call. To add context
 	// information for this function call, add it to ctx and return the updated context. If
 	// no context information is needed, return ctx as is.
-	Before(ctx context.Context) context.Context
+	Before(context.Context, []uint64) context.Context
 
 	// After is invoked after a function is called. ctx is the context of this function call.
-	After(ctx context.Context)
+	After(context.Context, []uint64)
 }
 
-// ValueInfo are information about the definition of a parameter or return value.
-type ValueInfo struct {
-	// The name of the value. Empty if name is not available.
-	Name string
+// FunctionDefinition includes information about a function available pre-instantiation.
+type FunctionDefinition interface {
+	// ModuleName is the possibly empty name of the module defining this function.
+	ModuleName() string
 
-	// The type of the value.
-	Type api.ValueType
-}
+	// Index is the position in the module's function index namespace, imports first.
+	Index() uint32
 
-func (info ValueInfo) String() string {
-	n := info.Name
-	if len(n) == 0 {
-		n = "<unknown>"
-	}
-	return fmt.Sprintf("%v: %v", n, api.ValueTypeName(info.Type))
-}
+	// Name is the module-defined name of the function, which is not necessarily the same as its export name.
+	Name() string
 
-// FunctionInfo are information about a function available pre-instantiation.
-type FunctionInfo struct {
-	// The name of the module the function is defined in.
-	ModuleName string
+	// ExportNames include all exported names for the given function.
+	ExportNames() []string
 
-	// The name of the function. This will be the name of the export for an exported function.
-	// Empty if name is not available.
-	Name string
+	// ParamTypes are the parameters of the function.
+	ParamTypes() []api.ValueType
 
-	// The function parameters.
-	Params []ValueInfo
+	// ParamNames are index-correlated with ParamTypes or nil if not available for one or more parameters.
+	ParamNames() []string
 
-	// The function return values.
-	Returns []ValueInfo
+	// ResultTypes are the results of the function.
+	ResultTypes() []api.ValueType
 }

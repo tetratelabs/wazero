@@ -103,6 +103,20 @@ func (ce *callEngine) popValue() (v uint64) {
 	return
 }
 
+// peekValues pops api.ValueType values from the stack and returns them in reverse order.
+func (ce *callEngine) peekValues(count int) []uint64 {
+	if count == 0 {
+		return nil
+	}
+	stackTopIndex := len(ce.stack) - 1
+	peeked := ce.stack[stackTopIndex-count : stackTopIndex]
+	values := make([]uint64, 0, count)
+	for i := count - 1; i >= 0; i-- {
+		values = append(values, peeked[i])
+	}
+	return values
+}
+
 func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
@@ -221,7 +235,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for _, f := range importedFunctions {
-		cf := f.Module.Engine.(*moduleEngine).functions[f.Index]
+		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
 		me.functions = append(me.functions, cf)
 	}
 
@@ -554,10 +568,10 @@ func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.E
 func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := me.functions[f.Index]
+	compiled := me.functions[f.Idx]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = m.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", me.name, f.Index))
+			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", me.name, f.Idx))
 		}
 		return
 	}
@@ -589,11 +603,17 @@ func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.F
 	}()
 
 	if f.Kind == wasm.FunctionKindWasm {
+		if f.FunctionListener != nil {
+			ctx = f.FunctionListener.Before(ctx, params)
+		}
 		for _, param := range params {
 			ce.pushValue(param)
 		}
 		ce.callNativeFunc(ctx, m, compiled)
 		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
+		if f.FunctionListener != nil {
+			f.FunctionListener.After(ctx, results)
+		}
 	} else {
 		results = ce.callGoFunc(ctx, m, compiled, params)
 	}
@@ -606,22 +626,19 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 		callCtx = callCtx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
 	}
 	if f.source.FunctionListener != nil {
-		ctx = f.source.FunctionListener.Before(ctx)
+		ctx = f.source.FunctionListener.Before(ctx, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
 	results = wasm.CallGoFunc(ctx, callCtx, f.source, params)
 	ce.popFrame()
 	if f.source.FunctionListener != nil {
-		f.source.FunctionListener.After(ctx)
+		f.source.FunctionListener.After(ctx, results)
 	}
 	return
 }
 
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
-	if f.source.FunctionListener != nil {
-		ctx = f.source.FunctionListener.Before(ctx)
-	}
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
@@ -631,6 +648,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
+	listener := f.source.FunctionListener
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -671,6 +689,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				f := functions[op.us[0]]
 				if f.hostFn != nil {
 					ce.callGoFuncWithStack(ctx, callCtx, f)
+				} else if listener != nil {
+					ctx = listener.Before(ctx, ce.peekValues(len(f.source.Type.Params)))
+					ce.callNativeFunc(ctx, callCtx, f)
+					listener.After(ctx, ce.peekValues(len(f.source.Type.Results)))
 				} else {
 					ce.callNativeFunc(ctx, callCtx, f)
 				}
@@ -682,18 +704,22 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if offset >= uint64(len(table.References)) {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
-				targetcode, ok := table.References[offset].(*function)
+				tf, ok := table.References[offset].(*function)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-				} else if targetcode.source.TypeID != typeIDs[op.us[0]] {
+				} else if tf.source.TypeID != typeIDs[op.us[0]] {
 					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
 				// Call in.
-				if targetcode.hostFn != nil {
-					ce.callGoFuncWithStack(ctx, callCtx, f)
+				if tf.hostFn != nil {
+					ce.callGoFuncWithStack(ctx, callCtx, tf)
+				} else if listener != nil {
+					ctx = listener.Before(ctx, ce.peekValues(len(tf.source.Type.Params)))
+					ce.callNativeFunc(ctx, callCtx, tf)
+					listener.After(ctx, ce.peekValues(len(tf.source.Type.Results)))
 				} else {
-					ce.callNativeFunc(ctx, callCtx, targetcode)
+					ce.callNativeFunc(ctx, callCtx, tf)
 				}
 				frame.pc++
 			}
@@ -1784,9 +1810,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
-	if f.source.FunctionListener != nil {
-		f.source.FunctionListener.After(ctx)
-	}
 }
 
 // popMemoryOffset takes a memory offset off the stack for use in load and store instructions.

@@ -39,11 +39,12 @@ func FuncName(moduleName, funcName string, funcIdx uint32) string {
 	return ret.String()
 }
 
-// signature returns a formatted signature similar to how it is defined in Go.
+// Signature returns a formatted signature similar to how it is defined in Go.
 //
 // * paramTypes should be from wasm.FunctionType
 // * resultTypes should be from wasm.FunctionType
-func addSignature(funcName string, paramTypes []api.ValueType, resultTypes []api.ValueType) string {
+// TODO: add paramNames
+func Signature(funcName string, paramTypes []api.ValueType, resultTypes []api.ValueType) string {
 	var ret strings.Builder
 	ret.WriteString(funcName)
 
@@ -140,5 +141,5 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType) {
 	// Format as best as we can, considering we don't yet have source and line numbers,
 	// TODO: include DWARF symbols. See #58
-	s.frames = append(s.frames, addSignature(funcName, paramTypes, resultTypes))
+	s.frames = append(s.frames, Signature(funcName, paramTypes, resultTypes))
 }

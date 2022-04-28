@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
+	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
@@ -135,8 +135,22 @@ type (
 		// TypeID is assigned by a store for FunctionType.
 		TypeID FunctionTypeID
 
-		// Index holds the index of this function instance in the function index namespace (beginning with imports).
-		Index Index
+		// Idx holds the index of this function instance in the function index namespace (beginning with imports).
+		Idx Index
+
+		// The below metadata are used in function listeners, prior to instantiation:
+
+		// moduleName is the defining module's name
+		moduleName string
+
+		// name is the module-defined name of this function
+		name string
+
+		// paramNames is non-nil when all parameters have names.
+		paramNames []string
+
+		// exportNames is non-nil when the function is exported.
+		exportNames []string
 
 		// FunctionListener holds a listener to notify when this function is called.
 		FunctionListener experimentalapi.FunctionListener
@@ -156,6 +170,31 @@ type (
 	// and used at runtime to do type-checks on indirect function calls.
 	FunctionTypeID uint32
 )
+
+// Index implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionInstance) Index() uint32 {
+	return f.Idx
+}
+
+// Name implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionInstance) Name() string {
+	return f.name
+}
+
+// ModuleName implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionInstance) ModuleName() string {
+	return f.moduleName
+}
+
+// ExportNames implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionInstance) ExportNames() []string {
+	return f.exportNames
+}
+
+// ParamNames implements the same method as documented on experimental.FunctionDefinition.
+func (f *FunctionInstance) ParamNames() []string {
+	return f.paramNames
+}
 
 // The wazero specific limitations described at RATIONALE.md.
 const (

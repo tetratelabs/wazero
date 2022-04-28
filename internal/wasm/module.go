@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	experimental_api "github.com/tetratelabs/wazero/internal/experimental/api"
+	experimental "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -486,10 +486,12 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 	return
 }
 
-func (m *Module) buildFunctions(moduleName string, functionListenerFactory experimental_api.FunctionListenerFactory) (functions []*FunctionInstance) {
+func (m *Module) buildFunctions(moduleName string, fnlf experimental.FunctionListenerFactory) (functions []*FunctionInstance) {
 	var functionNames NameMap
+	var localNames IndirectNameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
+		localNames = m.NameSection.LocalNames
 	}
 
 	importCount := m.ImportFuncCount()
@@ -514,16 +516,44 @@ func (m *Module) buildFunctions(moduleName string, functionListenerFactory exper
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,
 			LocalTypes: m.CodeSection[codeIndex].LocalTypes,
-			Index:      funcIdx,
+			Idx:        funcIdx,
 		}
+
 		f.DebugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
-		if functionListenerFactory != nil {
-			info := m.resolveFunction(moduleName, f, funcIdx)
-			f.FunctionListener = functionListenerFactory.NewListener(info)
+		f.moduleName = moduleName
+		f.name = funcName
+		f.paramNames = paramNames(localNames, funcIdx, len(f.ParamTypes()))
+
+		for _, e := range m.ExportSection {
+			if e.Type == ExternTypeFunc && e.Index == funcIdx {
+				f.exportNames = append(f.exportNames, e.Name)
+			}
+		}
+
+		if fnlf != nil {
+			f.FunctionListener = fnlf.NewListener(f)
 		}
 		functions = append(functions, f)
 	}
 	return
+}
+
+func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []string {
+	for _, nm := range localNames {
+		// Only build parameter names if we have one for each.
+		if nm.Index != funcIdx || len(nm.NameMap) < paramLen {
+			continue
+		}
+
+		ret := make([]string, paramLen)
+		for _, p := range nm.NameMap {
+			if int(p.Index) < paramLen {
+				ret[p.Index] = p.Name
+			}
+		}
+		return ret
+	}
+	return nil
 }
 
 func (m *Module) buildMemory() (mem *MemoryInstance) {
@@ -536,39 +566,6 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 		}
 	}
 	return
-}
-
-func (m *Module) resolveFunction(moduleName string, f *FunctionInstance, funcIdx uint32) experimental_api.FunctionInfo {
-	params := make([]experimental_api.ValueInfo, len(f.ParamTypes()))
-	for i, p := range f.ParamTypes() {
-		params[i].Type = p
-	}
-	results := make([]experimental_api.ValueInfo, len(f.ResultTypes()))
-	for i, r := range f.ResultTypes() {
-		results[i].Type = r
-	}
-
-	for _, nm := range m.NameSection.LocalNames {
-		if nm.Index == funcIdx {
-			for _, n := range nm.NameMap {
-				if int(n.Index) < len(params) {
-					params[n.Index].Name = n.Name
-				} else {
-					resIdx := int(n.Index) - len(params)
-					// Only malformed program would have an index out of bounds here.
-					if resIdx < len(results) {
-						results[resIdx].Name = n.Name
-					}
-				}
-			}
-		}
-	}
-	return experimental_api.FunctionInfo{
-		ModuleName: moduleName,
-		Name:       f.DebugName,
-		Params:     params,
-		Returns:    results,
-	}
 }
 
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because

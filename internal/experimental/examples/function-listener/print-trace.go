@@ -8,30 +8,39 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/internal/experimental/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 type stackKey struct{}
 
-type callListener struct {
-	message string
-}
+type callListener struct{ message string }
 
-func (l *callListener) Before(ctx context.Context) context.Context {
+func (l *callListener) Before(ctx context.Context, _ []uint64) context.Context {
 	currStack, _ := ctx.Value(stackKey{}).([]string)
 	return context.WithValue(ctx, stackKey{}, append(currStack, l.message))
 }
 
-func (l *callListener) After(_ context.Context) {
+func (l *callListener) After(context.Context, []uint64) {
 }
 
-type callListenerFactory struct {
-}
+type callListenerFactory struct{}
 
-func (f *callListenerFactory) NewListener(info experimentalapi.FunctionInfo) experimentalapi.FunctionListener {
+func (f *callListenerFactory) NewListener(fnd experimental.FunctionDefinition) experimental.FunctionListener {
 	return &callListener{
-		message: fmt.Sprintf("%v(%v) %v", info.Name, info.Params, info.Returns),
+		message: wasmdebug.Signature(fnd.ModuleName()+"."+funcName(fnd), fnd.ParamTypes(), fnd.ResultTypes()),
 	}
+}
+
+// funcName returns the name in priority order: first export name, module-defined name, numeric index.
+func funcName(fnd experimental.FunctionDefinition) string {
+	if len(fnd.ExportNames()) > 0 {
+		return fnd.ExportNames()[0]
+	}
+	if fnd.Name() != "" {
+		return fnd.Name()
+	}
+	return fmt.Sprintf("[%d]", fnd.Index())
 }
 
 // main shows how to define, import and call a Go-defined function from a
@@ -41,7 +50,7 @@ func (f *callListenerFactory) NewListener(info experimentalapi.FunctionInfo) exp
 func main() {
 	// FunctionListenerFactory is an experimental API, so the only way to configure it is via context key.
 	ctx := context.WithValue(context.Background(),
-		experimentalapi.FunctionListenerFactoryKey{}, &callListenerFactory{})
+		experimental.FunctionListenerFactoryKey{}, &callListenerFactory{})
 
 	// Create a new WebAssembly Runtime.
 	// Note: This is interpreter-only for now!
@@ -56,7 +65,7 @@ func main() {
 	// host-defined functions, but any name would do.
 	env, err := r.NewModuleBuilder("env").
 		ExportFunction("host1", host1).
-		ExportFunction("print_trace", print_trace).
+		ExportFunction("print_trace", printTrace).
 		Instantiate(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -110,14 +119,14 @@ func main() {
 }
 
 func host1(ctx context.Context, m api.Module, val uint32) {
-	hostonly(ctx, m, val)
+	hostOnly(ctx, m, val)
 }
 
 // Wazero cannot intercept host->host calls as it is precompiled by Go. But since
 // ctx is propagated, such calls can still participate in the trace manually if
 // they want.
-func hostonly(ctx context.Context, m api.Module, val uint32) {
-	ctx = (&callListener{message: "hostonly"}).Before(ctx)
+func hostOnly(ctx context.Context, m api.Module, val uint32) {
+	ctx = (&callListener{message: "host_only(i32)"}).Before(ctx, nil)
 	host2(ctx, m, val)
 }
 
@@ -128,7 +137,7 @@ func host2(ctx context.Context, m api.Module, val uint32) {
 	}
 }
 
-func print_trace(ctx context.Context) {
+func printTrace(ctx context.Context) {
 	stack := ctx.Value(stackKey{}).([]string)
 	for _, f := range stack {
 		fmt.Println(f)

@@ -64,7 +64,7 @@ func getFunctionInstance(module *wasm.Module, index wasm.Index, moduleInstance *
 		Type:       module.TypeSection[typeIndex],
 		Body:       module.CodeSection[index].Body,
 		LocalTypes: module.CodeSection[index].LocalTypes,
-		Index:      index + c,
+		Idx:        index + c,
 	}
 }
 
@@ -298,7 +298,7 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 		Kind:   wasm.FunctionKindGoModule,
 		Type:   sig,
 		Module: module,
-		Index:  0,
+		Idx:    0,
 	}
 
 	me, err := e.NewModuleEngine(t.Name(), m, nil, []*wasm.FunctionInstance{f}, nil, nil)
@@ -600,7 +600,7 @@ func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 
 // addFunction assigns and adds a function to the module.
 func addFunction(module *wasm.ModuleInstance, funcName string, fn *wasm.FunctionInstance) {
-	fn.DebugName = wasmdebug.FuncName(module.Name, funcName, fn.Index)
+	fn.DebugName = wasmdebug.FuncName(module.Name, funcName, fn.Idx)
 	module.Functions = append(module.Functions, fn)
 	if module.Exports == nil {
 		module.Exports = map[string]*wasm.ExportInstance{}
