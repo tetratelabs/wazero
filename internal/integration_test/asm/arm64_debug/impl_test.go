@@ -581,6 +581,14 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_R0},
 				expErr: "ADR is unsupported for from:const,to:register type",
 			},
+			{
+				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.LSR, Types: asm_arm64.OperandTypesConstToRegister, DstReg: asm_arm64.REG_R0},
+				expErr: "LSR with zero constant should be optimized out",
+			},
+			{
+				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.LSL, Types: asm_arm64.OperandTypesConstToRegister, DstReg: asm_arm64.REG_R0},
+				expErr: "LSL with zero constant should be optimized out",
+			},
 		} {
 			a := asm_arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeConstToRegister(tc.n)
