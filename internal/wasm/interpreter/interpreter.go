@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -612,7 +613,8 @@ func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.F
 		ce.callNativeFunc(ctx, m, compiled)
 		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
 		if f.FunctionListener != nil {
-			f.FunctionListener.After(ctx, results)
+			// TODO: This doesn't get the error due to use of panic to propagate them.
+			f.FunctionListener.After(ctx, nil, results)
 		}
 	} else {
 		results = ce.callGoFunc(ctx, m, compiled, params)
@@ -633,7 +635,8 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	results = wasm.CallGoFunc(ctx, callCtx, f.source, params)
 	ce.popFrame()
 	if f.source.FunctionListener != nil {
-		f.source.FunctionListener.After(ctx, results)
+		// TODO: This doesn't get the error due to use of panic to propagate them.
+		f.source.FunctionListener.After(ctx, nil, results)
 	}
 	return
 }
@@ -690,9 +693,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if f.hostFn != nil {
 					ce.callGoFuncWithStack(ctx, callCtx, f)
 				} else if listener != nil {
-					ctx = listener.Before(ctx, ce.peekValues(len(f.source.Type.Params)))
-					ce.callNativeFunc(ctx, callCtx, f)
-					listener.After(ctx, ce.peekValues(len(f.source.Type.Results)))
+					ctx = ce.callNativeFuncWithListener(ctx, callCtx, f, listener)
 				} else {
 					ce.callNativeFunc(ctx, callCtx, f)
 				}
@@ -715,9 +716,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if tf.hostFn != nil {
 					ce.callGoFuncWithStack(ctx, callCtx, tf)
 				} else if listener != nil {
-					ctx = listener.Before(ctx, ce.peekValues(len(tf.source.Type.Params)))
-					ce.callNativeFunc(ctx, callCtx, tf)
-					listener.After(ctx, ce.peekValues(len(tf.source.Type.Results)))
+					ctx = ce.callNativeFuncWithListener(ctx, callCtx, f, listener)
 				} else {
 					ce.callNativeFunc(ctx, callCtx, tf)
 				}
@@ -1810,6 +1809,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+}
+
+func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
+	ctx = fnl.Before(ctx, ce.peekValues(len(f.source.Type.Params)))
+	ce.callNativeFunc(ctx, callCtx, f)
+	// TODO: This doesn't get the error due to use of panic to propagate them.
+	fnl.After(ctx, nil, ce.peekValues(len(f.source.Type.Results)))
+	return ctx
 }
 
 // popMemoryOffset takes a memory offset off the stack for use in load and store instructions.

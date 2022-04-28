@@ -7,7 +7,9 @@ import (
 )
 
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
+//
 // Note: This is interpreter-only for now!
+// See https://github.com/tetratelabs/wazero/issues/451
 type FunctionListenerFactoryKey struct{}
 
 // FunctionListenerFactory returns FunctionListeners to be notified when a function is called.
@@ -24,11 +26,18 @@ type FunctionListener interface {
 	// The returned context will be used as the context of this function call. To add context
 	// information for this function call, add it to ctx and return the updated context. If
 	// no context information is needed, return ctx as is.
-	Before(context.Context, []uint64) context.Context
+	Before(ctx context.Context, paramValues []uint64) context.Context
 
 	// After is invoked after a function is called. ctx is the context of this function call.
-	After(context.Context, []uint64)
+	// The err parameter is nil on success.
+	After(ctx context.Context, err error, resultValues []uint64)
 }
+
+// TODO: We need to add tests to enginetest to ensure contexts nest. A good test can use a combination of call and call
+// indirect in terms of depth and breadth. The test could show a tree 3 calls deep where the there are a couple calls at
+// each depth under the root. The main thing this can help prevent is accidentally swapping the context internally.
+
+// TODO: Errors aren't handled, and the After hook should accept one along with the result values.
 
 // FunctionDefinition includes information about a function available pre-instantiation.
 type FunctionDefinition interface {
