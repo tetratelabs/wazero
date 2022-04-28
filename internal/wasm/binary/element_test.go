@@ -51,7 +51,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 		},
 		{
 			in: []byte{
-				2, // Tow indexes.
+				2, // Two indexes.
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 				wasm.OpcodeRefFunc, 100, wasm.OpcodeEnd,
 			},

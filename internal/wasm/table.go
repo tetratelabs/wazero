@@ -76,9 +76,9 @@ type TableInstance struct {
 	Max *uint32
 }
 
-// ElementInstance represents a element instance in a module.
+// ElementInstance represents an element instance in a module.
 //
-// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#table-instances
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/runtime.html#element-instances
 type ElementInstance struct {
 	// References holds references whose type is either RefTypeFuncref or RefTypeExternref (unsupported).
 	References []Reference

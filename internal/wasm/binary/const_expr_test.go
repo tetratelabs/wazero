@@ -49,7 +49,6 @@ func TestDecodeConstantExpression(t *testing.T) {
 				},
 			},
 		},
-		// TOOD: backfill more cases for const and global opcodes.
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -79,7 +78,6 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 			},
 			expectedErr: "ref.null instruction in constant expression must be of funcref type but was 0x6f",
 		},
-		// TOOD: backfill more cases for const and global opcodes.
 	} {
 		t.Run(tc.expectedErr, func(t *testing.T) {
 			_, err := decodeConstantExpression(bytes.NewReader(tc.in))
