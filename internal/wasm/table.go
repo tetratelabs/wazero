@@ -41,9 +41,10 @@ const (
 type ElementSegment struct {
 	// OffsetExpr returns the table element offset to apply to Init indices.
 	// Note: This can be validated prior to instantiation unless it includes OpcodeGlobalGet (an imported global).
+	// Note: This is nil if the Mode is either passive or declarative.
 	OffsetExpr *ConstantExpression
 
-	// Init indices are table elements relative to the result of OffsetExpr.
+	// Init indices are (nullable) table elements where each index is the function index by which the module initialize the table.
 	Init []*Index
 
 	// Type holds the type of this element segment, which is the RefType in WebAssembly 2.0.
