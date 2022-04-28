@@ -104,7 +104,7 @@ func (ce *callEngine) popValue() (v uint64) {
 	return
 }
 
-// peekValues pops api.ValueType values from the stack and returns them in reverse order.
+// peekValues peeks api.ValueType values from the stack and returns them in reverse order.
 func (ce *callEngine) peekValues(count int) []uint64 {
 	if count == 0 {
 		return nil
