@@ -1,3 +1,4 @@
+;; https://github.com/WebAssembly/spec/blob/9b4d86fbcd3309c3365c8430a4ac5ef2126c43a8/test/core/bulk.wast#L300-L316
 (module
   (table 10 funcref)
   (elem (i32.const 0) $zero $one $two)

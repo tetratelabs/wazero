@@ -1,3 +1,4 @@
+;; https://github.com/WebAssembly/spec/blob/9b4d86fbcd3309c3365c8430a4ac5ef2126c43a8/test/core/bulk.wast#L199-L216
 (module
   (table 3 funcref)
   (elem funcref
