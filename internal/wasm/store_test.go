@@ -28,16 +28,16 @@ func TestModuleInstance_Memory(t *testing.T) {
 		},
 		{
 			name:  "memory not exported",
-			input: &Module{MemorySection: &Memory{Min: 1}},
+			input: &Module{MemorySection: &Memory{Min: 1, Cap: 1}},
 		},
 		{
 			name:  "memory not exported, one page",
-			input: &Module{MemorySection: &Memory{Min: 1}},
+			input: &Module{MemorySection: &Memory{Min: 1, Cap: 1}},
 		},
 		{
 			name: "memory exported, different name",
 			input: &Module{
-				MemorySection: &Memory{Min: 1},
+				MemorySection: &Memory{Min: 1, Cap: 1},
 				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "momory", Index: 0}},
 			},
 		},
@@ -52,7 +52,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 		{
 			name: "memory exported, one page",
 			input: &Module{
-				MemorySection: &Memory{Min: 1},
+				MemorySection: &Memory{Min: 1, Cap: 1},
 				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -61,7 +61,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 		{
 			name: "memory exported, two pages",
 			input: &Module{
-				MemorySection: &Memory{Min: 2},
+				MemorySection: &Memory{Min: 2, Cap: 2},
 				ExportSection: []*Export{{Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -156,7 +156,7 @@ func TestStore_CloseModule(t *testing.T) {
 			_, err := s.Instantiate(testCtx, &Module{
 				TypeSection:   []*FunctionType{{}},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
-				MemorySection: &Memory{Min: 1},
+				MemorySection: &Memory{Min: 1, Cap: 1},
 				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
 				TableSection:  &Table{Min: 10},
 			}, importingModuleName, nil, nil)
@@ -205,7 +205,7 @@ func TestStore_hammer(t *testing.T) {
 		TypeSection:     []*FunctionType{{}},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
-		MemorySection:   &Memory{Min: 1},
+		MemorySection:   &Memory{Min: 1, Cap: 1},
 		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
 		TableSection:    &Table{Min: 10},
 		ImportSection: []*Import{
@@ -352,7 +352,7 @@ func TestCallContext_ExportedFunction(t *testing.T) {
 		importing, err := s.Instantiate(testCtx, &Module{
 			TypeSection:   []*FunctionType{{}},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
-			MemorySection: &Memory{Min: 1},
+			MemorySection: &Memory{Min: 1, Cap: 1},
 			ExportSection: []*Export{{Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
 		}, "test", nil, nil)
 		require.NoError(t, err)
@@ -636,10 +636,10 @@ func TestStore_resolveImports(t *testing.T) {
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
-			importMemoryType := &Memory{Min: 2}
+			importMemoryType := &Memory{Min: 2, Cap: 2}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
+				Memory: &MemoryInstance{Min: importMemoryType.Min - 1, Cap: 2},
 			}}, Name: moduleName}
 			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
@@ -650,7 +650,7 @@ func TestStore_resolveImports(t *testing.T) {
 			importMemoryType := &Memory{Max: max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{Max: MemoryMaxPages},
+				Memory: &MemoryInstance{Max: MemoryLimitPages},
 			}}, Name: moduleName}
 			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")

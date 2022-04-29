@@ -23,7 +23,7 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte, enabledFeatures Features, memoryMaxPages uint32) (result *Module, err error)
+type DecodeModule func(source []byte, enabledFeatures Features, memoryLimitPages uint32) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -559,9 +559,12 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
+		min := MemoryPagesToBytesNum(memSec.Min)
+		capacity := MemoryPagesToBytesNum(memSec.Cap)
 		mem = &MemoryInstance{
-			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
+			Buffer: make([]byte, min, capacity),
 			Min:    memSec.Min,
+			Cap:    memSec.Cap,
 			Max:    memSec.Max,
 		}
 	}
@@ -652,9 +655,36 @@ type limitsType struct {
 
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
-	Min, Max uint32
-	// IsMaxEncoded true if the Max is encoded in the orignial source (binary or text).
+	Min, Cap, Max uint32
+	// IsMaxEncoded true if the Max is encoded in the original source (binary or text).
 	IsMaxEncoded bool
+}
+
+// ValidateMinMax ensures values assigned to Min and Max are within valid thresholds.
+func (m *Memory) ValidateMinMax(memoryLimitPages uint32) error {
+	if !m.IsMaxEncoded {
+		m.Max = memoryLimitPages
+	}
+	min, max := m.Min, m.Max
+	if max > memoryLimitPages {
+		return fmt.Errorf("max %d pages (%s) over limit of %d pages (%s)", max, PagesToUnitOfBytes(max), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
+	} else if min > memoryLimitPages {
+		return fmt.Errorf("min %d pages (%s) over limit of %d pages (%s)", min, PagesToUnitOfBytes(min), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
+	} else if min > max {
+		return fmt.Errorf("min %d pages (%s) > max %d pages (%s)", min, PagesToUnitOfBytes(min), max, PagesToUnitOfBytes(max))
+	}
+	return nil
+}
+
+// ValidateCap ensures the value assigned to Cap is within valid thresholds.
+func (m *Memory) ValidateCap(memoryLimitPages uint32) error {
+	capacity, min := m.Cap, m.Min
+	if capacity < min {
+		return fmt.Errorf("capacity %d pages (%s) less than minimum %d pages (%s)", capacity, PagesToUnitOfBytes(capacity), min, PagesToUnitOfBytes(min))
+	} else if capacity > memoryLimitPages {
+		return fmt.Errorf("capacity %d pages (%s) over limit of %d pages (%s)", capacity, PagesToUnitOfBytes(capacity), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
+	}
+	return nil
 }
 
 type GlobalType struct {

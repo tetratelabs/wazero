@@ -139,7 +139,7 @@ func TestEncodeImport(t *testing.T) {
 				Type:    wasm.ExternTypeMemory,
 				Module:  "my",
 				Name:    "memory",
-				DescMem: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages, IsMaxEncoded: false},
+				DescMem: &wasm.Memory{Min: 1, Max: wasm.MemoryLimitPages, IsMaxEncoded: false},
 			},
 			expected: []byte{
 				0x02, 'm', 'y',

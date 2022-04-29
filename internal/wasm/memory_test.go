@@ -11,7 +11,7 @@ import (
 func TestMemoryPageConsts(t *testing.T) {
 	require.Equal(t, MemoryPageSize, uint32(1)<<MemoryPageSizeInBits)
 	require.Equal(t, MemoryPageSize, uint32(1<<16))
-	require.Equal(t, MemoryMaxPages, uint32(1<<16))
+	require.Equal(t, MemoryLimitPages, uint32(1<<16))
 }
 
 func Test_MemoryPagesToBytesNum(t *testing.T) {
@@ -27,28 +27,56 @@ func Test_MemoryBytesNumToPages(t *testing.T) {
 }
 
 func TestMemoryInstance_Grow_Size(t *testing.T) {
-	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		max := uint32(10)
-		m := &MemoryInstance{Max: max, Buffer: make([]byte, 0)}
-		require.Equal(t, uint32(0), m.Grow(ctx, 5))
-		require.Equal(t, uint32(5), m.PageSize(ctx))
+	tests := []struct {
+		name         string
+		ctx          context.Context
+		capEqualsMax bool
+	}{
+		{name: "nil context"},
+		{name: "context", ctx: testCtx},
+		{name: "nil context, capEqualsMax", capEqualsMax: true},
+		{name: "context,  capEqualsMax", ctx: testCtx, capEqualsMax: true},
+	}
 
-		// Zero page grow is well-defined, should return the current page correctly.
-		require.Equal(t, uint32(5), m.Grow(ctx, 0))
-		require.Equal(t, uint32(5), m.PageSize(ctx))
-		require.Equal(t, uint32(5), m.Grow(ctx, 4))
-		require.Equal(t, uint32(9), m.PageSize(ctx))
+	for _, tt := range tests {
+		tc := tt
 
-		// At this point, the page size equal 9,
-		// so trying to grow two pages should result in failure.
-		require.Equal(t, int32(-1), int32(m.Grow(ctx, 2)))
-		require.Equal(t, uint32(9), m.PageSize(ctx))
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.ctx
+			max := uint32(10)
+			maxBytes := MemoryPagesToBytesNum(max)
+			var m *MemoryInstance
+			if tc.capEqualsMax {
+				m = &MemoryInstance{Cap: max, Max: max, Buffer: make([]byte, 0, maxBytes)}
+			} else {
+				m = &MemoryInstance{Max: max, Buffer: make([]byte, 0)}
+			}
+			require.Equal(t, uint32(0), m.Grow(ctx, 5))
+			require.Equal(t, uint32(5), m.PageSize(ctx))
 
-		// But growing one page is still permitted.
-		require.Equal(t, uint32(9), m.Grow(ctx, 1))
+			// Zero page grow is well-defined, should return the current page correctly.
+			require.Equal(t, uint32(5), m.Grow(ctx, 0))
+			require.Equal(t, uint32(5), m.PageSize(ctx))
+			require.Equal(t, uint32(5), m.Grow(ctx, 4))
+			require.Equal(t, uint32(9), m.PageSize(ctx))
 
-		// Ensure that the current page size equals the max.
-		require.Equal(t, max, m.PageSize(ctx))
+			// At this point, the page size equal 9,
+			// so trying to grow two pages should result in failure.
+			require.Equal(t, int32(-1), int32(m.Grow(ctx, 2)))
+			require.Equal(t, uint32(9), m.PageSize(ctx))
+
+			// But growing one page is still permitted.
+			require.Equal(t, uint32(9), m.Grow(ctx, 1))
+
+			// Ensure that the current page size equals the max.
+			require.Equal(t, max, m.PageSize(ctx))
+
+			if tc.capEqualsMax { // Ensure the capacity isn't more than max.
+				require.Equal(t, maxBytes, uint64(cap(m.Buffer)))
+			} else { // Slice doubles, so it should have a higher capacity than max.
+				require.True(t, maxBytes < uint64(cap(m.Buffer)))
+			}
+		})
 	}
 }
 
@@ -130,7 +158,7 @@ func TestPagesToUnitOfBytes(t *testing.T) {
 		},
 		{
 			name:     "max memory",
-			pages:    MemoryMaxPages,
+			pages:    MemoryLimitPages,
 			expected: "4 Gi",
 		},
 		{

@@ -703,15 +703,15 @@ func TestGenerator_dataSection(t *testing.T) {
 			{
 				numData: 1,
 				ints: []int{
-					int(wasm.MemoryMaxPages) - 1, // offset
-					1,                            // size of inits
+					int(wasm.MemoryLimitPages) - 1, // offset
+					1,                              // size of inits
 				},
 				bufs: [][]byte{{0x1}},
 				exps: []*wasm.DataSegment{
 					{
 						OffsetExpression: &wasm.ConstantExpression{
 							Opcode: wasm.OpcodeI32Const,
-							Data:   leb128.EncodeUint32(uint32(wasm.MemoryMaxPages) - 1),
+							Data:   leb128.EncodeUint32(uint32(wasm.MemoryLimitPages) - 1),
 						},
 						Init: []byte{0x1},
 					},

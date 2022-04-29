@@ -166,7 +166,7 @@ func (g *generator) genImportSection() {
 
 		if memoryImported == 0 {
 			min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-			max := g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min
+			max := g.nextRandom().Intn(int(wasm.MemoryLimitPages)-min) + min
 
 			imp.Type = wasm.ExternTypeMemory
 			imp.DescMem = &wasm.Memory{
@@ -180,7 +180,7 @@ func (g *generator) genImportSection() {
 
 		if tableImported == 0 {
 			min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-			max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
+			max := uint32(g.nextRandom().Intn(int(wasm.MemoryLimitPages)-min) + min)
 
 			imp.Type = wasm.ExternTypeTable
 			tableImported = 1
@@ -215,7 +215,7 @@ func (g *generator) genTableSection() {
 	}
 
 	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-	max := uint32(g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min)
+	max := uint32(g.nextRandom().Intn(int(wasm.MemoryLimitPages)-min) + min)
 	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
 }
 
@@ -225,7 +225,7 @@ func (g *generator) genMemorySection() {
 		return
 	}
 	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
-	max := g.nextRandom().Intn(int(wasm.MemoryMaxPages)-min) + min
+	max := g.nextRandom().Intn(int(wasm.MemoryLimitPages)-min) + min
 	g.m.MemorySection = &wasm.Memory{Min: uint32(min), Max: uint32(max), IsMaxEncoded: true}
 }
 
@@ -412,7 +412,7 @@ func (g *generator) newCode() *wasm.Code {
 		wasm.OpcodeEnd}}
 }
 
-// genDataSection generates random data section if memory is declared and its minums is not zero.
+// genDataSection generates random data section if memory is declared and its min is not zero.
 func (g *generator) genDataSection() {
 	_, _, mem, _, err := g.m.AllDeclarations()
 	if err != nil {
