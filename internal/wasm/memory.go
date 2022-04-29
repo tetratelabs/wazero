@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 )
@@ -31,8 +33,8 @@ var _ api.Memory = &MemoryInstance{}
 // wasm.Store Memories index zero: `store.Memories[0]`
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type MemoryInstance struct {
-	Buffer   []byte
-	Min, Max uint32
+	Buffer        []byte
+	Min, Cap, Max uint32
 }
 
 // Size implements the same method as documented on api.Memory.
@@ -193,17 +195,25 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 //
 // Returns -1 if the operation resulted in exceeding the maximum memory pages.
 // Otherwise, returns the prior memory size after growing the memory buffer.
-func (m *MemoryInstance) Grow(_ context.Context, newPages uint32) (result uint32) {
+func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
+	if delta == 0 {
+		return currentPages
+	}
 
 	// If exceeds the max of memory size, we push -1 according to the spec.
-	if currentPages+newPages > m.Max {
+	newPages := currentPages + delta
+	if newPages > m.Max {
 		return 0xffffffff // = -1 in signed 32-bit integer.
-	} else {
-		// Otherwise, grow the memory.
-		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(newPages))...)
+	} else if newPages > m.Cap { // grow the memory.
+		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
+		m.Cap = newPages
+		return currentPages
+	} else { // We already have the capacity we need.
+		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
+		sp.Len = int(MemoryPagesToBytesNum(newPages))
 		return currentPages
 	}
 }

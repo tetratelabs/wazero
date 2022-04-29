@@ -159,7 +159,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemory("memory", 1)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryMaxPages},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryMaxPages},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -171,7 +171,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemory("memory", 1).ExportMemory("memory", 2)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 2, Max: wasm.MemoryMaxPages},
+				MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: wasm.MemoryMaxPages},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -183,7 +183,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, 1)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: 1},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -195,7 +195,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, 1).ExportMemoryWithMax("memory", 1, 2)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: 2},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: 2, IsMaxEncoded: true},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},

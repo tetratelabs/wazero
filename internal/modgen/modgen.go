@@ -412,7 +412,7 @@ func (g *generator) newCode() *wasm.Code {
 		wasm.OpcodeEnd}}
 }
 
-// genDataSection generates random data section if memory is declared and its minums is not zero.
+// genDataSection generates random data section if memory is declared and its min is not zero.
 func (g *generator) genDataSection() {
 	_, _, mem, _, err := g.m.AllDeclarations()
 	if err != nil {

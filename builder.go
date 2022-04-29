@@ -195,13 +195,17 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 
 // ExportMemory implements ModuleBuilder.ExportMemory
 func (b *moduleBuilder) ExportMemory(name string, minPages uint32) ModuleBuilder {
-	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: b.r.memoryMaxPages}
+	mem := &wasm.Memory{Min: minPages, Max: b.r.memoryMaxPages}
+	mem.Cap = b.r.memoryCapacityPages(mem.Min, nil)
+	b.nameToMemory[name] = mem
 	return b
 }
 
 // ExportMemoryWithMax implements ModuleBuilder.ExportMemoryWithMax
 func (b *moduleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder {
-	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: maxPages}
+	mem := &wasm.Memory{Min: minPages, Max: maxPages, IsMaxEncoded: true}
+	mem.Cap = b.r.memoryCapacityPages(mem.Min, &maxPages)
+	b.nameToMemory[name] = mem
 	return b
 }
 

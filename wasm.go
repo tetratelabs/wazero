@@ -124,17 +124,19 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
-		store:           wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
-		enabledFeatures: config.enabledFeatures,
-		memoryMaxPages:  config.memoryMaxPages,
+		store:               wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
+		enabledFeatures:     config.enabledFeatures,
+		memoryMaxPages:      config.memoryMaxPages,
+		memoryCapacityPages: config.memoryCapacityPages,
 	}
 }
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	enabledFeatures wasm.Features
-	store           *wasm.Store
-	memoryMaxPages  uint32
+	enabledFeatures     wasm.Features
+	store               *wasm.Store
+	memoryMaxPages      uint32
+	memoryCapacityPages func(minPages uint32, maxPages *uint32) uint32
 }
 
 // Module implements Runtime.Module
@@ -167,12 +169,22 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCo
 	}
 
 	internal, err := decoder(source, r.enabledFeatures, r.memoryMaxPages)
+
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {
 		// TODO: decoders should validate before returning, as that allows
 		// them to err with the correct source position.
 		return nil, err
+	}
+
+	// Determine the correct memory capacity, if a memory was defined.
+	if mem := internal.MemorySection; mem != nil {
+		var max *uint32
+		if mem.IsMaxEncoded {
+			max = &mem.Max
+		}
+		mem.Cap = r.memoryCapacityPages(mem.Min, max)
 	}
 
 	internal.AssignModuleID(source)

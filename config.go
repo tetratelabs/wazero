@@ -16,23 +16,26 @@ import (
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	enabledFeatures wasm.Features
-	newEngine       func(wasm.Features) wasm.Engine
-	memoryMaxPages  uint32
+	enabledFeatures     wasm.Features
+	newEngine           func(wasm.Features) wasm.Engine
+	memoryMaxPages      uint32
+	memoryCapacityPages func(minPages uint32, maxPages *uint32) uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
-	enabledFeatures: wasm.Features20191205,
-	memoryMaxPages:  wasm.MemoryMaxPages,
+	enabledFeatures:     wasm.Features20191205,
+	memoryMaxPages:      wasm.MemoryMaxPages,
+	memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 { return minPages },
 }
 
 // clone ensures all fields are coped even if nil.
 func (c *RuntimeConfig) clone() *RuntimeConfig {
 	return &RuntimeConfig{
-		enabledFeatures: c.enabledFeatures,
-		newEngine:       c.newEngine,
-		memoryMaxPages:  c.memoryMaxPages,
+		enabledFeatures:     c.enabledFeatures,
+		newEngine:           c.newEngine,
+		memoryMaxPages:      c.memoryMaxPages,
+		memoryCapacityPages: c.memoryCapacityPages,
 	}
 }
 
@@ -66,6 +69,24 @@ func NewRuntimeConfigInterpreter() *RuntimeConfig {
 func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig {
 	ret := c.clone()
 	ret.memoryMaxPages = memoryMaxPages
+	return ret
+}
+
+// WithMemoryCapacityPages is a function that determines memory capacity in pages (65536 bytes per page). The inputs are
+// the min and possibly nil max defined by the module, and the default is to return the min.
+//
+// Ex. To set capacity to max when exists:
+//	c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+//		if maxPages != nil {
+//			return *maxPages
+//		}
+//		return minPages
+//	})
+//
+// Note: This applies at compile time, ModuleBuilder.Build or Runtime.CompileModule.
+func (c *RuntimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) *RuntimeConfig {
+	ret := c.clone()
+	ret.memoryCapacityPages = maxCapacityPages
 	return ret
 }
 

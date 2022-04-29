@@ -559,9 +559,15 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
+		min := MemoryPagesToBytesNum(memSec.Min)
+		capacity := MemoryPagesToBytesNum(memSec.Cap)
+		if capacity == 0 && min != 0 {
+			capacity = min // Internal code may avoid setting Cap. Default to min.
+		}
 		mem = &MemoryInstance{
-			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
+			Buffer: make([]byte, min, capacity),
 			Min:    memSec.Min,
+			Cap:    memSec.Cap,
 			Max:    memSec.Max,
 		}
 	}
@@ -652,8 +658,8 @@ type limitsType struct {
 
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
-	Min, Max uint32
-	// IsMaxEncoded true if the Max is encoded in the orignial source (binary or text).
+	Min, Cap, Max uint32
+	// IsMaxEncoded true if the Max is encoded in the original source (binary or text).
 	IsMaxEncoded bool
 }
 
