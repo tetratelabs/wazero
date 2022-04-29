@@ -54,7 +54,7 @@ func TestAddSignature(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			withSignature := addSignature("x.y", tc.paramTypes, tc.resultTypes)
+			withSignature := signature("x.y", tc.paramTypes, tc.resultTypes)
 			require.Equal(t, tc.expected, withSignature)
 		})
 	}

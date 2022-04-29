@@ -16,6 +16,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -27,7 +28,7 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 //
 // Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
 func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Module, error) {
-	_, fns := snapshotPreview1Functions()
+	_, fns := snapshotPreview1Functions(ctx)
 	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)
 }
 
@@ -427,16 +428,14 @@ const (
 // See https://github.com/WebAssembly/WASI/issues/215
 // See https://wwa.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type snapshotPreview1 struct {
-	// timeNowUnixNano is mutable for testing
-	timeNowUnixNano func() uint64
-	randSource      func([]byte) error
+	sys experimental.Sys
 }
 
 // snapshotPreview1Functions returns all go functions that implement snapshotPreview1.
 // These should be exported in the module named "wasi_snapshot_preview1".
 // See wasm.NewHostModule
-func snapshotPreview1Functions() (a *snapshotPreview1, nameToGoFunc map[string]interface{}) {
-	a = newSnapshotPreview1()
+func snapshotPreview1Functions(ctx context.Context) (a *snapshotPreview1, nameToGoFunc map[string]interface{}) {
+	a = newSnapshotPreview1(ctx)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -658,7 +657,7 @@ func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uin
 // See https://linux.die.net/man/3/clock_gettime
 func (a *snapshotPreview1) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: id and precision are currently ignored.
-	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, a.timeNowUnixNano()) {
+	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, a.sys.TimeNowUnixNano()) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1293,7 +1292,7 @@ func (a *snapshotPreview1) SchedYield(m api.Module) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 func (a *snapshotPreview1) RandomGet(ctx context.Context, m api.Module, buf uint32, bufLen uint32) (errno Errno) {
 	randomBytes := make([]byte, bufLen)
-	err := a.randSource(randomBytes)
+	err := a.sys.RandSource(randomBytes)
 	if err != nil {
 		// TODO: handle different errors that syscal to entropy source can return
 		return ErrnoIo
@@ -1327,16 +1326,27 @@ const (
 	fdStderr = 2
 )
 
-func newSnapshotPreview1() *snapshotPreview1 {
-	return &snapshotPreview1{
-		timeNowUnixNano: func() uint64 {
-			return uint64(time.Now().UnixNano())
-		},
-		randSource: func(p []byte) error {
-			_, err := crand.Read(p)
-			return err
-		},
+// compile-time check to ensure defaultSys implements experimental.Sys.
+var _ experimental.Sys = &defaultSys{}
+
+type defaultSys struct{}
+
+func (d *defaultSys) TimeNowUnixNano() uint64 {
+	return uint64(time.Now().UnixNano())
+}
+
+func (d *defaultSys) RandSource(bytes []byte) error {
+	_, err := crand.Read(bytes)
+	return err
+}
+
+func newSnapshotPreview1(ctx context.Context) *snapshotPreview1 {
+	if ctx != nil { // Test to see if internal code are using an experimental feature.
+		if sys := ctx.Value(experimental.SysKey{}); sys != nil {
+			return &snapshotPreview1{sys: sys.(experimental.Sys)}
+		}
 	}
+	return &snapshotPreview1{sys: &defaultSys{}}
 }
 
 func sysCtx(m api.Module) *wasm.SysContext {

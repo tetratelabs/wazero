@@ -17,13 +17,35 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+// compile-time check to ensure fakeSys implements experimental.Sys.
+var _ experimental.Sys = fakeSys{}
+
+type fakeSys struct{}
+
+const (
+	epochNanos = uint64(1640995200000000000) // midnight UTC 2022-01-01
+	seed       = int64(42)                   // fixed seed value
+)
+
+func (d fakeSys) TimeNowUnixNano() uint64 {
+	return epochNanos
+}
+
+func (d fakeSys) RandSource(p []byte) error {
+	s := rand.NewSource(seed)
+	rng := rand.New(s)
+	_, err := rng.Read(p)
+	return err
+}
+
+// testCtx ensures fakeSys is used for WASI functions.
+var testCtx = context.WithValue(context.Background(), experimental.SysKey{}, fakeSys{})
 
 func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 	sysCtx, err := newSysContext([]string{"a", "bc"}, nil, nil)
@@ -40,7 +62,7 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, functionArgsGet, importArgsGet, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionArgsGet, importArgsGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.ArgsGet", func(t *testing.T) {
@@ -73,7 +95,7 @@ func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 	sysCtx, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionArgsGet, importArgsGet, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionArgsGet, importArgsGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -133,7 +155,7 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, functionArgsSizesGet, importArgsSizesGet, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionArgsSizesGet, importArgsSizesGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.ArgsSizesGet", func(t *testing.T) {
@@ -166,7 +188,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 	sysCtx, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionArgsSizesGet, importArgsSizesGet, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionArgsSizesGet, importArgsSizesGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -225,7 +247,7 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, functionEnvironGet, importEnvironGet, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionEnvironGet, importEnvironGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.EnvironGet", func(t *testing.T) {
@@ -258,7 +280,7 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 	sysCtx, err := newSysContext(nil, []string{"a=bc", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionEnvironGet, importEnvironGet, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionEnvironGet, importEnvironGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -317,7 +339,7 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, functionEnvironSizesGet, importEnvironSizesGet, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionEnvironSizesGet, importEnvironSizesGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.EnvironSizesGet", func(t *testing.T) {
@@ -350,7 +372,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 	sysCtx, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionEnvironSizesGet, importEnvironSizesGet, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionEnvironSizesGet, importEnvironSizesGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -395,7 +417,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_ClockResGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_ClockResGet(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionClockResGet, importClockResGet, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.ClockResGet", func(t *testing.T) {
@@ -411,18 +433,15 @@ func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 }
 
 func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
-	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-	resultTimestamp := uint32(1)              // arbitrary offset
+	resultTimestamp := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
 		'?',                                          // resultTimestamp is after this
 		0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, functionClockTimeGet, importClockTimeGet, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
 	defer mod.Close(testCtx)
-
-	a.timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("snapshotPreview1.ClockTimeGet", func(t *testing.T) {
 		maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -451,12 +470,8 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 }
 
 func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
-	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-
-	a, mod, fn := instantiateModule(t, functionClockTimeGet, importClockTimeGet, nil)
+	_, mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
 	defer mod.Close(testCtx)
-
-	a.timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := mod.Memory().Size(testCtx)
 
@@ -490,7 +505,7 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_FdAdvise only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdAdvise(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdAdvise, importFdAdvise, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdAdvise, importFdAdvise, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdAdvise", func(t *testing.T) {
@@ -508,7 +523,7 @@ func TestSnapshotPreview1_FdAdvise(t *testing.T) {
 
 // TestSnapshotPreview1_FdAllocate only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdAllocate(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdAllocate, importFdAllocate, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdAllocate, importFdAllocate, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdAllocate", func(t *testing.T) {
@@ -543,7 +558,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		a, mod, fn := instantiateModule(t, functionFdClose, importFdClose, sysCtx)
+		a, mod, fn := instantiateModule(testCtx, t, functionFdClose, importFdClose, sysCtx)
 		return mod, fn, a
 	}
 
@@ -588,7 +603,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 
 // TestSnapshotPreview1_FdDatasync only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdDatasync(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdDatasync, importFdDatasync, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdDatasync, importFdDatasync, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdDatasync", func(t *testing.T) {
@@ -612,7 +627,7 @@ func TestSnapshotPreview1_FdFdstatGet(t *testing.T) {
 
 // TestSnapshotPreview1_FdFdstatSetFlags only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdFdstatSetFlags, importFdFdstatSetFlags, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdFdstatSetFlags, importFdFdstatSetFlags, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdFdstatSetFlags", func(t *testing.T) {
@@ -630,7 +645,7 @@ func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
 
 // TestSnapshotPreview1_FdFdstatSetRights only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdFdstatSetRights, importFdFdstatSetRights, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdFdstatSetRights, importFdFdstatSetRights, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdFdstatSetRights", func(t *testing.T) {
@@ -648,7 +663,7 @@ func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
 
 // TestSnapshotPreview1_FdFilestatGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdFilestatGet, importFdFilestatGet, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdFilestatGet, importFdFilestatGet, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdFilestatGet", func(t *testing.T) {
@@ -666,7 +681,7 @@ func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
 
 // TestSnapshotPreview1_FdFilestatSetSize only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdFilestatSetSize, importFdFilestatSetSize, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdFilestatSetSize, importFdFilestatSetSize, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdFilestatSetSize", func(t *testing.T) {
@@ -684,7 +699,7 @@ func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
 
 // TestSnapshotPreview1_FdFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdFilestatSetTimes, importFdFilestatSetTimes, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdFilestatSetTimes, importFdFilestatSetTimes, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdFilestatSetTimes", func(t *testing.T) {
@@ -702,7 +717,7 @@ func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
 
 // TestSnapshotPreview1_FdPread only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdPread(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdPread, importFdPread, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdPread, importFdPread, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdPread", func(t *testing.T) {
@@ -725,7 +740,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: pathName}})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	resultPrestat := uint32(1) // arbitrary offset
@@ -770,7 +785,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -812,7 +827,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
 	defer mod.Close(testCtx)
 
 	path := uint32(1)    // arbitrary offset
@@ -853,7 +868,7 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -910,7 +925,7 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_FdPwrite only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdPwrite(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdPwrite, importFdPwrite, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdPwrite, importFdPwrite, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdPwrite", func(t *testing.T) {
@@ -977,7 +992,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			a, mod, fn := instantiateModule(t, functionFdRead, importFdRead, sysCtx)
+			a, mod, fn := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
 			defer mod.Close(testCtx)
 
 			maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -1004,7 +1019,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionFdRead, importFdRead, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
 	defer mod.Close(testCtx)
 
 	tests := []struct {
@@ -1089,7 +1104,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_FdReaddir only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdReaddir(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdReaddir, importFdReaddir, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdReaddir, importFdReaddir, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdReaddir", func(t *testing.T) {
@@ -1107,7 +1122,7 @@ func TestSnapshotPreview1_FdReaddir(t *testing.T) {
 
 // TestSnapshotPreview1_FdRenumber only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdRenumber(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdRenumber, importFdRenumber, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdRenumber, importFdRenumber, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdRenumber", func(t *testing.T) {
@@ -1133,7 +1148,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, functionFdSeek, importFdSeek, sysCtx)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
 	defer mod.Close(testCtx)
 
 	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
@@ -1239,7 +1254,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionFdSeek, importFdSeek, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -1282,7 +1297,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_FdSync only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdSync(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdSync, importFdSync, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdSync, importFdSync, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdSync", func(t *testing.T) {
@@ -1300,7 +1315,7 @@ func TestSnapshotPreview1_FdSync(t *testing.T) {
 
 // TestSnapshotPreview1_FdTell only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdTell(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionFdTell, importFdTell, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionFdTell, importFdTell, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.FdTell", func(t *testing.T) {
@@ -1370,7 +1385,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			a, mod, fn := instantiateModule(t, functionFdWrite, importFdWrite, sysCtx)
+			a, mod, fn := instantiateModule(testCtx, t, functionFdWrite, importFdWrite, sysCtx)
 			defer mod.Close(testCtx)
 
 			maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -1405,7 +1420,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionFdWrite, importFdWrite, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionFdWrite, importFdWrite, sysCtx)
 	defer mod.Close(testCtx)
 
 	// Setup valid test memory
@@ -1473,7 +1488,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_PathCreateDirectory only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathCreateDirectory, importPathCreateDirectory, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathCreateDirectory, importPathCreateDirectory, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathCreateDirectory", func(t *testing.T) {
@@ -1491,7 +1506,7 @@ func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
 
 // TestSnapshotPreview1_PathFilestatGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathFilestatGet, importPathFilestatGet, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathFilestatGet, importPathFilestatGet, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathFilestatGet", func(t *testing.T) {
@@ -1509,7 +1524,7 @@ func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
 
 // TestSnapshotPreview1_PathFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathFilestatSetTimes, importPathFilestatSetTimes, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathFilestatSetTimes, importPathFilestatSetTimes, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathFilestatSetTimes", func(t *testing.T) {
@@ -1527,7 +1542,7 @@ func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
 
 // TestSnapshotPreview1_PathLink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathLink(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathLink, importPathLink, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathLink, importPathLink, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathLink", func(t *testing.T) {
@@ -1573,7 +1588,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			workdirFD: {Path: ".", FS: testFS},
 		})
 		require.NoError(t, err)
-		a, mod, fn := instantiateModule(t, functionPathOpen, importPathOpen, sysCtx)
+		a, mod, fn := instantiateModule(testCtx, t, functionPathOpen, importPathOpen, sysCtx)
 		maskMemory(t, testCtx, mod, len(expectedMemory))
 		ok := mod.Memory().Write(testCtx, 0, initialMemory)
 		require.True(t, ok)
@@ -1618,7 +1633,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, functionPathOpen, importPathOpen, sysCtx)
+	a, mod, _ := instantiateModule(testCtx, t, functionPathOpen, importPathOpen, sysCtx)
 	defer mod.Close(testCtx)
 
 	validPath := uint32(0)    // arbitrary offset
@@ -1677,7 +1692,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 
 // TestSnapshotPreview1_PathReadlink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathReadlink(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathReadlink, importPathReadlink, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathReadlink, importPathReadlink, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathLink", func(t *testing.T) {
@@ -1695,7 +1710,7 @@ func TestSnapshotPreview1_PathReadlink(t *testing.T) {
 
 // TestSnapshotPreview1_PathRemoveDirectory only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathRemoveDirectory, importPathRemoveDirectory, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathRemoveDirectory, importPathRemoveDirectory, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathRemoveDirectory", func(t *testing.T) {
@@ -1713,7 +1728,7 @@ func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
 
 // TestSnapshotPreview1_PathRename only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathRename(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathRename, importPathRename, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathRename, importPathRename, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathRename", func(t *testing.T) {
@@ -1731,7 +1746,7 @@ func TestSnapshotPreview1_PathRename(t *testing.T) {
 
 // TestSnapshotPreview1_PathSymlink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathSymlink(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathSymlink, importPathSymlink, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathSymlink, importPathSymlink, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathSymlink", func(t *testing.T) {
@@ -1749,7 +1764,7 @@ func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 
 // TestSnapshotPreview1_PathUnlinkFile only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPathUnlinkFile, importPathUnlinkFile, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPathUnlinkFile, importPathUnlinkFile, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PathUnlinkFile", func(t *testing.T) {
@@ -1767,7 +1782,7 @@ func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
 
 // TestSnapshotPreview1_PollOneoff only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PollOneoff(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionPollOneoff, importPollOneoff, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionPollOneoff, importPollOneoff, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.PollOneoff", func(t *testing.T) {
@@ -1804,7 +1819,7 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Note: Unlike most tests, this uses fn, not the 'a' result parameter. This is because currently, this function
 			// body panics, and we expect Call to unwrap the panic.
-			_, mod, fn := instantiateModule(t, functionProcExit, importProcExit, nil)
+			_, mod, fn := instantiateModule(testCtx, t, functionProcExit, importProcExit, nil)
 			defer mod.Close(testCtx)
 
 			// When ProcExit is called, store.Callfunction returns immediately, returning the exit code as the error.
@@ -1816,7 +1831,7 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 
 // TestSnapshotPreview1_ProcRaise only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_ProcRaise(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionProcRaise, importProcRaise, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionProcRaise, importProcRaise, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.ProcRaise", func(t *testing.T) {
@@ -1834,7 +1849,7 @@ func TestSnapshotPreview1_ProcRaise(t *testing.T) {
 
 // TestSnapshotPreview1_SchedYield only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SchedYield(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionSchedYield, importSchedYield, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionSchedYield, importSchedYield, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.SchedYield", func(t *testing.T) {
@@ -1859,18 +1874,9 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 
 	length := uint32(5) // arbitrary length,
 	offset := uint32(1) // offset,
-	seed := int64(42)   // and seed value
 
-	a, mod, fn := instantiateModule(t, functionRandomGet, importRandomGet, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, nil)
 	defer mod.Close(testCtx)
-
-	a.randSource = func(p []byte) error {
-		s := rand.NewSource(seed)
-		rng := rand.New(s)
-		_, err := rng.Read(p)
-
-		return err
-	}
 
 	t.Run("snapshotPreview1.RandomGet", func(t *testing.T) {
 		maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -1901,7 +1907,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address
 
-	a, mod, _ := instantiateModule(t, functionRandomGet, importRandomGet, nil)
+	a, mod, _ := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, nil)
 	defer mod.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -1934,21 +1940,32 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 	}
 }
 
+// compile-time check to ensure fakeSysErr implements experimental.Sys.
+var _ experimental.Sys = &fakeSysErr{}
+
+type fakeSysErr struct{}
+
+func (d *fakeSysErr) TimeNowUnixNano() uint64 {
+	panic(errors.New("TimeNowUnixNano error"))
+}
+
+func (d *fakeSysErr) RandSource([]byte) error {
+	return errors.New("RandSource error")
+}
+
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
-	a, mod, _ := instantiateModule(t, functionRandomGet, importRandomGet, nil)
-	defer mod.Close(testCtx)
+	var errCtx = context.WithValue(context.Background(), experimental.SysKey{}, &fakeSysErr{})
 
-	a.randSource = func(p []byte) error {
-		return errors.New("random source error")
-	}
+	a, mod, _ := instantiateModule(errCtx, t, functionRandomGet, importRandomGet, nil)
+	defer mod.Close(errCtx)
 
-	errno := a.RandomGet(testCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
+	errno := a.RandomGet(errCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
 	require.Equal(t, ErrnoIo, errno, ErrnoName(errno))
 }
 
 // TestSnapshotPreview1_SockRecv only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockRecv(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionSockRecv, importSockRecv, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionSockRecv, importSockRecv, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.SockRecv", func(t *testing.T) {
@@ -1966,7 +1983,7 @@ func TestSnapshotPreview1_SockRecv(t *testing.T) {
 
 // TestSnapshotPreview1_SockSend only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockSend(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionSockSend, importSockSend, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionSockSend, importSockSend, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.SockSend", func(t *testing.T) {
@@ -1984,7 +2001,7 @@ func TestSnapshotPreview1_SockSend(t *testing.T) {
 
 // TestSnapshotPreview1_SockShutdown only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockShutdown(t *testing.T) {
-	a, mod, fn := instantiateModule(t, functionSockShutdown, importSockShutdown, nil)
+	a, mod, fn := instantiateModule(testCtx, t, functionSockShutdown, importSockShutdown, nil)
 	defer mod.Close(testCtx)
 
 	t.Run("snapshotPreview1.SockShutdown", func(t *testing.T) {
@@ -2009,25 +2026,25 @@ func maskMemory(t *testing.T, ctx context.Context, mod api.Module, size int) {
 	}
 }
 
-func instantiateModule(t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (*snapshotPreview1, api.Module, api.Function) {
+func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (*snapshotPreview1, api.Module, api.Function) {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
 	// The package `wazero` has a simpler interface for adding host modules, but we can't use that as it would create an
 	// import cycle. Instead, we export wasm.NewHostModule and use it here.
-	a, fns := snapshotPreview1Functions()
+	a, fns := snapshotPreview1Functions(ctx)
 	_, err := r.NewModuleBuilder("wasi_snapshot_preview1").ExportFunctions(fns).Instantiate(testCtx)
 	require.NoError(t, err)
 
-	compiled, err := r.CompileModule(testCtx, []byte(fmt.Sprintf(`(module
+	compiled, err := r.CompileModule(ctx, []byte(fmt.Sprintf(`(module
   %[2]s
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
 )`, wasifunction, wasiimport)))
 	require.NoError(t, err)
-	defer compiled.Close(testCtx)
+	defer compiled.Close(ctx)
 
-	mod, err := r.InstantiateModuleWithConfig(testCtx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
+	mod, err := r.InstantiateModuleWithConfig(ctx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
 	require.NoError(t, err)
 
 	if sysCtx != nil {

@@ -469,7 +469,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for _, f := range importedFunctions {
-		cf := f.Module.Engine.(*moduleEngine).functions[f.Index]
+		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
 		me.functions = append(me.functions, cf)
 	}
 
@@ -532,10 +532,10 @@ func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.E
 func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := me.functions[f.Index]
+	compiled := me.functions[f.Idx]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = callCtx.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", me.name, f.Index))
+			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", me.name, f.Idx))
 		}
 		return
 	}

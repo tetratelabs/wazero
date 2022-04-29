@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	experimental_api "github.com/tetratelabs/wazero/internal/experimental/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
@@ -166,7 +166,7 @@ func (m *Module) maybeAddType(ft *FunctionType) Index {
 
 func (m *Module) buildHostFunctions(
 	moduleName string,
-	functionListenerFactory experimental_api.FunctionListenerFactory,
+	functionListenerFactory experimental.FunctionListenerFactory,
 ) (functions []*FunctionInstance) {
 	// ModuleBuilder has no imports, which means the FunctionSection index is the same as the position in the function
 	// index namespace. Also, it ensures every function has a name. That's why there is less error checking here.
@@ -177,27 +177,16 @@ func (m *Module) buildHostFunctions(
 			Kind:   kind(fn.Type()),
 			Type:   m.TypeSection[typeIndex],
 			GoFunc: fn,
-			Index:  Index(idx),
+			Idx:    Index(idx),
 		}
-		f.DebugName = wasmdebug.FuncName(moduleName, functionNames[f.Index].Name, f.Index)
+		name := functionNames[f.Idx].Name
+		f.moduleName = moduleName
+		f.DebugName = wasmdebug.FuncName(moduleName, name, f.Idx)
+		f.name = name
+		// TODO: add parameter names for host functions (vararg strings that must match arity with param length)
+		f.exportNames = []string{name}
 		if functionListenerFactory != nil {
-			params := make([]experimental_api.ValueInfo, len(f.ParamTypes()))
-			for i, p := range f.ParamTypes() {
-				params[i].Type = p
-			}
-			results := make([]experimental_api.ValueInfo, len(f.ResultTypes()))
-			for i, r := range f.ResultTypes() {
-				results[i].Type = r
-			}
-
-			// TODO: add parameter names for host functions (vararg strings that must match arity with param length)
-
-			f.FunctionListener = functionListenerFactory.NewListener(experimental_api.FunctionInfo{
-				ModuleName: moduleName,
-				Name:       f.DebugName,
-				Params:     params,
-				Returns:    results,
-			})
+			f.FunctionListener = functionListenerFactory.NewListener(f)
 		}
 		functions = append(functions, f)
 	}

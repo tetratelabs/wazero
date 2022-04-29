@@ -406,7 +406,7 @@ func (e *mockModuleEngine) Name() string {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Call(ctx context.Context, callCtx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
-	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
+	if e.callFailIndex >= 0 && f.Idx == Index(e.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
