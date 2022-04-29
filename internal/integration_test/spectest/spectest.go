@@ -267,6 +267,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
+	maybeSetMemoryCap(mod)
 	err = store.Engine.CompileModule(testCtx, mod)
 	require.NoError(t, err)
 
@@ -274,7 +275,14 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	require.NoError(t, err)
 }
 
-// Run runs all the test inside of the testDataFS file system where all the cases are descirbed
+// maybeSetMemoryCap assigns wasm.Memory Cap to Min, which is what wazero.CompileModule would do.
+func maybeSetMemoryCap(mod *wasm.Module) {
+	if mem := mod.MemorySection; mem != nil {
+		mem.Cap = mem.Min
+	}
+}
+
+// Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
 func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
 	files, err := testDataFS.ReadDir("testdata")
@@ -329,6 +337,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							}
 						}
 
+						maybeSetMemoryCap(mod)
 						err = store.Engine.CompileModule(testCtx, mod)
 						require.NoError(t, err, msg)
 
@@ -458,6 +467,7 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 
 	mod.AssignModuleID(buf)
 
+	maybeSetMemoryCap(mod)
 	err = store.Engine.CompileModule(testCtx, mod)
 	if err != nil {
 		return

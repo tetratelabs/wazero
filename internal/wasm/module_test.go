@@ -807,7 +807,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
-		m := Module{MemorySection: &Memory{Min: min, Max: max}}
+		m := Module{MemorySection: &Memory{Min: min, Cap: min, Max: max}}
 		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, mem.Max)

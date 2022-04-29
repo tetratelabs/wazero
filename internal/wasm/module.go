@@ -561,9 +561,6 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	if memSec != nil {
 		min := MemoryPagesToBytesNum(memSec.Min)
 		capacity := MemoryPagesToBytesNum(memSec.Cap)
-		if capacity == 0 && min != 0 {
-			capacity = min // Internal code may avoid setting Cap. Default to min.
-		}
 		mem = &MemoryInstance{
 			Buffer: make([]byte, min, capacity),
 			Min:    memSec.Min,
