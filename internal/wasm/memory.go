@@ -17,9 +17,9 @@ const (
 	// and is defined as 2^16 = 65536.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0
 	MemoryPageSize = uint32(65536)
-	// MemoryMaxPages is maximum number of pages defined (2^16).
+	// MemoryLimitPages is maximum number of pages defined (2^16).
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-	MemoryMaxPages = uint32(65536)
+	MemoryLimitPages = uint32(65536)
 	// MemoryPageSizeInBits satisfies the relation: "1 << MemoryPageSizeInBits == MemoryPageSize".
 	MemoryPageSizeInBits = 16
 )

@@ -68,7 +68,7 @@ func TestBinaryEncoder(t *testing.T) {
 
 						buf = requireStripCustomSections(t, buf)
 
-						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryMaxPages)
+						mod, err := binary.DecodeModule(buf, wasm.Features20191205, wasm.MemoryLimitPages)
 						require.NoError(t, err)
 
 						encodedBuf := binary.EncodeModule(mod)

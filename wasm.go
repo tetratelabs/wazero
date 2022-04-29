@@ -126,7 +126,7 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
 		store:               wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
 		enabledFeatures:     config.enabledFeatures,
-		memoryMaxPages:      config.memoryMaxPages,
+		memoryLimitPages:    config.memoryLimitPages,
 		memoryCapacityPages: config.memoryCapacityPages,
 	}
 }
@@ -135,7 +135,7 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 type runtime struct {
 	enabledFeatures     wasm.Features
 	store               *wasm.Store
-	memoryMaxPages      uint32
+	memoryLimitPages    uint32
 	memoryCapacityPages func(minPages uint32, maxPages *uint32) uint32
 }
 
@@ -162,13 +162,13 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCo
 		decoder = text.DecodeModule
 	}
 
-	if r.memoryMaxPages > wasm.MemoryMaxPages {
-		return nil, fmt.Errorf("memoryMaxPages %d (%s) > specification max %d (%s)",
-			r.memoryMaxPages, wasm.PagesToUnitOfBytes(r.memoryMaxPages),
-			wasm.MemoryMaxPages, wasm.PagesToUnitOfBytes(wasm.MemoryMaxPages))
+	if r.memoryLimitPages > wasm.MemoryLimitPages {
+		return nil, fmt.Errorf("memoryLimitPages %d (%s) > specification max %d (%s)",
+			r.memoryLimitPages, wasm.PagesToUnitOfBytes(r.memoryLimitPages),
+			wasm.MemoryLimitPages, wasm.PagesToUnitOfBytes(wasm.MemoryLimitPages))
 	}
 
-	internal, err := decoder(source, r.enabledFeatures, r.memoryMaxPages)
+	internal, err := decoder(source, r.enabledFeatures, r.memoryLimitPages)
 
 	if err != nil {
 		return nil, err
@@ -180,11 +180,16 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCo
 
 	// Determine the correct memory capacity, if a memory was defined.
 	if mem := internal.MemorySection; mem != nil {
-		var max *uint32
-		if mem.IsMaxEncoded {
-			max = &mem.Max
+		memoryName := "0"
+		for _, e := range internal.ExportSection {
+			if e.Type == wasm.ExternTypeMemory {
+				memoryName = e.Name
+				break
+			}
 		}
-		mem.Cap = r.memoryCapacityPages(mem.Min, max)
+		if err = r.setMemoryCapacity(memoryName, mem); err != nil {
+			return nil, err
+		}
 	}
 
 	internal.AssignModuleID(source)
@@ -263,4 +268,17 @@ func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *Com
 		}
 	}
 	return
+}
+
+// setMemoryCapacity sets wasm.Memory cap using the function supplied by RuntimeConfig.WithMemoryCapacityPages.
+func (r *runtime) setMemoryCapacity(name string, mem *wasm.Memory) error {
+	var max *uint32
+	if mem.IsMaxEncoded {
+		max = &mem.Max
+	}
+	mem.Cap = r.memoryCapacityPages(mem.Min, max)
+	if err := mem.ValidateCap(r.memoryLimitPages); err != nil {
+		return fmt.Errorf("memory[%s] %v", name, err)
+	}
+	return nil
 }

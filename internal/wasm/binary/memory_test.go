@@ -11,7 +11,7 @@ import (
 
 func TestMemoryType(t *testing.T) {
 	zero := uint32(0)
-	max := wasm.MemoryMaxPages
+	max := wasm.MemoryLimitPages
 
 	tests := []struct {
 		name     string
@@ -20,12 +20,12 @@ func TestMemoryType(t *testing.T) {
 	}{
 		{
 			name:     "min 0",
-			input:    &wasm.Memory{Max: wasm.MemoryMaxPages, IsMaxEncoded: true},
+			input:    &wasm.Memory{Max: wasm.MemoryLimitPages, IsMaxEncoded: true},
 			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
 			name:     "min 0 - default max",
-			input:    &wasm.Memory{Max: wasm.MemoryMaxPages},
+			input:    &wasm.Memory{Max: wasm.MemoryLimitPages},
 			expected: []byte{0x0, 0},
 		},
 		{
@@ -68,10 +68,10 @@ func TestMemoryType(t *testing.T) {
 
 func TestDecodeMemoryType_Errors(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          []byte
-		memoryMaxPages uint32
-		expectedErr    string
+		name             string
+		input            []byte
+		memoryLimitPages uint32
+		expectedErr      string
 	}{
 		{
 			name:        "max < min",
@@ -81,24 +81,24 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 		{
 			name:        "min > limit",
 			input:       []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
-			expectedErr: "min 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+			expectedErr: "min 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max > limit",
 			input:       []byte{0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
-			expectedErr: "max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
-		if tc.memoryMaxPages == 0 {
-			tc.memoryMaxPages = wasm.MemoryMaxPages
+		if tc.memoryLimitPages == 0 {
+			tc.memoryLimitPages = wasm.MemoryLimitPages
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), tc.memoryMaxPages)
+			_, err := decodeMemory(bytes.NewReader(tc.input), tc.memoryLimitPages)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

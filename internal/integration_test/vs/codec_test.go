@@ -14,13 +14,13 @@ import (
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleBinary, wasm.FeaturesFinished, wasm.MemoryMaxPages)
+		m, err := binary.DecodeModule(exampleBinary, wasm.FeaturesFinished, wasm.MemoryLimitPages)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("text.DecodeModule", func(t *testing.T) {
-		m, err := text.DecodeModule(exampleText, wasm.FeaturesFinished, wasm.MemoryMaxPages)
+		m, err := text.DecodeModule(exampleText, wasm.FeaturesFinished, wasm.MemoryLimitPages)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
@@ -49,7 +49,7 @@ func BenchmarkCodec(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary, wasm.FeaturesFinished, wasm.MemoryMaxPages); err != nil {
+			if _, err := binary.DecodeModule(exampleBinary, wasm.FeaturesFinished, wasm.MemoryLimitPages); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -63,7 +63,7 @@ func BenchmarkCodec(b *testing.B) {
 	b.Run("text.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := text.DecodeModule(exampleText, wasm.FeaturesFinished, wasm.MemoryMaxPages); err != nil {
+			if _, err := text.DecodeModule(exampleText, wasm.FeaturesFinished, wasm.MemoryLimitPages); err != nil {
 				b.Fatal(err)
 			}
 		}

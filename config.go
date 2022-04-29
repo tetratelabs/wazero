@@ -15,26 +15,28 @@ import (
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
+//
+// Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type RuntimeConfig struct {
 	enabledFeatures     wasm.Features
 	newEngine           func(wasm.Features) wasm.Engine
-	memoryMaxPages      uint32
+	memoryLimitPages    uint32
 	memoryCapacityPages func(minPages uint32, maxPages *uint32) uint32
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &RuntimeConfig{
 	enabledFeatures:     wasm.Features20191205,
-	memoryMaxPages:      wasm.MemoryMaxPages,
+	memoryLimitPages:    wasm.MemoryLimitPages,
 	memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 { return minPages },
 }
 
-// clone ensures all fields are coped even if nil.
+// clone ensures all fields are copied even if nil.
 func (c *RuntimeConfig) clone() *RuntimeConfig {
 	return &RuntimeConfig{
 		enabledFeatures:     c.enabledFeatures,
 		newEngine:           c.newEngine,
-		memoryMaxPages:      c.memoryMaxPages,
+		memoryLimitPages:    c.memoryLimitPages,
 		memoryCapacityPages: c.memoryCapacityPages,
 	}
 }
@@ -56,19 +58,19 @@ func NewRuntimeConfigInterpreter() *RuntimeConfig {
 	return ret
 }
 
-// WithMemoryMaxPages reduces the maximum number of pages a module can define from 65536 pages (4GiB) to a lower value.
+// WithMemoryLimitPages limits the maximum number of pages a module can define from 65536 pages (4GiB) to a lower value.
 //
 // Notes:
-// * If a module defines no memory max limit, Runtime.CompileModule sets max to this value.
-// * If a module defines a memory max larger than this amount, it will fail to compile (Runtime.CompileModule).
+// * If a module defines no memory max value, Runtime.CompileModule sets max to the limit.
+// * If a module defines a memory max larger than this limit, it will fail to compile (Runtime.CompileModule).
 // * Any "memory.grow" instruction that results in a larger value than this results in an error at runtime.
 // * Zero is a valid value and results in a crash if any module uses memory.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-types%E2%91%A0
-func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig {
+func (c *RuntimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) *RuntimeConfig {
 	ret := c.clone()
-	ret.memoryMaxPages = memoryMaxPages
+	ret.memoryLimitPages = memoryLimitPages
 	return ret
 }
 
@@ -76,15 +78,19 @@ func (c *RuntimeConfig) WithMemoryMaxPages(memoryMaxPages uint32) *RuntimeConfig
 // the min and possibly nil max defined by the module, and the default is to return the min.
 //
 // Ex. To set capacity to max when exists:
-//	c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+//	c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
 //		if maxPages != nil {
 //			return *maxPages
 //		}
 //		return minPages
 //	})
 //
-// Note: This applies at compile time, ModuleBuilder.Build or Runtime.CompileModule.
+// This function is used at compile time (ModuleBuilder.Build or Runtime.CompileModule). Compile will err if the
+// function returns a value lower than minPages or greater than WithMemoryLimitPages.
 func (c *RuntimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) *RuntimeConfig {
+	if maxCapacityPages == nil {
+		return c // Instead of erring.
+	}
 	ret := c.clone()
 	ret.memoryCapacityPages = maxCapacityPages
 	return ret
@@ -204,12 +210,15 @@ func (c *CompiledCode) Close(_ context.Context) error {
 	return nil
 }
 
-// ModuleConfig configures resources needed by functions that have low-level interactions with the host operating system.
-// Using this, resources such as STDIN can be isolated (ex via StartWASICommandWithConfig), so that the same module can
-// be safely instantiated multiple times.
+// ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
+// system. Using this, resources such as STDIN can be isolated, so that the same module can be safely instantiated
+// multiple times.
 //
 // Note: While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
+//
+// TODO: This is accidentally mutable. A follow-up PR should change it to be immutable as that's how baseline
+// configuration can be used safely in modules instantiated on different goroutines.
 type ModuleConfig struct {
 	name           string
 	startFunctions []string

@@ -18,9 +18,10 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-func TestRuntime_DecodeModule(t *testing.T) {
+func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {
 		name         string
+		runtime      Runtime
 		source       []byte
 		expectedName string
 	}{
@@ -66,9 +67,27 @@ func TestRuntime_DecodeModule(t *testing.T) {
 			require.Equal(t, r.(*runtime).store.Engine, code.compiledEngine)
 		})
 	}
+
+	t.Run("text - memory", func(t *testing.T) {
+		r := NewRuntimeWithConfig(NewRuntimeConfig().
+			WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 2 }))
+
+		source := []byte(`(module (memory 1 3))`)
+
+		code, err := r.CompileModule(testCtx, source)
+		require.NoError(t, err)
+		defer code.Close(testCtx)
+
+		require.Equal(t, &wasm.Memory{
+			Min:          1,
+			Cap:          2, // Uses capacity function
+			Max:          3,
+			IsMaxEncoded: true,
+		}, code.module.MemorySection)
+	})
 }
 
-func TestRuntime_DecodeModule_Errors(t *testing.T) {
+func TestRuntime_CompileModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		runtime     Runtime
@@ -90,22 +109,36 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 			expectedErr: "1:2: unexpected field: modular",
 		},
 		{
-			name:        "RuntimeConfig.memoryMaxPage too large",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(math.MaxUint32)),
+			name:        "RuntimeConfig.memoryLimitPages too large",
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(math.MaxUint32)),
 			source:      []byte(`(module)`),
-			expectedErr: "memoryMaxPages 4294967295 (3 Ti) > specification max 65536 (4 Gi)",
+			expectedErr: "memoryLimitPages 4294967295 (3 Ti) > specification max 65536 (4 Gi)",
 		},
 		{
 			name:        "memory has too many pages - text",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(2)),
 			source:      []byte(`(module (memory 3))`),
-			expectedErr: "1:17: min 3 pages (192 Ki) outside range of 2 pages (128 Ki) in module.memory[0]",
+			expectedErr: "1:17: min 3 pages (192 Ki) over limit of 2 pages (128 Ki) in module.memory[0]",
+		},
+		{
+			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
+			runtime: NewRuntimeWithConfig(NewRuntimeConfig().
+				WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 1 })),
+			source:      []byte(`(module (memory 3))`),
+			expectedErr: "memory[0] capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
+		},
+		{
+			name: "memory cap < min - exported", // only one test to avoid duplicating tests in module_test.go
+			runtime: NewRuntimeWithConfig(NewRuntimeConfig().
+				WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 1 })),
+			source:      []byte(`(module (memory 3) (export "memory" (memory 0)))`),
+			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
 		},
 		{
 			name:        "memory has too many pages - binary",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryMaxPages(2)),
+			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(2)),
 			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true}}),
-			expectedErr: "section memory: max 3 pages (192 Ki) outside range of 2 pages (128 Ki)",
+			expectedErr: "section memory: max 3 pages (192 Ki) over limit of 2 pages (128 Ki)",
 		},
 	}
 
@@ -120,6 +153,52 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := tc.runtime.CompileModule(testCtx, tc.source)
 			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func TestRuntime_setMemoryCapacity(t *testing.T) {
+	tests := []struct {
+		name        string
+		runtime     *runtime
+		mem         *wasm.Memory
+		expectedErr string
+	}{
+		{
+			name: "cap ok",
+			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
+				return 3
+			}, memoryLimitPages: 3},
+			mem: &wasm.Memory{Min: 2},
+		},
+		{
+			name: "cap < min",
+			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
+				return 1
+			}, memoryLimitPages: 3},
+			mem:         &wasm.Memory{Min: 2},
+			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 2 pages (128 Ki)",
+		},
+		{
+			name: "cap > maxLimit",
+			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
+				return 4
+			}, memoryLimitPages: 3},
+			mem:         &wasm.Memory{Min: 2},
+			expectedErr: "memory[memory] capacity 4 pages (256 Ki) over limit of 3 pages (192 Ki)",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.runtime.setMemoryCapacity("memory", tc.mem)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
 		})
 	}
 }

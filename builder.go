@@ -30,8 +30,10 @@ import (
 //	env2, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.2"))
 //	defer env2.Close(ctx)
 //
-// Note: Builder methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
-// Note: Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
+// Notes:
+// * ModuleBuilder is mutable. WithXXX functions return the same instance for chaining.
+// * WithXXX methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
+// * Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
 type ModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
@@ -91,7 +93,7 @@ type ModuleBuilder interface {
 	//	// (memory (export "memory") 1)
 	//	builder.ExportMemory(1)
 	//
-	// Note: This is allowed to grow to RuntimeConfig.WithMemoryMaxPages (4GiB). To bound it, use ExportMemoryWithMax.
+	// Note: This is allowed to grow to RuntimeConfig.WithMemoryLimitPages (4GiB). To bound it, use ExportMemoryWithMax.
 	// Note: If a memory is already exported with the same name, this overwrites it.
 	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
@@ -103,7 +105,7 @@ type ModuleBuilder interface {
 	//	// (memory (export "memory") 1 1)
 	//	builder.ExportMemoryWithMax(1, 1)
 	//
-	// Note: maxPages must be at least minPages and no larger than RuntimeConfig.WithMemoryMaxPages
+	// Note: maxPages must be at least minPages and no larger than RuntimeConfig.WithMemoryLimitPages
 	ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder
 
 	// ExportGlobalI32 exports a global constant of type api.ValueTypeI32.
@@ -195,7 +197,7 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 
 // ExportMemory implements ModuleBuilder.ExportMemory
 func (b *moduleBuilder) ExportMemory(name string, minPages uint32) ModuleBuilder {
-	mem := &wasm.Memory{Min: minPages, Max: b.r.memoryMaxPages}
+	mem := &wasm.Memory{Min: minPages, Max: b.r.memoryLimitPages}
 	mem.Cap = b.r.memoryCapacityPages(mem.Min, nil)
 	b.nameToMemory[name] = mem
 	return b
@@ -250,11 +252,13 @@ func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 // Build implements ModuleBuilder.Build
 func (b *moduleBuilder) Build(ctx context.Context) (*CompiledCode, error) {
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
-	maxLimit := b.r.memoryMaxPages
+	memoryLimitPages := b.r.memoryLimitPages
 	for name, mem := range b.nameToMemory {
-		if mem.Max > maxLimit {
-			max := mem.Max
-			return nil, fmt.Errorf("memory[%s] max %d pages (%s) outside range of %d pages (%s)", name, max, wasm.PagesToUnitOfBytes(max), maxLimit, wasm.PagesToUnitOfBytes(maxLimit))
+		if err := mem.ValidateMinMax(memoryLimitPages); err != nil {
+			return nil, fmt.Errorf("memory[%s] %v", name, err)
+		}
+		if err := b.r.setMemoryCapacity(name, mem); err != nil {
+			return nil, err
 		}
 	}
 

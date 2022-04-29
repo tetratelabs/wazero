@@ -9,7 +9,7 @@ import (
 
 func TestMemoryParser(t *testing.T) {
 	zero := uint32(0)
-	max := wasm.MemoryMaxPages
+	max := wasm.MemoryLimitPages
 	tests := []struct {
 		name       string
 		input      string
@@ -122,12 +122,12 @@ func TestMemoryParser_Errors(t *testing.T) {
 		{
 			name:        "min > limit",
 			input:       "(memory 4294967295)",
-			expectedErr: "min 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+			expectedErr: "min 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max > limit",
 			input:       "(memory 0 4294967295)",
-			expectedErr: "max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 	}
 
@@ -166,7 +166,7 @@ func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.Memor
 		parsed = &wasm.Memory{Min: min, Max: max, IsMaxEncoded: maxDecoded}
 		return parseErr
 	}
-	tp := newMemoryParser(wasm.MemoryMaxPages, memoryNamespace, setFunc)
+	tp := newMemoryParser(wasm.MemoryLimitPages, memoryNamespace, setFunc)
 	// memoryParser starts after the '(memory', so we need to eat it first!
 	_, _, err := lex(skipTokens(2, tp.begin), []byte(input))
 	return parsed, tp, err

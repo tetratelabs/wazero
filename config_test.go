@@ -18,12 +18,12 @@ func TestRuntimeConfig(t *testing.T) {
 		expected *RuntimeConfig
 	}{
 		{
-			name: "WithMemoryMaxPages",
+			name: "WithMemoryLimitPages",
 			with: func(c *RuntimeConfig) *RuntimeConfig {
-				return c.WithMemoryMaxPages(1)
+				return c.WithMemoryLimitPages(1)
 			},
 			expected: &RuntimeConfig{
-				memoryMaxPages: 1,
+				memoryLimitPages: 1,
 			},
 		},
 		{
@@ -83,6 +83,24 @@ func TestRuntimeConfig(t *testing.T) {
 			require.Equal(t, &RuntimeConfig{}, input)
 		})
 	}
+
+	t.Run("WithMemoryCapacityPages", func(t *testing.T) {
+		c := NewRuntimeConfig()
+
+		// Test default returns min
+		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
+
+		// Nil ignored
+		c = c.WithMemoryCapacityPages(nil)
+		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
+
+		// Assign a valid function
+		c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+			return 2
+		})
+		// Returns updated value
+		require.Equal(t, uint32(2), c.memoryCapacityPages(1, nil))
+	})
 }
 
 func TestRuntimeConfig_FeatureToggle(t *testing.T) {

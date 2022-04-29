@@ -159,7 +159,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemory("memory", 1)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryMaxPages},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryLimitPages},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -171,7 +171,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 				return r.NewModuleBuilder("").ExportMemory("memory", 1).ExportMemory("memory", 2)
 			},
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: wasm.MemoryMaxPages},
+				MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: wasm.MemoryLimitPages},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -362,22 +362,26 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       func(Runtime) ModuleBuilder
+		input       func(*RuntimeConfig) ModuleBuilder
 		expectedErr string
 	}{
 		{
-			name: "memory max > limit",
-			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportMemory("memory", math.MaxUint32)
+			name: "memory min > limit", // only one test to avoid duplicating tests in module_test.go
+			input: func(cfg *RuntimeConfig) ModuleBuilder {
+				return NewRuntimeWithConfig(cfg).NewModuleBuilder("").
+					ExportMemory("memory", math.MaxUint32)
 			},
-			expectedErr: "memory[memory] min 4294967295 pages (3 Ti) > max 65536 pages (4 Gi)",
+			expectedErr: "memory[memory] min 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
-			name: "memory min > limit",
-			input: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder("").ExportMemoryWithMax("memory", 1, math.MaxUint32)
+			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
+			input: func(cfg *RuntimeConfig) ModuleBuilder {
+				cfg = cfg.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+					return 1
+				})
+				return NewRuntimeWithConfig(cfg).NewModuleBuilder("").ExportMemory("memory", 2)
 			},
-			expectedErr: "memory[memory] max 4294967295 pages (3 Ti) outside range of 65536 pages (4 Gi)",
+			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 2 pages (128 Ki)",
 		},
 	}
 
@@ -385,7 +389,7 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := tc.input(NewRuntime()).Build(testCtx)
+			_, e := tc.input(NewRuntimeConfig()).Build(testCtx)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

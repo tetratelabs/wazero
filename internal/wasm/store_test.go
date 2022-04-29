@@ -650,7 +650,7 @@ func TestStore_resolveImports(t *testing.T) {
 			importMemoryType := &Memory{Max: max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{Max: MemoryMaxPages},
+				Memory: &MemoryInstance{Max: MemoryLimitPages},
 			}}, Name: moduleName}
 			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10 < 65536")
