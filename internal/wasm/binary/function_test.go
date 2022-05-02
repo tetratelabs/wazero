@@ -72,7 +72,7 @@ func TestFunctionType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			binary, err := decodeFunctionType(wasm.FeaturesFinished, bytes.NewReader(b))
+			binary, err := decodeFunctionType(wasm.Features20220419, bytes.NewReader(b))
 			require.NoError(t, err)
 			require.Equal(t, binary, tc.input)
 		})

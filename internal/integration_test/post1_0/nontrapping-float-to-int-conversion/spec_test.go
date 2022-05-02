@@ -56,7 +56,7 @@ var nonTrappingFloatToIntConversion = []byte(`(module $conversions.wast
 )
 `)
 
-func testNonTrappingFloatToIntConversion(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testNonTrappingFloatToIntConversion(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("disabled", func(t *testing.T) {
 		// Non-trapping Float-to-int Conversions are disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())

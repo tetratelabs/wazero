@@ -272,7 +272,7 @@ func TestFuncParser(t *testing.T) {
 			}
 
 			module := &wasm.Module{}
-			fp := newFuncParser(wasm.FeaturesFinished, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			fp := newFuncParser(wasm.Features20220419, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -390,7 +390,7 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(wasm.FeaturesFinished, &typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
+			fp := newFuncParser(wasm.Features20220419, &typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})

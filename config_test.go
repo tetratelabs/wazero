@@ -14,61 +14,79 @@ import (
 func TestRuntimeConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		with     func(*RuntimeConfig) *RuntimeConfig
-		expected *RuntimeConfig
+		with     func(RuntimeConfig) RuntimeConfig
+		expected RuntimeConfig
 	}{
 		{
 			name: "WithMemoryLimitPages",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithMemoryLimitPages(1)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				memoryLimitPages: 1,
 			},
 		},
 		{
 			name: "bulk-memory-operations",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithFeatureBulkMemoryOperations(true)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				enabledFeatures: wasm.FeatureBulkMemoryOperations,
 			},
 		},
 		{
 			name: "multi-value",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithFeatureMultiValue(true)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				enabledFeatures: wasm.FeatureMultiValue,
 			},
 		},
 		{
 			name: "mutable-global",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithFeatureMutableGlobal(true)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				enabledFeatures: wasm.FeatureMutableGlobal,
 			},
 		},
 		{
 			name: "nontrapping-float-to-int-conversion",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithFeatureNonTrappingFloatToIntConversion(true)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				enabledFeatures: wasm.FeatureNonTrappingFloatToIntConversion,
 			},
 		},
 		{
 			name: "sign-extension-ops",
-			with: func(c *RuntimeConfig) *RuntimeConfig {
+			with: func(c RuntimeConfig) RuntimeConfig {
 				return c.WithFeatureSignExtensionOps(true)
 			},
-			expected: &RuntimeConfig{
+			expected: &runtimeConfig{
 				enabledFeatures: wasm.FeatureSignExtensionOps,
+			},
+		},
+		{
+			name: "REC-wasm-core-1-20191205",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithFeatureSignExtensionOps(true).WithWasmCore1()
+			},
+			expected: &runtimeConfig{
+				enabledFeatures: wasm.Features20191205,
+			},
+		},
+		{
+			name: "WD-wasm-core-2-20220419",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithFeatureMutableGlobal(false).WithWasmCore2()
+			},
+			expected: &runtimeConfig{
+				enabledFeatures: wasm.Features20220419,
 			},
 		},
 	}
@@ -76,28 +94,28 @@ func TestRuntimeConfig(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			input := &RuntimeConfig{}
+			input := &runtimeConfig{}
 			rc := tc.with(input)
 			require.Equal(t, tc.expected, rc)
 			// The source wasn't modified
-			require.Equal(t, &RuntimeConfig{}, input)
+			require.Equal(t, &runtimeConfig{}, input)
 		})
 	}
 
 	t.Run("WithMemoryCapacityPages", func(t *testing.T) {
-		c := NewRuntimeConfig()
+		c := NewRuntimeConfig().(*runtimeConfig)
 
 		// Test default returns min
 		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
 
 		// Nil ignored
-		c = c.WithMemoryCapacityPages(nil)
+		c = c.WithMemoryCapacityPages(nil).(*runtimeConfig)
 		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
 
 		// Assign a valid function
 		c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
 			return 2
-		})
+		}).(*runtimeConfig)
 		// Returns updated value
 		require.Equal(t, uint32(2), c.memoryCapacityPages(1, nil))
 	})
@@ -108,13 +126,13 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 		name          string
 		feature       wasm.Features
 		expectDefault bool
-		setFeature    func(*RuntimeConfig, bool) *RuntimeConfig
+		setFeature    func(RuntimeConfig, bool) RuntimeConfig
 	}{
 		{
 			name:          "bulk-memory-operations",
 			feature:       wasm.FeatureBulkMemoryOperations,
 			expectDefault: false,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
 				return c.WithFeatureBulkMemoryOperations(v)
 			},
 		},
@@ -122,7 +140,7 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			name:          "multi-value",
 			feature:       wasm.FeatureMultiValue,
 			expectDefault: false,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
 				return c.WithFeatureMultiValue(v)
 			},
 		},
@@ -130,7 +148,7 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			name:          "mutable-global",
 			feature:       wasm.FeatureMutableGlobal,
 			expectDefault: true,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
 				return c.WithFeatureMutableGlobal(v)
 			},
 		},
@@ -138,7 +156,7 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			name:          "nontrapping-float-to-int-conversion",
 			feature:       wasm.FeatureNonTrappingFloatToIntConversion,
 			expectDefault: false,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
 				return c.WithFeatureNonTrappingFloatToIntConversion(v)
 			},
 		},
@@ -146,7 +164,7 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 			name:          "sign-extension-ops",
 			feature:       wasm.FeatureSignExtensionOps,
 			expectDefault: false,
-			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
 				return c.WithFeatureSignExtensionOps(v)
 			},
 		},
@@ -156,19 +174,19 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			c := NewRuntimeConfig()
+			c := NewRuntimeConfig().(*runtimeConfig)
 			require.Equal(t, tc.expectDefault, c.enabledFeatures.Get(tc.feature))
 
 			// Set to false even if it was initially false.
-			c = tc.setFeature(c, false)
+			c = tc.setFeature(c, false).(*runtimeConfig)
 			require.False(t, c.enabledFeatures.Get(tc.feature))
 
 			// Set true makes it true
-			c = tc.setFeature(c, true)
+			c = tc.setFeature(c, true).(*runtimeConfig)
 			require.True(t, c.enabledFeatures.Get(tc.feature))
 
 			// Set false makes it false again
-			c = tc.setFeature(c, false)
+			c = tc.setFeature(c, false).(*runtimeConfig)
 			require.False(t, c.enabledFeatures.Get(tc.feature))
 		})
 	}

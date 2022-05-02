@@ -45,7 +45,7 @@ var signExtend = []byte(`(module
 )
 `)
 
-func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testSignExtensionOps(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("disabled", func(t *testing.T) {
 		// Sign-extension is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())

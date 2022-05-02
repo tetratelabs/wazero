@@ -38,20 +38,20 @@ type Module interface {
 }
 
 func NewWazeroInterpreterRuntime() Runtime {
-	return newWazeroRuntime("wazero-interpreter", wazero.NewRuntimeConfigInterpreter().WithFinishedFeatures())
+	return newWazeroRuntime("wazero-interpreter", wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
 }
 
 func NewWazeroJITRuntime() Runtime {
-	return newWazeroRuntime(jitRuntime, wazero.NewRuntimeConfigJIT().WithFinishedFeatures())
+	return newWazeroRuntime(jitRuntime, wazero.NewRuntimeConfigJIT().WithWasmCore2())
 }
 
-func newWazeroRuntime(name string, config *wazero.RuntimeConfig) *wazeroRuntime {
+func newWazeroRuntime(name string, config wazero.RuntimeConfig) *wazeroRuntime {
 	return &wazeroRuntime{name: name, config: config}
 }
 
 type wazeroRuntime struct {
 	name          string
-	config        *wazero.RuntimeConfig
+	config        wazero.RuntimeConfig
 	runtime       wazero.Runtime
 	logFn         func([]byte) error
 	env, compiled *wazero.CompiledCode

@@ -189,7 +189,7 @@ func TestTypeParser(t *testing.T) {
 				require.Equal(t, wasm.SectionIDType, sectionID)
 				return 0
 			})
-			parsed, tp, err := parseFunctionType(wasm.FeaturesFinished, typeNamespace, tc.input)
+			parsed, tp, err := parseFunctionType(wasm.Features20220419, typeNamespace, tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, parsed)
 			require.Equal(t, uint32(1), tp.typeNamespace.count)
@@ -291,13 +291,13 @@ func TestTypeParser_Errors(t *testing.T) {
 		{
 			name:            "result second wrong",
 			input:           "(type (func (result i32) (result i33)))",
-			enabledFeatures: wasm.FeaturesFinished,
+			enabledFeatures: wasm.Features20220419,
 			expectedErr:     "unknown type: i33",
 		},
 		{
 			name:            "result second redundant type wrong",
 			input:           "(type (func (result i32) (result i32 i33)))",
-			enabledFeatures: wasm.FeaturesFinished,
+			enabledFeatures: wasm.Features20220419,
 			expectedErr:     "unknown type: i33",
 		},
 		{
