@@ -203,8 +203,13 @@ as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
 wazero conforms with spectests [7] defined alongside WebAssembly Core
-Specification [1.0][1]. There is also [work in progress][14] towards release
-[2.0][2], despite it not being a Web Standard, yet.
+Specification [1.0][1]. This is the default [RuntimeConfig][18].
+
+The WebAssembly Core Specification [2.0][2] is in draft form and wazero has
+[work in progress][14] towards that. Opt in via the below configuration:
+```go
+rConfig = wazero.NewRuntimeConfig().WithWasmCore2()
+```
 
 One current limitation of wazero is that it doesn't fully implement the Text
 Format, yet, e.g. compiling `.wat` files. The intent is to [finish this][15],
