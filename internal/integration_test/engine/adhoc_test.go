@@ -364,7 +364,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			var importingCode, importedCode *wazero.CompiledCode
+			var importingCode, importedCode wazero.CompiledCode
 			var imported, importing api.Module
 			var err error
 			closeAndReturn := func(ctx context.Context, x uint32) uint32 {

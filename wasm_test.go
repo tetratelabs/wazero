@@ -19,7 +19,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func TestNewRuntimeWithConfig_PanicsOnWrongImpl(t *testing.T) {
-	// It is too burdensome to define an impl of RuntimeConfig in tests just to verify the error when it is wrong.
+	// It causes maintenance to define an impl of RuntimeConfig in tests just to verify the error when it is wrong.
 	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
 	err := require.CapturePanic(func() {
 		NewRuntimeWithConfig(nil)
@@ -68,8 +68,9 @@ func TestRuntime_CompileModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			code, err := r.CompileModule(testCtx, tc.source)
+			m, err := r.CompileModule(testCtx, tc.source)
 			require.NoError(t, err)
+			code := m.(*compiledCode)
 			defer code.Close(testCtx)
 			if tc.expectedName != "" {
 				require.Equal(t, tc.expectedName, code.module.NameSection.ModuleName)
@@ -84,8 +85,9 @@ func TestRuntime_CompileModule(t *testing.T) {
 
 		source := []byte(`(module (memory 1 3))`)
 
-		code, err := r.CompileModule(testCtx, source)
+		m, err := r.CompileModule(testCtx, source)
 		require.NoError(t, err)
+		code := m.(*compiledCode)
 		defer code.Close(testCtx)
 
 		require.Equal(t, &wasm.Memory{
@@ -312,12 +314,13 @@ func TestModule_Global(t *testing.T) {
 
 		r := NewRuntime().(*runtime)
 		t.Run(tc.name, func(t *testing.T) {
-			var code *CompiledCode
+			var m CompiledCode
 			if tc.module != nil {
-				code = &CompiledCode{module: tc.module}
+				m = &compiledCode{module: tc.module}
 			} else {
-				code, _ = tc.builder(r).Build(testCtx)
+				m, _ = tc.builder(r).Build(testCtx)
 			}
+			code := m.(*compiledCode)
 
 			err := r.store.Engine.CompileModule(testCtx, code.module)
 			require.NoError(t, err)
@@ -463,6 +466,17 @@ func TestRuntime_InstantiateModuleFromCode_UsesContext(t *testing.T) {
 	require.True(t, calledStart)
 }
 
+func TestInstantiateModuleWithConfig_PanicsOnWrongCompiledCodeImpl(t *testing.T) {
+	// It causes maintenance to define an impl of CompiledCode in tests just to verify the error when it is wrong.
+	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
+	r := NewRuntime()
+	err := require.CapturePanic(func() {
+		_, _ = r.InstantiateModuleWithConfig(testCtx, nil, NewModuleConfig())
+	})
+
+	require.EqualError(t, err, "unsupported wazero.CompiledCode implementation: <nil>")
+}
+
 // TestInstantiateModuleWithConfig_WithName tests that we can pre-validate (cache) a module and instantiate it under
 // different names. This pattern is used in wapc-go.
 func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
@@ -471,7 +485,7 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	require.NoError(t, err)
 	defer base.Close(testCtx)
 
-	require.Equal(t, "0", base.module.NameSection.ModuleName)
+	require.Equal(t, "0", base.(*compiledCode).module.NameSection.ModuleName)
 
 	// Use the same runtime to instantiate multiple modules
 	internal := r.(*runtime).store

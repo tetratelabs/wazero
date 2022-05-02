@@ -153,7 +153,7 @@ type ModuleBuilder interface {
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
-	Build(context.Context) (*CompiledCode, error)
+	Build(context.Context) (CompiledCode, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
 	//
@@ -250,7 +250,7 @@ func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 }
 
 // Build implements ModuleBuilder.Build
-func (b *moduleBuilder) Build(ctx context.Context) (*CompiledCode, error) {
+func (b *moduleBuilder) Build(ctx context.Context) (CompiledCode, error) {
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
 	memoryLimitPages := b.r.memoryLimitPages
 	for name, mem := range b.nameToMemory {
@@ -271,19 +271,19 @@ func (b *moduleBuilder) Build(ctx context.Context) (*CompiledCode, error) {
 		return nil, err
 	}
 
-	return &CompiledCode{module: module, compiledEngine: b.r.store.Engine}, nil
+	return &compiledCode{module: module, compiledEngine: b.r.store.Engine}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
 func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
-	if module, err := b.Build(ctx); err != nil {
+	if compiled, err := b.Build(ctx); err != nil {
 		return nil, err
 	} else {
-		if err = b.r.store.Engine.CompileModule(ctx, module.module); err != nil {
+		if err = b.r.store.Engine.CompileModule(ctx, compiled.(*compiledCode).module); err != nil {
 			return nil, err
 		}
 		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside this function.
-		defer module.Close(ctx)
-		return b.r.InstantiateModuleWithConfig(ctx, module, NewModuleConfig().WithName(b.moduleName))
+		defer compiled.Close(ctx)
+		return b.r.InstantiateModuleWithConfig(ctx, compiled, NewModuleConfig().WithName(b.moduleName))
 	}
 }
