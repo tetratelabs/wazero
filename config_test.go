@@ -195,87 +195,87 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 func TestModuleConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		with     func(*ModuleConfig) *ModuleConfig
-		expected *ModuleConfig
+		with     func(ModuleConfig) ModuleConfig
+		expected ModuleConfig
 	}{
 		{
 			name: "WithName",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("wazero")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				name: "wazero",
 			},
 		},
 		{
 			name: "WithName - empty",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("")
 			},
-			expected: &ModuleConfig{},
+			expected: &moduleConfig{},
 		},
 		{
 			name: "WithImport",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "abort", "assemblyscript", "abort")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
 			},
 		},
 		{
 			name: "WithImport - empty to non-empty - module",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("", "abort", "assemblyscript", "abort")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"\000abort": {"assemblyscript", "abort"}},
 			},
 		},
 		{
 			name: "WithImport - non-empty to empty - module",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "abort", "", "abort")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"", "abort"}},
 			},
 		},
 		{
 			name: "WithImport - empty to non-empty - name",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "", "assemblyscript", "abort")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000": {"assemblyscript", "abort"}},
 			},
 		},
 		{
 			name: "WithImport - non-empty to empty - name",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "abort", "assemblyscript", "")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", ""}},
 			},
 		},
 		{
 			name: "WithImport - override",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "abort", "assemblyscript", "abort").
 					WithImport("env", "abort", "go", "exit")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"go", "exit"}},
 			},
 		},
 		{
 			name: "WithImport - twice",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImport("env", "abort", "assemblyscript", "abort").
 					WithImport("wasi_unstable", "proc_exit", "wasi_snapshot_preview1", "proc_exit")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImports: map[string][2]string{
 					"env\000abort":               {"assemblyscript", "abort"},
 					"wasi_unstable\000proc_exit": {"wasi_snapshot_preview1", "proc_exit"},
@@ -284,48 +284,48 @@ func TestModuleConfig(t *testing.T) {
 		},
 		{
 			name: "WithImportModule",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImportModule("env", "assemblyscript")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImportModules: map[string]string{"env": "assemblyscript"},
 			},
 		},
 		{
 			name: "WithImportModule - empty to non-empty",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImportModule("", "assemblyscript")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImportModules: map[string]string{"": "assemblyscript"},
 			},
 		},
 		{
 			name: "WithImportModule - non-empty to empty",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImportModule("env", "")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImportModules: map[string]string{"env": ""},
 			},
 		},
 		{
 			name: "WithImportModule - override",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImportModule("env", "assemblyscript").
 					WithImportModule("env", "go")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImportModules: map[string]string{"env": "go"},
 			},
 		},
 		{
 			name: "WithImportModule - twice",
-			with: func(c *ModuleConfig) *ModuleConfig {
+			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithImportModule("env", "go").
 					WithImportModule("wasi_unstable", "wasi_snapshot_preview1")
 			},
-			expected: &ModuleConfig{
+			expected: &moduleConfig{
 				replacedImportModules: map[string]string{
 					"env":           "go",
 					"wasi_unstable": "wasi_snapshot_preview1",
@@ -337,9 +337,11 @@ func TestModuleConfig(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			input := &ModuleConfig{}
+			input := &moduleConfig{}
 			rc := tc.with(input)
 			require.Equal(t, tc.expected, rc)
+			// The source wasn't modified
+			require.Equal(t, &moduleConfig{}, input)
 		})
 	}
 }
@@ -347,21 +349,21 @@ func TestModuleConfig(t *testing.T) {
 func TestModuleConfig_replaceImports(t *testing.T) {
 	tests := []struct {
 		name       string
-		config     *ModuleConfig
+		config     ModuleConfig
 		input      *wasm.Module
 		expected   *wasm.Module
 		expectSame bool
 	}{
 		{
 			name:       "no config, no imports",
-			config:     &ModuleConfig{},
+			config:     &moduleConfig{},
 			input:      &wasm.Module{},
 			expected:   &wasm.Module{},
 			expectSame: true,
 		},
 		{
 			name:   "no config",
-			config: &ModuleConfig{},
+			config: &moduleConfig{},
 			input: &wasm.Module{
 				ImportSection: []*wasm.Import{
 					{
@@ -380,7 +382,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		},
 		{
 			name: "replacedImportModules",
-			config: &ModuleConfig{
+			config: &moduleConfig{
 				replacedImportModules: map[string]string{"wasi_unstable": "wasi_snapshot_preview1"},
 			},
 			input: &wasm.Module{
@@ -414,7 +416,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		},
 		{
 			name: "replacedImportModules doesn't match",
-			config: &ModuleConfig{
+			config: &moduleConfig{
 				replacedImportModules: map[string]string{"env": ""},
 			},
 			input: &wasm.Module{
@@ -435,7 +437,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		},
 		{
 			name: "replacedImports",
-			config: &ModuleConfig{
+			config: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
 			},
 			input: &wasm.Module{
@@ -469,7 +471,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		},
 		{
 			name: "replacedImports don't match",
-			config: &ModuleConfig{
+			config: &moduleConfig{
 				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
 			},
 			input: &wasm.Module{
@@ -490,7 +492,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		},
 		{
 			name: "replacedImportModules and replacedImports",
-			config: &ModuleConfig{
+			config: &moduleConfig{
 				replacedImportModules: map[string]string{"js": "wasm"},
 				replacedImports: map[string][2]string{
 					"wasm\000increment": {"go", "increment"},
@@ -561,7 +563,7 @@ func TestModuleConfig_replaceImports(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			actual := tc.config.replaceImports(tc.input)
+			actual := tc.config.(*moduleConfig).replaceImports(tc.input)
 			if tc.expectSame {
 				require.Same(t, tc.input, actual)
 			} else {
@@ -578,7 +580,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    *ModuleConfig
+		input    ModuleConfig
 		expected *wasm.SysContext
 	}{
 		{
@@ -783,7 +785,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sys, err := tc.input.toSysContext()
+			sys, err := tc.input.(*moduleConfig).toSysContext()
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, sys)
 		})
@@ -793,7 +795,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       *ModuleConfig
+		input       ModuleConfig
 		expectedErr string
 	}{
 		{
@@ -836,7 +838,7 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.input.toSysContext()
+			_, err := tc.input.(*moduleConfig).toSysContext()
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
