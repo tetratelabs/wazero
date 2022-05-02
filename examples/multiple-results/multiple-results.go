@@ -48,7 +48,7 @@ func main() {
 	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
 	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
 		wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
-		// ^^ Note: You can enable release 2.0 features via WithWasmCore2.
+		// ^^ Note: WebAssembly 2.0 (WithWasmCore2) includes "multi-value".
 	)
 
 	// Add a module that uses multiple results values, with functions defined in WebAssembly.
