@@ -477,6 +477,21 @@ func TestInstantiateModuleWithConfig_PanicsOnWrongCompiledCodeImpl(t *testing.T)
 	require.EqualError(t, err, "unsupported wazero.CompiledCode implementation: <nil>")
 }
 
+func TestInstantiateModuleWithConfig_PanicsOnWrongModuleConfigImpl(t *testing.T) {
+	r := NewRuntime()
+	code, err := r.CompileModule(testCtx, []byte(`(module)`))
+	require.NoError(t, err)
+	defer code.Close(testCtx)
+
+	// It causes maintenance to define an impl of ModuleConfig in tests just to verify the error when it is wrong.
+	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
+	err = require.CapturePanic(func() {
+		_, _ = r.InstantiateModuleWithConfig(testCtx, code, nil)
+	})
+
+	require.EqualError(t, err, "unsupported wazero.ModuleConfig implementation: <nil>")
+}
+
 // TestInstantiateModuleWithConfig_WithName tests that we can pre-validate (cache) a module and instantiate it under
 // different names. This pattern is used in wapc-go.
 func TestInstantiateModuleWithConfig_WithName(t *testing.T) {

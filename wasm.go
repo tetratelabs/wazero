@@ -76,7 +76,7 @@ type Runtime interface {
 	//	defer wasm.Close()
 	//
 	// Note: When the context is nil, it defaults to context.Background.
-	InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config *ModuleConfig) (api.Module, error)
+	InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config ModuleConfig) (api.Module, error)
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
@@ -114,7 +114,7 @@ type Runtime interface {
 	//
 	// Note: When the context is nil, it defaults to context.Background.
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
-	InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, config *ModuleConfig) (mod api.Module, err error)
+	InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, config ModuleConfig) (api.Module, error)
 }
 
 func NewRuntime() Runtime {
@@ -217,7 +217,7 @@ func (r *runtime) InstantiateModuleFromCode(ctx context.Context, source []byte) 
 }
 
 // InstantiateModuleFromCodeWithConfig implements Runtime.InstantiateModuleFromCodeWithConfig
-func (r *runtime) InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config *ModuleConfig) (api.Module, error) {
+func (r *runtime) InstantiateModuleFromCodeWithConfig(ctx context.Context, source []byte, config ModuleConfig) (api.Module, error) {
 	if compiled, err := r.CompileModule(ctx, source); err != nil {
 		return nil, err
 	} else {
@@ -233,15 +233,20 @@ func (r *runtime) InstantiateModule(ctx context.Context, compiled CompiledCode) 
 }
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
-func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
-	var sysCtx *wasm.SysContext
-	if sysCtx, err = config.toSysContext(); err != nil {
-		return
-	}
-
+func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, mConfig ModuleConfig) (mod api.Module, err error) {
 	code, ok := compiled.(*compiledCode)
 	if !ok {
 		panic(fmt.Errorf("unsupported wazero.CompiledCode implementation: %#v", compiled))
+	}
+
+	config, ok := mConfig.(*moduleConfig)
+	if !ok {
+		panic(fmt.Errorf("unsupported wazero.ModuleConfig implementation: %#v", mConfig))
+	}
+
+	var sysCtx *wasm.SysContext
+	if sysCtx, err = config.toSysContext(); err != nil {
+		return
 	}
 
 	name := config.name
