@@ -238,22 +238,27 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 	return ret
 }
 
-// CompiledCode is a WebAssembly 1.0 (20191205) module ready to be instantiated (Runtime.InstantiateModule) as an\
+// CompiledCode is a WebAssembly 1.0 (20191205) module ready to be instantiated (Runtime.InstantiateModule) as an
 // api.Module.
 //
 // Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
-type CompiledCode struct {
+type CompiledCode interface {
+	// Close releases all the allocated resources for this CompiledCode.
+	//
+	// Note: It is safe to call Close while having outstanding calls from Modules instantiated from this CompiledCode.
+	Close(context.Context) error
+}
+
+type compiledCode struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
 }
 
-// Close releases all the allocated resources for this CompiledCode.
-//
-// Note: It is safe to call Close while having outstanding calls from Modules instantiated from this *CompiledCode.
-func (c *CompiledCode) Close(_ context.Context) error {
+// Close implements CompiledCode.Close
+func (c *compiledCode) Close(_ context.Context) error {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	c.compiledEngine.DeleteCompiledModule(c.module)

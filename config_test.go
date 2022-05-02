@@ -853,12 +853,12 @@ func TestCompiledCode_Close(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 		e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 
-		var cs []*CompiledCode
+		var cs []*compiledCode
 		for i := 0; i < 10; i++ {
 			m := &wasm.Module{}
 			err := e.CompileModule(ctx, m)
 			require.NoError(t, err)
-			cs = append(cs, &CompiledCode{module: m, compiledEngine: e})
+			cs = append(cs, &compiledCode{module: m, compiledEngine: e})
 		}
 
 		// Before Close.

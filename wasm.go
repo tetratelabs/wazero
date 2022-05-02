@@ -49,7 +49,7 @@ type Runtime interface {
 	// Note: When the context is nil, it defaults to context.Background.
 	// Note: The resulting module name defaults to what was binary from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(ctx context.Context, source []byte) (*CompiledCode, error)
+	CompileModule(ctx context.Context, source []byte) (CompiledCode, error)
 
 	// InstantiateModuleFromCode instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
 	// errs if invalid.
@@ -94,7 +94,7 @@ type Runtime interface {
 	//  * The module has a start function, and it failed to execute.
 	//
 	// Note: When the context is nil, it defaults to context.Background.
-	InstantiateModule(ctx context.Context, compiled *CompiledCode) (api.Module, error)
+	InstantiateModule(ctx context.Context, compiled CompiledCode) (api.Module, error)
 
 	// InstantiateModuleWithConfig is like InstantiateModule, except you can override configuration such as the module
 	// name or ENV variables.
@@ -114,7 +114,7 @@ type Runtime interface {
 	//
 	// Note: When the context is nil, it defaults to context.Background.
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
-	InstantiateModuleWithConfig(ctx context.Context, compiled *CompiledCode, config *ModuleConfig) (mod api.Module, err error)
+	InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, config *ModuleConfig) (mod api.Module, err error)
 }
 
 func NewRuntime() Runtime {
@@ -149,7 +149,7 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCode, error) {
+func (r *runtime) CompileModule(ctx context.Context, source []byte) (CompiledCode, error) {
 	if source == nil {
 		return nil, errors.New("source == nil")
 	}
@@ -202,7 +202,7 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte) (*CompiledCo
 		return nil, err
 	}
 
-	return &CompiledCode{module: internal, compiledEngine: r.store.Engine}, nil
+	return &compiledCode{module: internal, compiledEngine: r.store.Engine}, nil
 }
 
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
@@ -228,23 +228,28 @@ func (r *runtime) InstantiateModuleFromCodeWithConfig(ctx context.Context, sourc
 }
 
 // InstantiateModule implements Runtime.InstantiateModule
-func (r *runtime) InstantiateModule(ctx context.Context, compiled *CompiledCode) (mod api.Module, err error) {
+func (r *runtime) InstantiateModule(ctx context.Context, compiled CompiledCode) (mod api.Module, err error) {
 	return r.InstantiateModuleWithConfig(ctx, compiled, NewModuleConfig())
 }
 
 // InstantiateModuleWithConfig implements Runtime.InstantiateModuleWithConfig
-func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled *CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
+func (r *runtime) InstantiateModuleWithConfig(ctx context.Context, compiled CompiledCode, config *ModuleConfig) (mod api.Module, err error) {
 	var sysCtx *wasm.SysContext
 	if sysCtx, err = config.toSysContext(); err != nil {
 		return
 	}
 
-	name := config.name
-	if name == "" && compiled.module.NameSection != nil && compiled.module.NameSection.ModuleName != "" {
-		name = compiled.module.NameSection.ModuleName
+	code, ok := compiled.(*compiledCode)
+	if !ok {
+		panic(fmt.Errorf("unsupported wazero.CompiledCode implementation: %#v", compiled))
 	}
 
-	module := config.replaceImports(compiled.module)
+	name := config.name
+	if name == "" && code.module.NameSection != nil && code.module.NameSection.ModuleName != "" {
+		name = code.module.NameSection.ModuleName
+	}
+
+	module := config.replaceImports(code.module)
 
 	var functionListenerFactory experimentalapi.FunctionListenerFactory
 	if ctx != nil { // Test to see if internal code are using an experimental feature.

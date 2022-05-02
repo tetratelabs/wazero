@@ -344,8 +344,9 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			b := tc.input(NewRuntime()).(*moduleBuilder)
-			m, err := b.Build(testCtx)
+			compiled, err := b.Build(testCtx)
 			require.NoError(t, err)
+			m := compiled.(*compiledCode)
 
 			requireHostModuleEquals(t, tc.expected, m.module)
 

@@ -54,7 +54,7 @@ type wazeroRuntime struct {
 	config        wazero.RuntimeConfig
 	runtime       wazero.Runtime
 	logFn         func([]byte) error
-	env, compiled *wazero.CompiledCode
+	env, compiled wazero.CompiledCode
 }
 
 type wazeroModule struct {
