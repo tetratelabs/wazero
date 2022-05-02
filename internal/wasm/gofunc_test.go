@@ -247,7 +247,7 @@ func TestPopGoFuncParams(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, FeaturesFinished)
+			fk, _, err := getFunctionType(&goFunc, Features20220419)
 			require.NoError(t, err)
 
 			vals := PopGoFuncParams(&FunctionInstance{Kind: fk, GoFunc: &goFunc}, (&stack{stackVals}).pop)
@@ -387,7 +387,7 @@ func TestCallGoFunc(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, FeaturesFinished)
+			fk, _, err := getFunctionType(&goFunc, Features20220419)
 			require.NoError(t, err)
 
 			results := CallGoFunc(testCtx, callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)

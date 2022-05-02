@@ -12,14 +12,20 @@ type Features uint64
 
 // Features20191205 include those finished in WebAssembly 1.0 (20191205).
 //
-// See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205
 const Features20191205 = FeatureMutableGlobal
 
-// FeaturesFinished include all supported finished features, regardless of W3C status.
+// Features20220419 include those finished in WebAssembly 2.0 (20220419).
 //
-// See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
-const FeaturesFinished = 0xffffffffffffffff
+// TODO: not yet complete https://github.com/tetratelabs/wazero/issues/484
+// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#release-1-1
+const Features20220419 = Features20191205 |
+	FeatureBulkMemoryOperations |
+	FeatureMultiValue |
+	FeatureNonTrappingFloatToIntConversion |
+	// TODO: FeatureReferenceTypes |
+	FeatureSignExtensionOps
+	// TODO: FeatureSIMD
 
 const (
 	// FeatureBulkMemoryOperations decides if parsing should succeed on the following instructions:

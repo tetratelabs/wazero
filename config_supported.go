@@ -5,6 +5,6 @@ package wazero
 const JITSupported = true
 
 // NewRuntimeConfig returns NewRuntimeConfigJIT
-func NewRuntimeConfig() *RuntimeConfig {
+func NewRuntimeConfig() RuntimeConfig {
 	return NewRuntimeConfigJIT()
 }

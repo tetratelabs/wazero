@@ -16,8 +16,122 @@ import (
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 //
+// Ex. To explicitly limit to Wasm Core 1.0 features as opposed to relying on defaults:
+//	rConfig = wazero.NewRuntimeConfig().WithWasmCore1()
+//
 // Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
-type RuntimeConfig struct {
+type RuntimeConfig interface {
+
+	// WithFeatureBulkMemoryOperations adds instructions modify ranges of memory or table entries
+	// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0 (20191205).
+	//
+	// Here are the notable effects:
+	// * Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
+	// * Adds `table.fill`, `table.init`, `table.copy` and `elem.drop` instructions.
+	// * Introduces a "passive" form of element and data segments.
+	// * Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+	//
+	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
+	// due to the WebAssembly Working Group merging them "mutually dependent".
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+	// See https://github.com/WebAssembly/spec/pull/1287
+	WithFeatureBulkMemoryOperations(enabled bool) RuntimeConfig
+
+	// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not finished
+	// in WebAssembly 1.0 (20191205).
+	//
+	// Here are the notable effects:
+	// * Function (`func`) types allow more than one result
+	// * Block types (`block`, `loop` and `if`) can be arbitrary function types
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+	WithFeatureMultiValue(enabled bool) RuntimeConfig
+
+	// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
+	// WebAssembly 1.0 (20191205).
+	//
+	// When false, an api.Global can never be cast to an api.MutableGlobal, and any source that includes global vars
+	// will fail to parse.
+	WithFeatureMutableGlobal(enabled bool) RuntimeConfig
+
+	// WithFeatureNonTrappingFloatToIntConversion enables non-trapping float-to-int conversions.
+	// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0 (20191205).
+	//
+	// The only effect of enabling this is allowing the following instructions, which return 0 on NaN instead of panicking.
+	// * `i32.trunc_sat_f32_s`
+	// * `i32.trunc_sat_f32_u`
+	// * `i32.trunc_sat_f64_s`
+	// * `i32.trunc_sat_f64_u`
+	// * `i64.trunc_sat_f32_s`
+	// * `i64.trunc_sat_f32_u`
+	// * `i64.trunc_sat_f64_s`
+	// * `i64.trunc_sat_f64_u`
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+	WithFeatureNonTrappingFloatToIntConversion(enabled bool) RuntimeConfig
+
+	// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
+	// feature was not in WebAssembly 1.0 (20191205).
+	//
+	// Here are the notable effects:
+	// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+	WithFeatureSignExtensionOps(enabled bool) RuntimeConfig
+
+	// WithMemoryCapacityPages is a function that determines memory capacity in pages (65536 bytes per page). The inputs are
+	// the min and possibly nil max defined by the module, and the default is to return the min.
+	//
+	// Ex. To set capacity to max when exists:
+	//	c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+	//		if maxPages != nil {
+	//			return *maxPages
+	//		}
+	//		return minPages
+	//	})
+	//
+	// This function is used at compile time (ModuleBuilder.Build or Runtime.CompileModule). Compile will err if the
+	// function returns a value lower than minPages or greater than WithMemoryLimitPages.
+	WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) RuntimeConfig
+
+	// WithMemoryLimitPages limits the maximum number of pages a module can define from 65536 pages (4GiB) to a lower value.
+	//
+	// Notes:
+	// * If a module defines no memory max value, Runtime.CompileModule sets max to the limit.
+	// * If a module defines a memory max larger than this limit, it will fail to compile (Runtime.CompileModule).
+	// * Any "memory.grow" instruction that results in a larger value than this results in an error at runtime.
+	// * Zero is a valid value and results in a crash if any module uses memory.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-types%E2%91%A0
+	WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig
+
+	// WithWasmCore1 enables features included in the WebAssembly Core Specification 1.0 (20191205). Selecting this
+	// overwrites any currently accumulated features with only those included in this W3C recommendation.
+	//
+	// This is default because as of mid 2022, this is the only version that is a Web Standard (W3C Recommendation).
+	//
+	// You can select the latest draft of the WebAssembly Core Specification 2.0 instead via WithWasmCore2. You can
+	// also enable or disable individual features via `WithXXX` methods. Ex.
+	//	rConfig = wazero.NewRuntimeConfig().WithWasmCore1().WithFeatureMutableGlobal(false)
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
+	WithWasmCore1() RuntimeConfig
+
+	// WithWasmCore2 enables features included in the WebAssembly Core Specification 2.0 (20220419). Selecting this
+	// overwrites any currently accumulated features with only those included in this W3C working draft.
+	//
+	// This is not default because it is not yet incomplete and also not yet a Web Standard (W3C Recommendation).
+	//
+	// Even after selecting this, you can enable or disable individual features via `WithXXX` methods. Ex.
+	//	rConfig = wazero.NewRuntimeConfig().WithWasmCore2().WithFeatureMutableGlobal(false)
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
+	WithWasmCore2() RuntimeConfig
+}
+
+type runtimeConfig struct {
 	enabledFeatures     wasm.Features
 	newEngine           func(wasm.Features) wasm.Engine
 	memoryLimitPages    uint32
@@ -25,15 +139,15 @@ type RuntimeConfig struct {
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
-var engineLessConfig = &RuntimeConfig{
+var engineLessConfig = &runtimeConfig{
 	enabledFeatures:     wasm.Features20191205,
 	memoryLimitPages:    wasm.MemoryLimitPages,
 	memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 { return minPages },
 }
 
 // clone ensures all fields are copied even if nil.
-func (c *RuntimeConfig) clone() *RuntimeConfig {
-	return &RuntimeConfig{
+func (c *runtimeConfig) clone() *runtimeConfig {
+	return &runtimeConfig{
 		enabledFeatures:     c.enabledFeatures,
 		newEngine:           c.newEngine,
 		memoryLimitPages:    c.memoryLimitPages,
@@ -45,49 +159,56 @@ func (c *RuntimeConfig) clone() *RuntimeConfig {
 //
 // Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not support JIT. Use NewRuntimeConfig to safely
 // detect and fallback to NewRuntimeConfigInterpreter if needed.
-func NewRuntimeConfigJIT() *RuntimeConfig {
+func NewRuntimeConfigJIT() RuntimeConfig {
 	ret := engineLessConfig.clone()
 	ret.newEngine = jit.NewEngine
 	return ret
 }
 
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
-func NewRuntimeConfigInterpreter() *RuntimeConfig {
+func NewRuntimeConfigInterpreter() RuntimeConfig {
 	ret := engineLessConfig.clone()
 	ret.newEngine = interpreter.NewEngine
 	return ret
 }
 
-// WithMemoryLimitPages limits the maximum number of pages a module can define from 65536 pages (4GiB) to a lower value.
-//
-// Notes:
-// * If a module defines no memory max value, Runtime.CompileModule sets max to the limit.
-// * If a module defines a memory max larger than this limit, it will fail to compile (Runtime.CompileModule).
-// * Any "memory.grow" instruction that results in a larger value than this results in an error at runtime.
-// * Zero is a valid value and results in a crash if any module uses memory.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-types%E2%91%A0
-func (c *RuntimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) *RuntimeConfig {
+// WithFeatureBulkMemoryOperations implements RuntimeConfig.WithFeatureBulkMemoryOperations
+func (c *runtimeConfig) WithFeatureBulkMemoryOperations(enabled bool) RuntimeConfig {
 	ret := c.clone()
-	ret.memoryLimitPages = memoryLimitPages
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
 	return ret
 }
 
-// WithMemoryCapacityPages is a function that determines memory capacity in pages (65536 bytes per page). The inputs are
-// the min and possibly nil max defined by the module, and the default is to return the min.
-//
-// Ex. To set capacity to max when exists:
-//	c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
-//		if maxPages != nil {
-//			return *maxPages
-//		}
-//		return minPages
-//	})
-//
-// This function is used at compile time (ModuleBuilder.Build or Runtime.CompileModule). Compile will err if the
-// function returns a value lower than minPages or greater than WithMemoryLimitPages.
-func (c *RuntimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) *RuntimeConfig {
+// WithFeatureMultiValue implements RuntimeConfig.WithFeatureMultiValue
+func (c *runtimeConfig) WithFeatureMultiValue(enabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
+	return ret
+}
+
+// WithFeatureMutableGlobal implements RuntimeConfig.WithFeatureMutableGlobal
+func (c *runtimeConfig) WithFeatureMutableGlobal(enabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
+	return ret
+}
+
+// WithFeatureNonTrappingFloatToIntConversion implements RuntimeConfig.WithFeatureNonTrappingFloatToIntConversion
+func (c *runtimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
+	return ret
+}
+
+// WithFeatureSignExtensionOps implements RuntimeConfig.WithFeatureSignExtensionOps
+func (c *runtimeConfig) WithFeatureSignExtensionOps(enabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
+	return ret
+}
+
+// WithMemoryCapacityPages implements RuntimeConfig.WithMemoryCapacityPages
+func (c *runtimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) RuntimeConfig {
 	if maxCapacityPages == nil {
 		return c // Instead of erring.
 	}
@@ -96,94 +217,24 @@ func (c *RuntimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages u
 	return ret
 }
 
-// WithFinishedFeatures enables currently supported "finished" feature proposals. Use this to improve compatibility with
-// tools that enable all features by default.
-//
-// Note: The features implied can vary and can lead to unpredictable behavior during updates.
-// Note: This only includes "finished" features, but "finished" is not an official W3C term: it is possible that
-// "finished" features do not make the next W3C recommended WebAssembly core specification.
-// See https://github.com/WebAssembly/spec/tree/main/proposals
-func (c *RuntimeConfig) WithFinishedFeatures() *RuntimeConfig {
+// WithMemoryLimitPages implements RuntimeConfig.WithMemoryLimitPages
+func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = wasm.FeaturesFinished
+	ret.memoryLimitPages = memoryLimitPages
 	return ret
 }
 
-// WithFeatureBulkMemoryOperations adds instructions modify ranges of memory or table entries
-// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0 (20191205).
-//
-// Here are the notable effects:
-// * Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-// * Adds `table.fill`, `table.init`, `table.copy` and `elem.drop` instructions.
-// * Introduces a "passive" form of element and data segments.
-// * Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
-//
-// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
-// due to the WebAssembly Working Group merging them "mutually dependent".
-// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
-// See https://github.com/WebAssembly/spec/pull/1287
-func (c *RuntimeConfig) WithFeatureBulkMemoryOperations(enabled bool) *RuntimeConfig {
+// WithWasmCore1 implements RuntimeConfig.WithWasmCore1
+func (c *runtimeConfig) WithWasmCore1() RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
+	ret.enabledFeatures = wasm.Features20191205
 	return ret
 }
 
-// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not finished
-// in WebAssembly 1.0 (20191205).
-//
-// Here are the notable effects:
-// * Function (`func`) types allow more than one result
-// * Block types (`block`, `loop` and `if`) can be arbitrary function types
-//
-// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
-func (c *RuntimeConfig) WithFeatureMultiValue(enabled bool) *RuntimeConfig {
+// WithWasmCore2 implements RuntimeConfig.WithWasmCore2
+func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
-	return ret
-}
-
-// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
-// WebAssembly 1.0 (20191205).
-//
-// When false, an api.Global can never be cast to an api.MutableGlobal, and any source that includes global vars
-// will fail to parse.
-func (c *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
-	return ret
-}
-
-// WithFeatureNonTrappingFloatToIntConversion enables non-trapping float-to-int conversions.
-// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0 (20191205).
-//
-// The only effect of enabling this is allowing the following instructions, which return 0 on NaN instead of panicking.
-// * `i32.trunc_sat_f32_s`
-// * `i32.trunc_sat_f32_u`
-// * `i32.trunc_sat_f64_s`
-// * `i32.trunc_sat_f64_u`
-// * `i64.trunc_sat_f32_s`
-// * `i64.trunc_sat_f32_u`
-// * `i64.trunc_sat_f64_s`
-// * `i64.trunc_sat_f64_u`
-//
-// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
-func (c *RuntimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) *RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
-	return ret
-}
-
-// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false as the
-// feature was not in WebAssembly 1.0 (20191205).
-//
-// Here are the notable effects:
-// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
-//
-// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-func (c *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
+	ret.enabledFeatures = wasm.Features20220419
 	return ret
 }
 

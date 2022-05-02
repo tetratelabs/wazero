@@ -28,7 +28,7 @@ func TestMultiValue_Interpreter(t *testing.T) {
 //go:embed testdata/multi_value.wasm
 var multiValueWasm []byte
 
-func testMultiValue(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testMultiValue(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("disabled", func(t *testing.T) {
 		// multi-value is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())

@@ -85,7 +85,7 @@ func TestCompile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enabledFeatures := tc.enabledFeatures
 			if enabledFeatures == 0 {
-				enabledFeatures = wasm.FeaturesFinished
+				enabledFeatures = wasm.Features20220419
 			}
 
 			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
@@ -487,7 +487,7 @@ func TestCompile_MultiValue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enabledFeatures := tc.enabledFeatures
 			if enabledFeatures == 0 {
-				enabledFeatures = wasm.FeaturesFinished
+				enabledFeatures = wasm.Features20220419
 			}
 			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 
 func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expected *CompilationResult, module *wasm.Module) {
 	if enabledFeatures == 0 {
-		enabledFeatures = wasm.FeaturesFinished
+		enabledFeatures = wasm.Features20220419
 	}
 	res, err := CompileFunctions(ctx, enabledFeatures, module)
 	require.NoError(t, err)
@@ -558,7 +558,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 }
 
 func requireModuleText(t *testing.T, source string) *wasm.Module {
-	m, err := text.DecodeModule([]byte(source), wasm.FeaturesFinished, wasm.MemoryLimitPages)
+	m, err := text.DecodeModule([]byte(source), wasm.Features20220419, wasm.MemoryLimitPages)
 	require.NoError(t, err)
 	return m
 }

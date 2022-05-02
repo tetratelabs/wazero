@@ -362,12 +362,12 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       func(*RuntimeConfig) ModuleBuilder
+		input       func(RuntimeConfig) ModuleBuilder
 		expectedErr string
 	}{
 		{
 			name: "memory min > limit", // only one test to avoid duplicating tests in module_test.go
-			input: func(cfg *RuntimeConfig) ModuleBuilder {
+			input: func(cfg RuntimeConfig) ModuleBuilder {
 				return NewRuntimeWithConfig(cfg).NewModuleBuilder("").
 					ExportMemory("memory", math.MaxUint32)
 			},
@@ -375,7 +375,7 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 		},
 		{
 			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
-			input: func(cfg *RuntimeConfig) ModuleBuilder {
+			input: func(cfg RuntimeConfig) ModuleBuilder {
 				cfg = cfg.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
 					return 1
 				})

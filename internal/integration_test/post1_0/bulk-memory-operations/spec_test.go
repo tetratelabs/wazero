@@ -45,7 +45,7 @@ var (
 	elemDropWasm []byte
 )
 
-func requireErrorOnBulkMemoryFeatureDisabled(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig, bin []byte) {
+func requireErrorOnBulkMemoryFeatureDisabled(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig, bin []byte) {
 	t.Run("disabled", func(t *testing.T) {
 		// bulk-memory-operations is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
@@ -54,7 +54,7 @@ func requireErrorOnBulkMemoryFeatureDisabled(t *testing.T, newRuntimeConfig func
 	})
 }
 
-func testTableCopy(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testTableCopy(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("table.copy", func(t *testing.T) {
 
 		requireErrorOnBulkMemoryFeatureDisabled(t, newRuntimeConfig, tableCopyWasm)
@@ -123,7 +123,7 @@ func testTableCopy(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	})
 }
 
-func testTableInit(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testTableInit(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("table.init", func(t *testing.T) {
 		requireErrorOnBulkMemoryFeatureDisabled(t, newRuntimeConfig, tableInitWasm)
 
@@ -166,7 +166,7 @@ func testTableInit(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	})
 }
 
-func testElemDrop(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testElemDrop(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("elem.drop", func(t *testing.T) {
 		requireErrorOnBulkMemoryFeatureDisabled(t, newRuntimeConfig, elemDropWasm)
 
@@ -194,7 +194,7 @@ func testElemDrop(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	})
 }
 
-func testBulkMemoryOperations(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testBulkMemoryOperations(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	requireErrorOnBulkMemoryFeatureDisabled(t, newRuntimeConfig, bulkMemoryOperationsWasm)
 
 	t.Run("enabled", func(t *testing.T) {

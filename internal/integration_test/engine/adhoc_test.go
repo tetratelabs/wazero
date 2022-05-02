@@ -42,7 +42,7 @@ func TestEngineInterpreter(t *testing.T) {
 	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
 }
 
-func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config *wazero.RuntimeConfig) {
+func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
 	for name, testf := range tests {
 		name := name   // pin
 		testf := testf // pin

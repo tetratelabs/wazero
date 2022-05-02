@@ -18,6 +18,16 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
+func TestNewRuntimeWithConfig_PanicsOnWrongImpl(t *testing.T) {
+	// It is too burdensome to define an impl of RuntimeConfig in tests just to verify the error when it is wrong.
+	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
+	err := require.CapturePanic(func() {
+		NewRuntimeWithConfig(nil)
+	})
+
+	require.EqualError(t, err, "unsupported wazero.RuntimeConfig implementation: <nil>")
+}
+
 func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {
 		name         string

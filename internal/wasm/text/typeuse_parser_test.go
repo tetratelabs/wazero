@@ -160,7 +160,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
 		module := &wasm.Module{}
-		tp := newTypeUseParser(wasm.FeaturesFinished, module, newIndexNamespace(module.SectionElementCount))
+		tp := newTypeUseParser(wasm.Features20220419, module, newIndexNamespace(module.SectionElementCount))
 		return tp, func(t *testing.T) {
 			// We should have inlined the type, and it is the first type use, which means the inlined index is zero
 			require.Zero(t, tp.inlinedTypeIndices[0].inlinedIdx)
@@ -196,7 +196,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
 		module := &wasm.Module{}
-		tp := newTypeUseParser(wasm.FeaturesFinished, module, newIndexNamespace(module.SectionElementCount))
+		tp := newTypeUseParser(wasm.Features20220419, module, newIndexNamespace(module.SectionElementCount))
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
@@ -306,7 +306,7 @@ func TestTypeUseParser_ReuseExistingType(t *testing.T) {
 		require.NoError(t, err)
 		typeNamespace.count++
 
-		tp := newTypeUseParser(wasm.FeaturesFinished, module, typeNamespace)
+		tp := newTypeUseParser(wasm.Features20220419, module, typeNamespace)
 		return tp, func(t *testing.T) {
 			require.Zero(t, len(tp.typeNamespace.unresolvedIndices))
 			require.Zero(t, len(tp.inlinedTypes))
@@ -340,7 +340,7 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
 		module := &wasm.Module{}
-		tp := newTypeUseParser(wasm.FeaturesFinished, module, newIndexNamespace(module.SectionElementCount))
+		tp := newTypeUseParser(wasm.Features20220419, module, newIndexNamespace(module.SectionElementCount))
 		// inline a type that doesn't match the test
 		require.NoError(t, parseTypeUse(tp, "((param i32 i64))", ignoreTypeUse))
 		// inline the test type
@@ -386,7 +386,7 @@ func TestTypeUseParser_BeginResets(t *testing.T) {
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
 		module := &wasm.Module{}
-		tp := newTypeUseParser(wasm.FeaturesFinished, module, newIndexNamespace(module.SectionElementCount))
+		tp := newTypeUseParser(wasm.Features20220419, module, newIndexNamespace(module.SectionElementCount))
 		// inline a type that uses all fields
 		require.NoError(t, parseTypeUse(tp, "((type $i32i64_i32) (param $x i32) (param $y i64) (result i32))", ignoreTypeUse))
 		require.NoError(t, parseTypeUse(tp, tc.input, ignoreTypeUse))
@@ -510,13 +510,13 @@ func TestTypeUseParser_Errors(t *testing.T) {
 		{
 			name:            "result second wrong",
 			input:           "((result i32) (result i33))",
-			enabledFeatures: wasm.FeaturesFinished,
+			enabledFeatures: wasm.Features20220419,
 			expectedErr:     "1:23: unknown type: i33",
 		},
 		{
 			name:            "result second redundant type wrong",
 			input:           "((result i32) (result i32 i33))",
-			enabledFeatures: wasm.FeaturesFinished,
+			enabledFeatures: wasm.Features20220419,
 			expectedErr:     "1:27: unknown type: i33",
 		},
 		{
@@ -600,7 +600,7 @@ func TestTypeUseParser_FailsMatch(t *testing.T) {
 	require.NoError(t, err)
 	typeNamespace.count++
 
-	tp := newTypeUseParser(wasm.FeaturesFinished, module, typeNamespace)
+	tp := newTypeUseParser(wasm.Features20220419, module, typeNamespace)
 	tests := []struct{ name, source, expectedErr string }{
 		{
 			name:        "nullary index",

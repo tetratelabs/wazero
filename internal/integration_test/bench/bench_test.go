@@ -153,8 +153,8 @@ func runRandomMatMul(b *testing.B, m api.Module) {
 	}
 }
 
-func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.RuntimeConfig) api.Module {
-	r := createRuntime(b, engine)
+func instantiateHostFunctionModuleWithEngine(b *testing.B, config wazero.RuntimeConfig) api.Module {
+	r := createRuntime(b, config)
 
 	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
 	m, err := r.InstantiateModuleFromCode(testCtx, caseWasm)
@@ -164,7 +164,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 	return m
 }
 
-func createRuntime(b *testing.B, engine *wazero.RuntimeConfig) wazero.Runtime {
+func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 	getRandomString := func(ctx context.Context, m api.Module, retBufPtr uint32, retBufSize uint32) {
 		results, err := m.ExportedFunction("allocate_buffer").Call(ctx, 10)
 		if err != nil {
@@ -179,7 +179,7 @@ func createRuntime(b *testing.B, engine *wazero.RuntimeConfig) wazero.Runtime {
 		m.Memory().Write(ctx, offset, b)
 	}
 
-	r := wazero.NewRuntimeWithConfig(engine)
+	r := wazero.NewRuntimeWithConfig(config)
 
 	_, err := r.NewModuleBuilder("env").
 		ExportFunction("get_random_string", getRandomString).

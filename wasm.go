@@ -122,7 +122,11 @@ func NewRuntime() Runtime {
 }
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
-func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
+func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
+	config, ok := rConfig.(*runtimeConfig)
+	if !ok {
+		panic(fmt.Errorf("unsupported wazero.RuntimeConfig implementation: %#v", rConfig))
+	}
 	return &runtime{
 		store:               wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures)),
 		enabledFeatures:     config.enabledFeatures,
