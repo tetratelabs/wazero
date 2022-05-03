@@ -56,6 +56,11 @@ const (
 	OpcodeGlobalGet Opcode = 0x23
 	OpcodeGlobalSet Opcode = 0x24
 
+	// Below are toggled with FeatureReferenceTypes
+
+	OpcodeTableGet Opcode = 0x25
+	OpcodeTableSet Opcode = 0x26
+
 	// memory instructions
 
 	OpcodeI32Load    Opcode = 0x28
@@ -302,9 +307,11 @@ const (
 	OpcodeMiscTableInit  OpcodeMisc = 0x0c
 	OpcodeMiscElemDrop   OpcodeMisc = 0x0d
 	OpcodeMiscTableCopy  OpcodeMisc = 0x0e
-	OpcodeMiscTableGrow  OpcodeMisc = 0x0f
-	OpcodeMiscTableSize  OpcodeMisc = 0x10
-	OpcodeMiscTableFill  OpcodeMisc = 0x11
+
+	// Below are toggled with FeatureReferenceTypes
+	OpcodeMiscTableGrow OpcodeMisc = 0x0f
+	OpcodeMiscTableSize OpcodeMisc = 0x10
+	OpcodeMiscTableFill OpcodeMisc = 0x11
 )
 
 const (
@@ -484,6 +491,9 @@ const (
 	OpcodeRefNullName   = "ref.null"
 	OpcodeRefIsNullName = "ref.is_null"
 	OpcodeRefFuncName   = "ref.func"
+
+	OpcodeTableGetName = "table.get"
+	OpcodeTableSetName = "table.set"
 
 	// Below are toggled with FeatureSignExtensionOps
 
@@ -673,6 +683,9 @@ var instructionNames = [256]string{
 	OpcodeRefNull:   OpcodeRefNullName,
 	OpcodeRefIsNull: OpcodeRefIsNullName,
 	OpcodeRefFunc:   OpcodeRefFuncName,
+
+	OpcodeTableGet: OpcodeTableGetName,
+	OpcodeTableSet: OpcodeTableSetName,
 
 	// Below are toggled with FeatureSignExtensionOps
 	OpcodeI32Extend8S:  OpcodeI32Extend8SName,

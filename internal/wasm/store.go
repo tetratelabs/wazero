@@ -62,7 +62,7 @@ type (
 		Globals   []*GlobalInstance
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		Memory *MemoryInstance
-		Table  *TableInstance
+		Tables []*TableInstance
 		Types  []*FunctionType
 
 		// CallCtx holds default function call context from this function instance.
@@ -203,7 +203,7 @@ const (
 
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
-	importedGlobals, globals []*GlobalInstance, table *TableInstance, memory, importedMemory *MemoryInstance,
+	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
 	types []*FunctionType, typeIDs []FunctionTypeID) {
 
 	m.Types = types
@@ -220,7 +220,7 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	m.Globals = append(m.Globals, importedGlobals...)
 	m.Globals = append(m.Globals, globals...)
 
-	m.Table = table
+	m.Tables = tables
 
 	if importedMemory != nil {
 		m.Memory = importedMemory
@@ -241,7 +241,9 @@ func (m *ModuleInstance) buildDataInstances(segments []*DataSegment) {
 func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 	m.ElementInstances = make([]ElementInstance, len(elements))
 	for i, elm := range elements {
-		if elm.Type == RefTypeFuncref {
+		if elm.Type == RefTypeFuncref && elm.Mode == ElementModePassive {
+			// Only passive elements can be access as element instances.
+			// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/modules.html#element-segments
 			m.ElementInstances[i] = *m.Engine.CreateFuncElementInstance(elm.Init)
 		}
 	}
@@ -260,7 +262,7 @@ func (m *ModuleInstance) buildExports(exports []*Export) {
 		case ExternTypeMemory:
 			ei = &ExportInstance{Type: exp.Type, Memory: m.Memory}
 		case ExternTypeTable:
-			ei = &ExportInstance{Type: exp.Type, Table: m.Table}
+			ei = &ExportInstance{Type: exp.Type, Table: m.Tables[index]}
 		}
 
 		// We already validated the duplicates during module validation phase.
@@ -343,13 +345,13 @@ func (s *Store) Instantiate(
 		return nil, err
 	}
 
-	importedFunctions, importedGlobals, importedTable, importedMemory, err := s.resolveImports(module)
+	importedFunctions, importedGlobals, importedTables, importedMemory, err := s.resolveImports(module)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, err
 	}
 
-	table, tableInit, err := module.buildTable(importedTable, importedGlobals)
+	tables, tableInit, err := module.buildTables(importedTables, importedGlobals)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, err
@@ -369,7 +371,7 @@ func (s *Store) Instantiate(
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m := &ModuleInstance{Name: name}
-	m.addSections(module, importedFunctions, functions, importedGlobals, globals, table, importedMemory, memory, module.TypeSection, typeIDs)
+	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection, typeIDs)
 
 	if err = m.validateData(module.DataSection); err != nil {
 		s.deleteModule(name)
@@ -377,7 +379,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, table, tableInit)
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, tables, tableInit)
 	if err != nil {
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
@@ -450,7 +452,7 @@ func (s *Store) module(moduleName string) *ModuleInstance {
 
 func (s *Store) resolveImports(module *Module) (
 	importedFunctions []*FunctionInstance, importedGlobals []*GlobalInstance,
-	importedTable *TableInstance, importedMemory *MemoryInstance,
+	importedTables []*TableInstance, importedMemory *MemoryInstance,
 	err error,
 ) {
 	s.mux.RLock()
@@ -489,7 +491,7 @@ func (s *Store) resolveImports(module *Module) (
 			importedFunctions = append(importedFunctions, importedFunction)
 		case ExternTypeTable:
 			expected := i.DescTable
-			importedTable = imported.Table
+			importedTable := imported.Table
 
 			if expected.Min > importedTable.Min {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedTable.Min)
@@ -506,6 +508,7 @@ func (s *Store) resolveImports(module *Module) (
 					return
 				}
 			}
+			importedTables = append(importedTables, importedTable)
 		case ExternTypeMemory:
 			expected := i.DescMem
 			importedMemory = imported.Memory

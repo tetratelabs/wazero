@@ -53,20 +53,29 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 // et is used for tests defined in the enginetest package.
 var et = &engineTester{}
 
-type engineTester struct {
-}
+// engineTester implements enginetest.EngineTester.
+type engineTester struct{}
 
+// NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return NewEngine(enabledFeatures)
 }
 
-func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
-	table := make([]interface{}, initTableLen)
-	internal := me.(*moduleEngine)
-	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.functions[fnidx]
+// InitTables implements enginetest.EngineTester InitTables.
+func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference {
+	references := make([][]wasm.Reference, len(tableIndexToLen))
+	for tableIndex, l := range tableIndexToLen {
+		references[tableIndex] = make([]interface{}, l)
 	}
-	return table
+	internal := me.(*moduleEngine)
+
+	for tableIndex, init := range initTableIdxToFnIdx {
+		referencesPerTable := references[tableIndex]
+		for idx, fnidx := range init {
+			referencesPerTable[idx] = internal.functions[fnidx]
+		}
+	}
+	return references
 }
 
 func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {

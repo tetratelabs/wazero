@@ -86,6 +86,7 @@ func TestDecodeElementSegment(t *testing.T) {
 		name     string
 		in       []byte
 		exp      *wasm.ElementSegment
+		expErr   string
 		features wasm.Features
 	}{
 		{
@@ -143,7 +144,7 @@ func TestDecodeElementSegment(t *testing.T) {
 			name: "active with table index encoded.",
 			in: []byte{
 				2, // Prefix.
-				0, // Table index which is fixed to zero until reference type proposal.
+				0,
 				// Offset const expr.
 				wasm.OpcodeI32Const, 0x80, 0, wasm.OpcodeEnd,
 				0, // Elem kind must be fixed to zero.
@@ -156,6 +157,42 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
+		},
+		{
+
+			name: "active with non zero table index encoded.",
+			in: []byte{
+				2, // Prefix.
+				10,
+				// Offset const expr.
+				wasm.OpcodeI32Const, 0x80, 0, wasm.OpcodeEnd,
+				0, // Elem kind must be fixed to zero.
+				// Init vector.
+				5, 1, 2, 3, 4, 5,
+			},
+			exp: &wasm.ElementSegment{
+				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 0}},
+				Init:       []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
+				Mode:       wasm.ElementModeActive,
+				Type:       wasm.RefTypeFuncref,
+				TableIndex: 10,
+			},
+			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+		},
+		{
+
+			name: "active with non zero table index encoded but reference-types disabled",
+			in: []byte{
+				2, // Prefix.
+				10,
+				// Offset const expr.
+				wasm.OpcodeI32Const, 0x80, 0, wasm.OpcodeEnd,
+				0, // Elem kind must be fixed to zero.
+				// Init vector.
+				5, 1, 2, 3, 4, 5,
+			},
+			expErr:   `table index must be zero but was 10: feature "reference-types" is disabled`,
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
@@ -216,10 +253,55 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
+			name: "passive const expr vector - extern ref",
+			in: []byte{
+				5, // Prefix.
+				wasm.RefTypeExternref,
+				// Init const expr vector.
+				3, // number of const expr.
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+				wasm.OpcodeRefFunc,
+				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				wasm.OpcodeEnd,
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+			},
+			exp: &wasm.ElementSegment{
+				Init: []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Mode: wasm.ElementModePassive,
+				Type: wasm.RefTypeExternref,
+			},
+			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+		},
+		{
+			name: "passive const expr vector - extern ref but feature disabled",
+			in: []byte{
+				5, // Prefix.
+				wasm.RefTypeExternref,
+				// Init const expr vector.
+				3, // number of const expr.
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+				wasm.OpcodeRefFunc,
+				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				wasm.OpcodeEnd,
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+			},
+			expErr:   `ref type must be funcref for element: feature "reference-types" is disabled`,
+			features: wasm.FeatureBulkMemoryOperations,
+		},
+		{
+			name: "passive const expr vector - unknown ref type",
+			in: []byte{
+				5, // Prefix.
+				0xff,
+			},
+			expErr:   `unknown reference type: 0xff`,
+			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+		},
+		{
 			name: "active with table index and const expr vector",
 			in: []byte{
 				6, // Prefix.
-				0, // Table index which is fixed to zero until reference type proposal.
+				0,
 				// Offset expr.
 				wasm.OpcodeI32Const, 0x80, 1, wasm.OpcodeEnd,
 				wasm.RefTypeFuncref,
@@ -237,6 +319,50 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
+			features: wasm.FeatureBulkMemoryOperations,
+		},
+		{
+			name: "active with non zero table index and const expr vector",
+			in: []byte{
+				6, // Prefix.
+				10,
+				// Offset expr.
+				wasm.OpcodeI32Const, 0x80, 1, wasm.OpcodeEnd,
+				wasm.RefTypeFuncref,
+				// Init const expr vector.
+				3, // number of const expr.
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+				wasm.OpcodeRefFunc,
+				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				wasm.OpcodeEnd,
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+			},
+			exp: &wasm.ElementSegment{
+				OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x80, 1}},
+				Init:       []*wasm.Index{nil, uint32Ptr(165675008), nil},
+				Mode:       wasm.ElementModeActive,
+				Type:       wasm.RefTypeFuncref,
+				TableIndex: 10,
+			},
+			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+		},
+		{
+			name: "active with non zero table index and const expr vector but feature disabled",
+			in: []byte{
+				6, // Prefix.
+				10,
+				// Offset expr.
+				wasm.OpcodeI32Const, 0x80, 1, wasm.OpcodeEnd,
+				wasm.RefTypeFuncref,
+				// Init const expr vector.
+				3, // number of const expr.
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+				wasm.OpcodeRefFunc,
+				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
+				wasm.OpcodeEnd,
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
+			},
+			expErr:   `table index must be zero but was 10: feature "reference-types" is disabled`,
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
@@ -262,8 +388,12 @@ func TestDecodeElementSegment(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := decodeElementSegment(bytes.NewReader(tc.in), tc.features)
-			require.NoError(t, err)
-			require.Equal(t, actual, tc.exp)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, actual, tc.exp)
+			}
 		})
 	}
 }

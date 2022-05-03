@@ -101,11 +101,9 @@ type (
 		memoryElement0Address uintptr
 		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
 		memorySliceLen uint64
-		// tableElement0Address is the address of the first item in the global slice,
-		// i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
-		tableElement0Address uintptr
-		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
-		tableSliceLen uint64
+		// tableElement0Address is the address of the first item in the tables slice,
+		// i.e. &ModuleInstance.Tables[0] as uintptr.
+		tablesElement0Address uintptr
 
 		// codesElement0Address is &moduleContext.engine.codes[0] as uintptr.
 		codesElement0Address uintptr
@@ -239,20 +237,19 @@ const (
 	callEngineModuleContextGlobalElement0AddressOffset           = 48
 	callEngineModuleContextMemoryElement0AddressOffset           = 56
 	callEngineModuleContextMemorySliceLenOffset                  = 64
-	callEngineModuleContextTableElement0AddressOffset            = 72
-	callEngineModuleContextTableSliceLenOffset                   = 80
-	callEngineModuleContextCodesElement0AddressOffset            = 88
-	callEngineModuleContextTypeIDsElement0AddressOffset          = 96
-	callEngineModuleContextDataInstancesElement0AddressOffset    = 104
-	callEngineModuleContextElementInstancesElement0AddressOffset = 112
+	callEngineModuleContextTablesElement0AddressOffset           = 72
+	callEngineModuleContextCodesElement0AddressOffset            = 80
+	callEngineModuleContextTypeIDsElement0AddressOffset          = 88
+	callEngineModuleContextDataInstancesElement0AddressOffset    = 96
+	callEngineModuleContextElementInstancesElement0AddressOffset = 104
 
 	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset     = 120
-	callEngineValueStackContextStackBasePointerOffset = 128
+	callEngineValueStackContextStackPointerOffset     = 112
+	callEngineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextJITCallStatusCodeOffset          = 136
-	callEngineExitContextBuiltinFunctionCallAddressOffset = 140
+	callEngineExitContextJITCallStatusCodeOffset          = 128
+	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -270,11 +267,11 @@ const (
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 48
 	moduleInstanceMemoryOffset           = 72
-	moduleInstanceTableOffset            = 80
-	moduleInstanceEngineOffset           = 120
-	moduleInstanceTypeIDsOffset          = 136
-	moduleInstanceDataInstancesOffset    = 160
-	moduleInstanceElementInstancesOffset = 184
+	moduleInstanceTablesOffset           = 80
+	moduleInstanceEngineOffset           = 136
+	moduleInstanceTypeIDsOffset          = 152
+	moduleInstanceDataInstancesOffset    = 176
+	moduleInstanceElementInstancesOffset = 200
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -460,7 +457,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInit wasm.TableInitMap) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -484,8 +481,10 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		me.functions = append(me.functions, function)
 	}
 
-	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
-		table.References[elemIdx] = me.functions[funcidx]
+	for tableIndex, init := range tableInit {
+		for elemIdx, funcidx := range init { // Initialize any elements with compiled functions
+			tables[tableIndex].References[elemIdx] = me.functions[funcidx]
+		}
 	}
 	return me, nil
 }
@@ -617,7 +616,7 @@ func newEngine(enabledFeatures wasm.Features) *engine {
 // By declaring these values as `var`, slices created via `make([]..., var)`
 // will never be allocated on stack [1]. This means accessing these slices via
 // raw pointers is safe: As of version 1.18, Go's garbage collector never relocates
-// heap-allocated objects (aka no compilation of memory [2]).
+// heap-allocated objects (aka no compaction of memory [2]).
 //
 // On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/wasm/jit/...`.
 //

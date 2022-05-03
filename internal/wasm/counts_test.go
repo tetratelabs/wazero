@@ -53,7 +53,6 @@ func TestModule_ImportFuncCount(t *testing.T) {
 	}
 }
 
-// TODO: once we fix up-front validation, this only needs to check zero or one
 func TestModule_ImportTableCount(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -66,7 +65,7 @@ func TestModule_ImportTableCount(t *testing.T) {
 		},
 		{
 			name:  "none with table section",
-			input: &Module{TableSection: &Table{1, nil}},
+			input: &Module{TableSection: []*Table{{Min: 1, Max: nil}}},
 		},
 		{
 			name:     "one",
@@ -77,7 +76,7 @@ func TestModule_ImportTableCount(t *testing.T) {
 			name: "one with table section",
 			input: &Module{
 				ImportSection: []*Import{{Type: ExternTypeTable}},
-				TableSection:  &Table{1, nil},
+				TableSection:  []*Table{{Min: 1, Max: nil}},
 			},
 			expected: 1,
 		},
@@ -288,10 +287,18 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "TableSection and ElementSection",
 			input: &Module{
-				TableSection:   &Table{Min: 1},
+				TableSection:   []*Table{{Min: 1}},
 				ElementSection: []*ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 1},
+		},
+		{
+			name: "TableSection (multiple tables) and ElementSection",
+			input: &Module{
+				TableSection:   []*Table{{Min: 1}, {Min: 2}},
+				ElementSection: []*ElementSegment{{OffsetExpr: empty}},
+			},
+			expected: map[string]uint32{"element": 1, "table": 2},
 		},
 	}
 

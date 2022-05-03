@@ -227,7 +227,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInit wasm.TableInitMap) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -251,8 +251,10 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		me.functions = append(me.functions, insntantiatedcode)
 	}
 
-	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
-		table.References[elemIdx] = me.functions[funcidx]
+	for tableIndex, init := range tableInit {
+		for elemIdx, funcidx := range init { // Initialize any elements with compiled functions
+			tables[tableIndex].References[elemIdx] = me.functions[funcidx]
+		}
 	}
 	return me, nil
 }
@@ -353,8 +355,9 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.us = make([]uint64, 1)
 			op.us = []uint64{uint64(o.FunctionIndex)}
 		case *wazeroir.OperationCallIndirect:
-			op.us = make([]uint64, 1)
+			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TypeIndex)
+			op.us[1] = uint64(o.TableIndex)
 		case *wazeroir.OperationDrop:
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Depth
@@ -524,12 +527,16 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationMemoryCopy:
 		case *wazeroir.OperationMemoryFill:
 		case *wazeroir.OperationTableInit:
-			op.us = make([]uint64, 1)
+			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.ElemIndex)
+			op.us[1] = uint64(o.TableIndex)
 		case *wazeroir.OperationElemDrop:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.ElemIndex)
 		case *wazeroir.OperationTableCopy:
+			op.us = make([]uint64, 2)
+			op.us[0] = uint64(o.SrcTableIndex)
+			op.us[1] = uint64(o.DstTableIndex)
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -646,7 +653,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	moduleInst := f.source.Module
 	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
-	table := moduleInst.Table
+	tables := moduleInst.Tables
 	typeIDs := f.source.Module.TypeIDs
 	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
@@ -702,6 +709,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindCallIndirect:
 			{
 				offset := ce.popValue()
+				table := tables[op.us[1]]
 				if offset >= uint64(len(table.References)) {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
@@ -1784,6 +1792,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			copySize := ce.popValue()
 			inElementOffset := ce.popValue()
 			inTableOffset := ce.popValue()
+			table := tables[op.us[1]]
 			if inElementOffset+copySize > uint64(len(elementInstance.References)) ||
 				inTableOffset+copySize > uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
@@ -1795,15 +1804,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			elementInstances[op.us[0]].References = nil
 			frame.pc++
 		case wazeroir.OperationKindTableCopy:
-			table := table.References
-			tableLen := uint64(len(table))
+			srcTable, dstTable := tables[op.us[0]].References, tables[op.us[1]].References
 			copySize := ce.popValue()
 			sourceOffset := ce.popValue()
 			destinationOffset := ce.popValue()
-			if sourceOffset+copySize > tableLen || destinationOffset+copySize > tableLen {
+			if sourceOffset+copySize > uint64(len(srcTable)) || destinationOffset+copySize > uint64(len(dstTable)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if copySize != 0 {
-				copy(table[destinationOffset:], table[sourceOffset:sourceOffset+copySize])
+				copy(dstTable[destinationOffset:], srcTable[sourceOffset:sourceOffset+copySize])
 			}
 			frame.pc++
 		}

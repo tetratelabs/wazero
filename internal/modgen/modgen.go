@@ -216,7 +216,7 @@ func (g *generator) genTableSection() {
 
 	min := g.nextRandom().Intn(4) // Min in reality is relatively small like 4.
 	max := uint32(g.nextRandom().Intn(int(wasm.MemoryLimitPages)-min) + min)
-	g.m.TableSection = &wasm.Table{Min: uint32(min), Max: &max}
+	g.m.TableSection = []*wasm.Table{{Min: uint32(min), Max: &max}}
 }
 
 // genTableSection generates random memory definition if there's no import fot table.
@@ -366,17 +366,17 @@ func (g *generator) genStartSection() {
 
 // genStartSection generates random element section if table and functions exist.
 func (g *generator) genElementSection() {
-	funcs, _, _, table, err := g.m.AllDeclarations()
+	funcs, _, _, tables, err := g.m.AllDeclarations()
 	if err != nil {
 		panic("BUG:" + err.Error())
 	}
 
 	numFuncs := len(funcs)
-	if table == nil || numFuncs == 0 {
+	if tables == nil || numFuncs == 0 {
 		return
 	}
 
-	min := table.Min
+	min := tables[0].Min
 	for i := uint32(0); i < g.numElements; i++ {
 		// Elements can't exceed min of table.
 		indexes := make([]*wasm.Index, g.nextRandom().Intn(int(min)+1))

@@ -975,9 +975,10 @@ func (o *OperationMemoryFill) Kind() OperationKind {
 }
 
 type OperationTableInit struct {
-	// ElemIndex is the index of the element by which this operation inisiates a part of the table.
+	// ElemIndex is the index of the element by which this operation initializes a part of the table.
 	ElemIndex uint32
-	// TODO: add table index in reference type proposal.
+	// TableIndex is the index of the table on which this operation initialize by the target element.
+	TableIndex uint32
 }
 
 func (o *OperationTableInit) Kind() OperationKind {
@@ -994,7 +995,7 @@ func (o *OperationElemDrop) Kind() OperationKind {
 }
 
 type OperationTableCopy struct {
-	// TODO: add table index in reference type proposal.
+	SrcTableIndex, DstTableIndex uint32
 }
 
 func (o *OperationTableCopy) Kind() OperationKind {

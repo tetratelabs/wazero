@@ -14,8 +14,8 @@ type Engine interface {
 	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
 	// * importedFunctions: functions this module imports, already compiled in this engine.
 	// * moduleFunctions: functions declared in this module that must be compiled.
-	// * table: a possibly shared table used by this module. When nil tableInit will be nil.
-	// * tableInit: a mapping of TableInstance.Table index to the function index it should point to.
+	// * tables: possibly shared tables used by this module. When nil tableInit will be nil.
+	// * tableInit: a mapping of Table's index to a mapping of TableInstance.Table index to the function index it should point to.
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
@@ -23,8 +23,8 @@ type Engine interface {
 		name string,
 		module *Module,
 		importedFunctions, moduleFunctions []*FunctionInstance,
-		table *TableInstance,
-		tableInit map[Index]Index,
+		tables []*TableInstance,
+		tableInit TableInitMap,
 	) (ModuleEngine, error)
 
 	// DeleteCompiledModule releases compilation caches for the given module (source).
@@ -45,3 +45,6 @@ type ModuleEngine interface {
 	// corresponding to the given `indexes`.
 	CreateFuncElementInstance(indexes []*Index) *ElementInstance
 }
+
+// TableInitMap is a mapping of Table's index to a mapping of TableInstance.Table index to the function index.
+type TableInitMap = map[Index]map[Index]Index

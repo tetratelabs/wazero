@@ -69,7 +69,6 @@ type compiler interface {
 	// 2) If the type of the function table[offset] doesn't match the specified function type, the function exits with jitCallStatusCodeTypeMismatchOnIndirectCall.
 	// Otherwise, we successfully enter the target function.
 	//
-	// Note: WebAssembly 1.0 (20191205) supports at most one table, so this doesn't support multiple tables.
 	// See wasm.CallIndirect
 	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to drop values within the given inclusive range from the value stack.

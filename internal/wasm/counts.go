@@ -11,7 +11,7 @@ func (m *Module) ImportFuncCount() uint32 {
 // ImportTableCount returns the possibly empty count of imported tables. This plus SectionElementCount of SectionIDTable
 // is the size of the table index namespace.
 func (m *Module) ImportTableCount() uint32 {
-	return m.importCount(ExternTypeTable) // TODO: once validation happens on decode, this is zero or one.
+	return m.importCount(ExternTypeTable)
 }
 
 // ImportMemoryCount returns the possibly empty count of imported memories. This plus SectionElementCount of
@@ -58,10 +58,7 @@ func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as
 	case SectionIDFunction:
 		return uint32(len(m.FunctionSection))
 	case SectionIDTable:
-		if m.TableSection != nil {
-			return 1
-		}
-		return 0
+		return uint32(len(m.TableSection))
 	case SectionIDMemory:
 		if m.MemorySection != nil {
 			return 1

@@ -173,7 +173,7 @@ func TestModule_allDeclarations(t *testing.T) {
 		expectedFunctions []Index
 		expectedGlobals   []*GlobalType
 		expectedMemory    *Memory
-		expectedTable     *Table
+		expectedTables    []*Table
 	}{
 		// Functions.
 		{
@@ -233,22 +233,22 @@ func TestModule_allDeclarations(t *testing.T) {
 			module: &Module{
 				ImportSection: []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1}}},
 			},
-			expectedTable: &Table{Min: 1},
+			expectedTables: []*Table{{Min: 1}},
 		},
 		{
 			module: &Module{
-				TableSection: &Table{Min: 10},
+				TableSection: []*Table{{Min: 10}},
 			},
-			expectedTable: &Table{Min: 10},
+			expectedTables: []*Table{{Min: 10}},
 		},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			functions, globals, memory, table, err := tc.module.AllDeclarations()
+			functions, globals, memory, tables, err := tc.module.AllDeclarations()
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedFunctions, functions)
 			require.Equal(t, tc.expectedGlobals, globals)
-			require.Equal(t, tc.expectedTable, table)
+			require.Equal(t, tc.expectedTables, tables)
 			require.Equal(t, tc.expectedMemory, memory)
 		})
 	}
@@ -668,7 +668,7 @@ func TestModule_validateExports(t *testing.T) {
 		functions       []Index
 		globals         []*GlobalType
 		memory          *Memory
-		table           *Table
+		tables          []*Table
 		expectedErr     string
 	}{
 		{name: "empty export section", exportSection: []*Export{}},
@@ -715,13 +715,19 @@ func TestModule_validateExports(t *testing.T) {
 			name:            "table",
 			enabledFeatures: Features20191205,
 			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}},
-			table:           &Table{},
+			tables:          []*Table{{}},
+		},
+		{
+			name:            "multiple tables",
+			enabledFeatures: Features20191205,
+			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}, {Type: ExternTypeTable, Index: 1}, {Type: ExternTypeTable, Index: 2}},
+			tables:          []*Table{{}, {}, {}},
 		},
 		{
 			name:            "table out of range",
 			enabledFeatures: Features20191205,
 			exportSection:   []*Export{{Type: ExternTypeTable, Index: 1, Name: "e"}},
-			table:           &Table{},
+			tables:          []*Table{},
 			expectedErr:     `table for export["e"] out of range`,
 		},
 		{
@@ -734,14 +740,14 @@ func TestModule_validateExports(t *testing.T) {
 			name:            "memory out of range",
 			enabledFeatures: Features20191205,
 			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0, Name: "e"}},
-			table:           &limitsType{},
+			tables:          []*Table{},
 			expectedErr:     `memory for export["e"] out of range`,
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := Module{ExportSection: tc.exportSection}
-			err := m.validateExports(tc.enabledFeatures, tc.functions, tc.globals, tc.memory, tc.table)
+			err := m.validateExports(tc.enabledFeatures, tc.functions, tc.globals, tc.memory, tc.tables)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

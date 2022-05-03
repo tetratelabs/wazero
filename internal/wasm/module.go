@@ -83,7 +83,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
-	TableSection *Table
+	TableSection []*Table
 
 	// MemorySection contains each memory defined in this module.
 	//
@@ -230,7 +230,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
-	functions, globals, memory, table, err := m.AllDeclarations()
+	functions, globals, memory, tables, err := m.AllDeclarations()
 	if err != nil {
 		return err
 	}
@@ -248,16 +248,16 @@ func (m *Module) Validate(enabledFeatures Features) error {
 	}
 
 	if m.CodeSection != nil {
-		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, table, MaximumFunctionIndex); err != nil {
+		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, tables, MaximumFunctionIndex); err != nil {
 			return err
 		}
 	} // No need to validate host functions as NewHostModule validates
 
-	if _, err = m.validateTable(enabledFeatures); err != nil {
+	if _, err = m.validateTable(enabledFeatures, tables); err != nil {
 		return err
 	}
 
-	if err = m.validateExports(enabledFeatures, functions, globals, memory, table); err != nil {
+	if err = m.validateExports(enabledFeatures, functions, globals, memory, tables); err != nil {
 		return err
 	}
 
@@ -299,7 +299,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals uint32) error
 	return nil
 }
 
-func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, table *Table, maximumFunctionIndex uint32) error {
+func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, maximumFunctionIndex uint32) error {
 	if uint32(len(functions)) > maximumFunctionIndex {
 		return fmt.Errorf("too many functions in a store")
 	}
@@ -320,7 +320,7 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
 
-		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, table); err != nil {
+		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
@@ -377,7 +377,7 @@ func (m *Module) validateImports(enabledFeatures Features) error {
 	return nil
 }
 
-func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, table *Table) error {
+func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
 	for _, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
@@ -400,7 +400,7 @@ func (m *Module) validateExports(enabledFeatures Features, functions []Index, gl
 				return fmt.Errorf("memory for export[%q] out of range", exp.Name)
 			}
 		case ExternTypeTable:
-			if index > 0 || table == nil {
+			if index >= uint32(len(tables)) {
 				return fmt.Errorf("table for export[%q] out of range", exp.Name)
 			}
 		}
@@ -648,11 +648,6 @@ type Import struct {
 	DescGlobal *GlobalType
 }
 
-type limitsType struct {
-	Min uint32
-	Max *uint32
-}
-
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory struct {
 	Min, Cap, Max uint32
@@ -803,7 +798,7 @@ type NameMapAssoc struct {
 }
 
 // AllDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
-func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
+func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, err error) {
 	for _, imp := range m.ImportSection {
 		switch imp.Type {
 		case ExternTypeFunc:
@@ -813,7 +808,7 @@ func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, me
 		case ExternTypeMemory:
 			memory = imp.DescMem
 		case ExternTypeTable:
-			table = imp.DescTable
+			tables = append(tables, imp.DescTable)
 		}
 	}
 
@@ -829,11 +824,7 @@ func (m *Module) AllDeclarations() (functions []Index, globals []*GlobalType, me
 		memory = m.MemorySection
 	}
 	if m.TableSection != nil {
-		if table != nil { // shouldn't be possible due to Validate
-			err = errors.New("at most one table allowed in module")
-			return
-		}
-		table = m.TableSection
+		tables = append(tables, m.TableSection...)
 	}
 	return
 }

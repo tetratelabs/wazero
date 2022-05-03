@@ -562,3 +562,35 @@ func requireModuleText(t *testing.T, source string) *wasm.Module {
 	require.NoError(t, err)
 	return m
 }
+
+func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
+	module := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v, v_v, v_v},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []*wasm.Code{{Body: []byte{
+			wasm.OpcodeI32Const, 0, // call indirect offset
+			wasm.OpcodeCallIndirect,
+			2, // Type index for call_indirect.
+			5, // Non-zero table index for call_indirect.
+			wasm.OpcodeEnd,
+		}}},
+		TableSection: []*wasm.Table{{}, {}, {}, {}, {}, {Min: 100}},
+	}
+
+	expected := &CompilationResult{
+		Operations: []Operation{ // begin with params: []
+			&OperationConstI32{},
+			&OperationCallIndirect{TypeIndex: 2, TableIndex: 5},
+			&OperationBr{Target: &BranchTarget{}}, // return!
+		},
+		HasTable:     true,
+		LabelCallers: map[string]uint32{},
+		Signature:    v_v,
+		Functions:    []wasm.Index{0},
+		Types:        []*wasm.FunctionType{v_v, v_v, v_v},
+	}
+
+	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
+	require.NoError(t, err)
+	require.Equal(t, expected, res[0])
+}

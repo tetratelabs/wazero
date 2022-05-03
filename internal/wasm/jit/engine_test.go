@@ -34,8 +34,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.tablesElement0Address)), callEngineModuleContextTablesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextCodesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
@@ -70,7 +69,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.DataInstances)), moduleInstanceDataInstancesOffset)
@@ -116,19 +115,29 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 // et is used for tests defined in the enginetest package.
 var et = &engineTester{}
 
+// engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
+// NewEngine implements enginetest.EngineTester NewEngine.
 func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return newEngine(enabledFeatures)
 }
 
-func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
-	table := make([]interface{}, initTableLen)
-	internal := me.(*moduleEngine)
-	for idx, fnidx := range initTableIdxToFnIdx {
-		table[idx] = internal.functions[fnidx]
+// InitTables implements enginetest.EngineTester InitTables.
+func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference {
+	references := make([][]wasm.Reference, len(tableIndexToLen))
+	for tableIndex, l := range tableIndexToLen {
+		references[tableIndex] = make([]interface{}, l)
 	}
-	return table
+	internal := me.(*moduleEngine)
+
+	for tableIndex, init := range initTableIdxToFnIdx {
+		referencesPerTable := references[tableIndex]
+		for idx, fnidx := range init {
+			referencesPerTable[idx] = internal.functions[fnidx]
+		}
+	}
+	return references
 }
 
 func TestJIT_Engine_NewModuleEngine(t *testing.T) {

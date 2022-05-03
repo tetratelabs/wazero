@@ -24,7 +24,7 @@ func decodeTypeSection(enabledFeatures wasm.Features, r *bytes.Reader) ([]*wasm.
 	return result, nil
 }
 
-func decodeImportSection(r *bytes.Reader, memoryLimitPages uint32) ([]*wasm.Import, error) {
+func decodeImportSection(r *bytes.Reader, memoryLimitPages uint32, enabledFeatures wasm.Features) ([]*wasm.Import, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -32,7 +32,7 @@ func decodeImportSection(r *bytes.Reader, memoryLimitPages uint32) ([]*wasm.Impo
 
 	result := make([]*wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeImport(r, i, memoryLimitPages); err != nil {
+		if result[i], err = decodeImport(r, i, memoryLimitPages, enabledFeatures); err != nil {
 			return nil, err
 		}
 	}
@@ -54,16 +54,26 @@ func decodeFunctionSection(r *bytes.Reader) ([]uint32, error) {
 	return result, err
 }
 
-func decodeTableSection(r *bytes.Reader) (*wasm.Table, error) {
+func decodeTableSection(r *bytes.Reader, enabledFeatures wasm.Features) ([]*wasm.Table, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("error reading size")
 	}
 	if vs > 1 {
-		return nil, fmt.Errorf("at most one table allowed in module, but read %d", vs)
+		if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+			return nil, fmt.Errorf("at most one table allowed in module as %w", err)
+		}
 	}
 
-	return decodeTable(r)
+	ret := make([]*wasm.Table, vs)
+	for i := range ret {
+		table, err := decodeTable(r, enabledFeatures)
+		if err != nil {
+			return nil, err
+		}
+		ret[i] = table
+	}
+	return ret, nil
 }
 
 func decodeMemorySection(r *bytes.Reader, memoryLimitPages uint32) (*wasm.Memory, error) {
@@ -240,8 +250,11 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 //
 // See encodeTable
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
-func encodeTableSection(table *wasm.Table) []byte {
-	contents := append([]byte{1}, encodeTable(table)...)
+func encodeTableSection(tables []*wasm.Table) []byte {
+	var contents []byte = leb128.EncodeUint32(uint32(len(tables)))
+	for _, table := range tables {
+		contents = append(contents, encodeTable(table)...)
+	}
 	return encodeSection(wasm.SectionIDTable, contents)
 }
 

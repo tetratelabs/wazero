@@ -10,14 +10,16 @@ import (
 // decodeTable returns the wasm.Table decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-table
-func decodeTable(r *bytes.Reader) (*wasm.Table, error) {
-	b, err := r.ReadByte()
+func decodeTable(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.Table, error) {
+	tableType, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
-	if b != wasm.RefTypeFuncref {
-		return nil, fmt.Errorf("invalid element type %#x != funcref(%#x)", b, wasm.RefTypeFuncref)
+	if tableType != wasm.RefTypeFuncref {
+		if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+			return nil, fmt.Errorf("table type funcref is invalid: %w", err)
+		}
 	}
 
 	min, max, err := decodeLimitsType(r)
@@ -34,12 +36,12 @@ func decodeTable(r *bytes.Reader) (*wasm.Table, error) {
 			return nil, fmt.Errorf("table max must be at most %d", wasm.MaximumFunctionIndex)
 		}
 	}
-	return &wasm.Table{Min: min, Max: max}, nil
+	return &wasm.Table{Min: min, Max: max, Type: tableType}, nil
 }
 
 // encodeTable returns the wasm.Table encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-table
 func encodeTable(i *wasm.Table) []byte {
-	return append([]byte{wasm.RefTypeFuncref}, encodeLimitsType(i.Min, i.Max)...)
+	return append([]byte{i.Type}, encodeLimitsType(i.Min, i.Max)...)
 }
