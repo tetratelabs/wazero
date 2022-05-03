@@ -4,7 +4,8 @@
 wazero uses internal packages extensively to balance API compatability desires for end users with the need to safely
 share internals between compilers.
 
-End-user packages include `wazero`,with `Config` structs, and `api`, with shared types. Everything else is internal.
+End-user packages include `wazero`, with `Config` structs, `api`, with shared types, and the built-in `wasi` library.
+Everything else is internal.
 
 ### Internal packages
 Most code in wazero is internal, and it is acknowledged that this prevents external implementation of facets such as
@@ -39,7 +40,7 @@ The above guarantees no cyclic dependencies at the cost of having to re-define s
 For example, if `wasm.Store` is a type the user needs access to, it is narrowed by a cover type in the `wazero`:
 
 ```go
-type Runtime struct {
+type runtime struct {
 	s *wasm.Store
 }
 ```
@@ -60,6 +61,131 @@ Ex. `api.Memory` protects access by exposing functions like `WriteFloat64Le` ins
 Ex. There is no exported symbol for the `[]byte` representing the `CodeSection`
 
 Besides security, this practice prevents other bugs and allows centralization of validation logic such as decoding Wasm.
+
+### Interfaces, not structs
+
+All exported types in public packages, regardless of configuration vs runtime, are interfaces. The primary benefits are
+internal flexibility and avoiding people accidentally mis-initializing by instantiating the types on their own vs using
+the `NewXxx` constructor functions. In other words, there's less support load when things can't be done incorrectly.
+
+Ex.
+```go
+rt := &RuntimeConfig{} // not initialized properly (fields are nil which shouldn't be)
+rt := RuntimeConfig{} // not initialized properly (should be a pointer)
+rt := wazero.NewRuntimeConfig() // initialized properly
+```
+
+There are a few drawbacks to this, notably some work for maintainers.
+* Interfaces are decoupled from the structs implementing them, which means the signature has to be repeated twice.
+* Interfaces have to be documented and guarded at time of use, that 3rd party implementations aren't supported.
+* As of Golang 1.18, interfaces are still [not well supported](https://github.com/golang/go/issues/5860) in godoc.
+
+## Config
+
+wazero configures scopes such as Runtime and Module using `XxxConfig` types. Ex. `RuntimeConfig` configures `Runtime`
+and `ModuleConfig` configures `Module` (instantiation). In all cases, config types begin defaults and can be customized
+by a user, for example, selecting features or a module name override.
+
+### Why don't we make each configuration setting return an error?
+No config types create resources that would need to be closed, nor do they return errors on use. This helps reduce
+resource leaks, and makes chaining easier. It makes it possible to parse configuration (ex by parsing yaml) independent
+of validating it.
+
+Instead of:
+```
+cfg, err = cfg.WithFS(fs)
+if err != nil {
+  return err
+}
+cfg, err = cfg.WithName(name)
+if err != nil {
+  return err
+}
+mod, err = rt.InstantiateModuleWithConfig(ctx, code, cfg)
+if err != nil {
+  return err
+}
+```
+
+There's only one call site to handle errors:
+```
+cfg = cfg.WithFS(fs).WithName(name)
+mod, err = rt.InstantiateModuleWithConfig(ctx, code, cfg)
+if err != nil {
+  return err
+}
+```
+
+This allows users one place to look for errors, and also the benefit that if anything internally opens a resource, but
+errs, there's nothing they need to close. In other words the call site using config is fully responsible to close any
+resources that happened with later errors.
+
+### Why are configuration immutable?
+While it seems certain scopes like `Runtime` won't repeat within a process, they do, possibly in different goroutines.
+For example, some users create a new runtime for each module, and some re-use the same base module configuration with
+only small updates (ex the name) for each instantiation. Making configuration immutable allows them to be safely used in
+any goroutine.
+
+Since config are immutable, changes apply via return val, similar to `append` in a slice.
+
+Ex. Both of these are the same sort of error:
+```go
+append(slice, element) // bug as only the return value has the updated slice.
+cfg.WithName(next) // bug as only the return value has the updated name.
+```
+
+This means the correct use is re-assigning explicitly or via chaining. Ex.
+```go
+cfg = cfg.WithName(name) // explicit
+
+mod, err = rt.InstantiateModuleWithConfig(ctx, code, cfg.WithName(name)) // implicit
+if err != nil {
+  return err
+}
+```
+
+### Why aren't configuration assigned with option types?
+The option pattern is a familiar one in Go. For example, someone defines a type `func (x X) err` and uses it to update
+the target. For example, you could imagine wazero could choose to make `ModuleConfig` from options vs chaining fields.
+
+Ex instead of:
+```go
+type ModuleConfig interface {
+	WithName(string) ModuleConfig
+    WithFS(fs.FS) ModuleConfig
+}
+
+config := r.NewModuleConfig().WithFS(fs)
+configDerived := config.WithName("name")
+```
+
+An option function could be defined, then prefixed implementations could also for each method in the interface:
+```go
+type ModuleConfigOption func(c *moduleConfig)
+
+func ModuleConfigName(name string) ModuleConfigOption {
+    return func(c *moduleConfig) {
+        c.name = name
+	}
+}
+
+func ModuleConfigFS(fs fs.FS) ModuleConfigOption {
+    return func(c *moduleConfig) {
+        c.fs = fs
+    }
+}
+
+config := r.NewModuleConfig(ModuleConfigName("name"), ModuleConfigFS(fs))
+configDerived := config.WithOptions(ModuleConfigName("name"))
+```
+
+wazero took the path of the former design primarily due to:
+* interfaces provide natural namespaces for their methods, which is more direct than functions with name prefixes.
+* parsing config into function callbacks is more direct vs parsing config into a slice of functions to do the same.
+* in either case derived config is needed and the options pattern is more awkward to achieve that.
+
+There are other reasons such as test and debug being simpler without options: the above list is constrained to conserve
+space. It is accepted that the options pattern is common in Go, which is the main reason for documenting this decision.
 
 ## Why does InstantiateModule call "_start" by default?
 We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
