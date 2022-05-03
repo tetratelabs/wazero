@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeImport(r *bytes.Reader, idx uint32, memoryLimitPages uint32) (i *wasm.Import, err error) {
+func decodeImport(r *bytes.Reader, idx uint32, memoryLimitPages uint32, enabledFeatures wasm.Features) (i *wasm.Import, err error) {
 	i = &wasm.Import{}
 	if i.Module, _, err = decodeUTF8(r, "import module"); err != nil {
 		return nil, fmt.Errorf("import[%d] error decoding module: %w", idx, err)
@@ -27,7 +27,7 @@ func decodeImport(r *bytes.Reader, idx uint32, memoryLimitPages uint32) (i *wasm
 	case wasm.ExternTypeFunc:
 		i.DescFunc, _, err = leb128.DecodeUint32(r)
 	case wasm.ExternTypeTable:
-		i.DescTable, err = decodeTable(r)
+		i.DescTable, err = decodeTable(r, enabledFeatures)
 	case wasm.ExternTypeMemory:
 		i.DescMem, err = decodeMemory(r, memoryLimitPages)
 	case wasm.ExternTypeGlobal:

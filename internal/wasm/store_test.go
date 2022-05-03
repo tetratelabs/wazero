@@ -158,7 +158,7 @@ func TestStore_CloseModule(t *testing.T) {
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection: &Memory{Min: 1, Cap: 1},
 				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
-				TableSection:  &Table{Min: 10},
+				TableSection:  []*Table{{Min: 10}},
 			}, importingModuleName, nil, nil)
 			require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestStore_hammer(t *testing.T) {
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:   &Memory{Min: 1, Cap: 1},
 		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
-		TableSection:    &Table{Min: 10},
+		TableSection:    []*Table{{Min: 10}},
 		ImportSection: []*Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
@@ -381,7 +381,7 @@ func newStore() *Store {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ []*TableInstance, _ TableInitMap) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
 	}

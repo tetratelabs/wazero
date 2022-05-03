@@ -25,8 +25,8 @@ const maximumValuesOnStack = 1 << 27
 //
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
-func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index, globals []*GlobalType, memory *Memory, table *Table) error {
-	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, table, maximumValuesOnStack)
+func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
+	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack)
 }
 
 // validateFunctionWithMaxStackValues is like validateFunction, but allows overriding maxStackValues for testing.
@@ -38,7 +38,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	functions []Index,
 	globals []*GlobalType,
 	memory *Memory,
-	table *Table,
+	tables []*Table,
 	maxStackValues int,
 ) error {
 	functionType := m.TypeSection[m.FunctionSection[idx]]
@@ -492,19 +492,36 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
-			pc += num - 1
-			pc++
-			if body[pc] != 0x00 {
-				return fmt.Errorf("%s reserved bytes not zero but got %d", OpcodeCallIndirectName, body[pc])
-			}
-			if table == nil {
-				return fmt.Errorf("table not given while having %s", OpcodeCallIndirectName)
-			}
-			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-				return fmt.Errorf("cannot pop the in table index's type for %s", OpcodeCallIndirectName)
-			}
+			pc += num
+
 			if int(typeIndex) >= len(types) {
 				return fmt.Errorf("invalid type index at %s: %d", OpcodeCallIndirectName, typeIndex)
+			}
+
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			if err != nil {
+				return fmt.Errorf("read table index: %v", err)
+			}
+			pc += num - 1
+			if tableIndex != 0 {
+				if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+					return fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
+				}
+			}
+
+			if tableIndex >= uint32(len(tables)) {
+				return fmt.Errorf("unknown table index: %d", tableIndex)
+			}
+
+			table := tables[tableIndex]
+			if table == nil {
+				return fmt.Errorf("table not given while having %s", OpcodeCallIndirectName)
+			} else if table.Type != RefTypeFuncref {
+				return fmt.Errorf("table is not funcref type but was %s for %s", RefTypeName(table.Type), OpcodeCallIndirectName)
+			}
+
+			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+				return fmt.Errorf("cannot pop the offset in table for %s", OpcodeCallIndirectName)
 			}
 			funcType := types[typeIndex]
 			for i := 0; i < len(funcType.Params); i++ {
@@ -816,41 +833,85 @@ func (m *Module) validateFunctionWithMaxStackValues(
 							return fmt.Errorf("%s reserved byte must be zero encoded with 1 byte", MiscInstructionName(miscOpcode))
 						}
 					}
-				case OpcodeMiscTableInit, OpcodeMiscElemDrop, OpcodeMiscTableCopy:
-					if miscOpcode != OpcodeMiscElemDrop {
-						if table == nil {
-							return fmt.Errorf("table must exist for %s", MiscInstructionName(miscOpcode))
-						}
-						params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
+
+				case OpcodeMiscTableInit:
+					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
+					pc++
+					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
-					if miscOpcode == OpcodeMiscTableInit || miscOpcode == OpcodeMiscElemDrop {
-						pc++
-						index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
-						if err != nil {
-							return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
+					if int(elementIndex) >= len(m.ElementSection) {
+						return fmt.Errorf("index %d out of range of element section(len=%d)", elementIndex, len(m.ElementSection))
+					}
+					pc += num
+
+					tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
+					}
+					if tableIndex != 0 {
+						if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+							return fmt.Errorf("source table index must be zero for %s as %v", MiscInstructionName(miscOpcode), err)
 						}
-						if int(index) >= len(m.ElementSection) {
-							return fmt.Errorf("index %d out of range of element section(len=%d)", index, len(m.ElementSection))
-						}
-						pc += num - 1
+					}
+					if tableIndex >= uint32(len(tables)) {
+						return fmt.Errorf("table of index %d not found", tableIndex)
 					}
 
-					if miscOpcode != OpcodeMiscElemDrop {
-						pc++
-						_, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
-						if err != nil {
-							return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
-						}
-						if miscOpcode == OpcodeMiscTableCopy {
-							pc += num
-							// table.copy needs two table index which are reserved as zero.
-							_, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
-							if err != nil {
-								return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
-							}
-							pc += num - 1
+					if m.ElementSection[elementIndex].Type != tables[tableIndex].Type {
+						return fmt.Errorf("type mismatch for table.init: element type %s does not match table type %s",
+							RefTypeName(m.ElementSection[elementIndex].Type),
+							RefTypeName(tables[tableIndex].Type),
+						)
+					}
+					pc += num - 1
+				case OpcodeMiscElemDrop:
+					pc++
+					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
+					} else if int(elementIndex) >= len(m.ElementSection) {
+						return fmt.Errorf("index %d out of range of element section(len=%d)", elementIndex, len(m.ElementSection))
+					}
+					pc += num - 1
+				case OpcodeMiscTableCopy:
+					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
+					pc++
+
+					dstTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read destination table index for %s: %v", MiscInstructionName(miscOpcode), err)
+					}
+					if dstTableIndex != 0 {
+						if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+							return fmt.Errorf("destination table index must be zero for %s as %v", MiscInstructionName(miscOpcode), err)
 						}
 					}
+					if dstTableIndex >= uint32(len(tables)) {
+						return fmt.Errorf("table of index %d not found", dstTableIndex)
+					}
+					pc += num
+
+					srcTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					if err != nil {
+						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
+					}
+					if srcTableIndex != 0 {
+						if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+							return fmt.Errorf("source table index must be zero for %s as %v", MiscInstructionName(miscOpcode), err)
+						}
+					}
+					if srcTableIndex >= uint32(len(tables)) {
+						return fmt.Errorf("table of index %d not found", srcTableIndex)
+					}
+
+					if tables[srcTableIndex].Type != tables[dstTableIndex].Type {
+						return fmt.Errorf("table type mismatch for table.copy: %s (src) != %s (dst)",
+							RefTypeName(tables[srcTableIndex].Type), RefTypeName(tables[dstTableIndex].Type))
+					}
+
+					pc += num - 1
 				}
 				for _, p := range params {
 					if err := valueTypeStack.popAndVerifyType(p); err != nil {

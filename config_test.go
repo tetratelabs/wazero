@@ -32,7 +32,7 @@ func TestRuntimeConfig(t *testing.T) {
 				return c.WithFeatureBulkMemoryOperations(true)
 			},
 			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureBulkMemoryOperations,
+				enabledFeatures: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
 			},
 		},
 		{
@@ -87,6 +87,15 @@ func TestRuntimeConfig(t *testing.T) {
 			},
 			expected: &runtimeConfig{
 				enabledFeatures: wasm.Features20220419,
+			},
+		},
+		{
+			name: "reference-types",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithFeatureReferenceTypes(true)
+			},
+			expected: &runtimeConfig{
+				enabledFeatures: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
 			},
 		},
 	}

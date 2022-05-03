@@ -2,7 +2,6 @@ package binary
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -61,15 +60,19 @@ func decodeElementConstExprVector(r *bytes.Reader, enabledFeatures wasm.Features
 	return vec, nil
 }
 
-func decodeElementRefType(r *bytes.Reader) (ret wasm.RefType, err error) {
+func decodeElementRefType(r *bytes.Reader, enabledFeatures wasm.Features) (ret wasm.RefType, err error) {
 	ret, err = r.ReadByte()
 	if err != nil {
 		err = fmt.Errorf("read element ref type: %w", err)
 		return
 	}
 	if ret != wasm.RefTypeFuncref {
-		// TODO: this will be relaxed to accept externref when we implement the reference-types proposal.
-		err = errors.New("ref type must be funcref for element")
+		if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+			return 0, fmt.Errorf("ref type must be funcref for element: %w", err)
+		}
+		if ret != wasm.RefTypeExternref {
+			return 0, fmt.Errorf("unknown reference type: 0x%x", ret)
+		}
 	}
 	return
 }
@@ -126,6 +129,8 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
+			// Legacy prefix has the fixed table index zero.
+			TableIndex: 0,
 		}, nil
 	case elementSegmentPrefixPassiveFuncrefValueVector:
 		// Prefix 1 requires funcref.
@@ -149,8 +154,9 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 		}
 
 		if tableIndex != 0 {
-			// TODO: this will be relaxed after reference type proposal impl.
-			return nil, fmt.Errorf("table index must be zero but was %d", tableIndex)
+			if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
+			}
 		}
 
 		expr, err := decodeConstantExpression(r, enabledFeatures)
@@ -172,6 +178,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
+			TableIndex: tableIndex,
 		}, nil
 	case elementSegmentPrefixDeclarativeFuncrefValueVector:
 		// Prefix 3 requires funcref.
@@ -203,9 +210,10 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 			Init:       init,
 			Type:       wasm.RefTypeFuncref,
 			Mode:       wasm.ElementModeActive,
+			TableIndex: 0,
 		}, nil
 	case elementSegmentPrefixPassiveConstExprVector:
-		refType, err := decodeElementRefType(r)
+		refType, err := decodeElementRefType(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -225,15 +233,16 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 		}
 
 		if tableIndex != 0 {
-			// TODO: this will be relaxed after reference type proposal impl.
-			return nil, fmt.Errorf("table index must be zero but was %d", tableIndex)
+			if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
+			}
 		}
 		expr, err := decodeConstantExpression(r, enabledFeatures)
 		if err != nil {
 			return nil, fmt.Errorf("read expr for offset: %w", err)
 		}
 
-		refType, err := decodeElementRefType(r)
+		refType, err := decodeElementRefType(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -248,9 +257,10 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 			Init:       init,
 			Type:       refType,
 			Mode:       wasm.ElementModeActive,
+			TableIndex: tableIndex,
 		}, nil
 	case elementSegmentPrefixDeclarativeConstExprVector:
-		refType, err := decodeElementRefType(r)
+		refType, err := decodeElementRefType(r, enabledFeatures)
 		if err != nil {
 			return nil, err
 		}
@@ -273,8 +283,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#element-section%E2%91%A0
 func encodeElement(e *wasm.ElementSegment) (ret []byte) {
 	if e.Mode == wasm.ElementModeActive {
-		// As of WebAssembly 2.0, multiple tables are not supported.
-		ret = append(ret, leb128.EncodeInt32(0)...)
+		ret = append(ret, leb128.EncodeInt32(int32(e.TableIndex))...)
 		ret = append(ret, encodeConstantExpression(e.OffsetExpr)...)
 		ret = append(ret, leb128.EncodeUint32(uint32(len(e.Init)))...)
 		for _, idx := range e.Init {

@@ -27,12 +27,13 @@ type RuntimeConfig interface {
 	//
 	// Here are the notable effects:
 	// * Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-	// * Adds `table.fill`, `table.init`, `table.copy` and `elem.drop` instructions.
+	// * Adds `table.init`, `table.copy` and `elem.drop` instructions.
 	// * Introduces a "passive" form of element and data segments.
 	// * Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
 	//
 	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
+	// Therefore, enabling this feature results in enabling WithFeatureReferenceTypes, and vice-versa.
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
 	// See https://github.com/WebAssembly/spec/pull/1287
@@ -70,6 +71,31 @@ type RuntimeConfig interface {
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
+
+	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
+	//
+	// * Introduction of new value types: `funcref` and `externref`.
+	// * Support for the following new instructions:
+	//   * `ref.null`
+	//   * `ref.func`
+	//   * `ref.is_null`
+	//   * `table.fill`
+	//   * `table.get`
+	//   * `table.grow`
+	//   * `table.set`
+	//   * `table.size`
+	// * Support for multiple tables per module:
+	//   * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
+	//   * Element segments can take non-zero table index.
+	//
+	//
+	// Note: "reference-types" is mixed with the "bulk-memory-operations" proposal
+	// due to the WebAssembly Working Group merging them "mutually dependent".
+	// Therefore, enabling this feature results in enabling WithFeatureBulkMemoryOperations, and vice-versa.
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+	// See https://github.com/WebAssembly/spec/pull/1287
+	WithFeatureReferenceTypes(enabled bool) RuntimeConfig
 
 	// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false
 	// as the feature was not in WebAssembly 1.0.
@@ -166,6 +192,8 @@ func NewRuntimeConfigInterpreter() RuntimeConfig {
 func (c *runtimeConfig) WithFeatureBulkMemoryOperations(enabled bool) RuntimeConfig {
 	ret := *c // copy
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
+	// bulk-memory-operations proposal is mutually-dependant with reference-types proposal.
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
 	return &ret
 }
 
@@ -187,6 +215,15 @@ func (c *runtimeConfig) WithFeatureMutableGlobal(enabled bool) RuntimeConfig {
 func (c *runtimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) RuntimeConfig {
 	ret := *c // copy
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
+	return &ret
+}
+
+// WithFeatureReferenceTypes implements RuntimeConfig.WithFeatureReferenceTypes
+func (c *runtimeConfig) WithFeatureReferenceTypes(enabled bool) RuntimeConfig {
+	ret := *c // copy
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
+	// reference-types proposal is mutually-dependant with bulk-memory-operations proposal.
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
 	return &ret
 }
 

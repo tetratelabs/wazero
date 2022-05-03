@@ -264,7 +264,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 
 	//  (table (export "table") 10 20 funcref)
 	tableLimitMax := uint32(20)
-	mod.TableSection = &wasm.Table{Min: 10, Max: &tableLimitMax}
+	mod.TableSection = []*wasm.Table{{Min: 10, Max: &tableLimitMax}}
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
 	maybeSetMemoryCap(mod)

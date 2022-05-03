@@ -23,7 +23,7 @@ const Features20220419 = Features20191205 |
 	FeatureBulkMemoryOperations |
 	FeatureMultiValue |
 	FeatureNonTrappingFloatToIntConversion |
-	// TODO: FeatureReferenceTypes |
+	FeatureReferenceTypes |
 	FeatureSignExtensionOps
 	// TODO: FeatureSIMD
 
@@ -37,9 +37,6 @@ const (
 	// * [ OpcodeMiscPrefix, OpcodeMiscTableInit]
 	// * [ OpcodeMiscPrefix, OpcodeMiscElemDrop]
 	// * [ OpcodeMiscPrefix, OpcodeMiscTableCopy]
-	// * [ OpcodeMiscPrefix, OpcodeMiscTableGrow]
-	// * [ OpcodeMiscPrefix, OpcodeMiscTableSize]
-	// * [ OpcodeMiscPrefix, OpcodeMiscTableFill]
 	//
 	// Also, if the parsing should succeed with the presence of SectionIDDataCount.
 	//
@@ -71,6 +68,24 @@ const (
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	FeatureNonTrappingFloatToIntConversion
+
+	// FeatureReferenceTypes enables various features related to reference types and tables.
+	// * Introduction of new values types: RefTypeFuncref and RefTypeExternref
+	// * Support for the following opcodes:
+	//  * OpcodeRefNull
+	//  * OpcodeRefIsNull
+	//  * OpcodeRefFunc
+	// 	* OpcodeTableGet
+	// 	* OpcodeTableSet
+	// 	* [ OpcodeMiscPrefix, OpcodeMiscTableFill]
+	// 	* [ OpcodeMiscPrefix, OpcodeMiscTableGrow]
+	// 	* [ OpcodeMiscPrefix, OpcodeMiscTableSize]
+	// * Support for multiple tables per module:
+	// 	* OpcodeCallIndirect, OpcodeTableInit, and OpcodeElemDrop can take non-zero table indexes.
+	// 	* Element segments can take non-zero table index.
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+	FeatureReferenceTypes
 
 	// FeatureSignExtensionOps decides if parsing should succeed on the following instructions:
 	//
@@ -136,7 +151,11 @@ func featureName(f Features) string {
 		// match https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 		return "nontrapping-float-to-int-conversion"
 	case FeatureBulkMemoryOperations:
+		// match https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
 		return "bulk-memory-operations"
+	case FeatureReferenceTypes:
+		// match https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+		return "reference-types"
 	}
 	return ""
 }

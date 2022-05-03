@@ -85,11 +85,11 @@ var (
 
 const (
 	// arm64CallEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	arm64CallEngineArchContextJITCallReturnAddressOffset = 144
+	arm64CallEngineArchContextJITCallReturnAddressOffset = 136
 	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 152
+	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 144
 	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 160
+	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 152
 )
 
 func isZeroRegister(r asm.Register) bool {
@@ -158,7 +158,7 @@ func (c *arm64Compiler) pushValueLocationOnRegister(reg asm.Register) (ret *valu
 
 func (c *arm64Compiler) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
-		if !isZeroRegister(reg) {
+		if !isZeroRegister(reg) && reg != asm.NilRegister {
 			c.locationStack.markRegisterUsed(reg)
 		}
 	}
@@ -166,7 +166,7 @@ func (c *arm64Compiler) markRegisterUsed(regs ...asm.Register) {
 
 func (c *arm64Compiler) markRegisterUnused(regs ...asm.Register) {
 	for _, reg := range regs {
-		if !isZeroRegister(reg) {
+		if !isZeroRegister(reg) && reg != asm.NilRegister {
 			c.locationStack.markRegisterUnused(reg)
 		}
 	}
@@ -1095,13 +1095,21 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.markRegisterUsed(tmp2)
 
 	// First, we need to check if the offset doesn't exceed the length of table.
-	// "tmp = len(table)"
+	// "tmp = &Tables[0]"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+		arm64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
 		tmp,
 	)
-	// "cmp tmp, offset"
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp, offset.register)
+	// tmp = [tmp + TableIndex*8] = [&Tables[0] + TableIndex*sizeOf(*tableInstance)] = Tables[tableIndex]
+	c.assembler.CompileMemoryToRegister(arm64.MOVD,
+		tmp, int64(o.TableIndex)*8,
+		tmp,
+	)
+	// tmp2 = [tmp + tableInstanceTableLenOffset] = len(Tables[tableIndex])
+	c.assembler.CompileMemoryToRegister(arm64.MOVD, tmp, tableInstanceTableLenOffset, tmp2)
+
+	// "cmp tmp2, offset"
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmp2, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
 	brIfOffsetOK := c.assembler.CompileJump(arm64.BLO)
@@ -1111,10 +1119,10 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
 
 	// We need to obtains the absolute address of table element.
-	// "tmp = &table[0]"
+	// "tmp = &Tables[tableIndex].table[0]"
 	c.assembler.CompileMemoryToRegister(
 		arm64.MOVD,
-		arm64ReservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
+		tmp, tableInstanceTableOffset,
 		tmp,
 	)
 	// "offset = tmp + (offset << 4) (== &table[offset])"
@@ -2863,14 +2871,14 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 
 // compileMemoryInit implements compiler.compileMemoryInit for the arm64 architecture.
 func (c *arm64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error {
-	return c.compileInitImpl(false, o.DataIndex)
+	return c.compileInitImpl(false, o.DataIndex, 0)
 }
 
 // compileInitImpl implements compileTableInit and compileMemoryInit.
 //
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
-func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
+func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) error {
 	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
 	if isTable {
 		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
@@ -2908,6 +2916,15 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
 	}
 	c.markRegisterUsed(destinationOffset.register)
 
+	var tableInstanceAddressReg asm.Register = asm.NilRegister
+	if isTable {
+		tableInstanceAddressReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		c.markRegisterUsed(tableInstanceAddressReg)
+	}
+
 	if !isZeroRegister(copySize.register) {
 		// sourceOffset += size.
 		c.assembler.CompileRegisterToRegister(arm64.ADD, copySize.register, sourceOffset.register)
@@ -2941,8 +2958,19 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
 
 	// Check destination bounds.
 	if isTable {
+		// arm64ReservedRegisterForTemporary = &tables[0]
 		c.assembler.CompileMemoryToRegister(arm64.MOVD,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+			arm64ReservedRegisterForTemporary)
+		// tableInstanceAddressReg = arm64ReservedRegisterForTemporary + tableIndex*8
+		//                         = &tables[0] + sizeOf(*tableInstance)*8
+		//                         = &tables[tableIndex]
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForTemporary, int64(tableIndex)*8,
+			tableInstanceAddressReg)
+		// arm64ReservedRegisterForTemporary = [tableInstanceAddressReg+tableInstanceTableLenOffset] = len(tables[tableIndex])
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			tableInstanceAddressReg, tableInstanceTableLenOffset,
 			arm64ReservedRegisterForTemporary)
 	} else {
 		c.assembler.CompileMemoryToRegister(arm64.MOVD,
@@ -2971,8 +2999,8 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
 			movSize = 8
 
 			// arm64ReservedRegisterForTemporary = &Table[0]
-			c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
-				callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
+			c.assembler.CompileMemoryToRegister(arm64.MOVD, tableInstanceAddressReg,
+				tableInstanceTableOffset, arm64ReservedRegisterForTemporary)
 			// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + arm64ReservedRegisterForTemporary
 			c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 				destinationOffset.register, interfaceDataSizeLog2,
@@ -3023,7 +3051,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index uint32) error {
 	}
 
 	c.markRegisterUnused(copySize.register, sourceOffset.register,
-		destinationOffset.register, instanceAddr)
+		destinationOffset.register, instanceAddr, tableInstanceAddressReg)
 	return nil
 }
 
@@ -3061,14 +3089,14 @@ func (c *arm64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm
 
 // compileMemoryCopy implements compiler.compileMemoryCopy for the arm64 architecture.
 func (c *arm64Compiler) compileMemoryCopy() error {
-	return c.compileCopyImpl(false)
+	return c.compileCopyImpl(false, 0, 0)
 }
 
 // compileCopyImpl implements compileTableCopy and compileMemoryCopy.
 //
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
-func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
+func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableIndex uint32) error {
 	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
 	if isTable {
 		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
@@ -3114,9 +3142,19 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
 	}
 
 	if isTable {
-		// arm64ReservedRegisterForTemporary = len(table.Table).
+		// arm64ReservedRegisterForTemporary = &tables[0]
 		c.assembler.CompileMemoryToRegister(arm64.MOVD,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+			arm64ReservedRegisterForTemporary)
+		// arm64ReservedRegisterForTemporary = arm64ReservedRegisterForTemporary + srcTableIndex*8
+		//                                   = &tables[0] + sizeOf(*tableInstance)*8
+		//                                   = &tables[srcTableIndex]
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForTemporary, int64(srcTableIndex)*8,
+			arm64ReservedRegisterForTemporary)
+		// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary+tableInstanceTableLenOffset] = len(tables[srcTableIndex])
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForTemporary, tableInstanceTableLenOffset,
 			arm64ReservedRegisterForTemporary)
 	} else {
 		// arm64ReservedRegisterForTemporary = len(memoryInst.Buffer).
@@ -3132,8 +3170,25 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
 	// If not, raise out of bounds memory access error.
 	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
 
-	// Otherwise, check memory len >= destinationOffset.
 	c.assembler.SetJumpTargetOnNext(sourceBoundsOK)
+
+	// Otherwise, check memory len >= destinationOffset.
+	if isTable {
+		// arm64ReservedRegisterForTemporary = &tables[0]
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+			arm64ReservedRegisterForTemporary)
+		// arm64ReservedRegisterForTemporary = arm64ReservedRegisterForTemporary + dstTableIndex*8
+		//                                   = &tables[0] + sizeOf(*tableInstance)*8
+		//                                   = &tables[dstTableIndex]
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForTemporary, int64(dstTableIndex)*8,
+			arm64ReservedRegisterForTemporary)
+		// arm64ReservedRegisterForTemporary = [arm64ReservedRegisterForTemporary+tableInstanceTableLenOffset] = len(tables[dstTableIndex])
+		c.assembler.CompileMemoryToRegister(arm64.MOVD,
+			arm64ReservedRegisterForTemporary, tableInstanceTableLenOffset,
+			arm64ReservedRegisterForTemporary)
+	}
 
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64ReservedRegisterForTemporary, destinationOffset.register)
 	destinationBoundsOK := c.assembler.CompileJump(arm64.BLS)
@@ -3171,13 +3226,29 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
 			c.assembler.CompileRegisterToRegister(arm64.SUB, copySize.register, destinationOffset.register)
 
 			if isTable {
-				// arm64ReservedRegisterForTemporary = &Table[0]
+				// arm64ReservedRegisterForTemporary = &Tables[dstTableIndex].Table[0]
 				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
-					callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
-				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[0]
+					callEngineModuleContextTablesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, int64(dstTableIndex)*8,
+					arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, tableInstanceTableOffset,
+					arm64ReservedRegisterForTemporary)
+				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[dstTableIndex].Table[0]
 				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 					destinationOffset.register, interfaceDataSizeLog2,
 					arm64ReservedRegisterForTemporary, destinationOffset.register)
+
+				// arm64ReservedRegisterForTemporary = &Tables[srcTableIndex]
+				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
+					callEngineModuleContextTablesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, int64(srcTableIndex)*8,
+					arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, tableInstanceTableOffset,
+					arm64ReservedRegisterForTemporary)
 				// sourceOffset = (sourceOffset<< interfaceDataySizeLog2) + &Table[0]
 				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 					sourceOffset.register, interfaceDataSizeLog2,
@@ -3219,13 +3290,29 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool) error {
 		{
 
 			if isTable {
-				// arm64ReservedRegisterForTemporary = &Table[0]
+				// arm64ReservedRegisterForTemporary = &Tables[dstTableIndex].Table[0]
 				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
-					callEngineModuleContextTableElement0AddressOffset, arm64ReservedRegisterForTemporary)
-				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[0]
+					callEngineModuleContextTablesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, int64(dstTableIndex)*8,
+					arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, tableInstanceTableOffset,
+					arm64ReservedRegisterForTemporary)
+				// destinationOffset = (destinationOffset<< interfaceDataySizeLog2) + &Table[dstTableIndex].Table[0]
 				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 					destinationOffset.register, interfaceDataSizeLog2,
 					arm64ReservedRegisterForTemporary, destinationOffset.register)
+
+				// arm64ReservedRegisterForTemporary = &Tables[srcTableIndex]
+				c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine,
+					callEngineModuleContextTablesElement0AddressOffset, arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, int64(srcTableIndex)*8,
+					arm64ReservedRegisterForTemporary)
+				c.assembler.CompileMemoryToRegister(arm64.MOVD,
+					arm64ReservedRegisterForTemporary, tableInstanceTableOffset,
+					arm64ReservedRegisterForTemporary)
 				// sourceOffset = (sourceOffset<< interfaceDataySizeLog2) + &Table[0]
 				c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
 					sourceOffset.register, interfaceDataSizeLog2,
@@ -3351,12 +3438,12 @@ func (c *arm64Compiler) compileMemoryFill() error {
 
 // compileTableInit implements compiler.compileTableInit for the arm64 architecture.
 func (c *arm64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
-	return c.compileInitImpl(true, o.ElemIndex)
+	return c.compileInitImpl(true, o.ElemIndex, o.TableIndex)
 }
 
 // compileTableCopy implements compiler.compileTableCopy for the arm64 architecture.
-func (c *arm64Compiler) compileTableCopy(*wazeroir.OperationTableCopy) error {
-	return c.compileCopyImpl(true)
+func (c *arm64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
+	return c.compileCopyImpl(true, o.SrcTableIndex, o.DstTableIndex)
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
@@ -3698,36 +3785,16 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		// "tmpX = &tables[0] (type of **wasm.Table)"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
-			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceTableOffset,
+			arm64CallingConventionModuleInstanceAddressRegister, moduleInstanceTablesOffset,
 			tmpX,
 		)
 
 		// Update ce.tableElement0Address.
-		// "tmpY = &tables[0].Table[0]"
-		c.assembler.CompileMemoryToRegister(
-			arm64.MOVD,
-			tmpX, tableInstanceTableOffset,
-			tmpY,
-		)
-		// "ce.tableElement0Address = tmpY".
+		// "ce.tableElement0Address = tmpX".
 		c.assembler.CompileRegisterToMemory(
 			arm64.MOVD,
-			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
-		)
-
-		// Update ce.tableSliceLen.
-		// "tmpY = len(tables[0].Table)"
-		c.assembler.CompileMemoryToRegister(
-			arm64.MOVD,
-			tmpX, tableInstanceTableLenOffset,
-			tmpY,
-		)
-		// "ce.tableSliceLen = tmpY".
-		c.assembler.CompileRegisterToMemory(
-			arm64.MOVD,
-			tmpY,
-			arm64ReservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
+			tmpX,
+			arm64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
 		)
 
 		// Finally, we put &ModuleInstance.TypeIDs[0] into moduleContext.typeIDsElement0Address.

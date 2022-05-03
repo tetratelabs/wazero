@@ -108,7 +108,7 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name: "table and memory section",
 			input: &wasm.Module{
-				TableSection:  &wasm.Table{Min: 3},
+				TableSection:  []*wasm.Table{{Min: 3, Type: wasm.RefTypeFuncref}},
 				MemorySection: &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true},
 			},
 			expected: append(append(Magic, version...),

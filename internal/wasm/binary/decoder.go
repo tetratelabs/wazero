@@ -71,13 +71,13 @@ func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryLimitPages
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
 		case wasm.SectionIDImport:
-			if m.ImportSection, err = decodeImportSection(r, memoryLimitPages); err != nil {
+			if m.ImportSection, err = decodeImportSection(r, memoryLimitPages, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDFunction:
 			m.FunctionSection, err = decodeFunctionSection(r)
 		case wasm.SectionIDTable:
-			m.TableSection, err = decodeTableSection(r)
+			m.TableSection, err = decodeTableSection(r, enabledFeatures)
 		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r, memoryLimitPages)
 		case wasm.SectionIDGlobal:

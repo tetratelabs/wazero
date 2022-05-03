@@ -301,7 +301,7 @@ func TestGenerator_tableSection(t *testing.T) {
 		g := newGenerator(100, []int{1, 100}, nil)
 		g.genTableSection()
 		expMax := uint32(101)
-		require.Equal(t, &wasm.Table{Min: 1, Max: &expMax}, g.m.TableSection)
+		require.Equal(t, []*wasm.Table{{Min: 1, Max: &expMax}}, g.m.TableSection)
 	})
 }
 
@@ -485,7 +485,7 @@ func TestGenerator_exportSection(t *testing.T) {
 			{Type: &wasm.GlobalType{}},
 			{Type: &wasm.GlobalType{}},
 		},
-		TableSection:  &wasm.Table{},
+		TableSection:  []*wasm.Table{{}},
 		MemorySection: &wasm.Memory{},
 	}
 
@@ -598,7 +598,7 @@ func TestGenerator_elementSection(t *testing.T) {
 	})
 	t.Run("without function", func(t *testing.T) {
 		g := newGenerator(100, nil, nil)
-		g.m.TableSection = &wasm.Table{}
+		g.m.TableSection = []*wasm.Table{{}}
 		g.genElementSection()
 		require.Nil(t, g.m.ElementSection)
 	})
@@ -648,7 +648,7 @@ func TestGenerator_elementSection(t *testing.T) {
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				g := newGenerator(100, tc.ints, nil)
 				g.m = &wasm.Module{
-					TableSection:    &wasm.Table{Min: 100},
+					TableSection:    []*wasm.Table{{Min: 100}},
 					FunctionSection: make([]uint32, 100),
 				}
 				g.numElements = tc.numElements

@@ -13,7 +13,7 @@ func TestTableSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected *wasm.Table
+		expected []*wasm.Table
 	}{
 		{
 			name: "min and min with max",
@@ -21,7 +21,21 @@ func TestTableSection(t *testing.T) {
 				0x01,                            // 1 table
 				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
 			},
-			expected: &wasm.Table{Min: 2, Max: &three},
+			expected: []*wasm.Table{{Min: 2, Max: &three, Type: wasm.RefTypeFuncref}},
+		},
+		{
+			name: "min and min with max - three tables",
+			input: []byte{
+				0x03,                            // 3 table
+				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
+				wasm.RefTypeExternref, 0x01, 2, 3, // (table 2 3)
+				wasm.RefTypeFuncref, 0x01, 2, 3, // (table 2 3)
+			},
+			expected: []*wasm.Table{
+				{Min: 2, Max: &three, Type: wasm.RefTypeFuncref},
+				{Min: 2, Max: &three, Type: wasm.RefTypeExternref},
+				{Min: 2, Max: &three, Type: wasm.RefTypeFuncref},
+			},
 		},
 	}
 
@@ -29,7 +43,7 @@ func TestTableSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			tables, err := decodeTableSection(bytes.NewReader(tc.input))
+			tables, err := decodeTableSection(bytes.NewReader(tc.input), wasm.FeatureReferenceTypes)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, tables)
 		})
@@ -41,6 +55,7 @@ func TestTableSection_Errors(t *testing.T) {
 		name        string
 		input       []byte
 		expectedErr string
+		features    wasm.Features
 	}{
 		{
 			name: "min and min with max",
@@ -49,7 +64,8 @@ func TestTableSection_Errors(t *testing.T) {
 				wasm.RefTypeFuncref, 0x00, 0x01, // (table 1)
 				wasm.RefTypeFuncref, 0x01, 0x02, 0x03, // (table 2 3)
 			},
-			expectedErr: "at most one table allowed in module, but read 2",
+			expectedErr: "at most one table allowed in module as feature \"reference-types\" is disabled",
+			features:    wasm.Features20191205,
 		},
 	}
 
@@ -57,7 +73,7 @@ func TestTableSection_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeTableSection(bytes.NewReader(tc.input))
+			_, err := decodeTableSection(bytes.NewReader(tc.input), tc.features)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

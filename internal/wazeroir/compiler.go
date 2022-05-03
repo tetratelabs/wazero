@@ -188,12 +188,12 @@ type CompilationResult struct {
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
-	functions, globals, mem, table, err := module.AllDeclarations()
+	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
 	}
 
-	hasMemory, hasTable := mem != nil, table != nil
+	hasMemory, hasTable := mem != nil, len(tables) > 0
 
 	var ret []*CompilationResult
 	for funcInxdex := range module.FunctionSection {
@@ -1532,13 +1532,13 @@ operatorSwitch:
 			}
 			c.pc += num
 			// Read table index which is fixed to zero currently.
-			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
 			c.emit(
-				&OperationTableInit{ElemIndex: elemIndex},
+				&OperationTableInit{ElemIndex: elemIndex, TableIndex: tableIndex},
 			)
 			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscElemDrop:
@@ -1553,20 +1553,20 @@ operatorSwitch:
 			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table index which is not used for now (until reference type proposal impl.)
-			_, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			dst, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
 			// Read the destination table index which is not used for now (until reference type proposal impl.)
-			_, num, err = leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			src, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
 			c.emit(
-				&OperationTableCopy{},
+				&OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
 			)
 			c.result.NeedsAccessToElementInstances = true
 		default:
