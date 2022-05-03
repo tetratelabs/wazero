@@ -88,7 +88,6 @@ type RuntimeConfig interface {
 	//   * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
 	//   * Element segments can take non-zero table index.
 	//
-	//
 	// Note: "reference-types" is mixed with the "bulk-memory-operations" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
 	// Therefore, enabling this feature results in enabling WithFeatureBulkMemoryOperations, and vice-versa.
