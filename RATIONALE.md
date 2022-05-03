@@ -155,12 +155,36 @@ type ModuleConfig interface {
 	WithFS(fs.FS) ModuleConfig
 }
 
+struct moduleConfig {
+	name string
+	fs fs.FS
+}
+
+func (c *moduleConfig) WithName(name string) ModuleConfig {
+    ret := *c // copy
+    ret.name = name
+    return &ret
+}
+
+func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
+    ret := *c // copy
+    ret.setFS("/", fs)
+    return &ret
+}
+
 config := r.NewModuleConfig().WithFS(fs)
 configDerived := config.WithName("name")
 ```
 
-An option function could be defined, then prefixed implementations could also for each method in the interface:
+An option function could be defined, then refactor each config method into an name prefixed option function:
 ```go
+type ModuleConfig interface {
+}
+struct moduleConfig {
+    name string
+    fs fs.FS
+}
+
 type ModuleConfigOption func(c *moduleConfig)
 
 func ModuleConfigName(name string) ModuleConfigOption {
@@ -175,7 +199,23 @@ func ModuleConfigFS(fs fs.FS) ModuleConfigOption {
     }
 }
 
-config := r.NewModuleConfig(ModuleConfigName("name"), ModuleConfigFS(fs))
+func (r *runtime) NewModuleConfig(opts ...ModuleConfigOption) ModuleConfig {
+	ret := newModuleConfig() // defaults
+    for _, opt := range opts {
+        opt(&ret.config)
+    }
+    return ret
+}
+
+func (c *moduleConfig) WithOptions(opts ...ModuleConfigOption) ModuleConfig {
+    ret := *c // copy base config
+    for _, opt := range opts {
+        opt(&ret.config)
+    }
+    return ret
+}
+
+config := r.NewModuleConfig(ModuleConfigFS(fs))
 configDerived := config.WithOptions(ModuleConfigName("name"))
 ```
 
