@@ -607,7 +607,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 3},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        FeatureBulkMemoryOperations, // Multiple tables require FeatureReferenceTypes.
 				tables:      []*Table{{}, {}, {}, {}},
 				expectedErr: "source table index must be zero for table.copy as feature \"reference-types\" is disabled",
 			},

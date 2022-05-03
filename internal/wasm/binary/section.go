@@ -251,9 +251,9 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 // See encodeTable
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
 func encodeTableSection(tables []*wasm.Table) []byte {
-	var contents []byte
+	var contents []byte = leb128.EncodeUint32(uint32(len(tables)))
 	for _, table := range tables {
-		contents = append([]byte{1}, encodeTable(table)...)
+		contents = append(contents, encodeTable(table)...)
 	}
 	return encodeSection(wasm.SectionIDTable, contents)
 }

@@ -57,7 +57,7 @@ const (
 type ElementSegment struct {
 	// OffsetExpr returns the table element offset to apply to Init indices.
 	// Note: This can be validated prior to instantiation unless it includes OpcodeGlobalGet (an imported global).
-	// Note: This is not nil if and only if the Mode is active.
+	// Note: This is only set when Mode is active.
 	OffsetExpr *ConstantExpression
 
 	// TableIndex is the tables's index to which this element segment is applied.
