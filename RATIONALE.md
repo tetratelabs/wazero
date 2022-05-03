@@ -152,7 +152,7 @@ Ex instead of:
 ```go
 type ModuleConfig interface {
 	WithName(string) ModuleConfig
-    WithFS(fs.FS) ModuleConfig
+	WithFS(fs.FS) ModuleConfig
 }
 
 config := r.NewModuleConfig().WithFS(fs)
