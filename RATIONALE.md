@@ -117,8 +117,8 @@ if err != nil {
 ```
 
 This allows users one place to look for errors, and also the benefit that if anything internally opens a resource, but
-errs, there's nothing they need to close. In other words the call site using config is fully responsible to close any
-resources that happened with later errors.
+errs, there's nothing they need to close. In other words, users don't need to track which resources need closing on
+partial error, as that is handled internally by the only code that can read configuration fields.
 
 ### Why are configuration immutable?
 While it seems certain scopes like `Runtime` won't repeat within a process, they do, possibly in different goroutines.
