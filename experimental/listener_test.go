@@ -15,7 +15,7 @@ import (
 // loggerFactory implements experimental.FunctionListenerFactory to log all function calls to the console.
 type loggerFactory struct{}
 
-// Size implements the same method as documented on api.Memory.
+// NewListener implements the same method as documented on experimental.FunctionListener.
 func (f *loggerFactory) NewListener(fnd experimental.FunctionDefinition) experimental.FunctionListener {
 	return &logger{funcName: []byte(fnd.ModuleName() + "." + funcName(fnd))}
 }

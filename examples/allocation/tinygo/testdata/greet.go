@@ -56,13 +56,14 @@ func _greeting(ptr, size uint32) (ptrSize uint64) {
 
 // ptrToString returns a string from WebAssembly compatible numeric types
 // representing its pointer and length.
-func ptrToString(ptr uint32, size uint32) (ret string) {
-	// Here, we want to get a string represented by the ptr and size. If we
-	// wanted a []byte, we'd use reflect.SliceHeader instead.
-	strHdr := (*reflect.StringHeader)(unsafe.Pointer(&ret))
-	strHdr.Data = uintptr(ptr)
-	strHdr.Len = uintptr(size)
-	return
+func ptrToString(ptr uint32, size uint32) string {
+	// Get a slice view of the underlying bytes in the stream. We use SliceHeader, not StringHeader
+	// as it allows us to fix the capacity to what was allocated.
+	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(ptr),
+		Len:  uintptr(size), // Tinygo requires these as uintptrs even if they are int fields.
+		Cap:  uintptr(size), // ^^
+	}))
 }
 
 // stringToPtr returns a pointer and size pair for the given string in a way
