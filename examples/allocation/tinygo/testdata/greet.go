@@ -62,7 +62,7 @@ func ptrToString(ptr uint32, size uint32) string {
 	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: uintptr(ptr),
 		Len:  uintptr(size), // Tinygo requires these as uintptrs even if they are int fields.
-		Cap:  uintptr(size), // ^^
+		Cap:  uintptr(size), // ^^ See https://github.com/tinygo-org/tinygo/issues/1284
 	}))
 }
 
