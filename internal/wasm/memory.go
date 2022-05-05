@@ -122,7 +122,7 @@ func (m *MemoryInstance) Read(_ context.Context, offset, byteCount uint32) ([]by
 	if !m.hasSize(offset, byteCount) {
 		return nil, false
 	}
-	return m.Buffer[offset : offset+byteCount], true
+	return m.Buffer[offset : offset+byteCount : offset+byteCount], true
 }
 
 // WriteByte implements the same method as documented on api.Memory.
