@@ -101,7 +101,7 @@ const (
 func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.ElementSegment, error) {
 	prefix, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("read element prefix: %w", err)
 	}
 
 	if prefix != elementSegmentPrefixLegacy {

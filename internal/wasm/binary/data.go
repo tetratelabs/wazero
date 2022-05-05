@@ -26,7 +26,7 @@ const (
 func decodeDataSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.DataSegment, error) {
 	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("read data segment prefix: %w", err)
 	}
 
 	if dataSegmentPrefx != dataSegmentPrefixActive {
