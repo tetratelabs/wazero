@@ -99,7 +99,7 @@ const (
 )
 
 func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.ElementSegment, error) {
-	prefix, err := r.ReadByte()
+	prefix, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("read element prefix: %w", err)
 	}

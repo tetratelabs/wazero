@@ -12,7 +12,7 @@ import (
 // dataSegmentPrefix represents three types of data segments.
 //
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-section
-type dataSegmentPrefix = byte
+type dataSegmentPrefix = uint32
 
 const (
 	// dataSegmentPrefixActive is the prefix for the version 1.0 compatible data segment, which is classified as "active" in 2.0.
@@ -24,7 +24,7 @@ const (
 )
 
 func decodeDataSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.DataSegment, error) {
-	dataSegmentPrefx, err := r.ReadByte()
+	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("read data segment prefix: %w", err)
 	}
