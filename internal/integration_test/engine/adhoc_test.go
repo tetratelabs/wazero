@@ -15,6 +15,8 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+const memoryCapacityPages = 2
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
@@ -43,6 +45,9 @@ func TestEngineInterpreter(t *testing.T) {
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
+	config.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
+		return memoryCapacityPages
+	})
 	for name, testf := range tests {
 		name := name   // pin
 		testf := testf // pin
@@ -431,6 +436,13 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
   (export "size" (func $size))
   (export "grow" (func $grow))
   (export "memory" (memory 0))
+
+  (func $store (param $offset i32)
+	local.get 0    ;; memory offset
+	i64.const 1
+	i64.store
+  )
+  (export "store" (func $store))
 )`))
 	require.NoError(t, err)
 	defer memory.Close(testCtx)
@@ -444,16 +456,38 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	require.Zero(t, results[0])
 	require.Zero(t, memory.ExportedMemory("memory").Size(testCtx))
 
+	// Any offset should be out of bounds error even when it is less than memory capacity(=memoryCapacityPages).
+	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
+	require.Error(t, err) // Out of bounds error.
+
 	// Try to grow the memory by one page
 	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
 	require.NoError(t, err)
 	require.Zero(t, results[0]) // should succeed and return the old size in pages.
+
+	// Any offset larger than the current size should be out of of bounds error even when it is less than memory capacity.
+	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
+	require.Error(t, err) // Out of bounds error.
 
 	// Check the size command works!
 	results, err = memory.ExportedFunction("size").Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), results[0])                        // 1 page
 	require.Equal(t, uint32(65536), memory.Memory().Size(testCtx)) // 64KB
+
+	// Grow again so that the memory size matches memory capacity.
+	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), results[0])
+
+	// Verify the size matches cap.
+	results, err = memory.ExportedFunction("size").Call(testCtx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(memoryCapacityPages), results[0])
+
+	// Now the store instruction at the memory capcity bound should suceed.
+	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8) // i64.store needs 8 bytes from offset.
+	require.NoError(t, err)
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
