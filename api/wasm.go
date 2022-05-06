@@ -225,7 +225,7 @@ type Memory interface {
 	//
 	// If you don't desire this behavior, make a copy of the returned slice before affecting it.
 	//
-	// Note: The returned slice is no longer shared on a capacity change. For example, `buf = append(buf, 'a')` results
+	// Note: The returned slice is no longer shared on a capacity change. For example, `buf = append(buf, 'a')` might result
 	// in a slice that is no longer shared. The same exists Wasm side. For example, if Wasm changes its memory capacity,
 	// ex via "memory.grow"), the host slice is no longer shared. Those who need a stable view must set Wasm memory
 	// min=max, or use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always allocated.
