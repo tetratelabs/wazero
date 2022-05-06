@@ -215,6 +215,20 @@ type Memory interface {
 	ReadFloat64Le(ctx context.Context, offset uint32) (float64, bool)
 
 	// Read reads byteCount bytes from the underlying buffer at the offset or returns false if out of range.
+	//
+	// This returns a view of the underlying memory, not a copy. This means any writes to the slice returned are visible
+	// to Wasm, and any updates from Wasm are visible reading the returned slice.
+	//
+	// For example:
+	//	buf, _ = memory.Read(ctx, offset, byteCount)
+	//	buf[1] = 'a' // writes through to memory, meaning Wasm code see 'a' at that position.
+	//
+	// If you don't desire this behavior, make a copy of the returned slice before affecting it.
+	//
+	// Note: The returned slice is no longer shared on a capacity change. For example, `buf = append(buf, 'a')` might result
+	// in a slice that is no longer shared. The same exists Wasm side. For example, if Wasm changes its memory capacity,
+	// ex via "memory.grow"), the host slice is no longer shared. Those who need a stable view must set Wasm memory
+	// min=max, or use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always allocated.
 	Read(ctx context.Context, offset, byteCount uint32) ([]byte, bool)
 
 	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.

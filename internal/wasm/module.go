@@ -559,14 +559,7 @@ func paramNames(localNames IndirectNameMap, funcIdx uint32, paramLen int) []stri
 func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
-		min := MemoryPagesToBytesNum(memSec.Min)
-		capacity := MemoryPagesToBytesNum(memSec.Cap)
-		mem = &MemoryInstance{
-			Buffer: make([]byte, min, capacity),
-			Min:    memSec.Min,
-			Cap:    memSec.Cap,
-			Max:    memSec.Max,
-		}
+		mem = NewMemoryInstance(memSec)
 	}
 	return
 }

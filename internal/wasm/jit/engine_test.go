@@ -165,6 +165,11 @@ func TestJIT_ModuleEngine_Call_Errors(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
 }
 
+func TestJIT_ModuleEngine_Memory(t *testing.T) {
+	requireSupportedOSArch(t)
+	enginetest.RunTestModuleEngine_Memory(t, et)
+}
+
 func requireSupportedOSArch(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()

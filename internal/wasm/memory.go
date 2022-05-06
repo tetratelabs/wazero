@@ -37,6 +37,18 @@ type MemoryInstance struct {
 	Min, Cap, Max uint32
 }
 
+// NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
+func NewMemoryInstance(memSec *Memory) *MemoryInstance {
+	min := MemoryPagesToBytesNum(memSec.Min)
+	capacity := MemoryPagesToBytesNum(memSec.Cap)
+	return &MemoryInstance{
+		Buffer: make([]byte, min, capacity),
+		Min:    memSec.Min,
+		Cap:    memSec.Cap,
+		Max:    memSec.Max,
+	}
+}
+
 // Size implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Size(_ context.Context) uint32 {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!

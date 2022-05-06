@@ -506,6 +506,121 @@ wasm stack trace:
 	}
 }
 
+// RunTestModuleEngine_Memory shows that the byte slice returned from api.Memory Read is not a copy, rather a re-slice
+// of the underlying memory. This allows both host and Wasm to see each other's writes, unless one side changes the
+// capacity of the slice.
+//
+// Known cases that change the slice capacity:
+// * Host code calls append on a byte slice returned by api.Memory Read
+// * Wasm code calls wasm.OpcodeMemoryGrowName and this changes the capacity (by default, it will).
+func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
+	e := et.NewEngine(wasm.Features20220419)
+
+	wasmPhrase := "Well, that'll be the day when you say goodbye."
+	wasmPhraseSize := uint32(len(wasmPhrase))
+
+	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
+	one := uint32(1)
+	m := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}, {}},
+		FunctionSection: []wasm.Index{0, 1},
+		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
+		DataSection: []*wasm.DataSegment{
+			{
+				OffsetExpression: nil, // passive
+				Init:             []byte(wasmPhrase),
+			},
+		},
+		DataCountSection: &one,
+		CodeSection: []*wasm.Code{
+			{Body: []byte{ // "grow"
+				wasm.OpcodeLocalGet, 0, // how many pages to grow (param)
+				wasm.OpcodeMemoryGrow, 0, // memory index zero
+				wasm.OpcodeDrop, // drop the previous page count (or -1 if grow failed)
+				wasm.OpcodeEnd,
+			}},
+			{Body: []byte{ // "init"
+				wasm.OpcodeI32Const, 0, // target offset
+				wasm.OpcodeI32Const, 0, // source offset
+				wasm.OpcodeI32Const, byte(wasmPhraseSize), // len
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscMemoryInit, 0, 0, // segment 0, memory 0
+				wasm.OpcodeEnd,
+			}},
+		},
+	}
+	// Compile the Wasm into wazeroir
+	err := e.CompileModule(testCtx, m)
+	require.NoError(t, err)
+
+	// Assign memory to the module instance
+	module := &wasm.ModuleInstance{
+		Name:          t.Name(),
+		Memory:        wasm.NewMemoryInstance(m.MemorySection),
+		DataInstances: []wasm.DataInstance{m.DataSection[0].Init},
+	}
+	var memory api.Memory = module.Memory
+
+	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
+	grow := getFunctionInstance(m, 0, module)
+	addFunction(module, "grow", grow)
+	init := getFunctionInstance(m, 1, module)
+	addFunction(module, "init", init)
+
+	// Compile the module
+	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions, nil, nil)
+	init.Module.Engine = me
+	require.NoError(t, err)
+	linkModuleToEngine(module, me)
+
+	buf, ok := memory.Read(testCtx, 0, wasmPhraseSize)
+	require.True(t, ok)
+	require.Equal(t, make([]byte, wasmPhraseSize), buf)
+
+	// Initialize the memory using Wasm. This copies the test phrase.
+	_, err = me.Call(testCtx, module.CallCtx, init)
+	require.NoError(t, err)
+
+	// We expect the same []byte read earlier to now include the phrase in wasm.
+	require.Equal(t, wasmPhrase, string(buf))
+
+	hostPhrase := "Goodbye, cruel world. I'm off to join the circus." // Intentionally slightly longer.
+	hostPhraseSize := uint32(len(hostPhrase))
+
+	// Copy over the buffer, which should stop at the current length.
+	copy(buf, hostPhrase)
+	require.Equal(t, "Goodbye, cruel world. I'm off to join the circ", string(buf))
+
+	// The underlying memory should be updated. This proves that Memory.Read returns a re-slice, not a copy, and that
+	// programs can rely on this (for example, to update shared state in Wasm and view that in Go and visa versa).
+	buf2, ok := memory.Read(testCtx, 0, wasmPhraseSize)
+	require.True(t, ok)
+	require.Equal(t, buf, buf2)
+
+	// Now, append to the buffer we got from Wasm. As this changes capacity, it should result in a new byte slice.
+	buf = append(buf, 'u', 's', '.')
+	require.Equal(t, hostPhrase, string(buf))
+
+	// To prove the above, we re-read the memory and should not see the appended bytes (rather zeros instead).
+	buf2, ok = memory.Read(testCtx, 0, hostPhraseSize)
+	require.True(t, ok)
+	hostPhraseTruncated := "Goodbye, cruel world. I'm off to join the circ" + string([]byte{0, 0, 0})
+	require.Equal(t, hostPhraseTruncated, string(buf2))
+
+	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
+	_, err = me.Call(testCtx, module.CallCtx, grow, 1)
+	require.NoError(t, err)
+
+	// The host buffer should still contain the same bytes as before grow
+	require.Equal(t, hostPhraseTruncated, string(buf2))
+
+	// Re-initialize the memory in wasm, which overwrites the region.
+	_, err = me.Call(testCtx, module.CallCtx, init)
+	require.NoError(t, err)
+
+	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.
+	require.Equal(t, hostPhraseTruncated, string(buf2))
+}
+
 const (
 	wasmFnName               = "wasm_div_by"
 	hostFnName               = "host_div_by"

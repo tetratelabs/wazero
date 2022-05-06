@@ -98,6 +98,10 @@ func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
 }
 
+func TestInterpreter_ModuleEngine_Memory(t *testing.T) {
+	enginetest.RunTestModuleEngine_Memory(t, et)
+}
+
 func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 	_0x80000000 := uint32(0x80000000)
 	_0xffffffff := uint32(0xffffffff)
