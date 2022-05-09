@@ -7,11 +7,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func newMemoryParser(memoryLimitPages uint32, memoryNamespace *indexNamespace, onMemory onMemory) *memoryParser {
-	return &memoryParser{memoryLimitPages: memoryLimitPages, memoryNamespace: memoryNamespace, onMemory: onMemory}
+func newMemoryParser(
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memoryNamespace *indexNamespace,
+	onMemory onMemory,
+) *memoryParser {
+	return &memoryParser{memorySizer: memorySizer, memoryNamespace: memoryNamespace, onMemory: onMemory}
 }
 
-type onMemory func(min, max uint32, maxDecoded bool) tokenParser
+type onMemory func(*wasm.Memory) tokenParser
 
 // memoryParser parses an api.Memory from and dispatches to onMemory.
 //
@@ -22,9 +26,7 @@ type onMemory func(min, max uint32, maxDecoded bool) tokenParser
 // Note: memoryParser is reusable. The caller resets via begin.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
 type memoryParser struct {
-	// memoryLimitPages is the limit of pages (not bytes) for each wasm.Memory.
-	memoryLimitPages uint32
-	maxDecoded       bool
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32)
 
 	memoryNamespace *indexNamespace
 
@@ -32,9 +34,7 @@ type memoryParser struct {
 	onMemory onMemory
 
 	// currentMin is reset on begin and read onMemory
-	currentMin uint32
-	// currentMax is reset on begin and read onMemory
-	currentMax uint32
+	currentMemory *wasm.Memory
 }
 
 // begin should be called after reaching the wasm.ExternTypeMemoryName keyword in a module field. Parsing
@@ -49,8 +49,7 @@ type memoryParser struct {
 // Ex. No memory ID `(memory 0)`
 //          calls beginMin --^
 func (p *memoryParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	p.currentMin = 0
-	p.currentMax = p.memoryLimitPages
+	p.currentMemory = &wasm.Memory{}
 	if tok == tokenID { // Ex. $mem
 		if _, err := p.memoryNamespace.setID(tokenBytes); err != nil {
 			return nil, err
@@ -66,10 +65,14 @@ func (p *memoryParser) beginMin(tok tokenType, tokenBytes []byte, _, _ uint32) (
 	case tokenID: // Ex.(memory $rf32 $rf32
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenUN:
-		if i, overflow := decodeUint32(tokenBytes); overflow || i > p.memoryLimitPages {
-			return nil, fmt.Errorf("min %d pages (%s) over limit of %d pages (%s)", i, wasm.PagesToUnitOfBytes(i), p.memoryLimitPages, wasm.PagesToUnitOfBytes(p.memoryLimitPages))
+		mem := p.currentMemory
+		if min, err := decodePages("min", tokenBytes); err != nil {
+			return nil, err
 		} else {
-			p.currentMin = i
+			mem.Min, mem.Cap, mem.Max = p.memorySizer(min, nil)
+			if err = mem.Validate(); err != nil {
+				return nil, err
+			}
 		}
 		return p.beginMax, nil
 	case tokenRParen:
@@ -84,14 +87,16 @@ func (p *memoryParser) beginMin(tok tokenType, tokenBytes []byte, _, _ uint32) (
 func (p *memoryParser) beginMax(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch tok {
 	case tokenUN:
-		i, overflow := decodeUint32(tokenBytes)
-		if overflow || i > p.memoryLimitPages {
-			return nil, fmt.Errorf("max %d pages (%s) over limit of %d pages (%s)", i, wasm.PagesToUnitOfBytes(i), p.memoryLimitPages, wasm.PagesToUnitOfBytes(p.memoryLimitPages))
-		} else if i < p.currentMin {
-			return nil, fmt.Errorf("min %d pages (%s) > max %d pages (%s)", p.currentMin, wasm.PagesToUnitOfBytes(p.currentMin), i, wasm.PagesToUnitOfBytes(i))
+		mem := p.currentMemory
+		if max, err := decodePages("max", tokenBytes); err != nil {
+			return nil, err
+		} else {
+			mem.Min, mem.Cap, mem.Max = p.memorySizer(p.currentMemory.Min, &max)
+			mem.IsMaxEncoded = true
+			if err = mem.Validate(); err != nil {
+				return nil, err
+			}
 		}
-		p.maxDecoded = true
-		p.currentMax = i
 		return p.end, nil
 	case tokenRParen:
 		return p.end(tok, tokenBytes, line, col)
@@ -100,11 +105,20 @@ func (p *memoryParser) beginMax(tok tokenType, tokenBytes []byte, line, col uint
 	}
 }
 
+func decodePages(fieldName string, tokenBytes []byte) (uint32, error) {
+	i, overflow := decodeUint32(tokenBytes)
+	if overflow {
+		return 0, fmt.Errorf("%s %d pages (%s) over limit of %d pages (%s)", fieldName,
+			i, wasm.PagesToUnitOfBytes(i), wasm.MemoryLimitPages, wasm.PagesToUnitOfBytes(wasm.MemoryLimitPages))
+	}
+	return i, nil
+}
+
 // end increments the memory namespace and calls onMemory with the current limits
 func (p *memoryParser) end(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenRParen {
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
 	p.memoryNamespace.count++
-	return p.onMemory(p.currentMin, p.currentMax, p.maxDecoded), nil
+	return p.onMemory(p.currentMemory), nil
 }

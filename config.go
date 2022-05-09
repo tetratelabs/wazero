@@ -7,8 +7,8 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"strings"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
@@ -105,33 +105,6 @@ type RuntimeConfig interface {
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
 
-	// WithMemoryCapacityPages is a function that determines memory capacity in pages (65536 bytes per page). The input
-	// are the min and possibly nil max defined by the module, and the default is to return the min.
-	//
-	// Ex. To set capacity to max when exists:
-	//	c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
-	//		if maxPages != nil {
-	//			return *maxPages
-	//		}
-	//		return minPages
-	//	})
-	//
-	// This function is used at compile time (ModuleBuilder.Build or Runtime.CompileModule). Compile will err if the
-	// function returns a value lower than minPages or greater than WithMemoryLimitPages.
-	WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32) RuntimeConfig
-
-	// WithMemoryLimitPages limits the maximum number of pages a module can define from 65536 pages (4GiB) to the input.
-	//
-	// Notes:
-	// * If a module defines no memory max value, Runtime.CompileModule sets max to the limit.
-	// * If a module defines a memory max larger than this limit, it will fail to compile (Runtime.CompileModule).
-	// * Any "memory.grow" instruction that results in a larger value than this results in an error at runtime.
-	// * Zero is a valid value and results in a crash if any module uses memory.
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-types%E2%91%A0
-	WithMemoryLimitPages(uint32) RuntimeConfig
-
 	// WithWasmCore1 enables features included in the WebAssembly Core Specification 1.0. Selecting this
 	// overwrites any currently accumulated features with only those included in this W3C recommendation.
 	//
@@ -157,17 +130,13 @@ type RuntimeConfig interface {
 }
 
 type runtimeConfig struct {
-	enabledFeatures     wasm.Features
-	newEngine           func(wasm.Features) wasm.Engine
-	memoryLimitPages    uint32
-	memoryCapacityPages func(minPages uint32, maxPages *uint32) uint32
+	enabledFeatures wasm.Features
+	newEngine       func(wasm.Features) wasm.Engine
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &runtimeConfig{
-	enabledFeatures:     wasm.Features20191205,
-	memoryLimitPages:    wasm.MemoryLimitPages,
-	memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 { return minPages },
+	enabledFeatures: wasm.Features20191205,
 }
 
 // NewRuntimeConfigJIT compiles WebAssembly modules into runtime.GOARCH-specific assembly for optimal performance.
@@ -233,23 +202,6 @@ func (c *runtimeConfig) WithFeatureSignExtensionOps(enabled bool) RuntimeConfig 
 	return &ret
 }
 
-// WithMemoryCapacityPages implements RuntimeConfig.WithMemoryCapacityPages
-func (c *runtimeConfig) WithMemoryCapacityPages(maxCapacityPages func(minPages uint32, maxPages *uint32) uint32) RuntimeConfig {
-	if maxCapacityPages == nil {
-		return c // Instead of erring.
-	}
-	ret := *c // copy
-	ret.memoryCapacityPages = maxCapacityPages
-	return &ret
-}
-
-// WithMemoryLimitPages implements RuntimeConfig.WithMemoryLimitPages
-func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig {
-	ret := *c // copy
-	ret.memoryLimitPages = memoryLimitPages
-	return &ret
-}
-
 // WithWasmCore1 implements RuntimeConfig.WithWasmCore1
 func (c *runtimeConfig) WithWasmCore1() RuntimeConfig {
 	ret := *c // copy
@@ -264,16 +216,15 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 	return &ret
 }
 
-// CompiledCode is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an
-// api.Module.
+// CompiledModule is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
 // Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
-type CompiledCode interface {
-	// Close releases all the allocated resources for this CompiledCode.
+type CompiledModule interface {
+	// Close releases all the allocated resources for this CompiledModule.
 	//
-	// Note: It is safe to call Close while having outstanding calls from Modules instantiated from this CompiledCode.
+	// Note: It is safe to call Close while having outstanding calls from an api.Module instantiated from this.
 	Close(context.Context) error
 }
 
@@ -283,13 +234,66 @@ type compiledCode struct {
 	compiledEngine wasm.Engine
 }
 
-// Close implements CompiledCode.Close
+// Close implements CompiledModule.Close
 func (c *compiledCode) Close(_ context.Context) error {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	c.compiledEngine.DeleteCompiledModule(c.module)
 	// It is possible the underlying may need to return an error later, but in any case this matches api.Module.Close.
 	return nil
+}
+
+// CompileConfig allows you to override what was decoded from source, prior to compilation (ModuleBuilder.Compile or
+// Runtime.CompileModule).
+//
+// For example, WithImportRenamer allows you to override hard-coded names that don't match your requirements.
+//
+// Note: CompileConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
+type CompileConfig interface {
+
+	// WithImportRenamer can rename imports or break them into different modules. No default.
+	//
+	// Note: A nil function is invalid and ignored.
+	// Note: This is currently not relevant for ModuleBuilder as it has no means to define imports.
+	WithImportRenamer(api.ImportRenamer) CompileConfig
+
+	// WithMemorySizer are the allocation parameters used for a Wasm memory.
+	// The default is to set cap=min and max=65536 if unset.
+	//
+	// Note: A nil function is invalid and ignored.
+	WithMemorySizer(api.MemorySizer) CompileConfig
+}
+
+type compileConfig struct {
+	importRenamer api.ImportRenamer
+	memorySizer   api.MemorySizer
+}
+
+func NewCompileConfig() CompileConfig {
+	return &compileConfig{
+		importRenamer: nil,
+		memorySizer:   wasm.MemorySizer,
+	}
+}
+
+// WithImportRenamer implements CompileConfig.WithImportRenamer
+func (c *compileConfig) WithImportRenamer(importRenamer api.ImportRenamer) CompileConfig {
+	if importRenamer == nil {
+		return c
+	}
+	ret := *c // copy
+	ret.importRenamer = importRenamer
+	return &ret
+}
+
+// WithMemorySizer implements CompileConfig.WithMemorySizer
+func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConfig {
+	if memorySizer == nil {
+		return c
+	}
+	ret := *c // copy
+	ret.memorySizer = memorySizer
+	return &ret
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
@@ -351,54 +355,7 @@ type ModuleConfig interface {
 	// Note: This sets WithWorkDirFS to the same file-system unless already set.
 	WithFS(fs.FS) ModuleConfig
 
-	// WithImport replaces a specific import module and name with a new one. This allows you to break up a monolithic
-	// module imports, such as "env". This can also help reduce cyclic dependencies.
-	//
-	// For example, if a module was compiled with one module owning all imports:
-	//	(import "js" "tbl" (table $tbl 4 funcref))
-	//	(import "js" "increment" (func $increment (result i32)))
-	//	(import "js" "decrement" (func $decrement (result i32)))
-	//	(import "js" "wasm_increment" (func $wasm_increment (result i32)))
-	//	(import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
-	//
-	// Use this function to import "increment" and "decrement" from the module "go" and other imports from "wasm":
-	//	config.WithImportModule("js", "wasm")
-	//	config.WithImport("wasm", "increment", "go", "increment")
-	//	config.WithImport("wasm", "decrement", "go", "decrement")
-	//
-	// Upon instantiation, imports resolve as if they were compiled like so:
-	//	(import "wasm" "tbl" (table $tbl 4 funcref))
-	//	(import "go" "increment" (func $increment (result i32)))
-	//	(import "go" "decrement" (func $decrement (result i32)))
-	//	(import "wasm" "wasm_increment" (func $wasm_increment (result i32)))
-	//	(import "wasm" "wasm_decrement" (func $wasm_decrement (result i32)))
-	//
-	// Note: Any WithImport instructions happen in order, after any WithImportModule instructions.
-	WithImport(oldModule, oldName, newModule, newName string) ModuleConfig
-
-	// WithImportModule replaces every import with oldModule with newModule. This is helpful for modules who have
-	// transitioned to a stable status since the underlying wasm was compiled.
-	//
-	// For example, if a module was compiled like below, with an old module for WASI:
-	//	(import "wasi_unstable" "args_get" (func (param i32, i32) (result i32)))
-	//
-	// Use this function to update it to the current version:
-	//	config.WithImportModule("wasi_unstable", wasi.ModuleSnapshotPreview1)
-	//
-	// See WithImport for a comprehensive example.
-	// Note: Any WithImportModule instructions happen in order, before any WithImport instructions.
-	WithImportModule(oldModule, newModule string) ModuleConfig
-
-	// WithName configures the module name. Defaults to what was decoded from the module source.
-	//
-	// If the source was in WebAssembly 1.0 Binary Format, this defaults to what was decoded from the custom name
-	// section. Otherwise, if it was decoded from Text Format, this defaults to the module ID stripped of leading '$'.
-	//
-	// For example, if the Module was decoded from the text format `(module $math)`, the default name is "math".
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%91%A2
+	// WithName configures the module name. Defaults to what was decoded or overridden via CompileConfig.WithModuleName.
 	WithName(string) ModuleConfig
 
 	// WithStartFunctions configures the functions to call after the module is instantiated. Defaults to "_start".
@@ -469,11 +426,6 @@ type moduleConfig struct {
 	preopens map[uint32]*wasm.FileEntry
 	// preopenPaths allow overwriting of existing paths.
 	preopenPaths map[string]uint32
-	// replacedImports holds the latest state of WithImport
-	// Note: Key is NUL delimited as import module and name can both include any UTF-8 characters.
-	replacedImports map[string][2]string
-	// replacedImportModules holds the latest state of WithImportModule
-	replacedImportModules map[string]string
 }
 
 func NewModuleConfig() ModuleConfig {
@@ -510,30 +462,6 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
 	ret := *c // copy
 	ret.setFS("/", fs)
-	return &ret
-}
-
-// WithImport implements ModuleConfig.WithImport
-func (c *moduleConfig) WithImport(oldModule, oldName, newModule, newName string) ModuleConfig {
-	ret := *c // copy
-	if ret.replacedImports == nil {
-		ret.replacedImports = map[string][2]string{}
-	}
-	var builder strings.Builder
-	builder.WriteString(oldModule)
-	builder.WriteByte(0) // delimit with NUL as module and name can be any UTF-8 characters.
-	builder.WriteString(oldName)
-	ret.replacedImports[builder.String()] = [2]string{newModule, newName}
-	return &ret
-}
-
-// WithImportModule implements ModuleConfig.WithImportModule
-func (c *moduleConfig) WithImportModule(oldModule, newModule string) ModuleConfig {
-	ret := *c // copy
-	if ret.replacedImportModules == nil {
-		ret.replacedImportModules = map[string]string{}
-	}
-	ret.replacedImportModules[oldModule] = newModule
 	return &ret
 }
 
@@ -632,54 +560,4 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 	}
 
 	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
-}
-
-func (c *moduleConfig) replaceImports(module *wasm.Module) *wasm.Module {
-	if (c.replacedImportModules == nil && c.replacedImports == nil) || module.ImportSection == nil {
-		return module
-	}
-
-	changed := false
-
-	ret := *module // shallow copy
-	replacedImports := make([]*wasm.Import, len(module.ImportSection))
-	copy(replacedImports, module.ImportSection)
-
-	// First, replace any import.Module
-	for oldModule, newModule := range c.replacedImportModules {
-		for i, imp := range replacedImports {
-			if imp.Module == oldModule {
-				changed = true
-				cp := *imp // shallow copy
-				cp.Module = newModule
-				replacedImports[i] = &cp
-			} else {
-				replacedImports[i] = imp
-			}
-		}
-	}
-
-	// Now, replace any import.Module+import.Name
-	for oldImport, newImport := range c.replacedImports {
-		for i, imp := range replacedImports {
-			nulIdx := strings.IndexByte(oldImport, 0)
-			oldModule := oldImport[0:nulIdx]
-			oldName := oldImport[nulIdx+1:]
-			if imp.Module == oldModule && imp.Name == oldName {
-				changed = true
-				cp := *imp // shallow copy
-				cp.Module = newImport[0]
-				cp.Name = newImport[1]
-				replacedImports[i] = &cp
-			} else {
-				replacedImports[i] = imp
-			}
-		}
-	}
-
-	if !changed {
-		return module
-	}
-	ret.ImportSection = replacedImports
-	return &ret
 }

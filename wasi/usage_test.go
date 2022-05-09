@@ -13,7 +13,7 @@ import (
 //go:embed testdata/wasi_arg.wasm
 var wasiArg []byte
 
-func TestInstantiateModuleWithConfig(t *testing.T) {
+func TestInstantiateModule(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	stdout := bytes.NewBuffer(nil)
@@ -24,13 +24,13 @@ func TestInstantiateModuleWithConfig(t *testing.T) {
 	require.NoError(t, err)
 	defer wm.Close(testCtx)
 
-	compiled, err := r.CompileModule(testCtx, wasiArg)
+	compiled, err := r.CompileModule(testCtx, wasiArg, wazero.NewCompileConfig())
 	require.NoError(t, err)
 	defer compiled.Close(testCtx)
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {
-		mod, err := r.InstantiateModuleWithConfig(testCtx, compiled, sys.WithArgs(tc).WithName(tc))
+		mod, err := r.InstantiateModule(testCtx, compiled, sys.WithArgs(tc).WithName(tc))
 		require.NoError(t, err)
 
 		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).

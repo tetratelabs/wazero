@@ -11,7 +11,11 @@ import (
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
-func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryLimitPages uint32) (*wasm.Module, error) {
+func DecodeModule(
+	binary []byte,
+	enabledFeatures wasm.Features,
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
 	// Magic number.
@@ -71,7 +75,7 @@ func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryLimitPages
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
 		case wasm.SectionIDImport:
-			if m.ImportSection, err = decodeImportSection(r, memoryLimitPages, enabledFeatures); err != nil {
+			if m.ImportSection, err = decodeImportSection(r, memorySizer, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDFunction:
@@ -79,7 +83,7 @@ func DecodeModule(binary []byte, enabledFeatures wasm.Features, memoryLimitPages
 		case wasm.SectionIDTable:
 			m.TableSection, err = decodeTableSection(r, enabledFeatures)
 		case wasm.SectionIDMemory:
-			m.MemorySection, err = decodeMemorySection(r, memoryLimitPages)
+			m.MemorySection, err = decodeMemorySection(r, memorySizer)
 		case wasm.SectionIDGlobal:
 			if m.GlobalSection, err = decodeGlobalSection(r, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.

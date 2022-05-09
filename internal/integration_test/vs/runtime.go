@@ -54,7 +54,7 @@ type wazeroRuntime struct {
 	config        wazero.RuntimeConfig
 	runtime       wazero.Runtime
 	logFn         func([]byte) error
-	env, compiled wazero.CompiledCode
+	env, compiled wazero.CompiledModule
 }
 
 type wazeroModule struct {
@@ -81,11 +81,11 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 	if cfg.LogFn != nil {
 		r.logFn = cfg.LogFn
 		if r.env, err = r.runtime.NewModuleBuilder("env").
-			ExportFunction("log", r.log).Build(ctx); err != nil {
+			ExportFunction("log", r.log).Compile(ctx, wazero.NewCompileConfig()); err != nil {
 			return err
 		}
 	}
-	r.compiled, err = r.runtime.CompileModule(ctx, cfg.ModuleWasm)
+	r.compiled, err = r.runtime.CompileModule(ctx, cfg.ModuleWasm, wazero.NewCompileConfig())
 	return
 }
 
@@ -102,13 +102,13 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mo
 
 	// Instantiate the host module, "env", if configured.
 	if env := r.env; env != nil {
-		if m.env, err = r.runtime.InstantiateModule(ctx, env); err != nil {
+		if m.env, err = r.runtime.InstantiateModule(ctx, env, wazero.NewModuleConfig()); err != nil {
 			return
 		}
 	}
 
 	// Instantiate the module.
-	if m.mod, err = r.runtime.InstantiateModuleWithConfig(ctx, r.compiled, wazeroCfg); err != nil {
+	if m.mod, err = r.runtime.InstantiateModule(ctx, r.compiled, wazeroCfg); err != nil {
 		return
 	}
 

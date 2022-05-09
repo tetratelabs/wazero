@@ -9,20 +9,19 @@ import (
 // decodeMemory returns the api.Memory decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
-func decodeMemory(r *bytes.Reader, memoryLimitPages uint32) (*wasm.Memory, error) {
+func decodeMemory(
+	r *bytes.Reader,
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+) (*wasm.Memory, error) {
 	min, maxP, err := decodeLimitsType(r)
 	if err != nil {
 		return nil, err
 	}
 
-	var max uint32
-	var isMaxEncoded bool
-	if maxP != nil {
-		isMaxEncoded = true
-		max = *maxP
-	}
-	mem := &wasm.Memory{Min: min, Max: max, IsMaxEncoded: isMaxEncoded}
-	return mem, mem.ValidateMinMax(memoryLimitPages)
+	min, capacity, max := memorySizer(min, maxP)
+	mem := &wasm.Memory{Min: min, Cap: capacity, Max: max, IsMaxEncoded: maxP != nil}
+
+	return mem, mem.Validate()
 }
 
 // encodeMemory returns the wasm.Memory encoded in WebAssembly 1.0 (20191205) Binary Format.

@@ -7,6 +7,50 @@ import (
 	"math"
 )
 
+// ExternType classifies imports and exports with their respective types.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
+type ExternType = byte
+
+const (
+	ExternTypeFunc   ExternType = 0x00
+	ExternTypeTable  ExternType = 0x01
+	ExternTypeMemory ExternType = 0x02
+	ExternTypeGlobal ExternType = 0x03
+)
+
+// The below are exported to consolidate parsing behavior for external types.
+const (
+	// ExternTypeFuncName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeFunc.
+	ExternTypeFuncName = "func"
+	// ExternTypeTableName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeTable.
+	ExternTypeTableName = "table"
+	// ExternTypeMemoryName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeMemory.
+	ExternTypeMemoryName = "memory"
+	// ExternTypeGlobalName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeGlobal.
+	ExternTypeGlobalName = "global"
+)
+
+// ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
+func ExternTypeName(et ExternType) string {
+	switch et {
+	case ExternTypeFunc:
+		return ExternTypeFuncName
+	case ExternTypeTable:
+		return ExternTypeTableName
+	case ExternTypeMemory:
+		return ExternTypeMemoryName
+	case ExternTypeGlobal:
+		return ExternTypeGlobalName
+	}
+	return fmt.Sprintf("%#x", et)
+}
+
 // ValueType describes a numeric type used in Web Assembly 1.0 (20191205). For example, Function parameters and results are
 // only definable as a value type.
 //
@@ -293,3 +337,44 @@ func EncodeF64(input float64) uint64 {
 func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
 }
+
+// ImportRenamer applies during compilation after a module has been decoded from source, but before it is instantiated.
+//
+// For example, you may have a module like below, but the exported functions are in two different modules:
+//	(import "js" "increment" (func $increment (result i32)))
+//	(import "js" "decrement" (func $decrement (result i32)))
+//	(import "js" "wasm_increment" (func $wasm_increment (result i32)))
+//	(import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
+//
+// The below breaks up the imports: "increment" and "decrement" from the module "go" and other functions from "wasm":
+//	renamer := func(externType api.ExternType, oldModule, oldName string) (string, string) {
+//		if externType != api.ExternTypeFunc {
+//			return oldModule, oldName
+//		}
+//		switch oldName {
+//			case "increment", "decrement": return "go", oldName
+//			default: return "wasm", oldName
+//		}
+//	}
+//
+// The resulting CompiledModule imports will look identical to this:
+//	(import "go" "increment" (func $increment (result i32)))
+//	(import "go" "decrement" (func $decrement (result i32)))
+//	(import "wasm" "wasm_increment" (func $wasm_increment (result i32)))
+//	(import "wasm" "wasm_decrement" (func $wasm_decrement (result i32)))
+//
+type ImportRenamer func(externType ExternType, oldModule, oldName string) (newModule, newName string)
+
+// MemorySizer applies during compilation after a module has been decoded from source, but before it is instantiated.
+// This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
+//
+// Ex. Here's how to set the capacity to max instead of min, when set:
+//	capIsMax := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+//		if maxPages != nil {
+//			return minPages, *maxPages, *maxPages
+//		}
+//		return minPages, minPages, 65536
+//	}
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+type MemorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32)

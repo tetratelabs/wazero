@@ -11,7 +11,7 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 	const max = 100
 	const valuesNum = max + 1
 
-	// Build a function which has max+1 const instructions.
+	// Compile a function which has max+1 const instructions.
 	var body []byte
 	for i := 0; i < valuesNum; i++ {
 		body = append(body, OpcodeI32Const, 1)

@@ -23,7 +23,11 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte, enabledFeatures Features, memoryLimitPages uint32) (result *Module, err error)
+type DecodeModule func(
+	source []byte,
+	enabledFeatures Features,
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -648,29 +652,25 @@ type Memory struct {
 	IsMaxEncoded bool
 }
 
-// ValidateMinMax ensures values assigned to Min and Max are within valid thresholds.
-func (m *Memory) ValidateMinMax(memoryLimitPages uint32) error {
-	if !m.IsMaxEncoded {
-		m.Max = memoryLimitPages
-	}
-	min, max := m.Min, m.Max
-	if max > memoryLimitPages {
-		return fmt.Errorf("max %d pages (%s) over limit of %d pages (%s)", max, PagesToUnitOfBytes(max), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
-	} else if min > memoryLimitPages {
-		return fmt.Errorf("min %d pages (%s) over limit of %d pages (%s)", min, PagesToUnitOfBytes(min), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
-	} else if min > max {
-		return fmt.Errorf("min %d pages (%s) > max %d pages (%s)", min, PagesToUnitOfBytes(min), max, PagesToUnitOfBytes(max))
-	}
-	return nil
-}
+// Validate ensures values assigned to Min, Cap and Max are within valid thresholds.
+func (m *Memory) Validate() error {
+	min, capacity, max := m.Min, m.Cap, m.Max
 
-// ValidateCap ensures the value assigned to Cap is within valid thresholds.
-func (m *Memory) ValidateCap(memoryLimitPages uint32) error {
-	capacity, min := m.Cap, m.Min
-	if capacity < min {
-		return fmt.Errorf("capacity %d pages (%s) less than minimum %d pages (%s)", capacity, PagesToUnitOfBytes(capacity), min, PagesToUnitOfBytes(min))
-	} else if capacity > memoryLimitPages {
-		return fmt.Errorf("capacity %d pages (%s) over limit of %d pages (%s)", capacity, PagesToUnitOfBytes(capacity), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
+	if max > MemoryLimitPages {
+		return fmt.Errorf("max %d pages (%s) over limit of %d pages (%s)",
+			max, PagesToUnitOfBytes(max), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
+	} else if min > MemoryLimitPages {
+		return fmt.Errorf("min %d pages (%s) over limit of %d pages (%s)",
+			min, PagesToUnitOfBytes(min), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
+	} else if min > max {
+		return fmt.Errorf("min %d pages (%s) > max %d pages (%s)",
+			min, PagesToUnitOfBytes(min), max, PagesToUnitOfBytes(max))
+	} else if capacity < min {
+		return fmt.Errorf("capacity %d pages (%s) less than minimum %d pages (%s)",
+			capacity, PagesToUnitOfBytes(capacity), min, PagesToUnitOfBytes(min))
+	} else if capacity > MemoryLimitPages {
+		return fmt.Errorf("capacity %d pages (%s) over limit of %d pages (%s)",
+			capacity, PagesToUnitOfBytes(capacity), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
 	}
 	return nil
 }
@@ -908,46 +908,21 @@ func ValueTypeName(t ValueType) string {
 	return api.ValueTypeName(t)
 }
 
-// ExternType classifies imports and exports with their respective types.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
-type ExternType = byte
+// ExternType is an alias of api.ExternType defined to simplify imports.
+type ExternType = api.ExternType
 
 const (
-	ExternTypeFunc   ExternType = 0x00
-	ExternTypeTable  ExternType = 0x01
-	ExternTypeMemory ExternType = 0x02
-	ExternTypeGlobal ExternType = 0x03
+	ExternTypeFunc       = api.ExternTypeFunc
+	ExternTypeFuncName   = api.ExternTypeFuncName
+	ExternTypeTable      = api.ExternTypeTable
+	ExternTypeTableName  = api.ExternTypeTableName
+	ExternTypeMemory     = api.ExternTypeMemory
+	ExternTypeMemoryName = api.ExternTypeMemoryName
+	ExternTypeGlobal     = api.ExternTypeGlobal
+	ExternTypeGlobalName = api.ExternTypeGlobalName
 )
 
-// The below are exported to consolidate parsing behavior for external types.
-const (
-	// ExternTypeFuncName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeFunc.
-	ExternTypeFuncName = "func"
-	// ExternTypeTableName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeTable.
-	ExternTypeTableName = "table"
-	// ExternTypeMemoryName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeMemory.
-	ExternTypeMemoryName = "memory"
-	// ExternTypeGlobalName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeGlobal.
-	ExternTypeGlobalName = "global"
-)
-
-// ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
-func ExternTypeName(et ExternType) string {
-	switch et {
-	case ExternTypeFunc:
-		return ExternTypeFuncName
-	case ExternTypeTable:
-		return ExternTypeTableName
-	case ExternTypeMemory:
-		return ExternTypeMemoryName
-	case ExternTypeGlobal:
-		return ExternTypeGlobalName
-	}
-	return fmt.Sprintf("%#x", et)
+// ExternTypeName is an alias of api.ExternTypeName defined to simplify imports.
+func ExternTypeName(t ValueType) string {
+	return api.ExternTypeName(t)
 }

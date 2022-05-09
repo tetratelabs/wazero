@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"math"
+	"reflect"
 	"testing"
 	"testing/fstest"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -17,15 +19,6 @@ func TestRuntimeConfig(t *testing.T) {
 		with     func(RuntimeConfig) RuntimeConfig
 		expected RuntimeConfig
 	}{
-		{
-			name: "WithMemoryLimitPages",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithMemoryLimitPages(1)
-			},
-			expected: &runtimeConfig{
-				memoryLimitPages: 1,
-			},
-		},
 		{
 			name: "bulk-memory-operations",
 			with: func(c RuntimeConfig) RuntimeConfig {
@@ -110,24 +103,6 @@ func TestRuntimeConfig(t *testing.T) {
 			require.Equal(t, &runtimeConfig{}, input)
 		})
 	}
-
-	t.Run("WithMemoryCapacityPages", func(t *testing.T) {
-		c := NewRuntimeConfig().(*runtimeConfig)
-
-		// Test default returns min
-		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
-
-		// Nil ignored
-		c = c.WithMemoryCapacityPages(nil).(*runtimeConfig)
-		require.Equal(t, uint32(1), c.memoryCapacityPages(1, nil))
-
-		// Assign a valid function
-		c = c.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
-			return 2
-		}).(*runtimeConfig)
-		// Returns updated value
-		require.Equal(t, uint32(2), c.memoryCapacityPages(1, nil))
-	})
 }
 
 func TestRuntimeConfig_FeatureToggle(t *testing.T) {
@@ -201,6 +176,67 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 	}
 }
 
+func TestCompileConfig(t *testing.T) {
+	im := func(externType api.ExternType, oldModule, oldName string) (newModule, newName string) {
+		return "a", oldName
+	}
+	im2 := func(externType api.ExternType, oldModule, oldName string) (newModule, newName string) {
+		return "b", oldName
+	}
+	mp := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+		return 0, 1, 1
+	}
+	tests := []struct {
+		name     string
+		with     func(CompileConfig) CompileConfig
+		expected *compileConfig
+	}{
+		{
+			name: "WithImportRenamer",
+			with: func(c CompileConfig) CompileConfig {
+				return c.WithImportRenamer(im)
+			},
+			expected: &compileConfig{importRenamer: im},
+		},
+		{
+			name: "WithImportRenamer twice",
+			with: func(c CompileConfig) CompileConfig {
+				return c.WithImportRenamer(im).WithImportRenamer(im2)
+			},
+			expected: &compileConfig{importRenamer: im2},
+		},
+		{
+			name: "WithMemorySizer",
+			with: func(c CompileConfig) CompileConfig {
+				return c.WithMemorySizer(mp)
+			},
+			expected: &compileConfig{memorySizer: mp},
+		},
+		{
+			name: "WithMemorySizer twice",
+			with: func(c CompileConfig) CompileConfig {
+				return c.WithMemorySizer(wasm.MemorySizer).WithMemorySizer(mp)
+			},
+			expected: &compileConfig{memorySizer: mp},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			input := &compileConfig{}
+			rc := tc.with(input).(*compileConfig)
+
+			// We cannot compare func, but we can compare reflect.Value
+			// See https://go.dev/ref/spec#Comparison_operators
+			require.Equal(t, reflect.ValueOf(tc.expected.importRenamer), reflect.ValueOf(rc.importRenamer))
+			require.Equal(t, reflect.ValueOf(tc.expected.memorySizer), reflect.ValueOf(rc.memorySizer))
+			// The source wasn't modified
+			require.Equal(t, &compileConfig{}, input)
+		})
+	}
+}
+
 func TestModuleConfig(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -217,128 +253,19 @@ func TestModuleConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "WithName - empty",
+			name: "WithName empty",
 			with: func(c ModuleConfig) ModuleConfig {
 				return c.WithName("")
 			},
 			expected: &moduleConfig{},
 		},
 		{
-			name: "WithImport",
+			name: "WithName twice",
 			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "abort", "assemblyscript", "abort")
+				return c.WithName("wazero").WithName("wa0")
 			},
 			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
-			},
-		},
-		{
-			name: "WithImport - empty to non-empty - module",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("", "abort", "assemblyscript", "abort")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"\000abort": {"assemblyscript", "abort"}},
-			},
-		},
-		{
-			name: "WithImport - non-empty to empty - module",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "abort", "", "abort")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"", "abort"}},
-			},
-		},
-		{
-			name: "WithImport - empty to non-empty - name",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "", "assemblyscript", "abort")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000": {"assemblyscript", "abort"}},
-			},
-		},
-		{
-			name: "WithImport - non-empty to empty - name",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "abort", "assemblyscript", "")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", ""}},
-			},
-		},
-		{
-			name: "WithImport - override",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "abort", "assemblyscript", "abort").
-					WithImport("env", "abort", "go", "exit")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"go", "exit"}},
-			},
-		},
-		{
-			name: "WithImport - twice",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImport("env", "abort", "assemblyscript", "abort").
-					WithImport("wasi_unstable", "proc_exit", "wasi_snapshot_preview1", "proc_exit")
-			},
-			expected: &moduleConfig{
-				replacedImports: map[string][2]string{
-					"env\000abort":               {"assemblyscript", "abort"},
-					"wasi_unstable\000proc_exit": {"wasi_snapshot_preview1", "proc_exit"},
-				},
-			},
-		},
-		{
-			name: "WithImportModule",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImportModule("env", "assemblyscript")
-			},
-			expected: &moduleConfig{
-				replacedImportModules: map[string]string{"env": "assemblyscript"},
-			},
-		},
-		{
-			name: "WithImportModule - empty to non-empty",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImportModule("", "assemblyscript")
-			},
-			expected: &moduleConfig{
-				replacedImportModules: map[string]string{"": "assemblyscript"},
-			},
-		},
-		{
-			name: "WithImportModule - non-empty to empty",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImportModule("env", "")
-			},
-			expected: &moduleConfig{
-				replacedImportModules: map[string]string{"env": ""},
-			},
-		},
-		{
-			name: "WithImportModule - override",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImportModule("env", "assemblyscript").
-					WithImportModule("env", "go")
-			},
-			expected: &moduleConfig{
-				replacedImportModules: map[string]string{"env": "go"},
-			},
-		},
-		{
-			name: "WithImportModule - twice",
-			with: func(c ModuleConfig) ModuleConfig {
-				return c.WithImportModule("env", "go").
-					WithImportModule("wasi_unstable", "wasi_snapshot_preview1")
-			},
-			expected: &moduleConfig{
-				replacedImportModules: map[string]string{
-					"env":           "go",
-					"wasi_unstable": "wasi_snapshot_preview1",
-				},
+				name: "wa0",
 			},
 		},
 	}
@@ -351,234 +278,6 @@ func TestModuleConfig(t *testing.T) {
 			require.Equal(t, tc.expected, rc)
 			// The source wasn't modified
 			require.Equal(t, &moduleConfig{}, input)
-		})
-	}
-}
-
-func TestModuleConfig_replaceImports(t *testing.T) {
-	tests := []struct {
-		name       string
-		config     ModuleConfig
-		input      *wasm.Module
-		expected   *wasm.Module
-		expectSame bool
-	}{
-		{
-			name:       "no config, no imports",
-			config:     &moduleConfig{},
-			input:      &wasm.Module{},
-			expected:   &wasm.Module{},
-			expectSame: true,
-		},
-		{
-			name:   "no config",
-			config: &moduleConfig{},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-			expectSame: true,
-		},
-		{
-			name: "replacedImportModules",
-			config: &moduleConfig{
-				replacedImportModules: map[string]string{"wasi_unstable": "wasi_snapshot_preview1"},
-			},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_unstable", Name: "args_sizes_get",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasi_unstable", Name: "fd_write",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-			expected: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-		},
-		{
-			name: "replacedImportModules doesn't match",
-			config: &moduleConfig{
-				replacedImportModules: map[string]string{"env": ""},
-			},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-			expectSame: true,
-		},
-		{
-			name: "replacedImports",
-			config: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
-			},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "env", Name: "abort",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "env", Name: "seed",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-			expected: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "assemblyscript", Name: "abort",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "env", Name: "seed",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-		},
-		{
-			name: "replacedImports don't match",
-			config: &moduleConfig{
-				replacedImports: map[string][2]string{"env\000abort": {"assemblyscript", "abort"}},
-			},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 2,
-					},
-				},
-			},
-			expectSame: true,
-		},
-		{
-			name: "replacedImportModules and replacedImports",
-			config: &moduleConfig{
-				replacedImportModules: map[string]string{"js": "wasm"},
-				replacedImports: map[string][2]string{
-					"wasm\000increment": {"go", "increment"},
-					"wasm\000decrement": {"go", "decrement"},
-				},
-			},
-			input: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "js", Name: "tbl",
-						Type:      wasm.ExternTypeTable,
-						DescTable: &wasm.Table{Min: 4},
-					},
-					{
-						Module: "js", Name: "increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "js", Name: "decrement",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "js", Name: "wasm_increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "js", Name: "wasm_increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-				},
-			},
-			expected: &wasm.Module{
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasm", Name: "tbl",
-						Type:      wasm.ExternTypeTable,
-						DescTable: &wasm.Table{Min: 4},
-					},
-					{
-						Module: "go", Name: "increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "go", Name: "decrement",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasm", Name: "wasm_increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-					{
-						Module: "wasm", Name: "wasm_increment",
-						Type:     wasm.ExternTypeFunc,
-						DescFunc: 0,
-					},
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			actual := tc.config.(*moduleConfig).replaceImports(tc.input)
-			if tc.expectSame {
-				require.Same(t, tc.input, actual)
-			} else {
-				require.NotSame(t, tc.input, actual)
-				require.Equal(t, tc.expected, actual)
-			}
 		})
 	}
 }
@@ -619,7 +318,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			),
 		},
 		{
-			name:  "WithArgs - empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
+			name:  "WithArgs empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
 			input: NewModuleConfig().WithArgs("", "bc"),
 			expected: requireSysContext(t,
 				math.MaxUint32,     // max
@@ -632,7 +331,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			),
 		},
 		{
-			name:  "WithArgs - second call overwrites",
+			name:  "WithArgs second call overwrites",
 			input: NewModuleConfig().WithArgs("a", "bc").WithArgs("bc", "a"),
 			expected: requireSysContext(t,
 				math.MaxUint32,      // max
@@ -658,7 +357,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			),
 		},
 		{
-			name:  "WithEnv - empty value",
+			name:  "WithEnv empty value",
 			input: NewModuleConfig().WithEnv("a", ""),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
@@ -727,7 +426,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			),
 		},
 		{
-			name:  "WithFS - overwrites",
+			name:  "WithFS overwrites",
 			input: NewModuleConfig().WithFS(testFS).WithFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
@@ -808,37 +507,37 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:        "WithArgs - arg contains NUL",
+			name:        "WithArgs arg contains NUL",
 			input:       NewModuleConfig().WithArgs("", string([]byte{'a', 0})),
 			expectedErr: "args invalid: contains NUL character",
 		},
 		{
-			name:        "WithEnv - key contains NUL",
+			name:        "WithEnv key contains NUL",
 			input:       NewModuleConfig().WithEnv(string([]byte{'a', 0}), "a"),
 			expectedErr: "environ invalid: contains NUL character",
 		},
 		{
-			name:        "WithEnv - value contains NUL",
+			name:        "WithEnv value contains NUL",
 			input:       NewModuleConfig().WithEnv("a", string([]byte{'a', 0})),
 			expectedErr: "environ invalid: contains NUL character",
 		},
 		{
-			name:        "WithEnv - key contains equals",
+			name:        "WithEnv key contains equals",
 			input:       NewModuleConfig().WithEnv("a=", "a"),
 			expectedErr: "environ invalid: key contains '=' character",
 		},
 		{
-			name:        "WithEnv - empty key",
+			name:        "WithEnv empty key",
 			input:       NewModuleConfig().WithEnv("", "a"),
 			expectedErr: "environ invalid: empty key",
 		},
 		{
-			name:        "WithFS - nil",
+			name:        "WithFS nil",
 			input:       NewModuleConfig().WithFS(nil),
 			expectedErr: "FS for / is nil",
 		},
 		{
-			name:        "WithWorkDirFS - nil",
+			name:        "WithWorkDirFS nil",
 			input:       NewModuleConfig().WithWorkDirFS(nil),
 			expectedErr: "FS for . is nil",
 		},

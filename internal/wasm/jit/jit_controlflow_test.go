@@ -860,7 +860,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 	t.Run("exit", func(t *testing.T) {
 		env := newJITEnvironment()
 
-		// Build code.
+		// Compile code.
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)

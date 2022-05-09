@@ -18,16 +18,20 @@ import (
 //	hello := func() {
 //		fmt.Fprintln(stdout, "hello!")
 //	}
-//	env, _ := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx)
+//	env, _ := r.NewModuleBuilder("env").
+//		ExportFunction("hello", hello).
+//		Instantiate(ctx)
 //
 // If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
 //
-//	env, _ := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Build(ctx)
+//	compiled, _ := r.NewModuleBuilder("env").
+//		ExportFunction("get_random_string", getRandomString).
+//		Compile(ctx, wazero.NewCompileConfig())
 //
-//	env1, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.1"))
+//	env1, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.1"))
 //	defer env1.Close(ctx)
 //
-//	env2, _ := r.InstantiateModuleWithConfig(ctx, env, NewModuleConfig().WithName("env.2"))
+//	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
 //	defer env2.Close(ctx)
 //
 // Notes:
@@ -152,12 +156,13 @@ type ModuleBuilder interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
-	// Build returns a module to instantiate, or returns an error if any of the configuration is invalid.
-	Build(context.Context) (CompiledCode, error)
+	// Compile returns a module to instantiate, or an error if any of the configuration is invalid.
+	Compile(context.Context, CompileConfig) (CompiledModule, error)
 
-	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
+	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule, using default configuration.
 	//
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
+	// Note: To avoid using configuration defaults, use Compile instead.
 	Instantiate(context.Context) (api.Module, error)
 }
 
@@ -197,17 +202,13 @@ func (b *moduleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) Mod
 
 // ExportMemory implements ModuleBuilder.ExportMemory
 func (b *moduleBuilder) ExportMemory(name string, minPages uint32) ModuleBuilder {
-	mem := &wasm.Memory{Min: minPages, Max: b.r.memoryLimitPages}
-	mem.Cap = b.r.memoryCapacityPages(mem.Min, nil)
-	b.nameToMemory[name] = mem
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages}
 	return b
 }
 
 // ExportMemoryWithMax implements ModuleBuilder.ExportMemoryWithMax
 func (b *moduleBuilder) ExportMemoryWithMax(name string, minPages, maxPages uint32) ModuleBuilder {
-	mem := &wasm.Memory{Min: minPages, Max: maxPages, IsMaxEncoded: true}
-	mem.Cap = b.r.memoryCapacityPages(mem.Min, &maxPages)
-	b.nameToMemory[name] = mem
+	b.nameToMemory[name] = &wasm.Memory{Min: minPages, Max: maxPages, IsMaxEncoded: true}
 	return b
 }
 
@@ -249,16 +250,22 @@ func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 	return b
 }
 
-// Build implements ModuleBuilder.Build
-func (b *moduleBuilder) Build(ctx context.Context) (CompiledCode, error) {
+// Compile implements ModuleBuilder.Compile
+func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (CompiledModule, error) {
+	config, ok := cConfig.(*compileConfig)
+	if !ok {
+		panic(fmt.Errorf("unsupported wazero.CompileConfig implementation: %#v", cConfig))
+	}
+
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
-	memoryLimitPages := b.r.memoryLimitPages
 	for name, mem := range b.nameToMemory {
-		if err := mem.ValidateMinMax(memoryLimitPages); err != nil {
-			return nil, fmt.Errorf("memory[%s] %v", name, err)
+		var maxP *uint32
+		if mem.IsMaxEncoded {
+			maxP = &mem.Max
 		}
-		if err := b.r.setMemoryCapacity(name, mem); err != nil {
-			return nil, err
+		mem.Min, mem.Cap, mem.Max = config.memorySizer(mem.Min, maxP)
+		if err := mem.Validate(); err != nil {
+			return nil, fmt.Errorf("memory[%s] %v", name, err)
 		}
 	}
 
@@ -276,7 +283,7 @@ func (b *moduleBuilder) Build(ctx context.Context) (CompiledCode, error) {
 
 // Instantiate implements ModuleBuilder.Instantiate
 func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
-	if compiled, err := b.Build(ctx); err != nil {
+	if compiled, err := b.Compile(ctx, NewCompileConfig()); err != nil {
 		return nil, err
 	} else {
 		if err = b.r.store.Engine.CompileModule(ctx, compiled.(*compiledCode).module); err != nil {
@@ -284,6 +291,6 @@ func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
 		}
 		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside this function.
 		defer compiled.Close(ctx)
-		return b.r.InstantiateModuleWithConfig(ctx, compiled, NewModuleConfig().WithName(b.moduleName))
+		return b.r.InstantiateModule(ctx, compiled, NewModuleConfig().WithName(b.moduleName))
 	}
 }

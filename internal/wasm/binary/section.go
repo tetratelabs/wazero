@@ -24,7 +24,11 @@ func decodeTypeSection(enabledFeatures wasm.Features, r *bytes.Reader) ([]*wasm.
 	return result, nil
 }
 
-func decodeImportSection(r *bytes.Reader, memoryLimitPages uint32, enabledFeatures wasm.Features) ([]*wasm.Import, error) {
+func decodeImportSection(
+	r *bytes.Reader,
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	enabledFeatures wasm.Features,
+) ([]*wasm.Import, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -32,7 +36,7 @@ func decodeImportSection(r *bytes.Reader, memoryLimitPages uint32, enabledFeatur
 
 	result := make([]*wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeImport(r, i, memoryLimitPages, enabledFeatures); err != nil {
+		if result[i], err = decodeImport(r, i, memorySizer, enabledFeatures); err != nil {
 			return nil, err
 		}
 	}
@@ -76,7 +80,10 @@ func decodeTableSection(r *bytes.Reader, enabledFeatures wasm.Features) ([]*wasm
 	return ret, nil
 }
 
-func decodeMemorySection(r *bytes.Reader, memoryLimitPages uint32) (*wasm.Memory, error) {
+func decodeMemorySection(
+	r *bytes.Reader,
+	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+) (*wasm.Memory, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("error reading size")
@@ -85,7 +92,7 @@ func decodeMemorySection(r *bytes.Reader, memoryLimitPages uint32) (*wasm.Memory
 		return nil, fmt.Errorf("at most one memory allowed in module, but read %d", vs)
 	}
 
-	return decodeMemory(r, memoryLimitPages)
+	return decodeMemory(r, memorySizer)
 }
 
 func decodeGlobalSection(r *bytes.Reader, enabledFeatures wasm.Features) ([]*wasm.Global, error) {

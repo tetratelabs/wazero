@@ -50,14 +50,14 @@ func BenchmarkInitialization(b *testing.B) {
 }
 
 func runInitializationBench(b *testing.B, r wazero.Runtime) {
-	compiled, err := r.CompileModule(testCtx, caseWasm)
+	compiled, err := r.CompileModule(testCtx, caseWasm, wazero.NewCompileConfig())
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer compiled.Close(testCtx)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mod, err := r.InstantiateModule(testCtx, compiled)
+		mod, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig())
 		if err != nil {
 			b.Fatal(err)
 		}

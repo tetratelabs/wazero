@@ -36,7 +36,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
 					env := newJITEnvironment()
 
-					// Build code.
+					// Compile code.
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)

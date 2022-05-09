@@ -89,7 +89,7 @@ func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 // BuildJumpTable implements the same method as documented on asm.AssemblerBase.
 func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []asm.Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Build the offset table for each target.
+		// Compile the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
 			if uint64(nop.OffsetInBinary())-uint64(base) >= asm.JumpTableMaximumOffset {

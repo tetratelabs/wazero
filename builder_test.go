@@ -344,7 +344,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			b := tc.input(NewRuntime()).(*moduleBuilder)
-			compiled, err := b.Build(testCtx)
+			compiled, err := b.Compile(testCtx, NewCompileConfig())
 			require.NoError(t, err)
 			m := compiled.(*compiledCode)
 
@@ -353,7 +353,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			require.Equal(t, b.r.store.Engine, m.compiledEngine)
 
 			// Built module must be instantiable by Engine.
-			_, err = b.r.InstantiateModule(testCtx, m)
+			_, err = b.r.InstantiateModule(testCtx, m, NewModuleConfig())
 			require.NoError(t, err)
 		})
 	}
@@ -363,25 +363,26 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       func(RuntimeConfig) ModuleBuilder
+		input       func(Runtime) ModuleBuilder
+		config      CompileConfig
 		expectedErr string
 	}{
 		{
 			name: "memory min > limit", // only one test to avoid duplicating tests in module_test.go
-			input: func(cfg RuntimeConfig) ModuleBuilder {
-				return NewRuntimeWithConfig(cfg).NewModuleBuilder("").
-					ExportMemory("memory", math.MaxUint32)
+			input: func(rt Runtime) ModuleBuilder {
+				return rt.NewModuleBuilder("").ExportMemory("memory", math.MaxUint32)
 			},
+			config:      NewCompileConfig(),
 			expectedErr: "memory[memory] min 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
 			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
-			input: func(cfg RuntimeConfig) ModuleBuilder {
-				cfg = cfg.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
-					return 1
-				})
-				return NewRuntimeWithConfig(cfg).NewModuleBuilder("").ExportMemory("memory", 2)
+			input: func(rt Runtime) ModuleBuilder {
+				return rt.NewModuleBuilder("").ExportMemory("memory", 2)
 			},
+			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+				return 2, 1, 2
+			}),
 			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 2 pages (128 Ki)",
 		},
 	}
@@ -390,7 +391,7 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := tc.input(NewRuntimeConfig()).Build(testCtx)
+			_, e := tc.input(NewRuntime()).Compile(testCtx, tc.config)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}
