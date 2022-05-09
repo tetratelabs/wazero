@@ -66,22 +66,33 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 			} else {
 				m = &MemoryInstance{Max: max, Buffer: make([]byte, 0)}
 			}
-			require.Equal(t, uint32(0), m.Grow(ctx, 5))
+
+			res, ok := m.Grow(ctx, 5)
+			require.True(t, ok)
+			require.Equal(t, uint32(0), res)
 			require.Equal(t, uint32(5), m.PageSize(ctx))
 
 			// Zero page grow is well-defined, should return the current page correctly.
-			require.Equal(t, uint32(5), m.Grow(ctx, 0))
+			res, ok = m.Grow(ctx, 0)
+			require.True(t, ok)
+			require.Equal(t, uint32(5), res)
 			require.Equal(t, uint32(5), m.PageSize(ctx))
-			require.Equal(t, uint32(5), m.Grow(ctx, 4))
+
+			res, ok = m.Grow(ctx, 4)
+			require.True(t, ok)
+			require.Equal(t, uint32(5), res)
 			require.Equal(t, uint32(9), m.PageSize(ctx))
 
 			// At this point, the page size equal 9,
 			// so trying to grow two pages should result in failure.
-			require.Equal(t, int32(-1), int32(m.Grow(ctx, 2)))
+			_, ok = m.Grow(ctx, 2)
+			require.False(t, ok)
 			require.Equal(t, uint32(9), m.PageSize(ctx))
 
 			// But growing one page is still permitted.
-			require.Equal(t, uint32(9), m.Grow(ctx, 1))
+			res, ok = m.Grow(ctx, 1)
+			require.True(t, ok)
+			require.Equal(t, uint32(9), res)
 
 			// Ensure that the current page size equals the max.
 			require.Equal(t, max, m.PageSize(ctx))

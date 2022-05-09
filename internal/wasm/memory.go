@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
@@ -44,6 +45,8 @@ var _ api.Memory = &MemoryInstance{}
 type MemoryInstance struct {
 	Buffer        []byte
 	Min, Cap, Max uint32
+	// mux is used to prevent overlapping calls to Grow.
+	mux sync.RWMutex
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -211,31 +214,31 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 	return uint64(pages) << MemoryPageSizeInBits
 }
 
-// Grow extends the memory buffer by "newPages" * memoryPageSize.
-// The logic here is described in https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem.
-//
-// Returns -1 if the operation resulted in exceeding the maximum memory pages.
-// Otherwise, returns the prior memory size after growing the memory buffer.
-func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32) {
+// Grow implements the same method as documented on api.Memory.
+func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32, ok bool) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
+
+	// We take write-lock here as the following might result in a new slice
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 	if delta == 0 {
-		return currentPages
+		return currentPages, true
 	}
 
 	// If exceeds the max of memory size, we push -1 according to the spec.
 	newPages := currentPages + delta
 	if newPages > m.Max {
-		return 0xffffffff // = -1 in signed 32-bit integer.
+		return 0, false
 	} else if newPages > m.Cap { // grow the memory.
 		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(delta))...)
 		m.Cap = newPages
-		return currentPages
+		return currentPages, true
 	} else { // We already have the capacity we need.
 		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
 		sp.Len = int(MemoryPagesToBytesNum(newPages))
-		return currentPages
+		return currentPages, true
 	}
 }
 
@@ -274,7 +277,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 
 // size returns the size in bytes of the buffer.
 func (m *MemoryInstance) size() uint32 {
-	return uint32(len(m.Buffer))
+	return uint32(len(m.Buffer)) // We don't lock here because size can't become smaller.
 }
 
 // hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
