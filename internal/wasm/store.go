@@ -33,7 +33,7 @@ type (
 		Engine Engine
 
 		// moduleNames ensures no race conditions instantiating two modules of the same name
-		moduleNames map[string]struct{} // guarded by mux
+		moduleNames []string // guarded by mux
 
 		// modules holds the instantiated Wasm modules by module name from Instantiate.
 		modules map[string]*ModuleInstance // guarded by mux
@@ -309,7 +309,7 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
-		moduleNames:      map[string]struct{}{},
+		moduleNames:      nil,
 		modules:          map[string]*ModuleInstance{},
 		typeIDs:          map[string]FunctionTypeID{},
 		functionMaxTypes: maximumFunctionTypes,
@@ -413,7 +413,12 @@ func (s *Store) deleteModule(moduleName string) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	delete(s.modules, moduleName)
-	delete(s.moduleNames, moduleName)
+	for i, n := range s.moduleNames {
+		if n == moduleName {
+			s.moduleNames = append(s.moduleNames[:i], s.moduleNames[i+1:]...)
+			break
+		}
+	}
 }
 
 // requireModuleName is a pre-flight check to reserve a module.
@@ -421,10 +426,12 @@ func (s *Store) deleteModule(moduleName string) {
 func (s *Store) requireModuleName(moduleName string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	if _, ok := s.moduleNames[moduleName]; ok {
-		return fmt.Errorf("module %s has already been instantiated", moduleName)
+	for _, n := range s.moduleNames {
+		if n == moduleName {
+			return fmt.Errorf("module %s has already been instantiated", moduleName)
+		}
 	}
-	s.moduleNames[moduleName] = struct{}{}
+	s.moduleNames = append(s.moduleNames, moduleName)
 	return nil
 }
 
@@ -618,4 +625,18 @@ func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 		s.typeIDs[key] = id
 	}
 	return id, nil
+}
+
+func (s *Store) Close(ctx context.Context) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	var err error
+	// Close modules in reverse initialization order.
+	for i := len(s.moduleNames) - 1; i >= 0; i-- {
+		_, err = s.modules[s.moduleNames[i]].CallCtx.close(ctx, 0)
+	}
+	s.moduleNames = nil
+	s.modules = map[string]*ModuleInstance{}
+	// Only returns last error.
+	return err
 }

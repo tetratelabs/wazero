@@ -92,6 +92,18 @@ type Runtime interface {
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
 	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
+
+	// Close closes all the modules that have been initialized in this Runtime with an exit code of 0.
+	// An error is returned if any module returns an error when closed.
+	//
+	// Ex.
+	//	ctx := context.Background()
+	//  r := wazero.NewRuntime()
+	//  defer r.Close(ctx)
+	//	_, _ = r.InstantiateModuleFromCode(ctx, sourceLib)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, sourceApp)
+	//
+	Close(ctx context.Context) error
 }
 
 func NewRuntime() Runtime {
@@ -279,4 +291,9 @@ func (r *runtime) InstantiateModule(ctx context.Context, compiled CompiledModule
 		}
 	}
 	return
+}
+
+// Close implements Runtime.Close
+func (r *runtime) Close(ctx context.Context) error {
+	return r.store.Close(ctx)
 }

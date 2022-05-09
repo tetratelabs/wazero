@@ -182,6 +182,38 @@ func TestStore_CloseModule(t *testing.T) {
 	}
 }
 
+func TestStore_CloseStore(t *testing.T) {
+	const importedModuleName = "imported"
+	const importingModuleName = "test"
+
+	s := newStore()
+
+	m1, err := s.Instantiate(testCtx, &Module{
+		TypeSection:     []*FunctionType{{}},
+		FunctionSection: []uint32{0},
+		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+		ExportSection:   []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+	}, importedModuleName, nil, nil)
+	require.NoError(t, err)
+
+	m2, err := s.Instantiate(testCtx, &Module{
+		TypeSection:   []*FunctionType{{}},
+		ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
+		MemorySection: &Memory{Min: 1, Cap: 1},
+		GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
+		TableSection:  []*Table{{Min: 10}},
+	}, importingModuleName, nil, nil)
+	require.NoError(t, err)
+
+	err = s.Close(testCtx)
+	require.NoError(t, err)
+	require.Nil(t, s.modules[importedModuleName])
+	require.Nil(t, s.modules[importingModuleName])
+
+	require.Equal(t, uint64(1), *m1.closed)
+	require.Equal(t, uint64(1), *m2.closed)
+}
+
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 

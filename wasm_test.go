@@ -529,6 +529,36 @@ func TestInstantiateModule_ExitError(t *testing.T) {
 	require.Equal(t, err, sys.NewExitError("env", 2))
 }
 
+func TestClose(t *testing.T) {
+	r := NewRuntime()
+
+	m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
+	require.NoError(t, err)
+	m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
+	require.NoError(t, err)
+
+	func1 := m1.ExportedFunction("func1")
+	func2 := m2.ExportedFunction("func2")
+
+	// Modules not closed so calls succeed
+
+	_, err = func1.Call(testCtx)
+	require.NoError(t, err)
+
+	_, err = func2.Call(testCtx)
+	require.NoError(t, err)
+
+	err = r.Close(testCtx)
+	require.NoError(t, err)
+
+	// Modules closed so calls fail
+	_, err = func1.Call(testCtx)
+	require.Error(t, err)
+
+	_, err = func2.Call(testCtx)
+	require.Error(t, err)
+}
+
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx context.Context) uint64, functionName string) ([]byte, func(context.Context) error) {
 	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx)
