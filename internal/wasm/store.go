@@ -633,10 +633,11 @@ func (s *Store) Close(ctx context.Context) error {
 	var err error
 	// Close modules in reverse initialization order.
 	for i := len(s.moduleNames) - 1; i >= 0; i-- {
-		_, err = s.modules[s.moduleNames[i]].CallCtx.close(ctx, 0)
+		if _, e := s.modules[s.moduleNames[i]].CallCtx.close(ctx, 0); e != nil && err == nil {
+			err = e // first error
+		}
 	}
 	s.moduleNames = nil
 	s.modules = map[string]*ModuleInstance{}
-	// Only returns last error.
 	return err
 }
