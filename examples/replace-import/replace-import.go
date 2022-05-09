@@ -30,21 +30,27 @@ func main() {
 	}
 	defer host.Close(ctx)
 
-	// Compile WebAssembly code that needs the function "env.abort".
+	// Compile the WebAssembly module, replacing the import "env.abort" with "assemblyscript.abort".
+	compileConfig := wazero.NewCompileConfig().
+		WithImportRenamer(func(externType api.ExternType, oldModule, oldName string) (newModule, newName string) {
+			if oldModule == "env" && oldName == "abort" {
+				return "assemblyscript", "abort"
+			}
+			return oldModule, oldName
+		})
+
 	code, err := r.CompileModule(ctx, []byte(`(module $needs-import
 	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 
 	(export "abort" (func 0)) ;; exports the import for testing
-)`))
+)`), compileConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer code.Close(ctx)
 
-	// Instantiate the WebAssembly module, replacing the import "env.abort"
-	// with "assemblyscript.abort".
-	mod, err := r.InstantiateModuleWithConfig(ctx, code, wazero.NewModuleConfig().
-		WithImport("env", "abort", "assemblyscript", "abort"))
+	// Instantiate the WebAssembly module.
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig())
 	if err != nil {
 		log.Fatal(err)
 	}

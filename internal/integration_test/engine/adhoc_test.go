@@ -15,10 +15,20 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-const memoryCapacityPages = 2
-
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
+var memoryCapacityPages = uint32(2)
+
+var compileConfig = wazero.NewCompileConfig().
+	WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+		if maxPages != nil {
+			return minPages, memoryCapacityPages, *maxPages
+		}
+		return minPages, memoryCapacityPages, memoryCapacityPages
+	})
+
+var moduleConfig = wazero.NewModuleConfig()
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"huge stack":                              testHugeStack,
@@ -45,9 +55,6 @@ func TestEngineInterpreter(t *testing.T) {
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
-	config.WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 {
-		return memoryCapacityPages
-	})
 	for name, testf := range tests {
 		name := name   // pin
 		testf := testf // pin
@@ -369,7 +376,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			var importingCode, importedCode wazero.CompiledCode
+			var importingCode, importedCode wazero.CompiledModule
 			var imported, importing api.Module
 			var err error
 			closeAndReturn := func(ctx context.Context, x uint32) uint32 {
@@ -390,19 +397,19 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			// Create the host module, which exports the function that closes the importing module.
 			importedCode, err = r.NewModuleBuilder(t.Name()+"-imported").
-				ExportFunction("return_input", closeAndReturn).Build(testCtx)
+				ExportFunction("return_input", closeAndReturn).Compile(testCtx, compileConfig)
 			require.NoError(t, err)
 
-			imported, err = r.InstantiateModule(testCtx, importedCode)
+			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
 
 			// Import that module.
 			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-			importingCode, err = r.CompileModule(testCtx, source)
+			importingCode, err = r.CompileModule(testCtx, source, compileConfig)
 			require.NoError(t, err)
 
-			importing, err = r.InstantiateModule(testCtx, importingCode)
+			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig)
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
 
@@ -499,13 +506,13 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		  i64.store
 		)
 		(export "store" (func $store))
-	  )`))
+	  )`), compileConfig)
 	require.NoError(t, err)
 	defer compiled.Close(testCtx)
 
-	// Instantiate multiple modules with the same source (*CompiledCode).
+	// Instantiate multiple modules with the same source (*CompiledModule).
 	for i := 0; i < 100; i++ {
-		module, err := r.InstantiateModuleWithConfig(testCtx, compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
+		module, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().WithName(strconv.Itoa(i)))
 		require.NoError(t, err)
 		defer module.Close(testCtx)
 

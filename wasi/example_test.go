@@ -27,11 +27,8 @@ func Example() {
 	}
 	defer wm.Close(testCtx)
 
-	// Override default configuration (which discards stdout).
-	config := wazero.NewModuleConfig().WithStdout(os.Stdout)
-
-	// InstantiateModuleFromCodeWithConfig runs the "_start" function which is like a "main" function.
-	_, err = r.InstantiateModuleFromCodeWithConfig(ctx, []byte(`
+	// Compile the WebAssembly module using the default configuration.
+	code, err := r.CompileModule(ctx, []byte(`
 (module
   (import "wasi_snapshot_preview1" "proc_exit" (func $wasi.proc_exit (param $rval i32)))
 
@@ -41,8 +38,18 @@ func Example() {
   )
   (export "_start" (func $main))
 )
-`), config.WithName("wasi-demo"))
+`), wazero.NewCompileConfig())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer code.Close(ctx)
 
+	// InstantiateModule runs the "_start" function which is like a "main" function.
+	// Override default configuration (which discards stdout).
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout).WithName("wasi-demo"))
+	if mod != nil {
+		defer mod.Close(ctx)
+	}
 	// Print the exit code
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		fmt.Printf("exit_code: %d\n", exitErr.ExitCode())

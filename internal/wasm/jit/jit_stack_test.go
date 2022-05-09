@@ -26,7 +26,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 
-			// Build code.
+			// Compile code.
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 
-			// Build code.
+			// Compile code.
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

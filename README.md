@@ -81,8 +81,8 @@ For example, here's how you can allow WebAssembly modules to read
 wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
 defer wm.Close(ctx)
 
-config := wazero.ModuleConfig().WithFS(os.DirFS("/work/home"))
-module, err := r.InstantiateModule(ctx, binary, config)
+config := wazero.NewModuleConfig().WithFS(os.DirFS("/work/home"))
+module, err := r.InstantiateModule(ctx, compiled, config)
 defer module.Close(ctx)
 ...
 ```

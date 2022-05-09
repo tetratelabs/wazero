@@ -14,6 +14,21 @@ func TestMemoryPageConsts(t *testing.T) {
 	require.Equal(t, MemoryLimitPages, uint32(1<<16))
 }
 
+func TestMemoryPages(t *testing.T) {
+	t.Run("cap=min, nil max", func(t *testing.T) {
+		min, capacity, max := MemorySizer(1, nil)
+		require.Equal(t, uint32(1), min)
+		require.Equal(t, uint32(1), capacity)
+		require.Equal(t, MemoryLimitPages, max)
+	})
+	t.Run("cap=min, max", func(t *testing.T) {
+		min, capacity, max := MemorySizer(1, uint32Ptr(2))
+		require.Equal(t, uint32(1), min)
+		require.Equal(t, uint32(1), capacity)
+		require.Equal(t, uint32(2), max)
+	})
+}
+
 func Test_MemoryPagesToBytesNum(t *testing.T) {
 	for _, numPage := range []uint32{0, 1, 5, 10} {
 		require.Equal(t, uint64(numPage*MemoryPageSize), MemoryPagesToBytesNum(numPage))

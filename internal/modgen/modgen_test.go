@@ -49,7 +49,7 @@ func TestModGen(t *testing.T) {
 				// Encode the generated module (*wasm.Module) as binary.
 				bin := binary.EncodeModule(m)
 				// Pass the generated binary into our compilers.
-				code, err := runtime.CompileModule(testCtx, bin)
+				code, err := runtime.CompileModule(testCtx, bin, wazero.NewCompileConfig())
 				require.NoError(t, err)
 				err = code.Close(testCtx)
 				require.NoError(t, err)

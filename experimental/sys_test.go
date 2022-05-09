@@ -43,14 +43,19 @@ func Example_sys() {
 	}
 	defer wm.Close(ctx)
 
-	cfg := wazero.NewModuleConfig().WithStdout(os.Stdout)
-	mod, err := r.InstantiateModuleFromCodeWithConfig(ctx, []byte(`(module
+	code, err := r.CompileModule(ctx, []byte(`(module
   (import "wasi_snapshot_preview1" "random_get"
     (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))
   (func i32.const 0 i32.const 4 call 0 drop) ;; write 4 bytes of random data
   (memory 1 1)
   (start 1) ;; call the second function
-)`), cfg)
+)`), wazero.NewCompileConfig())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer code.Close(ctx)
+
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
 		log.Fatal(err)
 	}

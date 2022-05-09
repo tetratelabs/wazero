@@ -1226,14 +1226,14 @@ func TestDecodeModule(t *testing.T) {
 			name:  "memory",
 			input: "(module (memory 1))",
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryLimitPages},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryLimitPages},
 			},
 		},
 		{
 			name:  "memory ID",
 			input: "(module (memory $mem 1))",
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryLimitPages},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryLimitPages},
 			},
 		},
 		{
@@ -1465,7 +1465,7 @@ func TestDecodeModule(t *testing.T) {
     (export "memory" (memory $mem))
 )`,
 			expected: &wasm.Module{
-				MemorySection: &wasm.Memory{Min: 1, Max: wasm.MemoryLimitPages},
+				MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: wasm.MemoryLimitPages},
 				ExportSection: []*wasm.Export{
 					{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1564,7 +1564,7 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := DecodeModule([]byte(tc.input), wasm.Features20220419, wasm.MemoryLimitPages)
+			m, err := DecodeModule([]byte(tc.input), wasm.Features20220419, wasm.MemorySizer)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -1573,9 +1573,8 @@ func TestDecodeModule(t *testing.T) {
 
 func TestParseModule_Errors(t *testing.T) {
 	tests := []struct {
-		name, input      string
-		memoryLimitPages uint32
-		expectedErr      string
+		name, input string
+		expectedErr string
 	}{
 		{
 			name:        "forgot parens",
@@ -1998,10 +1997,9 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "2:47: i32.trunc_sat_f32_s invalid as feature \"nontrapping-float-to-int-conversion\" is disabled in module.func[0]",
 		},
 		{
-			name:             "memory over max",
-			input:            "(module (memory 1 4))",
-			memoryLimitPages: 3,
-			expectedErr:      "1:19: max 4 pages (256 Ki) over limit of 3 pages (192 Ki) in module.memory[0]",
+			name:        "memory over max",
+			input:       "(module (memory 1 70000))",
+			expectedErr: "1:19: max 70000 pages (4 Gi) over limit of 65536 pages (4 Gi) in module.memory[0]",
 		},
 		{
 			name:        "second memory",
@@ -2145,17 +2143,14 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.memoryLimitPages == 0 {
-				tc.memoryLimitPages = wasm.MemoryLimitPages
-			}
-			_, err := DecodeModule([]byte(tc.input), wasm.Features20191205, tc.memoryLimitPages)
+			_, err := DecodeModule([]byte(tc.input), wasm.Features20191205, wasm.MemorySizer)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
 
 func TestModuleParser_ErrorContext(t *testing.T) {
-	p := newModuleParser(&wasm.Module{}, 0, 0)
+	p := newModuleParser(&wasm.Module{}, 0, wasm.MemorySizer)
 	tests := []struct {
 		input    string
 		pos      parserPosition

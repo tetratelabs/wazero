@@ -68,29 +68,7 @@ func TestSectionIDName(t *testing.T) {
 	}
 }
 
-func TestExternTypeName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    ExternType
-		expected string
-	}{
-		{"func", ExternTypeFunc, "func"},
-		{"table", ExternTypeTable, "table"},
-		{"mem", ExternTypeMemory, "memory"},
-		{"global", ExternTypeGlobal, "global"},
-		{"unknown", 100, "0x64"},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, ExternTypeName(tc.input))
-		})
-	}
-}
-
-func TestMemory_ValidateCap(t *testing.T) {
+func TestMemory_Validate(t *testing.T) {
 	tests := []struct {
 		name        string
 		mem         *Memory
@@ -98,58 +76,32 @@ func TestMemory_ValidateCap(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			mem:  &Memory{Min: 2, Cap: 2},
+			mem:  &Memory{Min: 2, Cap: 2, Max: 2},
 		},
 		{
 			name:        "cap < min",
-			mem:         &Memory{Min: 2, Cap: 1},
+			mem:         &Memory{Min: 2, Cap: 1, Max: 2},
 			expectedErr: "capacity 1 pages (64 Ki) less than minimum 2 pages (128 Ki)",
 		},
 		{
 			name:        "cap > maxLimit",
-			mem:         &Memory{Min: 2, Cap: 4},
-			expectedErr: "capacity 4 pages (256 Ki) over limit of 3 pages (192 Ki)",
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			err := tc.mem.ValidateCap(3)
-			if tc.expectedErr == "" {
-				require.NoError(t, err)
-			} else {
-				require.EqualError(t, err, tc.expectedErr)
-			}
-		})
-	}
-}
-
-func TestMemory_ValidateMinMax(t *testing.T) {
-	tests := []struct {
-		name        string
-		mem         *Memory
-		expectedErr string
-	}{
-		{
-			name: "ok",
-			mem:  &Memory{Min: 2},
+			mem:         &Memory{Min: 2, Cap: math.MaxUint32, Max: 2},
+			expectedErr: "capacity 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max < min",
-			mem:         &Memory{Min: 2, Max: 0, IsMaxEncoded: true},
+			mem:         &Memory{Min: 2, Cap: 2, Max: 0, IsMaxEncoded: true},
 			expectedErr: "min 2 pages (128 Ki) > max 0 pages (0 Ki)",
 		},
 		{
 			name:        "min > limit",
 			mem:         &Memory{Min: math.MaxUint32},
-			expectedErr: "min 4294967295 pages (3 Ti) over limit of 3 pages (192 Ki)",
+			expectedErr: "min 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 		{
 			name:        "max > limit",
 			mem:         &Memory{Max: math.MaxUint32, IsMaxEncoded: true},
-			expectedErr: "max 4294967295 pages (3 Ti) over limit of 3 pages (192 Ki)",
+			expectedErr: "max 4294967295 pages (3 Ti) over limit of 65536 pages (4 Gi)",
 		},
 	}
 
@@ -157,7 +109,7 @@ func TestMemory_ValidateMinMax(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.mem.ValidateMinMax(3)
+			err := tc.mem.Validate()
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
 			} else {

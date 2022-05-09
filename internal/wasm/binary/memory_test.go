@@ -24,7 +24,7 @@ func TestMemoryType(t *testing.T) {
 			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
-			name:     "min 0 - default max",
+			name:     "min 0 default max",
 			input:    &wasm.Memory{Max: wasm.MemoryLimitPages},
 			expected: []byte{0x0, 0},
 		},
@@ -35,7 +35,7 @@ func TestMemoryType(t *testing.T) {
 		},
 		{
 			name:     "min=max",
-			input:    &wasm.Memory{Min: 1, Max: 1, IsMaxEncoded: true},
+			input:    &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
 			expected: []byte{0x1, 1, 1},
 		},
 		{
@@ -45,7 +45,7 @@ func TestMemoryType(t *testing.T) {
 		},
 		{
 			name:     "min largest max largest",
-			input:    &wasm.Memory{Min: max, Max: max, IsMaxEncoded: true},
+			input:    &wasm.Memory{Min: max, Cap: max, Max: max, IsMaxEncoded: true},
 			expected: []byte{0x1, 0x80, 0x80, 0x4, 0x80, 0x80, 0x4},
 		},
 	}
@@ -54,12 +54,12 @@ func TestMemoryType(t *testing.T) {
 		tc := tt
 
 		b := encodeMemory(tc.input)
-		t.Run(fmt.Sprintf("encode - %s", tc.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("encode %s", tc.name), func(t *testing.T) {
 			require.Equal(t, tc.expected, b)
 		})
 
-		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			binary, err := decodeMemory(bytes.NewReader(b), max)
+		t.Run(fmt.Sprintf("decode %s", tc.name), func(t *testing.T) {
+			binary, err := decodeMemory(bytes.NewReader(b), wasm.MemorySizer)
 			require.NoError(t, err)
 			require.Equal(t, binary, tc.input)
 		})
@@ -68,10 +68,9 @@ func TestMemoryType(t *testing.T) {
 
 func TestDecodeMemoryType_Errors(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            []byte
-		memoryLimitPages uint32
-		expectedErr      string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
 			name:        "max < min",
@@ -93,12 +92,8 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		if tc.memoryLimitPages == 0 {
-			tc.memoryLimitPages = wasm.MemoryLimitPages
-		}
-
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), tc.memoryLimitPages)
+			_, err := decodeMemory(bytes.NewReader(tc.input), wasm.MemorySizer)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

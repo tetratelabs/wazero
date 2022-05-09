@@ -55,7 +55,7 @@ func newExample() *wasm.Module {
 			}},
 			{Body: []byte{wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
 		},
-		MemorySection: &wasm.Memory{Min: 1, Max: three, IsMaxEncoded: true},
+		MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: three, IsMaxEncoded: true},
 		ExportSection: []*wasm.Export{
 			{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
 			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
@@ -92,7 +92,7 @@ func newExample() *wasm.Module {
 func BenchmarkWat2Wasm(b *testing.B, vsName string, vsWat2Wasm func([]byte) error) {
 	b.Run("wazero", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText, wasm.Features20220419, wasm.MemoryLimitPages); err != nil {
+			if m, err := text.DecodeModule(exampleText, wasm.Features20220419, wasm.MemorySizer); err != nil {
 				b.Fatal(err)
 			} else {
 				_ = binary.EncodeModule(m)

@@ -2040,11 +2040,11 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasifunction, wasiimport)))
+)`, wasifunction, wasiimport)), wazero.NewCompileConfig())
 	require.NoError(t, err)
 	defer compiled.Close(ctx)
 
-	mod, err := r.InstantiateModuleWithConfig(ctx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
+	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
 	require.NoError(t, err)
 
 	if sysCtx != nil {

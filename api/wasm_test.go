@@ -8,6 +8,28 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+func TestExternTypeName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    ExternType
+		expected string
+	}{
+		{"func", ExternTypeFunc, "func"},
+		{"table", ExternTypeTable, "table"},
+		{"mem", ExternTypeMemory, "memory"},
+		{"global", ExternTypeGlobal, "global"},
+		{"unknown", 100, "0x64"},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, ExternTypeName(tc.input))
+		})
+	}
+}
+
 func TestValueTypeName(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -36,28 +36,28 @@ func TestRuntime_CompileModule(t *testing.T) {
 		expectedName string
 	}{
 		{
-			name:   "text - no name",
+			name:   "text no name",
 			source: []byte(`(module)`),
 		},
 		{
-			name:   "text - empty name",
+			name:   "text empty name",
 			source: []byte(`(module $)`),
 		},
 		{
-			name:         "text - name",
+			name:         "text name",
 			source:       []byte(`(module $test)`),
 			expectedName: "test",
 		},
 		{
-			name:   "binary - no name section",
+			name:   "binary no name section",
 			source: binary.EncodeModule(&wasm.Module{}),
 		},
 		{
-			name:   "binary - empty NameSection.ModuleName",
+			name:   "binary empty NameSection.ModuleName",
 			source: binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
 		},
 		{
-			name:         "binary - NameSection.ModuleName",
+			name:         "binary NameSection.ModuleName",
 			source:       binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
 			expectedName: "test",
 		},
@@ -68,7 +68,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := r.CompileModule(testCtx, tc.source)
+			m, err := r.CompileModule(testCtx, tc.source, NewCompileConfig())
 			require.NoError(t, err)
 			code := m.(*compiledCode)
 			defer code.Close(testCtx)
@@ -79,30 +79,79 @@ func TestRuntime_CompileModule(t *testing.T) {
 		})
 	}
 
-	t.Run("text - memory", func(t *testing.T) {
-		r := NewRuntimeWithConfig(NewRuntimeConfig().
-			WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 2 }))
+	t.Run("WithMemorySizer", func(t *testing.T) {
+		source := []byte(`(module (memory 1))`)
 
-		source := []byte(`(module (memory 1 3))`)
-
-		m, err := r.CompileModule(testCtx, source)
+		m, err := r.CompileModule(testCtx, source, NewCompileConfig().
+			WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+				return 1, 2, 3
+			}))
 		require.NoError(t, err)
 		code := m.(*compiledCode)
 		defer code.Close(testCtx)
 
 		require.Equal(t, &wasm.Memory{
-			Min:          1,
-			Cap:          2, // Uses capacity function
-			Max:          3,
-			IsMaxEncoded: true,
+			Min: 1,
+			Cap: 2,
+			Max: 3,
 		}, code.module.MemorySection)
+	})
+
+	t.Run("WithImportReplacements", func(t *testing.T) {
+		source := []byte(`(module
+  (import "js" "increment" (func $increment (result i32)))
+  (import "js" "decrement" (func $decrement (result i32)))
+  (import "js" "wasm_increment" (func $wasm_increment (result i32)))
+  (import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
+)`)
+
+		m, err := r.CompileModule(testCtx, source, NewCompileConfig().
+			WithImportRenamer(func(externType api.ExternType, oldModule, oldName string) (string, string) {
+				if externType != api.ExternTypeFunc {
+					return oldModule, oldName
+				}
+				switch oldName {
+				case "increment", "decrement":
+					return "go", oldName
+				case "wasm_increment", "wasm_decrement":
+					return "wasm", oldName
+				default:
+					return oldModule, oldName
+				}
+			}))
+		require.NoError(t, err)
+		code := m.(*compiledCode)
+		defer code.Close(testCtx)
+
+		require.Equal(t, []*wasm.Import{
+			{
+				Module: "go", Name: "increment",
+				Type:     wasm.ExternTypeFunc,
+				DescFunc: 0,
+			},
+			{
+				Module: "go", Name: "decrement",
+				Type:     wasm.ExternTypeFunc,
+				DescFunc: 0,
+			},
+			{
+				Module: "wasm", Name: "wasm_increment",
+				Type:     wasm.ExternTypeFunc,
+				DescFunc: 0,
+			},
+			{
+				Module: "wasm", Name: "wasm_decrement",
+				Type:     wasm.ExternTypeFunc,
+				DescFunc: 0,
+			},
+		}, code.module.ImportSection)
 	})
 }
 
 func TestRuntime_CompileModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		runtime     Runtime
+		config      CompileConfig
 		source      []byte
 		expectedErr string
 	}{
@@ -121,36 +170,30 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 			expectedErr: "1:2: unexpected field: modular",
 		},
 		{
-			name:        "RuntimeConfig.memoryLimitPages too large",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(math.MaxUint32)),
-			source:      []byte(`(module)`),
-			expectedErr: "memoryLimitPages 4294967295 (3 Ti) > specification max 65536 (4 Gi)",
-		},
-		{
-			name:        "memory has too many pages - text",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(2)),
-			source:      []byte(`(module (memory 3))`),
-			expectedErr: "1:17: min 3 pages (192 Ki) over limit of 2 pages (128 Ki) in module.memory[0]",
+			name:        "memory has too many pages text",
+			source:      []byte(`(module (memory 70000))`),
+			expectedErr: "1:17: min 70000 pages (4 Gi) over limit of 65536 pages (4 Gi) in module.memory[0]",
 		},
 		{
 			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
-			runtime: NewRuntimeWithConfig(NewRuntimeConfig().
-				WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 1 })),
+			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+				return 3, 1, 3
+			}),
 			source:      []byte(`(module (memory 3))`),
-			expectedErr: "memory[0] capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
+			expectedErr: "1:17: capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki) in module.memory[0]",
 		},
 		{
-			name: "memory cap < min - exported", // only one test to avoid duplicating tests in module_test.go
-			runtime: NewRuntimeWithConfig(NewRuntimeConfig().
-				WithMemoryCapacityPages(func(minPages uint32, maxPages *uint32) uint32 { return 1 })),
+			name: "memory cap < min exported", // only one test to avoid duplicating tests in module_test.go
+			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+				return 3, 2, 3
+			}),
 			source:      []byte(`(module (memory 3) (export "memory" (memory 0)))`),
-			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
+			expectedErr: "1:17: capacity 2 pages (128 Ki) less than minimum 3 pages (192 Ki) in module.memory[0]",
 		},
 		{
-			name:        "memory has too many pages - binary",
-			runtime:     NewRuntimeWithConfig(NewRuntimeConfig().WithMemoryLimitPages(2)),
-			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Max: 3, IsMaxEncoded: true}}),
-			expectedErr: "section memory: max 3 pages (192 Ki) over limit of 2 pages (128 Ki)",
+			name:        "memory has too many pages binary",
+			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: 70000, IsMaxEncoded: true}}),
+			expectedErr: "section memory: max 70000 pages (4 Gi) over limit of 65536 pages (4 Gi)",
 		},
 	}
 
@@ -158,59 +201,13 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		if tc.runtime == nil {
-			tc.runtime = r
-		}
-
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.runtime.CompileModule(testCtx, tc.source)
-			require.EqualError(t, err, tc.expectedErr)
-		})
-	}
-}
-
-func TestRuntime_setMemoryCapacity(t *testing.T) {
-	tests := []struct {
-		name        string
-		runtime     *runtime
-		mem         *wasm.Memory
-		expectedErr string
-	}{
-		{
-			name: "cap ok",
-			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
-				return 3
-			}, memoryLimitPages: 3},
-			mem: &wasm.Memory{Min: 2},
-		},
-		{
-			name: "cap < min",
-			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
-				return 1
-			}, memoryLimitPages: 3},
-			mem:         &wasm.Memory{Min: 2},
-			expectedErr: "memory[memory] capacity 1 pages (64 Ki) less than minimum 2 pages (128 Ki)",
-		},
-		{
-			name: "cap > maxLimit",
-			runtime: &runtime{memoryCapacityPages: func(minPages uint32, maxPages *uint32) uint32 {
-				return 4
-			}, memoryLimitPages: 3},
-			mem:         &wasm.Memory{Min: 2},
-			expectedErr: "memory[memory] capacity 4 pages (256 Ki) over limit of 3 pages (192 Ki)",
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			err := tc.runtime.setMemoryCapacity("memory", tc.mem)
-			if tc.expectedErr == "" {
-				require.NoError(t, err)
-			} else {
-				require.EqualError(t, err, tc.expectedErr)
+			config := tc.config
+			if config == nil {
+				config = NewCompileConfig()
 			}
+			_, err := r.CompileModule(testCtx, tc.source, config)
+			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
@@ -314,11 +311,11 @@ func TestModule_Global(t *testing.T) {
 
 		r := NewRuntime().(*runtime)
 		t.Run(tc.name, func(t *testing.T) {
-			var m CompiledCode
+			var m CompiledModule
 			if tc.module != nil {
 				m = &compiledCode{module: tc.module}
 			} else {
-				m, _ = tc.builder(r).Build(testCtx)
+				m, _ = tc.builder(r).Compile(testCtx, NewCompileConfig())
 			}
 			code := m.(*compiledCode)
 
@@ -326,7 +323,7 @@ func TestModule_Global(t *testing.T) {
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above global
-			module, err := r.InstantiateModule(testCtx, code)
+			module, err := r.InstantiateModule(testCtx, code, NewModuleConfig())
 			require.NoError(t, err)
 			defer module.Close(testCtx)
 
@@ -382,7 +379,7 @@ func TestFunction_Context(t *testing.T) {
 			defer closer(testCtx) // nolint
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModuleFromCodeWithConfig(tc.ctx, source, NewModuleConfig().WithName(t.Name()))
+			module, err := r.InstantiateModuleFromCode(tc.ctx, source)
 			require.NoError(t, err)
 			defer module.Close(testCtx)
 
@@ -413,12 +410,12 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	code, err := r.CompileModule(testCtx, []byte(`(module $runtime_test.go
 	(import "env" "start" (func $start))
 	(start $start)
-)`))
+)`), NewCompileConfig())
 	require.NoError(t, err)
 	defer code.Close(testCtx)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	m, err := r.InstantiateModule(testCtx, code)
+	m, err := r.InstantiateModule(testCtx, code, NewModuleConfig())
 	require.NoError(t, err)
 	defer m.Close(testCtx)
 
@@ -466,37 +463,37 @@ func TestRuntime_InstantiateModuleFromCode_UsesContext(t *testing.T) {
 	require.True(t, calledStart)
 }
 
-func TestInstantiateModuleWithConfig_PanicsOnWrongCompiledCodeImpl(t *testing.T) {
-	// It causes maintenance to define an impl of CompiledCode in tests just to verify the error when it is wrong.
+func TestInstantiateModule_PanicsOnWrongCompiledCodeImpl(t *testing.T) {
+	// It causes maintenance to define an impl of CompiledModule in tests just to verify the error when it is wrong.
 	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
 	r := NewRuntime()
 	err := require.CapturePanic(func() {
-		_, _ = r.InstantiateModuleWithConfig(testCtx, nil, NewModuleConfig())
+		_, _ = r.InstantiateModule(testCtx, nil, NewModuleConfig())
 	})
 
-	require.EqualError(t, err, "unsupported wazero.CompiledCode implementation: <nil>")
+	require.EqualError(t, err, "unsupported wazero.CompiledModule implementation: <nil>")
 }
 
-func TestInstantiateModuleWithConfig_PanicsOnWrongModuleConfigImpl(t *testing.T) {
+func TestInstantiateModule_PanicsOnWrongModuleConfigImpl(t *testing.T) {
 	r := NewRuntime()
-	code, err := r.CompileModule(testCtx, []byte(`(module)`))
+	code, err := r.CompileModule(testCtx, []byte(`(module)`), NewCompileConfig())
 	require.NoError(t, err)
 	defer code.Close(testCtx)
 
 	// It causes maintenance to define an impl of ModuleConfig in tests just to verify the error when it is wrong.
 	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
 	err = require.CapturePanic(func() {
-		_, _ = r.InstantiateModuleWithConfig(testCtx, code, nil)
+		_, _ = r.InstantiateModule(testCtx, code, nil)
 	})
 
 	require.EqualError(t, err, "unsupported wazero.ModuleConfig implementation: <nil>")
 }
 
-// TestInstantiateModuleWithConfig_WithName tests that we can pre-validate (cache) a module and instantiate it under
+// TestInstantiateModule_WithName tests that we can pre-validate (cache) a module and instantiate it under
 // different names. This pattern is used in wapc-go.
-func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
+func TestInstantiateModule_WithName(t *testing.T) {
 	r := NewRuntime()
-	base, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`))
+	base, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`), NewCompileConfig())
 	require.NoError(t, err)
 	defer base.Close(testCtx)
 
@@ -504,14 +501,14 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 
 	// Use the same runtime to instantiate multiple modules
 	internal := r.(*runtime).store
-	m1, err := r.InstantiateModuleWithConfig(testCtx, base, NewModuleConfig().WithName("1"))
+	m1, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName("1"))
 	require.NoError(t, err)
 	defer m1.Close(testCtx)
 
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("1"), m1)
 
-	m2, err := r.InstantiateModuleWithConfig(testCtx, base, NewModuleConfig().WithName("2"))
+	m2, err := r.InstantiateModule(testCtx, base, NewModuleConfig().WithName("2"))
 	require.NoError(t, err)
 	defer m2.Close(testCtx)
 
@@ -519,7 +516,7 @@ func TestInstantiateModuleWithConfig_WithName(t *testing.T) {
 	require.Equal(t, internal.Module("2"), m2)
 }
 
-func TestInstantiateModuleWithConfig_ExitError(t *testing.T) {
+func TestInstantiateModule_ExitError(t *testing.T) {
 	r := NewRuntime()
 
 	start := func(ctx context.Context, m api.Module) {

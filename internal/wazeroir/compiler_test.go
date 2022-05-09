@@ -558,7 +558,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 }
 
 func requireModuleText(t *testing.T, source string) *wasm.Module {
-	m, err := text.DecodeModule([]byte(source), wasm.Features20220419, wasm.MemoryLimitPages)
+	m, err := text.DecodeModule([]byte(source), wasm.Features20220419, wasm.MemorySizer)
 	require.NoError(t, err)
 	return m
 }

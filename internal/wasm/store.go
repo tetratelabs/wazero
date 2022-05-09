@@ -390,7 +390,7 @@ func (s *Store) Instantiate(
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	m.applyData(module.DataSection)
 
-	// Build the default context for calls to this module.
+	// Compile the default context for calls to this module.
 	m.CallCtx = NewCallContext(s, m, sys)
 
 	// Execute the start function.

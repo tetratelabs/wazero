@@ -238,7 +238,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 
   (func (param f64 f64) local.get 0 drop local.get 1 drop)
      (export "print_f64_f64" (func 6))
-)`), wasm.Features20191205, wasm.MemoryLimitPages)
+)`), wasm.Features20191205, wasm.MemorySizer)
 	require.NoError(t, err)
 
 	// (global (export "global_i32") i32 (i32.const 666))
@@ -321,7 +321,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 					case "module":
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages)
+						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
 						mod.AssignModuleID(buf)
@@ -455,7 +455,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 }
 
 func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg string) {
-	mod, err := binary.DecodeModule(buf, store.EnabledFeatures, wasm.MemoryLimitPages)
+	mod, err := binary.DecodeModule(buf, store.EnabledFeatures, wasm.MemorySizer)
 	if err != nil {
 		return
 	}

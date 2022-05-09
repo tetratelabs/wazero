@@ -31,7 +31,7 @@ func (a *BaseAssemblerImpl) AddOnGenerateCallBack(cb func([]byte) error) {
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
 func (a *BaseAssemblerImpl) BuildJumpTable(table []byte, labelInitialInstructions []Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Build the offset table for each target.
+		// Compile the offset table for each target.
 		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
 			if uint64(nop.OffsetInBinary())-uint64(base) >= JumpTableMaximumOffset {
