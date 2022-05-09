@@ -221,13 +221,20 @@ type MutableGlobal interface {
 // Note: This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
+
 	// Size returns the size in bytes available. Ex. If the underlying memory has 1 page: 65536
-	//
-	// Note: this will not grow during a host function call, even if the underlying memory can.  Ex. If the underlying
-	// memory has min 0 and max 2 pages, this returns zero.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size(context.Context) uint32
+
+	// Grow increases memory by the delta in pages (65536 bytes per page). The return val is the previous memory size in
+	// pages, or false if the delta was ignored as it exceeds max memory.
+	//
+	// Note: This is the same as the "memory.grow" instruction defined in the WebAssembly Core Specification, except
+	// returns false instead of -1 on failure
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	// See MemorySizer
+	Grow(ctx context.Context, deltaPages uint32) (previousPages uint32, ok bool)
 
 	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
 	// not found or out of range.

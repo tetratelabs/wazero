@@ -882,8 +882,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindMemoryGrow:
 			{
 				n := ce.popValue()
-				res := memoryInst.Grow(ctx, uint32(n))
-				ce.pushValue(uint64(res))
+				if res, ok := memoryInst.Grow(ctx, uint32(n)); !ok {
+					ce.pushValue(uint64(0xffffffff)) // = -1 in signed 32-bit integer.
+				} else {
+					ce.pushValue(uint64(res))
+				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,

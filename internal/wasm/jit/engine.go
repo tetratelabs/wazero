@@ -774,8 +774,11 @@ func (ce *callEngine) builtinFunctionGrowCallFrameStack() {
 func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.MemoryInstance) {
 	newPages := ce.popValue()
 
-	res := mem.Grow(ctx, uint32(newPages))
-	ce.pushValue(uint64(res))
+	if res, ok := mem.Grow(ctx, uint32(newPages)); !ok {
+		ce.pushValue(uint64(0xffffffff)) // = -1 in signed 32-bit integer.
+	} else {
+		ce.pushValue(uint64(res))
+	}
 
 	// Update the moduleContext fields as they become stale after the update ^^.
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
