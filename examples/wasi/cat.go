@@ -30,36 +30,32 @@ func main() {
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Since wazero uses fs.FS, we can use standard libraries to do things like trim the leading path.
 	rooted, err := fs.Sub(catFS, "testdata")
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 
 	// Combine the above into our baseline config, overriding defaults (which discard stdout and have no file system).
 	config := wazero.NewModuleConfig().WithStdout(os.Stdout).WithFS(rooted)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
-	if err != nil {
-		log.Fatal(err)
+	if _, err = wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+		log.Panicln(err)
 	}
-	defer wm.Close(ctx)
 
 	// Compile the WebAssembly module using the default configuration.
 	code, err := r.CompileModule(ctx, catWasm, wazero.NewCompileConfig())
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer code.Close(ctx)
 
 	// InstantiateModule runs the "_start" function which is what TinyGo compiles "main" to.
 	// * Set the program name (arg[0]) to "wasi" and add args to write "test.txt" to stdout twice.
 	// * We use "/test.txt" or "./test.txt" because WithFS by default maps the workdir "." to "/".
-	cat, err := r.InstantiateModule(ctx, code, config.WithArgs("wasi", os.Args[1]))
-	if err != nil {
-		log.Fatal(err)
+	if _, err = r.InstantiateModule(ctx, code, config.WithArgs("wasi", os.Args[1])); err != nil {
+		log.Panicln(err)
 	}
-	defer cat.Close(ctx)
 }

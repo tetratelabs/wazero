@@ -27,7 +27,7 @@ func Example() {
     (export "add" (func $add))
 )`))
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer mod.Close(ctx)
 
@@ -37,7 +37,7 @@ func Example() {
 	x, y := uint64(1), uint64(2)
 	results, err := add.Call(ctx, x, y)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 
 	fmt.Printf("%s: %d + %d = %d\n", mod.Name(), x, y, results[0])

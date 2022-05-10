@@ -105,6 +105,7 @@ func ValueTypeName(t ValueType) string {
 
 // Module return functions exported in a module, post-instantiation.
 //
+// Note: Closing the wazero.Runtime closes any Module it instantiated.
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {

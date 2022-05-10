@@ -29,21 +29,20 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	runtime := wazero.NewRuntime()
+	r := wazero.NewRuntime()
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add a module that uses offset parameters for multiple results, with functions defined in WebAssembly.
-	wasm, err := resultOffsetWasmFunctions(ctx, runtime)
+	wasm, err := resultOffsetWasmFunctions(ctx, r)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer wasm.Close(ctx)
 
 	// Add a module that uses offset parameters for multiple results, with functions defined in Go.
-	host, err := resultOffsetHostFunctions(ctx, runtime)
+	host, err := resultOffsetHostFunctions(ctx, r)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer host.Close(ctx)
 
 	// wazero enables only W3C recommended features by default. Opt-in to other features like so:
 	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
@@ -54,23 +53,21 @@ func main() {
 	// Add a module that uses multiple results values, with functions defined in WebAssembly.
 	wasmWithMultiValue, err := multiValueWasmFunctions(ctx, runtimeWithMultiValue)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer wasmWithMultiValue.Close(ctx)
 
 	// Add a module that uses multiple results values, with functions defined in Go.
 	hostWithMultiValue, err := multiValueHostFunctions(ctx, runtimeWithMultiValue)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer hostWithMultiValue.Close(ctx)
 
 	// Call the same function in all modules and print the results to the console.
 	for _, mod := range []api.Module{wasm, host, wasmWithMultiValue, hostWithMultiValue} {
 		getAge := mod.ExportedFunction("call_get_age")
 		results, err := getAge.Call(ctx)
 		if err != nil {
-			log.Fatal(err)
+			log.Panicln(err)
 		}
 
 		fmt.Printf("%s: age=%d\n", mod.Name(), results[0])

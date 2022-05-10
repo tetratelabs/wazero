@@ -19,6 +19,7 @@ func main() {
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add a module to the runtime named "wasm/math" which exports one function "add", implemented in WebAssembly.
 	wasm, err := r.InstantiateModuleFromCode(ctx, []byte(`(module $wasm/math
@@ -30,9 +31,8 @@ func main() {
     (export "add" (func $add))
 )`))
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer wasm.Close(ctx)
 
 	// Add a module to the runtime named "host/math" which exports one function "add", implemented in Go.
 	host, err := r.NewModuleBuilder("host/math").
@@ -40,9 +40,8 @@ func main() {
 			return v1 + v2
 		}).Instantiate(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer host.Close(ctx)
 
 	// Read two args to add.
 	x, y := readTwoArgs()
@@ -52,7 +51,7 @@ func main() {
 		add := mod.ExportedFunction("add")
 		results, err := add.Call(ctx, x, y)
 		if err != nil {
-			log.Fatal(err)
+			log.Panicln(err)
 		}
 
 		fmt.Printf("%s: %d + %d = %d\n", mod.Name(), x, y, results[0])
@@ -62,12 +61,12 @@ func main() {
 func readTwoArgs() (uint64, uint64) {
 	x, err := strconv.ParseUint(os.Args[1], 10, 64)
 	if err != nil {
-		log.Fatalf("invalid arg %v: %v", os.Args[1], err)
+		log.Panicf("invalid arg %v: %v", os.Args[1], err)
 	}
 
 	y, err := strconv.ParseUint(os.Args[2], 10, 64)
 	if err != nil {
-		log.Fatalf("invalid arg %v: %v", os.Args[2], err)
+		log.Panicf("invalid arg %v: %v", os.Args[2], err)
 	}
 	return x, y
 }
