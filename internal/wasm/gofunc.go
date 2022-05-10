@@ -126,6 +126,8 @@ func CallGoFunc(ctx context.Context, callCtx *CallContext, f *FunctionInstance, 
 			results = append(results, ret.Uint())
 		case reflect.Int32, reflect.Int64:
 			results = append(results, uint64(ret.Int()))
+		case reflect.Uintptr:
+			results = append(results, ret.Uint())
 		default:
 			panic("BUG: invalid return type")
 		}
@@ -243,6 +245,8 @@ func getTypeOf(kind reflect.Kind) (ValueType, bool) {
 		return ValueTypeI32, true
 	case reflect.Int64, reflect.Uint64:
 		return ValueTypeI64, true
+	case reflect.Uintptr:
+		return ValueTypeExternref, true
 	default:
 		return 0x00, false
 	}

@@ -656,21 +656,21 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 }
 
 var (
-	f32, f64, i32, i64 = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64
-	f32i32_v           = &FunctionType{Params: []ValueType{f32, i32}}
-	i32_i32            = &FunctionType{Params: []ValueType{i32}, Results: []ValueType{i32}}
-	i32f64_v           = &FunctionType{Params: []ValueType{i32, f64}}
-	i32i32_i32         = &FunctionType{Params: []ValueType{i32, i32}, Results: []ValueType{i32}}
-	i32_v              = &FunctionType{Params: []ValueType{i32}}
-	v_v                = &FunctionType{}
-	v_f32              = &FunctionType{Results: []ValueType{f32}}
-	v_f32f32           = &FunctionType{Results: []ValueType{f32, f32}}
-	v_f64i32           = &FunctionType{Results: []ValueType{f64, i32}}
-	v_f64f64           = &FunctionType{Results: []ValueType{f64, f64}}
-	v_i32              = &FunctionType{Results: []ValueType{i32}}
-	v_i32i32           = &FunctionType{Results: []ValueType{i32, i32}}
-	v_i32i64           = &FunctionType{Results: []ValueType{i32, i64}}
-	v_i64i64           = &FunctionType{Results: []ValueType{i64, i64}}
+	f32, f64, i32, i64, externref = ValueTypeF32, ValueTypeF64, ValueTypeI32, ValueTypeI64, ValueTypeExternref
+	f32i32_v                      = &FunctionType{Params: []ValueType{f32, i32}}
+	i32_i32                       = &FunctionType{Params: []ValueType{i32}, Results: []ValueType{i32}}
+	i32f64_v                      = &FunctionType{Params: []ValueType{i32, f64}}
+	i32i32_i32                    = &FunctionType{Params: []ValueType{i32, i32}, Results: []ValueType{i32}}
+	i32_v                         = &FunctionType{Params: []ValueType{i32}}
+	v_v                           = &FunctionType{}
+	v_f32                         = &FunctionType{Results: []ValueType{f32}}
+	v_f32f32                      = &FunctionType{Results: []ValueType{f32, f32}}
+	v_f64i32                      = &FunctionType{Results: []ValueType{f64, i32}}
+	v_f64f64                      = &FunctionType{Results: []ValueType{f64, f64}}
+	v_i32                         = &FunctionType{Results: []ValueType{i32}}
+	v_i32i32                      = &FunctionType{Results: []ValueType{i32, i32}}
+	v_i32i64                      = &FunctionType{Results: []ValueType{i32, i64}}
+	v_i64i64                      = &FunctionType{Results: []ValueType{i64, i64}}
 )
 
 // TestModule_ValidateFunction_TypeMismatchSpecTests are "type mismatch" tests when "multi-value" was merged.

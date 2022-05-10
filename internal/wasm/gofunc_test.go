@@ -70,9 +70,9 @@ func TestGetFunctionType(t *testing.T) {
 		},
 		{
 			name:         "all supported params and i32 result - context.Context and api.Module",
-			inputFunc:    func(context.Context, api.Module, uint32, uint64, float32, float64) uint32 { return 0 },
+			inputFunc:    func(context.Context, api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoContextModule,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 	}
 	for _, tt := range tests {
