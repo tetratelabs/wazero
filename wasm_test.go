@@ -578,6 +578,23 @@ func TestClose(t *testing.T) {
 	}
 }
 
+func TestCloseClosesCompiledModules(t *testing.T) {
+	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
+	conf := *engineLessConfig
+	conf.newEngine = func(_ wasm.Features) wasm.Engine {
+		return engine
+	}
+	r := NewRuntimeWithConfig(&conf)
+	// Normally compiled modules are closed when instantiated but this is never instantiated.
+	_, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`), NewCompileConfig())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(engine.cachedModules))
+
+	err = r.Close(testCtx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(engine.cachedModules))
+}
+
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx context.Context) uint64, functionName string) ([]byte, func(context.Context) error) {
 	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx)
