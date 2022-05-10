@@ -413,6 +413,7 @@ func (s *Store) deleteModule(moduleName string) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	delete(s.modules, moduleName)
+	// remove this module name
 	for i, n := range s.moduleNames {
 		if n == moduleName {
 			s.moduleNames = append(s.moduleNames[:i], s.moduleNames[i+1:]...)
@@ -627,13 +628,14 @@ func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 	return id, nil
 }
 
-func (s *Store) Close(ctx context.Context) error {
+// CloseWithExitCode implements the same method as documented on wazero.Runtime.
+func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	var err error
 	// Close modules in reverse initialization order.
 	for i := len(s.moduleNames) - 1; i >= 0; i-- {
-		if _, e := s.modules[s.moduleNames[i]].CallCtx.close(ctx, 0); e != nil && err == nil {
+		// If closing this module errs, proceed anyway to close the others.
+		if _, e := s.modules[s.moduleNames[i]].CallCtx.close(ctx, exitCode); e != nil && err == nil {
 			err = e // first error
 		}
 	}

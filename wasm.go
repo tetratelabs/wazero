@@ -100,10 +100,22 @@ type Runtime interface {
 	//	ctx := context.Background()
 	//  r := wazero.NewRuntime()
 	//  defer r.Close(ctx)
-	//	_, _ = r.InstantiateModuleFromCode(ctx, sourceLib)
-	//	mod, _ := r.InstantiateModuleFromCode(ctx, sourceApp)
+	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 	//
-	Close(ctx context.Context) error
+	Close(context.Context) error
+
+	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
+	// An error is returned if any module returns an error when closed.
+	//
+	// Ex.
+	//	ctx := context.Background()
+	//  r := wazero.NewRuntime()
+	//  defer r.CloseWithExitCode(ctx, 2)
+	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+	//
+	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 }
 
 func NewRuntime() Runtime {
@@ -295,5 +307,10 @@ func (r *runtime) InstantiateModule(ctx context.Context, compiled CompiledModule
 
 // Close implements Runtime.Close
 func (r *runtime) Close(ctx context.Context) error {
-	return r.store.Close(ctx)
+	return r.CloseWithExitCode(ctx, 0)
+}
+
+// CloseWithExitCode implements Runtime.CloseWithExitCode
+func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
+	return r.store.CloseWithExitCode(ctx, exitCode)
 }
