@@ -14,7 +14,7 @@ defaults:
 
 jobs:
   check:
-    name: Pre-commit check, Go-${{ matrix.go-version }})
+    name: Pre-commit check, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
       matrix:  # use latest available versions and be consistent on all workflows!
