@@ -529,6 +529,73 @@ func TestInstantiateModule_ExitError(t *testing.T) {
 	require.Equal(t, err, sys.NewExitError("env", 2))
 }
 
+func TestClose(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		exitCode uint32
+	}{
+		{
+			name:     "exit code 0",
+			exitCode: uint32(0),
+		},
+		{
+			name:     "exit code 2",
+			exitCode: uint32(2),
+		},
+	} {
+
+		r := NewRuntime()
+
+		m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
+		require.NoError(t, err)
+		m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
+		require.NoError(t, err)
+
+		func1 := m1.ExportedFunction("func1")
+		func2 := m2.ExportedFunction("func2")
+
+		// Modules not closed so calls succeed
+
+		_, err = func1.Call(testCtx)
+		require.NoError(t, err)
+
+		_, err = func2.Call(testCtx)
+		require.NoError(t, err)
+
+		if tc.exitCode == 0 {
+			err = r.Close(testCtx)
+		} else {
+			err = r.CloseWithExitCode(testCtx, tc.exitCode)
+		}
+		require.NoError(t, err)
+
+		// Modules closed so calls fail
+		_, err = func1.Call(testCtx)
+		// TODO: This could be neater with ErrorIs
+		require.Error(t, err, sys.NewExitError("mod1", tc.exitCode).Error())
+
+		_, err = func2.Call(testCtx)
+		require.Error(t, err, sys.NewExitError("mod2", tc.exitCode).Error())
+	}
+}
+
+func TestClose_ClosesCompiledModules(t *testing.T) {
+	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
+	conf := *engineLessConfig
+	conf.newEngine = func(_ wasm.Features) wasm.Engine {
+		return engine
+	}
+	r := NewRuntimeWithConfig(&conf)
+	// Normally compiled modules are closed when instantiated but this is never instantiated.
+	_, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`), NewCompileConfig())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(engine.cachedModules))
+
+	err = r.Close(testCtx)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(engine.cachedModules))
+}
+
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx context.Context) uint64, functionName string) ([]byte, func(context.Context) error) {
 	mod, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx)

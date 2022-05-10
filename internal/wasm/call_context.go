@@ -79,18 +79,28 @@ func (m *CallContext) Close(ctx context.Context) (err error) {
 }
 
 // CloseWithExitCode implements the same method as documented on api.Module.
-func (m *CallContext) CloseWithExitCode(_ context.Context, exitCode uint32) (err error) {
+func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
+	closed, err := m.close(ctx, exitCode)
+	if !closed {
+		return nil
+	}
+	m.store.deleteModule(m.Name())
+	return err
+}
+
+// close marks this CallContext as closed and releases underlying system resources without removing
+// from the store.
+func (m *CallContext) close(_ context.Context, exitCode uint32) (c bool, err error) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
-		return nil
+		return false, nil
 	}
-	m.store.deleteModule(m.Name())
 	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
-		return sys.Close()
+		return true, sys.Close()
 	}
-	return
+	return true, nil
 }
 
 // Memory implements the same method as documented on api.Module.

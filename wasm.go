@@ -92,6 +92,28 @@ type Runtime interface {
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
 	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
+
+	// Close closes all the modules that have been initialized in this Runtime with an exit code of 0.
+	// An error is returned if any module returns an error when closed.
+	//
+	// Ex.
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime()
+	//	defer r.Close(ctx)
+	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+	Close(context.Context) error
+
+	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
+	// An error is returned if any module returns an error when closed.
+	//
+	// Ex.
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime()
+	//	defer r.CloseWithExitCode(ctx, 2)
+	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 }
 
 func NewRuntime() Runtime {
@@ -114,6 +136,7 @@ func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
 type runtime struct {
 	store           *wasm.Store
 	enabledFeatures wasm.Features
+	compiledModules []*compiledCode
 }
 
 // Module implements Runtime.Module
@@ -166,7 +189,9 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 		return nil, err
 	}
 
-	return &compiledCode{module: internal, compiledEngine: r.store.Engine}, nil
+	c := &compiledCode{module: internal, compiledEngine: r.store.Engine}
+	r.compiledModules = append(r.compiledModules, c)
+	return c, nil
 }
 
 //
@@ -279,4 +304,20 @@ func (r *runtime) InstantiateModule(ctx context.Context, compiled CompiledModule
 		}
 	}
 	return
+}
+
+// Close implements Runtime.Close
+func (r *runtime) Close(ctx context.Context) error {
+	return r.CloseWithExitCode(ctx, 0)
+}
+
+// CloseWithExitCode implements Runtime.CloseWithExitCode
+func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
+	err := r.store.CloseWithExitCode(ctx, exitCode)
+	for _, c := range r.compiledModules {
+		if e := c.Close(ctx); e != nil && err == nil {
+			err = e
+		}
+	}
+	return err
 }
