@@ -917,9 +917,9 @@ const (
 	ValueTypeI64 = api.ValueTypeI64
 	ValueTypeF32 = api.ValueTypeF32
 	ValueTypeF64 = api.ValueTypeF64
-	// TODO: RefTypes are not exposed in the api pkg yet.
+	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
-	ValueTypeExternref ValueType = 0x6f
+	ValueTypeExternref ValueType = api.ValueTypeExternref
 )
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.

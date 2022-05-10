@@ -2238,10 +2238,18 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "ref.null",
+			name: "ref.null (funcref)",
 			flag: FeatureReferenceTypes,
 			body: []byte{
 				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeDrop, OpcodeEnd,
+			},
+		},
+		{
+			name: "ref.null (externref)",
+			flag: FeatureReferenceTypes,
+			body: []byte{
+				OpcodeRefNull, ValueTypeExternref,
 				OpcodeDrop, OpcodeEnd,
 			},
 		},
