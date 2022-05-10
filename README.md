@@ -1,4 +1,4 @@
-# wazero
+# wazero: the zero dependency WebAssembly runtime for Go developers
 
 WebAssembly is a way to safely run code compiled in other languages. Runtimes
 execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm`
