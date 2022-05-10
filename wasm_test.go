@@ -530,33 +530,52 @@ func TestInstantiateModule_ExitError(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	r := NewRuntime()
+	for _, tc := range []struct {
+		name     string
+		exitCode uint32
+	}{
+		{
+			name:     "exit code 0",
+			exitCode: uint32(0),
+		},
+		{
+			name:     "exit code 2",
+			exitCode: uint32(2),
+		},
+	} {
 
-	m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
-	require.NoError(t, err)
-	m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
-	require.NoError(t, err)
+		r := NewRuntime()
 
-	func1 := m1.ExportedFunction("func1")
-	func2 := m2.ExportedFunction("func2")
+		m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
+		require.NoError(t, err)
+		m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
+		require.NoError(t, err)
 
-	// Modules not closed so calls succeed
+		func1 := m1.ExportedFunction("func1")
+		func2 := m2.ExportedFunction("func2")
 
-	_, err = func1.Call(testCtx)
-	require.NoError(t, err)
+		// Modules not closed so calls succeed
 
-	_, err = func2.Call(testCtx)
-	require.NoError(t, err)
+		_, err = func1.Call(testCtx)
+		require.NoError(t, err)
 
-	err = r.Close(testCtx)
-	require.NoError(t, err)
+		_, err = func2.Call(testCtx)
+		require.NoError(t, err)
 
-	// Modules closed so calls fail
-	_, err = func1.Call(testCtx)
-	require.Error(t, err)
+		if tc.exitCode == 0 {
+			err = r.Close(testCtx)
+		} else {
+			err = r.CloseWithExitCode(testCtx, tc.exitCode)
+		}
+		require.NoError(t, err)
 
-	_, err = func2.Call(testCtx)
-	require.Error(t, err)
+		// Modules closed so calls fail
+		_, err = func1.Call(testCtx)
+		require.Error(t, err, sys.NewExitError("mod1", tc.exitCode).Error())
+
+		_, err = func2.Call(testCtx)
+		require.Error(t, err, sys.NewExitError("mod2", tc.exitCode).Error())
+	}
 }
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.

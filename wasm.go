@@ -138,6 +138,7 @@ func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
 type runtime struct {
 	store           *wasm.Store
 	enabledFeatures wasm.Features
+	compiledModules []*compiledCode
 }
 
 // Module implements Runtime.Module
@@ -190,7 +191,9 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 		return nil, err
 	}
 
-	return &compiledCode{module: internal, compiledEngine: r.store.Engine}, nil
+	c := &compiledCode{module: internal, compiledEngine: r.store.Engine}
+	r.compiledModules = append(r.compiledModules, c)
+	return c, nil
 }
 
 //
@@ -312,5 +315,11 @@ func (r *runtime) Close(ctx context.Context) error {
 
 // CloseWithExitCode implements Runtime.CloseWithExitCode
 func (r *runtime) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
-	return r.store.CloseWithExitCode(ctx, exitCode)
+	err := r.store.CloseWithExitCode(ctx, exitCode)
+	for _, c := range r.compiledModules {
+		if e := c.Close(ctx); e != nil && err == nil {
+			err = e
+		}
+	}
+	return err
 }
