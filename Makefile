@@ -1,5 +1,7 @@
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.0
+# sync this with netlify.toml!
+hugo          := github.com/gohugoio/hugo@v0.98.0
 
 ensureJITFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
 .PHONY: bench
@@ -88,3 +90,8 @@ check:
 		echo "The following differences will fail CI until committed:"; \
 		git diff --exit-code; \
 	fi
+
+.PHONY: site
+site: ## Serve website content
+	@git submodule update
+	@cd site && go run $(hugo) server --minify --disableFastRender --baseURL localhost:1313 --cleanDestinationDir -D

@@ -12,8 +12,7 @@ Import wazero and extend your Go application with code written in any language!
 
 ## Example
 
-The best way to learn this and other features you get with wazero is by trying
-one of our [examples](examples).
+The best way to learn wazero is by trying one of our [examples](examples).
 
 For the impatient, here's how invoking a factorial function looks in wazero:
 
@@ -342,6 +341,9 @@ may be surprised to find equal or better performance vs mature JIT-style
 runtimes because [CGO is slow][27]. More specifically, if you make large amount
 of CGO calls which cross the boundary between Go and C (stack) space, then the
 usage of CGO could be a bottleneck.
+
+-----
+wazero is a registered trademark of Tetrate.io, Inc. in the United States and/or other countries
 
 [1]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 [2]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/

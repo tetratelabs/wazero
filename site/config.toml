@@ -1,0 +1,28 @@
+baseURL = "https://wazero.io/"
+languageCode = "en-us"
+defaultContentLanguage = "en"
+title = "wazero"
+theme = "hello-friend"
+
+[params]
+  defaultTheme = "light"
+  showReadingTime = false
+
+[languages]
+  [languages.en]
+    [languages.en.params.logo]
+      logoText = "wazero"
+      path = "/img/wazero.svg"
+    [languages.en.menu]
+      [[languages.en.menu.main]]
+        url = "https://github.com/tetratelabs/wazero/blob/main/examples"
+        name = "Examples"
+        weight = 20
+      [[languages.en.menu.main]]
+        url = "https://github.com/tetratelabs/wazero/releases"
+        name = "Releases"
+        weight = 30
+      [[languages.en.menu.main]]
+        url = "https://github.com/tetratelabs/wazero"
+        name = "GitHub"
+        weight = 40

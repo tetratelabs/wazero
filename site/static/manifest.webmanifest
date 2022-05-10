@@ -1,0 +1,34 @@
+{
+  "name": "wazero",
+  "short_name": "wazero",
+  "description": "wazero: the zero dependency WebAssembly runtime for Go developers",
+  "start_url": "/",
+  "background_color": "white",
+  "icons": [
+    {
+      "src": "img/icon@16w.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon@32w.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon@180w.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon@192w.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon@512w.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
