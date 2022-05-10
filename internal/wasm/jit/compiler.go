@@ -371,4 +371,37 @@ type compiler interface {
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	compileElemDrop(*wazeroir.OperationElemDrop) error
+	// compileRefFunc adds instructions to perform operations corresponding to wasm.OpcodeRefFunc instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// Note: in wazero, we express any reference types (funcref or externref) as opaque pointers which is uint64.
+	// Thefore, the compilers implementations emit instructions to push the address of *function onto the stack.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-ref-mathsf-ref-func-x
+	compileRefFunc(*wazeroir.OperationRefFunc) error
+	// compileTableGet adds instructions to perform operations corresponding to wasm.OpcodeTableGet instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-get-x
+	compileTableGet(*wazeroir.OperationTableGet) error
+	// compileTableSet adds instructions to perform operations corresponding to wasm.OpcodeTableSet instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-set-x
+	compileTableSet(*wazeroir.OperationTableSet) error
+	// compileTableGrow adds instructions to perform operations corresponding to wasm.OpcodeMiscTableGrow instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-grow-x
+	compileTableGrow(*wazeroir.OperationTableGrow) error
+	// compileTableSize adds instructions to perform operations corresponding to wasm.OpcodeMiscTableSize instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-size-x
+	compileTableSize(*wazeroir.OperationTableSize) error
+	// compileTableFill adds instructions to perform operations corresponding to wasm.OpcodeMiscTableFill instruction introduced in
+	// wasm.FeatureReferenceTypes.
+	//
+	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-fill-x
+	compileTableFill(*wazeroir.OperationTableFill) error
 }

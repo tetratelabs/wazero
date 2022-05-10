@@ -1,0 +1,51 @@
+;; https://github.com/WebAssembly/spec/blob/1ffb924e94856e89f787fc2000fa4c5dc069a24f/test/core/ref_func.wast#L6-L54
+
+(module
+  (func $f (import "M" "f") (param i32) (result i32))
+  (func $g (param $x i32) (result i32)
+    (i32.add (local.get $x) (i32.const 1))
+  )
+
+  (global funcref (ref.func $f))
+  (global funcref (ref.func $g))
+  (global $v (mut funcref) (ref.func $f))
+
+  (global funcref (ref.func $gf1))
+  (global funcref (ref.func $gf2))
+  (func (drop (ref.func $ff1)) (drop (ref.func $ff2)))
+  (elem declare func $gf1 $ff1)
+  (elem declare funcref (ref.func $gf2) (ref.func $ff2))
+  (func $gf1)
+  (func $gf2)
+  (func $ff1)
+  (func $ff2)
+
+  (func (export "is_null-f") (result i32)
+    (ref.is_null (ref.func $f))
+  )
+  (func (export "is_null-g") (result i32)
+    (ref.is_null (ref.func $g))
+  )
+  (func (export "is_null-v") (result i32)
+    (ref.is_null (global.get $v))
+  )
+
+  (func (export "set-f") (global.set $v (ref.func $f)))
+  (func (export "set-g") (global.set $v (ref.func $g)))
+
+  (table $t 1 funcref)
+  (elem declare func $f $g)
+
+  (func (export "call-f") (param $x i32) (result i32)
+    (table.set $t (i32.const 0) (ref.func $f))
+    (call_indirect $t (param i32) (result i32) (local.get $x) (i32.const 0))
+  )
+  (func (export "call-g") (param $x i32) (result i32)
+    (table.set $t (i32.const 0) (ref.func $g))
+    (call_indirect $t (param i32) (result i32) (local.get $x) (i32.const 0))
+  )
+  (func (export "call-v") (param $x i32) (result i32)
+    (table.set $t (i32.const 0) (global.get $v))
+    (call_indirect $t (param i32) (result i32) (local.get $x) (i32.const 0))
+  )
+)

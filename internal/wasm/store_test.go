@@ -453,6 +453,9 @@ func (me *mockModuleEngine) CreateFuncElementInstance([]*Index) *ElementInstance
 	return nil
 }
 
+// InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) InitializeFuncrefGlobals(globals []*GlobalInstance) {}
+
 // Name implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Name() string {
 	return e.name
@@ -505,7 +508,7 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 }
 
 func TestExecuteConstExpression(t *testing.T) {
-	t.Run("non global expr", func(t *testing.T) {
+	t.Run("basic type const expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
 			t.Run(ValueTypeName(vt), func(t *testing.T) {
 				expr := &ConstantExpression{}
@@ -545,6 +548,44 @@ func TestExecuteConstExpression(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, float64(math.MaxFloat64), actual)
 				}
+			})
+		}
+	})
+	t.Run("reference types", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			expr *ConstantExpression
+			exp  interface{}
+		}{
+			{
+				name: "ref.null (externref)",
+				expr: &ConstantExpression{
+					Opcode: OpcodeRefNull,
+					Data:   []byte{RefTypeExternref},
+				},
+				exp: int64(0),
+			},
+			{
+				name: "ref.null (funcref)",
+				expr: &ConstantExpression{
+					Opcode: OpcodeRefNull,
+					Data:   []byte{RefTypeFuncref},
+				},
+				exp: int64(GlobalInstanceNullFuncRefValue),
+			},
+			{
+				name: "ref.func",
+				expr: &ConstantExpression{
+					Opcode: OpcodeRefFunc,
+					Data:   []byte{1},
+				},
+				exp: int32(1),
+			},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				val := executeConstExpression(nil, tc.expr)
+				require.Equal(t, tc.exp, val)
 			})
 		}
 	})

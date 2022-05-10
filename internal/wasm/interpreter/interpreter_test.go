@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
@@ -65,21 +66,31 @@ func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference {
 	references := make([][]wasm.Reference, len(tableIndexToLen))
 	for tableIndex, l := range tableIndexToLen {
-		references[tableIndex] = make([]interface{}, l)
+		references[tableIndex] = make([]wasm.Reference, l)
 	}
 	internal := me.(*moduleEngine)
 
 	for tableIndex, init := range initTableIdxToFnIdx {
 		referencesPerTable := references[tableIndex]
 		for idx, fnidx := range init {
-			referencesPerTable[idx] = internal.functions[fnidx]
+			referencesPerTable[idx] = uintptr(unsafe.Pointer(internal.functions[fnidx]))
 		}
 	}
 	return references
 }
 
+// CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
+func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
+	internal := me.(*moduleEngine)
+	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
+}
+
 func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
+}
+
+func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
+	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
 }
 
 func TestInterpreter_Engine_NewModuleEngine_InitTable(t *testing.T) {
@@ -434,7 +445,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		}
 
 		err := e.CompileModule(testCtx, errModule)
-		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+		require.EqualError(t, err, "failed to lower func[2/2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		_, ok := e.codes[errModule.ID]

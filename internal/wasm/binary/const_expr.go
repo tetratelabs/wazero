@@ -36,10 +36,11 @@ func decodeConstantExpression(r *bytes.Reader, enabledFeatures wasm.Features) (*
 		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
 			return nil, fmt.Errorf("ref.null is not supported as %w", err)
 		}
-		var reftype byte
-		reftype, err = r.ReadByte()
-		if reftype != wasm.RefTypeFuncref {
-			return nil, fmt.Errorf("ref.null instruction in constant expression must be of funcref type but was 0x%x", reftype)
+		reftype, err := r.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("read reference type for ref.null: %w", err)
+		} else if reftype != wasm.RefTypeFuncref && reftype != wasm.RefTypeExternref {
+			return nil, fmt.Errorf("invalid type for ref.null: 0x%x", reftype)
 		}
 	case wasm.OpcodeRefFunc:
 		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {

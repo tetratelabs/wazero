@@ -56,7 +56,6 @@ func requireErrorOnBulkMemoryFeatureDisabled(t *testing.T, newRuntimeConfig func
 
 func testTableCopy(t *testing.T, newRuntimeConfig func() wazero.RuntimeConfig) {
 	t.Run("table.copy", func(t *testing.T) {
-
 		requireErrorOnBulkMemoryFeatureDisabled(t, newRuntimeConfig, tableCopyWasm)
 
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureBulkMemoryOperations(true))

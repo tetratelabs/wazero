@@ -745,6 +745,69 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			default:
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
+		} else if op >= OpcodeRefNull && op <= OpcodeRefFunc {
+			if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+				return fmt.Errorf("%s invalid as %v", instructionNames[op], err)
+			}
+			switch op {
+			case OpcodeRefNull:
+				pc++
+				switch reftype := body[pc]; reftype {
+				case ValueTypeExternref:
+					valueTypeStack.push(ValueTypeExternref)
+				case ValueTypeFuncref:
+					valueTypeStack.push(ValueTypeFuncref)
+				default:
+					return fmt.Errorf("unknown type for ref.null: 0x%x", reftype)
+				}
+			case OpcodeRefIsNull:
+				tp, err := valueTypeStack.pop()
+				if err != nil {
+					return fmt.Errorf("cannot pop the operand for ref.is_null: %v", err)
+				} else if tp != ValueTypeExternref && tp != ValueTypeFuncref {
+					return fmt.Errorf("type mismatch: expected reference type but was %s", ValueTypeName(tp))
+				}
+				valueTypeStack.push(ValueTypeI32)
+			case OpcodeRefFunc:
+				pc++
+				index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				if err != nil {
+					return fmt.Errorf("failed to read function index for ref.func: %v", err)
+				}
+				if int(index) >= len(functions) {
+					return fmt.Errorf("invalid function index for ref.func: %d", index)
+				}
+				pc += num - 1
+				valueTypeStack.push(ValueTypeFuncref)
+			}
+		} else if op == OpcodeTableGet || op == OpcodeTableSet {
+			if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+				return fmt.Errorf("%s is invalid as %v", InstructionName(op), err)
+			}
+			pc++
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			if err != nil {
+				return fmt.Errorf("read immediate: %v", err)
+			}
+			if tableIndex >= uint32(len(tables)) {
+				return fmt.Errorf("table of index %d not found", tableIndex)
+			}
+
+			refType := tables[tableIndex].Type
+			if op == OpcodeTableGet {
+				if err := valueTypeStack.popAndVerifyType(api.ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for table.get: %v", err)
+				}
+				valueTypeStack.push(refType)
+			} else {
+				if err := valueTypeStack.popAndVerifyType(refType); err != nil {
+					return fmt.Errorf("cannot pop the operand for table.set: %v", err)
+				}
+				if err := valueTypeStack.popAndVerifyType(api.ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for table.set: %v", err)
+				}
+			}
+			pc += num - 1
 		} else if op == OpcodeMiscPrefix {
 			pc++
 			// Miscellaneous instructions come with two bytes which starts with OpcodeMiscPrefix,
@@ -917,6 +980,40 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					if err := valueTypeStack.popAndVerifyType(p); err != nil {
 						return fmt.Errorf("cannot pop the operand for %s: %v", miscInstructionNames[miscOpcode], err)
 					}
+				}
+			} else if miscOpcode >= OpcodeMiscTableGrow && miscOpcode <= OpcodeMiscTableFill {
+				if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
+				}
+
+				pc++
+				tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				if err != nil {
+					return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
+				}
+				if tableIndex >= uint32(len(tables)) {
+					return fmt.Errorf("table of index %d not found", tableIndex)
+				}
+				pc += num - 1
+
+				var params, results []ValueType
+				reftype := tables[tableIndex].Type
+				if miscOpcode == OpcodeMiscTableGrow {
+					params = []ValueType{ValueTypeI32, reftype}
+					results = []ValueType{ValueTypeI32}
+				} else if miscOpcode == OpcodeMiscTableSize {
+					results = []ValueType{ValueTypeI32}
+				} else if miscOpcode == OpcodeMiscTableFill {
+					params = []ValueType{ValueTypeI32, reftype, ValueTypeI32}
+				}
+
+				for _, p := range params {
+					if err := valueTypeStack.popAndVerifyType(p); err != nil {
+						return fmt.Errorf("cannot pop the operand for %s: %v", miscInstructionNames[miscOpcode], err)
+					}
+				}
+				for _, r := range results {
+					valueTypeStack.push(r)
 				}
 			}
 		} else if op == OpcodeBlock {

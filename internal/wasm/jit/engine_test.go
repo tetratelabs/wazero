@@ -35,7 +35,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tablesElement0Address)), callEngineModuleContextTablesElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.codesElement0Address)), callEngineModuleContextCodesElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.functionsElement0Address)), callEngineModuleContextFunctionsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.elementInstancesElemen0Address)), callEngineModuleContextElementInstancesElement0AddressOffset)
@@ -95,21 +95,14 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	var globalInstance wasm.GlobalInstance
 	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset)
 
-	// Offsets for Go's interface.
-	// The underlying struct is not exposed in the public API, so we simulate it here.
-	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
-	var eface struct {
-		_type *struct{}
-		data  unsafe.Pointer
-	}
-	require.Equal(t, int(unsafe.Offsetof(eface.data)), interfaceDataOffset)
-	require.Equal(t, int(unsafe.Sizeof(eface)), 1<<interfaceDataSizeLog2)
-
 	var dataInstance wasm.DataInstance
 	require.Equal(t, int(unsafe.Sizeof(dataInstance)), dataInstanceStructSize)
 
 	var elementInstance wasm.ElementInstance
 	require.Equal(t, int(unsafe.Sizeof(elementInstance)), elementInstanceStructSize)
+
+	var pointer uintptr
+	require.Equal(t, unsafe.Sizeof(pointer), uintptr(1<<pointerSizeLog2))
 }
 
 // et is used for tests defined in the enginetest package.
@@ -127,22 +120,32 @@ func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference {
 	references := make([][]wasm.Reference, len(tableIndexToLen))
 	for tableIndex, l := range tableIndexToLen {
-		references[tableIndex] = make([]interface{}, l)
+		references[tableIndex] = make([]uintptr, l)
 	}
 	internal := me.(*moduleEngine)
 
 	for tableIndex, init := range initTableIdxToFnIdx {
 		referencesPerTable := references[tableIndex]
 		for idx, fnidx := range init {
-			referencesPerTable[idx] = internal.functions[fnidx]
+			referencesPerTable[idx] = uintptr(unsafe.Pointer(internal.functions[fnidx]))
 		}
 	}
 	return references
 }
 
+// CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
+func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
+	internal := me.(*moduleEngine)
+	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
+}
+
 func TestJIT_Engine_NewModuleEngine(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
+}
+
+func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
+	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
 }
 
 func TestJIT_Engine_NewModuleEngine_InitTable(t *testing.T) {
@@ -235,7 +238,7 @@ func TestJIT_CompileModule(t *testing.T) {
 
 		e := et.NewEngine(wasm.Features20191205).(*engine)
 		err := e.CompileModule(testCtx, errModule)
-		require.EqualError(t, err, "failed to lower func[2/3] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+		require.EqualError(t, err, "failed to lower func[2/2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
 		_, ok := e.codes[errModule.ID]

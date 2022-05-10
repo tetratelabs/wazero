@@ -279,7 +279,6 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 				return fmt.Errorf("out of bounds memory access")
 			}
 		}
-
 	}
 	return
 }
@@ -384,8 +383,9 @@ func (s *Store) Instantiate(
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
 
-	// After engine creation, we can create the funcref element instances.
+	// After engine creation, we can create the funcref element instances and initialize funcref type globals.
 	m.buildElementInstances(module.ElementSection)
+	m.Engine.InitializeFuncrefGlobals(globals)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	m.applyData(module.DataSection)
@@ -595,9 +595,26 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		case ValueTypeF64:
 			v = api.DecodeF64(g.Val)
 		}
+	case OpcodeRefNull:
+		switch expr.Data[0] {
+		case ValueTypeExternref:
+			v = int64(0) // Extern reference types are opaque 64bit pointer at runtime.
+		case ValueTypeFuncref:
+			// For funcref types, the pointer value will be set by Engines, so
+			// here we set the "invalid function index" (-1) to indicate that this should be null reference.
+			v = GlobalInstanceNullFuncRefValue
+		}
+	case OpcodeRefFunc:
+		// For ref.func const expresssion, we temporarily store the index as value,
+		// and if this is the const expr for global, the value will be further downed to
+		// opaque pointer of the engine-specific compiled function.
+		v, _, _ = leb128.DecodeInt32(r)
 	}
 	return
 }
+
+// GlobalInstanceNullFuncRefValue is the temporarly value for ValueTypeFuncref globals which are initialized via ref.null.
+const GlobalInstanceNullFuncRefValue int64 = -1
 
 func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
 	// We take write-lock here as the following might end up mutating typeIDs map.

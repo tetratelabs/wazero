@@ -44,6 +44,9 @@ type ModuleEngine interface {
 	// CreateFuncElementInstance creates an ElementInstance whose references are engine-specific function pointers
 	// corresponding to the given `indexes`.
 	CreateFuncElementInstance(indexes []*Index) *ElementInstance
+
+	// InitializeFuncrefGlobals initializes the globals of Funcref type as the opaque pointer values of engine specific compiled functions.
+	InitializeFuncrefGlobals(globals []*GlobalInstance)
 }
 
 // TableInitMap is a mapping of Table's index to a mapping of TableInstance.Table index to the function index.

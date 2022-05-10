@@ -2229,3 +2229,356 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 		require.EqualError(t, err, "table is not funcref type but was externref for call_indirect")
 	})
 }
+
+func TestModule_funcValidation_RefTypes(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "ref.null",
+			flag: FeatureReferenceTypes,
+			body: []byte{
+				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeDrop, OpcodeEnd,
+			},
+		},
+		{
+			name: "ref.null - disabled",
+			flag: Features20191205,
+			body: []byte{
+				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeDrop, OpcodeEnd,
+			},
+			expectedErr: "ref.null invalid as feature \"reference-types\" is disabled",
+		},
+		{
+			name: "ref.is_null",
+			flag: FeatureReferenceTypes,
+			body: []byte{
+				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeRefIsNull,
+				OpcodeDrop, OpcodeEnd,
+			},
+		},
+		{
+			name: "ref.is_null - disabled",
+			flag: Features20191205,
+			body: []byte{
+				OpcodeRefIsNull,
+				OpcodeDrop, OpcodeEnd,
+			},
+			expectedErr: `ref.is_null invalid as feature "reference-types" is disabled`,
+		},
+		{
+			name: "ref.func",
+			flag: FeatureReferenceTypes,
+			body: []byte{
+				OpcodeRefFunc, 0,
+				OpcodeDrop, OpcodeEnd,
+			},
+		},
+		{
+			name: "ref.func",
+			flag: Features20191205,
+			body: []byte{
+				OpcodeRefFunc, 0,
+				OpcodeDrop, OpcodeEnd,
+			},
+			expectedErr: "ref.func invalid as feature \"reference-types\" is disabled",
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
+	tables := []*Table{{Type: RefTypeFuncref}, {Type: RefTypeExternref}}
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "table.grow (funcref)",
+			body: []byte{
+				OpcodeRefNull, RefTypeFuncref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableGrow,
+				0, // Table Index.
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.grow (funcref) - type mismatch",
+			body: []byte{
+				OpcodeRefNull, RefTypeFuncref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableGrow,
+				1, // Table of externref type -> mismatch.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.grow: type mismatch: expected externref, but was funcref`,
+		},
+		{
+			name: "table.grow (externref)",
+			body: []byte{
+				OpcodeRefNull, RefTypeExternref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableGrow,
+				1, // Table Index.
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.grow (externref) type mismatch",
+			body: []byte{
+				OpcodeRefNull, RefTypeExternref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableGrow,
+				0, // Table of funcref type -> mismatch.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.grow: type mismatch: expected funcref, but was externref`,
+		},
+		{
+			name: "table.grow - table not found",
+			body: []byte{
+				OpcodeRefNull, RefTypeFuncref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableGrow,
+				10, // Table Index.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `table of index 10 not found`,
+		},
+		{
+			name: "table.size - table not found",
+			body: []byte{
+				OpcodeMiscPrefix, OpcodeMiscTableSize,
+				10, // Table Index.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `table of index 10 not found`,
+		},
+		{
+			name: "table.size",
+			body: []byte{
+				OpcodeMiscPrefix, OpcodeMiscTableSize,
+				1, // Table Index.
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.fill (funcref)",
+			body: []byte{
+				OpcodeI32Const, 1, // offset
+				OpcodeRefNull, RefTypeFuncref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableFill,
+				0, // Table Index.
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.fill (funcref) - type mismatch",
+			body: []byte{
+				OpcodeI32Const, 1, // offset
+				OpcodeRefNull, RefTypeFuncref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableFill,
+				1, // Table of externref type -> mismatch.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.fill: type mismatch: expected externref, but was funcref`,
+		},
+		{
+			name: "table.fill (externref)",
+			body: []byte{
+				OpcodeI32Const, 1, // offset
+				OpcodeRefNull, RefTypeExternref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableFill,
+				1, // Table Index.
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.fill (externref) - type mismatch",
+			body: []byte{
+				OpcodeI32Const, 1, // offset
+				OpcodeRefNull, RefTypeExternref,
+				OpcodeI32Const, 1, // number of elements
+				OpcodeMiscPrefix, OpcodeMiscTableFill,
+				0, // Table of funcref type -> mismatch.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.fill: type mismatch: expected funcref, but was externref`,
+		},
+		{
+			name: "table.fill - table not found",
+			body: []byte{
+				OpcodeMiscPrefix, OpcodeMiscTableFill,
+				10, // Table Index.
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `table of index 10 not found`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestModule_funcValidation_TableGetSet(t *testing.T) {
+	tables := []*Table{{Type: RefTypeFuncref}, {Type: RefTypeExternref}}
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "table.get (funcref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeTableGet, 0,
+				OpcodeRefIsNull,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.get (externref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeTableGet, 1,
+				OpcodeRefIsNull,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.get (disabled)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeTableGet, 0,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag:        Features20191205,
+			expectedErr: `table.get is invalid as feature "reference-types" is disabled`,
+		},
+		{
+			name: "table.set (funcref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeTableSet, 0,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.set type mismatch (src=funcref, dst=externref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeRefNull, ValueTypeFuncref,
+				OpcodeTableSet, 1,
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.set: type mismatch: expected externref, but was funcref`,
+		},
+		{
+			name: "table.set (externref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeRefNull, ValueTypeExternref,
+				OpcodeTableSet, 1,
+				OpcodeEnd,
+			},
+			flag: FeatureReferenceTypes,
+		},
+		{
+			name: "table.set type mismatch (src=externref, dst=funcref)",
+			body: []byte{
+				OpcodeI32Const, 0,
+				OpcodeRefNull, ValueTypeExternref,
+				OpcodeTableSet, 0,
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `cannot pop the operand for table.set: type mismatch: expected funcref, but was externref`,
+		},
+		{
+			name: "table.set (disabled)",
+			body: []byte{
+				OpcodeTableSet, 1,
+				OpcodeEnd,
+			},
+			flag:        Features20191205,
+			expectedErr: `table.set is invalid as feature "reference-types" is disabled`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

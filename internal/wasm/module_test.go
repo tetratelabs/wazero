@@ -209,7 +209,7 @@ func TestModule_allDeclarations(t *testing.T) {
 func TestValidateConstExpression(t *testing.T) {
 	t.Run("invalid opcode", func(t *testing.T) {
 		expr := &ConstantExpression{Opcode: OpcodeNop}
-		err := validateConstExpression(nil, expr, valueTypeUnknown)
+		err := validateConstExpression(nil, 0, expr, valueTypeUnknown)
 		require.Error(t, err)
 	})
 	for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
@@ -231,7 +231,7 @@ func TestValidateConstExpression(t *testing.T) {
 					expr.Opcode = OpcodeF64Const
 				}
 
-				err := validateConstExpression(nil, expr, vt)
+				err := validateConstExpression(nil, 0, expr, vt)
 				require.NoError(t, err)
 			})
 			t.Run("invalid", func(t *testing.T) {
@@ -247,23 +247,46 @@ func TestValidateConstExpression(t *testing.T) {
 				case ValueTypeF64:
 					expr.Opcode = OpcodeF64Const
 				}
-				err := validateConstExpression(nil, expr, vt)
+				err := validateConstExpression(nil, 0, expr, vt)
 				require.Error(t, err)
 			})
 		})
 	}
+	t.Run("ref types", func(t *testing.T) {
+		t.Run("ref.func", func(t *testing.T) {
+			expr := &ConstantExpression{Data: []byte{5}, Opcode: OpcodeRefFunc}
+			err := validateConstExpression(nil, 10, expr, ValueTypeFuncref)
+			require.NoError(t, err)
+			err = validateConstExpression(nil, 2, expr, ValueTypeFuncref)
+			require.EqualError(t, err, "ref.func index out of range [5] with length 1")
+		})
+		t.Run("ref.null", func(t *testing.T) {
+			err := validateConstExpression(nil, 0,
+				&ConstantExpression{Data: []byte{ValueTypeFuncref}, Opcode: OpcodeRefNull},
+				ValueTypeFuncref)
+			require.NoError(t, err)
+			err = validateConstExpression(nil, 0,
+				&ConstantExpression{Data: []byte{ValueTypeExternref}, Opcode: OpcodeRefNull},
+				ValueTypeExternref)
+			require.NoError(t, err)
+			err = validateConstExpression(nil, 0,
+				&ConstantExpression{Data: []byte{0xff}, Opcode: OpcodeRefNull},
+				ValueTypeExternref)
+			require.EqualError(t, err, "invalid type for ref.null: 0xff")
+		})
+	})
 	t.Run("global expr", func(t *testing.T) {
 		t.Run("failed to read global index", func(t *testing.T) {
 			// Empty data for global index is invalid.
 			expr := &ConstantExpression{Data: make([]byte, 0), Opcode: OpcodeGlobalGet}
-			err := validateConstExpression(nil, expr, valueTypeUnknown)
+			err := validateConstExpression(nil, 0, expr, valueTypeUnknown)
 			require.Error(t, err)
 		})
 		t.Run("global index out of range", func(t *testing.T) {
 			// Data holds the index in leb128 and this time the value exceeds len(globals) (=0).
 			expr := &ConstantExpression{Data: []byte{1}, Opcode: OpcodeGlobalGet}
 			var globals []*GlobalType
-			err := validateConstExpression(globals, expr, valueTypeUnknown)
+			err := validateConstExpression(globals, 0, expr, valueTypeUnknown)
 			require.Error(t, err)
 		})
 
@@ -276,7 +299,7 @@ func TestValidateConstExpression(t *testing.T) {
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
 					globals := []*GlobalType{{ValType: valueTypeUnknown}}
 
-					err := validateConstExpression(globals, expr, vt)
+					err := validateConstExpression(globals, 0, expr, vt)
 					require.Error(t, err)
 				})
 			}
@@ -290,7 +313,7 @@ func TestValidateConstExpression(t *testing.T) {
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
 					globals := []*GlobalType{{ValType: vt}}
 
-					err := validateConstExpression(globals, expr, vt)
+					err := validateConstExpression(globals, 0, expr, vt)
 					require.NoError(t, err)
 				})
 			}
@@ -380,7 +403,7 @@ func TestModule_validateStartSection(t *testing.T) {
 func TestModule_validateGlobals(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		m := Module{}
-		err := m.validateGlobals(make([]*GlobalType, 10), 9)
+		err := m.validateGlobals(make([]*GlobalType, 10), 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "too many globals in a module")
 	})
@@ -392,7 +415,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
 			},
 		}}
-		err := m.validateGlobals(nil, 9)
+		err := m.validateGlobals(nil, 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "global index out of range")
 	})
@@ -403,7 +426,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: &ConstantExpression{Opcode: OpcodeUnreachable},
 			},
 		}}
-		err := m.validateGlobals(nil, 9)
+		err := m.validateGlobals(nil, 0, 9)
 		require.Error(t, err)
 		require.EqualError(t, err, "invalid opcode for const expression: 0x0")
 	})
@@ -414,7 +437,7 @@ func TestModule_validateGlobals(t *testing.T) {
 				Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
 			},
 		}}
-		err := m.validateGlobals(nil, 9)
+		err := m.validateGlobals(nil, 0, 9)
 		require.NoError(t, err)
 	})
 	t.Run("ok with imported global", func(t *testing.T) {
@@ -432,7 +455,7 @@ func TestModule_validateGlobals(t *testing.T) {
 			{ValType: ValueTypeI32}, // Imported one.
 			nil,                     // the local one trying to validate.
 		}
-		err := m.validateGlobals(globalDeclarations, 9)
+		err := m.validateGlobals(globalDeclarations, 0, 9)
 		require.NoError(t, err)
 	})
 }

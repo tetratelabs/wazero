@@ -10,7 +10,7 @@ import (
 )
 
 func TestFunctionType(t *testing.T) {
-	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
+	i32, i64, funcRef, externRef := wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref
 	tests := []struct {
 		name     string
 		input    *wasm.FunctionType
@@ -61,6 +61,16 @@ func TestFunctionType(t *testing.T) {
 			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 2, i32, i64},
 		},
+		{
+			name:     "two param two results with funcrefs",
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, funcRef}, Results: []wasm.ValueType{funcRef, i64}},
+			expected: []byte{0x60, 2, i32, funcRef, 2, funcRef, i64},
+		},
+		{
+			name:     "two param two results with externrefs",
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, externRef}, Results: []wasm.ValueType{externRef, i64}},
+			expected: []byte{0x60, 2, i32, externRef, 2, externRef, i64},
+		},
 	}
 
 	for _, tt := range tests {
@@ -89,18 +99,18 @@ func TestDecodeFunctionType_Errors(t *testing.T) {
 	}{
 		{
 			name:        "undefined param no result",
-			input:       []byte{0x60, 1, 0x6f, 0},
-			expectedErr: "could not read parameter types: invalid value type: 111",
+			input:       []byte{0x60, 1, 0x6e, 0},
+			expectedErr: "could not read parameter types: invalid value type: 110",
 		},
 		{
 			name:        "no param undefined result",
-			input:       []byte{0x60, 0, 1, 0x6f},
-			expectedErr: "could not read result types: invalid value type: 111",
+			input:       []byte{0x60, 0, 1, 0x6e},
+			expectedErr: "could not read result types: invalid value type: 110",
 		},
 		{
 			name:        "undefined param undefined result",
-			input:       []byte{0x60, 1, 0x6f, 1, 0x6f},
-			expectedErr: "could not read parameter types: invalid value type: 111",
+			input:       []byte{0x60, 1, 0x6e, 1, 0x6e},
+			expectedErr: "could not read parameter types: invalid value type: 110",
 		},
 		{
 			name:        "no param two results - multi-value not enabled",

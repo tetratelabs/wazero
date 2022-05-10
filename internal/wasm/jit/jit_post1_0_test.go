@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -554,9 +555,9 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 
 			// Setup the table.
 			table := make([]wasm.Reference, tableSize)
-			env.setTable(table)
+			env.addTable(&wasm.TableInstance{References: table})
 			for i := 0; i < tableSize; i++ {
-				table[i] = byte(i)
+				table[i] = uintptr(i)
 			}
 
 			// Run code.
@@ -565,7 +566,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 			if !tc.requireOutOfBoundsError {
 				exp := make([]wasm.Reference, tableSize)
 				for i := 0; i < tableSize; i++ {
-					exp[i] = byte(i)
+					exp[i] = uintptr(i)
 				}
 				copy(exp[tc.destOffset:],
 					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
@@ -639,9 +640,9 @@ func TestCompiler_compileTableInit(t *testing.T) {
 
 			// Setup the table.
 			table := make([]wasm.Reference, tableSize)
-			env.setTable(table)
+			env.addTable(&wasm.TableInstance{References: table})
 			for i := 0; i < tableSize; i++ {
-				table[i] = byte(i)
+				table[i] = uintptr(i)
 			}
 
 			// Generate the code under test.
@@ -654,9 +655,10 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			env.exec(code)
 
 			if !tc.expOutOfBounds {
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 				exp := make([]wasm.Reference, tableSize)
 				for i := 0; i < tableSize; i++ {
-					exp[i] = byte(i)
+					exp[i] = uintptr(i)
 				}
 				if inst := elementInstances[tc.elemIndex]; inst.References != nil {
 					copy(exp[tc.destOffset:], inst.References[tc.sourceOffset:tc.sourceOffset+tc.copySize])
@@ -665,6 +667,280 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			} else {
 				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
 			}
+		})
+	}
+}
+
+type dog struct{ name string }
+
+func TestCompiler_compileTableSet(t *testing.T) {
+	externDog := &dog{name: "sushi"}
+	externrefOpaque := uintptr(unsafe.Pointer(externDog))
+	funcref := &function{source: &wasm.FunctionInstance{DebugName: "sushi"}}
+	funcrefOpaque := uintptr(unsafe.Pointer(funcref))
+
+	externTable := &wasm.TableInstance{Type: wasm.RefTypeExternref, References: []wasm.Reference{0, 0, externrefOpaque, 0, 0}}
+	funcrefTable := &wasm.TableInstance{Type: wasm.RefTypeFuncref, References: []wasm.Reference{0, 0, 0, 0, funcrefOpaque}}
+	tables := []*wasm.TableInstance{externTable, funcrefTable}
+
+	for _, tc := range []struct {
+		name       string
+		tableIndex uint32
+		offset     uint32
+		in         uintptr
+		expExtern  bool
+		expError   bool
+	}{
+		{
+			name:       "externref - non nil",
+			tableIndex: 0,
+			offset:     2,
+			in:         externrefOpaque,
+			expExtern:  true,
+		},
+		{
+			name:       "externref - nil",
+			tableIndex: 0,
+			offset:     1,
+			in:         0,
+			expExtern:  true,
+		},
+		{
+			name:       "externref - out of bounds",
+			tableIndex: 0,
+			offset:     10,
+			in:         0,
+			expError:   true,
+		},
+		{
+			name:       "funcref - non nil",
+			tableIndex: 1,
+			offset:     4,
+			in:         funcrefOpaque,
+			expExtern:  false,
+		},
+		{
+			name:       "funcref - nil",
+			tableIndex: 1,
+			offset:     3,
+			in:         0,
+			expExtern:  false,
+		},
+		{
+			name:       "funcref - out of bounds",
+			tableIndex: 1,
+			offset:     100000,
+			in:         0,
+			expError:   true,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+
+			for _, table := range tables {
+				env.addTable(table)
+			}
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				HasTable:  true,
+				Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
+			require.NoError(t, err)
+
+			err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.in)})
+			require.NoError(t, err)
+
+			err = compiler.compileTableSet(&wazeroir.OperationTableSet{TableIndex: tc.tableIndex})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			if tc.expError {
+				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+			} else {
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, uint64(0), env.stackPointer())
+
+				if tc.expExtern {
+					actual := dogFromPtr(externTable.References[tc.offset])
+					exp := externDog
+					if tc.in == 0 {
+						exp = nil
+					}
+					require.Equal(t, exp, actual)
+				} else {
+					actual := functionFromPtr(funcrefTable.References[tc.offset])
+					exp := funcref
+					if tc.in == 0 {
+						exp = nil
+					}
+					require.Equal(t, exp, actual)
+				}
+			}
+		})
+	}
+}
+
+//go:nocheckptr ignore "pointer arithmetic result points to invalid allocation"
+func dogFromPtr(ptr uintptr) *dog {
+	if ptr == 0 {
+		return nil
+	}
+	return (*dog)(unsafe.Pointer(ptr))
+}
+
+//go:nocheckptr ignore "pointer arithmetic result points to invalid allocation"
+func functionFromPtr(ptr uintptr) *function {
+	if ptr == 0 {
+		return nil
+	}
+	return (*function)(unsafe.Pointer(ptr))
+}
+
+func TestCompiler_compileTableGet(t *testing.T) {
+
+	externDog := &dog{name: "sushi"}
+	externrefOpaque := uintptr(unsafe.Pointer(externDog))
+	funcref := &function{source: &wasm.FunctionInstance{DebugName: "sushi"}}
+	funcrefOpaque := uintptr(unsafe.Pointer(funcref))
+	tables := []*wasm.TableInstance{
+		{Type: wasm.RefTypeExternref, References: []wasm.Reference{0, 0, externrefOpaque, 0, 0}},
+		{Type: wasm.RefTypeFuncref, References: []wasm.Reference{0, 0, 0, 0, funcrefOpaque}},
+	}
+
+	for _, tc := range []struct {
+		name       string
+		tableIndex uint32
+		offset     uint32
+		exp        uintptr
+		expError   bool
+	}{
+		{
+			name:       "externref - non nil",
+			tableIndex: 0,
+			offset:     2,
+			exp:        externrefOpaque,
+		},
+		{
+			name:       "externref - nil",
+			tableIndex: 0,
+			offset:     4,
+			exp:        0,
+		},
+		{
+			name:       "externref - out of bounds",
+			tableIndex: 0,
+			offset:     5,
+			expError:   true,
+		},
+		{
+			name:       "funcref - non nil",
+			tableIndex: 1,
+			offset:     4,
+			exp:        funcrefOpaque,
+		},
+		{
+			name:       "funcref - nil",
+			tableIndex: 1,
+			offset:     1,
+			exp:        0,
+		},
+		{
+			name:       "funcref - out of bounds",
+			tableIndex: 1,
+			offset:     1000,
+			expError:   true,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+
+			for _, table := range tables {
+				env.addTable(table)
+			}
+
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+				HasTable:  true,
+				Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
+			require.NoError(t, err)
+
+			err = compiler.compileTableGet(&wazeroir.OperationTableGet{TableIndex: tc.tableIndex})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			if tc.expError {
+				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+			} else {
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, uint64(1), env.stackPointer())
+				require.Equal(t, uint64(tc.exp), env.stackTopAsUint64())
+			}
+		})
+	}
+}
+
+func TestCompiler_compileRefFunc(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: &wasm.FunctionType{}})
+
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	me := env.moduleEngine()
+	const numFuncs = 20
+	for i := 0; i < numFuncs; i++ {
+		me.functions = append(me.functions, &function{source: &wasm.FunctionInstance{DebugName: strconv.Itoa(i)}})
+	}
+
+	for i := 0; i < numFuncs; i++ {
+		i := i
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileRefFunc(&wazeroir.OperationRefFunc{FunctionIndex: uint32(i)})
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, uint64(1), env.stackPointer())
+			require.Equal(t, uintptr(unsafe.Pointer(me.functions[i])), uintptr(env.stackTopAsUint64()))
 		})
 	}
 }

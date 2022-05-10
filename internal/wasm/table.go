@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math"
 
@@ -20,9 +21,9 @@ type RefType = byte
 
 const (
 	// RefTypeFuncref represents a reference to a function.
-	RefTypeFuncref RefType = 0x70
+	RefTypeFuncref RefType = ValueTypeFuncref
 	// RefTypeExternref represents a reference to a host object, which is not currently supported in wazero.
-	RefTypeExternref RefType = 0x6f
+	RefTypeExternref RefType = ValueTypeExternref
 )
 
 func RefTypeName(t RefType) (ret string) {
@@ -111,10 +112,10 @@ type ElementInstance struct {
 	Type RefType
 }
 
-// Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref (unsupported).
+// Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref.
 //
 // Currently the content is a (possively nil) pointer to the engine-specific struct which can be only used in indirect function calls.
-type Reference = interface{}
+type Reference = uintptr
 
 // validatedActiveElementSegment is like ElementSegment of active mode except the inputs are expanded and validated based on defining module.
 //
@@ -307,4 +308,30 @@ func (m *Module) verifyImportGlobalI32(sectionID SectionID, sectionIdx Index, id
 		}
 	}
 	return fmt.Errorf("%s[%d] (global.get %d): out of range of imported globals", SectionIDName(sectionID), sectionIdx, idx)
+}
+
+// Grow appends the `initialRef` by `delta` times into the .References slice.
+// Returns -1 if the operation is not valid, otherwise the old length of the table.
+//
+// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-grow-x
+func (t *TableInstance) Grow(_ context.Context, delta uint32, initialRef Reference) (currentLen uint32) {
+	currentLen = uint32(len(t.References))
+	if delta == 0 {
+		return
+	}
+
+	if newLen := int64(currentLen) + int64(delta); // adding as 64bit ints to avoide overflow.
+	newLen >= math.MaxUint32 || (t.Max != nil && newLen >= int64(*t.Max)) {
+		return 0xffffffff // = -1 in signed 32-bit integer.
+	}
+	t.References = append(t.References, make([]uintptr, delta)...)
+
+	// Uses the copy trick for faster filling the new region with the initial value.
+	// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+	newRegion := t.References[currentLen:]
+	newRegion[0] = initialRef
+	for i := 1; i < len(newRegion); i *= 2 {
+		copy(newRegion[i:], newRegion[:i])
+	}
+	return
 }

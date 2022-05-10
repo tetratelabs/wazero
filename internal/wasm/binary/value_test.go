@@ -8,7 +8,7 @@ import (
 )
 
 func TestEncodeValTypes(t *testing.T) {
-	i32, i64, f32, f64 := wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64
+	i32, i64, f32, f64, ext, fref := wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref
 	tests := []struct {
 		name     string
 		input    []wasm.ValueType
@@ -23,6 +23,16 @@ func TestEncodeValTypes(t *testing.T) {
 			name:     "undefined", // ensure future spec changes don't panic
 			input:    []wasm.ValueType{0x6f},
 			expected: []byte{1, 0x6f},
+		},
+		{
+			name:     "funcref",
+			input:    []wasm.ValueType{fref},
+			expected: []byte{1, fref},
+		},
+		{
+			name:     "externref",
+			input:    []wasm.ValueType{ext},
+			expected: []byte{1, ext},
 		},
 		{
 			name:     "i32",

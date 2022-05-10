@@ -11,7 +11,7 @@ import (
 func TestCompiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
 	for _, tp := range []wasm.ValueType{
-		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref,
 	} {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
@@ -65,6 +65,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 	for _, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64,
 		wasm.ValueTypeI32, wasm.ValueTypeI64,
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref,
 	} {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
@@ -83,7 +84,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			// Place the set target value.
 			loc := compiler.valueLocationStack().pushValueLocationOnStack()
 			switch tp {
-			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			case wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 				loc.setRegisterType(generalPurposeRegisterTypeInt)
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				loc.setRegisterType(generalPurposeRegisterTypeFloat)
