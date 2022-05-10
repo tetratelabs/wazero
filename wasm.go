@@ -98,11 +98,10 @@ type Runtime interface {
 	//
 	// Ex.
 	//	ctx := context.Background()
-	//  r := wazero.NewRuntime()
-	//  defer r.Close(ctx)
+	//	r := wazero.NewRuntime()
+	//	defer r.Close(ctx)
 	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
-	//
 	Close(context.Context) error
 
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
@@ -110,11 +109,10 @@ type Runtime interface {
 	//
 	// Ex.
 	//	ctx := context.Background()
-	//  r := wazero.NewRuntime()
-	//  defer r.CloseWithExitCode(ctx, 2)
+	//	r := wazero.NewRuntime()
+	//	defer r.CloseWithExitCode(ctx, 2)
 	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
-	//
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 }
 

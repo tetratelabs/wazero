@@ -571,6 +571,7 @@ func TestClose(t *testing.T) {
 
 		// Modules closed so calls fail
 		_, err = func1.Call(testCtx)
+		// TODO: This could be neater with ErrorIs
 		require.Error(t, err, sys.NewExitError("mod1", tc.exitCode).Error())
 
 		_, err = func2.Call(testCtx)
@@ -578,7 +579,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-func TestCloseClosesCompiledModules(t *testing.T) {
+func TestClose_ClosesCompiledModules(t *testing.T) {
 	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 	conf := *engineLessConfig
 	conf.newEngine = func(_ wasm.Features) wasm.Engine {
