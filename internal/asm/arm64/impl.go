@@ -1465,7 +1465,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 			ftype = 0b01
 		}
 		a.Buf.Write([]byte{
-			(src2RegBits << 5) | 0b00000,
+			(src2RegBits << 5),
 			0b001000_00 | (src2RegBits >> 3),
 			ftype<<6 | 0b1_00000 | src1RegBits,
 			0b000_11110,

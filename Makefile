@@ -1,5 +1,5 @@
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.0
 
 ensureJITFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
 .PHONY: bench
