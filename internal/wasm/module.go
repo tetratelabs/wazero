@@ -924,21 +924,11 @@ const (
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
-	switch t {
-	case ValueTypeI32:
-		return "i32"
-	case ValueTypeI64:
-		return "i64"
-	case ValueTypeF32:
-		return "f32"
-	case ValueTypeF64:
-		return "f64"
-	case ValueTypeFuncref:
+	if t == ValueTypeFuncref {
+		// TODO: funcref is not exposed in the API pkg yet.
 		return "funcref"
-	case ValueTypeExternref:
-		return "externref"
 	}
-	return "unknown"
+	return api.ValueTypeName(t)
 }
 
 // ExternType is an alias of api.ExternType defined to simplify imports.
