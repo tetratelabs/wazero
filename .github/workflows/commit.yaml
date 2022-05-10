@@ -14,14 +14,18 @@ defaults:
 
 jobs:
   check:
-    name: Pre-commit check
+    name: Pre-commit check, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:  # use latest available versions and be consistent on all workflows!
+        go-version:
+        - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.18"
+
     steps:
       - uses: actions/setup-go@v3
         with:
-          # TODO: Change to a matrix to ensure developers can use the latest version, noting often there is a lag of
-          # weeks before the latest version is usable. Ex. golangci/golangci-lint#2649
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ matrix.go-version }}
 
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
@@ -37,7 +41,7 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
             ~/go/bin
-          key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+          key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
       - run: make check
 
