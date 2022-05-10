@@ -105,8 +105,8 @@ type (
 		// i.e. &ModuleInstance.Tables[0] as uintptr.
 		tablesElement0Address uintptr
 
-		// codesElement0Address is &moduleContext.engine.codes[0] as uintptr.
-		codesElement0Address uintptr
+		// functionsElement0Address is &moduleContext.functions[0] as uintptr.
+		functionsElement0Address uintptr
 
 		// typeIDsElement0Address holds the &ModuleInstance.TypeIDs[0] as uintptr.
 		typeIDsElement0Address uintptr
@@ -238,7 +238,7 @@ const (
 	callEngineModuleContextMemoryElement0AddressOffset           = 56
 	callEngineModuleContextMemorySliceLenOffset                  = 64
 	callEngineModuleContextTablesElement0AddressOffset           = 72
-	callEngineModuleContextCodesElement0AddressOffset            = 80
+	callEngineModuleContextFunctionsElement0AddressOffset        = 80
 	callEngineModuleContextTypeIDsElement0AddressOffset          = 88
 	callEngineModuleContextDataInstancesElement0AddressOffset    = 96
 	callEngineModuleContextElementInstancesElement0AddressOffset = 104
@@ -291,14 +291,15 @@ const (
 	// https://research.swtch.com/interfaces
 	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
 	interfaceDataOffset = 8
-	// Interface consists of two pointers therefore 16 bytes = 2^4.
-	interfaceDataSizeLog2 = 4
 
 	// Consts for DataInstance.
 	dataInstanceStructSize = 24
 
 	// Consts for ElementInstance.
 	elementInstanceStructSize = 32
+
+	// pointerSizeLog2 satisfies: 1 << pointerSizeLog2 = sizeOf(uintptr)
+	pointerSizeLog2 = 3
 )
 
 // jitCallStatusCode represents the result of `jitcall`.
@@ -483,7 +484,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 
 	for tableIndex, init := range tableInit {
 		for elemIdx, funcidx := range init { // Initialize any elements with compiled functions
-			tables[tableIndex].References[elemIdx] = me.functions[funcidx]
+			tables[tableIndex].References[elemIdx] = uintptr(unsafe.Pointer(me.functions[funcidx]))
 		}
 	}
 	return me, nil
@@ -518,12 +519,26 @@ func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.E
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = me.functions[*index]
+			refs[i] = uintptr(unsafe.Pointer(me.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
 		References: refs,
 		Type:       wasm.RefTypeFuncref,
+	}
+}
+
+// InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
+func (me *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
+	for _, g := range globals {
+		if g.Type.ValType == wasm.ValueTypeFuncref {
+			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
+				g.Val = 0 // Null funcref is expressed as zero.
+			} else {
+				// Lowers the stored function index into the interpreter specific function's opaque pointer.
+				g.Val = uint64(uintptr(unsafe.Pointer(me.functions[g.Val])))
+			}
+		}
 	}
 }
 
@@ -676,6 +691,7 @@ const (
 	builtinFunctionIndexMemoryGrow wasm.Index = iota
 	builtinFunctionIndexGrowValueStack
 	builtinFunctionIndexGrowCallFrameStack
+	builtinFunctionIndexTableGrow
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
@@ -720,13 +736,16 @@ jitentry:
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				callercode := ce.callFrameTop().function
-				ce.builtinFunctionMemoryGrow(ctx, callercode.source.Module.Memory)
+				callerFunction := ce.callFrameTop().function
+				ce.builtinFunctionMemoryGrow(ctx, callerFunction.source.Module.Memory)
 			case builtinFunctionIndexGrowValueStack:
 				callercode := ce.callFrameTop().function
 				ce.builtinFunctionGrowValueStack(callercode.stackPointerCeil)
 			case builtinFunctionIndexGrowCallFrameStack:
 				ce.builtinFunctionGrowCallFrameStack()
+			case builtinFunctionIndexTableGrow:
+				caller := ce.callFrameTop().function
+				ce.builtinFunctionTableGrow(ctx, caller.source.Module.Tables)
 			}
 			if buildoptions.IsDebugMode {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -784,6 +803,15 @@ func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.M
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
 	ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
+}
+
+func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wasm.TableInstance) {
+	tableIndex := ce.popValue()
+	table := tables[tableIndex] // verifed not to be out of range by the func validation at compilation phase.
+	num := ce.popValue()
+	ref := ce.popValue()
+	res := table.Grow(ctx, uint32(num), uintptr(ref))
+	ce.pushValue(uint64(res))
 }
 
 func compileHostFunction(sig *wasm.FunctionType) (*code, error) {
@@ -991,6 +1019,18 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 			err = compiler.compileTableCopy(o)
 		case *wazeroir.OperationElemDrop:
 			err = compiler.compileElemDrop(o)
+		case *wazeroir.OperationRefFunc:
+			err = compiler.compileRefFunc(o)
+		case *wazeroir.OperationTableGet:
+			err = compiler.compileTableGet(o)
+		case *wazeroir.OperationTableSet:
+			err = compiler.compileTableSet(o)
+		case *wazeroir.OperationTableGrow:
+			err = compiler.compileTableGrow(o)
+		case *wazeroir.OperationTableSize:
+			err = compiler.compileTableSize(o)
+		case *wazeroir.OperationTableFill:
+			err = compiler.compileTableFill(o)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)

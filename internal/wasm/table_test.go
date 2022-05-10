@@ -778,7 +778,7 @@ func TestModule_buildTables(t *testing.T) {
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
-			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{nil, nil}}},
+			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
 			expectedInit:    TableInitMap{0: {1: 0}},
 		},
 		{
@@ -803,7 +803,7 @@ func TestModule_buildTables(t *testing.T) {
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
-			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{nil, nil}}},
+			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
 			expectedInit:    TableInitMap{0: {1: 0}},
 		},
 		{
@@ -967,6 +967,64 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals)
 			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func TestTableInstance_Grow(t *testing.T) {
+	expOnErr := uint32(0xffff_ffff) // -1 as signed i32.
+	max10 := uint32(10)
+	for _, tc := range []struct {
+		name       string
+		currentLen int
+		max        *uint32
+		delta, exp uint32
+	}{
+		{
+			name:       "growing ousside 32-bit range",
+			currentLen: 0x10,
+			delta:      0xffff_fff0,
+			exp:        expOnErr,
+		},
+		{
+			name:       "growing zero",
+			currentLen: 0,
+			delta:      0,
+			exp:        0,
+		},
+		{
+			name:       "growing zero on non zero table",
+			currentLen: 5,
+			delta:      0,
+			exp:        5,
+		},
+		{
+			name:       "grow zero on max",
+			currentLen: 10,
+			delta:      0,
+			max:        &max10,
+			exp:        10,
+		},
+		{
+			name:       "grow out of range beyond max",
+			currentLen: 10,
+			delta:      1,
+			max:        &max10,
+			exp:        expOnErr,
+		},
+		{
+			name:       "grow out of range beyond max part2",
+			currentLen: 10,
+			delta:      100,
+			max:        &max10,
+			exp:        expOnErr,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			table := &TableInstance{References: make([]uintptr, tc.currentLen), Max: tc.max}
+			actual := table.Grow(testCtx, tc.delta, 0)
+			require.Equal(t, tc.exp, actual)
 		})
 	}
 }

@@ -40,6 +40,7 @@ func TestCompile(t *testing.T) {
 				Functions:    []uint32{0},
 				Types:        []*wasm.FunctionType{{}},
 				Signature:    &wasm.FunctionType{},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -57,6 +58,7 @@ func TestCompile(t *testing.T) {
 				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
 				Functions:    []uint32{0},
 				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -75,6 +77,7 @@ func TestCompile(t *testing.T) {
 				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
 				Functions:    []uint32{0},
 				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 	}
@@ -137,6 +140,7 @@ func TestCompile_Block(t *testing.T) {
 				Functions:    []uint32{0},
 				Types:        []*wasm.FunctionType{v_v},
 				Signature:    v_v,
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 	}
@@ -214,6 +218,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		Signature:                  v_v,
 		Functions:                  []wasm.Index{0},
 		Types:                      []*wasm.FunctionType{v_v},
+		TableTypes:                 []wasm.RefType{},
 	}
 
 	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
@@ -251,6 +256,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				Signature:    i32i32_i32i32,
 				Functions:    []wasm.Index{0},
 				Types:        []*wasm.FunctionType{i32i32_i32i32},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -295,6 +301,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				Signature:    v_f64f64,
 				Functions:    []wasm.Index{0},
 				Types:        []*wasm.FunctionType{v_f64f64},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -313,6 +320,7 @@ func TestCompile_MultiValue(t *testing.T) {
 				Signature:    _i32i64,
 				Functions:    []wasm.Index{0},
 				Types:        []*wasm.FunctionType{_i32i64},
+				TableTypes:   []wasm.RefType{},
 			},
 		},
 		{
@@ -362,9 +370,10 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
-				Signature: i32_i32,
-				Functions: []wasm.Index{0},
-				Types:     []*wasm.FunctionType{i32_i32},
+				Signature:  i32_i32,
+				Functions:  []wasm.Index{0},
+				Types:      []*wasm.FunctionType{i32_i32},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -418,9 +427,10 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
-				Signature: i32_i32,
-				Functions: []wasm.Index{0},
-				Types:     []*wasm.FunctionType{i32_i32, i32i32_i32},
+				Signature:  i32_i32,
+				Functions:  []wasm.Index{0},
+				Types:      []*wasm.FunctionType{i32_i32, i32i32_i32},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -474,9 +484,10 @@ func TestCompile_MultiValue(t *testing.T) {
 					".L2_cont": 2,
 					".L2_else": 1,
 				},
-				Signature: i32_i32,
-				Functions: []wasm.Index{0},
-				Types:     []*wasm.FunctionType{i32_i32, i32i32_i32},
+				Signature:  i32_i32,
+				Functions:  []wasm.Index{0},
+				Types:      []*wasm.FunctionType{i32_i32, i32i32_i32},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 	}
@@ -517,6 +528,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 		Signature:    f32_i32,
 		Functions:    []wasm.Index{0},
 		Types:        []*wasm.FunctionType{f32_i32},
+		TableTypes:   []wasm.RefType{},
 	}
 
 	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
@@ -541,6 +553,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 		Signature:    i32_i32,
 		Functions:    []wasm.Index{0},
 		Types:        []*wasm.FunctionType{i32_i32},
+		TableTypes:   []wasm.RefType{},
 	}
 
 	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
@@ -574,7 +587,11 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 			5, // Non-zero table index for call_indirect.
 			wasm.OpcodeEnd,
 		}}},
-		TableSection: []*wasm.Table{{}, {}, {}, {}, {}, {Min: 100}},
+		TableSection: []*wasm.Table{
+			{Type: wasm.RefTypeExternref}, {Type: wasm.RefTypeFuncref}, {Type: wasm.RefTypeFuncref},
+			{Type: wasm.RefTypeFuncref}, {Type: wasm.RefTypeFuncref},
+			{Type: wasm.RefTypeFuncref, Min: 100},
+		},
 	}
 
 	expected := &CompilationResult{
@@ -587,10 +604,238 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		LabelCallers: map[string]uint32{},
 		Signature:    v_v,
 		Functions:    []wasm.Index{0},
-		Types:        []*wasm.FunctionType{v_v, v_v, v_v},
+		TableTypes: []wasm.RefType{
+			wasm.RefTypeExternref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref, wasm.RefTypeFuncref,
+		},
+		Types: []*wasm.FunctionType{v_v, v_v, v_v},
 	}
 
 	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
+}
+
+func TestCompile_Refs(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		body     []byte
+		expected []Operation
+	}{
+		{
+			name: "ref.func",
+			body: []byte{
+				wasm.OpcodeRefFunc, 100,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationRefFunc{FunctionIndex: 100},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "ref.null (externref)",
+			body: []byte{
+				wasm.OpcodeRefNull, wasm.ValueTypeExternref,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "ref.null (funcref)",
+			body: []byte{
+				wasm.OpcodeRefNull, wasm.ValueTypeFuncref,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "ref.is_null",
+			body: []byte{
+				wasm.OpcodeRefFunc, 100,
+				wasm.OpcodeRefIsNull,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationRefFunc{FunctionIndex: 100},
+				&OperationEqz{Type: UnsignedInt64},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "ref.is_null (externref)",
+			body: []byte{
+				wasm.OpcodeRefNull, wasm.ValueTypeExternref,
+				wasm.OpcodeRefIsNull,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationEqz{Type: UnsignedInt64},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			module := &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: tc.body}},
+			}
+			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res[0].Operations)
+		})
+	}
+}
+
+func TestCompile_TableGetOrSet(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		body     []byte
+		expected []Operation
+	}{
+		{
+			name: "table.get",
+			body: []byte{
+				wasm.OpcodeI32Const, 10,
+				wasm.OpcodeTableGet, 0,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI32{Value: 10},
+				&OperationTableGet{TableIndex: 0},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "table.set (externref)",
+			body: []byte{
+				wasm.OpcodeI32Const, 10,
+				wasm.OpcodeRefNull, wasm.ValueTypeExternref,
+				wasm.OpcodeTableSet, 0,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI32{Value: 10},
+				&OperationConstI64{Value: 0},
+				&OperationTableSet{TableIndex: 0},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "table.set (funcref)",
+			body: []byte{
+				wasm.OpcodeI32Const, 10,
+				wasm.OpcodeRefFunc, 1,
+				wasm.OpcodeTableSet, 0,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI32{Value: 10},
+				&OperationRefFunc{FunctionIndex: 1},
+				&OperationTableSet{TableIndex: 0},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			module := &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				TableSection:    []*wasm.Table{{}},
+			}
+			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res[0].Operations)
+		})
+	}
+}
+
+func TestCompile_TableGrowFillSize(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		body     []byte
+		expected []Operation
+	}{
+		{
+			name: "table.grow",
+			body: []byte{
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableGrow, 1,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0}, // Null ref.
+				&OperationConstI32{Value: 1},
+				&OperationTableGrow{TableIndex: 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "table.fill",
+			body: []byte{
+				wasm.OpcodeI32Const, 10,
+				wasm.OpcodeRefNull, wasm.RefTypeFuncref,
+				wasm.OpcodeI32Const, 1,
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableFill, 1,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationConstI32{Value: 10},
+				&OperationConstI64{Value: 0}, // Null ref.
+				&OperationConstI32{Value: 1},
+				&OperationTableFill{TableIndex: 1},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "table.size",
+			body: []byte{
+				wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableSize, 1,
+				wasm.OpcodeEnd,
+			},
+			expected: []Operation{
+				&OperationTableSize{TableIndex: 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			module := &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: tc.body}},
+				TableSection:    []*wasm.Table{{}},
+			}
+			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res[0].Operations)
+			require.True(t, res[0].HasTable)
+		})
+	}
 }

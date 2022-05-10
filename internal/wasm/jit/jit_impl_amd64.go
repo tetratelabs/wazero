@@ -799,16 +799,16 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
-	// by 16 as the offset is the "length" of table in Go's "[]interface{}",
-	// and size of interface{} equals 16 bytes == (2^4).
-	c.assembler.CompileConstToRegister(amd64.SHLQ, 4, offset.register)
+	// by 8 as the offset is the "length" of table in Go's "[]uintptr{}",
+	// and size of uintptr equals 8 bytes == (2^3).
+	c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, offset.register)
 
 	// Adds the address of wasm.Table[0] stored as callEngine.tableElement0Address to the offset.
 	c.assembler.CompileMemoryToRegister(amd64.ADDQ,
 		tmp, tableInstanceTableOffset, offset.register)
 
-	// "offset = (*offset) + interfaceDataOffset (== table[offset] + interfaceDataOffset == *code type)"
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, interfaceDataOffset, offset.register)
+	// "offset = (*offset) (== table[offset]  == *code type)"
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, 0, offset.register)
 
 	// At this point offset.register holds the address of *code (as uintptr) at wasm.Table[offset].
 	//
@@ -3449,17 +3449,15 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 	var scale int16
 	var memToReg, regToMem asm.Instruction
 	if isTable {
-		// Each element has 16 bytes = 2^4 = 1 << interfaceDataSizeLog2.
-		c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, sourceOffset.register)
-		c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, destinationOffset.register)
+		// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
+		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, sourceOffset.register)
+		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
 		// destinationOffset += table buffer's absolute address.
 		c.assembler.CompileMemoryToRegister(amd64.ADDQ,
 			tmp, tableInstanceTableOffset, destinationOffset.register)
 		// sourceOffset += data buffer's absolute address.
 		c.assembler.CompileMemoryToRegister(amd64.ADDQ,
 			instanceAddr, 0, sourceOffset.register)
-		// We move 8 bytes at once (via MOVQ) so we need to double the counter (as each element is 16 byte).
-		c.assembler.CompileConstToRegister(amd64.SHLQ, 1, copySize.register)
 
 		// For tables, we move 8 bytes at once.
 		memToReg = amd64.MOVQ
@@ -3633,17 +3631,15 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, destinationOffset.register)
 
 		if isTable {
-			// Each element has 16 bytes = 2^4 = 1 << interfaceDataSizeLog2.
-			c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, sourceOffset.register)
-			c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, destinationOffset.register)
+			// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
+			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, sourceOffset.register)
+			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
 			// destinationOffset += table buffer's absolute address.
 			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
 			// sourceOffset += table buffer's absolute address.
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
 			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, sourceOffset.register)
-			// We move 8 bytes at once (via MOVQ) so we need to double the counter (as each element is 16 byte).
-			c.assembler.CompileConstToRegister(amd64.SHLQ, 1, copySize.register)
 		} else {
 			// destinationOffset += memory buffer's absolute address.
 			c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
@@ -3674,17 +3670,15 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump)
 	{
 		if isTable {
-			// Each element has 16 bytes = 2^4 = 1 << interfaceDataSizeLog2.
-			c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, sourceOffset.register)
-			c.assembler.CompileConstToRegister(amd64.SHLQ, interfaceDataSizeLog2, destinationOffset.register)
+			// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
+			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, sourceOffset.register)
+			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
 			// destinationOffset += table buffer's absolute address.
 			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
 			// sourceOffset += table buffer's absolute address.
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
 			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, sourceOffset.register)
-			// We move 8 bytes at once (via MOVQ) so we need to double the counter (as each element is 16 byte).
-			c.assembler.CompileConstToRegister(amd64.SHLQ, 1, copySize.register)
 		} else {
 			// destinationOffset += memory buffer's absolute address.
 			c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
@@ -3720,7 +3714,7 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 //
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
-func (c *amd64Compiler) compileMemoryFill() error {
+func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	copySize := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
 		return err
@@ -3745,12 +3739,32 @@ func (c *amd64Compiler) compileMemoryFill() error {
 	// destinationOffset += size.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
 
-	// Check destination memory bounds and if exceeds the length, exit with out of bounds error.
-	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-		destinationOffset.register)
+	// Check destination bounds and if exceeds the length, exit with out of bounds error.
+	if isTable {
+		// tmp = &tables[0]
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+			amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+			tmp)
+
+		// tmp = [tmp + TableIndex*8]
+		//     = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
+		//     = [&tables[TableIndex]] = tables[TableIndex].
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(tableIndex)*8, tmp)
+
+		c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+			tmp, tableInstanceTableLenOffset,
+			destinationOffset.register)
+	} else {
+		c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
+			destinationOffset.register)
+	}
 	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	if isTable {
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	} else {
+		c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	}
 	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
 
 	// Otherwise, ready to copy the value from source to destination.
@@ -3759,8 +3773,20 @@ func (c *amd64Compiler) compileMemoryFill() error {
 	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
-	// destinationOffset += memory buffer's absolute address.
-	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+	var scale int16
+	var movInst asm.Instruction
+	if isTable {
+		// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
+		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
+		// destinationOffset += table buffer's absolute address.
+		c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
+		// For tables, we move 8 bytes at once.
+		scale, movInst = 8, amd64.MOVQ
+	} else {
+		// destinationOffset += memory buffer's absolute address.
+		c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+		scale, movInst = 1, amd64.MOVB
+	}
 
 	// Negate the counter.
 	c.assembler.CompileNoneToRegister(amd64.NEGQ, copySize.register)
@@ -3768,9 +3794,9 @@ func (c *amd64Compiler) compileMemoryFill() error {
 	beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
 
 	// [destinationOffset + (size.register)] = tmp.
-	c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVB,
+	c.assembler.CompileRegisterToMemoryWithIndex(movInst,
 		value.register,
-		destinationOffset.register, 0, copySize.register, 1,
+		destinationOffset.register, 0, copySize.register, scale,
 	)
 
 	// size += 1
@@ -3781,6 +3807,14 @@ func (c *amd64Compiler) compileMemoryFill() error {
 		destinationOffset.register, tmp)
 	c.assembler.SetJumpTargetOnNext(skipJump)
 	return nil
+}
+
+// compileMemoryFill implements compiler.compileMemoryFill for the amd64 architecture.
+//
+// TODO: the compiled code in this function should be reused and compile at once as
+// the code is independent of any module.
+func (c *amd64Compiler) compileMemoryFill() error {
+	return c.compileFillImpl(false, 0)
 }
 
 // compileTableInit implements compiler.compileTableInit for the amd64 architecture.
@@ -3802,7 +3836,7 @@ func (c *amd64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 
 	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
 
-	// Clears the content of ElementInstances[o.ElemIndex].References (== []interface{} type).
+	// Clears the content of ElementInstances[o.ElemIndex].References (== []uintptr{} type).
 	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 0)
 	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 8)
 	c.assembler.CompileConstToMemory(amd64.MOVQ, 0, tmp, 16)
@@ -3820,6 +3854,184 @@ func (c *amd64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextElementInstancesElement0AddressOffset,
 		dst,
 	)
+}
+
+// compileTableGet implements compiler.compileTableGet for the amd64 architecture.
+func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
+	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	c.locationStack.markRegisterUsed(ref)
+
+	offset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+		return err
+	}
+
+	// ref = &tables[0]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+		ref)
+
+	// ref = [ref + TableIndex*8]
+	//     = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
+	//     = [&tables[TableIndex]] = tables[TableIndex].
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, ref, int64(o.TableIndex)*8, ref)
+
+	// Out of bounds check.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, ref, tableInstanceTableLenOffset, offset.register)
+	boundOKJmp := c.assembler.CompileJump(amd64.JHI)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.assembler.SetJumpTargetOnNext(boundOKJmp)
+
+	// ref = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, ref, tableInstanceTableOffset, ref)
+
+	// ref = [ref + 0 + offset.register * 8]
+	//     = [&tables[TableIndex].References[0] + sizeOf(uintptr) * offset]
+	//     = [&tables[TableIndex].References[offset]]
+	//     = tables[TableIndex].References[offset]
+	c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVQ, ref,
+		0, offset.register, 8, ref,
+	)
+
+	c.locationStack.markRegisterUnused(offset.register)
+	c.pushValueLocationOnRegister(ref)
+	return nil
+}
+
+// compileTableSet implements compiler.compileTableSet for the amd64 architecture.
+func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
+	ref := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(ref); err != nil {
+		return err
+	}
+
+	offset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// tmp = &tables[0]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+		tmp)
+
+	// ref = [ref + TableIndex*8]
+	//     = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
+	//     = [&tables[TableIndex]] = tables[TableIndex].
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.TableIndex)*8, tmp)
+
+	// Out of bounds check.
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
+	boundOKJmp := c.assembler.CompileJump(amd64.JHI)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.assembler.SetJumpTargetOnNext(boundOKJmp)
+
+	// tmp = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, tableInstanceTableOffset, tmp)
+
+	// [tmp + 0 + offset.register * 8] = ref
+	// [&tables[TableIndex].References[0] + sizeOf(uintptr) * offset] = ref
+	// [&tables[TableIndex].References[offset]] = ref
+	// tables[TableIndex].References[offset] = ref
+	c.assembler.CompileRegisterToMemoryWithIndex(amd64.MOVQ,
+		ref.register,
+		tmp, 0, offset.register, 8)
+
+	c.locationStack.markRegisterUnused(offset.register, ref.register)
+	return nil
+}
+
+// compileTableGrow implements compiler.compileTableGrow for the amd64 architecture.
+func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
+	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+
+	// Pushes the table index.
+	if err := c.compileConstI32(&wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
+		return err
+	}
+
+	// Table grow cannot be done in assembly just like memory grow as it involves with allocation in Go.
+	// Therefore, call out to the built function for this purpose.
+	if err := c.compileCallBuiltinFunction(builtinFunctionIndexTableGrow); err != nil {
+		return err
+	}
+
+	// TableGrow consumes three values (table index, number of items, initial value).
+	for i := 0; i < 3; i++ {
+		c.locationStack.pop()
+	}
+
+	// Then, the previous length was pushed as the result.
+	c.locationStack.pushValueLocationOnStack()
+
+	// After return, we re-initialize reserved registers just like preamble of functions.
+	c.compileReservedStackBasePointerInitialization()
+	return nil
+}
+
+// compileTableSize implements compiler.compileTableSize for the amd64 architecture.
+func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
+	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// result = &tables[0]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset,
+		result)
+
+	// result = [result + TableIndex*8]
+	//        = [&tables[0] + TableIndex*sizeOf(*tableInstance)]
+	//        = [&tables[TableIndex]] = tables[TableIndex].
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, result, int64(o.TableIndex)*8, result)
+
+	// result = [result + tableInstanceTableLenOffset]
+	//        = [tables[TableIndex] + tableInstanceTableLenOffset]
+	//        = len(tables[TableIndex])
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, result, tableInstanceTableLenOffset, result)
+
+	c.pushValueLocationOnRegister(result)
+	return nil
+}
+
+// compileTableFill implements compiler.compileTableFill for the amd64 architecture.
+func (c *amd64Compiler) compileTableFill(o *wazeroir.OperationTableFill) error {
+	return c.compileFillImpl(true, o.TableIndex)
+}
+
+// compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
+func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
+	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// ref = [amd64ReservedRegisterForCallEngine + callEngineModuleContextFunctionsElement0AddressOffset]
+	//     = &moduleEngine.functions[0]
+	c.assembler.CompileMemoryToRegister(
+		amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
+		ref,
+	)
+
+	// ref = [ref +  int64(o.FunctionIndex)*8]
+	//     = [&moduleEngine.functions[0] + sizeOf(*function) * index]
+	//     = moduleEngine.functions[index]
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+		ref, int64(o.FunctionIndex)*8, // * 8 because the size of *code equals 8 bytes.
+		ref,
+	)
+	c.pushValueLocationOnRegister(ref)
+	return nil
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
@@ -4139,9 +4351,10 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, codeAddressReg
 			// We must set the target function's address(pointer) of *code into the next call-frame stack.
 			// In the example, this is equivalent to writing the value into "rc.next".
 			//
-			// First, we read the address of the first item of callEngine.codes slice (= &callEngine.codes[0])
+			// First, we read the address of the first item of callEngine.functions slice (= &callEngine.functions[0])
 			// into tmpRegister.
-			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset, tmpRegister)
+			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine,
+				callEngineModuleContextFunctionsElement0AddressOffset, tmpRegister)
 
 			// Next, read the address of the target function (= &callEngine.codes[offset])
 			// into targetAddressRegister.
@@ -4609,8 +4822,9 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		// "tmpRegister = [tmpRegister + moduleEnginecodesOffset] (== &moduleEngine.codes[0])"
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, moduleEngineFunctionsOffset, tmpRegister)
 
-		// "callEngine.moduleContext.codesElement0Address = tmpRegister".
-		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine, callEngineModuleContextCodesElement0AddressOffset)
+		// "callEngine.moduleContext.functionsElement0Address = tmpRegister".
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine,
+			callEngineModuleContextFunctionsElement0AddressOffset)
 	}
 
 	// Update dataInstancesElement0Address.

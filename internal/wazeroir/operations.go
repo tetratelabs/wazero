@@ -118,7 +118,7 @@ type Operation interface {
 	Kind() OperationKind
 }
 
-type OperationKind byte
+type OperationKind uint16
 
 func (o OperationKind) String() (ret string) {
 	switch o {
@@ -275,6 +275,18 @@ func (o OperationKind) String() (ret string) {
 		ret = "ElemDrop"
 	case OperationKindTableCopy:
 		ret = "TableCopy"
+	case OperationKindRefFunc:
+		ret = "RefFunc"
+	case OperationKindTableGet:
+		ret = "TableGet"
+	case OperationKindTableSet:
+		ret = "TableSet"
+	case OperationKindTableSize:
+		ret = "TableSize"
+	case OperationKindTableGrow:
+		ret = "TableGrow"
+	case OperationKindTableFill:
+		ret = "TableFill"
 	}
 	return
 }
@@ -361,6 +373,12 @@ const (
 	OperationKindTableInit
 	OperationKindElemDrop
 	OperationKindTableCopy
+	OperationKindRefFunc
+	OperationKindTableGet
+	OperationKindTableSet
+	OperationKindTableSize
+	OperationKindTableGrow
+	OperationKindTableFill
 )
 
 type Label struct {
@@ -611,240 +629,280 @@ type OperationStore32 struct {
 	Arg *MemoryImmediate
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationStore32) Kind() OperationKind {
 	return OperationKindStore32
 }
 
 type OperationMemorySize struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationMemorySize) Kind() OperationKind {
 	return OperationKindMemorySize
 }
 
 type OperationMemoryGrow struct{ Alignment uint64 }
 
+// Kind implements Operation.Kind.
 func (o *OperationMemoryGrow) Kind() OperationKind {
 	return OperationKindMemoryGrow
 }
 
 type OperationConstI32 struct{ Value uint32 }
 
+// Kind implements Operation.Kind.
 func (o *OperationConstI32) Kind() OperationKind {
 	return OperationKindConstI32
 }
 
 type OperationConstI64 struct{ Value uint64 }
 
+// Kind implements Operation.Kind.
 func (o *OperationConstI64) Kind() OperationKind {
 	return OperationKindConstI64
 }
 
 type OperationConstF32 struct{ Value float32 }
 
+// Kind implements Operation.Kind.
 func (o *OperationConstF32) Kind() OperationKind {
 	return OperationKindConstF32
 }
 
 type OperationConstF64 struct{ Value float64 }
 
+// Kind implements Operation.Kind.
 func (o *OperationConstF64) Kind() OperationKind {
 	return OperationKindConstF64
 }
 
 type OperationEq struct{ Type UnsignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationEq) Kind() OperationKind {
 	return OperationKindEq
 }
 
 type OperationNe struct{ Type UnsignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationNe) Kind() OperationKind {
 	return OperationKindNe
 }
 
 type OperationEqz struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationEqz) Kind() OperationKind {
 	return OperationKindEqz
 }
 
 type OperationLt struct{ Type SignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationLt) Kind() OperationKind {
 	return OperationKindLt
 }
 
 type OperationGt struct{ Type SignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationGt) Kind() OperationKind {
 	return OperationKindGt
 }
 
 type OperationLe struct{ Type SignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationLe) Kind() OperationKind {
 	return OperationKindLe
 }
 
 type OperationGe struct{ Type SignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationGe) Kind() OperationKind {
 	return OperationKindGe
 }
 
 type OperationAdd struct{ Type UnsignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationAdd) Kind() OperationKind {
 	return OperationKindAdd
 }
 
 type OperationSub struct{ Type UnsignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationSub) Kind() OperationKind {
 	return OperationKindSub
 }
 
 type OperationMul struct{ Type UnsignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationMul) Kind() OperationKind {
 	return OperationKindMul
 }
 
 type OperationClz struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationClz) Kind() OperationKind {
 	return OperationKindClz
 }
 
 type OperationCtz struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationCtz) Kind() OperationKind {
 	return OperationKindCtz
 }
 
 type OperationPopcnt struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationPopcnt) Kind() OperationKind {
 	return OperationKindPopcnt
 }
 
 type OperationDiv struct{ Type SignedType }
 
+// Kind implements Operation.Kind.
 func (o *OperationDiv) Kind() OperationKind {
 	return OperationKindDiv
 }
 
 type OperationRem struct{ Type SignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationRem) Kind() OperationKind {
 	return OperationKindRem
 }
 
 type OperationAnd struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationAnd) Kind() OperationKind {
 	return OperationKindAnd
 }
 
 type OperationOr struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationOr) Kind() OperationKind {
 	return OperationKindOr
 }
 
 type OperationXor struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationXor) Kind() OperationKind {
 	return OperationKindXor
 }
 
 type OperationShl struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationShl) Kind() OperationKind {
 	return OperationKindShl
 }
 
 type OperationShr struct{ Type SignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationShr) Kind() OperationKind {
 	return OperationKindShr
 }
 
 type OperationRotl struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationRotl) Kind() OperationKind {
 	return OperationKindRotl
 }
 
 type OperationRotr struct{ Type UnsignedInt }
 
+// Kind implements Operation.Kind.
 func (o *OperationRotr) Kind() OperationKind {
 	return OperationKindRotr
 }
 
 type OperationAbs struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationAbs) Kind() OperationKind {
 	return OperationKindAbs
 }
 
 type OperationNeg struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationNeg) Kind() OperationKind {
 	return OperationKindNeg
 }
 
 type OperationCeil struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationCeil) Kind() OperationKind {
 	return OperationKindCeil
 }
 
 type OperationFloor struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationFloor) Kind() OperationKind {
 	return OperationKindFloor
 }
 
 type OperationTrunc struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationTrunc) Kind() OperationKind {
 	return OperationKindTrunc
 }
 
 type OperationNearest struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationNearest) Kind() OperationKind {
 	return OperationKindNearest
 }
 
 type OperationSqrt struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationSqrt) Kind() OperationKind {
 	return OperationKindSqrt
 }
 
 type OperationMin struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationMin) Kind() OperationKind {
 	return OperationKindMin
 }
 
 type OperationMax struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationMax) Kind() OperationKind {
 	return OperationKindMax
 }
 
 type OperationCopysign struct{ Type Float }
 
+// Kind implements Operation.Kind.
 func (o *OperationCopysign) Kind() OperationKind {
 	return OperationKindCopysign
 }
 
 type OperationI32WrapFromI64 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationI32WrapFromI64) Kind() OperationKind {
 	return OperationKindI32WrapFromI64
 }
@@ -857,6 +915,7 @@ type OperationITruncFromF struct {
 	NonTrapping bool
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationITruncFromF) Kind() OperationKind {
 	return OperationKindITruncFromF
 }
@@ -866,42 +925,49 @@ type OperationFConvertFromI struct {
 	OutputType Float
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationFConvertFromI) Kind() OperationKind {
 	return OperationKindFConvertFromI
 }
 
 type OperationF32DemoteFromF64 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationF32DemoteFromF64) Kind() OperationKind {
 	return OperationKindF32DemoteFromF64
 }
 
 type OperationF64PromoteFromF32 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationF64PromoteFromF32) Kind() OperationKind {
 	return OperationKindF64PromoteFromF32
 }
 
 type OperationI32ReinterpretFromF32 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationI32ReinterpretFromF32) Kind() OperationKind {
 	return OperationKindI32ReinterpretFromF32
 }
 
 type OperationI64ReinterpretFromF64 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationI64ReinterpretFromF64) Kind() OperationKind {
 	return OperationKindI64ReinterpretFromF64
 }
 
 type OperationF32ReinterpretFromI32 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationF32ReinterpretFromI32) Kind() OperationKind {
 	return OperationKindF32ReinterpretFromI32
 }
 
 type OperationF64ReinterpretFromI64 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationF64ReinterpretFromI64) Kind() OperationKind {
 	return OperationKindF64ReinterpretFromI64
 }
@@ -914,30 +980,35 @@ func (o *OperationExtend) Kind() OperationKind {
 
 type OperationSignExtend32From8 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationSignExtend32From8) Kind() OperationKind {
 	return OperationKindSignExtend32From8
 }
 
 type OperationSignExtend32From16 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationSignExtend32From16) Kind() OperationKind {
 	return OperationKindSignExtend32From16
 }
 
 type OperationSignExtend64From8 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationSignExtend64From8) Kind() OperationKind {
 	return OperationKindSignExtend64From8
 }
 
 type OperationSignExtend64From16 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationSignExtend64From16) Kind() OperationKind {
 	return OperationKindSignExtend64From16
 }
 
 type OperationSignExtend64From32 struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationSignExtend64From32) Kind() OperationKind {
 	return OperationKindSignExtend64From32
 }
@@ -948,6 +1019,7 @@ type OperationMemoryInit struct {
 	DataIndex uint32
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationMemoryInit) Kind() OperationKind {
 	return OperationKindMemoryInit
 }
@@ -958,18 +1030,21 @@ type OperationDataDrop struct {
 	DataIndex uint32
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationDataDrop) Kind() OperationKind {
 	return OperationKindDataDrop
 }
 
 type OperationMemoryCopy struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationMemoryCopy) Kind() OperationKind {
 	return OperationKindMemoryCopy
 }
 
 type OperationMemoryFill struct{}
 
+// Kind implements Operation.Kind.
 func (o *OperationMemoryFill) Kind() OperationKind {
 	return OperationKindMemoryFill
 }
@@ -981,6 +1056,7 @@ type OperationTableInit struct {
 	TableIndex uint32
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationTableInit) Kind() OperationKind {
 	return OperationKindTableInit
 }
@@ -990,6 +1066,7 @@ type OperationElemDrop struct {
 	ElemIndex uint32
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationElemDrop) Kind() OperationKind {
 	return OperationKindElemDrop
 }
@@ -998,6 +1075,70 @@ type OperationTableCopy struct {
 	SrcTableIndex, DstTableIndex uint32
 }
 
+// Kind implements Operation.Kind.
 func (o *OperationTableCopy) Kind() OperationKind {
 	return OperationKindTableCopy
+}
+
+// OperationRefFunc corresponds to OpcodeRefFunc, and engines are expected to
+// push the opaque pointer value of engine specific func for the given FunctionIndex.
+//
+// OperationRefFunc implements Operation.
+type OperationRefFunc struct {
+	FunctionIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationRefFunc) Kind() OperationKind {
+	return OperationKindRefFunc
+}
+
+// OperationTableGet implements Operation.
+type OperationTableGet struct {
+	TableIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationTableGet) Kind() OperationKind {
+	return OperationKindTableGet
+}
+
+// OperationTableSet implements Operation.
+type OperationTableSet struct {
+	TableIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationTableSet) Kind() OperationKind {
+	return OperationKindTableSet
+}
+
+// OperationTableSize implements Operation.
+type OperationTableSize struct {
+	TableIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationTableSize) Kind() OperationKind {
+	return OperationKindTableSize
+}
+
+// OperationTableGrow implements Operation.
+type OperationTableGrow struct {
+	TableIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationTableGrow) Kind() OperationKind {
+	return OperationKindTableGrow
+}
+
+// OperationTableFill implements Operation.
+type OperationTableFill struct {
+	TableIndex uint32
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationTableFill) Kind() OperationKind {
+	return OperationKindTableFill
 }

@@ -14,10 +14,12 @@ var noValType = []byte{0}
 
 // encodedValTypes is a cache of size prefixed binary encoding of known val types.
 var encodedValTypes = map[wasm.ValueType][]byte{
-	wasm.ValueTypeI32: {1, wasm.ValueTypeI32},
-	wasm.ValueTypeI64: {1, wasm.ValueTypeI64},
-	wasm.ValueTypeF32: {1, wasm.ValueTypeF32},
-	wasm.ValueTypeF64: {1, wasm.ValueTypeF64},
+	wasm.ValueTypeI32:       {1, wasm.ValueTypeI32},
+	wasm.ValueTypeI64:       {1, wasm.ValueTypeI64},
+	wasm.ValueTypeF32:       {1, wasm.ValueTypeF32},
+	wasm.ValueTypeF64:       {1, wasm.ValueTypeF64},
+	wasm.ValueTypeExternref: {1, wasm.ValueTypeExternref},
+	wasm.ValueTypeFuncref:   {1, wasm.ValueTypeFuncref},
 }
 
 // encodeValTypes fast paths binary encoding of common value type lengths
@@ -55,7 +57,8 @@ func decodeValueTypes(r *bytes.Reader, num uint32) ([]wasm.ValueType, error) {
 
 	for i, v := range buf {
 		switch v {
-		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64:
+		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64,
+			wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 			ret[i] = v
 		default:
 			return nil, fmt.Errorf("invalid value type: %d", v)

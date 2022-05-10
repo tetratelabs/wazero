@@ -59,6 +59,7 @@ func ExternTypeName(et ExternType) string {
 //  * ValueTypeI64 - uint64(int64)
 //  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
+//  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
 //
@@ -81,8 +82,20 @@ const (
 	ValueTypeI64 ValueType = 0x7e
 	// ValueTypeF32 is a 32-bit floating point number.
 	ValueTypeF32 ValueType = 0x7d
-	// ValueTypeF64 is a 32-bit floating point number.
+	// ValueTypeF64 is a 64-bit floating point number.
 	ValueTypeF64 ValueType = 0x7c
+	// ValueTypeExternref is a externref type.
+	//
+	// Note: in wazero, externref type value are opaque raw 64-bit pointers, and the ValueTypeExternref type
+	// in the signature will be translated as uintptr in wazero's API level.
+	// For example, the import function `(func (import "env" "f") (param externref) (result externref))` can be defined in Go as:
+	//
+	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
+	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
+	//  })
+	//
+	// Note: The usage of this type is toggled with WithFeatureBulkMemoryOperations.
+	ValueTypeExternref ValueType = 0x6f
 )
 
 // ValueTypeName returns the type name of the given ValueType as a string.
@@ -99,6 +112,8 @@ func ValueTypeName(t ValueType) string {
 		return "f32"
 	case ValueTypeF64:
 		return "f64"
+	case ValueTypeExternref:
+		return "externref"
 	}
 	return "unknown"
 }

@@ -49,6 +49,19 @@ func TestDecodeConstantExpression(t *testing.T) {
 				},
 			},
 		},
+		{
+			in: []byte{
+				wasm.OpcodeRefNull,
+				wasm.RefTypeExternref,
+				wasm.OpcodeEnd,
+			},
+			exp: &wasm.ConstantExpression{
+				Opcode: wasm.OpcodeRefNull,
+				Data: []byte{
+					wasm.RefTypeExternref,
+				},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -76,9 +89,17 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 		{
 			in: []byte{
 				wasm.OpcodeRefNull,
-				wasm.RefTypeExternref,
 			},
-			expectedErr: "ref.null instruction in constant expression must be of funcref type but was 0x6f",
+			expectedErr: "read reference type for ref.null: EOF",
+			features:    wasm.FeatureBulkMemoryOperations,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeRefNull,
+				0xff,
+				wasm.OpcodeEnd,
+			},
+			expectedErr: "invalid type for ref.null: 0xff",
 			features:    wasm.FeatureBulkMemoryOperations,
 		},
 		{

@@ -528,7 +528,7 @@ func TestCompiler_compileBr(t *testing.T) {
 func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
-		env.setTable(make([]interface{}, 10))
+		env.addTable(&wasm.TableInstance{References: make([]wasm.Reference, 10)})
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
 			Types:     []*wasm.FunctionType{{}},
@@ -571,10 +571,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]interface{}, 10)
-		env.setTable(table)
+		table := make([]wasm.Reference, 10)
+		env.addTable(&wasm.TableInstance{References: table})
 		env.module().TypeIDs = make([]wasm.FunctionTypeID, 10)
-		table[0] = nil
 
 		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -609,11 +608,11 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.module().TypeIDs = []wasm.FunctionTypeID{1000}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]interface{}, 10)
-		env.setTable(table)
+		table := make([]wasm.Reference, 10)
+		env.addTable(&wasm.TableInstance{References: table})
 
 		cf := &function{source: &wasm.FunctionInstance{TypeID: 50}}
-		table[0] = cf
+		table[0] = uintptr(unsafe.Pointer(cf))
 
 		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -644,9 +643,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
 				operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 
-				table := make([]interface{}, 10)
+				table := make([]wasm.Reference, 10)
 				env := newJITEnvironment()
-				env.setTable(table)
+				env.addTable(&wasm.TableInstance{References: table})
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 				// and the typeID  matches the table[targetOffset]'s type ID.
@@ -684,7 +683,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							},
 						}
 						me.functions = append(me.functions, f)
-						table[i] = f
+						table[i] = uintptr(unsafe.Pointer(f))
 					})
 				}
 

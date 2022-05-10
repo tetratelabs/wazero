@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -31,16 +32,17 @@ var compileConfig = wazero.NewCompileConfig().
 var moduleConfig = wazero.NewModuleConfig()
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
-	"huge stack":                              testHugeStack,
-	"unreachable":                             testUnreachable,
-	"recursive entry":                         testRecursiveEntry,
-	"imported-and-exported func":              testImportedAndExportedFunc,
-	"host function with context parameter":    testHostFunctionContextParameter,
-	"host function with nested context":       testNestedGoContext,
-	"host function with numeric parameter":    testHostFunctionNumericParameter,
-	"close module with in-flight calls":       testCloseInFlight,
-	"multiple instantiation from same source": testMultipleInstantiation,
-	"exported function that grows memory":     testMemOps,
+	"huge stack":                                        testHugeStack,
+	"unreachable":                                       testUnreachable,
+	"recursive entry":                                   testRecursiveEntry,
+	"imported-and-exported func":                        testImportedAndExportedFunc,
+	"host function with context parameter":              testHostFunctionContextParameter,
+	"host function with nested context":                 testNestedGoContext,
+	"host function with numeric parameter":              testHostFunctionNumericParameter,
+	"close module with in-flight calls":                 testCloseInFlight,
+	"multiple instantiation from same source":           testMultipleInstantiation,
+	"exported function that grows memory":               testMemOps,
+	"import functions with reference type in signature": testReftypeImports,
 }
 
 func TestEngineJIT(t *testing.T) {
@@ -55,6 +57,7 @@ func TestEngineInterpreter(t *testing.T) {
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
+	config = config.WithFeatureReferenceTypes(true)
 	for name, testf := range tests {
 		name := name   // pin
 		testf := testf // pin
@@ -72,7 +75,36 @@ var (
 	recursiveWasm []byte
 	//go:embed testdata/hugestack.wasm
 	hugestackWasm []byte
+	//go:embed testdata/reftype_imports.wasm
+	reftypeImportsWasm []byte
 )
+
+func testReftypeImports(t *testing.T, r wazero.Runtime) {
+	type dog struct {
+		name string
+	}
+
+	hostObj := &dog{name: "hello"}
+	host, err := r.NewModuleBuilder("host").
+		ExportFunctions(map[string]interface{}{
+			"externref": func(externrefFromRefNull uintptr) uintptr {
+				require.Zero(t, externrefFromRefNull)
+				return uintptr(unsafe.Pointer(hostObj))
+			},
+		}).Instantiate(testCtx)
+	require.NoError(t, err)
+	defer host.Close(testCtx)
+
+	module, err := r.InstantiateModuleFromCode(testCtx, reftypeImportsWasm)
+	require.NoError(t, err)
+	defer module.Close(testCtx)
+
+	actual, err := module.ExportedFunction("get_externref_by_host").Call(testCtx)
+	require.NoError(t, err)
+
+	// Verifies that the returned raw uintptr is the same as the one for the host object.
+	require.Equal(t, uintptr(unsafe.Pointer(hostObj)), uintptr(actual[0]))
+}
 
 func testHugeStack(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromCode(testCtx, hugestackWasm)

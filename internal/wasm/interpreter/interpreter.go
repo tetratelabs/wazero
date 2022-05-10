@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
@@ -170,6 +171,18 @@ type function struct {
 	hostFn *reflect.Value
 }
 
+// functionFromUintptr resurrects the original *function from the given uintptr
+// which comes from either funcref table or OpcodeRefFunc instruction.
+func functionFromUintptr(ptr uintptr) *function {
+	// Wraps ptrs as the double pointer in order to avoid the unsafe access as detected by race detector.
+	//
+	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
+	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
+	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
+	var wrapped *uintptr = &ptr
+	return *(**function)(unsafe.Pointer(wrapped))
+}
+
 func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 	return &function{
 		source: f,
@@ -253,7 +266,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 
 	for tableIndex, init := range tableInit {
 		for elemIdx, funcidx := range init { // Initialize any elements with compiled functions
-			tables[tableIndex].References[elemIdx] = me.functions[funcidx]
+			tables[tableIndex].References[elemIdx] = uintptr(unsafe.Pointer(me.functions[funcidx]))
 		}
 	}
 	return me, nil
@@ -537,6 +550,24 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.SrcTableIndex)
 			op.us[1] = uint64(o.DstTableIndex)
+		case *wazeroir.OperationRefFunc:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.FunctionIndex)
+		case *wazeroir.OperationTableGet:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TableIndex)
+		case *wazeroir.OperationTableSet:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TableIndex)
+		case *wazeroir.OperationTableSize:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TableIndex)
+		case *wazeroir.OperationTableGrow:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TableIndex)
+		case *wazeroir.OperationTableFill:
+			op.us = make([]uint64, 1)
+			op.us[0] = uint64(o.TableIndex)
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -563,12 +594,26 @@ func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.E
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = me.functions[*index]
+			refs[i] = uintptr(unsafe.Pointer(me.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
 		References: refs,
 		Type:       wasm.RefTypeFuncref,
+	}
+}
+
+// InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
+func (me *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
+	for _, g := range globals {
+		if g.Type.ValType == wasm.ValueTypeFuncref {
+			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
+				g.Val = 0 // Null funcref is expressed as zero.
+			} else {
+				// Lowers the stored function index into the interpreter specific function's opaque pointer.
+				g.Val = uint64(uintptr(unsafe.Pointer(me.functions[g.Val])))
+			}
+		}
 	}
 }
 
@@ -713,10 +758,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				if offset >= uint64(len(table.References)) {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 				}
-				tf, ok := table.References[offset].(*function)
-				if !ok {
+				rawPtr := table.References[offset]
+				if rawPtr == 0 {
 					panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-				} else if tf.source.TypeID != typeIDs[op.us[0]] {
+				}
+
+				tf := functionFromUintptr(rawPtr)
+				if tf.source.TypeID != typeIDs[op.us[0]] {
 					panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 				}
 
@@ -1815,6 +1863,57 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if copySize != 0 {
 				copy(dstTable[destinationOffset:], srcTable[sourceOffset:sourceOffset+copySize])
+			}
+			frame.pc++
+		case wazeroir.OperationKindRefFunc:
+			ce.pushValue(uint64(uintptr(unsafe.Pointer(functions[op.us[0]]))))
+			frame.pc++
+		case wazeroir.OperationKindTableGet:
+			table := tables[op.us[0]]
+
+			offset := ce.popValue()
+			if offset > uint64(len(table.References)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+
+			ce.pushValue(uint64(table.References[offset]))
+			frame.pc++
+		case wazeroir.OperationKindTableSet:
+			table := tables[op.us[0]]
+			ref := ce.popValue()
+
+			offset := ce.popValue()
+			if offset >= uint64(len(table.References)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			}
+
+			table.References[offset] = uintptr(ref) // externrefs are opaque uint64.
+			frame.pc++
+		case wazeroir.OperationKindTableSize:
+			table := tables[op.us[0]]
+			ce.pushValue(uint64(len(table.References)))
+			frame.pc++
+		case wazeroir.OperationKindTableGrow:
+			table := tables[op.us[0]]
+			num, ref := ce.popValue(), ce.popValue()
+			ret := table.Grow(ctx, uint32(num), uintptr(ref))
+			ce.pushValue(uint64(ret))
+			frame.pc++
+		case wazeroir.OperationKindTableFill:
+			table := tables[op.us[0]]
+			num := ce.popValue()
+			ref := uintptr(ce.popValue())
+			offset := ce.popValue()
+			if num+offset > uint64(len(table.References)) {
+				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+			} else if num > 0 {
+				// Uses the copy trick for faster filling the region with the value.
+				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				targetRegion := table.References[offset : offset+num]
+				targetRegion[0] = ref
+				for i := 1; i < len(targetRegion); i *= 2 {
+					copy(targetRegion[i:], targetRegion[:i])
+				}
 			}
 			frame.pc++
 		}

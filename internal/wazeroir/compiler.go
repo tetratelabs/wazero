@@ -175,6 +175,8 @@ type CompilationResult struct {
 	Functions []wasm.Index
 	// Types holds all the types in the module from which this function is compiled.
 	Types []*wasm.FunctionType
+	// TableTypes holds all the reference types of all tables declared in the module.
+	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
 	HasMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
@@ -195,6 +197,11 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 
 	hasMemory, hasTable := mem != nil, len(tables) > 0
 
+	tableTypes := make([]wasm.ValueType, len(tables))
+	for i := range tableTypes {
+		tableTypes[i] = tables[i].Type
+	}
+
 	var ret []*CompilationResult
 	for funcInxdex := range module.FunctionSection {
 		typeID := module.FunctionSection[funcInxdex]
@@ -202,7 +209,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		code := module.CodeSection[funcInxdex]
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
-			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcInxdex, len(functions), err)
+			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcInxdex, len(functions)-1, err)
 		}
 		r.Globals = globals
 		r.Functions = functions
@@ -210,6 +217,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		r.HasMemory = hasMemory
 		r.HasTable = hasTable
 		r.Signature = sig
+		r.TableTypes = tableTypes
 		ret = append(ret, r)
 	}
 	return ret, nil
@@ -1460,6 +1468,46 @@ operatorSwitch:
 		c.emit(
 			&OperationSignExtend64From32{},
 		)
+	case wasm.OpcodeRefFunc:
+		c.pc++
+		index, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc:]))
+		if err != nil {
+			return fmt.Errorf("failed to read function index for ref.func: %v", err)
+		}
+		c.pc += num - 1
+		c.emit(
+			&OperationRefFunc{FunctionIndex: index},
+		)
+	case wasm.OpcodeRefNull:
+		c.pc++ // Skip the type of reftype as every ref value is opaque pointer.
+		c.emit(
+			&OperationConstI64{Value: 0},
+		)
+	case wasm.OpcodeRefIsNull:
+		// Simply compare the opaque pointer (i64) with zero.
+		c.emit(
+			&OperationEqz{Type: UnsignedInt64},
+		)
+	case wasm.OpcodeTableGet:
+		c.pc++
+		tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc:]))
+		if err != nil {
+			return fmt.Errorf("failed to read function index for table.get: %v", err)
+		}
+		c.pc += num - 1
+		c.emit(
+			&OperationTableGet{TableIndex: tableIndex},
+		)
+	case wasm.OpcodeTableSet:
+		c.pc++
+		tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc:]))
+		if err != nil {
+			return fmt.Errorf("failed to read function index for table.set: %v", err)
+		}
+		c.pc += num - 1
+		c.emit(
+			&OperationTableSet{TableIndex: tableIndex},
+		)
 	case wasm.OpcodeMiscPrefix:
 		c.pc++
 		switch miscOp := c.body[c.pc]; miscOp {
@@ -1552,13 +1600,13 @@ operatorSwitch:
 			)
 			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableCopy:
-			// Read the source table index which is not used for now (until reference type proposal impl.)
+			// Read the source table index.
 			dst, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
-			// Read the destination table index which is not used for now (until reference type proposal impl.)
+			// Read the destination table index.
 			src, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 
@@ -1567,6 +1615,39 @@ operatorSwitch:
 			c.pc += num
 			c.emit(
 				&OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
+			)
+			c.result.NeedsAccessToElementInstances = true
+		case wasm.OpcodeMiscTableGrow:
+			// Read the source table index.
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationTableGrow{TableIndex: tableIndex},
+			)
+			c.result.NeedsAccessToElementInstances = true
+		case wasm.OpcodeMiscTableSize:
+			// Read the source table index.
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationTableSize{TableIndex: tableIndex},
+			)
+			c.result.NeedsAccessToElementInstances = true
+		case wasm.OpcodeMiscTableFill:
+			// Read the source table index.
+			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
+			if err != nil {
+				return fmt.Errorf("reading i32.const value: %v", err)
+			}
+			c.pc += num
+			c.emit(
+				&OperationTableFill{TableIndex: tableIndex},
 			)
 			c.result.NeedsAccessToElementInstances = true
 		default:
@@ -1702,7 +1783,7 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	case wasm.ValueTypeI32:
 		c.stackPush(UnsignedTypeI32)
 		c.emit(&OperationConstI32{Value: 0})
-	case wasm.ValueTypeI64:
+	case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 		c.stackPush(UnsignedTypeI64)
 		c.emit(&OperationConstI64{Value: 0})
 	case wasm.ValueTypeF32:

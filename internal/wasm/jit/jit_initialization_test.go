@@ -22,8 +22,8 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables: []*wasm.TableInstance{
-					{References: make([]interface{}, 20)},
-					{References: make([]interface{}, 10)},
+					{References: make([]wasm.Reference, 20)},
+					{References: make([]wasm.Reference, 10)},
 				},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
@@ -35,7 +35,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:          []*wasm.GlobalInstance{{Val: 100}},
 				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:           []*wasm.TableInstance{{References: make([]interface{}, 20)}},
+				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: nil,
@@ -46,7 +46,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:          []*wasm.GlobalInstance{{Val: 100}},
 				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:           []*wasm.TableInstance{{References: make([]interface{}, 20)}},
+				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    nil,
 				ElementInstances: make([]wasm.ElementInstance, 10),
@@ -56,7 +56,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory:           &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:           []*wasm.TableInstance{{References: make([]interface{}, 20)}},
+				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
@@ -66,7 +66,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:          []*wasm.GlobalInstance{{Val: 100}},
-				Tables:           []*wasm.TableInstance{{References: make([]interface{}, 20)}},
+				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
@@ -85,7 +85,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:           []*wasm.TableInstance{{References: make([]interface{}, 20)}},
+				Tables:           []*wasm.TableInstance{{References: make([]wasm.Reference, 20)}},
 				TypeIDs:          make([]wasm.FunctionTypeID, 10),
 				DataInstances:    make([][]byte, 10),
 				ElementInstances: make([]wasm.ElementInstance, 10),
@@ -169,7 +169,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.ElementInstances[0])), ce.moduleContext.elementInstancesElemen0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.codesElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.functionsElement0Address)
 		})
 	}
 }

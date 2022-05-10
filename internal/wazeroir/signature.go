@@ -99,6 +99,7 @@ var (
 	signature_I32I32_None = &signature{
 		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI32},
 	}
+
 	signature_I32I32_I32 = &signature{
 		in:  []UnsignedType{UnsignedTypeI32, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeI32},
@@ -111,6 +112,10 @@ var (
 	}
 	signature_I32F64_None = &signature{
 		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeF64},
+	}
+	signature_I64I32_I32 = &signature{
+		in:  []UnsignedType{UnsignedTypeI64, UnsignedTypeI32},
+		out: []UnsignedType{UnsignedTypeI32},
 	}
 	signature_I64I64_I32 = &signature{
 		in:  []UnsignedType{UnsignedTypeI64, UnsignedTypeI64},
@@ -138,6 +143,9 @@ var (
 	}
 	signature_I32I32I32_None = &signature{
 		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI32, UnsignedTypeI32},
+	}
+	signature_I32I64I32_None = &signature{
+		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeI64, UnsignedTypeI32},
 	}
 	signature_UnknownUnknownI32_Unknown = &signature{
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
@@ -353,6 +361,21 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		return signature_I32_I32, nil
 	case wasm.OpcodeI64Extend8S, wasm.OpcodeI64Extend16S, wasm.OpcodeI64Extend32S:
 		return signature_I64_I64, nil
+	case wasm.OpcodeTableGet:
+		// table.get takes table's offset and pushes the ref type value of opaque pointer as i64 value onto the stack.
+		return signature_I32_I64, nil
+	case wasm.OpcodeTableSet:
+		// table.set takes table's offset and the ref type value of opaque pointer as i64 value.
+		return signature_I32I64_None, nil
+	case wasm.OpcodeRefFunc:
+		// ref.func is translated as pushing the compiled function's opaque pointer (uint64) at wazeroir layer.
+		return signature_None_I64, nil
+	case wasm.OpcodeRefIsNull:
+		// ref.is_null is translated as checking if the uint64 on the top of the stack (opaque pointer) is zero or not.
+		return signature_I64_I32, nil
+	case wasm.OpcodeRefNull:
+		// ref.null is translated as i64.const 0.
+		return signature_None_I64, nil
 	case wasm.OpcodeMiscPrefix:
 		switch miscOp := c.body[c.pc+1]; miscOp {
 		case wasm.OpcodeMiscI32TruncSatF32S, wasm.OpcodeMiscI32TruncSatF32U:
@@ -368,6 +391,12 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 			return signature_I32I32I32_None, nil
 		case wasm.OpcodeMiscDataDrop, wasm.OpcodeMiscElemDrop:
 			return signature_None_None, nil
+		case wasm.OpcodeMiscTableGrow:
+			return signature_I64I32_I32, nil
+		case wasm.OpcodeMiscTableSize:
+			return signature_None_I32, nil
+		case wasm.OpcodeMiscTableFill:
+			return signature_I32I64I32_None, nil
 		default:
 			return nil, fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}
@@ -391,7 +420,9 @@ func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
 	switch vt {
 	case wasm.ValueTypeI32:
 		return UnsignedTypeI32
-	case wasm.ValueTypeI64:
+	case wasm.ValueTypeI64,
+		// From wazeroir layer, ref type values are opaque 64-bit pointers.
+		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 		return UnsignedTypeI64
 	case wasm.ValueTypeF32:
 		return UnsignedTypeF32

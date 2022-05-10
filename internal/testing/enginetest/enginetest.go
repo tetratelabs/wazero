@@ -37,6 +37,8 @@ type EngineTester interface {
 	// InitTables returns expected table contents ([]wasm.Reference) per table.
 	InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int,
 		initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference
+	// CompiledFunctionPointerValue returns the opaque compiledFunction's pointer for the `funcIndex`.
+	CompiledFunctionPointerValue(tme wasm.ModuleEngine, funcIndex wasm.Index) uint64
 }
 
 func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
@@ -55,6 +57,60 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 		require.NoError(t, err)
 		require.Equal(t, t.Name(), me.Name())
 	})
+}
+
+func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
+	e := et.NewEngine(wasm.Features20220419)
+
+	i64 := wasm.ValueTypeI64
+	m := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
+		FunctionSection: []uint32{0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
+		},
+	}
+
+	err := e.CompileModule(testCtx, m)
+	require.NoError(t, err)
+
+	// To use the function, we first need to add it to a module.
+	var fns []*wasm.FunctionInstance
+	for i := range m.CodeSection {
+		typeIndex := m.FunctionSection[i]
+		f := &wasm.FunctionInstance{
+			Kind:       wasm.FunctionKindWasm,
+			Type:       m.TypeSection[typeIndex],
+			Body:       m.CodeSection[i].Body,
+			LocalTypes: m.CodeSection[i].LocalTypes,
+			Idx:        wasm.Index(i),
+		}
+		fns = append(fns, f)
+	}
+
+	me, err := e.NewModuleEngine(t.Name(), m, nil, fns, nil, nil)
+	require.NoError(t, err)
+
+	nullRefVal := wasm.GlobalInstanceNullFuncRefValue
+	globals := []*wasm.GlobalInstance{
+		{Val: 10, Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32}},
+		{Val: uint64(nullRefVal), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
+		{Val: uint64(2), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
+		{Val: uint64(1), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
+		{Val: uint64(0), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
+	}
+	me.InitializeFuncrefGlobals(globals)
+
+	// Non-funcref values must be intact.
+	require.Equal(t, uint64(10), globals[0].Val)
+	// The second global had wasm.GlobalInstanceNullFuncRefValue, so that value must be translated as null reference (uint64(0)).
+	require.Zero(t, globals[1].Val)
+	// Non GlobalInstanceNullFuncRefValue valued globals must result in having the valid compiled function's pointers.
+	require.Equal(t, et.CompiledFunctionPointerValue(me, 2), globals[2].Val)
+	require.Equal(t, et.CompiledFunctionPointerValue(me, 1), globals[3].Val)
+	require.Equal(t, et.CompiledFunctionPointerValue(me, 0), globals[4].Val)
 }
 
 func getFunctionInstance(module *wasm.Module, index wasm.Index, moduleInstance *wasm.ModuleInstance) *wasm.FunctionInstance {
@@ -135,7 +191,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	t.Run("module-defined function", func(t *testing.T) {
 		tables := []*wasm.TableInstance{
 			{Min: 2, References: make([]wasm.Reference, 2)},
-			{Min: 10, References: make([]interface{}, 10)},
+			{Min: 10, References: make([]wasm.Reference, 10)},
 		}
 
 		m := &wasm.Module{

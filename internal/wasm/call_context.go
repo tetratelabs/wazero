@@ -171,7 +171,8 @@ func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []ui
 		ctx = context.Background()
 	}
 	mod := f.Module
-	return mod.Engine.Call(ctx, mod.CallCtx, f, params...)
+	ret, err = mod.Engine.Call(ctx, mod.CallCtx, f, params...)
+	return
 }
 
 // ExportedGlobal implements the same method as documented on api.Module.

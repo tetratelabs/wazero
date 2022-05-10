@@ -243,7 +243,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
-	if err = m.validateGlobals(globals, MaximumGlobals); err != nil {
+	if err = m.validateGlobals(globals, uint32(len(functions)), MaximumGlobals); err != nil {
 		return err
 	}
 
@@ -287,7 +287,7 @@ func (m *Module) validateStartSection() error {
 	return nil
 }
 
-func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals uint32) error {
+func (m *Module) validateGlobals(globals []*GlobalType, numFuncts, maxGlobals uint32) error {
 	if uint32(len(globals)) > maxGlobals {
 		return fmt.Errorf("too many globals in a module")
 	}
@@ -296,7 +296,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals uint32) error
 	// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 	importedGlobals := globals[:m.ImportGlobalCount()]
 	for _, g := range m.GlobalSection {
-		if err := validateConstExpression(importedGlobals, g.Init, g.Type.ValType); err != nil {
+		if err := validateConstExpression(importedGlobals, numFuncts, g.Init, g.Type.ValType); err != nil {
 			return err
 		}
 	}
@@ -358,7 +358,7 @@ func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFe
 
 	for _, d := range m.DataSection {
 		if !d.IsPassive() {
-			if err := validateConstExpression(globals, d.OffsetExpression, ValueTypeI32); err != nil {
+			if err := validateConstExpression(globals, 0, d.OffsetExpression, ValueTypeI32); err != nil {
 				return fmt.Errorf("calculate offset: %w", err)
 			}
 		}
@@ -412,7 +412,7 @@ func (m *Module) validateExports(enabledFeatures Features, functions []Index, gl
 	return nil
 }
 
-func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, expectedType ValueType) (err error) {
+func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *ConstantExpression, expectedType ValueType) (err error) {
 	var actualType ValueType
 	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
@@ -451,6 +451,22 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 			return fmt.Errorf("global index out of range")
 		}
 		actualType = globals[id].ValType
+	case OpcodeRefNull:
+		reftype, err := r.ReadByte()
+		if err != nil {
+			return fmt.Errorf("read reference type for ref.null: %w", err)
+		} else if reftype != RefTypeFuncref && reftype != RefTypeExternref {
+			return fmt.Errorf("invalid type for ref.null: 0x%x", reftype)
+		}
+		actualType = reftype
+	case OpcodeRefFunc:
+		index, _, err := leb128.DecodeUint32(r)
+		if err != nil {
+			return fmt.Errorf("read i32: %w", err)
+		} else if index >= numFuncs {
+			return fmt.Errorf("ref.func index out of range [%d] with length %d", index, numFuncs-1)
+		}
+		actualType = ValueTypeFuncref
 	default:
 		return fmt.Errorf("invalid opcode for const expression: 0x%x", expr.Opcode)
 	}
@@ -901,10 +917,17 @@ const (
 	ValueTypeI64 = api.ValueTypeI64
 	ValueTypeF32 = api.ValueTypeF32
 	ValueTypeF64 = api.ValueTypeF64
+	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
+	ValueTypeFuncref   ValueType = 0x70
+	ValueTypeExternref ValueType = api.ValueTypeExternref
 )
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
+	if t == ValueTypeFuncref {
+		// TODO: funcref is not exposed in the API pkg yet.
+		return "funcref"
+	}
 	return api.ValueTypeName(t)
 }
 
