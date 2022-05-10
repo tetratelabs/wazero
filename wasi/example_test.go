@@ -23,7 +23,7 @@ func Example() {
 	// Instantiate WASI, which implements system I/O such as console output.
 	wm, err := InstantiateSnapshotPreview1(ctx, r)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer wm.Close(testCtx)
 
@@ -40,7 +40,7 @@ func Example() {
 )
 `), wazero.NewCompileConfig())
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer code.Close(ctx)
 

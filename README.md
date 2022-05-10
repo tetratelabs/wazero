@@ -24,11 +24,20 @@ func main() {
 
 	// Read a WebAssembly binary containing an exported "fac" function.
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
-	source, _ := os.ReadFile("./path/to/fac.wasm")
+	source, err := os.ReadFile("./path/to/fac.wasm")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+    // Create a new WebAssembly Runtime.
+	r := wazero.NewRuntime()
+    defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate the module and return its exported functions
-	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
-	defer module.Close(ctx)
+	module, err := r.InstantiateModuleFromCode(ctx, source)
+    if err != nil {
+        log.Panicln(err)
+    }
 
 	// Discover 7! is 5040
 	fmt.Println(module.ExportedFunction("fac").Call(ctx, 7))
@@ -57,15 +66,14 @@ For example, you can grant WebAssembly code access to your console by exporting
 a function written in Go. The below function can be imported into standard
 WebAssembly as the module "env" and the function name "log_i32".
 ```go
-env, err := r.NewModuleBuilder("env").
+_, err := r.NewModuleBuilder("env").
 	ExportFunction("log_i32", func(v uint32) {
 		fmt.Println("log_i32 >>", v)
 	}).
 	Instantiate(ctx)
 if err != nil {
-	log.Fatal(err)
+    log.Panicln(err)
 }
-defer env.Close(ctx)
 ```
 
 The WebAssembly community has [subgroups][4] which maintain work that may not
@@ -78,12 +86,13 @@ bundles an implementation. That way, you don't have to write these functions.
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
-wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
-defer wm.Close(ctx)
+_, err := wasi.InstantiateSnapshotPreview1(ctx, r)
+if err != nil {
+    log.Panicln(err)
+}
 
 config := wazero.NewModuleConfig().WithFS(os.DirFS("/work/home"))
 module, err := r.InstantiateModule(ctx, compiled, config)
-defer module.Close(ctx)
 ...
 ```
 

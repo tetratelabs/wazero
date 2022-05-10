@@ -37,11 +37,11 @@ func Example_sys() {
 	ctx := context.WithValue(context.Background(), experimental.SysKey{}, &fakeSys{})
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
-	wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
-	if err != nil {
-		log.Fatal(err)
+	defer r.Close(ctx) // This closes everything this Runtime created.
+
+	if _, err := wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+		log.Panicln(err)
 	}
-	defer wm.Close(ctx)
 
 	code, err := r.CompileModule(ctx, []byte(`(module
   (import "wasi_snapshot_preview1" "random_get"
@@ -51,19 +51,17 @@ func Example_sys() {
   (start 1) ;; call the second function
 )`), wazero.NewCompileConfig())
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer code.Close(ctx)
 
 	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer mod.Close(ctx)
 
 	// Try to read 4 bytes of random data.
 	if bytes, ok := mod.Memory().Read(ctx, 0, 4); !ok {
-		log.Fatalf("Memory.Read(0, 4) out of range of memory size %d", mod.Memory().Size(ctx))
+		log.Panicf("Memory.Read(0, 4) out of range of memory size %d", mod.Memory().Size(ctx))
 	} else {
 		fmt.Println(hex.EncodeToString(bytes))
 	}

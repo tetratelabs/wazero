@@ -22,6 +22,7 @@ func main() {
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a Go-defined module named "env" that exports functions to
 	// get the current year and log to the console.
@@ -30,7 +31,7 @@ func main() {
 	// constrained to a subset of numeric types.
 	// Note: "env" is a module name conventionally used for arbitrary
 	// host-defined functions, but any name would do.
-	env, err := r.NewModuleBuilder("env").
+	_, err := r.NewModuleBuilder("env").
 		ExportFunction("log_i32", func(v uint32) {
 			fmt.Println("log_i32 >>", v)
 		}).
@@ -42,9 +43,8 @@ func main() {
 		}).
 		Instantiate(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer env.Close(ctx)
 
 	// Instantiate a WebAssembly module named "age-calculator" that imports
 	// functions defined in "env".
@@ -85,26 +85,25 @@ func main() {
 )`))
 	// ^^ Note: wazero's text compiler is incomplete #59. We are using it anyway to keep this example dependency free.
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer ageCalculator.Close(ctx)
 
 	// Read the birthYear from the arguments to main
 	birthYear, err := strconv.ParseUint(os.Args[1], 10, 64)
 	if err != nil {
-		log.Fatalf("invalid arg %v: %v", os.Args[1], err)
+		log.Panicf("invalid arg %v: %v", os.Args[1], err)
 	}
 
 	// First, try calling the "get_age" function and printing to the console externally.
 	results, err := ageCalculator.ExportedFunction("get_age").Call(ctx, birthYear)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	fmt.Println("println >>", results[0])
 
 	// First, try calling the "log_age" function and printing to the console externally.
 	_, err = ageCalculator.ExportedFunction("log_age").Call(ctx, birthYear)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 }

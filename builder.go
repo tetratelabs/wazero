@@ -15,6 +15,9 @@ import (
 // Ex. Below defines and instantiates a module named "env" with one function:
 //
 //	ctx := context.Background()
+//	r := wazero.NewRuntime()
+//	defer r.Close(ctx) // This closes everything this Runtime created.
+//
 //	hello := func() {
 //		fmt.Fprintln(stdout, "hello!")
 //	}
@@ -29,10 +32,8 @@ import (
 //		Compile(ctx, wazero.NewCompileConfig())
 //
 //	env1, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.1"))
-//	defer env1.Close(ctx)
 //
 //	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
-//	defer env2.Close(ctx)
 //
 // Notes:
 // * ModuleBuilder is mutable. WithXXX functions return the same instance for chaining.
@@ -157,10 +158,13 @@ type ModuleBuilder interface {
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
 	// Compile returns a module to instantiate, or an error if any of the configuration is invalid.
+	//
+	// Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
 	Compile(context.Context, CompileConfig) (CompiledModule, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule, using default configuration.
 	//
+	// Note: Closing the wazero.Runtime closes any api.Module it instantiated.
 	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
 	// Note: To avoid using configuration defaults, use Compile instead.
 	Instantiate(context.Context) (api.Module, error)

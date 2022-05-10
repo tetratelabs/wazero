@@ -16,11 +16,12 @@ import (
 
 // Runtime allows embedding of WebAssembly modules.
 //
-// Ex.
+// Ex. The below is the basic initialization of wazero's WebAssembly Runtime.
 //	ctx := context.Background()
 //	r := wazero.NewRuntime()
+//	defer r.Close(ctx) // This closes everything this Runtime created.
+//
 //	module, _ := r.InstantiateModuleFromCode(ctx, source)
-//	defer module.Close()
 type Runtime interface {
 	// NewModuleBuilder lets you create modules out of functions defined in Go.
 	//
@@ -52,8 +53,10 @@ type Runtime interface {
 	//
 	// Ex.
 	//	ctx := context.Background()
-	//	module, _ := wazero.NewRuntime().InstantiateModuleFromCode(ctx, source)
-	//	defer module.Close()
+	//	r := wazero.NewRuntime()
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	module, _ := r.InstantiateModuleFromCode(ctx, source)
 	//
 	// Note: When the context is nil, it defaults to context.Background.
 	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
@@ -66,10 +69,10 @@ type Runtime interface {
 	// Ex.
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
 	//	compiled, _ := r.CompileModule(ctx, source, wazero.NewCompileConfig())
-	//	defer compiled.Close()
 	//	module, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
-	//	defer module.Close()
 	//
 	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
 	//  * The module name is already in use.
@@ -80,7 +83,9 @@ type Runtime interface {
 	//
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
-	//	wasi, _ := wasi.InstantiateSnapshotPreview1(r)
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	_, _ := wasi.InstantiateSnapshotPreview1(r)
 	//	compiled, _ := r.CompileModule(ctx, source, wazero.NewCompileConfig())
 	//
 	//	// Initialize base configuration:
@@ -99,7 +104,9 @@ type Runtime interface {
 	// Ex.
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
-	//	defer r.Close(ctx)
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	// Everything below here can be closed, but will anyway due to above.
 	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 	Close(context.Context) error
@@ -110,7 +117,9 @@ type Runtime interface {
 	// Ex.
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime()
-	//	defer r.CloseWithExitCode(ctx, 2)
+	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.
+	//
+	//	// Everything below here can be closed, but will anyway due to above.
 	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error

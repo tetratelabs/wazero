@@ -18,6 +18,7 @@ func main() {
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a Go-defined module named "assemblyscript" that exports a
 	// function to close the module that calls "abort".
@@ -26,7 +27,7 @@ func main() {
 			_ = m.CloseWithExitCode(ctx, 255)
 		}).Instantiate(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer host.Close(ctx)
 
@@ -45,14 +46,14 @@ func main() {
 	(export "abort" (func 0)) ;; exports the import for testing
 )`), compileConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer code.Close(ctx)
 
 	// Instantiate the WebAssembly module.
 	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig())
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
 	defer mod.Close(ctx)
 

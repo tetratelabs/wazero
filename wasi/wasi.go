@@ -26,7 +26,17 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 
 // InstantiateSnapshotPreview1 instantiates ModuleSnapshotPreview1, so that other modules can import them.
 //
+// Ex. If your source (%.wasm binary) includes an import "wasi_snapshot_preview1", call InstantiateSnapshotPreview1
+// prior to instantiating it. Otherwise, it will error due to missing imports.
+//	ctx := context.Background()
+//	r := wazero.NewRuntime()
+//	defer r.Close(ctx) // This closes everything this Runtime created.
+//
+//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+//
 // Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
+// Note: Closing the wazero.Runtime closes any api.Module it instantiated.
 func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	_, fns := snapshotPreview1Functions(ctx)
 	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)

@@ -60,11 +60,11 @@ func Example_listener() {
 	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, &loggerFactory{})
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
-	wm, err := wasi.InstantiateSnapshotPreview1(ctx, r)
-	if err != nil {
-		log.Fatal(err)
+	defer r.Close(ctx) // This closes everything this Runtime created.
+
+	if _, err := wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+		log.Panicln(err)
 	}
-	defer wm.Close(ctx)
 
 	// Compile the WebAssembly module using the default configuration.
 	code, err := r.CompileModule(ctx, []byte(`(module $listener
@@ -75,15 +75,13 @@ func Example_listener() {
   (start 1) ;; call the second function
 )`), wazero.NewCompileConfig())
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer code.Close(ctx)
 
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
+	_, err = r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
-		log.Fatal(err)
+		log.Panicln(err)
 	}
-	defer mod.Close(ctx)
 
 	// Output:
 	// >>	listener.[1]
