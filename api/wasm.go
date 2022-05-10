@@ -59,7 +59,7 @@ func ExternTypeName(et ExternType) string {
 //  * ValueTypeI64 - uint64(int64)
 //  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//  * ValueTypeExternref - uint64(unintptr(unsafe.Pointer(p))) where p is any pointer type in Go (e.g. *string)
+//  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
 //
@@ -84,30 +84,14 @@ const (
 	ValueTypeF32 ValueType = 0x7d
 	// ValueTypeF64 is a 64-bit floating point number.
 	ValueTypeF64 ValueType = 0x7c
-	// ValueTypeFuncref is a funcref type.
-	//
-	// Note and TODO: currently Funcref cannot be used from the wazero API. That means
-	// users are encouraged not to use either exported functions or host functions whose signature
-	// contains Funcref type. The reason is that due to the implementation detail, a Funcref value
-	// must be a pointer to the wazero's internal struct per engine implementation.
-	//
-	// Note: Regardless of the limitation mentioned above, this type is encoded as uint64 in the wazero's API level.
-	// For example, the import function `(func (import "env" "f") (param funcref) (result funcref))` can be defined in Go as:
-	//
-	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
-	//    "f": func(funcref uint64)(resultFuncRef uint64) { return },
-	//  })
-	//
-	// Note: The usage of this type is toggled with WithFeatureBulkMemoryOperations.
-	ValueTypeFuncref ValueType = 0x70
 	// ValueTypeExternref is a externref type.
 	//
 	// Note: in wazero, externref type value are opaque raw 64-bit pointers, and the ValueTypeExternref type
-	// in the signature will be translated as uint64 in wazero's API level.
+	// in the signature will be translated as uintptr in wazero's API level.
 	// For example, the import function `(func (import "env" "f") (param externref) (result externref))` can be defined in Go as:
 	//
 	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
-	//    "f": func(externref uint64) (resultExternRef uint64) { return },
+	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
 	//  })
 	//
 	// Note: The usage of this type is toggled with WithFeatureBulkMemoryOperations.
@@ -128,8 +112,6 @@ func ValueTypeName(t ValueType) string {
 		return "f32"
 	case ValueTypeF64:
 		return "f64"
-	case ValueTypeFuncref:
-		return "funcref"
 	case ValueTypeExternref:
 		return "externref"
 	}
