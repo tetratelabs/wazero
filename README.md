@@ -29,15 +29,15 @@ func main() {
 		log.Panicln(err)
 	}
 
-    // Create a new WebAssembly Runtime.
+	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntime()
-    defer r.Close(ctx) // This closes everything this Runtime created.
+	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate the module and return its exported functions
 	module, err := r.InstantiateModuleFromCode(ctx, source)
-    if err != nil {
-        log.Panicln(err)
-    }
+	if err != nil {
+		log.Panicln(err)
+	}
 
 	// Discover 7! is 5040
 	fmt.Println(module.ExportedFunction("fac").Call(ctx, 7))
@@ -211,7 +211,7 @@ In summary, we hope this section can guide you in terms of what wazero supports
 as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
-wazero conforms with spectests [7] defined alongside WebAssembly Core
+wazero conforms with [spectests][7] defined alongside WebAssembly Core
 Specification [1.0][1]. This is the default [RuntimeConfig][18].
 
 The WebAssembly Core Specification [2.0][2] is in draft form and wazero has
