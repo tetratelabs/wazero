@@ -87,6 +87,7 @@ test:
 .PHONY: spectest
 spectest:
 	@$(MAKE) spectest.v1
+	@$(MAKE) spectest.v2
 
 spectest.v1:
 	go test $$(go list ./... | grep $(spectest_v1_dir)) -v -timeout 120s
