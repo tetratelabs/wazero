@@ -7,9 +7,7 @@ WebAssembly is a way to safely run code compiled in other languages. Runtimes
 execute WebAssembly Modules (Wasm), which are most often binaries with a
 `.wasm` extension.
 
-wazero is the only zero dependency WebAssembly runtime written in Go. This
-means you can run code written in other languages that compile to WebAssembly
-modules.
+wazero is the only zero dependency WebAssembly runtime written in Go.
 
 ## Example
 
