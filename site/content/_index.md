@@ -55,6 +55,18 @@ and lets you keep features like cross compilation. Being pure Go, wazero adds
 only a small amount of size to your binary. Meanwhile, wazero’s API gives
 features you expect in Go, such as safe concurrency and context propagation.
 
+### When can I use this?
+
+wazero is an early project, so APIs are subject to change until version 1.0.
+To use wazero meanwhile, you need to add its main branch to your project like
+this: `go get github.com/tetratelabs/wazero@main`.
+
+We expect [wazero 1.0][4] to be at or before Q3 2022, so please practice the
+current APIs to ensure they work for you, and give us a [star][5] if you are
+enjoying it so far!
+
 [1]: https://github.com/tetratelabs/wazero/blob/main/examples
 [2]: https://github.com/tetratelabs/wazero/blob/main/internal/integration_test/post1_0/multi-value/testdata/fac.wat
 [3]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
+[4]: https://github.com/tetratelabs/wazero/issues/506
+[5]: https://github.com/tetratelabs/wazero/stargazers

@@ -17,12 +17,8 @@ theme = "hello-friend"
       [[languages.en.menu.main]]
         url = "https://github.com/tetratelabs/wazero/blob/main/examples"
         name = "Examples"
-        weight = 20
-      [[languages.en.menu.main]]
-        url = "https://github.com/tetratelabs/wazero/releases"
-        name = "Releases"
-        weight = 30
+        weight = 10
       [[languages.en.menu.main]]
         url = "https://github.com/tetratelabs/wazero"
         name = "GitHub"
-        weight = 40
+        weight = 20
