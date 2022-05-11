@@ -66,7 +66,6 @@ jobs:
           key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
-        # Exclude benchmarks as we don't run those in Docker
         run: go list -f '{{.Dir}}' ./... | grep 'spectest' | xargs -Ipkg go test pkg -c -o spectest.test
         env:
           GOARCH: ${{ matrix.arch }}
