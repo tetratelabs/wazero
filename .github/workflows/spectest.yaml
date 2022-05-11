@@ -12,11 +12,8 @@ defaults:
 jobs:
   test_amd64:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     strategy:
-      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
-      matrix:  # use latest available versions and be consistent on all workflows!
-        os: [ubuntu-20.04, macos-11, windows-2022]
         go-version:
         - "1.17"
         - "1.18"
