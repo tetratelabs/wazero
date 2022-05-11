@@ -1,0 +1,1 @@
+(memory 1) (func (result i32) (f32x4.all_true (v128.const i32x4 0 0 0 0)))

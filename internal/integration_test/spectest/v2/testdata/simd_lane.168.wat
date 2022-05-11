@@ -1,0 +1,1 @@
+(func $f32x4.extract_lane-1st-arg-empty (result f32)  (f32x4.extract_lane (v128.const f32x4 0 0 0 0)))

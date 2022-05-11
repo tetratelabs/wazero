@@ -1,0 +1,1 @@
+(memory 1) (func (result v128) (i8x16.avgr (v128.const i8x16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (v128.const i8x16 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))

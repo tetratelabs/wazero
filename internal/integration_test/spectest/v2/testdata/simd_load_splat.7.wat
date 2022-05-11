@@ -1,0 +1,1 @@
+(memory 1) (func (drop (i16x8.load_splat (i32.const 0))))

@@ -1,0 +1,1 @@
+(memory 1) (func (drop (i16x8.load16x4_u (i32.const 0))))

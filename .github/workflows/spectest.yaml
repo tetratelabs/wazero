@@ -21,6 +21,7 @@ jobs:
         - "1.18"
         spec-version:
         - "v1"
+        - "v2"
 
     steps:
       - uses: actions/setup-go@v3
@@ -52,6 +53,7 @@ jobs:
         - "riscv64"
         spec-version:
         - "v1"
+        - "v2"
 
     steps:
       - uses: actions/setup-go@v3

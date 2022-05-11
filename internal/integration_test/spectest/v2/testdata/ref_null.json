@@ -1,0 +1,5 @@
+{"source_filename": "./ref_null.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "ref_null.0.wasm"}, 
+  {"type": "assert_return", "line": 9, "action": {"type": "invoke", "field": "externref", "args": []}, "expected": [{"type": "externref", "value": "null"}]}, 
+  {"type": "assert_return", "line": 10, "action": {"type": "invoke", "field": "funcref", "args": []}, "expected": [{"type": "funcref", "value": "null"}]}]}

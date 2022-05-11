@@ -1,0 +1,1 @@
+(memory 1)(func  (drop (v128.load offset=-1 (i32.const 0))))

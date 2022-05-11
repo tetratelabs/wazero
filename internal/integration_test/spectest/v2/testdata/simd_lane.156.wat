@@ -1,0 +1,1 @@
+(func $i8x16.extract_lane_s-1st-arg-empty (result i32)  (i8x16.extract_lane_s (v128.const i8x16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)))

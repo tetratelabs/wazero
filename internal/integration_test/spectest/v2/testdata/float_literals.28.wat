@@ -1,0 +1,1 @@
+(global f32 (f32.const 0x1_.0))

@@ -1,0 +1,13 @@
+{"source_filename": "./custom.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "custom.0.wasm"}, 
+  {"type": "module", "line": 14, "filename": "custom.1.wasm"}, 
+  {"type": "module", "line": 50, "filename": "custom.2.wasm"}, 
+  {"type": "assert_malformed", "line": 61, "filename": "custom.3.wasm", "text": "unexpected end", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 69, "filename": "custom.4.wasm", "text": "unexpected end", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 77, "filename": "custom.5.wasm", "text": "unexpected end", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 85, "filename": "custom.6.wasm", "text": "length out of bounds", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 93, "filename": "custom.7.wasm", "text": "malformed section id", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 102, "filename": "custom.8.wasm", "text": "function and code section have inconsistent lengths", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 115, "filename": "custom.9.wasm", "text": "length out of bounds", "module_type": "binary"}, 
+  {"type": "assert_malformed", "line": 123, "filename": "custom.10.wasm", "text": "data count and data section have inconsistent lengths", "module_type": "binary"}]}

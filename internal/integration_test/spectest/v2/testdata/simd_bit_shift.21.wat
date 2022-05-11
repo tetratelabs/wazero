@@ -1,0 +1,1 @@
+(memory 1) (func (result v128) (i32x4.shl_r (v128.const i32x4 0 0 0 0)))

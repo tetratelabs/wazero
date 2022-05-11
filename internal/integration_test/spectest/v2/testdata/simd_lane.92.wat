@@ -1,0 +1,1 @@
+(func (param v128) (result v128)(i8x16.shuffle 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 (local.get 0) (local.get 0)))

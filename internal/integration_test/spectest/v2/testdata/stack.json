@@ -1,0 +1,9 @@
+{"source_filename": "./stack.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "stack.0.wasm"}, 
+  {"type": "assert_return", "line": 146, "action": {"type": "invoke", "field": "fac-expr", "args": [{"type": "i64", "value": "25"}]}, "expected": [{"type": "i64", "value": "7034535277573963776"}]}, 
+  {"type": "assert_return", "line": 147, "action": {"type": "invoke", "field": "fac-stack", "args": [{"type": "i64", "value": "25"}]}, "expected": [{"type": "i64", "value": "7034535277573963776"}]}, 
+  {"type": "assert_return", "line": 148, "action": {"type": "invoke", "field": "fac-mixed", "args": [{"type": "i64", "value": "25"}]}, "expected": [{"type": "i64", "value": "7034535277573963776"}]}, 
+  {"type": "assert_return", "line": 150, "action": {"type": "invoke", "field": "not-quite-a-tree", "args": []}, "expected": [{"type": "i32", "value": "3"}]}, 
+  {"type": "assert_return", "line": 151, "action": {"type": "invoke", "field": "not-quite-a-tree", "args": []}, "expected": [{"type": "i32", "value": "9"}]}, 
+  {"type": "module", "line": 156, "filename": "stack.1.wasm"}]}

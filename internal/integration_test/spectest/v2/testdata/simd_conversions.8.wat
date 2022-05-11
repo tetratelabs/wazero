@@ -1,0 +1,1 @@
+(func (result v128) (i64x2.trunc_sat_f64x2_u (v128.const f64x2 -2.0 -1.0)))

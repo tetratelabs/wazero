@@ -1,0 +1,1 @@
+(func (result v128) (i32x4.narrow_i16x8_s (v128.const i8x16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (v128.const i8x16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)))

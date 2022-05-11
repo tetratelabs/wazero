@@ -1,0 +1,18 @@
+{"source_filename": "./table_get.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "table_get.0.wasm"}, 
+  {"type": "action", "line": 24, "action": {"type": "invoke", "field": "init", "args": [{"type": "externref", "value": "1"}]}, "expected": []}, 
+  {"type": "assert_return", "line": 26, "action": {"type": "invoke", "field": "get-externref", "args": [{"type": "i32", "value": "0"}]}, "expected": [{"type": "externref", "value": "null"}]}, 
+  {"type": "assert_return", "line": 27, "action": {"type": "invoke", "field": "get-externref", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "externref", "value": "1"}]}, 
+  {"type": "assert_return", "line": 29, "action": {"type": "invoke", "field": "get-funcref", "args": [{"type": "i32", "value": "0"}]}, "expected": [{"type": "funcref", "value": "null"}]}, 
+  {"type": "assert_return", "line": 30, "action": {"type": "invoke", "field": "is_null-funcref", "args": [{"type": "i32", "value": "1"}]}, "expected": [{"type": "i32", "value": "0"}]}, 
+  {"type": "assert_return", "line": 31, "action": {"type": "invoke", "field": "is_null-funcref", "args": [{"type": "i32", "value": "2"}]}, "expected": [{"type": "i32", "value": "0"}]}, 
+  {"type": "assert_trap", "line": 33, "action": {"type": "invoke", "field": "get-externref", "args": [{"type": "i32", "value": "2"}]}, "text": "out of bounds table access", "expected": [{"type": "externref"}]}, 
+  {"type": "assert_trap", "line": 34, "action": {"type": "invoke", "field": "get-funcref", "args": [{"type": "i32", "value": "3"}]}, "text": "out of bounds table access", "expected": [{"type": "funcref"}]}, 
+  {"type": "assert_trap", "line": 35, "action": {"type": "invoke", "field": "get-externref", "args": [{"type": "i32", "value": "4294967295"}]}, "text": "out of bounds table access", "expected": [{"type": "externref"}]}, 
+  {"type": "assert_trap", "line": 36, "action": {"type": "invoke", "field": "get-funcref", "args": [{"type": "i32", "value": "4294967295"}]}, "text": "out of bounds table access", "expected": [{"type": "funcref"}]}, 
+  {"type": "assert_invalid", "line": 42, "filename": "table_get.1.wasm", "text": "type mismatch", "module_type": "binary"}, 
+  {"type": "assert_invalid", "line": 51, "filename": "table_get.2.wasm", "text": "type mismatch", "module_type": "binary"}, 
+  {"type": "assert_invalid", "line": 61, "filename": "table_get.3.wasm", "text": "type mismatch", "module_type": "binary"}, 
+  {"type": "assert_invalid", "line": 70, "filename": "table_get.4.wasm", "text": "type mismatch", "module_type": "binary"}, 
+  {"type": "assert_invalid", "line": 80, "filename": "table_get.5.wasm", "text": "type mismatch", "module_type": "binary"}]}

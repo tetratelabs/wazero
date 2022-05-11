@@ -1,0 +1,1 @@
+(func (param i32) (result i64) (i64x2.extract_lane (local.get 0) (v128.const i64x2 0 0)))
