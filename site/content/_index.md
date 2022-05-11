@@ -17,7 +17,7 @@ The best way to learn wazero is by trying one of our [examples][1]
 
 For the impatient, here's how invoking a factorial function looks in wazero:
 
-```golang
+```go
 func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
