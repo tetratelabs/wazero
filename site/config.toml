@@ -10,6 +10,7 @@ theme = "hello-friend"
 
 [languages]
   [languages.en]
+    # TODO: dark theme logo https://github.com/panr/hugo-theme-hello-friend/issues/291
     [languages.en.params.logo]
       logoText = "wazero"
       path = "/img/wazero.svg"

@@ -93,5 +93,5 @@ check:
 
 .PHONY: site
 site: ## Serve website content
-	@git submodule update
+	@git submodule update --init
 	@cd site && go run $(hugo) server --minify --disableFastRender --baseURL localhost:1313 --cleanDestinationDir -D
