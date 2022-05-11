@@ -57,7 +57,11 @@ features you expect in Go, such as safe concurrency and context propagation.
 
 wazero is an early project, so APIs are subject to change until version 1.0.
 To use wazero meanwhile, you need to add its main branch to your project like
-this: `go get github.com/tetratelabs/wazero@main`.
+this:
+
+```bash
+go get github.com/tetratelabs/wazero@main
+```
 
 We expect [wazero 1.0][4] to be at or before Q3 2022, so please practice the
 current APIs to ensure they work for you, and give us a [star][5] if you are
