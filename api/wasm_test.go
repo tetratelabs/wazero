@@ -53,6 +53,7 @@ func TestValueTypeName(t *testing.T) {
 		})
 	}
 }
+
 func TestEncodeDecodeExternRef(t *testing.T) {
 	for _, v := range []uintptr{
 		0, uintptr(unsafe.Pointer(t)),
