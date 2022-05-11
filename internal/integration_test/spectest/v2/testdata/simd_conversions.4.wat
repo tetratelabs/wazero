@@ -1,0 +1,1 @@
+(func (result v128) (i32x4.convert_f32x4 (v128.const f32x4 -1 0 1 2)))

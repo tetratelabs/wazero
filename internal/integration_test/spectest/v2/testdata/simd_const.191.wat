@@ -1,0 +1,1 @@
+(func (v128.const f64x2 0x0.0p- 0x0.0p-) drop)

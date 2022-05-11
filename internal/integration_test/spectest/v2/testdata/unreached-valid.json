@@ -1,0 +1,9 @@
+{"source_filename": "./unreached-valid.wast",
+ "commands": [
+  {"type": "module", "line": 1, "filename": "unreached-valid.0.wasm"}, 
+  {"type": "assert_trap", "line": 42, "action": {"type": "invoke", "field": "select-trap-left", "args": [{"type": "i32", "value": "1"}]}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
+  {"type": "assert_trap", "line": 43, "action": {"type": "invoke", "field": "select-trap-left", "args": [{"type": "i32", "value": "0"}]}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
+  {"type": "assert_trap", "line": 44, "action": {"type": "invoke", "field": "select-trap-right", "args": [{"type": "i32", "value": "1"}]}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
+  {"type": "assert_trap", "line": 45, "action": {"type": "invoke", "field": "select-trap-right", "args": [{"type": "i32", "value": "0"}]}, "text": "unreachable", "expected": [{"type": "i32"}]}, 
+  {"type": "module", "line": 49, "filename": "unreached-valid.1.wasm"}, 
+  {"type": "assert_trap", "line": 63, "action": {"type": "invoke", "field": "meet-bottom", "args": []}, "text": "unreachable", "expected": []}]}

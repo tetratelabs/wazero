@@ -1,0 +1,1 @@
+(memory 1) (func (drop (i32x4.load32x2_s (i32.const 0))))

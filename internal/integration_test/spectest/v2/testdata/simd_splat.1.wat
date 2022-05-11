@@ -1,0 +1,1 @@
+(func (result v128) (v128.splat (i32.const 0)))

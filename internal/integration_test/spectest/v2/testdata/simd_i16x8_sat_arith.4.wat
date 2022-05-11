@@ -1,0 +1,1 @@
+(func (result v128) (i16x8.div_sat (v128.const i16x8 1 1 1 1 1 1 1 1) (v128.const i16x8 2 2 2 2 2 2 2 2)))

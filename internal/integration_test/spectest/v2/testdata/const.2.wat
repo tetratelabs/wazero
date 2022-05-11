@@ -1,0 +1,1 @@
+(func (i32.const) drop)

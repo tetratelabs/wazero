@@ -1,0 +1,1 @@
+(func $f64x2.replace_lane-arg-empty (result v128)  (f64x2.replace_lane))

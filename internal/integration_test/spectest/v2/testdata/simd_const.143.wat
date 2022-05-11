@@ -1,0 +1,1 @@
+(func (v128.const i16x8 1x 1x 1x 1x 1x 1x 1x 1x) drop)

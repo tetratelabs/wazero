@@ -1,0 +1,1 @@
+(table 0 funcref) (import "" "" (table 0 funcref))

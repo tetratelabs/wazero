@@ -1,0 +1,1 @@
+(func $i16x8.replace_lane-1st-arg-empty (result v128)  (i16x8.replace_lane (v128.const i16x8 0 0 0 0 0 0 0 0) (i32.const 1)))

@@ -1,0 +1,1 @@
+(func (v128.const f32x4 nan:1 nan:1 nan:1 nan:1) drop)

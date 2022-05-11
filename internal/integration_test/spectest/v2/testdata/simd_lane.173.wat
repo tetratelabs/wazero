@@ -1,0 +1,1 @@
+(func $f64x2.extract_lane-arg-empty (result f64)  (f64x2.extract_lane))

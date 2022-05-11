@@ -1,0 +1,1 @@
+(func (f64.const) drop)

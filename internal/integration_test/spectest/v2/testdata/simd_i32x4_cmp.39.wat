@@ -1,0 +1,1 @@
+(memory 1) (func (param $x v128) (param $y v128) (result v128) (i4x32.gt_u (local.get $x) (local.get $y)))

@@ -1,0 +1,1 @@
+(memory 1) (func (result v128) (v128.load32_splat align=3 (i32.const 0)))

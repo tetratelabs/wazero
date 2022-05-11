@@ -1,0 +1,1 @@
+(memory 1) (func (result v128) (v128.load64_splat align=7 (i32.const 0)))
