@@ -16,6 +16,10 @@ theme = "hello-friend"
       path = "/img/wazero.svg"
     [languages.en.menu]
       [[languages.en.menu.main]]
+        url = "https://pkg.go.dev/github.com/tetratelabs/wazero"
+        name = "API"
+        weight = 10
+      [[languages.en.menu.main]]
         url = "https://github.com/tetratelabs/wazero/blob/main/examples"
         name = "Examples"
         weight = 10
