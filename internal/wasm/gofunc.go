@@ -96,15 +96,18 @@ func CallGoFunc(ctx context.Context, callCtx *CallContext, f *FunctionInstance, 
 
 		for _, raw := range params {
 			val := reflect.New(tp.In(i)).Elem()
-			switch tp.In(i).Kind() {
+			k := tp.In(i).Kind()
+			switch k {
 			case reflect.Float32:
 				val.SetFloat(float64(math.Float32frombits(uint32(raw))))
 			case reflect.Float64:
 				val.SetFloat(math.Float64frombits(raw))
-			case reflect.Uint32, reflect.Uint64:
+			case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 				val.SetUint(raw)
 			case reflect.Int32, reflect.Int64:
 				val.SetInt(int64(raw))
+			default:
+				panic(fmt.Errorf("BUG: param[%d] has an invalid type: %v", i, k))
 			}
 			in[i] = val
 			i++
@@ -116,20 +119,18 @@ func CallGoFunc(ctx context.Context, callCtx *CallContext, f *FunctionInstance, 
 	if tp.NumOut() > 0 {
 		results = make([]uint64, 0, tp.NumOut())
 	}
-	for _, ret := range f.GoFunc.Call(in) {
+	for i, ret := range f.GoFunc.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float32:
 			results = append(results, uint64(math.Float32bits(float32(ret.Float()))))
 		case reflect.Float64:
 			results = append(results, math.Float64bits(ret.Float()))
-		case reflect.Uint32, reflect.Uint64:
+		case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 			results = append(results, ret.Uint())
 		case reflect.Int32, reflect.Int64:
 			results = append(results, uint64(ret.Int()))
-		case reflect.Uintptr:
-			results = append(results, ret.Uint())
 		default:
-			panic("BUG: invalid return type")
+			panic(fmt.Errorf("BUG: result[%d] has an invalid type: %v", i, ret.Kind()))
 		}
 	}
 	return results

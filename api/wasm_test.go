@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -40,6 +41,7 @@ func TestValueTypeName(t *testing.T) {
 		{"i64", ValueTypeI64, "i64"},
 		{"f32", ValueTypeF32, "f32"},
 		{"f64", ValueTypeF64, "f64"},
+		{"externref", ValueTypeExternref, "externref"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -48,6 +50,17 @@ func TestValueTypeName(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expected, ValueTypeName(tc.input))
+		})
+	}
+}
+func TestEncodeDecodeExternRef(t *testing.T) {
+	for _, v := range []uintptr{
+		0, uintptr(unsafe.Pointer(t)),
+	} {
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			encoded := EncodeExternref(v)
+			binary := DecodeExternref(encoded)
+			require.Equal(t, v, binary)
 		})
 	}
 }
