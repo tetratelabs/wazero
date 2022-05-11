@@ -31,15 +31,21 @@ build.examples: $(tinygo_sources)
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
 
-spectest_testdata_dir := internal/integration_test/spectest/testdata
-spec_version := wg-1.0
+spectest_base_dir := internal/integration_test/spectest
+spec_version_v1 := wg-1.0
+spectest_v1_testdata_dir := $(spectest_base_dir)/v1/testdata
 
 .PHONY: build.spectest
 build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags might drift as they include more. See WebAssembly/wabt#1878
-	@rm -rf $(spectest_testdata_dir) && mkdir -p $(spectest_testdata_dir)
-	@cd $(spectest_testdata_dir) \
-		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core?ref=$(spec_version)' | jq -r '.[]| .download_url' | grep -E ".wast"| xargs wget -q
-	@cd $(spectest_testdata_dir) && for f in `find . -name '*.wast'`; do \
+	@$(MAKE) build.spectest.v1
+
+.PHONY: build.spectest.v1
+build.spectest.v1:
+	@rm -rf $(spectest_v1_testdata_dir)
+	@mkdir -p $(spectest_v1_testdata_dir)
+	@cd $(spectest_v1_testdata_dir) \
+		&& curl -sSL 'https://api.github.com/repos/WebAssembly/spec/contents/test/core?ref=$(spec_version_v1)' | jq -r '.[]| .download_url' | grep -E ".wast" | xargs -Iurl curl -sJL url -O
+	@cd $(spectest_v1_testdata_dir) && for f in `find . -name '*.wast'`; do \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"f32.demote_f64"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \(f32.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"f64\.promote_f32"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \(f64.const nan\)\)/g' $$f; \
 		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
@@ -62,7 +68,10 @@ test:
 
 .PHONY: spectest
 spectest:
-	@go test $$(go list ./... | grep spectest) -v -timeout 120s
+	@$(MAKE) spectest.v1
+
+spectest.v1:
+	@go test $$(go list ./... | grep $(spectest_v2_testdata_dir)) -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 

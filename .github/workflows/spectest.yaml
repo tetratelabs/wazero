@@ -11,7 +11,7 @@ defaults:
 
 jobs:
   test_amd64:
-    name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
+    name: ${{ matrix.spec-version }} / amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
@@ -19,6 +19,8 @@ jobs:
         go-version:
         - "1.17"
         - "1.18"
+        spec-version:
+        - "v1"
 
     steps:
       - uses: actions/setup-go@v3
@@ -32,12 +34,12 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.spec-version }}
 
-      - run: make spectest
+      - run: make spectest.${{ matrix.spec-version }}
 
   test_scratch:
-    name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
+    name: ${{ matrix.spec-version }} / ${{ matrix.arch }}, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
@@ -46,9 +48,10 @@ jobs:
         - "1.17"
         - "1.18"
         arch:
-        - "amd64"
         - "arm64"
         - "riscv64"
+        spec-version:
+        - "v1"
 
     steps:
       - uses: actions/setup-go@v3
@@ -62,10 +65,10 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}-${{ matrix.spec-version }}
 
       - name: Build test binaries
-        run: go list -f '{{.Dir}}' ./... | grep 'spectest' | xargs -Ipkg go test pkg -c -o spectest.test
+        run: go list -f '{{.Dir}}' ./... | grep 'spectest/${{ matrix.spec-version }}' | xargs -Ipkg go test pkg -c -o spectest.test
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
