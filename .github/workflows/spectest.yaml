@@ -1,4 +1,4 @@
-name: WebAssembly Specification Test
+name: WebAssembly Core Specification Test
 on:
   pull_request:
     branches: [main]
@@ -14,6 +14,7 @@ jobs:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
         go-version:
         - "1.17"
         - "1.18"
