@@ -32,8 +32,9 @@ build.examples: $(tinygo_sources)
 	done
 
 spectest_base_dir := internal/integration_test/spectest
+spectest_v1_dir := $(spectest_base_dir)/v1
+spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
-spectest_v1_testdata_dir := $(spectest_base_dir)/v1/testdata
 
 .PHONY: build.spectest
 build.spectest: # Note: wabt by default uses >1.0 features, so wast2json flags might drift as they include more. See WebAssembly/wabt#1878
@@ -71,7 +72,7 @@ spectest:
 	@$(MAKE) spectest.v1
 
 spectest.v1:
-	@go test $$(go list ./... | grep $(spectest_v2_testdata_dir)) -timeout 120s
+	go test $$(go list ./... | grep $(spectest_v1_dir)) -v -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 
