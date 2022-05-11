@@ -327,6 +327,18 @@ type Memory interface {
 	Write(ctx context.Context, offset uint32, v []byte) bool
 }
 
+// EncodeExternref encodes the input as a ValueTypeExternref.
+// See DecodeExternref
+func EncodeExternref(input uintptr) uint64 {
+	return uint64(input)
+}
+
+// DecodeExternref decodes the input as a ValueTypeExternref.
+// See EncodeExternref
+func DecodeExternref(input uint64) uintptr {
+	return uintptr(input)
+}
+
 // EncodeI32 encodes the input as a ValueTypeI32.
 func EncodeI32(input int32) uint64 {
 	return uint64(uint32(input))
@@ -344,13 +356,13 @@ func EncodeF32(input float32) uint64 {
 }
 
 // DecodeF32 decodes the input as a ValueTypeF32.
-// See DecodeF32
+// See EncodeF32
 func DecodeF32(input uint64) float32 {
 	return math.Float32frombits(uint32(input))
 }
 
 // EncodeF64 encodes the input as a ValueTypeF64.
-// See DecodeF64
+// See EncodeF32
 func EncodeF64(input float64) uint64 {
 	return math.Float64bits(input)
 }
