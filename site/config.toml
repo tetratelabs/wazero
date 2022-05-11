@@ -1,0 +1,29 @@
+baseURL = "https://wazero.io/"
+languageCode = "en-us"
+defaultContentLanguage = "en"
+title = "wazero"
+theme = "hello-friend"
+
+[params]
+  defaultTheme = "light"
+  showReadingTime = false
+
+[languages]
+  [languages.en]
+    # TODO: dark theme logo https://github.com/panr/hugo-theme-hello-friend/issues/291
+    [languages.en.params.logo]
+      logoText = "wazero"
+      path = "/img/wazero.svg"
+    [languages.en.menu]
+      [[languages.en.menu.main]]
+        url = "https://pkg.go.dev/github.com/tetratelabs/wazero"
+        name = "API"
+        weight = 10
+      [[languages.en.menu.main]]
+        url = "https://github.com/tetratelabs/wazero/blob/main/examples"
+        name = "Examples"
+        weight = 10
+      [[languages.en.menu.main]]
+        url = "https://github.com/tetratelabs/wazero"
+        name = "GitHub"
+        weight = 20
