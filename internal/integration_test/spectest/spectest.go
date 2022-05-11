@@ -1,10 +1,12 @@
 package spectest
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -19,10 +21,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
-
-//go:embed testdata/*.wasm
-//go:embed testdata/*.json
-var testcases embed.FS
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
@@ -523,4 +521,71 @@ func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) 
 	fn := s.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(testCtx, params...)
 	return results, fn.ResultTypes(), err
+}
+
+// requireStripCustomSections strips all the custom sections from the given binary.
+func requireStripCustomSections(t *testing.T, binary []byte) []byte {
+	r := bytes.NewReader(binary)
+	out := bytes.NewBuffer(nil)
+	_, err := io.CopyN(out, r, 8)
+	require.NoError(t, err)
+
+	for {
+		sectionID, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			require.NoError(t, err)
+		}
+
+		sectionSize, _, err := leb128.DecodeUint32(r)
+		require.NoError(t, err)
+
+		switch sectionID {
+		case wasm.SectionIDCustom:
+			_, err = io.CopyN(io.Discard, r, int64(sectionSize))
+			require.NoError(t, err)
+		default:
+			out.WriteByte(sectionID)
+			out.Write(leb128.EncodeUint32(sectionSize))
+			_, err := io.CopyN(out, r, int64(sectionSize))
+			require.NoError(t, err)
+		}
+	}
+	return out.Bytes()
+}
+
+// TestBinaryEncoder ensures that binary.EncodeModule produces exactly the same binaries
+// for wasm.Module via binary.DecodeModule modulo custom sections for all the valid binaries in spectests.
+func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures wasm.Features) {
+	files, err := testDataFS.ReadDir("testdata")
+	require.NoError(t, err)
+
+	for _, f := range files {
+		filename := f.Name()
+		if strings.HasSuffix(filename, ".json") {
+			raw, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", filename))
+			require.NoError(t, err)
+
+			var base testbase
+			require.NoError(t, json.Unmarshal(raw, &base))
+
+			for _, c := range base.Commands {
+				if c.CommandType == "module" {
+					t.Run(c.Filename, func(t *testing.T) {
+						buf, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", c.Filename))
+						require.NoError(t, err)
+
+						buf = requireStripCustomSections(t, buf)
+
+						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
+						require.NoError(t, err)
+
+						encodedBuf := binary.EncodeModule(mod)
+						require.Equal(t, buf, encodedBuf)
+					})
+				}
+			}
+		}
+	}
 }

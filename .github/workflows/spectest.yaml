@@ -1,0 +1,90 @@
+name: WebAssembly Core Specification Test
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+defaults:
+  run:  # use bash for all operating systems unless overridden
+    shell: bash
+
+jobs:
+  test_amd64:
+    name: ${{ matrix.spec-version }} / amd64, Go-${{ matrix.go-version }}
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        go-version:
+        - "1.17"
+        - "1.18"
+        spec-version:
+        - "v1"
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.spec-version }}
+
+      - run: make spectest.${{ matrix.spec-version }}
+
+  test_scratch:
+    name: ${{ matrix.spec-version }} / ${{ matrix.arch }}, Go-${{ matrix.go-version }}
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        go-version:
+        - "1.17"
+        - "1.18"
+        arch:
+        - "arm64"
+        - "riscv64"
+        spec-version:
+        - "v1"
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}-${{ matrix.spec-version }}
+
+      - name: Build test binaries
+        run: go list -f '{{.Dir}}' ./... | grep 'spectest/${{ matrix.spec-version }}' | xargs -Ipkg go test pkg -c -o spectest.test
+        env:
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+
+      - name: Set up QEMU
+        if: ${{ matrix.arch != 'amd64' }}
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: ${{ matrix.arch }}
+
+      - name: Build scratch container
+        run: |
+          echo 'FROM scratch' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
+          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
+
+      - name: Run built test binaries
+        # Note: This mounts /tmp to allow t.TempDir() in tests.
+        run: docker run --platform linux/${{ matrix.arch }} -v $(pwd)/spectest.test:/test --tmpfs /tmp --rm -t wazero:test
