@@ -18,7 +18,7 @@ jobs:
       matrix:  # use latest available versions and be consistent on all workflows!
         os: [ubuntu-20.04, macos-11, windows-2022]
         go-version:
-        - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.17"
         - "1.18"
 
     steps:
@@ -44,7 +44,7 @@ jobs:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         go-version:
-        - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.17"
         - "1.18"
         arch:
         - "amd64"
