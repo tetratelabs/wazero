@@ -202,13 +202,6 @@ const (
 	maximumFunctionTypes = 1 << 27
 )
 
-func (s *Store) AliasModule(src, dst string) {
-	if _, ok := s.modules[src]; !ok {
-		panic(src)
-	}
-	s.modules[dst] = s.modules[src]
-}
-
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
@@ -687,4 +680,11 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	s.moduleNames = nil
 	s.modules = map[string]*ModuleInstance{}
 	return err
+}
+
+// AliasModule aliases the instantiated module named `src` as `dst`.
+//
+// Note: This is only used for spectests.
+func (s *Store) AliasModule(src, dst string) {
+	s.modules[dst] = s.modules[src]
 }
