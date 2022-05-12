@@ -1190,7 +1190,12 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
 					return fmt.Errorf("too many type immeidates for %s", InstructionName(op))
 				}
-				pc++ // Skip the value type as it doesn't affect the semantics.
+				pc++
+				tp := body[pc]
+				if tp != ValueTypeI32 && tp != ValueTypeI64 && tp != ValueTypeF32 && tp != ValueTypeF64 &&
+					tp != api.ValueTypeExternref && tp != ValueTypeFuncref {
+					return fmt.Errorf("invalid type %s for %s", ValueTypeName(tp), OpcodeTypedSelectName)
+				}
 			} else if isReferenceValueType(v1) || isReferenceValueType(v2) {
 				return fmt.Errorf("reference types cannot be used for non typed select instruction")
 			}

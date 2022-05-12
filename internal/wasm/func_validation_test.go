@@ -2603,3 +2603,54 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 		})
 	}
 }
+
+func TestModule_funcValidation_Select_error(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "typed_select (disabled)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 1, ValueTypeI32, // immediate vector's size must be one
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag:        Features20191205,
+			expectedErr: "typed_select is invalid as feature \"reference-types\" is disabled",
+		},
+		{
+			name: "typed_select (too many immediate types)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 2, // immediate vector's size must be one
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `too many type immeidates for typed_select`,
+		},
+		{
+			name: "typed_select (immediate type not found)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 1, 0,
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `invalid type unknown for typed_select`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}

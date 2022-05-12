@@ -399,6 +399,9 @@ func (s *Store) Instantiate(
 	// Plus, we are ready to compile functions.
 	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, tables, tableInit)
 	if err != nil && !errors.Is(err, ErrElementOffsetOutOfBounds) {
+		// ErrElementOffsetOutOfBounds is not an instantiation error, but rather runtime error, so we ignore it as
+		// in anyway the instantiated module and engines are fine and can be used for function invocations.
+		// See comments on ErrElementOffsetOutOfBounds.
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
 

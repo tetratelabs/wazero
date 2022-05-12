@@ -136,7 +136,7 @@ func decodeExportSection(r *bytes.Reader) ([]*wasm.Export, error) {
 func decodeStartSection(r *bytes.Reader) (*wasm.Index, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("get function index: %w", err)
 	}
 	return &vs, nil
 }

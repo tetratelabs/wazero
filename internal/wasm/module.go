@@ -336,6 +336,25 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 	return nil
 }
 
+// declaredFunctionIndexes returns a set of function indexes that can be used as an immediate for OpcodeRefFunc instruction.
+//
+// The criteria for which function indexes can be avaiable for that instruction is vague in the spec described as:
+//
+//  * "References: the list of function indices that occur in the module outside functions and can hence be used to form references inside them."
+//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/conventions.html#contexts
+//  * "Ref is the set funcidx(module with functions=ε, start=ε) , i.e., the set of function indices occurring in the module, except in its functions or start function."
+//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/modules.html#valid-module
+//
+// That said, the logic here is derived from the specification test case in WebAssembly 2.0:
+// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/ref_func.wast#L78-L115
+//
+// To summarize, the function indexes OpcodeRefFunc can refer include:
+//  * in an element section regardless of its mode (active, passive, declarative).
+//  * defined as globals whose value type is ValueRefFunc.
+//  * exported functions.
+//
+// See https://github.com/WebAssembly/reference-types/issues/31
+// See https://github.com/WebAssembly/reference-types/issues/76
 func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 	ret = map[uint32]struct{}{}
 

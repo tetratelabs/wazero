@@ -52,11 +52,18 @@ type ModuleEngine interface {
 	InitializeFuncrefGlobals(globals []*GlobalInstance)
 }
 
-// TableInitMap is a mapping of Table's index to a mapping of TableInstance.Table index to the function index.
+// TableInitEntry is normalized element segment used for initializing tables by engines.
 type TableInitEntry struct {
-	TableIndex      Index
-	Offset          Index
+	TableIndex Index
+	// Offset is the offset in the table from which the table is initialized by engine.
+	Offset Index
+	// FunctionIndexes contains nullable function indexes.
 	FunctionIndexes []*Index
 }
 
+// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
+// Before FeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
+// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
+//
+// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
 var ErrElementOffsetOutOfBounds = errors.New("element offset ouf of bounds")
