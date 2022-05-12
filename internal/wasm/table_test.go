@@ -55,6 +55,7 @@ func TestStore_resolveImports_table(t *testing.T) {
 var codeEnd = &Code{Body: []byte{OpcodeEnd}}
 
 func TestModule_validateTable(t *testing.T) {
+	const maxTableIndex = 5
 	three := uint32(3)
 	tests := []struct {
 		name     string
@@ -69,6 +70,11 @@ func TestModule_validateTable(t *testing.T) {
 		{
 			name:     "min zero",
 			input:    &Module{TableSection: []*Table{{}}},
+			expected: []*validatedActiveElementSegment{},
+		},
+		{
+			name:     "maximum number of tables",
+			input:    &Module{TableSection: []*Table{{}, {}, {}, {}, {}}},
 			expected: []*validatedActiveElementSegment{},
 		},
 		{
@@ -312,13 +318,13 @@ func TestModule_validateTable(t *testing.T) {
 			_, _, _, tables, err := tc.input.AllDeclarations()
 			require.NoError(t, err)
 
-			vt, err := tc.input.validateTable(Features20191205, tables)
+			vt, err := tc.input.validateTable(Features20191205, tables, maxTableIndex)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, vt)
 
 			// Ensure it was cached. We have to use Equal not Same because this is a slice, not a pointer.
 			require.Equal(t, vt, tc.input.validatedActiveElementSegments)
-			vt2, err := tc.input.validateTable(Features20191205, tables)
+			vt2, err := tc.input.validateTable(Features20191205, tables, maxTableIndex)
 			require.NoError(t, err)
 			require.Equal(t, vt, vt2)
 		})
@@ -326,11 +332,19 @@ func TestModule_validateTable(t *testing.T) {
 }
 
 func TestModule_validateTable_Errors(t *testing.T) {
+	const maxTableIndex = 5
 	tests := []struct {
 		name        string
 		input       *Module
 		expectedErr string
 	}{
+		{
+			name: "too many tables",
+			input: &Module{
+				TableSection: []*Table{{}, {}, {}, {}, {}, {}},
+			},
+			expectedErr: "too many tables in a module: 6 given with limit 5",
+		},
 		{
 			name: "non funcref",
 			input: &Module{
@@ -578,7 +592,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, _, tables, err := tc.input.AllDeclarations()
 			require.NoError(t, err)
-			_, err = tc.input.validateTable(Features20191205, tables)
+			_, err = tc.input.validateTable(Features20191205, tables, maxTableIndex)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

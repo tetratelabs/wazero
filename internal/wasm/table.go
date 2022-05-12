@@ -144,7 +144,11 @@ type validatedActiveElementSegment struct {
 
 // validateTable ensures any ElementSegment is valid. This caches results via Module.validatedActiveElementSegments.
 // Note: limitsType are validated by decoders, so not re-validated here.
-func (m *Module) validateTable(enabledFeatures Features, tables []*Table) ([]*validatedActiveElementSegment, error) {
+func (m *Module) validateTable(enabledFeatures Features, tables []*Table, maximumTableIndex uint32) ([]*validatedActiveElementSegment, error) {
+	if len(tables) > int(maximumTableIndex) {
+		return nil, fmt.Errorf("too many tables in a module: %d given with limit %d", len(tables), maximumTableIndex)
+	}
+
 	if m.validatedActiveElementSegments != nil {
 		return m.validatedActiveElementSegments, nil
 	}

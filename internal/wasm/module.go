@@ -187,6 +187,7 @@ type ModuleID = [sha256.Size]byte
 const (
 	MaximumGlobals       = uint32(1 << 27)
 	MaximumFunctionIndex = uint32(1 << 27)
+	MaximumTableIndex    = uint32(1 << 27)
 )
 
 // AssignModuleID calculates a sha256 checksum on `source` and set Module.ID to the result.
@@ -261,7 +262,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		}
 	} // No need to validate host functions as NewHostModule validates
 
-	if _, err = m.validateTable(enabledFeatures, tables); err != nil {
+	if _, err = m.validateTable(enabledFeatures, tables, MaximumTableIndex); err != nil {
 		return err
 	}
 
@@ -351,7 +352,7 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 // To summarize, the function indexes OpcodeRefFunc can refer include:
 //  * existing in an element section regardless of its mode (active, passive, declarative).
 //  * defined as globals whose value type is ValueRefFunc.
-//  * used as an exported functions.
+//  * used as an exported function.
 //
 // See https://github.com/WebAssembly/reference-types/issues/31
 // See https://github.com/WebAssembly/reference-types/issues/76
