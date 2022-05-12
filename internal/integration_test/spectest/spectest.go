@@ -327,10 +327,6 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 
 		wastName := basename(base.SourceFile)
 
-		if wastName != "unreached-valid.wast" {
-			continue
-		}
-
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
 			addSpectestModule(t, store)
@@ -367,15 +363,12 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							src = lastInstantiatedModuleName
 						}
 						store.AliasModule(src, c.As)
-						fmt.Println("alased:", src, "to", c.As)
 						lastInstantiatedModuleName = c.As
 					case "assert_return", "action":
 						moduleName := lastInstantiatedModuleName
 						if c.Action.Module != "" {
 							moduleName = c.Action.Module
 						}
-						fmt.Println(moduleName)
-						fmt.Println(c)
 						switch c.Action.ActionType {
 						case "invoke":
 							args, exps := c.getAssertReturnArgsExps()
@@ -579,7 +572,6 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
 func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
-	fmt.Printf("module: %s, funcname: %s\n", moduleName, funcName)
 	fn := s.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(testCtx, params...)
 	return results, fn.ResultTypes(), err

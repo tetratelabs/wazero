@@ -439,12 +439,33 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
-			expType := lnLabel.blockType.Results
+			expTypes := lnLabel.blockType.Results
 			if lnLabel.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				expType = []ValueType{}
+				expTypes = []ValueType{}
 			}
+
+			if enabledFeatures.Get(FeatureReferenceTypes) {
+				for i := range expTypes {
+					index := len(expTypes) - 1 - i
+					exp := expTypes[index]
+					actual, err := valueTypeStack.pop()
+					if err != nil {
+						return err
+					}
+					if actual == valueTypeUnknown {
+						expTypes[index] = valueTypeUnknown
+					} else if actual != exp {
+						return typeMismatchError(true, OpcodeBrTableName, actual, exp, i)
+					}
+				}
+			} else {
+				if err = valueTypeStack.popResults(op, expTypes, false); err != nil {
+					return err
+				}
+			}
+
 			for _, l := range list {
 				if int(l) >= len(controlBlockStack) {
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
@@ -456,18 +477,16 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					// the beginning of the loop.
 					expType2 = []ValueType{}
 				}
-				if len(expType) != len(expType2) {
-					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expType, ln, expType2, l)
+				if len(expTypes) != len(expType2) {
+					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
 				}
-				for i := range expType {
-					if expType[i] != expType2[i] {
+				for i := range expTypes {
+					if expTypes[i] != valueTypeUnknown && expTypes[i] != expType2[i] {
 						return fmt.Errorf("incosistent block type for %s at %d", OpcodeBrTableName, l)
 					}
 				}
 			}
-			if err = valueTypeStack.popResults(op, expType, false); err != nil {
-				return err
-			}
+
 			// br_table instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
