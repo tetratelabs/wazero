@@ -42,3 +42,11 @@ func (e *ExitError) ExitCode() uint32 {
 func (e *ExitError) Error() string {
 	return fmt.Sprintf("module %q closed with exit_code(%d)", e.moduleName, e.exitCode)
 }
+
+// Is allows use via errors.Is
+func (e *ExitError) Is(err error) bool {
+	if target, ok := err.(*ExitError); ok {
+		return e.moduleName == target.moduleName && e.exitCode == target.exitCode
+	}
+	return false
+}
