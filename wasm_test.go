@@ -543,38 +543,39 @@ func TestClose(t *testing.T) {
 			exitCode: uint32(2),
 		},
 	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewRuntime()
 
-		r := NewRuntime()
+			m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
+			require.NoError(t, err)
+			m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
+			require.NoError(t, err)
 
-		m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx)
-		require.NoError(t, err)
-		m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx)
-		require.NoError(t, err)
+			func1 := m1.ExportedFunction("func1")
+			func2 := m2.ExportedFunction("func2")
 
-		func1 := m1.ExportedFunction("func1")
-		func2 := m2.ExportedFunction("func2")
+			// Modules not closed so calls succeed
 
-		// Modules not closed so calls succeed
+			_, err = func1.Call(testCtx)
+			require.NoError(t, err)
 
-		_, err = func1.Call(testCtx)
-		require.NoError(t, err)
+			_, err = func2.Call(testCtx)
+			require.NoError(t, err)
 
-		_, err = func2.Call(testCtx)
-		require.NoError(t, err)
+			if tc.exitCode == 0 {
+				err = r.Close(testCtx)
+			} else {
+				err = r.CloseWithExitCode(testCtx, tc.exitCode)
+			}
+			require.NoError(t, err)
 
-		if tc.exitCode == 0 {
-			err = r.Close(testCtx)
-		} else {
-			err = r.CloseWithExitCode(testCtx, tc.exitCode)
-		}
-		require.NoError(t, err)
+			// Modules closed so calls fail
+			_, err = func1.Call(testCtx)
+			require.ErrorIs(t, err, sys.NewExitError("mod1", tc.exitCode))
 
-		// Modules closed so calls fail
-		_, err = func1.Call(testCtx)
-		require.ErrorIs(t, err, sys.NewExitError("mod1", tc.exitCode))
-
-		_, err = func2.Call(testCtx)
-		require.ErrorIs(t, err, sys.NewExitError("mod2", tc.exitCode))
+			_, err = func2.Call(testCtx)
+			require.ErrorIs(t, err, sys.NewExitError("mod2", tc.exitCode))
+		})
 	}
 }
 
