@@ -403,6 +403,16 @@ Theoretically, a module can declare globals (including imports) up to 2^32 times
 That is because internally we store globals in a slice with pointer types (meaning 8 bytes on 64-bit platforms), and therefore 2^27 globals
 means that we have 1 GiB size of slice which seems large enough for most applications.
 
+### Number of tables in a module
+
+While the the spec says that a module can have up to 2^32 tables, wazero limits this to 2^27 = 134,217,728.
+One of the reasons is even that number would occupy 1GB in the pointers tables alone. Not only that, we access tables slice by
+table index by using 32-bit signed offset in the JIT implementation, which means that the table index of 2^27 can reach 2^27 * 8 (pointer size on 64-bit machines) = 2^30 offsets in bytes.
+
+We _believe_ that all use cases are fine with the limitation, but also note that we have no way to test wazero runtimes under these unusual circumstances.
+
+If a module reaches this limit, an error is returned at the compilation phase.
+
 ## JIT engine implementation
 
 See [wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md).
