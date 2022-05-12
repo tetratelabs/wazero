@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -831,20 +830,63 @@ func TestModule_validateDataCountSection(t *testing.T) {
 }
 
 func TestModule_declaredFunctionIndexes(t *testing.T) {
-	for i, tc := range []struct {
+	for _, tc := range []struct {
+		name   string
 		mod    *Module
 		exp    map[Index]struct{}
 		expErr string
 	}{
 		{
-			mod: &Module{},
-			exp: map[uint32]struct{}{},
+			name: "empty",
+			mod:  &Module{},
+			exp:  map[uint32]struct{}{},
 		},
 		{
+			name: "global",
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 10, Type: ExternTypeFunc},
+					{Index: 1000, Type: ExternTypeGlobal},
+				},
+			},
+			exp: map[uint32]struct{}{10: {}},
+		},
+		{
+			name: "export",
 			mod: &Module{
 				ExportSection: []*Export{
 					{Index: 1000, Type: ExternTypeGlobal},
 					{Index: 10, Type: ExternTypeFunc},
+				},
+			},
+			exp: map[uint32]struct{}{10: {}},
+		},
+		{
+			name: "element",
+			mod: &Module{
+				ElementSection: []*ElementSegment{
+					{
+						Mode: ElementModeActive,
+						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModeDeclarative,
+						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModePassive,
+						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+					},
+				},
+			},
+			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}},
+		},
+		{
+			name: "all",
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 10, Type: ExternTypeGlobal},
+					{Index: 1000, Type: ExternTypeFunc},
 				},
 				GlobalSection: []*Global{
 					{
@@ -875,7 +917,7 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 					},
 				},
 			},
-			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}, 10: {}, 123: {}},
+			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}, 123: {}, 1000: {}},
 		},
 		{
 			mod: &Module{
@@ -888,11 +930,12 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 					},
 				},
 			},
+			name:   "invalid global",
 			expErr: `global[0] failed to initialize: EOF`,
 		},
 	} {
 		tc := tc
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			actual, err := tc.mod.declaredFunctionIndexes()
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
