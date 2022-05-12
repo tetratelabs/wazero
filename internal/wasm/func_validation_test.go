@@ -2629,7 +2629,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 				OpcodeTypedSelect, 2, // immediate vector's size must be one
 			},
 			flag:        FeatureReferenceTypes,
-			expectedErr: `too many type immeidates for typed_select`,
+			expectedErr: `too many type immediates for typed_select`,
 		},
 		{
 			name: "typed_select (immediate type not found)",
