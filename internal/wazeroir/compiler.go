@@ -687,7 +687,7 @@ operatorSwitch:
 		c.emit(
 			&OperationSelect{},
 		)
-	case wasm.OpcodeSelectTyped:
+	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
 		c.pc += 2
 		c.emit(

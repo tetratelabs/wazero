@@ -47,7 +47,7 @@ const (
 
 	OpcodeDrop        Opcode = 0x1a
 	OpcodeSelect      Opcode = 0x1b
-	OpcodeSelectTyped Opcode = 0x1c
+	OpcodeTypedSelect Opcode = 0x1c
 
 	// variable instructions
 
@@ -331,7 +331,7 @@ const (
 	OpcodeCallIndirectName      = "call_indirect"
 	OpcodeDropName              = "drop"
 	OpcodeSelectName            = "select"
-	OpcodeSelectTypedName       = "select_typed"
+	OpcodeTypedSelectName       = "typed_select"
 	OpcodeLocalGetName          = "local.get"
 	OpcodeLocalSetName          = "local.set"
 	OpcodeLocalTeeName          = "local.tee"
@@ -524,7 +524,7 @@ var instructionNames = [256]string{
 	OpcodeCallIndirect:      OpcodeCallIndirectName,
 	OpcodeDrop:              OpcodeDropName,
 	OpcodeSelect:            OpcodeSelectName,
-	OpcodeSelectTyped:       OpcodeSelectTypedName,
+	OpcodeTypedSelect:       OpcodeTypedSelectName,
 	OpcodeLocalGet:          OpcodeLocalGetName,
 	OpcodeLocalSet:          OpcodeLocalSetName,
 	OpcodeLocalTee:          OpcodeLocalTeeName,

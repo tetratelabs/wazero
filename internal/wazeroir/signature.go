@@ -178,7 +178,7 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		return ret, nil
 	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
-	case wasm.OpcodeSelect, wasm.OpcodeSelectTyped:
+	case wasm.OpcodeSelect, wasm.OpcodeTypedSelect:
 		return signature_UnknownUnknownI32_Unknown, nil
 	case wasm.OpcodeLocalGet:
 		inputLen := uint32(len(c.sig.Params))

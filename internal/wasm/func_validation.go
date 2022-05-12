@@ -1165,7 +1165,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("invalid drop: %v", err)
 			}
-		} else if op == OpcodeSelect || op == OpcodeSelectTyped {
+		} else if op == OpcodeSelect || op == OpcodeTypedSelect {
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("type mismatch on 3rd select operand: %v", err)
 			}
@@ -1178,7 +1178,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("invalid select: %v", err)
 			}
 
-			if op == OpcodeSelectTyped {
+			if op == OpcodeTypedSelect {
 				pc++
 				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
 					return fmt.Errorf("too many type immeidates for %s", InstructionName(op))
