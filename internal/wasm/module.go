@@ -251,6 +251,10 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if err = m.validateExports(enabledFeatures, functions, globals, memory, tables); err != nil {
+		return err
+	}
+
 	if m.CodeSection != nil {
 		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, tables, MaximumFunctionIndex); err != nil {
 			return err
@@ -258,10 +262,6 @@ func (m *Module) Validate(enabledFeatures Features) error {
 	} // No need to validate host functions as NewHostModule validates
 
 	if _, err = m.validateTable(enabledFeatures, tables); err != nil {
-		return err
-	}
-
-	if err = m.validateExports(enabledFeatures, functions, globals, memory, tables); err != nil {
 		return err
 	}
 
@@ -319,16 +319,51 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 		return fmt.Errorf("code count (%d) != function count (%d)", codeCount, functionCount)
 	}
 
+	declaredFuncIndexes, err := m.declaredFunctionIndexes()
+	if err != nil {
+		return err
+	}
+
 	for idx, typeIndex := range m.FunctionSection {
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
 
-		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables); err != nil {
+		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
 	return nil
+}
+
+func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
+	ret = map[uint32]struct{}{}
+
+	for _, exp := range m.ExportSection {
+		if exp.Type == ExternTypeFunc {
+			ret[exp.Index] = struct{}{}
+		}
+	}
+
+	for _, g := range m.GlobalSection {
+		if g.Init.Opcode == OpcodeRefFunc {
+			var index uint32
+			index, _, err = leb128.DecodeUint32(bytes.NewReader(g.Init.Data))
+			if err != nil {
+				return
+			}
+			ret[index] = struct{}{}
+		}
+	}
+
+	for _, elem := range m.ElementSection {
+		for _, index := range elem.Init {
+			if index != nil {
+				ret[*index] = struct{}{}
+			}
+		}
+	}
+	return
 }
 
 func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
@@ -932,6 +967,10 @@ func ValueTypeName(t ValueType) string {
 		return "funcref"
 	}
 	return api.ValueTypeName(t)
+}
+
+func isReferenceValueType(vt ValueType) bool {
+	return vt == ValueTypeExternref || vt == ValueTypeFuncref
 }
 
 // ExternType is an alias of api.ExternType defined to simplify imports.

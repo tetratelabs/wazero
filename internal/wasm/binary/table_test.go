@@ -90,12 +90,6 @@ func TestDecodeTableType_Errors(t *testing.T) {
 			expectedErr: "table min must be at most 134217728",
 			features:    wasm.FeatureReferenceTypes,
 		},
-		{
-			name:        "max > limit",
-			input:       []byte{wasm.RefTypeFuncref, 0x1, 0, 0xff, 0xff, 0xff, 0xff, 0xf},
-			expectedErr: "table max must be at most 134217728",
-			features:    wasm.FeatureReferenceTypes,
-		},
 	}
 
 	for _, tt := range tests {

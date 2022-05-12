@@ -1879,7 +1879,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			table := tables[op.us[0]]
 
 			offset := ce.popValue()
-			if offset > uint64(len(table.References)) {
+			if offset >= uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 

@@ -92,6 +92,9 @@ func (c commandActionVal) String() string {
 			// So in order to treat "externref 0" in spectest non nullref, we increment the value.
 			v = fmt.Sprintf("%d", original+1)
 		}
+	case "funcref":
+		// All the in and out funcref params are null in spectest (cannot represent non-null as it depends on runtime impl).
+		v = "null"
 	}
 	return fmt.Sprintf("{type: %s, value: %v}", c.ValType, v)
 }
@@ -324,7 +327,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 
 		wastName := basename(base.SourceFile)
 
-		if wastName != "linking.wast" {
+		if wastName != "unreached-valid.wast" {
 			continue
 		}
 
@@ -565,6 +568,8 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 			require.Equal(t, expF, actualF, msg)
 		}
 	case wasm.ValueTypeExternref:
+		require.Equal(t, expected, actual, msg)
+	case wasm.ValueTypeFuncref:
 		require.Equal(t, expected, actual, msg)
 	default:
 		t.Fatal(msg)

@@ -687,6 +687,12 @@ operatorSwitch:
 		c.emit(
 			&OperationSelect{},
 		)
+	case wasm.OpcodeSelectTyped:
+		// Skips two bytes: vector size fixed to 1, and the value type for select.
+		c.pc += 2
+		c.emit(
+			&OperationSelect{},
+		)
 	case wasm.OpcodeLocalGet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.get")

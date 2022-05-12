@@ -22,11 +22,13 @@ const maximumValuesOnStack = 1 << 27
 // * globals are the global index namespace, which is prefixed by imports.
 // * memory is the potentially imported memory and can be nil.
 // * table is the potentially imported table and can be nil.
+// * declaredFunctionIndexes is the set of function indexes declared by declarative element segments which can be acceed by OpcodeRefFunc instruction.
 //
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
-func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
-	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack)
+func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index,
+	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{}) error {
+	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
 
 // validateFunctionWithMaxStackValues is like validateFunction, but allows overriding maxStackValues for testing.
@@ -40,6 +42,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	memory *Memory,
 	tables []*Table,
 	maxStackValues int,
+	declaredFunctionIndexes map[Index]struct{},
 ) error {
 	functionType := m.TypeSection[m.FunctionSection[idx]]
 	body := m.CodeSection[idx].Body
@@ -764,7 +767,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				tp, err := valueTypeStack.pop()
 				if err != nil {
 					return fmt.Errorf("cannot pop the operand for ref.is_null: %v", err)
-				} else if tp != ValueTypeExternref && tp != ValueTypeFuncref {
+				} else if !isReferenceValueType(tp) && tp != valueTypeUnknown {
 					return fmt.Errorf("type mismatch: expected reference type but was %s", ValueTypeName(tp))
 				}
 				valueTypeStack.push(ValueTypeI32)
@@ -774,8 +777,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				if err != nil {
 					return fmt.Errorf("failed to read function index for ref.func: %v", err)
 				}
-				if int(index) >= len(functions) {
-					return fmt.Errorf("invalid function index for ref.func: %d", index)
+				if _, ok := declaredFunctionIndexes[index]; !ok {
+					return fmt.Errorf("undeclared function index %d for ref.func", index)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeFuncref)
@@ -1143,7 +1146,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("invalid drop: %v", err)
 			}
-		} else if op == OpcodeSelect {
+		} else if op == OpcodeSelect || op == OpcodeSelectTyped {
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("type mismatch on 3rd select operand: %v", err)
 			}
@@ -1155,6 +1158,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("invalid select: %v", err)
 			}
+
+			if op == OpcodeSelectTyped {
+				pc++
+				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
+					return fmt.Errorf("too many type immeidates for %s", InstructionName(op))
+				}
+				pc++ // Skip the value type as it doesn't affect the semantics.
+			} else if isReferenceValueType(v1) || isReferenceValueType(v2) {
+				return fmt.Errorf("reference types cannot be used for non typed select instruction")
+			}
+
 			if v1 != v2 && v1 != valueTypeUnknown && v2 != valueTypeUnknown {
 				return fmt.Errorf("type mismatch on 1st and 2nd select operands")
 			}
