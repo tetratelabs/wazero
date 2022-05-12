@@ -1186,7 +1186,7 @@ func (a *snapshotPreview1) PathLink(ctx context.Context, m api.Module, oldFd, ol
 //        path --^
 //
 // Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 5 with the given flags,
-// this function writes the blow to `m.Memory`:
+// this function writes the below to `m.Memory`:
 //
 //                          uint32le
 //                         +--------+
