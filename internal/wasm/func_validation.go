@@ -1188,7 +1188,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				pc++
 				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
-					return fmt.Errorf("too many type immeidates for %s", InstructionName(op))
+					return fmt.Errorf("too many type immediates for %s", InstructionName(op))
 				}
 				pc++
 				tp := body[pc]

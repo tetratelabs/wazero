@@ -212,7 +212,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	mod, err := text.DecodeModule([]byte(`(module $spectest
 (; TODO
   (global (export "global_i32") i32)
-  (global (export "global_i64") i75)
+  (global (export "global_i64") i64)
   (global (export "global_f32") f32)
   (global (export "global_f64") f64)
 
@@ -470,7 +470,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 						require.NoError(t, err, msg)
 						if c.Text == "out of bounds table access" {
 							// This is not actually an instantiation error, but assert_trap in the original wast, but wast2json translates it to assert_uninstantiable.
-							// In anyway, this spectest case expects the error due to active element offset ouf of bounds
+							// Anyway, this spectest case expects the error due to active element offset ouf of bounds
 							// "after" instantiation while retaining function instances used for elements.
 							// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
 							//
