@@ -349,9 +349,9 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 // https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/ref_func.wast#L78-L115
 //
 // To summarize, the function indexes OpcodeRefFunc can refer include:
-//  * in an element section regardless of its mode (active, passive, declarative).
+//  * existing in an element section regardless of its mode (active, passive, declarative).
 //  * defined as globals whose value type is ValueRefFunc.
-//  * exported functions.
+//  * used as an exported functions.
 //
 // See https://github.com/WebAssembly/reference-types/issues/31
 // See https://github.com/WebAssembly/reference-types/issues/76
