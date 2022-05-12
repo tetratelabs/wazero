@@ -546,8 +546,8 @@ func TestModule_validateFunctions(t *testing.T) {
 }
 
 func TestModule_validateMemory(t *testing.T) {
-	t.Run("data section exits but memory not declared", func(t *testing.T) {
-		m := Module{DataSection: make([]*DataSegment, 1)}
+	t.Run("active data segment exits but memory not declared", func(t *testing.T) {
+		m := Module{DataSection: []*DataSegment{{OffsetExpression: &ConstantExpression{}}}}
 		err := m.validateMemory(nil, nil, Features20191205)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())

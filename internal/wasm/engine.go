@@ -1,6 +1,9 @@
 package wasm
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
 // This is a top-level type implemented by an interpreter or JIT compiler.
@@ -24,7 +27,7 @@ type Engine interface {
 		module *Module,
 		importedFunctions, moduleFunctions []*FunctionInstance,
 		tables []*TableInstance,
-		tableInit TableInitMap,
+		tableInits []TableInitEntry,
 	) (ModuleEngine, error)
 
 	// DeleteCompiledModule releases compilation caches for the given module (source).
@@ -50,4 +53,10 @@ type ModuleEngine interface {
 }
 
 // TableInitMap is a mapping of Table's index to a mapping of TableInstance.Table index to the function index.
-type TableInitMap = map[Index]map[Index]Index
+type TableInitEntry struct {
+	TableIndex      Index
+	Offset          Index
+	FunctionIndexes []*Index
+}
+
+var ErrElementOffsetOutOfBounds = errors.New("element offset ouf of bounds")

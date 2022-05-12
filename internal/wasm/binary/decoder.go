@@ -2,6 +2,7 @@ package binary
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
@@ -91,6 +92,9 @@ func DecodeModule(
 		case wasm.SectionIDExport:
 			m.ExportSection, err = decodeExportSection(r)
 		case wasm.SectionIDStart:
+			if m.StartSection != nil {
+				return nil, errors.New("multiple start sections are invalid")
+			}
 			m.StartSection, err = decodeStartSection(r)
 		case wasm.SectionIDElement:
 			m.ElementSection, err = decodeElementSection(r, enabledFeatures)

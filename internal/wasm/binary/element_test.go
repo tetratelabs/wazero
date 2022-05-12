@@ -253,40 +253,13 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
-			name: "passive const expr vector - extern ref",
+			name: "passive const expr vector - extern ref type",
 			in: []byte{
 				5, // Prefix.
 				wasm.RefTypeExternref,
-				// Init const expr vector.
-				3, // number of const expr.
-				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
-				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
-				wasm.OpcodeEnd,
-				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
-			exp: &wasm.ElementSegment{
-				Init: []*wasm.Index{nil, uint32Ptr(165675008), nil},
-				Mode: wasm.ElementModePassive,
-				Type: wasm.RefTypeExternref,
-			},
+			expErr:   `ref type must be funcref for element as of WebAssembly 2.0`,
 			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
-		},
-		{
-			name: "passive const expr vector - extern ref but feature disabled",
-			in: []byte{
-				5, // Prefix.
-				wasm.RefTypeExternref,
-				// Init const expr vector.
-				3, // number of const expr.
-				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
-				wasm.OpcodeRefFunc,
-				0x80, 0x80, 0x80, 0x4f, // 165675008 in varint encoding.
-				wasm.OpcodeEnd,
-				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
-			},
-			expErr:   `ref type must be funcref for element: feature "reference-types" is disabled`,
-			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
 			name: "passive const expr vector - unknown ref type",
@@ -294,7 +267,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, // Prefix.
 				0xff,
 			},
-			expErr:   `unknown reference type: 0xff`,
+			expErr:   `ref type must be funcref for element as of WebAssembly 2.0`,
 			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
 		},
 		{

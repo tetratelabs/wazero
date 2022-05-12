@@ -349,11 +349,14 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 }
 
 func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFeatures Features) error {
-	if !enabledFeatures.Get(FeatureBulkMemoryOperations) {
-		// As of bulk memory operations, data segments can exist without memory declarations.
-		if len(m.DataSection) > 0 && memory == nil {
-			return fmt.Errorf("unknown memory")
+	var activeElementCount int
+	for _, sec := range m.DataSection {
+		if !sec.IsPassive() {
+			activeElementCount++
 		}
+	}
+	if activeElementCount > 0 && memory == nil {
+		return fmt.Errorf("unknown memory")
 	}
 
 	for _, d := range m.DataSection {

@@ -1026,6 +1026,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				blockType:      bt,
 				blockTypeBytes: num,
 			})
+			if err = valueTypeStack.popParams(op, bt.Params, false); err != nil {
+				return err
+			}
+			// Plus we have to push any block params again.
+			for _, p := range bt.Params {
+				valueTypeStack.push(p)
+			}
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
@@ -1438,6 +1445,10 @@ func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, 
 		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
+	case -16: // 0x70 in original byte = funcref
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
+	case -17: // 0x6f in original byte = externref
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
 	default:
 		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
 			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)

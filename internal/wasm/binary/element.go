@@ -2,6 +2,7 @@ package binary
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -52,6 +53,9 @@ func decodeElementConstExprVector(r *bytes.Reader, enabledFeatures wasm.Features
 			v, _, _ := leb128.DecodeUint32(bytes.NewReader(expr.Data))
 			vec[i] = &v
 		case wasm.OpcodeRefNull:
+			if expr.Data[0] != wasm.RefTypeFuncref {
+				return nil, errors.New("ref type must be funcref for element as of WebAssembly 2.0")
+			}
 			// vec[i] is already nil, so nothing to do.
 		default:
 			return nil, fmt.Errorf("const expr must be either ref.null or ref.func but was %s", wasm.InstructionName(expr.Opcode))
@@ -67,12 +71,7 @@ func decodeElementRefType(r *bytes.Reader, enabledFeatures wasm.Features) (ret w
 		return
 	}
 	if ret != wasm.RefTypeFuncref {
-		if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
-			return 0, fmt.Errorf("ref type must be funcref for element: %w", err)
-		}
-		if ret != wasm.RefTypeExternref {
-			return 0, fmt.Errorf("unknown reference type: 0x%x", ret)
-		}
+		return 0, errors.New("ref type must be funcref for element as of WebAssembly 2.0")
 	}
 	return
 }

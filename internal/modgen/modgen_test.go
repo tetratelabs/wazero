@@ -617,6 +617,7 @@ func TestGenerator_elementSection(t *testing.T) {
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(98)},
 						Init:       []*wasm.Index{uint32Ptr(0), uint32Ptr(50)},
+						Type:       wasm.RefTypeFuncref,
 					},
 				},
 			},
@@ -630,14 +631,17 @@ func TestGenerator_elementSection(t *testing.T) {
 				exps: []*wasm.ElementSegment{
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(0)},
+						Type:       wasm.RefTypeFuncref,
 						Init:       []*wasm.Index{uint32Ptr(25), uint32Ptr(75)},
 					},
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(99)},
+						Type:       wasm.RefTypeFuncref,
 						Init:       []*wasm.Index{uint32Ptr(3)},
 					},
 					{
 						OffsetExpr: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(90)},
+						Type:       wasm.RefTypeFuncref,
 						Init: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4),
 							uint32Ptr(5), uint32Ptr(6), uint32Ptr(7), uint32Ptr(8), uint32Ptr(9), uint32Ptr(10)},
 					},
