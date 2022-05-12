@@ -571,11 +571,10 @@ func TestClose(t *testing.T) {
 
 		// Modules closed so calls fail
 		_, err = func1.Call(testCtx)
-		// TODO: This could be neater with ErrorIs
-		require.Error(t, err, sys.NewExitError("mod1", tc.exitCode).Error())
+		require.ErrorIs(t, err, sys.NewExitError("mod1", tc.exitCode))
 
 		_, err = func2.Call(testCtx)
-		require.Error(t, err, sys.NewExitError("mod2", tc.exitCode).Error())
+		require.ErrorIs(t, err, sys.NewExitError("mod2", tc.exitCode))
 	}
 }
 
