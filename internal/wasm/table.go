@@ -117,8 +117,6 @@ type ElementInstance struct {
 }
 
 // Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref.
-//
-// Currently the content is a (possively nil) pointer to the engine-specific struct which can be only used in indirect function calls.
 type Reference = uintptr
 
 // validatedActiveElementSegment is like ElementSegment of active mode except the inputs are expanded and validated based on defining module.
