@@ -251,6 +251,10 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if err = m.validateExports(enabledFeatures, functions, globals, memory, tables); err != nil {
+		return err
+	}
+
 	if m.CodeSection != nil {
 		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, tables, MaximumFunctionIndex); err != nil {
 			return err
@@ -258,10 +262,6 @@ func (m *Module) Validate(enabledFeatures Features) error {
 	} // No need to validate host functions as NewHostModule validates
 
 	if _, err = m.validateTable(enabledFeatures, tables); err != nil {
-		return err
-	}
-
-	if err = m.validateExports(enabledFeatures, functions, globals, memory, tables); err != nil {
 		return err
 	}
 
@@ -319,16 +319,71 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 		return fmt.Errorf("code count (%d) != function count (%d)", codeCount, functionCount)
 	}
 
+	declaredFuncIndexes, err := m.declaredFunctionIndexes()
+	if err != nil {
+		return err
+	}
+
 	for idx, typeIndex := range m.FunctionSection {
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
 
-		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables); err != nil {
+		if err := m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
 	return nil
+}
+
+// declaredFunctionIndexes returns a set of function indexes that can be used as an immediate for OpcodeRefFunc instruction.
+//
+// The criteria for which function indexes can be available for that instruction is vague in the spec:
+//
+//  * "References: the list of function indices that occur in the module outside functions and can hence be used to form references inside them."
+//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/conventions.html#contexts
+//  * "Ref is the set funcidx(module with functions=ε, start=ε) , i.e., the set of function indices occurring in the module, except in its functions or start function."
+//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/modules.html#valid-module
+//
+// To clarify, we reverse-engineer logic required to pass the WebAssembly Core specification 2.0 test suite:
+// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/ref_func.wast#L78-L115
+//
+// To summarize, the function indexes OpcodeRefFunc can refer include:
+//  * existing in an element section regardless of its mode (active, passive, declarative).
+//  * defined as globals whose value type is ValueRefFunc.
+//  * used as an exported functions.
+//
+// See https://github.com/WebAssembly/reference-types/issues/31
+// See https://github.com/WebAssembly/reference-types/issues/76
+func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
+	ret = map[uint32]struct{}{}
+
+	for _, exp := range m.ExportSection {
+		if exp.Type == ExternTypeFunc {
+			ret[exp.Index] = struct{}{}
+		}
+	}
+
+	for i, g := range m.GlobalSection {
+		if g.Init.Opcode == OpcodeRefFunc {
+			var index uint32
+			index, _, err = leb128.DecodeUint32(bytes.NewReader(g.Init.Data))
+			if err != nil {
+				err = fmt.Errorf("%s[%d] failed to initialize: %w", SectionIDName(SectionIDGlobal), i, err)
+				return
+			}
+			ret[index] = struct{}{}
+		}
+	}
+
+	for _, elem := range m.ElementSection {
+		for _, index := range elem.Init {
+			if index != nil {
+				ret[*index] = struct{}{}
+			}
+		}
+	}
+	return
 }
 
 func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
@@ -349,11 +404,14 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 }
 
 func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFeatures Features) error {
-	if !enabledFeatures.Get(FeatureBulkMemoryOperations) {
-		// As of bulk memory operations, data segments can exist without memory declarations.
-		if len(m.DataSection) > 0 && memory == nil {
-			return fmt.Errorf("unknown memory")
+	var activeElementCount int
+	for _, sec := range m.DataSection {
+		if !sec.IsPassive() {
+			activeElementCount++
 		}
+	}
+	if activeElementCount > 0 && memory == nil {
+		return fmt.Errorf("unknown memory")
 	}
 
 	for _, d := range m.DataSection {
@@ -929,6 +987,10 @@ func ValueTypeName(t ValueType) string {
 		return "funcref"
 	}
 	return api.ValueTypeName(t)
+}
+
+func isReferenceValueType(vt ValueType) bool {
+	return vt == ValueTypeExternref || vt == ValueTypeFuncref
 }
 
 // ExternType is an alias of api.ExternType defined to simplify imports.

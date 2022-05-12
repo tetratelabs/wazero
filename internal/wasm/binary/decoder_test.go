@@ -135,6 +135,18 @@ func TestDecodeModule_Errors(t *testing.T) {
 			expectedErr: "invalid version header",
 		},
 		{
+			name: "multiple start sections",
+			input: append(append(Magic, version...),
+				wasm.SectionIDType, 4, 1, 0x60, 0, 0,
+				wasm.SectionIDFunction, 2, 1, 0,
+				wasm.SectionIDCode, 4, 1,
+				2, 0, wasm.OpcodeEnd,
+				wasm.SectionIDStart, 1, 0,
+				wasm.SectionIDStart, 1, 0,
+			),
+			expectedErr: `multiple start sections are invalid`,
+		},
+		{
 			name: "redundant name section",
 			input: append(append(Magic, version...),
 				wasm.SectionIDCustom, 0x09, // 9 bytes in this section

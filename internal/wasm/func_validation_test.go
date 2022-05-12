@@ -32,11 +32,11 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 	}
 
 	t.Run("not exceed", func(t *testing.T) {
-		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max+1)
+		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max+1, nil)
 		require.NoError(t, err)
 	})
 	t.Run("exceed", func(t *testing.T) {
-		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max)
+		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max, nil)
 		require.Error(t, err)
 		expMsg := fmt.Sprintf("function may have %d stack values, which exceeds limit %d", valuesNum, max)
 		require.Equal(t, expMsg, err.Error())
@@ -79,7 +79,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: []byte{tc.input}}},
 				}
-				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil)
+				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
@@ -96,7 +96,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: body}},
 				}
-				err := m.validateFunction(FeatureSignExtensionOps, 0, []Index{0}, nil, nil, nil)
+				err := m.validateFunction(FeatureSignExtensionOps, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -151,7 +151,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
 				}
-				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil)
+				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
@@ -169,7 +169,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: body}},
 				}
-				err := m.validateFunction(FeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil)
+				err := m.validateFunction(FeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -246,11 +246,11 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("disabled", func(t *testing.T) {
-				err := tc.module.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil)
+				err := tc.module.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
-				err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil)
+				err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -287,7 +287,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					ElementSection:   []*ElementSegment{{}},
 					DataCountSection: &c,
 				}
-				err := m.validateFunction(FeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}})
+				err := m.validateFunction(FeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 				require.NoError(t, err)
 			})
 		}
@@ -648,7 +648,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					c := uint32(0)
 					m.DataCountSection = &c
 				}
-				err := m.validateFunction(tc.flag, 0, []Index{0}, nil, tc.memory, tc.tables)
+				err := m.validateFunction(tc.flag, 0, []Index{0}, nil, tc.memory, tc.tables, nil)
 				require.EqualError(t, err, tc.expectedErr)
 			})
 		}
@@ -2176,7 +2176,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil)
+			err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -2193,7 +2193,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 				OpcodeEnd,
 			}}},
 		}
-		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeFuncref}})
+		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeFuncref}}, nil)
 		require.NoError(t, err)
 	})
 	t.Run("non zero table index", func(t *testing.T) {
@@ -2207,11 +2207,11 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 			}}},
 		}
 		t.Run("disabled", func(t *testing.T) {
-			err := m.validateFunction(Features20191205, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}})
+			err := m.validateFunction(Features20191205, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 			require.EqualError(t, err, "table index must be zero but was 100: feature \"reference-types\" is disabled")
 		})
 		t.Run("enabled but out of range", func(t *testing.T) {
-			err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}})
+			err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 			require.EqualError(t, err, "unknown table index: 100")
 		})
 	})
@@ -2225,17 +2225,18 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 				OpcodeEnd,
 			}}},
 		}
-		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeExternref}})
+		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeExternref}}, nil)
 		require.EqualError(t, err, "table is not funcref type but was externref for call_indirect")
 	})
 }
 
 func TestModule_funcValidation_RefTypes(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		body        []byte
-		flag        Features
-		expectedErr string
+		name                    string
+		body                    []byte
+		flag                    Features
+		declaredFunctionIndexes map[Index]struct{}
+		expectedErr             string
 	}{
 		{
 			name: "ref.null (funcref)",
@@ -2281,16 +2282,28 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			expectedErr: `ref.is_null invalid as feature "reference-types" is disabled`,
 		},
 		{
-			name: "ref.func",
-			flag: FeatureReferenceTypes,
+			name:                    "ref.func",
+			flag:                    FeatureReferenceTypes,
+			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
 			body: []byte{
 				OpcodeRefFunc, 0,
 				OpcodeDrop, OpcodeEnd,
 			},
 		},
 		{
-			name: "ref.func",
-			flag: Features20191205,
+			name:                    "ref.func - undeclared function index",
+			flag:                    FeatureReferenceTypes,
+			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
+			body: []byte{
+				OpcodeRefFunc, 100,
+				OpcodeDrop, OpcodeEnd,
+			},
+			expectedErr: `undeclared function index 100 for ref.func`,
+		},
+		{
+			name:                    "ref.func",
+			flag:                    Features20191205,
+			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
 			body: []byte{
 				OpcodeRefFunc, 0,
 				OpcodeDrop, OpcodeEnd,
@@ -2305,7 +2318,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil)
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, tc.declaredFunctionIndexes)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -2471,7 +2484,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables)
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables, nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -2581,12 +2594,63 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables)
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, tables, nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestModule_funcValidation_Select_error(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "typed_select (disabled)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 1, ValueTypeI32, // immediate vector's size must be one
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag:        Features20191205,
+			expectedErr: "typed_select is invalid as feature \"reference-types\" is disabled",
+		},
+		{
+			name: "typed_select (too many immediate types)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 2, // immediate vector's size must be one
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `too many type immediates for typed_select`,
+		},
+		{
+			name: "typed_select (immediate type not found)",
+			body: []byte{
+				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
+				OpcodeTypedSelect, 1, 0,
+				OpcodeEnd,
+			},
+			flag:        FeatureReferenceTypes,
+			expectedErr: `invalid type unknown for typed_select`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
+			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }

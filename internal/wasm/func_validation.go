@@ -22,11 +22,13 @@ const maximumValuesOnStack = 1 << 27
 // * globals are the global index namespace, which is prefixed by imports.
 // * memory is the potentially imported memory and can be nil.
 // * table is the potentially imported table and can be nil.
+// * declaredFunctionIndexes is the set of function indexes declared by declarative element segments which can be acceed by OpcodeRefFunc instruction.
 //
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
-func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
-	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack)
+func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions []Index,
+	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{}) error {
+	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
 
 // validateFunctionWithMaxStackValues is like validateFunction, but allows overriding maxStackValues for testing.
@@ -40,6 +42,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	memory *Memory,
 	tables []*Table,
 	maxStackValues int,
+	declaredFunctionIndexes map[Index]struct{},
 ) error {
 	functionType := m.TypeSection[m.FunctionSection[idx]]
 	body := m.CodeSection[idx].Body
@@ -436,12 +439,37 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
-			expType := lnLabel.blockType.Results
+			expTypes := lnLabel.blockType.Results
 			if lnLabel.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				expType = []ValueType{}
+				expTypes = []ValueType{}
 			}
+
+			if enabledFeatures.Get(FeatureReferenceTypes) {
+				// As of reference-types proposal, br_table on unreachable state
+				// can choose unknown types for expected parameter types for each label.
+				// https://github.com/WebAssembly/reference-types/pull/116
+				for i := range expTypes {
+					index := len(expTypes) - 1 - i
+					exp := expTypes[index]
+					actual, err := valueTypeStack.pop()
+					if err != nil {
+						return err
+					}
+					if actual == valueTypeUnknown {
+						// Re-assign the expected type to unknown.
+						expTypes[index] = valueTypeUnknown
+					} else if actual != exp {
+						return typeMismatchError(true, OpcodeBrTableName, actual, exp, i)
+					}
+				}
+			} else {
+				if err = valueTypeStack.popResults(op, expTypes, false); err != nil {
+					return err
+				}
+			}
+
 			for _, l := range list {
 				if int(l) >= len(controlBlockStack) {
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
@@ -453,18 +481,16 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					// the beginning of the loop.
 					expType2 = []ValueType{}
 				}
-				if len(expType) != len(expType2) {
-					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expType, ln, expType2, l)
+				if len(expTypes) != len(expType2) {
+					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
 				}
-				for i := range expType {
-					if expType[i] != expType2[i] {
+				for i := range expTypes {
+					if expTypes[i] != valueTypeUnknown && expTypes[i] != expType2[i] {
 						return fmt.Errorf("incosistent block type for %s at %d", OpcodeBrTableName, l)
 					}
 				}
 			}
-			if err = valueTypeStack.popResults(op, expType, false); err != nil {
-				return err
-			}
+
 			// br_table instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
@@ -764,7 +790,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				tp, err := valueTypeStack.pop()
 				if err != nil {
 					return fmt.Errorf("cannot pop the operand for ref.is_null: %v", err)
-				} else if tp != ValueTypeExternref && tp != ValueTypeFuncref {
+				} else if !isReferenceValueType(tp) && tp != valueTypeUnknown {
 					return fmt.Errorf("type mismatch: expected reference type but was %s", ValueTypeName(tp))
 				}
 				valueTypeStack.push(ValueTypeI32)
@@ -774,8 +800,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				if err != nil {
 					return fmt.Errorf("failed to read function index for ref.func: %v", err)
 				}
-				if int(index) >= len(functions) {
-					return fmt.Errorf("invalid function index for ref.func: %d", index)
+				if _, ok := declaredFunctionIndexes[index]; !ok {
+					return fmt.Errorf("undeclared function index %d for ref.func", index)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeFuncref)
@@ -1026,6 +1052,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				blockType:      bt,
 				blockTypeBytes: num,
 			})
+			if err = valueTypeStack.popParams(op, bt.Params, false); err != nil {
+				return err
+			}
+			// Plus we have to push any block params again.
+			for _, p := range bt.Params {
+				valueTypeStack.push(p)
+			}
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeLoop {
@@ -1136,7 +1169,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("invalid drop: %v", err)
 			}
-		} else if op == OpcodeSelect {
+		} else if op == OpcodeSelect || op == OpcodeTypedSelect {
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("type mismatch on 3rd select operand: %v", err)
 			}
@@ -1148,6 +1181,25 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			if err != nil {
 				return fmt.Errorf("invalid select: %v", err)
 			}
+
+			if op == OpcodeTypedSelect {
+				if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+					return fmt.Errorf("%s is invalid as %w", InstructionName(op), err)
+				}
+				pc++
+				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
+					return fmt.Errorf("too many type immediates for %s", InstructionName(op))
+				}
+				pc++
+				tp := body[pc]
+				if tp != ValueTypeI32 && tp != ValueTypeI64 && tp != ValueTypeF32 && tp != ValueTypeF64 &&
+					tp != api.ValueTypeExternref && tp != ValueTypeFuncref {
+					return fmt.Errorf("invalid type %s for %s", ValueTypeName(tp), OpcodeTypedSelectName)
+				}
+			} else if isReferenceValueType(v1) || isReferenceValueType(v2) {
+				return fmt.Errorf("reference types cannot be used for non typed select instruction")
+			}
+
 			if v1 != v2 && v1 != valueTypeUnknown && v2 != valueTypeUnknown {
 				return fmt.Errorf("type mismatch on 1st and 2nd select operands")
 			}
@@ -1438,6 +1490,10 @@ func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, 
 		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
+	case -16: // 0x70 in original byte = funcref
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
+	case -17: // 0x6f in original byte = externref
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
 	default:
 		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
 			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)

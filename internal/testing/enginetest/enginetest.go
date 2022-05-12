@@ -36,7 +36,7 @@ type EngineTester interface {
 	NewEngine(enabledFeatures wasm.Features) wasm.Engine
 	// InitTables returns expected table contents ([]wasm.Reference) per table.
 	InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int,
-		initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference
+		tableInits []wasm.TableInitEntry) [][]wasm.Reference
 	// CompiledFunctionPointerValue returns the opaque compiledFunction's pointer for the `funcIndex`.
 	CompiledFunctionPointerValue(tme wasm.ModuleEngine, funcIndex wasm.Index) uint64
 }
@@ -212,17 +212,19 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			getFunctionInstance(m, 2, nil),
 			getFunctionInstance(m, 3, nil),
 		}
-		tableInit := wasm.TableInitMap{
-			0: {0: 2},
-			1: {5: 1},
+
+		var func1, func2 = uint32(2), uint32(1)
+		tableInits := []wasm.TableInitEntry{
+			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1}},
+			{TableIndex: 1, Offset: 5, FunctionIndexes: []*wasm.Index{&func2}},
 		}
 
 		// Instantiate the module whose table points to its own functions.
-		me, err := e.NewModuleEngine(t.Name(), m, nil, moduleFunctions, tables, tableInit)
+		me, err := e.NewModuleEngine(t.Name(), m, nil, moduleFunctions, tables, tableInits)
 		require.NoError(t, err)
 
 		// The functions mapped to the table are defined in the same moduleEngine
-		expectedTables := et.InitTables(me, map[wasm.Index]int{0: 2, 1: 10}, tableInit)
+		expectedTables := et.InitTables(me, map[wasm.Index]int{0: 2, 1: 10}, tableInits)
 		for idx, table := range tables {
 			require.Equal(t, expectedTables[idx], table.References)
 		}
@@ -267,12 +269,16 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		err = e.CompileModule(testCtx, importingModule)
 		require.NoError(t, err)
 
-		tableInit := wasm.TableInitMap{0: {0: 2}}
-		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInit)
+		f := uint32(2)
+		tableInits := []wasm.TableInitEntry{
+			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&f}},
+		}
+
+		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInits)
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInit)
+		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInits)
 		for idx, table := range tables {
 			require.Equal(t, expectedTables[idx], table.References)
 		}
@@ -324,14 +330,18 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			getFunctionInstance(importedModule, 2, importingModuleInstance),
 			getFunctionInstance(importedModule, 3, importingModuleInstance),
 		}
-		tableInit := wasm.TableInitMap{0: {0: 0, 1: 4}}
+
+		var func1, func2 = uint32(0), uint32(4)
+		tableInits := []wasm.TableInitEntry{
+			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1, &func2}},
+		}
 
 		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInit)
+		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInits)
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInit)
+		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInits)
 		for idx, table := range tables {
 			require.Equal(t, expectedTables[idx], table.References)
 		}

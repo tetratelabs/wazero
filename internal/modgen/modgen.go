@@ -393,6 +393,7 @@ func (g *generator) genElementSection() {
 				Data:   leb128.EncodeInt32(int32(offset)),
 			},
 			Init: indexes,
+			Type: wasm.RefTypeFuncref,
 		}
 		g.m.ElementSection = append(g.m.ElementSection, elem)
 	}

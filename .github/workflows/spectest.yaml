@@ -84,7 +84,7 @@ jobs:
       - name: Build scratch container
         run: |
           echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/test"]' >> Dockerfile
+          echo 'CMD ["/test", "-test.v"]' >> Dockerfile
           docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
 
       - name: Run built test binaries

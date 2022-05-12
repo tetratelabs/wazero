@@ -3,6 +3,7 @@ package wasm
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -271,25 +272,29 @@ func (m *ModuleInstance) buildExports(exports []*Export) {
 }
 
 func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
-	for _, d := range data {
+	for i, d := range data {
 		if !d.IsPassive() {
 			offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
 			ceil := offset + len(d.Init)
 			if offset < 0 || ceil > len(m.Memory.Buffer) {
-				return fmt.Errorf("out of bounds memory access")
+				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
 			}
 		}
 	}
 	return
 }
 
-func (m *ModuleInstance) applyData(data []*DataSegment) {
-	for _, d := range data {
+func (m *ModuleInstance) applyData(data []*DataSegment) error {
+	for i, d := range data {
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
+			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
+				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
+			}
 			copy(m.Memory.Buffer[offset:], d.Init)
 		}
 	}
+	return nil
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
@@ -350,7 +355,9 @@ func (s *Store) Instantiate(
 		return nil, err
 	}
 
-	tables, tableInit, err := module.buildTables(importedTables, importedGlobals)
+	tables, tableInit, err := module.buildTables(importedTables, importedGlobals,
+		// As of reference-types proposal, boundary check must be done after instantiation.
+		s.EnabledFeatures.Get(FeatureReferenceTypes))
 	if err != nil {
 		s.deleteModule(name)
 		return nil, err
@@ -372,14 +379,22 @@ func (s *Store) Instantiate(
 	m := &ModuleInstance{Name: name}
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection, typeIDs)
 
-	if err = m.validateData(module.DataSection); err != nil {
-		s.deleteModule(name)
-		return nil, err
+	// As of reference types proposal, data segment validation must happen after instantiation,
+	// and the side effect must persist even if there's out of bounds error after instantiation.
+	// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L395-L405
+	if !s.EnabledFeatures.Get(FeatureReferenceTypes) {
+		if err = m.validateData(module.DataSection); err != nil {
+			s.deleteModule(name)
+			return nil, err
+		}
 	}
 
 	// Plus, we are ready to compile functions.
 	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, tables, tableInit)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrElementOffsetOutOfBounds) {
+		// ErrElementOffsetOutOfBounds is not an instantiation error, but rather runtime error, so we ignore it as
+		// in anyway the instantiated module and engines are fine and can be used for function invocations.
+		// See comments on ErrElementOffsetOutOfBounds.
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
 
@@ -388,7 +403,9 @@ func (s *Store) Instantiate(
 	m.Engine.InitializeFuncrefGlobals(globals)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
-	m.applyData(module.DataSection)
+	if err := m.applyData(module.DataSection); err != nil {
+		return nil, err
+	}
 
 	// Compile the default context for calls to this module.
 	m.CallCtx = NewCallContext(s, m, sys)
@@ -500,6 +517,10 @@ func (s *Store) resolveImports(module *Module) (
 		case ExternTypeTable:
 			expected := i.DescTable
 			importedTable := imported.Table
+			if expected.Type != importedTable.Type {
+				err = errorInvalidImport(i, idx, fmt.Errorf("table type mismatch: %s != %s",
+					RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
+			}
 
 			if expected.Min > importedTable.Min {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedTable.Min)
@@ -521,7 +542,7 @@ func (s *Store) resolveImports(module *Module) (
 			expected := i.DescMem
 			importedMemory = imported.Memory
 
-			if expected.Min > importedMemory.Min {
+			if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
 				return
 			}
@@ -659,4 +680,11 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	s.moduleNames = nil
 	s.modules = map[string]*ModuleInstance{}
 	return err
+}
+
+// AliasModule aliases the instantiated module named `src` as `dst`.
+//
+// Note: This is only used for spectests.
+func (s *Store) AliasModule(src, dst string) {
+	s.modules[dst] = s.modules[src]
 }

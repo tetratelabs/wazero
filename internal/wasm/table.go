@@ -207,7 +207,7 @@ func (m *Module) validateTable(enabledFeatures Features, tables []*Table) ([]*va
 				// Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L117 we must pass if imported
 				// table has set its min=0. Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L142, we
 				// have to do fail if module-defined min=0.
-				if elem.TableIndex >= importedTableCount {
+				if !enabledFeatures.Get(FeatureReferenceTypes) && elem.TableIndex >= importedTableCount {
 					if err = checkSegmentBounds(t.Min, uint64(initCount)+uint64(offset), idx); err != nil {
 						return nil, err
 					}
@@ -235,7 +235,7 @@ func (m *Module) validateTable(enabledFeatures Features, tables []*Table) ([]*va
 // If the result `init` is non-nil, it is the `tableInit` parameter of Engine.NewModuleEngine.
 //
 // Note: An error is only possible when an ElementSegment.OffsetExpr is out of range of the TableInstance.Min.
-func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []*GlobalInstance) (tables []*TableInstance, initMaps TableInitMap, err error) {
+func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []*GlobalInstance, skipBoundCheck bool) (tables []*TableInstance, inits []TableInitEntry, err error) {
 	tables = importedTables
 
 	for _, tsec := range m.TableSection {
@@ -251,15 +251,8 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 		return
 	}
 
-	initMaps = make(TableInitMap, len(tables))
 	for elemI, elem := range elementSegments {
-		initMapPerTable, ok := initMaps[elem.tableIndex]
 		table := tables[elem.tableIndex]
-		if !ok {
-			initMapPerTable = map[Index]Index{}
-			initMaps[elem.tableIndex] = initMapPerTable
-		}
-
 		var offset uint32
 		if elem.opcode == OpcodeGlobalGet {
 			global := importedGlobals[elem.arg]
@@ -270,16 +263,14 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 
 		// Check to see if we are out-of-bounds
 		initCount := uint64(len(elem.init))
-		if err = checkSegmentBounds(table.Min, uint64(offset)+initCount, Index(elemI)); err != nil {
-			return
-		}
-
-		for i, funcidx := range elem.init {
-			if funcidx != nil {
-				// Null Index can be ignored.
-				initMapPerTable[offset+uint32(i)] = *funcidx
+		if !skipBoundCheck {
+			if err = checkSegmentBounds(table.Min, uint64(offset)+initCount, Index(elemI)); err != nil {
+				return
 			}
 		}
+		inits = append(inits, TableInitEntry{
+			TableIndex: elem.tableIndex, Offset: offset, FunctionIndexes: elem.init,
+		})
 	}
 	return
 }
@@ -329,7 +320,7 @@ func (t *TableInstance) Grow(_ context.Context, delta uint32, initialRef Referen
 	}
 
 	if newLen := int64(currentLen) + int64(delta); // adding as 64bit ints to avoide overflow.
-	newLen >= math.MaxUint32 || (t.Max != nil && newLen >= int64(*t.Max)) {
+	newLen >= math.MaxUint32 || (t.Max != nil && newLen > int64(*t.Max)) {
 		return 0xffffffff // = -1 in signed 32-bit integer.
 	}
 	t.References = append(t.References, make([]uintptr, delta)...)

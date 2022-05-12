@@ -240,7 +240,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInit wasm.TableInitMap) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInits []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -264,9 +264,16 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		me.functions = append(me.functions, insntantiatedcode)
 	}
 
-	for tableIndex, init := range tableInit {
-		for elemIdx, funcidx := range init { // Initialize any elements with compiled functions
-			tables[tableIndex].References[elemIdx] = uintptr(unsafe.Pointer(me.functions[funcidx]))
+	for _, init := range tableInits {
+		references := tables[init.TableIndex].References
+		if int(init.Offset)+len(init.FunctionIndexes) > len(references) {
+			return me, wasm.ErrElementOffsetOutOfBounds
+		}
+
+		for i, funcindex := range init.FunctionIndexes {
+			if funcindex != nil {
+				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*funcindex]))
+			}
 		}
 	}
 	return me, nil
@@ -1872,7 +1879,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			table := tables[op.us[0]]
 
 			offset := ce.popValue()
-			if offset > uint64(len(table.References)) {
+			if offset >= uint64(len(table.References)) {
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			}
 

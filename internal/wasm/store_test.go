@@ -435,7 +435,7 @@ func newStore() *Store {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ []*TableInstance, _ TableInitMap) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ []*TableInstance, _ []TableInitEntry) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
 	}
@@ -796,10 +796,11 @@ func TestModuleInstance_validateData(t *testing.T) {
 
 func TestModuleInstance_applyData(t *testing.T) {
 	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
-	m.applyData([]*DataSegment{
+	err := m.applyData([]*DataSegment{
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
 	})
+	require.NoError(t, err)
 	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
 }
 

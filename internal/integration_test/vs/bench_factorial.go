@@ -8,17 +8,15 @@ import (
 )
 
 var (
-	// factorialWasm is compiled from ../post1_0/multi-value/testdata/fac.wat
-	// We can't use go:embed as it is outside this directory. Copying it isn't ideal due to size and drift.
-	factorialWasmPath = "../post1_0/multi-value/testdata/fac.wasm"
-	factorialWasm     []byte
-	factorialParam    = uint64(30)
-	factorialResult   = uint64(9682165104862298112)
-	factorialConfig   *RuntimeConfig
+	// catFS is an embedded filesystem limited to test.txt
+	//go:embed testdata/fac.wasm
+	factorialWasm   []byte
+	factorialParam  = uint64(30)
+	factorialResult = uint64(9682165104862298112)
+	factorialConfig *RuntimeConfig
 )
 
 func init() {
-	factorialWasm = readRelativeFile(factorialWasmPath)
 	factorialConfig = &RuntimeConfig{
 		ModuleName: "math",
 		ModuleWasm: factorialWasm,

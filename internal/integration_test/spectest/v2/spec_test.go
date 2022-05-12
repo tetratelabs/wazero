@@ -2,6 +2,7 @@ package spectest
 
 import (
 	"embed"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
@@ -17,8 +18,7 @@ var testcases embed.FS //nolint:unused
 const enabledFeatures = wasm.Features20220419
 
 func TestJIT(t *testing.T) {
-	t.Skip() // TODO!
-	if true {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
 
@@ -26,6 +26,5 @@ func TestJIT(t *testing.T) {
 }
 
 func TestInterpreter(t *testing.T) {
-	t.Skip() // TODO!
 	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
 }

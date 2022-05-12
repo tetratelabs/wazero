@@ -546,8 +546,8 @@ func TestModule_validateFunctions(t *testing.T) {
 }
 
 func TestModule_validateMemory(t *testing.T) {
-	t.Run("data section exits but memory not declared", func(t *testing.T) {
-		m := Module{DataSection: make([]*DataSegment, 1)}
+	t.Run("active data segment exits but memory not declared", func(t *testing.T) {
+		m := Module{DataSection: []*DataSegment{{OffsetExpression: &ConstantExpression{}}}}
 		err := m.validateMemory(nil, nil, Features20191205)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
@@ -827,4 +827,122 @@ func TestModule_validateDataCountSection(t *testing.T) {
 			require.Error(t, err)
 		}
 	})
+}
+
+func TestModule_declaredFunctionIndexes(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mod    *Module
+		exp    map[Index]struct{}
+		expErr string
+	}{
+		{
+			name: "empty",
+			mod:  &Module{},
+			exp:  map[uint32]struct{}{},
+		},
+		{
+			name: "global",
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 10, Type: ExternTypeFunc},
+					{Index: 1000, Type: ExternTypeGlobal},
+				},
+			},
+			exp: map[uint32]struct{}{10: {}},
+		},
+		{
+			name: "export",
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 1000, Type: ExternTypeGlobal},
+					{Index: 10, Type: ExternTypeFunc},
+				},
+			},
+			exp: map[uint32]struct{}{10: {}},
+		},
+		{
+			name: "element",
+			mod: &Module{
+				ElementSection: []*ElementSegment{
+					{
+						Mode: ElementModeActive,
+						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModeDeclarative,
+						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModePassive,
+						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+					},
+				},
+			},
+			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}},
+		},
+		{
+			name: "all",
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 10, Type: ExternTypeGlobal},
+					{Index: 1000, Type: ExternTypeFunc},
+				},
+				GlobalSection: []*Global{
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeI32Const, // not funcref.
+							Data:   leb128.EncodeInt32(-1),
+						},
+					},
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeRefFunc,
+							Data:   leb128.EncodeInt32(123),
+						},
+					},
+				},
+				ElementSection: []*ElementSegment{
+					{
+						Mode: ElementModeActive,
+						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModeDeclarative,
+						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModePassive,
+						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+					},
+				},
+			},
+			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}, 123: {}, 1000: {}},
+		},
+		{
+			mod: &Module{
+				GlobalSection: []*Global{
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeRefFunc,
+							Data:   nil,
+						},
+					},
+				},
+			},
+			name:   "invalid global",
+			expErr: `global[0] failed to initialize: EOF`,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := tc.mod.declaredFunctionIndexes()
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.exp, actual)
+			}
+		})
+	}
 }
