@@ -49,7 +49,7 @@ const (
 	ElementModeActive ElementMode = iota
 	// ElementModePassive is the mode which doesn't require the runtime to initialize table, and only used with OpcodeTableInitName.
 	ElementModePassive
-	// ElementModeDeclarative is introduced in reference-types proposal, but currently not used.
+	// ElementModeDeclarative is introduced in reference-types proposal which can be used to declare function indexes used by OpcodeRefFunc.
 	ElementModeDeclarative
 )
 
@@ -117,8 +117,6 @@ type ElementInstance struct {
 }
 
 // Reference is the runtime representation of RefType which is either RefTypeFuncref or RefTypeExternref.
-//
-// Currently the content is a (possively nil) pointer to the engine-specific struct which can be only used in indirect function calls.
 type Reference = uintptr
 
 // validatedActiveElementSegment is like ElementSegment of active mode except the inputs are expanded and validated based on defining module.
