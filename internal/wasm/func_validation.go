@@ -448,7 +448,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
 				// As of reference-types proposal, br_table on unreachable state
-				// can choose unknowna types for expected parameter types for each label.
+				// can choose unknown types for expected parameter types for each label.
 				// https://github.com/WebAssembly/reference-types/pull/116
 				for i := range expTypes {
 					index := len(expTypes) - 1 - i
@@ -1183,6 +1183,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 
 			if op == OpcodeTypedSelect {
+				if err := enabledFeatures.Require(FeatureReferenceTypes); err != nil {
+					return fmt.Errorf("%s is invalid as %w", InstructionName(op), err)
+				}
 				pc++
 				if numTypeImmeidates := body[pc]; numTypeImmeidates != 1 {
 					return fmt.Errorf("too many type immeidates for %s", InstructionName(op))

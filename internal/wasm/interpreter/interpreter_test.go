@@ -63,17 +63,17 @@ func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 }
 
 // InitTables implements enginetest.EngineTester InitTables.
-func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, initTableIdxToFnIdx wasm.TableInitMap) [][]wasm.Reference {
+func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, tableInits []wasm.TableInitEntry) [][]wasm.Reference {
 	references := make([][]wasm.Reference, len(tableIndexToLen))
 	for tableIndex, l := range tableIndexToLen {
 		references[tableIndex] = make([]wasm.Reference, l)
 	}
 	internal := me.(*moduleEngine)
 
-	for tableIndex, init := range initTableIdxToFnIdx {
-		referencesPerTable := references[tableIndex]
-		for idx, fnidx := range init {
-			referencesPerTable[idx] = uintptr(unsafe.Pointer(internal.functions[fnidx]))
+	for _, init := range tableInits {
+		referencesPerTable := references[init.TableIndex]
+		for idx, fnidx := range init.FunctionIndexes {
+			referencesPerTable[int(init.Offset)+idx] = uintptr(unsafe.Pointer(internal.functions[*fnidx]))
 		}
 	}
 	return references
