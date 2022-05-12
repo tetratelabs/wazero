@@ -2298,6 +2298,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 				OpcodeRefFunc, 100,
 				OpcodeDrop, OpcodeEnd,
 			},
+			expectedErr: `undeclared function index 100 for ref.func`,
 		},
 		{
 			name:                    "ref.func",

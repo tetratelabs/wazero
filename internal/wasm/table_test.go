@@ -595,7 +595,7 @@ func TestModule_buildTables(t *testing.T) {
 		importedTables  []*TableInstance
 		importedGlobals []*GlobalInstance
 		expectedTables  []*TableInstance
-		expectedInit    TableInitMap
+		expectedInit    []TableInitEntry
 	}{
 		{
 			name: "empty",
@@ -622,13 +622,10 @@ func TestModule_buildTables(t *testing.T) {
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "constant derived element offset=0 and no index",
 			module: &Module{
-				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 1}},
-				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}},
-				},
+				TypeSection:                    []*FunctionType{{}},
+				TableSection:                   []*Table{{Min: 1}},
+				FunctionSection:                []Index{0},
+				CodeSection:                    []*Code{codeEnd},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 1), Min: 1}},
@@ -640,18 +637,12 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []*Table{{Min: 1}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 1), Min: 1}},
-			expectedInit:   TableInitMap{0: {0: 0}},
+			expectedInit:   []TableInitEntry{{TableIndex: 0, Offset: 0, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "constant derived element offset - imported table",
@@ -659,19 +650,13 @@ func TestModule_buildTables(t *testing.T) {
 				TypeSection:     []*FunctionType{{}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
 			importedTables: []*TableInstance{{Min: 2}},
 			expectedTables: []*TableInstance{{Min: 2}},
-			expectedInit:   TableInitMap{0: {0: 0}},
+			expectedInit:   []TableInitEntry{{TableIndex: 0, Offset: 0, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "constant derived element offset=0 and one index - imported table",
@@ -680,19 +665,13 @@ func TestModule_buildTables(t *testing.T) {
 				ImportSection:   []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
 			importedTables: []*TableInstance{{Min: 1}},
 			expectedTables: []*TableInstance{{Min: 1}},
-			expectedInit:   TableInitMap{0: {0: 0}},
+			expectedInit:   []TableInitEntry{{TableIndex: 0, Offset: 0, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "constant derived element offset and two indices",
@@ -701,18 +680,12 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []*Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
-						Init:       []*Index{uint32Ptr(0), uint32Ptr(2)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 3), Min: 3}},
-			expectedInit:   TableInitMap{0: {1: 0, 2: 2}},
+			expectedInit:   []TableInitEntry{{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0), uint32Ptr(2)}}},
 		},
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
 			name: "imported global derived element offset and no index",
@@ -721,12 +694,9 @@ func TestModule_buildTables(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 1}},
-				FunctionSection: []Index{0},
-				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}}},
-				},
+				TableSection:                   []*Table{{Min: 1}},
+				FunctionSection:                []Index{0},
+				CodeSection:                    []*Code{codeEnd},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
@@ -742,19 +712,13 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []*Table{{Min: 2}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			expectedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
-			expectedInit:    TableInitMap{0: {1: 0}},
+			expectedInit:    []TableInitEntry{{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "imported global derived element offset and one index - imported table",
@@ -766,12 +730,6 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -779,7 +737,7 @@ func TestModule_buildTables(t *testing.T) {
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
 			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
-			expectedInit:    TableInitMap{0: {1: 0}},
+			expectedInit:    []TableInitEntry{{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "imported global derived element offset - ignores min on imported table",
@@ -791,12 +749,6 @@ func TestModule_buildTables(t *testing.T) {
 				},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
-						Init:       []*Index{uint32Ptr(0)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeGlobalGet, arg: 0, init: []*Index{uint32Ptr(0)}},
 				},
@@ -804,7 +756,7 @@ func TestModule_buildTables(t *testing.T) {
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
 			importedTables:  []*TableInstance{{References: make([]Reference, 2), Min: 2}},
 			expectedTables:  []*TableInstance{{Min: 2, References: []Reference{0, 0}}},
-			expectedInit:    TableInitMap{0: {1: 0}},
+			expectedInit:    []TableInitEntry{{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0)}}},
 		},
 		{
 			name: "imported global derived element offset - two indices",
@@ -814,25 +766,38 @@ func TestModule_buildTables(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 3}},
+				TableSection:    []*Table{{Min: 3}, {Min: 100}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
 					{
+						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x0}},
+						Init:       []*Index{nil, uint32Ptr(2)},
+						TableIndex: 1,
+					},
+					{
 						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x1}},
 						Init:       []*Index{uint32Ptr(0), uint32Ptr(2)},
+						TableIndex: 0,
 					},
 				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
-					{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
+					{tableIndex: 1, opcode: OpcodeGlobalGet, arg: 0, init: []*Index{nil, uint32Ptr(2)}},
+					{tableIndex: 0, opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{
 				{Type: &GlobalType{ValType: ValueTypeI64}, Val: 3},
 				{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1},
 			},
-			expectedTables: []*TableInstance{{References: make([]Reference, 3), Min: 3}},
-			expectedInit:   TableInitMap{0: {1: 0, 2: 2}},
+			expectedTables: []*TableInstance{
+				{References: make([]Reference, 3), Min: 3},
+				{References: make([]Reference, 100), Min: 100},
+			},
+			expectedInit: []TableInitEntry{
+				{TableIndex: 1, Offset: 3, FunctionIndexes: []*Index{nil, uint32Ptr(2)}},
+				{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0), uint32Ptr(2)}},
+			},
 		},
 		{
 			name: "mixed elementSegments - const before imported global",
@@ -845,16 +810,6 @@ func TestModule_buildTables(t *testing.T) {
 				TableSection:    []*Table{{Min: 3}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
-				ElementSection: []*ElementSegment{
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1},
-						Init:       []*Index{uint32Ptr(0), uint32Ptr(2)},
-					},
-					{
-						OffsetExpr: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0x1}},
-						Init:       []*Index{uint32Ptr(1), uint32Ptr(2)},
-					},
-				},
 				validatedActiveElementSegments: []*validatedActiveElementSegment{
 					{opcode: OpcodeI32Const, arg: 1, init: []*Index{uint32Ptr(0), uint32Ptr(2)}},
 					{opcode: OpcodeGlobalGet, arg: 1, init: []*Index{uint32Ptr(1), uint32Ptr(2)}},
@@ -865,7 +820,10 @@ func TestModule_buildTables(t *testing.T) {
 				{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1},
 			},
 			expectedTables: []*TableInstance{{References: make([]Reference, 3), Min: 3}},
-			expectedInit:   TableInitMap{0: {1: 1, 2: 2}},
+			expectedInit: []TableInitEntry{
+				{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(0), uint32Ptr(2)}},
+				{TableIndex: 0, Offset: 1, FunctionIndexes: []*Index{uint32Ptr(1), uint32Ptr(2)}},
+			},
 		},
 	}
 
@@ -873,7 +831,7 @@ func TestModule_buildTables(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			tables, init, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals)
+			tables, init, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals, false)
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expectedTables, tables)
@@ -965,7 +923,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals)
+			_, _, err := tc.module.buildTables(tc.importedTables, tc.importedGlobals, false)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
