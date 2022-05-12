@@ -447,6 +447,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
+				// As of reference-types proposal, br_table on unreachable state
+				// can choose unknowna types for expected parameter types for each label.
+				// https://github.com/WebAssembly/reference-types/pull/116
 				for i := range expTypes {
 					index := len(expTypes) - 1 - i
 					exp := expTypes[index]
@@ -455,6 +458,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 						return err
 					}
 					if actual == valueTypeUnknown {
+						// Re-assign the expected type to unknown.
 						expTypes[index] = valueTypeUnknown
 					} else if actual != exp {
 						return typeMismatchError(true, OpcodeBrTableName, actual, exp, i)

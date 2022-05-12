@@ -54,7 +54,7 @@ func decodeElementConstExprVector(r *bytes.Reader, enabledFeatures wasm.Features
 			vec[i] = &v
 		case wasm.OpcodeRefNull:
 			if expr.Data[0] != wasm.RefTypeFuncref {
-				return nil, errors.New("ref type must be funcref for element as of WebAssembly 2.0")
+				return nil, errors.New("ref type must be funcref for ref.null const expression as of WebAssembly 2.0")
 			}
 			// vec[i] is already nil, so nothing to do.
 		default:
