@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -827,4 +828,78 @@ func TestModule_validateDataCountSection(t *testing.T) {
 			require.Error(t, err)
 		}
 	})
+}
+
+func TestModule_declaredFunctionIndexes(t *testing.T) {
+	for i, tc := range []struct {
+		mod    *Module
+		exp    map[Index]struct{}
+		expErr string
+	}{
+		{
+			mod: &Module{},
+			exp: map[uint32]struct{}{},
+		},
+		{
+			mod: &Module{
+				ExportSection: []*Export{
+					{Index: 1000, Type: ExternTypeGlobal},
+					{Index: 10, Type: ExternTypeFunc},
+				},
+				GlobalSection: []*Global{
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeI32Const, // not funcref.
+							Data:   leb128.EncodeInt32(-1),
+						},
+					},
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeRefFunc,
+							Data:   leb128.EncodeInt32(123),
+						},
+					},
+				},
+				ElementSection: []*ElementSegment{
+					{
+						Mode: ElementModeActive,
+						Init: []*Index{uint32Ptr(0), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModeDeclarative,
+						Init: []*Index{uint32Ptr(1), nil, uint32Ptr(5)},
+					},
+					{
+						Mode: ElementModePassive,
+						Init: []*Index{uint32Ptr(5), uint32Ptr(2), nil, nil},
+					},
+				},
+			},
+			exp: map[uint32]struct{}{0: {}, 1: {}, 2: {}, 5: {}, 10: {}, 123: {}},
+		},
+		{
+			mod: &Module{
+				GlobalSection: []*Global{
+					{
+						Init: &ConstantExpression{
+							Opcode: OpcodeRefFunc,
+							Data:   nil,
+						},
+					},
+				},
+			},
+			expErr: `global[0] failed to initialize: EOF`,
+		},
+	} {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			actual, err := tc.mod.declaredFunctionIndexes()
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.exp, actual)
+			}
+		})
+	}
 }

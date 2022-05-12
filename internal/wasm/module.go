@@ -364,11 +364,12 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 		}
 	}
 
-	for _, g := range m.GlobalSection {
+	for i, g := range m.GlobalSection {
 		if g.Init.Opcode == OpcodeRefFunc {
 			var index uint32
 			index, _, err = leb128.DecodeUint32(bytes.NewReader(g.Init.Data))
 			if err != nil {
+				err = fmt.Errorf("%s[%d] failed to initialize: %w", SectionIDName(SectionIDGlobal), i, err)
 				return
 			}
 			ret[index] = struct{}{}

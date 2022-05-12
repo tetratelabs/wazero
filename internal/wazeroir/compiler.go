@@ -690,6 +690,7 @@ operatorSwitch:
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
 		c.pc += 2
+		// Typed select is semantically equivalent to select at runtime.
 		c.emit(
 			&OperationSelect{},
 		)
