@@ -27,8 +27,8 @@
       {{ if not .HasChildren }}
         <li><a href="{{ .URL }}">{{ .Name }}</a></li>
       {{ else }}
-        <!-- TODO: At some point, this will get too long.
-                   Implement CSS like desktop for drop-down -->
+        <!-- TODO: At some point, this will get too long, and also this loses
+                   categorization. Implement CSS like desktop for sub-menus -->
         {{ range .Children }}
         <li><a href="{{ .URL }}">{{ .Name }}</a></li>
         {{ end }}
