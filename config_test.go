@@ -91,6 +91,15 @@ func TestRuntimeConfig(t *testing.T) {
 				enabledFeatures: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
 			},
 		},
+		{
+			name: "simd",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithFeatureSIMD(true)
+			},
+			expected: &runtimeConfig{
+				enabledFeatures: wasm.FeatureSIMD,
+			},
+		},
 	}
 	for _, tt := range tests {
 		tc := tt

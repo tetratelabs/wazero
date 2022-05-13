@@ -2654,3 +2654,43 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 		})
 	}
 }
+
+func TestModule_funcValidation_SIMD_error(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		flag        Features
+		expectedErr string
+	}{
+		{
+			name: "simd disabled",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecF32x4Abs,
+			},
+			flag:        Features20191205,
+			expectedErr: "f32x4.abs invalid as feature \"simd\" is disabled",
+		},
+		{
+			// TODO delete this case after SIMD impl completion.
+			name: "unimplemented",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecF32x4DemoteF64x2Zero,
+			},
+			flag:        FeatureSIMD,
+			expectedErr: "TODO: SIMD instruction f32x4.demote_f64x2_zero will be implemented in #506",
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
