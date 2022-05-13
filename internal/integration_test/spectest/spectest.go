@@ -69,8 +69,6 @@ type (
 		LaneType string      `json:"lane_type"`
 		Value    interface{} `json:"value"`
 	}
-
-	simdVal []string
 )
 
 func (c commandActionVal) String() string {
@@ -99,11 +97,15 @@ func (c commandActionVal) String() string {
 		// All the in and out funcref params are null in spectest (cannot represent non-null as it depends on runtime impl).
 		v = "null"
 	case "v128":
-		simdValues, ok := c.Value.(simdVal)
+		simdValues, ok := c.Value.([]interface{})
 		if !ok {
 			panic("BUG")
 		}
-		v = strings.Join(simdValues, ",")
+		var strs []string
+		for _, v := range simdValues {
+			strs = append(strs, v.(string))
+		}
+		v = strings.Join(strs, ",")
 	}
 	return fmt.Sprintf("{type: %s, value: %v}", c.ValType, v)
 }
