@@ -58,7 +58,7 @@ type wazeroRuntime struct {
 }
 
 type wazeroModule struct {
-	wasi     api.ModuleCloser
+	wasi     api.Closer
 	env, mod api.Module
 	funcs    map[string]api.Function
 }

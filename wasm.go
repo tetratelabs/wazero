@@ -98,10 +98,11 @@ type Runtime interface {
 	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
-	// ModuleCloser closes all the modules that have been initialized in this Runtime.
+	// Closer closes resources initialized by this Runtime. Any instantiated modules will be closed with
+	// an exit code.
 	//
 	// Note: Methods will return an error if any module returns an error when closed.
-	api.ModuleCloser
+	api.Closer
 }
 
 func NewRuntime() Runtime {

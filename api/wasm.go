@@ -147,14 +147,14 @@ type Module interface {
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global
 
-	// ModuleCloser closes this module.
-	ModuleCloser
+	// Closer closes this module.
+	Closer
 }
 
-// ModuleCloser closes a module with an exit code.
+// Closer closes a resource. Any modules closed with it will be provided an exit code.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-type ModuleCloser interface {
+type Closer interface {
 	// Close is a convenience that invokes CloseWithExitCode with zero.
 	// Note: When the context is nil, it defaults to context.Background.
 	Close(context.Context) error
