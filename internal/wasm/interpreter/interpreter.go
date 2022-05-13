@@ -1929,6 +1929,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			frame.pc++
 		case wazeroir.OperationKindConstI128:
 			lo, hi := op.us[0], op.us[1]
+			fmt.Println("low, hi =", lo, ",", hi)
 			ce.pushValue(lo)
 			ce.pushValue(hi)
 			frame.pc++

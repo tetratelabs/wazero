@@ -158,6 +158,7 @@ func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
 	}
 	for _, exp := range c.Exps {
 		exps = append(exps, exp.toUint64s()...)
+		fmt.Println("exps", exps)
 	}
 	return args, exps
 }
@@ -194,11 +195,12 @@ func (c commandActionVal) toUint64s() (ret []uint64) {
 			low |= (v << (i * width))
 		}
 		for i := valNum / 2; i < valNum; i++ {
+			fmt.Println("hi: ", i)
 			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
 			if err != nil {
 				panic(err)
 			}
-			high |= (v << (i * width))
+			high |= (v << ((i - valNum/2) * width))
 		}
 		return []uint64{low, high}
 	} else {

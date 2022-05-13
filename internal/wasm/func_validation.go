@@ -1510,6 +1510,8 @@ func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, 
 		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
+	case -5: // 0x7b in original byte = f64
+		ret = &FunctionType{Results: []ValueType{ValueTypeVector}}
 	case -16: // 0x70 in original byte = funcref
 		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
 	case -17: // 0x6f in original byte = externref
