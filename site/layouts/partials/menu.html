@@ -1,0 +1,38 @@
+<nav class="menu">
+  <ul class="menu__inner menu__inner--desktop">
+    {{ range $.Site.Menus.main }}
+      {{ if not .HasChildren }}
+        <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+      <!-- The default theme supports a drop-down for showMenuItems > 0. We re-use this class
+           for child menus instead. -->
+      {{ else }}
+        <ul class="menu__sub-inner">
+          <li class="menu__sub-inner-more-trigger">
+            {{ .Name }}
+            <span class="menu__sub-inner-more-trigger-icon">{{ partial "greater-icon.html" . }}</span>
+          </li>
+          <ul class="menu__sub-inner-more hidden">
+            {{ range .Children }}
+              <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+            {{ end }}
+          </ul>
+        </ul>
+      {{ end }}
+    {{ end }}
+  </ul>
+
+  <!-- Handle mobile -->
+  <ul class="menu__inner menu__inner--mobile">
+    {{ range $.Site.Menus.main }}
+      {{ if not .HasChildren }}
+        <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+      {{ else }}
+        <!-- TODO: At some point, this will get too long, and also this loses
+                   categorization. Implement CSS like desktop for sub-menus -->
+        {{ range .Children }}
+        <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+        {{ end }}
+      {{ end }}
+    {{ end }}
+  </ul>
+</nav>

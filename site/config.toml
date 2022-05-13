@@ -15,12 +15,23 @@ theme = "hello-friend"
       [[languages.en.menu.main]]
         url = "https://pkg.go.dev/github.com/tetratelabs/wazero"
         name = "API"
-        weight = 10
+        weight = 1
       [[languages.en.menu.main]]
         url = "https://github.com/tetratelabs/wazero/blob/main/examples"
         name = "Examples"
-        weight = 10
+        weight = 2
       [[languages.en.menu.main]]
+        identifier = "community"
+        name = "Community"
+        weight = 3
+      [[languages.en.menu.main]]
+        parent = "community"
         url = "https://github.com/tetratelabs/wazero"
         name = "GitHub"
-        weight = 20
+        weight = 1
+      [[languages.en.menu.main]]
+        parent = "community"
+        url = "/history/"
+        identifier = "history"
+        name = "History"
+        weight = 2
