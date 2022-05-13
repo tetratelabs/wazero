@@ -24,14 +24,24 @@ theme = "hello-friend"
         identifier = "community"
         name = "Community"
         weight = 3
+        [[languages.en.menu.main]]
+          parent = "community"
+          url = "https://github.com/tetratelabs/wazero"
+          name = "GitHub"
+          weight = 1
+        [[languages.en.menu.main]]
+          parent = "community"
+          url = "/history/"
+          identifier = "history"
+          name = "History"
+          weight = 2
       [[languages.en.menu.main]]
-        parent = "community"
-        url = "https://github.com/tetratelabs/wazero"
-        name = "GitHub"
-        weight = 1
-      [[languages.en.menu.main]]
-        parent = "community"
-        url = "/history/"
-        identifier = "history"
-        name = "History"
-        weight = 2
+        identifier = "appendix"
+        name = "Appendix"
+        weight = 4
+        [[languages.en.menu.main]]
+          parent = "appendix"
+          url = "/specs/"
+          identifier = "specs"
+          name = "Specifications"
+          weight = 1
