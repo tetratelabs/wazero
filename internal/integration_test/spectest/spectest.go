@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"path"
 	"strconv"
 	"strings"
 	"testing"
@@ -355,7 +354,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
+func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features, filter func(jsonname string) bool) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -372,11 +371,8 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
 
 	for _, f := range jsonfiles {
-		// TODO: remove after SIMD proposal
-		if strings.Contains(f, "simd") {
-			if path.Base(f) != "simd_const.json" {
-				continue
-			}
+		if !filter(f) {
+			continue
 		}
 		raw, err := testDataFS.ReadFile(f)
 		require.NoError(t, err)
@@ -385,9 +381,6 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := basename(base.SourceFile)
-		if wastName != "simd_const.wast" {
-			continue
-		}
 
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
