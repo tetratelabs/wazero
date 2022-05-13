@@ -51,7 +51,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
@@ -70,7 +70,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []wasm.Index{0},
 				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
@@ -90,8 +90,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
@@ -114,8 +114,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
@@ -139,8 +139,8 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []wasm.Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},

@@ -178,6 +178,7 @@ func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKi
 	}
 
 	ft = &FunctionType{Params: make([]ValueType, p.NumIn()-pOffset), Results: make([]ValueType, rCount)}
+	ft.CacheNumInUint64()
 
 	for i := 0; i < len(ft.Params); i++ {
 		pI := p.In(i + pOffset)
