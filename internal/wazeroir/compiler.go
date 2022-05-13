@@ -1660,6 +1660,20 @@ operatorSwitch:
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}
+	case wasm.OpcodeVecPrefix:
+		c.pc++
+		switch miscOp := c.body[c.pc]; miscOp {
+		case wasm.OpcodeVecV128Const:
+			c.pc++
+			lo := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
+			c.pc += 8
+			hi := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
+			c.emit(
+				&OperationConstI128{Lo: lo, Hi: hi},
+			)
+		default:
+			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
+		}
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}

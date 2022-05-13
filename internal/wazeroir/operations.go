@@ -66,6 +66,7 @@ const (
 	UnsignedTypeI64
 	UnsignedTypeF32
 	UnsignedTypeF64
+	UnsignedTypeI128
 	UnsignedTypeUnknown
 )
 
@@ -79,6 +80,8 @@ func (s UnsignedType) String() (ret string) {
 		ret = "f32"
 	case UnsignedTypeF64:
 		ret = "f64"
+	case UnsignedTypeI128:
+		ret = "i128"
 	case UnsignedTypeUnknown:
 		ret = "unknown"
 	}
@@ -287,6 +290,10 @@ func (o OperationKind) String() (ret string) {
 		ret = "TableGrow"
 	case OperationKindTableFill:
 		ret = "TableFill"
+	case OperationKindConstVec:
+		ret = "ConstVec"
+	default:
+		panic("BUG")
 	}
 	return
 }
@@ -379,6 +386,7 @@ const (
 	OperationKindTableSize
 	OperationKindTableGrow
 	OperationKindTableFill
+	OperationKindConstI128
 )
 
 type Label struct {
@@ -1141,4 +1149,15 @@ type OperationTableFill struct {
 // Kind implements Operation.Kind.
 func (o *OperationTableFill) Kind() OperationKind {
 	return OperationKindTableFill
+}
+
+// OperationConstI128 implements Operation.
+
+type OperationConstI128 struct {
+	Lo, Hi uint64
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationConstI128) Kind() OperationKind {
+	return OperationKindConstI128
 }

@@ -972,10 +972,11 @@ func SectionIDName(sectionID SectionID) string {
 type ValueType = api.ValueType
 
 const (
-	ValueTypeI32 = api.ValueTypeI32
-	ValueTypeI64 = api.ValueTypeI64
-	ValueTypeF32 = api.ValueTypeF32
-	ValueTypeF64 = api.ValueTypeF64
+	ValueTypeI32    = api.ValueTypeI32
+	ValueTypeI64    = api.ValueTypeI64
+	ValueTypeF32    = api.ValueTypeF32
+	ValueTypeF64    = api.ValueTypeF64
+	ValueTypeVector = api.ValueTypeVector
 	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
 	ValueTypeExternref ValueType = api.ValueTypeExternref

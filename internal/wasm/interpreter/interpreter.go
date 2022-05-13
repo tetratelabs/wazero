@@ -575,6 +575,10 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationTableFill:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.TableIndex)
+		case *wazeroir.OperationConstI128:
+			op.us = make([]uint64, 2)
+			op.us[0] = o.Lo
+			op.us[1] = o.Hi
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -1922,6 +1926,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					copy(targetRegion[i:], targetRegion[:i])
 				}
 			}
+			frame.pc++
+		case wazeroir.OperationKindConstI128:
+			lo, hi := op.us[0], op.us[1]
+			ce.pushValue(lo)
+			ce.pushValue(hi)
 			frame.pc++
 		}
 	}

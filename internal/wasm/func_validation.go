@@ -1044,7 +1044,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeVecPrefix {
 			pc++
-			// Vector instructions come with two bytes which starts with OpcodeVecPrefix,
+			// Vector instructions come with two bytes where the first byte is always OpcodeVecPrefix,
 			// and the second byte determines the actual instruction.
 			vecOpcode := body[pc]
 			if err := enabledFeatures.Require(FeatureSIMD); err != nil {
@@ -1052,6 +1052,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 
 			switch vecOpcode {
+			case OpcodeVecV128Const:
+				// Read 128-bit = 16 bytes constants
+				if int(pc+16) >= len(body) {
+					return fmt.Errorf("cannot read constant vector value for %s", vectorInstructionName[vecOpcode])
+				}
+				pc += 16
+				valueTypeStack.push(ValueTypeVector)
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}

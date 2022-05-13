@@ -2655,6 +2655,37 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 	}
 }
 
+func TestModule_funcValidation_SIMD(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        []byte
+		expectedErr string
+	}{
+		{
+			name: "v128.const",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection:     []*FunctionType{v_v},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(FeatureSIMD, 0, []Index{0}, nil, nil, nil, nil)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestModule_funcValidation_SIMD_error(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -2670,6 +2701,17 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			},
 			flag:        Features20191205,
 			expectedErr: "f32x4.abs invalid as feature \"simd\" is disabled",
+		},
+		{
+			name: "v128.const immediate",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1,
+			},
+			flag:        FeatureSIMD,
+			expectedErr: "cannot read constant vector value for v128.const",
 		},
 		{
 			// TODO delete this case after SIMD impl completion.
