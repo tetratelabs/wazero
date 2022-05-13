@@ -21,11 +21,17 @@
     {{ end }}
   </ul>
 
-  <!-- This is the theme default layouts/partials/menu.html -->
+  <!-- Handle mobile -->
   <ul class="menu__inner menu__inner--mobile">
     {{ range $.Site.Menus.main }}
       {{ if not .HasChildren }}
         <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+      {{ else }}
+        <!-- TODO: At some point, this will get too long.
+                   Implement CSS like desktop for drop-down -->
+        {{ range .Children }}
+        <li><a href="{{ .URL }}">{{ .Name }}</a></li>
+        {{ end }}
       {{ end }}
     {{ end }}
   </ul>
