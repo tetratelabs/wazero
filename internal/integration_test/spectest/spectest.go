@@ -207,7 +207,6 @@ func (c commandActionVal) toUint64s() (ret []uint64) {
 }
 
 func (c commandActionVal) toUint64() (ret uint64) {
-	fmt.Println(c)
 	strValue := c.Value.(string)
 	if strings.Contains(strValue, "nan") {
 		if c.ValType == "f32" {
@@ -440,10 +439,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							vals, types, err := callFunction(store, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
-							require.Equal(t, len(exps), len(types), msg)
-							for i, exp := range exps {
-								requireValueEq(t, vals[i], exp, types[i], msg)
-							}
+							requireValuesEq(t, vals, exps, types, msg)
 						case "get":
 							_, exps := c.getAssertReturnArgsExps()
 							require.Equal(t, 1, len(exps))
@@ -472,13 +468,12 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							t.Fatalf("unsupported action type type: %v", c)
 						}
 					case "assert_malformed":
-						if c.ModuleType == "text" {
+						if c.ModuleType != "text" {
 							// We don't support direct loading of wast yet.
-							t.Skip()
+							buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
+							require.NoError(t, err, msg)
+							requireInstantiationError(t, store, buf, msg)
 						}
-						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
-						require.NoError(t, err, msg)
-						requireInstantiationError(t, store, buf, msg)
 					case "assert_trap":
 						moduleName := lastInstantiatedModuleName
 						if c.Action.Module != "" {
@@ -598,6 +593,21 @@ func basename(path string) string {
 // See https://pkg.go.dev/embed#hdr-Directives
 func testdataPath(filename string) string {
 	return fmt.Sprintf("testdata/%s", filename)
+}
+
+func requireValuesEq(t *testing.T, actual, exps []uint64, valTypes []wasm.ValueType, msg string) {
+	var expectedTypesVectorFlattend []wasm.ValueType
+	for _, tp := range valTypes {
+		if tp != wasm.ValueTypeVector {
+			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, tp)
+		} else {
+			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)
+			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)
+		}
+	}
+	for i := range exps {
+		requireValueEq(t, actual[i], exps[i], expectedTypesVectorFlattend[i], msg)
+	}
 }
 
 func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueType, msg string) {

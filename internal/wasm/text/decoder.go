@@ -108,7 +108,7 @@ func DecodeModule(
 	source []byte,
 	enabledFeatures wasm.Features,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
-) (result *wasm.Module, err error) {
+) (module *wasm.Module, err error) {
 	// TODO: when globals are supported, err on global vars if disabled
 
 	// names are the wasm.Module NameSection
@@ -117,7 +117,7 @@ func DecodeModule(
 	// * FunctionNames: nil when neither imported nor module-defined functions had a name
 	// * LocalNames: nil when neither imported nor module-defined functions had named (param) fields.
 	names := &wasm.NameSection{}
-	module := &wasm.Module{NameSection: names}
+	module = &wasm.Module{NameSection: names}
 	p := newModuleParser(module, enabledFeatures, memorySizer)
 	p.source = source
 
@@ -144,7 +144,10 @@ func DecodeModule(
 		module.NameSection = nil
 	}
 
-	return module, nil
+	for _, tp := range module.TypeSection {
+		tp.CacheResultsNumInUint64()
+	}
+	return
 }
 
 func newModuleParser(

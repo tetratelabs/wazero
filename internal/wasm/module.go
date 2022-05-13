@@ -667,6 +667,20 @@ type FunctionType struct {
 
 	// string is cached as it is used both for String and key
 	string string
+
+	// ResultsNumInUint64 is the result of ResultsNumInUint64.
+	ResultNumInUint64 int
+}
+
+func (f *FunctionType) CacheResultsNumInUint64() (cnt int) {
+	for _, tp := range f.Results {
+		cnt++
+		if tp == ValueTypeVector {
+			cnt++
+		}
+	}
+	f.ResultNumInUint64 = cnt
+	return
 }
 
 // EqualsSignature returns true if the function type has the same parameters and results.

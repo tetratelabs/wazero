@@ -600,7 +600,7 @@ func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *
 			ce.pushValue(v)
 		}
 		ce.execWasmFunction(ctx, callCtx, compiled)
-		results = wasm.PopValues(len(f.Type.Results), ce.popValue)
+		results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
 	} else {
 		results = wasm.CallGoFunc(ctx, callCtx, compiled.source, params)
 	}
