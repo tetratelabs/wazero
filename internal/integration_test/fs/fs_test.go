@@ -2,12 +2,12 @@ package fs
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"testing"
+	"testing/fstest"
 	"testing/iotest"
 
 	"github.com/tetratelabs/wazero"
@@ -17,6 +17,9 @@ import (
 )
 
 var testCtx = context.Background()
+
+//go:embed testdata/animals.txt
+var animals []byte
 
 // wasiFs is an implementation of fs.Fs calling into wasi. Not thread-safe because we use
 // fixed Memory offsets for transferring data with wasm.
@@ -145,7 +148,7 @@ func TestReader(t *testing.T) {
 	_, err := wasi.InstantiateSnapshotPreview1(testCtx, r)
 	require.NoError(t, err)
 
-	realFs := os.DirFS("testdata")
+	realFs := fstest.MapFS{"animals.txt": &fstest.MapFile{Data: animals}}
 	sys := wazero.NewModuleConfig().WithWorkDirFS(realFs)
 
 	// Create a module that just delegates to wasi functions.
@@ -190,9 +193,6 @@ func TestReader(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	expected, err := os.ReadFile(filepath.Join("testdata", "animals.txt"))
-	require.NoError(t, err)
-
-	err = iotest.TestReader(f, expected)
+	err = iotest.TestReader(f, animals)
 	require.NoError(t, err)
 }
