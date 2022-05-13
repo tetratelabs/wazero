@@ -60,9 +60,12 @@ func TestFeatures_String(t *testing.T) {
 		{name: "mutable-global", feature: FeatureMutableGlobal, expected: "mutable-global"},
 		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expected: "sign-extension-ops"},
 		{name: "multi-value", feature: FeatureMultiValue, expected: "multi-value"},
+		{name: "simd", feature: FeatureSIMD, expected: "simd"},
 		{name: "features", feature: FeatureMutableGlobal | FeatureMultiValue, expected: "multi-value|mutable-global"},
 		{name: "undefined", feature: 1 << 63, expected: ""},
-		{name: "2.0", feature: Features20220419, expected: "bulk-memory-operations|multi-value|mutable-global|nontrapping-float-to-int-conversion|reference-types|sign-extension-ops"},
+		{name: "2.0", feature: Features20220419,
+			expected: "bulk-memory-operations|multi-value|mutable-global|" +
+				"nontrapping-float-to-int-conversion|reference-types|sign-extension-ops|simd"},
 	}
 
 	for _, tt := range tests {

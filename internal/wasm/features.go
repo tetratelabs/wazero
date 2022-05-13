@@ -24,8 +24,8 @@ const Features20220419 = Features20191205 |
 	FeatureMultiValue |
 	FeatureNonTrappingFloatToIntConversion |
 	FeatureReferenceTypes |
-	FeatureSignExtensionOps
-	// TODO: FeatureSIMD
+	FeatureSignExtensionOps |
+	FeatureSIMD
 
 const (
 	// FeatureBulkMemoryOperations decides if parsing should succeed on the following instructions:
@@ -97,6 +97,11 @@ const (
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	FeatureSignExtensionOps
+
+	// FeatureSIMD enables the vector value type and vector instructions.
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+	FeatureSIMD
 )
 
 // Set assigns the value for the given feature.
@@ -123,9 +128,10 @@ func (f Features) Require(feature Features) error {
 // String implements fmt.Stringer by returning each enabled feature.
 func (f Features) String() string {
 	var builder strings.Builder
-	for i := Features(0); i < 63; i++ { // cycle through all bits to reduce code and maintenance
-		if f.Get(i) {
-			if name := featureName(i); name != "" {
+	for i := 0; i <= 63; i++ { // cycle through all bits to reduce code and maintenance
+		target := Features(1 << i)
+		if f.Get(target) {
+			if name := featureName(target); name != "" {
 				if builder.Len() > 0 {
 					builder.WriteByte('|')
 				}
@@ -156,6 +162,9 @@ func featureName(f Features) string {
 	case FeatureReferenceTypes:
 		// match https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
 		return "reference-types"
+	case FeatureSIMD:
+		// match https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+		return "simd"
 	}
 	return ""
 }

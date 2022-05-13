@@ -1042,6 +1042,19 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					valueTypeStack.push(r)
 				}
 			}
+		} else if op == OpcodeVecPrefix {
+			pc++
+			// Vector instructions come with two bytes which starts with OpcodeVecPrefix,
+			// and the second byte determines the actual instruction.
+			vecOpcode := body[pc]
+			if err := enabledFeatures.Require(FeatureSIMD); err != nil {
+				return fmt.Errorf("%s invalid as %v", vectorInstructionName[vecOpcode], err)
+			}
+
+			switch vecOpcode {
+			default:
+				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
+			}
 		} else if op == OpcodeBlock {
 			bt, num, err := DecodeBlockType(types, bytes.NewReader(body[pc+1:]), enabledFeatures)
 			if err != nil {

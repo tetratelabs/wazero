@@ -105,6 +105,12 @@ type RuntimeConfig interface {
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
 
+	// WithFeatureSIMD enables the vector value type and vector instructions (aka SIMD).  This defaults to false
+	// as the feature was not in WebAssembly 1.0.
+	//
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+	WithFeatureSIMD(bool) RuntimeConfig
+
 	// WithWasmCore1 enables features included in the WebAssembly Core Specification 1.0. Selecting this
 	// overwrites any currently accumulated features with only those included in this W3C recommendation.
 	//
@@ -199,6 +205,13 @@ func (c *runtimeConfig) WithFeatureReferenceTypes(enabled bool) RuntimeConfig {
 func (c *runtimeConfig) WithFeatureSignExtensionOps(enabled bool) RuntimeConfig {
 	ret := *c // copy
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
+	return &ret
+}
+
+// WithFeatureSIMD implements RuntimeConfig.WithFeatureSIMD
+func (c *runtimeConfig) WithFeatureSIMD(enabled bool) RuntimeConfig {
+	ret := *c // copy
+	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSIMD, enabled)
 	return &ret
 }
 
