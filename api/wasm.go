@@ -129,22 +129,6 @@ type Module interface {
 	// Name is the name this module was instantiated with. Exported functions can be imported with this name.
 	Name() string
 
-	// Close is a convenience that invokes CloseWithExitCode with zero.
-	// Note: When the context is nil, it defaults to context.Background.
-	Close(context.Context) error
-
-	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
-	// failure to ExportedFunction callers.
-	//
-	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
-	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
-	// be removed, making its name available again.
-	//
-	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
-	// with the exitCode.
-	// Note: When the context is nil, it defaults to context.Background.
-	CloseWithExitCode(ctx context.Context, exitCode uint32) error
-
 	// Memory returns a memory defined in this module or nil if there are none wasn't.
 	Memory() Memory
 
@@ -162,6 +146,30 @@ type Module interface {
 
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global
+
+	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
+	// failure to ExportedFunction callers.
+	//
+	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
+	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
+	// be removed, making its name available again.
+	//
+	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
+	// with the exitCode.
+	// Note: When the context is nil, it defaults to context.Background.
+	CloseWithExitCode(ctx context.Context, exitCode uint32) error
+
+	// Closer closes this module by delegating to CloseWithExitCode with an exit code of zero.
+	Closer
+}
+
+// Closer closes a resource.
+//
+// Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+type Closer interface {
+	// Close closes the resource.
+	// Note: When the context is nil, it defaults to context.Background.
+	Close(context.Context) error
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).
