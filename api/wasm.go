@@ -147,6 +147,7 @@ type Module interface {
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global
 
+	// ModuleCloser closes this module.
 	ModuleCloser
 }
 
