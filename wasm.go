@@ -98,10 +98,21 @@ type Runtime interface {
 	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
-	// Closer closes resources initialized by this Runtime. Any instantiated modules will be closed with
-	// an exit code.
+	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
+	// An error is returned if any module returns an error when closed.
 	//
-	// Note: Methods will return an error if any module returns an error when closed.
+	// Ex.
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime()
+	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.
+	//
+	//	// Everything below here can be closed, but will anyway due to above.
+	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+	CloseWithExitCode(ctx context.Context, exitCode uint32) error
+
+	// Closer closes resources initialized by this Runtime by delegating to CloseWithExitCode with an exit code of
+	// zero.
 	api.Closer
 }
 
