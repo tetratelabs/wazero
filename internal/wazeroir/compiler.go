@@ -1671,6 +1671,7 @@ operatorSwitch:
 			c.emit(
 				&OperationConstI128{Lo: lo, Hi: hi},
 			)
+			c.pc += 7
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
 		}

@@ -290,8 +290,8 @@ func (o OperationKind) String() (ret string) {
 		ret = "TableGrow"
 	case OperationKindTableFill:
 		ret = "TableFill"
-	case OperationKindConstVec:
-		ret = "ConstVec"
+	case OperationKindConstI128:
+		ret = "ConstI128"
 	default:
 		panic("BUG")
 	}

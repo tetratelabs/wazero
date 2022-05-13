@@ -438,6 +438,8 @@ func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
 		return UnsignedTypeF32
 	case wasm.ValueTypeF64:
 		return UnsignedTypeF64
+	case wasm.ValueTypeVector:
+		return UnsignedTypeI128
 	}
 	panic("unreachable")
 }

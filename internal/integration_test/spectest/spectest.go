@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"path"
 	"strconv"
 	"strings"
 	"testing"
@@ -65,29 +66,32 @@ type (
 	}
 
 	commandActionVal struct {
-		ValType string `json:"type"`
-		Value   string `json:"value"`
+		ValType  string      `json:"type"`
+		LaneType string      `json:"lane_type"`
+		Value    interface{} `json:"value"`
 	}
+
+	simdVal []string
 )
 
 func (c commandActionVal) String() string {
 	var v string
 	switch c.ValType {
 	case "i32":
-		v = c.Value
+		v = c.Value.(string)
 	case "f32":
-		ret, _ := strconv.ParseUint(c.Value, 10, 32)
+		ret, _ := strconv.ParseUint(c.Value.(string), 10, 32)
 		v = fmt.Sprintf("%f", math.Float32frombits(uint32(ret)))
 	case "i64":
-		v = c.Value
+		v = c.Value.(string)
 	case "f64":
-		ret, _ := strconv.ParseUint(c.Value, 10, 64)
+		ret, _ := strconv.ParseUint(c.Value.(string), 10, 64)
 		v = fmt.Sprintf("%f", math.Float64frombits(ret))
 	case "externref":
 		if c.Value == "null" {
 			v = "null"
 		} else {
-			original, _ := strconv.ParseUint(c.Value, 10, 64)
+			original, _ := strconv.ParseUint(c.Value.(string), 10, 64)
 			// In wazero, externref is opaque pointer, so "0" is considered as null.
 			// So in order to treat "externref 0" in spectest non nullref, we increment the value.
 			v = fmt.Sprintf("%d", original+1)
@@ -95,6 +99,12 @@ func (c commandActionVal) String() string {
 	case "funcref":
 		// All the in and out funcref params are null in spectest (cannot represent non-null as it depends on runtime impl).
 		v = "null"
+	case "v128":
+		simdValues, ok := c.Value.(simdVal)
+		if !ok {
+			panic("BUG")
+		}
+		v = strings.Join(simdValues, ",")
 	}
 	return fmt.Sprintf("{type: %s, value: %v}", c.ValType, v)
 }
@@ -136,7 +146,7 @@ func (c command) String() string {
 func (c command) getAssertReturnArgs() []uint64 {
 	var args []uint64
 	for _, arg := range c.Action.Args {
-		args = append(args, arg.toUint64())
+		args = append(args, arg.toUint64s()...)
 	}
 	return args
 }
@@ -144,16 +154,62 @@ func (c command) getAssertReturnArgs() []uint64 {
 func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
 	var args, exps []uint64
 	for _, arg := range c.Action.Args {
-		args = append(args, arg.toUint64())
+		args = append(args, arg.toUint64s()...)
 	}
 	for _, exp := range c.Exps {
-		exps = append(exps, exp.toUint64())
+		exps = append(exps, exp.toUint64s()...)
 	}
 	return args, exps
 }
 
+func (c commandActionVal) toUint64s() (ret []uint64) {
+	if c.ValType == "v128" {
+		strValues, ok := c.Value.([]interface{})
+		if !ok {
+			panic("BUG")
+		}
+		var low, high uint64
+		var width, valNum int
+		switch c.LaneType {
+		case "i8":
+			width, valNum = 8, 16
+		case "i16":
+			width, valNum = 16, 8
+		case "i32":
+			width, valNum = 32, 4
+		case "i64":
+			width, valNum = 64, 2
+		case "f32":
+			width, valNum = 32, 4
+		case "f64":
+			width, valNum = 64, 2
+		default:
+			panic("BUG")
+		}
+		for i := 0; i < valNum/2; i++ {
+			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
+			if err != nil {
+				panic(err)
+			}
+			low |= (v << (i * width))
+		}
+		for i := valNum / 2; i < valNum; i++ {
+			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
+			if err != nil {
+				panic(err)
+			}
+			high |= (v << (i * width))
+		}
+		return []uint64{low, high}
+	} else {
+		return []uint64{c.toUint64()}
+	}
+}
+
 func (c commandActionVal) toUint64() (ret uint64) {
-	if strings.Contains(c.Value, "nan") {
+	fmt.Println(c)
+	strValue := c.Value.(string)
+	if strings.Contains(strValue, "nan") {
 		if c.ValType == "f32" {
 			return uint64(math.Float32bits(float32(math.NaN())))
 		}
@@ -162,15 +218,15 @@ func (c commandActionVal) toUint64() (ret uint64) {
 		if c.Value == "null" {
 			ret = 0
 		} else {
-			original, _ := strconv.ParseUint(c.Value, 10, 64)
+			original, _ := strconv.ParseUint(strValue, 10, 64)
 			// In wazero, externref is opaque pointer, so "0" is considered as null.
 			// So in order to treat "externref 0" in spectest non nullref, we increment the value.
 			ret = original + 1
 		}
 	} else if strings.Contains(c.ValType, "32") {
-		ret, _ = strconv.ParseUint(c.Value, 10, 32)
+		ret, _ = strconv.ParseUint(strValue, 10, 32)
 	} else {
-		ret, _ = strconv.ParseUint(c.Value, 10, 64)
+		ret, _ = strconv.ParseUint(strValue, 10, 64)
 	}
 	return
 }
@@ -315,9 +371,11 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
 
 	for _, f := range jsonfiles {
+		// TODO: remove after SIMD proposal
 		if strings.Contains(f, "simd") {
-			// TODO: enable after SIMD proposal
-			continue
+			if path.Base(f) != "simd_const.json" {
+				continue
+			}
 		}
 		raw, err := testDataFS.ReadFile(f)
 		require.NoError(t, err)
@@ -326,6 +384,9 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := basename(base.SourceFile)
+		if wastName != "simd_const.wast" {
+			continue
+		}
 
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
