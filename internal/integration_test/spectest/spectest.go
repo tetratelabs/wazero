@@ -605,8 +605,10 @@ func requireValuesEq(t *testing.T, actual, exps []uint64, valTypes []wasm.ValueT
 			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)
 		}
 	}
+
+	result := fmt.Sprintf("\thave (%v)\n\twant (%v)", actual, exps)
 	for i := range exps {
-		requireValueEq(t, actual[i], exps[i], expectedTypesVectorFlattend[i], msg)
+		requireValueEq(t, actual[i], exps[i], expectedTypesVectorFlattend[i], msg+"\n"+result)
 	}
 }
 
