@@ -31,14 +31,12 @@ func TestJIT(t *testing.T) {
 
 func TestInterpreter(t *testing.T) {
 	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures, func(jsonname string) bool {
-		if path.Base(jsonname) != "simd_const.json" {
-			return true
-		}
+		return path.Base(jsonname) == "simd_const.json"
 
 		// TODO: remove after SIMD proposal
 		if strings.Contains(jsonname, "simd") {
 			return false
 		}
-		return false
+		return true
 	})
 }

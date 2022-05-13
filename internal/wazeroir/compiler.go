@@ -344,10 +344,11 @@ operatorSwitch:
 		// Create a new frame -- entering this block.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
 		}
+		fmt.Println(frame.originalStackLenWithoutParam)
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
@@ -367,7 +368,7 @@ operatorSwitch:
 		// Create a new frame -- entering loop.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			kind:                         controlFrameKindLoop,
 			blockType:                    bt,
 		}
@@ -402,7 +403,7 @@ operatorSwitch:
 		// Create a new frame -- entering if.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
 			kind:      controlFrameKindIfWithoutElse,
@@ -587,6 +588,7 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := &OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
+		fmt.Println(dropOp)
 		target := targetFrame.asBranchTarget()
 		c.result.LabelCallers[target.Label.String()]++
 		c.emit(

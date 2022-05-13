@@ -674,6 +674,7 @@ func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.F
 			ce.pushValue(param)
 		}
 		ce.callNativeFunc(ctx, m, compiled)
+		fmt.Println(f.Type.ResultNumInUint64)
 		results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
 		if f.FunctionListener != nil {
 			// TODO: This doesn't get the error due to use of panic to propagate them.
@@ -722,6 +723,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
+		fmt.Println(op.kind.String())
 		switch op.kind {
 		case wazeroir.OperationKindUnreachable:
 			panic(wasmruntime.ErrRuntimeUnreachable)
@@ -791,6 +793,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 		case wazeroir.OperationKindDrop:
 			{
+				fmt.Println(op.rs[0])
 				ce.drop(op.rs[0])
 				frame.pc++
 			}

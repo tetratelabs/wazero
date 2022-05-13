@@ -1494,19 +1494,19 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Fea
 	case -64: // 0x40 in original byte = nil
 		ret = &FunctionType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI32}, ResultNumInUint64: 1}
 	case -2: // 0x7e in original byte = i64
-		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI64}, ResultNumInUint64: 1}
 	case -3: // 0x7d in original byte = f32
-		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF32}, ResultNumInUint64: 1}
 	case -4: // 0x7c in original byte = f64
-		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF64}, ResultNumInUint64: 1}
 	case -5: // 0x7b in original byte = f64
-		ret = &FunctionType{Results: []ValueType{ValueTypeVector}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeVector}, ResultNumInUint64: 2}
 	case -16: // 0x70 in original byte = funcref
-		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
 	case -17: // 0x6f in original byte = externref
-		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
 	default:
 		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
 			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)
@@ -1516,7 +1516,5 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Fea
 		}
 		ret = types[raw]
 	}
-
-	ret.CacheNumInUint64()
 	return ret, num, err
 }
