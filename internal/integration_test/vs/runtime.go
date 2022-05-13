@@ -58,8 +58,9 @@ type wazeroRuntime struct {
 }
 
 type wazeroModule struct {
-	wasi, env, mod api.Module
-	funcs          map[string]api.Function
+	wasi     api.ModuleCloser
+	env, mod api.Module
+	funcs    map[string]api.Function
 }
 
 func (r *wazeroRuntime) Name() string {

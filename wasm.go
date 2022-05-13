@@ -98,31 +98,7 @@ type Runtime interface {
 	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
-	// Close closes all the modules that have been initialized in this Runtime with an exit code of 0.
-	// An error is returned if any module returns an error when closed.
-	//
-	// Ex.
-	//	ctx := context.Background()
-	//	r := wazero.NewRuntime()
-	//	defer r.Close(ctx) // This closes everything this Runtime created.
-	//
-	//	// Everything below here can be closed, but will anyway due to above.
-	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
-	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
-	Close(context.Context) error
-
-	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
-	// An error is returned if any module returns an error when closed.
-	//
-	// Ex.
-	//	ctx := context.Background()
-	//	r := wazero.NewRuntime()
-	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.
-	//
-	//	// Everything below here can be closed, but will anyway due to above.
-	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
-	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
-	CloseWithExitCode(ctx context.Context, exitCode uint32) error
+	api.ModuleCloser
 }
 
 func NewRuntime() Runtime {

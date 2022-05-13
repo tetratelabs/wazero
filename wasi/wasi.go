@@ -37,7 +37,7 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 //
 // Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
 // Note: Closing the wazero.Runtime closes any api.Module it instantiated.
-func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Module, error) {
+func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.ModuleCloser, error) {
 	_, fns := snapshotPreview1Functions(ctx)
 	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)
 }
