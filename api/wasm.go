@@ -159,8 +159,8 @@ type Closer interface {
 	// Note: When the context is nil, it defaults to context.Background.
 	Close(context.Context) error
 
-	// CloseWithExitCode releases resources allocated for a Module. Use a non-zero exitCode parameter to indicate a
-	// failure to ExportedFunction callers.
+	// CloseWithExitCode releases resources. The exit code will be provided to any released Modules.
+	// Use a non-zero exitCode parameter to indicate a failure to ExportedFunction callers.
 	//
 	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
 	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
