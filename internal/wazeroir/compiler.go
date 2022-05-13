@@ -726,27 +726,41 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		c.emit(
-			// -1 because we already manipulated the stack before
-			// called localDepth ^^.
-			&OperationPick{Depth: depth - 1},
-		)
+		if c.localType(id) == wasm.ValueTypeVector {
+			c.emit(
+				// -2 because we already manipulated the stack before
+				// called localDepth ^^.
+				&OperationPick{Depth: depth - 2},
+				&OperationPick{Depth: depth - 2},
+			)
+		} else {
+			c.emit(
+				// -1 because we already manipulated the stack before
+				// called localDepth ^^.
+				&OperationPick{Depth: depth - 1},
+			)
+		}
 	case wasm.OpcodeLocalSet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.set")
 		}
-		depth := c.localDepth(*index)
-		c.emit(
-			// +1 because we already manipulated the stack before
-			// called localDepth ^^.
-			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-		)
+		id := *index
+		depth := c.localDepth(id)
+		if c.localType(id) == wasm.ValueTypeVector {
+		} else {
+			c.emit(
+				// +1 because we already manipulated the stack before
+				// called localDepth ^^.
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		}
 	case wasm.OpcodeLocalTee:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.tee")
 		}
-		depth := c.localDepth(*index)
+		id := *index
+		depth := c.localDepth(id)
 		c.emit(
 			&OperationPick{Depth: 0},
 			&OperationSwap{Depth: depth + 1},
@@ -1849,6 +1863,15 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 func (c *compiler) localDepth(index wasm.Index) int {
 	height := c.localIndexToStackHeightMap[index]
 	return int(len(c.stack)) - 1 - int(height)
+}
+
+func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
+	if params := uint32(len(c.sig.Params)); index < params {
+		t = c.sig.Params[index]
+	} else {
+		t = c.localTypes[index-params]
+	}
+	return
 }
 
 // getFrameDropRange returns the range (starting from top of the stack) that spans across the stack. The range is
