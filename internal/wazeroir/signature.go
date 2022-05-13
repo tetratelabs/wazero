@@ -23,6 +23,9 @@ var (
 	signature_None_I64 = &signature{
 		out: []UnsignedType{UnsignedTypeI64},
 	}
+	signature_None_I64I64 = &signature{
+		out: []UnsignedType{UnsignedTypeI64, UnsignedTypeI64},
+	}
 	signature_None_F32 = &signature{
 		out: []UnsignedType{UnsignedTypeF32},
 	}
@@ -151,9 +154,6 @@ var (
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeUnknown},
 	}
-	signature_None_I128 = &signature{
-		out: []UnsignedType{UnsignedTypeI128},
-	}
 )
 
 // wasmOpcodeSignature returns the signature of given Wasm opcode.
@@ -188,50 +188,50 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t UnsignedType
+		var t []UnsignedType
 		if index < inputLen {
 			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
-		return &signature{out: []UnsignedType{t}}, nil
+		return &signature{out: t}, nil
 	case wasm.OpcodeLocalSet:
 		inputLen := uint32(len(c.sig.Params))
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t UnsignedType
+		var t []UnsignedType
 		if index < inputLen {
 			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
-		return &signature{in: []UnsignedType{t}}, nil
+		return &signature{in: t}, nil
 	case wasm.OpcodeLocalTee:
 		inputLen := uint32(len(c.sig.Params))
 		if l := uint32(len(c.localTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t UnsignedType
+		var t []UnsignedType
 		if index < inputLen {
 			t = wasmValueTypeToUnsignedType(c.sig.Params[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(c.localTypes[index-inputLen])
 		}
-		return &signature{in: []UnsignedType{t}, out: []UnsignedType{t}}, nil
+		return &signature{in: t, out: t}, nil
 	case wasm.OpcodeGlobalGet:
 		if len(c.globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
 		return &signature{
-			out: []UnsignedType{wasmValueTypeToUnsignedType(c.globals[index].ValType)},
+			out: wasmValueTypeToUnsignedType(c.globals[index].ValType),
 		}, nil
 	case wasm.OpcodeGlobalSet:
 		if len(c.globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(c.globals))
 		}
 		return &signature{
-			in: []UnsignedType{wasmValueTypeToUnsignedType(c.globals[index].ValType)},
+			in: wasmValueTypeToUnsignedType(c.globals[index].ValType),
 		}, nil
 	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil
@@ -406,7 +406,7 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	case wasm.OpcodeVecPrefix:
 		switch vecOp := c.body[c.pc+1]; vecOp {
 		case wasm.OpcodeVecV128Const:
-			return signature_None_I128, nil
+			return signature_None_I64I64, nil
 		default:
 			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
 		}
@@ -418,28 +418,28 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	ret := &signature{}
 	for _, vt := range tps.Params {
-		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt))
+		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt)...)
 	}
 	for _, vt := range tps.Results {
-		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt))
+		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt)...)
 	}
 	return ret
 }
 
-func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
+func wasmValueTypeToUnsignedType(vt wasm.ValueType) []UnsignedType {
 	switch vt {
 	case wasm.ValueTypeI32:
-		return UnsignedTypeI32
+		return []UnsignedType{UnsignedTypeI32}
 	case wasm.ValueTypeI64,
 		// From wazeroir layer, ref type values are opaque 64-bit pointers.
 		wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
-		return UnsignedTypeI64
+		return []UnsignedType{UnsignedTypeI64}
 	case wasm.ValueTypeF32:
-		return UnsignedTypeF32
+		return []UnsignedType{UnsignedTypeF32}
 	case wasm.ValueTypeF64:
-		return UnsignedTypeF64
+		return []UnsignedType{UnsignedTypeF64}
 	case wasm.ValueTypeVector:
-		return UnsignedTypeI128
+		return []UnsignedType{UnsignedTypeI64, UnsignedTypeI64}
 	}
 	panic("unreachable")
 }

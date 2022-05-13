@@ -640,10 +640,10 @@ func (me *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.F
 		return
 	}
 
-	paramSignature := f.Type.Params
+	paramSignature := f.Type.ParamNumInUint64
 	paramCount := len(params)
-	if len(paramSignature) != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
+	if paramSignature != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
 	}
 
 	ce := me.newCallEngine()

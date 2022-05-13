@@ -1477,22 +1477,13 @@ type controlBlock struct {
 	op Opcode
 }
 
-func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
-	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
-		if index < 0 || (index >= int64(len(types))) {
-			return nil, fmt.Errorf("type index out of range: %d", index)
-		}
-		return types[index], nil
-	}, r, enabledFeatures)
-}
-
 // decodeBlockTypeImpl decodes the type index from a positive 33-bit signed integer. Negative numbers indicate up to one
 // WebAssembly 1.0 (20191205) compatible result type. Positive numbers are decoded when `enabledFeatures` include
 // FeatureMultiValue and include an index in the Module.TypeSection.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-blocktype
 // See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
-func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1520,7 +1511,12 @@ func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, 
 		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
 			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)
 		}
-		ret, err = functionTypeResolver(raw)
+		if raw < 0 || (raw >= int64(len(types))) {
+			return nil, 0, fmt.Errorf("type index out of range: %d", raw)
+		}
+		ret = types[raw]
 	}
+
+	ret.CacheNumInUint64()
 	return ret, num, err
 }

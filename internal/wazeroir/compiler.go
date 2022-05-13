@@ -105,6 +105,27 @@ func (c *controlFrames) push(frame *controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
+func (c *compiler) calcLocalIndexToStackHeightMap() {
+	c.localIndexToStackHeightMap = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+	var current int
+	for index, lt := range c.sig.Params {
+		c.localIndexToStackHeightMap[wasm.Index(index)] = current
+		if lt == wasm.ValueTypeVector {
+			current++
+		}
+		current++
+	}
+
+	for index, lt := range c.localTypes {
+		index += len(c.sig.Params)
+		c.localIndexToStackHeightMap[wasm.Index(index)] = current
+		if lt == wasm.ValueTypeVector {
+			current++
+		}
+		current++
+	}
+}
+
 type compiler struct {
 	enabledFeatures  wasm.Features
 	stack            []UnsignedType
@@ -122,7 +143,8 @@ type compiler struct {
 	// sig is the function type of the target function.
 	sig *wasm.FunctionType
 	// localTypes holds the target function locals' value types.
-	localTypes []wasm.ValueType
+	localTypes                 []wasm.ValueType
+	localIndexToStackHeightMap map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []*wasm.FunctionType
@@ -245,9 +267,11 @@ func compile(enabledFeatures wasm.Features,
 		types:           types,
 	}
 
+	c.calcLocalIndexToStackHeightMap()
+
 	// Push function arguments.
 	for _, t := range sig.Params {
-		c.stackPush(wasmValueTypeToUnsignedType(t))
+		c.stackPush(wasmValueTypeToUnsignedType(t)...)
 	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
@@ -417,7 +441,7 @@ operatorSwitch:
 
 			// Re-push the parameters to the if block so that else block can use them.
 			for _, t := range frame.blockType.Params {
-				c.stackPush(wasmValueTypeToUnsignedType(t))
+				c.stackPush(wasmValueTypeToUnsignedType(t)...)
 			}
 
 			// We are no longer unreachable in else frame,
@@ -443,7 +467,7 @@ operatorSwitch:
 
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 		for _, t := range frame.blockType.Params {
-			c.stackPush(wasmValueTypeToUnsignedType(t))
+			c.stackPush(wasmValueTypeToUnsignedType(t)...)
 		}
 
 		// Prep labels for else and the continuation of this if block.
@@ -474,7 +498,7 @@ operatorSwitch:
 
 			c.stack = c.stack[:frame.originalStackLenWithoutParam]
 			for _, t := range frame.blockType.Results {
-				c.stackPush(wasmValueTypeToUnsignedType(t))
+				c.stackPush(wasmValueTypeToUnsignedType(t)...)
 			}
 
 			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
@@ -505,7 +529,7 @@ operatorSwitch:
 
 		// Push the result types onto the stack.
 		for _, t := range frame.blockType.Results {
-			c.stackPush(wasmValueTypeToUnsignedType(t))
+			c.stackPush(wasmValueTypeToUnsignedType(t)...)
 		}
 
 		// Emit the instructions according to the kind of the current control frame.
@@ -698,7 +722,8 @@ operatorSwitch:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.get")
 		}
-		depth := c.localDepth(*index)
+		id := *index
+		depth := c.localDepth(id)
 		c.emit(
 			// -1 because we already manipulated the stack before
 			// called localDepth ^^.
@@ -1772,8 +1797,8 @@ func (c *compiler) stackPop() (ret UnsignedType) {
 	return
 }
 
-func (c *compiler) stackPush(t UnsignedType) {
-	c.stack = append(c.stack, t)
+func (c *compiler) stackPush(ts ...UnsignedType) {
+	c.stack = append(c.stack, ts...)
 }
 
 // emit adds the operations into the result.
@@ -1819,8 +1844,9 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
-func (c *compiler) localDepth(n uint32) int {
-	return int(len(c.stack)) - 1 - int(n)
+func (c *compiler) localDepth(index wasm.Index) int {
+	height := c.localIndexToStackHeightMap[index]
+	return int(len(c.stack)) - 1 - int(height)
 }
 
 // getFrameDropRange returns the range (starting from top of the stack) that spans across the stack. The range is
@@ -1834,9 +1860,9 @@ func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 		// If this is not End and the call-site is trying to branch into the Loop control frame,
 		// we have to start executing from the beginning of the loop block.
 		// Therefore, we have to pass the inputs to the frame.
-		start = len(frame.blockType.Params)
+		start = frame.blockType.ParamNumInUint64
 	} else {
-		start = len(frame.blockType.Results)
+		start = frame.blockType.ResultNumInUint64
 	}
 	var end int
 	if frame.kind == controlFrameKindFunction {

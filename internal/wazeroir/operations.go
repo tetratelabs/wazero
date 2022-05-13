@@ -66,7 +66,6 @@ const (
 	UnsignedTypeI64
 	UnsignedTypeF32
 	UnsignedTypeF64
-	UnsignedTypeI128
 	UnsignedTypeUnknown
 )
 
@@ -80,8 +79,6 @@ func (s UnsignedType) String() (ret string) {
 		ret = "f32"
 	case UnsignedTypeF64:
 		ret = "f64"
-	case UnsignedTypeI128:
-		ret = "i128"
 	case UnsignedTypeUnknown:
 		ret = "unknown"
 	}

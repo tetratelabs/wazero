@@ -668,19 +668,27 @@ type FunctionType struct {
 	// string is cached as it is used both for String and key
 	string string
 
-	// ResultsNumInUint64 is the result of ResultsNumInUint64.
+	// ParamNumInUint64 is the number of uint64 values requires to represent the Wasm param type.
+	ParamNumInUint64 int
+
+	// ResultsNumInUint64 is the number of uint64 values requires to represent the Wasm result type.
 	ResultNumInUint64 int
 }
 
-func (f *FunctionType) CacheResultsNumInUint64() (cnt int) {
-	for _, tp := range f.Results {
-		cnt++
+func (f *FunctionType) CacheNumInUint64() {
+	for _, tp := range f.Params {
+		f.ParamNumInUint64++
 		if tp == ValueTypeVector {
-			cnt++
+			f.ParamNumInUint64++
 		}
 	}
-	f.ResultNumInUint64 = cnt
-	return
+
+	for _, tp := range f.Results {
+		f.ResultNumInUint64++
+		if tp == ValueTypeVector {
+			f.ResultNumInUint64++
+		}
+	}
 }
 
 // EqualsSignature returns true if the function type has the same parameters and results.

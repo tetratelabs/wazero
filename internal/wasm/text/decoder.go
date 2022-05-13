@@ -145,7 +145,7 @@ func DecodeModule(
 	}
 
 	for _, tp := range module.TypeSection {
-		tp.CacheResultsNumInUint64()
+		tp.CacheNumInUint64()
 	}
 	return
 }

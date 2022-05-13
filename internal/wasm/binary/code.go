@@ -48,7 +48,7 @@ func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 		}
 		switch vt := b; vt {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64,
-			wasm.ValueTypeFuncref, wasm.ValueTypeExternref:
+			wasm.ValueTypeFuncref, wasm.ValueTypeExternref, wasm.ValueTypeVector:
 			types = append(types, vt)
 		default:
 			return nil, fmt.Errorf("invalid local type: 0x%x", vt)
