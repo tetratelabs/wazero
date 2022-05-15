@@ -2,8 +2,16 @@ name: WebAssembly Core Specification Test
 on:
   pull_request:
     branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
   push:
     branches: [main]
+    paths-ignore:  # ignore docs as they are built with Netlify.
+      - '**/*.md'
+      - 'site/**'
+      - 'netlify.toml'
 
 defaults:
   run:  # use bash for all operating systems unless overridden
