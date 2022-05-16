@@ -125,7 +125,7 @@ func TestTypeParser(t *testing.T) {
 		{
 			name:     "mixed param abbreviation", // Verifies we can handle less param fields than param types
 			input:    "(type (func (param i32 i32) (param i32) (param i64) (param f32)))",
-			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
+			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i64, f32}, ParamNumInUint64: 5},
 		},
 
 		// Below are changes to test/core/br.wast from the commit that added "multi-value" support.
@@ -134,55 +134,58 @@ func TestTypeParser(t *testing.T) {
 		{
 			name:     "multi-value - v_i64f32 abbreviated",
 			input:    "(type (func (result i64 f32)))",
-			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}},
+			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}, ResultNumInUint64: 2},
 		},
 		{
 			name:     "multi-value - i32i64_f32f64 abbreviated",
 			input:    "(type (func (param i32 i64) (result f32 f64)))",
-			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
+			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
 		},
 		{
 			name:     "multi-value - v_i64f32",
 			input:    "(type (func (result i64) (result f32)))",
-			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}},
+			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}, ResultNumInUint64: 2},
 		},
 		{
 			name:     "multi-value - i32i64_f32f64",
 			input:    "(type (func (param i32) (param i64) (result f32) (result f64)))",
-			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
+			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
 		},
 		{
 			name:     "multi-value - i32i64_f32f64 named",
 			input:    "(type (func (param $x i32) (param $y i64) (result f32) (result f64)))",
-			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
+			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
 		},
 		{
 			name:     "multi-value - i64i64f32_f32i32 results abbreviated in groups",
 			input:    "(type (func (result i64 i64 f32) (result f32 i32)))",
-			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32, f32, i32}},
+			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32, f32, i32}, ResultNumInUint64: 5},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 params and results abbreviated in groups",
 			input: "(type (func (param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32)))",
 			expected: &wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i64, i32},
-				Results: []wasm.ValueType{f32, f64, f64, i32},
+				Params:           []wasm.ValueType{i32, i32, i64, i32},
+				Results:          []wasm.ValueType{f32, f64, f64, i32},
+				ParamNumInUint64: 4, ResultNumInUint64: 4,
 			},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 abbreviated in groups",
 			input: "(type (func (param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32)))",
 			expected: &wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i64, i32},
-				Results: []wasm.ValueType{f32, f64, f64, i32},
+				Params:           []wasm.ValueType{i32, i32, i64, i32},
+				Results:          []wasm.ValueType{f32, f64, f64, i32},
+				ParamNumInUint64: 4, ResultNumInUint64: 4,
 			},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 abbreviated in groups",
 			input: "(type (func (param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32)))",
 			expected: &wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i64, i32},
-				Results: []wasm.ValueType{f32, f64, f64, i32},
+				Params:           []wasm.ValueType{i32, i32, i64, i32},
+				Results:          []wasm.ValueType{f32, f64, f64, i32},
+				ParamNumInUint64: 4, ResultNumInUint64: 4,
 			},
 		},
 		{
@@ -190,7 +193,7 @@ func TestTypeParser(t *testing.T) {
 			input: "(type (func (result) (result) (result i64 i64) (result) (result f32) (result)))",
 			// Abbreviations have min length zero, which implies no-op results are ok.
 			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A2
-			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32}},
+			expected: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32}, ResultNumInUint64: 3},
 		},
 		{
 			name: "multi-value - empty abbreviated params and results",
@@ -201,8 +204,9 @@ func TestTypeParser(t *testing.T) {
 			// Abbreviations have min length zero, which implies no-op results are ok.
 			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A2
 			expected: &wasm.FunctionType{
-				Params:  []wasm.ValueType{i32, i32, i64, i32, i32},
-				Results: []wasm.ValueType{f32, f64, f64, i32},
+				Params:           []wasm.ValueType{i32, i32, i64, i32, i32},
+				Results:          []wasm.ValueType{f32, f64, f64, i32},
+				ParamNumInUint64: 5, ResultNumInUint64: 4,
 			},
 		},
 	}
@@ -404,6 +408,9 @@ func parseFunctionType(
 	tp := newTypeParser(enabledFeatures, typeNamespace, setFunc)
 	// typeParser starts after the '(type', so we need to eat it first!
 	_, _, err := lex(skipTokens(2, tp.begin), []byte(input))
+	if parsed != nil {
+		parsed.CacheNumInUint64()
+	}
 	return parsed, tp, err
 }
 

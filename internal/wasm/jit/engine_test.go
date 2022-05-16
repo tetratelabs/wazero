@@ -298,7 +298,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	const expectedReturnValue = 0x1
 	m := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
-			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}, ResultNumInUint64: 1},
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
 		},
 		FunctionSection: []wasm.Index{
