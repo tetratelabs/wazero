@@ -881,7 +881,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 		{
 			name: "local.get - func param",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeVector}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeLocalGet, 0,
@@ -905,7 +905,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 						wasm.OpcodeLocalGet, 0,
 						wasm.OpcodeEnd,
 					},
-					LocalTypes: []wasm.ValueType{wasm.ValueTypeVector},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
 			expected: []Operation{
@@ -920,7 +920,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 		{
 			name: "local.set - func param",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeVector}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
@@ -958,7 +958,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 						wasm.OpcodeLocalSet, 0, // [0x01, 0x02] -> []
 						wasm.OpcodeEnd,
 					},
-					LocalTypes: []wasm.ValueType{wasm.ValueTypeVector},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
 			expected: []Operation{
@@ -981,7 +981,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 		{
 			name: "local.tee - func param",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeVector}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
@@ -1023,7 +1023,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 						wasm.OpcodeLocalTee, 0, // [0x01, 0x02] ->  [0x01, 0x02]
 						wasm.OpcodeEnd,
 					},
-					LocalTypes: []wasm.ValueType{wasm.ValueTypeVector},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
 				}},
 			},
 			expected: []Operation{

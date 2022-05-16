@@ -59,7 +59,7 @@ func ExternTypeName(et ExternType) string {
 //  * ValueTypeI64 - uint64(int64)
 //  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//  * ValueTypeVector TODO:
+//  * ValueTypeV128 TODO:
 //  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
@@ -85,10 +85,10 @@ const (
 	ValueTypeF32 ValueType = 0x7d
 	// ValueTypeF64 is a 64-bit floating point number.
 	ValueTypeF64 ValueType = 0x7c
-	// ValueTypeVector is a 128-bit vector value.
+	// ValueTypeV128 is a 128-bit vector value.
 	//
 	// TODO
-	ValueTypeVector ValueType = 0x7b
+	ValueTypeV128 ValueType = 0x7b
 	// ValueTypeExternref is a externref type.
 	//
 	// Note: in wazero, externref type value are opaque raw 64-bit pointers, and the ValueTypeExternref type
@@ -117,7 +117,7 @@ func ValueTypeName(t ValueType) string {
 		return "f32"
 	case ValueTypeF64:
 		return "f64"
-	case ValueTypeVector:
+	case ValueTypeV128:
 		return "i128"
 	case ValueTypeExternref:
 		return "externref"

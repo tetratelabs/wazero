@@ -821,7 +821,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			{
 				g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
 				ce.pushValue(g.Val)
-				if g.Type.ValType == wasm.ValueTypeVector {
+				if g.Type.ValType == wasm.ValueTypeV128 {
 					ce.pushValue(g.ValHi)
 				}
 				frame.pc++
@@ -829,7 +829,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindGlobalSet:
 			{
 				g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
-				if g.Type.ValType == wasm.ValueTypeVector {
+				if g.Type.ValType == wasm.ValueTypeV128 {
 					g.ValHi = ce.popValue()
 				}
 				g.Val = ce.popValue()

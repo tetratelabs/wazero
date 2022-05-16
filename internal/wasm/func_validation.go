@@ -1058,21 +1058,21 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot read constant vector value for %s", vectorInstructionName[vecOpcode])
 				}
 				pc += 16
-				valueTypeStack.push(ValueTypeVector)
+				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecI32x4Add:
 				for i := 0; i < 2; i++ {
-					if err := valueTypeStack.popAndVerifyType(ValueTypeVector); err != nil {
+					if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI32x4AddName, err)
 					}
 				}
-				valueTypeStack.push(ValueTypeVector)
+				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecI64x2Add:
 				for i := 0; i < 2; i++ {
-					if err := valueTypeStack.popAndVerifyType(ValueTypeVector); err != nil {
+					if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI64x2AddName, err)
 					}
 				}
-				valueTypeStack.push(ValueTypeVector)
+				valueTypeStack.push(ValueTypeV128)
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}
@@ -1516,7 +1516,7 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Fea
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}, ResultNumInUint64: 1}
 	case -5: // 0x7b in original byte = f64
-		ret = &FunctionType{Results: []ValueType{ValueTypeVector}, ResultNumInUint64: 2}
+		ret = &FunctionType{Results: []ValueType{ValueTypeV128}, ResultNumInUint64: 2}
 	case -16: // 0x70 in original byte = funcref
 		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
 	case -17: // 0x6f in original byte = externref

@@ -598,7 +598,7 @@ func TestExecuteConstExpression(t *testing.T) {
 			{valueType: ValueTypeI64, val: 20},
 			{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
 			{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
-			{valueType: ValueTypeVector, val: 0x1, valHi: 0x2},
+			{valueType: ValueTypeV128, val: 0x1, valHi: 0x2},
 		} {
 			t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 				// The index specified in Data equals zero.
@@ -625,7 +625,7 @@ func TestExecuteConstExpression(t *testing.T) {
 					actual, ok := val.(float64)
 					require.True(t, ok)
 					require.Equal(t, api.DecodeF64(tc.val), actual)
-				case ValueTypeVector:
+				case ValueTypeV128:
 					vector, ok := val.([2]uint64)
 					require.True(t, ok)
 					require.Equal(t, uint64(0x1), vector[0])

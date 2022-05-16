@@ -596,7 +596,7 @@ func testdataPath(filename string) string {
 func requireValuesEq(t *testing.T, actual, exps []uint64, valTypes []wasm.ValueType, msg string) {
 	var expectedTypesVectorFlattend []wasm.ValueType
 	for _, tp := range valTypes {
-		if tp != wasm.ValueTypeVector {
+		if tp != wasm.ValueTypeV128 {
 			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, tp)
 		} else {
 			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)

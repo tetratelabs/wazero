@@ -745,7 +745,7 @@ func TestModule_buildGlobals(t *testing.T) {
 				Data: leb128.EncodeInt32(math.MaxInt32)},
 		},
 		{
-			Type: &GlobalType{Mutable: false, ValType: ValueTypeVector},
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeV128},
 			Init: &ConstantExpression{Opcode: OpcodeVecV128Const,
 				Data: []byte{
 					1, 0, 0, 0, 0, 0, 0, 0,
@@ -759,7 +759,7 @@ func TestModule_buildGlobals(t *testing.T) {
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: math.MaxInt32},
-		{Type: &GlobalType{ValType: ValueTypeVector, Mutable: false}, Val: 0x1, ValHi: 0x2},
+		{Type: &GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
 	}
 	require.Equal(t, expectedGlobals, globals)
 }

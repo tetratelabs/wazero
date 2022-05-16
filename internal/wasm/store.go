@@ -618,7 +618,7 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 			v = api.DecodeF32(g.Val)
 		case ValueTypeF64:
 			v = api.DecodeF64(g.Val)
-		case ValueTypeVector:
+		case ValueTypeV128:
 			v = [2]uint64{g.Val, g.ValHi}
 		}
 	case OpcodeRefNull:

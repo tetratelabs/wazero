@@ -530,7 +530,7 @@ func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *Const
 		if len(expr.Data) != 16 {
 			return fmt.Errorf("%s needs 16 bytes but was %d bytes", OpcodeVecV128ConstName, len(expr.Data))
 		}
-		actualType = ValueTypeVector
+		actualType = ValueTypeV128
 	default:
 		return fmt.Errorf("invalid opcode for const expression: 0x%x", expr.Opcode)
 	}
@@ -685,14 +685,14 @@ type FunctionType struct {
 func (f *FunctionType) CacheNumInUint64() {
 	for _, tp := range f.Params {
 		f.ParamNumInUint64++
-		if tp == ValueTypeVector {
+		if tp == ValueTypeV128 {
 			f.ParamNumInUint64++
 		}
 	}
 
 	for _, tp := range f.Results {
 		f.ResultNumInUint64++
-		if tp == ValueTypeVector {
+		if tp == ValueTypeV128 {
 			f.ResultNumInUint64++
 		}
 	}
@@ -1001,11 +1001,11 @@ func SectionIDName(sectionID SectionID) string {
 type ValueType = api.ValueType
 
 const (
-	ValueTypeI32    = api.ValueTypeI32
-	ValueTypeI64    = api.ValueTypeI64
-	ValueTypeF32    = api.ValueTypeF32
-	ValueTypeF64    = api.ValueTypeF64
-	ValueTypeVector = api.ValueTypeVector
+	ValueTypeI32  = api.ValueTypeI32
+	ValueTypeI64  = api.ValueTypeI64
+	ValueTypeF32  = api.ValueTypeF32
+	ValueTypeF64  = api.ValueTypeF64
+	ValueTypeV128 = api.ValueTypeV128
 	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
 	ValueTypeExternref ValueType = api.ValueTypeExternref

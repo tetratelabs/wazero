@@ -110,7 +110,7 @@ func (c *compiler) calcLocalIndexToStackHeight() {
 	var current int
 	for index, lt := range c.sig.Params {
 		c.localIndexToStackHeight[wasm.Index(index)] = current
-		if lt == wasm.ValueTypeVector {
+		if lt == wasm.ValueTypeV128 {
 			current++
 		}
 		current++
@@ -119,7 +119,7 @@ func (c *compiler) calcLocalIndexToStackHeight() {
 	for index, lt := range c.localTypes {
 		index += len(c.sig.Params)
 		c.localIndexToStackHeight[wasm.Index(index)] = current
-		if lt == wasm.ValueTypeVector {
+		if lt == wasm.ValueTypeV128 {
 			current++
 		}
 		current++
@@ -724,7 +724,7 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeVector {
+		if c.localType(id) == wasm.ValueTypeV128 {
 			c.emit(
 				// -2 because we already pushed the result of this operation into the c.stack before
 				// called localDepth ^^,
@@ -744,7 +744,7 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeVector {
+		if c.localType(id) == wasm.ValueTypeV128 {
 			c.emit(
 				// +1 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
@@ -767,7 +767,7 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeVector {
+		if c.localType(id) == wasm.ValueTypeV128 {
 			c.emit(
 				&OperationPick{Depth: 1},
 				&OperationPick{Depth: 1},
@@ -1880,7 +1880,7 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	case wasm.ValueTypeF64:
 		c.stackPush(UnsignedTypeF64)
 		c.emit(&OperationConstF64{Value: 0})
-	case wasm.ValueTypeVector:
+	case wasm.ValueTypeV128:
 		c.stackPush(UnsignedTypeI64)
 		c.emit(&OperationConstI64{Value: 0})
 		c.stackPush(UnsignedTypeI64)
