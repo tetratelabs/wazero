@@ -1949,8 +1949,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindI64x2Add:
 			xHigh, xLow := ce.popValue(), ce.popValue()
 			yHigh, yLow := ce.popValue(), ce.popValue()
-			ce.pushValue(xHigh + yHigh)
 			ce.pushValue(xLow + yLow)
+			ce.pushValue(xHigh + yHigh)
 			frame.pc++
 		}
 	}

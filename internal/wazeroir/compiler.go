@@ -105,11 +105,11 @@ func (c *controlFrames) push(frame *controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
-func (c *compiler) calcLocalIndexToStackHeightMap() {
-	c.localIndexToStackHeightMap = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+func (c *compiler) calcLocalIndexToStackHeight() {
+	c.localIndexToStackHeight = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
 	var current int
 	for index, lt := range c.sig.Params {
-		c.localIndexToStackHeightMap[wasm.Index(index)] = current
+		c.localIndexToStackHeight[wasm.Index(index)] = current
 		if lt == wasm.ValueTypeVector {
 			current++
 		}
@@ -118,7 +118,7 @@ func (c *compiler) calcLocalIndexToStackHeightMap() {
 
 	for index, lt := range c.localTypes {
 		index += len(c.sig.Params)
-		c.localIndexToStackHeightMap[wasm.Index(index)] = current
+		c.localIndexToStackHeight[wasm.Index(index)] = current
 		if lt == wasm.ValueTypeVector {
 			current++
 		}
@@ -143,8 +143,8 @@ type compiler struct {
 	// sig is the function type of the target function.
 	sig *wasm.FunctionType
 	// localTypes holds the target function locals' value types.
-	localTypes                 []wasm.ValueType
-	localIndexToStackHeightMap map[wasm.Index]int
+	localTypes              []wasm.ValueType
+	localIndexToStackHeight map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []*wasm.FunctionType
@@ -267,7 +267,7 @@ func compile(enabledFeatures wasm.Features,
 		types:           types,
 	}
 
-	c.calcLocalIndexToStackHeightMap()
+	c.calcLocalIndexToStackHeight()
 
 	// Push function arguments.
 	for _, t := range sig.Params {
@@ -726,9 +726,8 @@ operatorSwitch:
 		depth := c.localDepth(id)
 		if c.localType(id) == wasm.ValueTypeVector {
 			c.emit(
-				// -2 because we already manipulated the stack before
-				// called localDepth ^^.
-				// TODO: fix comment
+				// -2 because we already pushed the result of this operation into the c.stack before
+				// called localDepth ^^,
 				&OperationPick{Depth: depth - 2},
 				&OperationPick{Depth: depth - 2},
 			)
@@ -736,7 +735,6 @@ operatorSwitch:
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
-				// TODO: fix comment
 				&OperationPick{Depth: depth - 1},
 			)
 		}
@@ -748,9 +746,8 @@ operatorSwitch:
 		depth := c.localDepth(id)
 		if c.localType(id) == wasm.ValueTypeVector {
 			c.emit(
-				// +1 because we already manipulated the stack before
-				// called localDepth ^^.
-				// TODO: fix comment
+				// +1 because we already popped the operands for this operation from the c.stack before
+				// called localDepth ^^,
 				&OperationSwap{Depth: depth + 1},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				&OperationSwap{Depth: depth + 1},
@@ -758,9 +755,8 @@ operatorSwitch:
 			)
 		} else {
 			c.emit(
-				// +1 because we already manipulated the stack before
-				// called localDepth ^^.
-				// TODO: fix comment
+				// +1 because we already popped the operands for this operation from the c.stack before
+				// called localDepth ^^,
 				&OperationSwap{Depth: depth + 1},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 			)
@@ -1895,7 +1891,7 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
 func (c *compiler) localDepth(index wasm.Index) int {
-	height, ok := c.localIndexToStackHeightMap[index]
+	height, ok := c.localIndexToStackHeight[index]
 	if !ok {
 		panic("BUG")
 	}

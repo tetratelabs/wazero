@@ -1491,7 +1491,7 @@ type controlBlock struct {
 	op Opcode
 }
 
-// decodeBlockTypeImpl decodes the type index from a positive 33-bit signed integer. Negative numbers indicate up to one
+// DecodeBlockType decodes the type index from a positive 33-bit signed integer. Negative numbers indicate up to one
 // WebAssembly 1.0 (20191205) compatible result type. Positive numbers are decoded when `enabledFeatures` include
 // FeatureMultiValue and include an index in the Module.TypeSection.
 //
