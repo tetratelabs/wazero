@@ -59,7 +59,7 @@ func ExternTypeName(et ExternType) string {
 //  * ValueTypeI64 - uint64(int64)
 //  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//  * ValueTypeV128 TODO:
+//  * ValueTypeV128 - EncodeI8x16(...), EncodeI16x8(...), EncodeI32x4(...), EncodeI64x2(...), EncodeF32x4(...) or EncodeF64x2(...).
 //  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
@@ -391,6 +391,92 @@ func EncodeF64(input float64) uint64 {
 // See EncodeF64
 func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
+}
+
+// EncodeI8x16 encodes the input as a ValueTypeV128.
+func EncodeI8x16(i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16 int8) (low uint64, hi uint64) {
+	low = uint64(i1) | uint64(i2)<<8 | uint64(i3)<<16 | uint64(i4)<<24 | uint64(i5)<<32 | uint64(i6)<<40 | uint64(i7)<<48 | uint64(i8)<<56
+	hi = uint64(i9) | uint64(i10)<<8 | uint64(i11)<<16 | uint64(i12)<<24 | uint64(i13)<<32 | uint64(i14)<<40 | uint64(i15)<<48 | uint64(i16)<<56
+	return
+}
+
+// DecodeI8x16 decodes the input as a ValueTypeV128.
+func DecodeI8x16(low uint64, hi uint64) (i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16 int8) {
+	i1, i2, i3, i4, i5, i6, i7, i8 = int8(uint8(low)), int8(uint8(low>>8)), int8(uint8(low>>16)), int8(uint8(low>>24)),
+		int8(uint8(low>>32)), int8(uint8(low>>40)), int8(uint8(low>>48)), int8(uint8(low>>56))
+	i9, i10, i11, i12, i13, i14, i15, i16 = int8(uint8(hi)), int8(uint8(hi>>8)), int8(uint8(hi>>16)), int8(uint8(hi>>24)),
+		int8(uint8(hi>>32)), int8(uint8(hi>>40)), int8(uint8(hi>>48)), int8(uint8(hi>>56))
+	return
+}
+
+// EncodeI16x8 encodes the input as a ValueTypeV128.
+func EncodeI16x8(i1, i2, i3, i4, i5, i6, i7, i8 int16) (low uint64, hi uint64) {
+	low = uint64(uint16(i1)) | uint64(uint16(i2))<<16 | uint64(uint16(i3))<<32 | uint64(uint16(i4))<<48
+	hi = uint64(uint16(i5)) | uint64(uint16(i6))<<16 | uint64(uint16(i7))<<32 | uint64(uint16(i8))<<48
+	return
+}
+
+// DecodeI16x8 decodes the input as a ValueTypeV128.
+func DecodeI16x8(low uint64, hi uint64) (i1, i2, i3, i4, i5, i6, i7, i8 int16) {
+	i1, i2, i3, i4 = int16(uint16(low)), int16(uint16(low>>16)), int16(uint16(low>>32)), int16(uint16(low>>48))
+	i5, i6, i7, i8 = int16(uint16(hi)), int16(uint16(hi>>16)), int16(uint16(hi>>32)), int16(uint16(hi>>48))
+	return
+}
+
+// EncodeI32x4 encodes the input as a ValueTypeV128.
+func EncodeI32x4(i1, i2, i3, i4 int32) (low uint64, hi uint64) {
+	low = uint64(i1) | uint64(i2)<<32
+	hi = uint64(i3) | uint64(i4)<<32
+	return
+}
+
+// DecodeI32x4 decodes the input as a ValueTypeV128.
+func DecodeI32x4(low uint64, hi uint64) (i1, i2, i3, i4 int32) {
+	i1, i2 = int32(uint32(low)), int32(uint32(low>>32))
+	i3, i4 = int32(uint32(hi)), int32(uint32(hi>>32))
+	return
+}
+
+// EncodeI64x2 encodes the input as a ValueTypeV128.
+func EncodeI64x2(i1, i2 int64) (low uint64, hi uint64) {
+	low = uint64(i1)
+	hi = uint64(i2)
+	return
+}
+
+// DecodeI64x2 decodes the input as a ValueTypeV128.
+func DecodeI64x2(low uint64, hi uint64) (i1, i2 int64) {
+	i1 = int64(low)
+	i2 = int64(hi)
+	return
+}
+
+// EncodeF32x4 encodes the input as a ValueTypeV128.
+func EncodeF32x4(f1, f2, f3, f4 float32) (low uint64, hi uint64) {
+	low = uint64(math.Float32bits(f2))<<32 | uint64(math.Float32bits(f1))
+	hi = uint64(math.Float32bits(f4))<<32 | uint64(math.Float32bits(f3))
+	return
+}
+
+// DecodeF32x4 decodes the input as a ValueTypeV128.
+func DecodeF32x4(low uint64, hi uint64) (f1, f2, f3, f4 float32) {
+	f1, f2 = math.Float32frombits(uint32(low)), math.Float32frombits(uint32(low>>32))
+	f3, f4 = math.Float32frombits(uint32(hi)), math.Float32frombits(uint32(hi>>32))
+	return
+}
+
+// EncodeF64x2 encodes the input as a ValueTypeV128.
+func EncodeF64x2(f1, f2 float64) (low uint64, hi uint64) {
+	low = math.Float64bits(f1)
+	hi = math.Float64bits(f2)
+	return
+}
+
+// DecodeF64x2 decodes the input as a ValueTypeV128.
+func DecodeF64x2(low uint64, hi uint64) (f1, f2 float64) {
+	f1 = math.Float64frombits(low)
+	f2 = math.Float64frombits(hi)
+	return
 }
 
 // ImportRenamer applies during compilation after a module has been decoded from source, but before it is instantiated.

@@ -139,3 +139,101 @@ func TestEncodeCastI64(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeDecodeI16x8(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeI16x8(DecodeI16x8(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
+
+func TestEncodeDecodeI32x4(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeI32x4(DecodeI32x4(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
+
+func TestEncodeDecodeI64x2(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeI64x2(DecodeI64x2(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
+
+func TestEncodeDecodeF32x4(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{math.Float64bits(math.Inf(1)), 0xffffffff_efffffff},
+		{math.Float64bits(math.Inf(-1)), 0xffffffff_efffffff},
+		{0xffffffff_efffffff, math.Float64bits(math.Inf(1))},
+		{0xffffffff_efffffff, math.Float64bits(math.Inf(-1))},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeF32x4(DecodeF32x4(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
+
+func TestEncodeDecodeF64x2(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{math.Float64bits(math.Inf(1)), 0xffffffff_efffffff},
+		{math.Float64bits(math.Inf(-1)), 0xffffffff_efffffff},
+		{0xffffffff_efffffff, math.Float64bits(math.Inf(1))},
+		{0xffffffff_efffffff, math.Float64bits(math.Inf(-1))},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeF64x2(DecodeF64x2(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
