@@ -63,7 +63,7 @@ func TestDecodeModule(t *testing.T) {
 			input: "(module (type (func (param i32 i32) (result i32 i32))))",
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2},
 				},
 			},
 		},
@@ -72,7 +72,7 @@ func TestDecodeModule(t *testing.T) {
 			input: "(module (type (func (param i32) (param i32) (result i32) (result i32))))",
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2},
 				},
 			},
 		},
@@ -362,8 +362,8 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					v_v,
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
 				ImportSection: []*wasm.Import{
 					{
@@ -549,7 +549,7 @@ func TestDecodeModule(t *testing.T) {
 			input: "(module (import \"\" \"\" (func (param i32 i32) (param $v i32) (param i64) (param $t f32))))",
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i64, f32}, ParamNumInUint64: 5},
 				},
 				ImportSection: []*wasm.Import{{Type: wasm.ExternTypeFunc, DescFunc: 0}},
 				NameSection: &wasm.NameSection{
@@ -569,8 +569,8 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					v_v,
-					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 9, ResultNumInUint64: 1},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
 				ImportSection: []*wasm.Import{
 					{
@@ -598,7 +598,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "foo" "bar" (func (type 0) (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Type:     wasm.ExternTypeFunc,
@@ -613,7 +613,7 @@ func TestDecodeModule(t *testing.T) {
 	(type $i32 (func (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Type:     wasm.ExternTypeFunc,
@@ -628,7 +628,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "foo" "bar" (func (type $i32) (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Type:     wasm.ExternTypeFunc,
@@ -643,7 +643,7 @@ func TestDecodeModule(t *testing.T) {
 	(type $i32 (func (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Type:     wasm.ExternTypeFunc,
@@ -655,7 +655,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "import func multiple abbreviated results",
 			input: `(module (import "misc" "swap" (func $swap (param i32 i32) (result i32 i32))))`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}},
+				TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
 				ImportSection: []*wasm.Import{{
 					Module: "misc", Name: "swap",
 					Type:     wasm.ExternTypeFunc,
@@ -856,8 +856,8 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					v_v,
-					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 9, ResultNumInUint64: 1},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
 				FunctionSection: []wasm.Index{1, 2},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
@@ -881,8 +881,8 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					v_v,
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
 				FunctionSection: []wasm.Index{1, 2},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
@@ -922,7 +922,7 @@ func TestDecodeModule(t *testing.T) {
 	(func (type 0) (param i32))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{codeEnd},
 			},
@@ -934,7 +934,7 @@ func TestDecodeModule(t *testing.T) {
 	(type $i32 (func (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{codeEnd},
 			},
@@ -946,7 +946,7 @@ func TestDecodeModule(t *testing.T) {
 	(func (type $i32) (param i32))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{codeEnd},
 			},
@@ -958,7 +958,7 @@ func TestDecodeModule(t *testing.T) {
 	(type $i32 (func (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{codeEnd},
 			},
@@ -1101,7 +1101,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func param IDs",
 			input: "(module (func $one (param $x i32) (param $y i32) (result i32) local.get 0))",
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -1119,7 +1119,7 @@ func TestDecodeModule(t *testing.T) {
 			(func (param $l i32) (param $r i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1}},
 				FunctionSection: []wasm.Index{0, 0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -1134,7 +1134,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func mixed param IDs", // Verifies we can handle less param fields than Params
 			input: "(module (func (param i32 i32) (param $v i32) (param i64) (param $t f32)))",
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i32, i64, f32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i32, i64, f32}, ParamNumInUint64: 5}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				NameSection: &wasm.NameSection{
@@ -1148,7 +1148,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func multiple abbreviated results",
 			input: "(module (func $swap (param i32 i32) (result i32 i32) local.get 1 local.get 0))",
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}}},
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0x01, wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}}},
 				NameSection: &wasm.NameSection{
@@ -1393,7 +1393,7 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{

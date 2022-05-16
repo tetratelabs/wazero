@@ -132,7 +132,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	i64 := wasm.ValueTypeI64
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}, ParamNumInUint64: 1, ResultNumInUint64: 1}},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}}},
 	}

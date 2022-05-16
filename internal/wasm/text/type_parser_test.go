@@ -8,19 +8,45 @@ import (
 )
 
 var (
-	f32, f64, i32, i64              = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64
-	i32_v                           = &wasm.FunctionType{Params: []wasm.ValueType{i32}}
-	v_i32                           = &wasm.FunctionType{Results: []wasm.ValueType{i32}}
-	v_i32i64                        = &wasm.FunctionType{Results: []wasm.ValueType{i32, i64}}
-	f32_i32                         = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}}
-	i64_i64                         = &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}
-	i32i64_v                        = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
-	i32i32_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	i32i64_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}}
-	i32i32i32i32_i32                = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}
+	f32, f64, i32, i64 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64
+	i32_v              = &wasm.FunctionType{Params: []wasm.ValueType{i32},
+		ParamNumInUint64: 1,
+	}
+	v_i32 = &wasm.FunctionType{Results: []wasm.ValueType{i32},
+		ResultNumInUint64: 1,
+	}
+	v_i32i64 = &wasm.FunctionType{Results: []wasm.ValueType{i32, i64},
+		ResultNumInUint64: 2,
+	}
+	f32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i64_i64 = &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i32i64_v = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64},
+		ParamNumInUint64: 2,
+	}
+	i32i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 1,
+	}
+	i32i64_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 1,
+	}
+	i32i32i32i32_i32 = &wasm.FunctionType{
+		Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  4,
+		ResultNumInUint64: 1,
+	}
 	i32i32i32i32i32i64i64i32i32_i32 = &wasm.FunctionType{
-		Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
-		Results: []wasm.ValueType{i32},
+		Params:            []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+		Results:           []wasm.ValueType{i32},
+		ParamNumInUint64:  9,
+		ResultNumInUint64: 1,
 	}
 )
 

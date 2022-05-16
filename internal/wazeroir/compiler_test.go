@@ -16,11 +16,20 @@ var ctx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
 	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
-	f32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}}
-	i32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
-	i32i32_i32    = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	v_v           = &wasm.FunctionType{}
-	v_f64f64      = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}}
+	f32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i32i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 1,
+	}
+	v_v      = &wasm.FunctionType{}
+	v_f64f64 = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}, ResultNumInUint64: 2}
 )
 
 func TestCompile(t *testing.T) {
@@ -56,10 +65,18 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
-				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
-				Functions:    []uint32{0},
-				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
-				TableTypes:   []wasm.RefType{},
+				Types: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+						ParamNumInUint64:  1,
+						ResultNumInUint64: 1},
+				},
+				Functions: []uint32{0},
+				Signature: &wasm.FunctionType{
+					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -75,10 +92,18 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
-				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
-				Functions:    []uint32{0},
-				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
-				TableTypes:   []wasm.RefType{},
+				Types: []*wasm.FunctionType{{
+					Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				}},
+				Functions: []uint32{0},
+				Signature: &wasm.FunctionType{
+					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 	}
@@ -228,11 +253,17 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 }
 
 func TestCompile_MultiValue(t *testing.T) {
-	i32i32_i32i32 := &wasm.FunctionType{Params: []wasm.ValueType{
-		wasm.ValueTypeI32, wasm.ValueTypeI32},
-		Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+	i32i32_i32i32 := &wasm.FunctionType{
+		Params:            []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 2,
 	}
-	_i32i64 := &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64}}
+	_i32i64 := &wasm.FunctionType{
+		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64},
+		ParamNumInUint64:  0,
+		ResultNumInUint64: 2,
+	}
 
 	tests := []struct {
 		name            string

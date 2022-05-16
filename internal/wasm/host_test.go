@@ -65,8 +65,8 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
-					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []Index{0, 1},
 				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet, &fnFdWrite},
@@ -90,7 +90,7 @@ func TestNewHostModule(t *testing.T) {
 				functionSwap: swap,
 			},
 			expected: &Module{
-				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
+				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
 				FunctionSection:     []Index{0},
 				HostFunctionSection: []*reflect.Value{&fnSwap},
 				ExportSection:       []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
@@ -151,7 +151,7 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
 				},
 				FunctionSection:     []Index{0},
 				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet},

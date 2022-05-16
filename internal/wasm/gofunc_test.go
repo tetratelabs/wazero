@@ -49,7 +49,7 @@ func TestGetFunctionType(t *testing.T) {
 			name:         "all supported params and i32 result",
 			inputFunc:    func(uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoNoContext,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
 		},
 		{
 			name: "all supported params and all supported results",
@@ -58,27 +58,28 @@ func TestGetFunctionType(t *testing.T) {
 			},
 			expectedKind: FunctionKindGoNoContext,
 			expectedType: &FunctionType{
-				Params:  []ValueType{i32, i64, f32, f64, externref},
-				Results: []ValueType{i32, i64, f32, f64, externref},
+				Params:           []ValueType{i32, i64, f32, f64, externref},
+				Results:          []ValueType{i32, i64, f32, f64, externref},
+				ParamNumInUint64: 5, ResultNumInUint64: 5,
 			},
 		},
 		{
 			name:         "all supported params and i32 result - wasm.Module",
 			inputFunc:    func(api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoModule,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
 		},
 		{
 			name:         "all supported params and i32 result - context.Context",
 			inputFunc:    func(context.Context, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoContext,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
 		},
 		{
 			name:         "all supported params and i32 result - context.Context and api.Module",
 			inputFunc:    func(context.Context, api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoContextModule,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
 		},
 	}
 	for _, tt := range tests {
