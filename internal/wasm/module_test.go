@@ -1020,6 +1020,16 @@ func Test_EqualsSignatureV128Flattened(t *testing.T) {
 			results: []ValueType{ValueTypeI64, ValueTypeI64, ValueTypeI64},
 			exp:     true,
 		},
+		{
+			name: "one v128 in param and result with i32",
+			expectedSignature: &FunctionType{
+				Params:  []ValueType{ValueTypeV128, ValueTypeI32},
+				Results: []ValueType{ValueTypeI32, ValueTypeV128},
+			},
+			params:  []ValueType{ValueTypeI64, ValueTypeI64, ValueTypeI32},
+			results: []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeI64},
+			exp:     true,
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
