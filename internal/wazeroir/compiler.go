@@ -730,6 +730,7 @@ operatorSwitch:
 			c.emit(
 				// -2 because we already manipulated the stack before
 				// called localDepth ^^.
+				// TODO: fix comment
 				&OperationPick{Depth: depth - 2},
 				&OperationPick{Depth: depth - 2},
 			)
@@ -737,6 +738,7 @@ operatorSwitch:
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
+				// TODO: fix comment
 				&OperationPick{Depth: depth - 1},
 			)
 		}
@@ -747,10 +749,20 @@ operatorSwitch:
 		id := *index
 		depth := c.localDepth(id)
 		if c.localType(id) == wasm.ValueTypeVector {
+			c.emit(
+				// +1 because we already manipulated the stack before
+				// called localDepth ^^.
+				// TODO: fix comment
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
 		} else {
 			c.emit(
 				// +1 because we already manipulated the stack before
 				// called localDepth ^^.
+				// TODO: fix comment
 				&OperationSwap{Depth: depth + 1},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 			)
@@ -761,11 +773,22 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		c.emit(
-			&OperationPick{Depth: 0},
-			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-		)
+		if c.localType(id) == wasm.ValueTypeVector {
+			c.emit(
+				&OperationPick{Depth: 1},
+				&OperationPick{Depth: 1},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		} else {
+			c.emit(
+				&OperationPick{Depth: 0},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		}
 	case wasm.OpcodeGlobalGet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for global.get")
@@ -1855,13 +1878,21 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	case wasm.ValueTypeF64:
 		c.stackPush(UnsignedTypeF64)
 		c.emit(&OperationConstF64{Value: 0})
+	case wasm.ValueTypeVector:
+		c.stackPush(UnsignedTypeI64)
+		c.emit(&OperationConstI64{Value: 0})
+		c.stackPush(UnsignedTypeI64)
+		c.emit(&OperationConstI64{Value: 0})
 	}
 }
 
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
 func (c *compiler) localDepth(index wasm.Index) int {
-	height := c.localIndexToStackHeightMap[index]
+	height, ok := c.localIndexToStackHeightMap[index]
+	if !ok {
+		panic("BUG")
+	}
 	return int(len(c.stack)) - 1 - int(height)
 }
 
