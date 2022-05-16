@@ -956,3 +956,75 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 		})
 	}
 }
+
+func Test_EqualsSignatureV128Flattened(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		expectedSignature *FunctionType
+		params, results   []ValueType
+		exp               bool
+	}{
+		{
+			name: "no v128 - true",
+			expectedSignature: &FunctionType{
+				Params:  []ValueType{ValueTypeF32},
+				Results: []ValueType{ValueTypeI64},
+			},
+			params:  []ValueType{ValueTypeF32},
+			results: []ValueType{ValueTypeI64},
+			exp:     true,
+		},
+		{
+			name: "no v128 - false",
+			expectedSignature: &FunctionType{
+				Params:  []ValueType{ValueTypeF32},
+				Results: []ValueType{ValueTypeI64},
+			},
+			params:  []ValueType{ValueTypeF32},
+			results: []ValueType{ValueTypeI32},
+			exp:     false,
+		},
+		{
+			name: "one v128 in param",
+			expectedSignature: &FunctionType{
+				Params: []ValueType{ValueTypeV128},
+			},
+			params: []ValueType{ValueTypeI64, ValueTypeI64},
+			exp:    true,
+		},
+		{
+			name: "one v128 in result",
+			expectedSignature: &FunctionType{
+				Results: []ValueType{ValueTypeV128},
+			},
+			results: []ValueType{ValueTypeI64, ValueTypeI64},
+			exp:     true,
+		},
+		{
+			name: "one v128 in param and result",
+			expectedSignature: &FunctionType{
+				Params:  []ValueType{ValueTypeV128},
+				Results: []ValueType{ValueTypeV128},
+			},
+			params:  []ValueType{ValueTypeI64, ValueTypeI64},
+			results: []ValueType{ValueTypeI64, ValueTypeI64},
+			exp:     true,
+		},
+		{
+			name: "one v128 in param and result with normal i64",
+			expectedSignature: &FunctionType{
+				Params:  []ValueType{ValueTypeV128, ValueTypeI64},
+				Results: []ValueType{ValueTypeI64, ValueTypeV128},
+			},
+			params:  []ValueType{ValueTypeI64, ValueTypeI64, ValueTypeI64},
+			results: []ValueType{ValueTypeI64, ValueTypeI64, ValueTypeI64},
+			exp:     true,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			actual := tc.expectedSignature.EqualsSignatureV128Flattened(tc.params, tc.results)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}

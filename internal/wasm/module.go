@@ -714,20 +714,21 @@ func (t *FunctionType) EqualsSignatureV128Flattened(params []ValueType, results 
 			expParams = append(expParams, ValueTypeI64, ValueTypeI64)
 		}
 	}
-	expResults := make([]ValueType, 0, len(t.Results))
-	for _, p := range t.Results {
-		if p != ValueTypeV128 {
-			expResults = append(expResults, p)
-		} else {
-			expResults = append(expResults, ValueTypeI64, ValueTypeI64)
-		}
-	}
 	actualParams := make([]ValueType, 0, len(params))
 	for _, p := range params {
 		if p != ValueTypeV128 {
 			actualParams = append(actualParams, p)
 		} else {
 			actualParams = append(actualParams, ValueTypeI64, ValueTypeI64)
+		}
+	}
+
+	expResults := make([]ValueType, 0, len(t.Results))
+	for _, p := range t.Results {
+		if p != ValueTypeV128 {
+			expResults = append(expResults, p)
+		} else {
+			expResults = append(expResults, ValueTypeI64, ValueTypeI64)
 		}
 	}
 	actualResults := make([]ValueType, 0, len(results))
