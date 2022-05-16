@@ -118,7 +118,7 @@ func ValueTypeName(t ValueType) string {
 	case ValueTypeF64:
 		return "f64"
 	case ValueTypeV128:
-		return "i128"
+		return "v128"
 	case ValueTypeExternref:
 		return "externref"
 	}

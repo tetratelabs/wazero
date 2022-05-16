@@ -2760,7 +2760,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				OpcodeEnd,
 			},
 			flag:        FeatureSIMD,
-			expectedErr: "cannot pop the operand for i32x4.add: i128 missing",
+			expectedErr: "cannot pop the operand for i32x4.add: v128 missing",
 		},
 		{
 			name: "i64x2.add operand",
@@ -2775,7 +2775,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				OpcodeEnd,
 			},
 			flag:        FeatureSIMD,
-			expectedErr: "cannot pop the operand for i64x2.add: i128 missing",
+			expectedErr: "cannot pop the operand for i64x2.add: v128 missing",
 		},
 		{
 			// TODO delete this case after SIMD impl completion.
