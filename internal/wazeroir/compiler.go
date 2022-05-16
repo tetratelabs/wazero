@@ -105,6 +105,28 @@ func (c *controlFrames) push(frame *controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
+// localIndexToStackHeight initializes localIndexToStackHeight field. See the comment on localIndexToStackHeight.
+func (c *compiler) calcLocalIndexToStackHeight() {
+	c.localIndexToStackHeight = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+	var current int
+	for index, lt := range c.sig.Params {
+		c.localIndexToStackHeight[wasm.Index(index)] = current
+		if lt == wasm.ValueTypeV128 {
+			current++
+		}
+		current++
+	}
+
+	for index, lt := range c.localTypes {
+		index += len(c.sig.Params)
+		c.localIndexToStackHeight[wasm.Index(index)] = current
+		if lt == wasm.ValueTypeV128 {
+			current++
+		}
+		current++
+	}
+}
+
 type compiler struct {
 	enabledFeatures  wasm.Features
 	stack            []UnsignedType
@@ -121,8 +143,11 @@ type compiler struct {
 	body []byte
 	// sig is the function type of the target function.
 	sig *wasm.FunctionType
-	// localTypes holds the target function locals' value types.
+	// localTypes holds the target function locals' value types except function params.
 	localTypes []wasm.ValueType
+	// localIndexToStackHeight maps the local index (starting with function params) to the stack height
+	// where the local is places. This is the necessary mapping for functions who contain vector type locals.
+	localIndexToStackHeight map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []*wasm.FunctionType
@@ -245,9 +270,11 @@ func compile(enabledFeatures wasm.Features,
 		types:           types,
 	}
 
+	c.calcLocalIndexToStackHeight()
+
 	// Push function arguments.
 	for _, t := range sig.Params {
-		c.stackPush(wasmValueTypeToUnsignedType(t))
+		c.stackPush(wasmValueTypeToUnsignedType(t)...)
 	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
@@ -320,7 +347,7 @@ operatorSwitch:
 		// Create a new frame -- entering this block.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
 		}
@@ -343,7 +370,7 @@ operatorSwitch:
 		// Create a new frame -- entering loop.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			kind:                         controlFrameKindLoop,
 			blockType:                    bt,
 		}
@@ -378,7 +405,7 @@ operatorSwitch:
 		// Create a new frame -- entering if.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
+			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
 			kind:      controlFrameKindIfWithoutElse,
@@ -417,7 +444,7 @@ operatorSwitch:
 
 			// Re-push the parameters to the if block so that else block can use them.
 			for _, t := range frame.blockType.Params {
-				c.stackPush(wasmValueTypeToUnsignedType(t))
+				c.stackPush(wasmValueTypeToUnsignedType(t)...)
 			}
 
 			// We are no longer unreachable in else frame,
@@ -443,7 +470,7 @@ operatorSwitch:
 
 		c.stack = c.stack[:frame.originalStackLenWithoutParam]
 		for _, t := range frame.blockType.Params {
-			c.stackPush(wasmValueTypeToUnsignedType(t))
+			c.stackPush(wasmValueTypeToUnsignedType(t)...)
 		}
 
 		// Prep labels for else and the continuation of this if block.
@@ -474,7 +501,7 @@ operatorSwitch:
 
 			c.stack = c.stack[:frame.originalStackLenWithoutParam]
 			for _, t := range frame.blockType.Results {
-				c.stackPush(wasmValueTypeToUnsignedType(t))
+				c.stackPush(wasmValueTypeToUnsignedType(t)...)
 			}
 
 			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
@@ -505,7 +532,7 @@ operatorSwitch:
 
 		// Push the result types onto the stack.
 		for _, t := range frame.blockType.Results {
-			c.stackPush(wasmValueTypeToUnsignedType(t))
+			c.stackPush(wasmValueTypeToUnsignedType(t)...)
 		}
 
 		// Emit the instructions according to the kind of the current control frame.
@@ -698,33 +725,67 @@ operatorSwitch:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.get")
 		}
-		depth := c.localDepth(*index)
-		c.emit(
-			// -1 because we already manipulated the stack before
-			// called localDepth ^^.
-			&OperationPick{Depth: depth - 1},
-		)
+		id := *index
+		depth := c.localDepth(id)
+		if c.localType(id) == wasm.ValueTypeV128 {
+			c.emit(
+				// -2 because we already pushed the result of this operation into the c.stack before
+				// called localDepth ^^,
+				&OperationPick{Depth: depth - 2},
+				&OperationPick{Depth: depth - 2},
+			)
+		} else {
+			c.emit(
+				// -1 because we already manipulated the stack before
+				// called localDepth ^^.
+				&OperationPick{Depth: depth - 1},
+			)
+		}
 	case wasm.OpcodeLocalSet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.set")
 		}
-		depth := c.localDepth(*index)
-		c.emit(
-			// +1 because we already manipulated the stack before
-			// called localDepth ^^.
-			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-		)
+		id := *index
+		depth := c.localDepth(id)
+		if c.localType(id) == wasm.ValueTypeV128 {
+			c.emit(
+				// +1 because we already popped the operands for this operation from the c.stack before
+				// called localDepth ^^,
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		} else {
+			c.emit(
+				// +1 because we already popped the operands for this operation from the c.stack before
+				// called localDepth ^^,
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		}
 	case wasm.OpcodeLocalTee:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.tee")
 		}
-		depth := c.localDepth(*index)
-		c.emit(
-			&OperationPick{Depth: 0},
-			&OperationSwap{Depth: depth + 1},
-			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-		)
+		id := *index
+		depth := c.localDepth(id)
+		if c.localType(id) == wasm.ValueTypeV128 {
+			c.emit(
+				&OperationPick{Depth: 1},
+				&OperationPick{Depth: 1},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		} else {
+			c.emit(
+				&OperationPick{Depth: 0},
+				&OperationSwap{Depth: depth + 1},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			)
+		}
 	case wasm.OpcodeGlobalGet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for global.get")
@@ -1660,6 +1721,29 @@ operatorSwitch:
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}
+	case wasm.OpcodeVecPrefix:
+		c.pc++
+		switch miscOp := c.body[c.pc]; miscOp {
+		case wasm.OpcodeVecV128Const:
+			c.pc++
+			lo := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
+			c.pc += 8
+			hi := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
+			c.emit(
+				&OperationConstV128{Lo: lo, Hi: hi},
+			)
+			c.pc += 7
+		case wasm.OpcodeVecI32x4Add:
+			c.emit(
+				&OperationI32x4Add{},
+			)
+		case wasm.OpcodeVecI64x2Add:
+			c.emit(
+				&OperationI64x2Add{},
+			)
+		default:
+			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
+		}
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}
@@ -1757,8 +1841,8 @@ func (c *compiler) stackPop() (ret UnsignedType) {
 	return
 }
 
-func (c *compiler) stackPush(t UnsignedType) {
-	c.stack = append(c.stack, t)
+func (c *compiler) stackPush(ts ...UnsignedType) {
+	c.stack = append(c.stack, ts...)
 }
 
 // emit adds the operations into the result.
@@ -1799,13 +1883,31 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	case wasm.ValueTypeF64:
 		c.stackPush(UnsignedTypeF64)
 		c.emit(&OperationConstF64{Value: 0})
+	case wasm.ValueTypeV128:
+		c.stackPush(UnsignedTypeI64)
+		c.emit(&OperationConstI64{Value: 0})
+		c.stackPush(UnsignedTypeI64)
+		c.emit(&OperationConstI64{Value: 0})
 	}
 }
 
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
-func (c *compiler) localDepth(n uint32) int {
-	return int(len(c.stack)) - 1 - int(n)
+func (c *compiler) localDepth(index wasm.Index) int {
+	height, ok := c.localIndexToStackHeight[index]
+	if !ok {
+		panic("BUG")
+	}
+	return int(len(c.stack)) - 1 - int(height)
+}
+
+func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
+	if params := uint32(len(c.sig.Params)); index < params {
+		t = c.sig.Params[index]
+	} else {
+		t = c.localTypes[index-params]
+	}
+	return
 }
 
 // getFrameDropRange returns the range (starting from top of the stack) that spans across the stack. The range is
@@ -1819,9 +1921,9 @@ func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 		// If this is not End and the call-site is trying to branch into the Loop control frame,
 		// we have to start executing from the beginning of the loop block.
 		// Therefore, we have to pass the inputs to the frame.
-		start = len(frame.blockType.Params)
+		start = frame.blockType.ParamNumInUint64
 	} else {
-		start = len(frame.blockType.Results)
+		start = frame.blockType.ResultNumInUint64
 	}
 	var end int
 	if frame.kind == controlFrameKindFunction {

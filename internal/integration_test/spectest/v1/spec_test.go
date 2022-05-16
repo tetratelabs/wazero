@@ -22,11 +22,11 @@ func TestJIT(t *testing.T) {
 		t.Skip()
 	}
 
-	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures, func(string) bool { return true })
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures, func(jsonname string) bool { return true })
 }
 
 func TestBinaryEncoder(t *testing.T) {

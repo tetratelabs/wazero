@@ -62,10 +62,27 @@ func TestDecodeConstantExpression(t *testing.T) {
 				},
 			},
 		},
+		{
+			in: []byte{
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeEnd,
+			},
+			exp: &wasm.ConstantExpression{
+				Opcode: wasm.OpcodeVecV128Const,
+				Data: []byte{
+					1, 1, 1, 1, 1, 1, 1, 1,
+					1, 1, 1, 1, 1, 1, 1, 1,
+				},
+			},
+		},
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeConstantExpression(bytes.NewReader(tc.in), wasm.FeatureBulkMemoryOperations)
+			actual, err := decodeConstantExpression(bytes.NewReader(tc.in),
+				wasm.FeatureBulkMemoryOperations|wasm.FeatureSIMD)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
@@ -119,6 +136,43 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 			},
 			expectedErr: "ref.func is not supported as feature \"bulk-memory-operations\" is disabled",
 			features:    wasm.Features20191205,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeEnd,
+			},
+			expectedErr: "vector instructions are not supported as feature \"simd\" is disabled",
+			features:    wasm.Features20191205,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeVecPrefix,
+			},
+			expectedErr: "read vector instruction opcode suffix: EOF",
+			features:    wasm.FeatureSIMD,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeVecPrefix,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeEnd,
+			},
+			expectedErr: "invalid vector opcode for const expression: 0x1",
+			features:    wasm.FeatureSIMD,
+		},
+		{
+			in: []byte{
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+			},
+			expectedErr: "read vector const instruction immediates: needs 16 bytes but was 8 bytes",
+			features:    wasm.FeatureSIMD,
 		},
 	} {
 		t.Run(tc.expectedErr, func(t *testing.T) {

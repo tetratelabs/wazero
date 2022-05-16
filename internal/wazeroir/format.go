@@ -181,6 +181,8 @@ func formatOperation(w io.StringWriter, b Operation) {
 			out = "u64"
 		}
 		str = fmt.Sprintf("%s.extend_from.%s", out, in)
+	case *OperationConstV128:
+		str = fmt.Sprintf("v128.const [%#x, %#x]", o.Lo, o.Hi)
 	default:
 		panic("unreachable: a bug in wazeroir implementation")
 	}

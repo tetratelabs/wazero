@@ -92,8 +92,11 @@ func decodeFunctionType(enabledFeatures wasm.Features, r *bytes.Reader) (*wasm.F
 		return nil, fmt.Errorf("could not read result types: %w", err)
 	}
 
-	return &wasm.FunctionType{
+	ret := &wasm.FunctionType{
 		Params:  paramTypes,
 		Results: resultTypes,
-	}, nil
+	}
+
+	ret.CacheNumInUint64()
+	return ret, nil
 }

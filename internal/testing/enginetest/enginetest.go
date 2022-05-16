@@ -132,7 +132,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	i64 := wasm.ValueTypeI64
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
+		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}, ParamNumInUint64: 1, ResultNumInUint64: 1}},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}}},
 	}
@@ -353,8 +353,9 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	e := et.NewEngine(features)
 
 	sig := &wasm.FunctionType{
-		Params:  []wasm.ValueType{wasm.ValueTypeI64},
-		Results: []wasm.ValueType{wasm.ValueTypeI64},
+		Params:           []wasm.ValueType{wasm.ValueTypeI64},
+		Results:          []wasm.ValueType{wasm.ValueTypeI64},
+		ParamNumInUint64: 1, ResultNumInUint64: 1,
 	}
 
 	memory := &wasm.MemoryInstance{}
@@ -588,7 +589,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	one := uint32(1)
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}}, {}},
+		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
 		DataSection: []*wasm.DataSegment{
@@ -706,7 +707,7 @@ func divBy(d uint32) uint32 {
 
 func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
 	i32 := wasm.ValueTypeI32
-	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
+	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}
 
 	hostFnVal := reflect.ValueOf(divBy)
 	hostFnModule := &wasm.Module{

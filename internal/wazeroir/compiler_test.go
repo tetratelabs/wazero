@@ -2,6 +2,7 @@ package wazeroir
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -15,11 +16,20 @@ var ctx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var (
 	f32, f64, i32 = wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32
-	f32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}}
-	i32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}
-	i32i32_i32    = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	v_v           = &wasm.FunctionType{}
-	v_f64f64      = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}}
+	f32_i32       = &wasm.FunctionType{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  1,
+		ResultNumInUint64: 1,
+	}
+	i32i32_i32 = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 1,
+	}
+	v_v      = &wasm.FunctionType{}
+	v_f64f64 = &wasm.FunctionType{Results: []wasm.ValueType{f64, f64}, ResultNumInUint64: 2}
 )
 
 func TestCompile(t *testing.T) {
@@ -55,10 +65,18 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
-				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
-				Functions:    []uint32{0},
-				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
-				TableTypes:   []wasm.RefType{},
+				Types: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+						ParamNumInUint64:  1,
+						ResultNumInUint64: 1},
+				},
+				Functions: []uint32{0},
+				Signature: &wasm.FunctionType{
+					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 		{
@@ -74,10 +92,18 @@ func TestCompile(t *testing.T) {
 					&OperationBr{Target: &BranchTarget{}},                    // return!
 				},
 				LabelCallers: map[string]uint32{},
-				Types:        []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
-				Functions:    []uint32{0},
-				Signature:    &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
-				TableTypes:   []wasm.RefType{},
+				Types: []*wasm.FunctionType{{
+					Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				}},
+				Functions: []uint32{0},
+				Signature: &wasm.FunctionType{
+					Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI32},
+					ParamNumInUint64:  1,
+					ResultNumInUint64: 1,
+				},
+				TableTypes: []wasm.RefType{},
 			},
 		},
 	}
@@ -227,11 +253,17 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 }
 
 func TestCompile_MultiValue(t *testing.T) {
-	i32i32_i32i32 := &wasm.FunctionType{Params: []wasm.ValueType{
-		wasm.ValueTypeI32, wasm.ValueTypeI32},
-		Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+	i32i32_i32i32 := &wasm.FunctionType{
+		Params:            []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+		ParamNumInUint64:  2,
+		ResultNumInUint64: 2,
 	}
-	_i32i64 := &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64}}
+	_i32i64 := &wasm.FunctionType{
+		Results:           []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64},
+		ParamNumInUint64:  0,
+		ResultNumInUint64: 2,
+	}
 
 	tests := []struct {
 		name            string
@@ -836,6 +868,192 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 			require.True(t, res[0].HasTable)
+		})
+	}
+}
+
+func TestCompile_Locals_vector(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		mod      *wasm.Module
+		expected []Operation
+	}{
+		{
+			name: "local.get - func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				&OperationPick{Depth: 1}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low]
+				&OperationPick{Depth: 1}, // [param[0].low, param[0].high, param[0].low] ->  [param[0].low, param[0].high, param[0].low, param[0].high]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.get - non func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeLocalGet, 0,
+						wasm.OpcodeEnd,
+					},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
+				}},
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationConstI64{Value: 0},
+				&OperationPick{Depth: 1}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low]
+				&OperationPick{Depth: 1}, // [p[0].low, p[0].high, p[0].low] ->  [p[0].low, p[0].high, p[0].low, p[0].high]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.set - func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
+					1, 0, 0, 0, 0, 0, 0, 0,
+					2, 0, 0, 0, 0, 0, 0, 0,
+					wasm.OpcodeLocalSet, 0, // [0x01, 0x02] -> []
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
+				&OperationSwap{Depth: 2},
+				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, 0x02, 0x01] -> [0x01, 0x02, p[0].lo]
+				&OperationSwap{Depth: 2},
+				// [0x01, 0x02, p[0].lo] -> [0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.set - non func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
+						1, 0, 0, 0, 0, 0, 0, 0,
+						2, 0, 0, 0, 0, 0, 0, 0,
+						wasm.OpcodeLocalSet, 0, // [0x01, 0x02] -> []
+						wasm.OpcodeEnd,
+					},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
+				}},
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationConstI64{Value: 0},
+				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
+				&OperationSwap{Depth: 2},
+				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, 0x02, 0x01] -> [0x01, 0x02, p[0].lo]
+				&OperationSwap{Depth: 2},
+				// [0x01, 0x02, p[0].lo] -> [0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.tee - func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
+					1, 0, 0, 0, 0, 0, 0, 0,
+					2, 0, 0, 0, 0, 0, 0, 0,
+					wasm.OpcodeLocalTee, 0, // [0x01, 0x02] ->  [0x01, 0x02]
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
+				&OperationPick{Depth: 1},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
+				&OperationPick{Depth: 1},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi]
+				&OperationSwap{Depth: 4},
+				// [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi] ->  [p[0].lo, 0x02, 0x01, 0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, 0x02, 0x01, 0x02, 0x01] -> [0x10, 0x02, 0x01, 0x02, p[0].lo]
+				&OperationSwap{Depth: 4},
+				// [0x10, 0x02, 0x01, 0x02, p[0].lo] -> [0x10, 0x02, 0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.tee - non func param",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{
+					Body: []byte{
+						wasm.OpcodeVecPrefix, wasm.OpcodeVecV128Const, // [] -> [0x01, 0x02]
+						1, 0, 0, 0, 0, 0, 0, 0,
+						2, 0, 0, 0, 0, 0, 0, 0,
+						wasm.OpcodeLocalTee, 0, // [0x01, 0x02] ->  [0x01, 0x02]
+						wasm.OpcodeEnd,
+					},
+					LocalTypes: []wasm.ValueType{wasm.ValueTypeV128},
+				}},
+			},
+			expected: []Operation{
+				&OperationConstI64{Value: 0},
+				&OperationConstI64{Value: 0},
+				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
+				&OperationPick{Depth: 1},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
+				&OperationPick{Depth: 1},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi]
+				&OperationSwap{Depth: 4},
+				// [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi] ->  [p[0].lo, 0x02, 0x01, 0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, 0x02, 0x01, 0x02, 0x01] -> [0x10, 0x02, 0x01, 0x02, p[0].lo]
+				&OperationSwap{Depth: 4},
+				// [0x10, 0x02, 0x01, 0x02, p[0].lo] -> [0x10, 0x02, 0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			require.NoError(t, err)
+			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
+			require.Equal(t, tc.expected, res[0].Operations, msg)
 		})
 	}
 }

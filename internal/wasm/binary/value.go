@@ -20,6 +20,7 @@ var encodedValTypes = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64:       {1, wasm.ValueTypeF64},
 	wasm.ValueTypeExternref: {1, wasm.ValueTypeExternref},
 	wasm.ValueTypeFuncref:   {1, wasm.ValueTypeFuncref},
+	wasm.ValueTypeV128:      {1, wasm.ValueTypeV128},
 }
 
 // encodeValTypes fast paths binary encoding of common value type lengths
@@ -58,7 +59,7 @@ func decodeValueTypes(r *bytes.Reader, num uint32) ([]wasm.ValueType, error) {
 	for i, v := range buf {
 		switch v {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64,
-			wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+			wasm.ValueTypeExternref, wasm.ValueTypeFuncref, wasm.ValueTypeV128:
 			ret[i] = v
 		default:
 			return nil, fmt.Errorf("invalid value type: %d", v)

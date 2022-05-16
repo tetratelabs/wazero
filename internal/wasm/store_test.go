@@ -591,18 +591,19 @@ func TestExecuteConstExpression(t *testing.T) {
 	})
 	t.Run("global expr", func(t *testing.T) {
 		for _, tc := range []struct {
-			valueType ValueType
-			val       uint64
+			valueType  ValueType
+			val, valHi uint64
 		}{
 			{valueType: ValueTypeI32, val: 10},
 			{valueType: ValueTypeI64, val: 20},
 			{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
 			{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
+			{valueType: ValueTypeV128, val: 0x1, valHi: 0x2},
 		} {
 			t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 				// The index specified in Data equals zero.
 				expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
-				globals := []*GlobalInstance{{Val: tc.val, Type: &GlobalType{ValType: tc.valueType}}}
+				globals := []*GlobalInstance{{Val: tc.val, ValHi: tc.valHi, Type: &GlobalType{ValType: tc.valueType}}}
 
 				val := executeConstExpression(globals, expr)
 				require.NotNil(t, val)
@@ -624,9 +625,27 @@ func TestExecuteConstExpression(t *testing.T) {
 					actual, ok := val.(float64)
 					require.True(t, ok)
 					require.Equal(t, api.DecodeF64(tc.val), actual)
+				case ValueTypeV128:
+					vector, ok := val.([2]uint64)
+					require.True(t, ok)
+					require.Equal(t, uint64(0x1), vector[0])
+					require.Equal(t, uint64(0x2), vector[1])
 				}
 			})
 		}
+	})
+
+	t.Run("vector", func(t *testing.T) {
+		expr := &ConstantExpression{Data: []byte{
+			1, 0, 0, 0, 0, 0, 0, 0,
+			2, 0, 0, 0, 0, 0, 0, 0,
+		}, Opcode: OpcodeVecV128Const}
+		val := executeConstExpression(nil, expr)
+		require.NotNil(t, val)
+		vector, ok := val.([2]uint64)
+		require.True(t, ok)
+		require.Equal(t, uint64(0x1), vector[0])
+		require.Equal(t, uint64(0x2), vector[1])
 	})
 }
 

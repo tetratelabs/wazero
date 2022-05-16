@@ -2,7 +2,9 @@ package spectest
 
 import (
 	"embed"
+	"path"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
@@ -22,9 +24,18 @@ func TestJIT(t *testing.T) {
 		t.Skip()
 	}
 
-	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures, func(jsonname string) bool {
+		// TODO: remove after SIMD proposal
+		return !strings.Contains(jsonname, "simd")
+	})
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures, func(jsonname string) bool {
+		// TODO: remove after SIMD proposal
+		if strings.Contains(jsonname, "simd") {
+			return path.Base(jsonname) == "simd_const.json"
+		}
+		return true
+	})
 }
