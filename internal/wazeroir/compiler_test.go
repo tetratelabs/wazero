@@ -901,7 +901,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 			},
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstI128{Lo: 0x01, Hi: 0x02},
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
 				&OperationSwap{Depth: 2},
 				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
@@ -934,7 +934,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 				&OperationConstI64{Value: 0},
 				&OperationConstI64{Value: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstI128{Lo: 0x01, Hi: 0x02},
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
 				&OperationSwap{Depth: 2},
 				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
@@ -962,7 +962,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 			},
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstI128{Lo: 0x01, Hi: 0x02},
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
 				&OperationPick{Depth: 1},
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
@@ -999,7 +999,7 @@ func TestCompile_Locals_vector(t *testing.T) {
 				&OperationConstI64{Value: 0},
 				&OperationConstI64{Value: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstI128{Lo: 0x01, Hi: 0x02},
+				&OperationConstV128{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
 				&OperationPick{Depth: 1},
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]

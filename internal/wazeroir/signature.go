@@ -154,6 +154,10 @@ var (
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeUnknown},
 	}
+	signature_I64I64I64I64_I64I64 = &signature{
+		in:  []UnsignedType{UnsignedTypeI64, UnsignedTypeI64, UnsignedTypeI64, UnsignedTypeI64},
+		out: []UnsignedType{UnsignedTypeI64, UnsignedTypeI64},
+	}
 )
 
 // wasmOpcodeSignature returns the signature of given Wasm opcode.
@@ -407,6 +411,8 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		switch vecOp := c.body[c.pc+1]; vecOp {
 		case wasm.OpcodeVecV128Const:
 			return signature_None_I64I64, nil
+		case wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
+			return signature_I64I64I64I64_I64I64, nil
 		default:
 			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
 		}

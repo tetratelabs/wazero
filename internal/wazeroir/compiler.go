@@ -348,7 +348,6 @@ operatorSwitch:
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
 		}
-		fmt.Println(frame.originalStackLenWithoutParam)
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
@@ -588,7 +587,6 @@ operatorSwitch:
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := &OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
-		fmt.Println(dropOp)
 		target := targetFrame.asBranchTarget()
 		c.result.LabelCallers[target.Label.String()]++
 		c.emit(
@@ -1733,9 +1731,17 @@ operatorSwitch:
 			c.pc += 8
 			hi := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
 			c.emit(
-				&OperationConstI128{Lo: lo, Hi: hi},
+				&OperationConstV128{Lo: lo, Hi: hi},
 			)
 			c.pc += 7
+		case wasm.OpcodeVecI32x4Add:
+			c.emit(
+				&OperationI32x4Add{},
+			)
+		case wasm.OpcodeVecI64x2Add:
+			c.emit(
+				&OperationI64x2Add{},
+			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
 		}

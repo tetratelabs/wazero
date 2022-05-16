@@ -1059,6 +1059,20 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				pc += 16
 				valueTypeStack.push(ValueTypeVector)
+			case OpcodeVecI32x4Add:
+				for i := 0; i < 2; i++ {
+					if err := valueTypeStack.popAndVerifyType(ValueTypeVector); err != nil {
+						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI32x4AddName, err)
+					}
+				}
+				valueTypeStack.push(ValueTypeVector)
+			case OpcodeVecI64x2Add:
+				for i := 0; i < 2; i++ {
+					if err := valueTypeStack.popAndVerifyType(ValueTypeVector); err != nil {
+						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI64x2AddName, err)
+					}
+				}
+				valueTypeStack.push(ValueTypeVector)
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}

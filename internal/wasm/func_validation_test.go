@@ -2672,6 +2672,40 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				OpcodeEnd,
 			},
 		},
+		{
+			name: "i32x4.add",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecI32x4Add,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+		},
+		{
+			name: "i64x2.add",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecI64x2Add,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -2712,6 +2746,36 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			},
 			flag:        FeatureSIMD,
 			expectedErr: "cannot read constant vector value for v128.const",
+		},
+		{
+			name: "i32x4.add operand",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecI32x4Add,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag:        FeatureSIMD,
+			expectedErr: "cannot pop the operand for i32x4.add: i128 missing",
+		},
+		{
+			name: "i64x2.add operand",
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				OpcodeVecPrefix,
+				OpcodeVecI64x2Add,
+				OpcodeDrop,
+				OpcodeEnd,
+			},
+			flag:        FeatureSIMD,
+			expectedErr: "cannot pop the operand for i64x2.add: i128 missing",
 		},
 		{
 			// TODO delete this case after SIMD impl completion.

@@ -287,8 +287,8 @@ func (o OperationKind) String() (ret string) {
 		ret = "TableGrow"
 	case OperationKindTableFill:
 		ret = "TableFill"
-	case OperationKindConstI128:
-		ret = "ConstI128"
+	case OperationKindConstV128:
+		ret = "ConstV128"
 	default:
 		panic("BUG")
 	}
@@ -383,7 +383,9 @@ const (
 	OperationKindTableSize
 	OperationKindTableGrow
 	OperationKindTableFill
-	OperationKindConstI128
+	OperationKindConstV128
+	OperationKindI32x4Add
+	OperationKindI64x2Add
 )
 
 type Label struct {
@@ -1148,13 +1150,28 @@ func (o *OperationTableFill) Kind() OperationKind {
 	return OperationKindTableFill
 }
 
-// OperationConstI128 implements Operation.
-
-type OperationConstI128 struct {
+// OperationConstV128 implements Operation.
+type OperationConstV128 struct {
 	Lo, Hi uint64
 }
 
 // Kind implements Operation.Kind.
-func (o *OperationConstI128) Kind() OperationKind {
-	return OperationKindConstI128
+func (o *OperationConstV128) Kind() OperationKind {
+	return OperationKindConstV128
+}
+
+// OperationI32x4Add implements Operation.
+type OperationI32x4Add struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationI32x4Add) Kind() OperationKind {
+	return OperationKindI32x4Add
+}
+
+// OperationI64x2Add implements Operation.
+type OperationI64x2Add struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationI64x2Add) Kind() OperationKind {
+	return OperationKindI64x2Add
 }

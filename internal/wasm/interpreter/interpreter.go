@@ -575,10 +575,12 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationTableFill:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.TableIndex)
-		case *wazeroir.OperationConstI128:
+		case *wazeroir.OperationConstV128:
 			op.us = make([]uint64, 2)
 			op.us[0] = o.Lo
 			op.us[1] = o.Hi
+		case *wazeroir.OperationI32x4Add:
+		case *wazeroir.OperationI64x2Add:
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -1933,11 +1935,22 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 			}
 			frame.pc++
-		case wazeroir.OperationKindConstI128:
+		case wazeroir.OperationKindConstV128:
 			lo, hi := op.us[0], op.us[1]
-			fmt.Println("low, hi =", lo, ",", hi)
 			ce.pushValue(lo)
 			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindI32x4Add:
+			xHigh, xLow := ce.popValue(), ce.popValue()
+			yHigh, yLow := ce.popValue(), ce.popValue()
+			ce.pushValue(uint64((uint64(uint32(xLow>>32+yLow>>32)) << 32)) + uint64((uint32(xLow) + uint32(yLow))))
+			ce.pushValue(uint64((uint64(uint32(xHigh>>32+yHigh>>32)) << 32)) + uint64((uint32(xHigh) + uint32(yHigh))))
+			frame.pc++
+		case wazeroir.OperationKindI64x2Add:
+			xHigh, xLow := ce.popValue(), ce.popValue()
+			yHigh, yLow := ce.popValue(), ce.popValue()
+			ce.pushValue(xHigh + yHigh)
+			ce.pushValue(xLow + yLow)
 			frame.pc++
 		}
 	}

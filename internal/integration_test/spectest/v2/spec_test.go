@@ -25,17 +25,16 @@ func TestJIT(t *testing.T) {
 	}
 
 	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures, func(jsonname string) bool {
-		return strings.Contains(jsonname, "simd")
+		// TODO: remove after SIMD proposal
+		return !strings.Contains(jsonname, "simd")
 	})
 }
 
 func TestInterpreter(t *testing.T) {
 	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures, func(jsonname string) bool {
-		return path.Base(jsonname) == "simd_const.json"
-
 		// TODO: remove after SIMD proposal
 		if strings.Contains(jsonname, "simd") {
-			return false
+			return path.Base(jsonname) == "simd_const.json"
 		}
 		return true
 	})

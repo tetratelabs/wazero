@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -110,9 +111,9 @@ type stackTrace struct {
 }
 
 func (s *stackTrace) FromRecovered(recovered interface{}) error {
-	// if buildoptions.IsDebugMode {
-	debug.PrintStack()
-	// }
+	if buildoptions.IsDebugMode {
+		debug.PrintStack()
+	}
 
 	stack := strings.Join(s.frames, "\n\t")
 

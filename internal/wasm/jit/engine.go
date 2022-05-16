@@ -2,6 +2,7 @@ package jit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -866,6 +867,8 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 		}
 		var err error
 		switch o := op.(type) {
+		case *wazeroir.OperationLabel:
+			// Label op is already handled ^^.
 		case *wazeroir.OperationUnreachable:
 			err = compiler.compileUnreachable()
 		case *wazeroir.OperationBr:
@@ -1038,6 +1041,8 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 			err = compiler.compileTableSize(o)
 		case *wazeroir.OperationTableFill:
 			err = compiler.compileTableFill(o)
+		default:
+			err = errors.New("unsupported")
 		}
 		if err != nil {
 			return nil, fmt.Errorf("operation %s: %w", op.Kind().String(), err)

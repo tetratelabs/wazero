@@ -159,7 +159,6 @@ func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
 	}
 	for _, exp := range c.Exps {
 		exps = append(exps, exp.toUint64s()...)
-		fmt.Println("exps", exps)
 	}
 	return args, exps
 }
@@ -196,7 +195,6 @@ func (c commandActionVal) toUint64s() (ret []uint64) {
 			low |= (v << (i * width))
 		}
 		for i := valNum / 2; i < valNum; i++ {
-			fmt.Println("hi: ", i)
 			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
 			if err != nil {
 				panic(err)
@@ -356,6 +354,9 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
+//
+// filter is a callback which is called with the target json file name and should return true if the engine wants to run tests against it, false otherwise.
+// TODO: remove filter after SIMD completion.
 func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features, filter func(jsonname string) bool) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
