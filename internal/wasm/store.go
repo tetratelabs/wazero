@@ -511,7 +511,15 @@ func (s *Store) resolveImports(module *Module) (
 			importedFunction := imported.Function
 
 			actualType := importedFunction.Type
-			if !expectedType.EqualsSignature(actualType.Params, actualType.Results) {
+
+			var mismatch bool
+			if importedFunction.Kind != FunctionKindWasm {
+				// Host function takes two uint64 instead of a dedicated vector type in the signature.
+				mismatch = !expectedType.EqualsSignatureV128Flattened(actualType.Params, actualType.Results)
+			} else {
+				mismatch = !expectedType.EqualsSignature(actualType.Params, actualType.Results)
+			}
+			if mismatch {
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
 				return
 			}

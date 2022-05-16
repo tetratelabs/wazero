@@ -59,7 +59,7 @@ func ExternTypeName(et ExternType) string {
 //  * ValueTypeI64 - uint64(int64)
 //  * ValueTypeF32 - EncodeF32 and DecodeF32 from float32
 //  * ValueTypeF64 - EncodeF64 and DecodeF64 from float64
-//  * ValueTypeV128 - EncodeV128_XXX and DecodeV128_XXX where XXX is one of I8x16, I16x8, I32x4, I64x2, F32x4 or F64x2.
+//  * ValueTypeV128 - EncodeV128_XXX and DecodeV128_XXX where XXX is either I8x16, I16x8, I32x4, I64x2, F32x4 or F64x2.
 //  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.

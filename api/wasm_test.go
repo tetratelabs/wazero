@@ -192,7 +192,7 @@ func TestDecodeEncode_identical(t *testing.T) {
 				{0xffffffff_efffffff, 0xffffffff_ffffffff},
 				{0xffffffff_efffffff, 0xffffffff_efffffff},
 				{0xffff_ffff, 0xffff_ffff},
-				{0x1 << 4, 0x1 << 3},
+				{1 << 4, 1 << 3}, {1 << 3, 1 << 4},
 				{math.Float64bits(math.Inf(1)), 0xffffffff_efffffff},
 				{math.Float64bits(math.Inf(-1)), 0xffffffff_efffffff},
 				{0xffffffff_efffffff, math.Float64bits(math.Inf(1))},
@@ -206,6 +206,5 @@ func TestDecodeEncode_identical(t *testing.T) {
 				})
 			}
 		})
-
 	}
 }

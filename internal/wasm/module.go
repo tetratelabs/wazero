@@ -703,6 +703,44 @@ func (t *FunctionType) EqualsSignature(params []ValueType, results []ValueType) 
 	return bytes.Equal(t.Params, params) && bytes.Equal(t.Results, results)
 }
 
+// EqualsSignature is the same as EqualsSignature except that this translates ValueTypeV128 as
+// two ValueTypeI64. This is used for matching imported host functions with the signature containing v128 types.
+func (t *FunctionType) EqualsSignatureV128Flattened(params []ValueType, results []ValueType) bool {
+	expParams := make([]ValueType, 0, len(t.Params))
+	for _, p := range t.Params {
+		if p != ValueTypeV128 {
+			expParams = append(expParams, p)
+		} else {
+			expParams = append(expParams, ValueTypeI64, ValueTypeI64)
+		}
+	}
+	expResults := make([]ValueType, 0, len(t.Results))
+	for _, p := range t.Results {
+		if p != ValueTypeV128 {
+			expResults = append(expResults, p)
+		} else {
+			expResults = append(expResults, ValueTypeI64, ValueTypeI64)
+		}
+	}
+	actualParams := make([]ValueType, 0, len(params))
+	for _, p := range params {
+		if p != ValueTypeV128 {
+			actualParams = append(actualParams, p)
+		} else {
+			actualParams = append(actualParams, ValueTypeI64, ValueTypeI64)
+		}
+	}
+	actualResults := make([]ValueType, 0, len(results))
+	for _, p := range results {
+		if p != ValueTypeV128 {
+			actualResults = append(actualResults, p)
+		} else {
+			actualResults = append(actualResults, ValueTypeI64, ValueTypeI64)
+		}
+	}
+	return bytes.Equal(expParams, actualParams) && bytes.Equal(expResults, actualResults)
+}
+
 // key gets or generates the key for Store.typeIDs. Ex. "i32_v" for one i32 parameter and no (void) result.
 func (t *FunctionType) key() string {
 	if t.string != "" {

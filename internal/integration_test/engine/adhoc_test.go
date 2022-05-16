@@ -53,7 +53,10 @@ func TestEngineJIT(t *testing.T) {
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	// runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	testVectorParams(t, wazero.NewRuntimeWithConfig(
+		wazero.NewRuntimeConfigInterpreter().WithWasmCore2(),
+	))
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
@@ -77,6 +80,8 @@ var (
 	hugestackWasm []byte
 	//go:embed testdata/reftype_imports.wasm
 	reftypeImportsWasm []byte
+	//go:embed testdata/vector_params.wasm
+	vectorParamsWasm []byte
 )
 
 func testReftypeImports(t *testing.T, r wazero.Runtime) {
@@ -282,6 +287,91 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 			results, err := importing.ExportedFunction("call->"+test).Call(testCtx, math.MaxUint32-1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(math.MaxUint32), results[0])
+		})
+	}
+}
+
+func testVectorParams(t *testing.T, r wazero.Runtime) {
+	fns := map[string]interface{}{
+		"i8x16": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_I8x16(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_I8x16(decoded)
+		},
+		"i16x8": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_I16x8(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_I16x8(decoded)
+		},
+		"i32x4": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_I32x4(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_I32x4(decoded)
+		},
+		"i64x2": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_I64x2(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_I64x2(decoded)
+		},
+		"f32x4": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_F32x4(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_F32x4(decoded)
+		},
+		"f64x2": func(low, high uint64) (incrementedLow, incremetedHigh uint64) {
+			decoded := api.DecodeV128_F64x2(low, high)
+			for i := range decoded {
+				decoded[i]++
+			}
+			return api.EncodeV128_F64x2(decoded)
+		},
+	}
+
+	imported, err := r.NewModuleBuilder("env").ExportFunctions(fns).Instantiate(testCtx)
+	require.NoError(t, err)
+	defer imported.Close(testCtx)
+
+	mod, err := r.InstantiateModuleFromCode(testCtx, vectorParamsWasm)
+	require.NoError(t, err)
+	defer mod.Close(testCtx)
+
+	for _, tc := range []struct {
+		name          string
+		encodedParams func() (lo, hi uint64)
+		verifyFunc    func(t *testing.T, actualLo, actualHi uint64)
+	}{
+		{
+			name: "i8x16",
+			encodedParams: func() (lo, hi uint64) {
+				original := []int8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+				return api.EncodeV128_I8x16(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_I8x16(actualLo, actualHi)
+				require.Equal(t,
+					[]int8{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+					actual,
+				)
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lo, hi := tc.encodedParams()
+			results, err := mod.ExportedFunction("call_"+tc.name).Call(testCtx, lo, hi)
+			require.NoError(t, err)
+			require.Equal(t, int(2), len(results))
+			tc.verifyFunc(t, results[0], results[1])
 		})
 	}
 }
