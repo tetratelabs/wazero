@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 				uint64(math.Float32bits(float32(math.NaN()))),
 			} {
 				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 
 					// Compile code.
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -67,8 +67,8 @@ func TestCompiler_compileConsts(t *testing.T) {
 					// Run native code.
 					env.exec(code)
 
-					// JIT status must be returned.
-					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					// Compiler status must be returned.
+					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer())
 
 					switch op {
@@ -119,7 +119,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 					} {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
-							env := newJITEnvironment()
+							env := newCompilerEnvironment()
 							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
@@ -283,7 +283,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 						} {
 							x1OnRegister := x1OnRegister
 							t.Run(fmt.Sprintf("x1=0x%x(on_register=%v),x2=0x%x", x1, x1OnRegister, x2), func(t *testing.T) {
-								env := newJITEnvironment()
+								env := newCompilerEnvironment()
 								compiler := env.requireNewCompiler(t, newCompiler, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
@@ -417,7 +417,7 @@ func TestCompiler_compileShr(t *testing.T) {
 				} {
 					x1, x2 := values[0], values[1]
 					t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
-						env := newJITEnvironment()
+						env := newCompilerEnvironment()
 						compiler := env.requireNewCompiler(t, newCompiler, nil)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
@@ -535,7 +535,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							t.Skip()
 						}
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
-							env := newJITEnvironment()
+							env := newCompilerEnvironment()
 							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
@@ -747,7 +747,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							name = fmt.Sprintf("%032b", v)
 						}
 						t.Run(name, func(t *testing.T) {
-							env := newJITEnvironment()
+							env := newCompilerEnvironment()
 							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
@@ -938,7 +938,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 			} {
 				x1, x2 := vs[0], vs[1]
 				t.Run(fmt.Sprintf("x1=%f_x2=%f", x1, x2), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -974,7 +974,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					require.NoError(t, err)
 					env.exec(code)
 
-					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
 
 					tc.verifyFunc(t, x1, x2, env.stackTopAsUint64())
@@ -1244,7 +1244,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 			} {
 				v := v
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -1275,7 +1275,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					require.NoError(t, err)
 					env.exec(code)
 
-					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
 
 					tc.verifyFunc(t, v, env.stackTopAsUint64())
@@ -1344,7 +1344,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 					} {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
-							env := newJITEnvironment()
+							env := newCompilerEnvironment()
 							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
@@ -1409,31 +1409,31 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								switch signedType {
 								case wazeroir.SignedTypeUint32:
 									if uint32(x2) == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeInt32:
 									v1, v2 := int32(x1), int32(x2)
 									if v2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else if v1 == math.MinInt32 && v2 == -1 {
-										require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerOverflow, env.compilerStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt32())
 									}
 								case wazeroir.SignedTypeUint64:
 									if x2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, x1/x2, env.stackTopAsUint64())
 									}
 								case wazeroir.SignedTypeInt64:
 									v1, v2 := int64(x1), int64(x2)
 									if v2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else if v1 == math.MinInt64 && v2 == -1 {
-										require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerOverflow, env.compilerStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt64())
 									}
@@ -1459,27 +1459,27 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								case wazeroir.SignedTypeInt32:
 									v1, v2 := int32(x1), int32(x2)
 									if v2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsInt32())
 									}
 								case wazeroir.SignedTypeInt64:
 									v1, v2 := int64(x1), int64(x2)
 									if v2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsInt64())
 									}
 								case wazeroir.SignedTypeUint32:
 									v1, v2 := uint32(x1), uint32(x2)
 									if v2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeUint64:
 									if x2 == 0 {
-										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, x1%x2, env.stackTopAsUint64())
 									}

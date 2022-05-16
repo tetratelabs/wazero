@@ -684,8 +684,8 @@ func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 			const maxSignedInt19 int64 = 1<<19 - 1
 			const minSignedInt19 int64 = -(1 << 19)
 			if offset < minSignedInt19 || offset > maxSignedInt19 {
-				// This should be a bug in our JIT compiler as the conditional jumps are only used in the small offsets (~a few bytes),
-				// and if ever happens, JIT compiler can be fixed.
+				// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
+				// and if ever happens, compiler can be fixed.
 				return fmt.Errorf("BUG: relative jump offset %d/4(=%d)must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
 			}
 			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
@@ -1522,7 +1522,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
 
 // validateMemoryOffset validates the memory offset if the given offset can be encoded in the assembler.
 // In theory, offset can be any, but for simplicity of our homemade assembler, we limit the offset range
-// that can be encoded enough for supporting JIT compiler.
+// that can be encoded enough for supporting compiler.
 func validateMemoryOffset(offset int64) (err error) {
 	if offset > 255 && offset%8 != 0 {
 		// This is because we only have large offsets for load/store with Wasm value stack, and its offset

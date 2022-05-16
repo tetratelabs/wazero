@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"errors"
@@ -49,7 +49,7 @@ func allocateMemory(code []byte, protect uintptr) (uintptr, error) {
 	size := uintptr(len(code))
 	alloctype := windows_MEM_COMMIT
 	if r, _, err := procVirtualAlloc.Call(address, size, alloctype, protect); r == 0 {
-		return 0, fmt.Errorf("jit: VirtualAlloc error: %w", ensureErr(err))
+		return 0, fmt.Errorf("compiler: VirtualAlloc error: %w", ensureErr(err))
 	} else {
 		return r, nil
 	}
@@ -62,14 +62,14 @@ func freeMemory(code []byte) error {
 	size := uintptr(0) // size must be 0 because we're using MEM_RELEASE.
 	freetype := windows_MEM_RELEASE
 	if r, _, err := procVirtualFree.Call(address, size, freetype); r == 0 {
-		return fmt.Errorf("jit: VirtualFree error: %w", ensureErr(err))
+		return fmt.Errorf("compiler: VirtualFree error: %w", ensureErr(err))
 	}
 	return nil
 }
 
 func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error {
 	if r, _, err := procVirtualProtect.Call(address, size, newprotect, uintptr(unsafe.Pointer(oldprotect))); r == 0 {
-		return fmt.Errorf("jit: VirtualProtect error: %w", ensureErr(err))
+		return fmt.Errorf("compiler: VirtualProtect error: %w", ensureErr(err))
 	}
 	return nil
 }

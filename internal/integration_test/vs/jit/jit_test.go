@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/integration_test/vs"
 )
 
-var runtime = vs.NewWazeroJITRuntime
+var runtime = vs.NewWazeroCompilerRuntime
 
 func TestAllocation(t *testing.T) {
 	vs.RunTestAllocation(t, runtime)

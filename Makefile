@@ -3,11 +3,11 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.0
 # sync this with netlify.toml!
 hugo          := github.com/gohugoio/hugo@v0.98.0
 
-ensureJITFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
+ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
 bench:
 	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
-	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureJITFastest)
+	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureCompilerFastest)
 
 .PHONY: bench.check
 bench.check:
@@ -15,7 +15,7 @@ bench.check:
 	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
 	@for d in vs/wasmedge vs/wasmer vs/wasmtime ; do \
 		cd ./internal/integration_test/$$d ; \
-		go test -bench=. . -tags='wasmedge' $(ensureJITFastest) ; \
+		go test -bench=. . -tags='wasmedge' $(ensureCompilerFastest) ; \
 		cd - ;\
 	done
 

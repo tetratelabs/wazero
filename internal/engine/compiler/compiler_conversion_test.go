@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 					} {
 						v := v
 						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-							env := newJITEnvironment()
+							env := newCompilerEnvironment()
 							compiler := env.requireNewCompiler(t, newCompiler, nil)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 			} {
 				v := v
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -218,12 +218,12 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					env.exec(code)
 
 					// Check the result.
-					expStatus := jitCallStatusCodeReturned
+					expStatus := compilerCallStatusCodeReturned
 					if math.IsNaN(v) {
 						if tc.nonTrapping {
 							v = 0
 						} else {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = compilerCallStatusCodeInvalidFloatToIntConversion
 						}
 					}
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
@@ -237,10 +237,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt32
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
@@ -254,10 +254,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt64
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
@@ -269,10 +269,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									v = math.MaxInt32
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(v)), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
@@ -285,10 +285,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt64
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
@@ -302,10 +302,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint32
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
@@ -318,10 +318,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint32
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
@@ -335,10 +335,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint64
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
@@ -351,14 +351,14 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint64
 								}
 							} else {
-								expStatus = jitCallStatusIntegerOverflow
+								expStatus = compilerCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == jitCallStatusCodeReturned {
+						if expStatus == compilerCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					}
-					require.Equal(t, expStatus, env.jitStatus())
+					require.Equal(t, expStatus, env.compilerStatus())
 				})
 			}
 		})
@@ -388,7 +388,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 				math.MaxUint32, math.MaxUint64, math.MaxInt32, math.MaxInt64,
 			} {
 				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -465,7 +465,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -511,7 +511,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 		math.Inf(1), math.Inf(-1), math.NaN(),
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

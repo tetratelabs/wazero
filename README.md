@@ -103,9 +103,9 @@ they may answer them for you!
 
 ## Runtime
 
-There are two runtime configurations supported in wazero: _JIT_ is default:
+There are two runtime configurations supported in wazero: _Compiler_ is default:
 
-If you don't choose, ex `wazero.NewRuntime()`, JIT is used if supported. You can also force the interpreter like so:
+If you don't choose, ex `wazero.NewRuntime()`, Compiler is used if supported. You can also force the interpreter like so:
 ```go
 r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 ```
@@ -116,11 +116,12 @@ machine. Its implementation doesn't have any platform (GOARCH, GOOS) specific
 code, therefore _interpreter_ can be used for any compilation target available
 for Go (such as `riscv64`).
 
-### JIT
-JIT (Just In Time) compiles WebAssembly modules into machine code during
-`Runtime.CompileModule` so that they are executed natively at runtime. JIT is
-faster than Interpreter, often by order of magnitude (10x) or more. This is
-done while still having no host-specific dependencies.
+### Compiler
+Compiler compiles WebAssembly modules into machine code ahead of time (AOT),
+during `Runtime.CompileModule`. This means your WebAssembly functions execute
+natively at runtime. Compiler is faster than Interpreter, often by order of
+magnitude (10x) or more. This is done while still having no host-specific
+dependencies.
 
 If interested, check out the [RATIONALE.md][8] and help us optimize further!
 
@@ -131,7 +132,7 @@ Both runtimes pass [WebAssembly 1.0 spectests][7] on supported platforms:
 | Runtime     | Usage| amd64 | arm64 | others |
 |:---:|:---:|:---:|:---:|:---:|
 | Interpreter|`wazero.NewRuntimeConfigInterpreter()`|✅ |✅|✅|
-| JIT |`wazero.NewRuntimeConfigJIT()`|✅|✅ |❌|
+| Compiler |`wazero.NewRuntimeConfigCompiler()`|✅|✅ |❌|
 
 ## Support Policy
 
@@ -159,7 +160,7 @@ For example, once Go 1.29 is released, wazero may use a Go 1.28 feature.
 
 ### Platform
 
-wazero has two runtime modes: Interpreter and JIT. The only supported operating
+wazero has two runtime modes: Interpreter and Compiler. The only supported operating
 systems are ones we test, but that doesn't necessarily mean other operating
 system versions won't work.
 
@@ -169,7 +170,7 @@ We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
 * Interpreter
   * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
   * MacOS and Windows are only tested on amd64.
-* JIT
+* Compiler
   * Linux is tested on amd64 (native) as well arm64 via emulation.
   * MacOS and Windows are only tested on amd64.
 
@@ -190,7 +191,7 @@ wazero is a registered trademark of Tetrate.io, Inc. in the United States and/or
 [5]: https://github.com/WebAssembly/WASI
 [6]: https://pkg.go.dev/golang.org/x/sys/unix
 [7]: https://github.com/WebAssembly/spec/tree/wg-1.0/test/core
-[8]: ./internal/wasm/jit/RATIONALE.md
+[8]: internal/engine/compiler/RATIONALE.md
 [9]: https://github.com/tetratelabs/wazero/issues/506
 [10]: https://go.dev/doc/devel/release
 [11]: https://github.com/actions/virtual-environments

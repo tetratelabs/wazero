@@ -1,12 +1,12 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// jitcall(codeSegment, ce, moduleInstanceAddress)
-TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-24
+// compilercall(codeSegment, ce, moduleInstanceAddress)
+TEXT ·compilercall(SB),NOSPLIT|NOFRAME,$0-24
         // Load the address of *callEngine into arm64ReservedRegisterForCallEngine.
         MOVD ce+8(FP),R0
         // In arm64, return address is stored in R30 after jumping into the code.
-        // We save the return address value into archContext.jitReturnAddress in Engine.
+        // We save the return address value into archContext.compilerReturnAddress in Engine.
         // Note that the const 136 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
         MOVD R30,136(R0)
         // Load the address of *wasm.ModuleInstance into arm64CallingConventionModuleInstanceAddressRegister.

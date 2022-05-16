@@ -340,7 +340,7 @@ func RegisterName(r asm.Register) string {
 
 // Arm64-specific instructions.
 //
-// Note: This only defines arm64 instructions used by wazero's JIT compiler.
+// Note: This only defines arm64 instructions used by wazero's compiler.
 // Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 const (
 	NOP asm.Instruction = iota

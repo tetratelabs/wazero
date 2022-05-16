@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -104,7 +104,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			env.moduleInstance = tc.moduleInstance
 			ce := env.callEngine()
 
@@ -129,7 +129,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 0, len(compiler.valueLocationStack().usedRegisters), "expected no usedRegisters")
 
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -138,7 +138,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			env.exec(code)
 
 			// Check the exit status.
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 
 			// Check if the fields of callEngine.moduleContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
@@ -179,7 +179,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		const stackPointerCeil = 5
 		for _, baseOffset := range []uint64{5, 10, 20} {
 			t.Run(fmt.Sprintf("%d", baseOffset), func(t *testing.T) {
-				env := newJITEnvironment()
+				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 				// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
@@ -195,7 +195,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				compiler.getOnStackPointerCeilDeterminedCallBack()(stackPointerCeil)
 				env.setValueStackBasePointer(stackBasePointer)
 
-				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+				compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -203,12 +203,12 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env.exec(code)
 
 				// The status code must be "Returned", not "BuiltinFunctionCall".
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			})
 		}
 	})
 	t.Run("grow", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
@@ -234,17 +234,17 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		env.exec(code)
 
 		// Check if the call exits with builtin function call status.
-		require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.True(t, returnAddress != 0, "returnAddress was non-zero %d", returnAddress)
-		jitcall(
+		compilercall(
 			returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
 			uintptr(unsafe.Pointer(env.module())),
 		)
 
 		// Check the result. This should be "Returned".
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 	})
 }

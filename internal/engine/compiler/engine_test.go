@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
-func TestJIT_VerifyOffsetValue(t *testing.T) {
+func TestCompiler_VerifyOffsetValue(t *testing.T) {
 	var me moduleEngine
 	require.Equal(t, int(unsafe.Offsetof(me.functions)), moduleEngineFunctionsOffset)
 
@@ -45,7 +45,7 @@ func TestJIT_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
 
 	// Offsets for callEngine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextJITCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextCompilerCallStatusCodeOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.
@@ -139,7 +139,7 @@ func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcInd
 	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
 }
 
-func TestJIT_Engine_NewModuleEngine(t *testing.T) {
+func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
@@ -148,27 +148,27 @@ func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
 	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
 }
 
-func TestJIT_Engine_NewModuleEngine_InitTable(t *testing.T) {
+func TestCompiler_Engine_NewModuleEngine_InitTable(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
-func TestJIT_ModuleEngine_Call(t *testing.T) {
+func TestCompiler_ModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
-func TestJIT_ModuleEngine_Call_HostFn(t *testing.T) {
+func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
-func TestJIT_ModuleEngine_Call_Errors(t *testing.T) {
+func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
 }
 
-func TestJIT_ModuleEngine_Memory(t *testing.T) {
+func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Memory(t, et)
 }
@@ -189,7 +189,7 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 	f[cf] = finalizer.(func(*code))
 }
 
-func TestJIT_CompileModule(t *testing.T) {
+func TestCompiler_CompileModule(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		e := et.NewEngine(wasm.Features20191205).(*engine)
 		ff := fakeFinalizer{}
@@ -246,8 +246,8 @@ func TestJIT_CompileModule(t *testing.T) {
 	})
 }
 
-// TestJIT_Releasecode_Panic tests that an unexpected panic has some identifying information in it.
-func TestJIT_Releasecode_Panic(t *testing.T) {
+// TestCompiler_Releasecode_Panic tests that an unexpected panic has some identifying information in it.
+func TestCompiler_Releasecode_Panic(t *testing.T) {
 	captured := require.CapturePanic(func() {
 		releaseCode(&code{
 			indexInModule: 2,
@@ -255,13 +255,13 @@ func TestJIT_Releasecode_Panic(t *testing.T) {
 			codeSegment:   []byte{wasm.OpcodeEnd}, // never compiled means it was never mapped.
 		})
 	})
-	require.Contains(t, captured.Error(), fmt.Sprintf("jit: failed to munmap code segment for %[1]s.function[2]", t.Name()))
+	require.Contains(t, captured.Error(), fmt.Sprintf("compiler: failed to munmap code segment for %[1]s.function[2]", t.Name()))
 }
 
 // Ensures that value stack and call-frame stack are allocated on heap which
 // allows us to safely access to their data region from native code.
 // See comments on initialValueStackSize and initialCallFrameStackSize.
-func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
+func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := wasm.Features20191205
 	e := newEngine(enabledFeatures)
 	store := wasm.NewStore(enabledFeatures, e)
@@ -359,7 +359,7 @@ func TestJIT_SliceAllocatedOnHeap(t *testing.T) {
 	}
 }
 
-// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and jit
+// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and compiler
 func TestEngine_Cachedcodes(t *testing.T) {
 	e := newEngine(wasm.Features20191205)
 	exp := []*code{

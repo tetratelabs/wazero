@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
-	env := newJITEnvironment()
+	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newArm64Compiler, nil).(*arm64Compiler)
 
 	err := compiler.compilePreamble()
@@ -25,7 +25,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	// If we fail to branch, we reach here and exit with unreachable status,
 	// so the assertion would fail.
-	compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+	compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 
 	// This could be the read instruction target as this is the
 	// right after RET. Therefore, the branch instruction above
@@ -38,7 +38,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	env.exec(code)
 
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 }
 
 // compile implements compilerImpl.valueLocationStack for the amd64 architecture.

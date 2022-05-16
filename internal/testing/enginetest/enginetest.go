@@ -6,7 +6,7 @@
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
 //
-// Ex. Some tests using the JIT Engine may need to guard as they use compiled features:
+// Ex. Some tests using the Compiler Engine may need to guard as they use compiled features:
 //	func TestModuleEngine_Call(t *testing.T) {
 //		requireSupportedOSArch(t)
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)
@@ -785,14 +785,14 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 }
 
 // linkModuleToEngine assigns fields that wasm.Store would on instantiation. These includes fields both interpreter and
-// JIT needs as well as fields only needed by JIT.
+// Compiler needs as well as fields only needed by Compiler.
 //
-// Note: This sets fields that are not needed in the interpreter, but are required by code compiled by JIT. If a new
-// test here passes in the interpreter and segmentation faults in JIT, check for a new field offset or a change in JIT
-// (ex. jit.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
+// Note: This sets fields that are not needed in the interpreter, but are required by code compiled by Compiler. If a new
+// test here passes in the interpreter and segmentation faults in Compiler, check for a new field offset or a change in Compiler
+// (ex. compiler.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
 // wasm.Store: store isn't used here for unit test precision.
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
-	module.Engine = me // for JIT, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
+	module.Engine = me // for Compiler, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 	// callEngineModuleContextModuleInstanceAddressOffset
 	module.CallCtx = wasm.NewCallContext(nil, module, nil)
 }

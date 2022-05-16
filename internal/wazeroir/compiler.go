@@ -250,7 +250,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
-// or the JIT compilation engine.
+// or the Compiler compilation engine.
 func compile(enabledFeatures wasm.Features,
 	sig *wasm.FunctionType,
 	body []byte,
