@@ -87,7 +87,12 @@ const (
 	ValueTypeF64 ValueType = 0x7c
 	// ValueTypeV128 is a 128-bit vector value.
 	//
-	// TODO
+	// The type corresponds to a 128 bit vector of packed integer or floating-point data.
+	// The packed data can be interpreted as signed or unsigned integers, single or double
+	// precision floating-point values, or a single 128 bit type. The interpretation is
+	// determined by individual operations.
+	//
+	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/syntax/types.html#syntax-vectype
 	ValueTypeV128 ValueType = 0x7b
 	// ValueTypeExternref is a externref type.
 	//

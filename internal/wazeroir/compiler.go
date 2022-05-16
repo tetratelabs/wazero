@@ -105,6 +105,7 @@ func (c *controlFrames) push(frame *controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
+// localIndexToStackHeight initializes localIndexToStackHeight field. See the comment on localIndexToStackHeight.
 func (c *compiler) calcLocalIndexToStackHeight() {
 	c.localIndexToStackHeight = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
 	var current int
@@ -142,8 +143,10 @@ type compiler struct {
 	body []byte
 	// sig is the function type of the target function.
 	sig *wasm.FunctionType
-	// localTypes holds the target function locals' value types.
-	localTypes              []wasm.ValueType
+	// localTypes holds the target function locals' value types except function params.
+	localTypes []wasm.ValueType
+	// localIndexToStackHeight maps the local index (starting with function params) to the stack height
+	// where the local is places. This is the necessary mapping for functions who contain vector type locals.
 	localIndexToStackHeight map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
