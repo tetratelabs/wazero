@@ -57,9 +57,9 @@ func ExternTypeName(et ExternType) string {
 // The following describes how to convert between Wasm and Golang types:
 //  * ValueTypeI32 - uint64(uint32,int32)
 //  * ValueTypeI64 - uint64(int64)
-//  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
-//  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//  * ValueTypeV128 - EncodeI8x16(...), EncodeI16x8(...), EncodeI32x4(...), EncodeI64x2(...), EncodeF32x4(...) or EncodeF64x2(...).
+//  * ValueTypeF32 - EncodeF32 and DecodeF32 from float32
+//  * ValueTypeF64 - EncodeF64 and DecodeF64 from float64
+//  * ValueTypeV128 - EncodeV128_XXX and DecodeV128_XXX where XXX is one of I8x16, I16x8, I32x4, I64x2, F32x4 or F64x2.
 //  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
@@ -393,89 +393,106 @@ func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
 }
 
-// EncodeI8x16 encodes the input as a ValueTypeV128.
-func EncodeI8x16(i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16 int8) (low uint64, hi uint64) {
-	low = uint64(uint8(i1)) | uint64(uint8(i2))<<8 | uint64(uint8(i3))<<16 | uint64(uint8(i4))<<24 | uint64(uint8(i5))<<32 | uint64(uint8(i6))<<40 | uint64(uint8(i7))<<48 | uint64(uint8(i8))<<56
-	hi = uint64(uint8(i9)) | uint64(uint8(i10))<<8 | uint64(uint8(i11))<<16 | uint64(uint8(i12))<<24 | uint64(uint8(i13))<<32 | uint64(uint8(i14))<<40 | uint64(uint8(i15))<<48 | uint64(uint8(i16))<<56
+// EncodeV128_I8x16 encodes the input as a ValueTypeV128.
+func EncodeV128_I8x16(ints []int8) (low uint64, hi uint64) {
+	_ = ints[15] // bounds check hint to compiler; see golang.org/issue/14808
+	low = uint64(uint8(ints[0])) | uint64(uint8(ints[1]))<<8 | uint64(uint8(ints[2]))<<16 | uint64(uint8(ints[3]))<<24 |
+		uint64(uint8(ints[4]))<<32 | uint64(uint8(ints[5]))<<40 | uint64(uint8(ints[6]))<<48 | uint64(uint8(ints[7]))<<56
+	hi = uint64(uint8(ints[8])) | uint64(uint8(ints[9]))<<8 | uint64(uint8(ints[10]))<<16 | uint64(uint8(ints[11]))<<24 |
+		uint64(uint8(ints[12]))<<32 | uint64(uint8(ints[13]))<<40 | uint64(uint8(ints[14]))<<48 | uint64(uint8(ints[15]))<<56
 	return
 }
 
-// DecodeI8x16 decodes the input as a ValueTypeV128.
-func DecodeI8x16(low uint64, hi uint64) (i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16 int8) {
-	i1, i2, i3, i4, i5, i6, i7, i8 = int8(uint8(low)), int8(uint8(low>>8)), int8(uint8(low>>16)), int8(uint8(low>>24)),
-		int8(uint8(low>>32)), int8(uint8(low>>40)), int8(uint8(low>>48)), int8(uint8(low>>56))
-	i9, i10, i11, i12, i13, i14, i15, i16 = int8(uint8(hi)), int8(uint8(hi>>8)), int8(uint8(hi>>16)), int8(uint8(hi>>24)),
-		int8(uint8(hi>>32)), int8(uint8(hi>>40)), int8(uint8(hi>>48)), int8(uint8(hi>>56))
+// DecodeV128_I8x16 decodes the input as a ValueTypeV128.
+func DecodeV128_I8x16(low uint64, hi uint64) (ret []int8) {
+	ret = []int8{
+		int8(uint8(low)), int8(uint8(low >> 8)), int8(uint8(low >> 16)), int8(uint8(low >> 24)),
+		int8(uint8(low >> 32)), int8(uint8(low >> 40)), int8(uint8(low >> 48)), int8(uint8(low >> 56)),
+		int8(uint8(hi)), int8(uint8(hi >> 8)), int8(uint8(hi >> 16)), int8(uint8(hi >> 24)),
+		int8(uint8(hi >> 32)), int8(uint8(hi >> 40)), int8(uint8(hi >> 48)), int8(uint8(hi >> 56)),
+	}
 	return
 }
 
-// EncodeI16x8 encodes the input as a ValueTypeV128.
-func EncodeI16x8(i1, i2, i3, i4, i5, i6, i7, i8 int16) (low uint64, hi uint64) {
-	low = uint64(uint16(i1)) | uint64(uint16(i2))<<16 | uint64(uint16(i3))<<32 | uint64(uint16(i4))<<48
-	hi = uint64(uint16(i5)) | uint64(uint16(i6))<<16 | uint64(uint16(i7))<<32 | uint64(uint16(i8))<<48
+// EncodeV128_I16x8 encodes the input as a ValueTypeV128.
+func EncodeV128_I16x8(ints []int16) (low uint64, hi uint64) {
+	_ = ints[7] // bounds check hint to compiler; see golang.org/issue/14808
+	low = uint64(uint16(ints[0])) | uint64(uint16(ints[1]))<<16 | uint64(uint16(ints[2]))<<32 | uint64(uint16(ints[3]))<<48
+	hi = uint64(uint16(ints[4])) | uint64(uint16(ints[5]))<<16 | uint64(uint16(ints[6]))<<32 | uint64(uint16(ints[7]))<<48
 	return
 }
 
-// DecodeI16x8 decodes the input as a ValueTypeV128.
-func DecodeI16x8(low uint64, hi uint64) (i1, i2, i3, i4, i5, i6, i7, i8 int16) {
-	i1, i2, i3, i4 = int16(uint16(low)), int16(uint16(low>>16)), int16(uint16(low>>32)), int16(uint16(low>>48))
-	i5, i6, i7, i8 = int16(uint16(hi)), int16(uint16(hi>>16)), int16(uint16(hi>>32)), int16(uint16(hi>>48))
+// DecodeV128_I16x8 decodes the input as a ValueTypeV128.
+func DecodeV128_I16x8(low uint64, hi uint64) (ret []int16) {
+	ret = []int16{
+		int16(uint16(low)), int16(uint16(low >> 16)), int16(uint16(low >> 32)), int16(uint16(low >> 48)),
+		int16(uint16(hi)), int16(uint16(hi >> 16)), int16(uint16(hi >> 32)), int16(uint16(hi >> 48)),
+	}
 	return
 }
 
-// EncodeI32x4 encodes the input as a ValueTypeV128.
-func EncodeI32x4(i1, i2, i3, i4 int32) (low uint64, hi uint64) {
-	low = uint64(uint32(i1)) | uint64(uint32(i2))<<32
-	hi = uint64(uint32(i3)) | uint64(uint32(i4))<<32
+// EncodeV128_I32x4 encodes the input as a ValueTypeV128.
+func EncodeV128_I32x4(ints []int32) (low uint64, hi uint64) {
+	_ = ints[3] // bounds check hint to compiler; see golang.org/issue/14808
+	low = uint64(uint32(ints[0])) | uint64(uint32(ints[1]))<<32
+	hi = uint64(uint32(ints[2])) | uint64(uint32(ints[3]))<<32
 	return
 }
 
-// DecodeI32x4 decodes the input as a ValueTypeV128.
-func DecodeI32x4(low uint64, hi uint64) (i1, i2, i3, i4 int32) {
-	i1, i2 = int32(uint32(low)), int32(uint32(low>>32))
-	i3, i4 = int32(uint32(hi)), int32(uint32(hi>>32))
+// DecodeV128_I32x4 decodes the input as a ValueTypeV128.
+func DecodeV128_I32x4(low uint64, hi uint64) (ret []int32) {
+	ret = []int32{
+		int32(uint32(low)), int32(uint32(low >> 32)),
+		int32(uint32(hi)), int32(uint32(hi >> 32)),
+	}
 	return
 }
 
-// EncodeI64x2 encodes the input as a ValueTypeV128.
-func EncodeI64x2(i1, i2 int64) (low uint64, hi uint64) {
-	low = uint64(i1)
-	hi = uint64(i2)
+// EncodeV128_I64x2 encodes the input as a ValueTypeV128.
+func EncodeV128_I64x2(ints []int64) (low uint64, hi uint64) {
+	_ = ints[1] // bounds check hint to compiler; see golang.org/issue/14808
+	low = uint64(ints[0])
+	hi = uint64(ints[1])
 	return
 }
 
-// DecodeI64x2 decodes the input as a ValueTypeV128.
-func DecodeI64x2(low uint64, hi uint64) (i1, i2 int64) {
-	i1 = int64(low)
-	i2 = int64(hi)
+// DecodeV128_I64x2 decodes the input as a ValueTypeV128.
+func DecodeV128_I64x2(low uint64, hi uint64) (ret []int64) {
+	ret = []int64{int64(low), int64(hi)}
 	return
 }
 
-// EncodeF32x4 encodes the input as a ValueTypeV128.
-func EncodeF32x4(f1, f2, f3, f4 float32) (low uint64, hi uint64) {
-	low = uint64(math.Float32bits(f2))<<32 | uint64(math.Float32bits(f1))
-	hi = uint64(math.Float32bits(f4))<<32 | uint64(math.Float32bits(f3))
+// EncodeV128_F32x4 encodes the input as a ValueTypeV128.
+func EncodeV128_F32x4(fs []float32) (low uint64, hi uint64) {
+	_ = fs[3] // bounds check hint to compiler; see golang.org/issue/14808
+	low = uint64(math.Float32bits(fs[0])) | uint64(math.Float32bits(fs[1]))<<32
+	hi = uint64(math.Float32bits(fs[2])) | uint64(math.Float32bits(fs[3]))<<32
 	return
 }
 
-// DecodeF32x4 decodes the input as a ValueTypeV128.
-func DecodeF32x4(low uint64, hi uint64) (f1, f2, f3, f4 float32) {
-	f1, f2 = math.Float32frombits(uint32(low)), math.Float32frombits(uint32(low>>32))
-	f3, f4 = math.Float32frombits(uint32(hi)), math.Float32frombits(uint32(hi>>32))
+// DecodeV128_F32x4 decodes the input as a ValueTypeV128.
+func DecodeV128_F32x4(low uint64, hi uint64) (ret []float32) {
+	ret = []float32{
+		math.Float32frombits(uint32(low)), math.Float32frombits(uint32(low >> 32)),
+		math.Float32frombits(uint32(hi)), math.Float32frombits(uint32(hi >> 32)),
+	}
 	return
 }
 
-// EncodeF64x2 encodes the input as a ValueTypeV128.
-func EncodeF64x2(f1, f2 float64) (low uint64, hi uint64) {
-	low = math.Float64bits(f1)
-	hi = math.Float64bits(f2)
+// EncodeV128_F64x2 encodes the input as a ValueTypeV128.
+func EncodeV128_F64x2(fs []float64) (low uint64, hi uint64) {
+	_ = fs[1] // bounds check hint to compiler; see golang.org/issue/14808
+	low = math.Float64bits(fs[0])
+	hi = math.Float64bits(fs[1])
 	return
 }
 
-// DecodeF64x2 decodes the input as a ValueTypeV128.
-func DecodeF64x2(low uint64, hi uint64) (f1, f2 float64) {
-	f1 = math.Float64frombits(low)
-	f2 = math.Float64frombits(hi)
+// DecodeV128_F64x2 decodes the input as a ValueTypeV128.
+func DecodeV128_F64x2(low uint64, hi uint64) (ret []float64) {
+	ret = []float64{
+		math.Float64frombits(low),
+		math.Float64frombits(hi),
+	}
 	return
 }
 
