@@ -145,8 +145,8 @@ var engineLessConfig = &runtimeConfig{
 	enabledFeatures: wasm.Features20191205,
 }
 
-// NewRuntimeConfigCompiler WebAssembly modules into runtime.GOARCH-specific
-// assembly for optimal performance.
+// NewRuntimeConfigCompiler compiles WebAssembly modules into
+// runtime.GOARCH-specific assembly for optimal performance.
 //
 // The default implementation is AOT (Ahead of Time) compilation, applied at
 // Runtime.CompileModule. This allows consistent runtime performance, as well
