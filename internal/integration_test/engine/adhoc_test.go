@@ -53,7 +53,8 @@ func TestEngineJIT(t *testing.T) {
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	// runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	// TODO: move testVectorParams under runAllTests after v128 value support in JIT.
 	testVectorParams(t, wazero.NewRuntimeWithConfig(
 		wazero.NewRuntimeConfigInterpreter().WithWasmCore2(),
 	))
@@ -364,11 +365,83 @@ func testVectorParams(t *testing.T, r wazero.Runtime) {
 				)
 			},
 		},
+		{
+			name: "i16x8",
+			encodedParams: func() (lo, hi uint64) {
+				original := []int16{1, 2, 3, 4, 5, 6, 7, 8}
+				return api.EncodeV128_I16x8(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_I16x8(actualLo, actualHi)
+				require.Equal(t,
+					[]int16{2, 3, 4, 5, 6, 7, 8, 9},
+					actual,
+				)
+			},
+		},
+		{
+			name: "i32x4",
+			encodedParams: func() (lo, hi uint64) {
+				original := []int32{1, 2, 3, 4}
+				return api.EncodeV128_I32x4(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_I32x4(actualLo, actualHi)
+				require.Equal(t,
+					[]int32{2, 3, 4, 5},
+					actual,
+				)
+			},
+		},
+		{
+			name: "i64x2",
+			encodedParams: func() (lo, hi uint64) {
+				original := []int64{1, 2}
+				return api.EncodeV128_I64x2(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_I64x2(actualLo, actualHi)
+				require.Equal(t,
+					[]int64{2, 3},
+					actual,
+				)
+			},
+		},
+		{
+			name: "f32x4",
+			encodedParams: func() (lo, hi uint64) {
+				original := []float32{123.456, -123.456, float32(math.Inf(1)), float32(math.Inf(-1))}
+				return api.EncodeV128_F32x4(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_F32x4(actualLo, actualHi)
+				require.Equal(t,
+					[]float32{124.456, -122.456, float32(math.Inf(1)), float32(math.Inf(-1))},
+					actual,
+				)
+			},
+		},
+		{
+			name: "f64x2",
+			encodedParams: func() (lo, hi uint64) {
+				original := []float64{123.456, -123.456}
+				return api.EncodeV128_F64x2(original)
+			},
+			verifyFunc: func(t *testing.T, actualLo, actualHi uint64) {
+				actual := api.DecodeV128_F64x2(actualLo, actualHi)
+				require.Equal(t,
+					[]float64{124.456, -122.456},
+					actual,
+				)
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			lo, hi := tc.encodedParams()
-			results, err := mod.ExportedFunction("call_"+tc.name).Call(testCtx, lo, hi)
+			fn := mod.ExportedFunction("call_" + tc.name)
+			require.NotNil(t, fn)
+			results, err := fn.Call(testCtx, lo, hi)
 			require.NoError(t, err)
 			require.Equal(t, int(2), len(results))
 			tc.verifyFunc(t, results[0], results[1])
