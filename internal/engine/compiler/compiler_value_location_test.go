@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"testing"

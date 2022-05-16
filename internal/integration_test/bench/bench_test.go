@@ -27,8 +27,8 @@ func BenchmarkInvocation(b *testing.B) {
 		runAllInvocationBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
-		b.Run("jit", func(b *testing.B) {
-			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
+		b.Run("compiler", func(b *testing.B) {
+			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigCompiler())
 			defer m.Close(testCtx)
 			runAllInvocationBenches(b, m)
 		})
@@ -42,8 +42,8 @@ func BenchmarkInitialization(b *testing.B) {
 	})
 
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
-		b.Run("jit", func(b *testing.B) {
-			r := createRuntime(b, wazero.NewRuntimeConfigJIT())
+		b.Run("compiler", func(b *testing.B) {
+			r := createRuntime(b, wazero.NewRuntimeConfigCompiler())
 			runInitializationBench(b, r)
 		})
 	}

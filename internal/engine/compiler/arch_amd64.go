@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"

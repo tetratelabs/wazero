@@ -9,9 +9,9 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/engine/compiler"
+	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
-	"github.com/tetratelabs/wazero/internal/wasm/jit"
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
@@ -145,13 +145,22 @@ var engineLessConfig = &runtimeConfig{
 	enabledFeatures: wasm.Features20191205,
 }
 
-// NewRuntimeConfigJIT compiles WebAssembly modules into runtime.GOARCH-specific assembly for optimal performance.
+// NewRuntimeConfigCompiler WebAssembly modules into runtime.GOARCH-specific
+// assembly for optimal performance.
 //
-// Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not support JIT. Use NewRuntimeConfig to safely
-// detect and fallback to NewRuntimeConfigInterpreter if needed.
-func NewRuntimeConfigJIT() RuntimeConfig {
+// The default implementation is AOT (Ahead of Time) compilation, applied at
+// Runtime.CompileModule. This allows consistent runtime performance, as well
+// the ability to reduce any first request penalty.
+//
+// Note: While this is technically AOT, this does not imply any action on your
+// part. wazero automatically performs ahead-of-time compilation as needed when
+// Runtime.CompileModule is invoked.
+// Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not
+// support Compiler. Use NewRuntimeConfig to safely detect and fallback to
+// NewRuntimeConfigInterpreter if needed.
+func NewRuntimeConfigCompiler() RuntimeConfig {
 	ret := *engineLessConfig // copy
-	ret.newEngine = jit.NewEngine
+	ret.newEngine = compiler.NewEngine
 	return &ret
 }
 

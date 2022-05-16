@@ -31,8 +31,8 @@ difficult for Go developers when most of a library is written in Rustlang.
 [_CGO is not Go_][5] [ -- _Rob_ _Pike_][6] dives in deeper. In short, the
 primary motivation to start wazero was to avoid CGO.
 
-wazero compiles WebAssembly modules into native assembly (JIT) by default. You
-may be surprised to find equal or better performance vs mature JIT-style
+wazero compiles WebAssembly modules into native assembly (Compiler) by default. You
+may be surprised to find equal or better performance vs mature Compiler-style
 runtimes because [CGO is slow][7]. More specifically, if you make large amount
 of CGO calls which cross the boundary between Go and C (stack) space, then the
 usage of CGO could be a bottleneck.

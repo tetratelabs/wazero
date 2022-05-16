@@ -39,8 +39,8 @@ func testFactorialCall(t *testing.T, m Module, instantiation, iteration int) {
 	require.Equal(t, factorialResult, res)
 }
 
-func RunTestBenchmarkFactorial_Call_JITFastest(t *testing.T, vsRuntime Runtime) {
-	runTestBenchmark_Call_JITFastest(t, factorialConfig, "Factorial", factorialCall, vsRuntime)
+func RunTestBenchmarkFactorial_Call_CompilerFastest(t *testing.T, vsRuntime Runtime) {
+	runTestBenchmark_Call_CompilerFastest(t, factorialConfig, "Factorial", factorialCall, vsRuntime)
 }
 
 func RunBenchmarkFactorial(b *testing.B, runtime func() Runtime) {

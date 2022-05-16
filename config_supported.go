@@ -2,9 +2,9 @@
 
 package wazero
 
-const JITSupported = true
+const CompilerSupported = true
 
-// NewRuntimeConfig returns NewRuntimeConfigJIT
+// NewRuntimeConfig returns NewRuntimeConfigCompiler
 func NewRuntimeConfig() RuntimeConfig {
-	return NewRuntimeConfigJIT()
+	return NewRuntimeConfigCompiler()
 }

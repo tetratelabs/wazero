@@ -23,7 +23,7 @@ const (
 
 // AMD64-specific instructions.
 //
-// Note: This only defines amd64 instructions used by wazero's JIT compiler.
+// Note: This only defines amd64 instructions used by wazero's compiler.
 // Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 // See https://www.felixcloutier.com/x86/index.html
 const (

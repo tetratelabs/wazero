@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"math"
@@ -13,12 +13,12 @@ func init() {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
-	// jitCallReturnAddress holds the absolute return address for jitcall.
-	// The value is set whenever jitcall is executed and done in jit_arm64.s
+	// compilerCallReturnAddress holds the absolute return address for compilercall.
+	// The value is set whenever compilercall is executed and done in compiler_arm64.s
 	// Native code can return back to the ce.execWasmFunction's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
-	// Note: this is only used by JIT code so mark this as nolint.
-	jitCallReturnAddress uint64 //nolint
+	// Note: this is only used by Compiler code so mark this as nolint.
+	compilerCallReturnAddress uint64 //nolint
 
 	// Loading large constants in arm64 is a bit costly, so we place the following
 	// consts on callEngine struct so that we can quickly access them during various operations.

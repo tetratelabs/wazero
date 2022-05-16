@@ -45,11 +45,11 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"import functions with reference type in signature": testReftypeImports,
 }
 
-func TestEngineJIT(t *testing.T) {
-	if !wazero.JITSupported {
+func TestEngineCompiler(t *testing.T) {
+	if !wazero.CompilerSupported {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigJIT())
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
 }
 
 func TestEngineInterpreter(t *testing.T) {
@@ -163,7 +163,7 @@ func TestImportedAndExportedFunc(t *testing.T) {
 }
 
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
-// Notably, this uses memory, which ensures api.Module is valid in both interpreter and JIT engines.
+// Notably, this uses memory, which ensures api.Module is valid in both interpreter and Compiler engines.
 func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(ctx context.Context, m api.Module, offset uint32, val uint64) uint32 {

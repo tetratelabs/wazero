@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestCompiler_compileHostFunction(t *testing.T) {
-	env := newJITEnvironment()
+	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 	// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
@@ -27,16 +27,16 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env.exec(code)
 
 	// On the return, the code must exit with the host call status.
-	require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeCallHostFunction, env.compilerStatus())
 
 	// Re-enter the return address.
-	jitcall(env.callFrameStackPeek().returnAddress,
+	compilercall(env.callFrameStackPeek().returnAddress,
 		uintptr(unsafe.Pointer(env.callEngine())),
 		uintptr(unsafe.Pointer(env.module())),
 	)
 
 	// After that, the code must exit with returned status.
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 }
 
 func TestCompiler_compileLabel(t *testing.T) {
@@ -44,7 +44,7 @@ func TestCompiler_compileLabel(t *testing.T) {
 	for _, expectSkip := range []bool{false, true} {
 		expectSkip := expectSkip
 		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			if expectSkip {
@@ -63,7 +63,7 @@ func TestCompiler_compileLabel(t *testing.T) {
 
 func TestCompiler_compileBrIf(t *testing.T) {
 	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus :=
-		jitCallStatusCodeUnreachable, jitCallStatusCodeUnreachable+1, jitCallStatusCodeUnreachable+2
+		compilerCallStatusCodeUnreachable, compilerCallStatusCodeUnreachable+1, compilerCallStatusCodeUnreachable+2
 	thenBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}}
 	elseBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}}
 
@@ -229,7 +229,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 			for _, shouldGoToElse := range []bool{false, true} {
 				shouldGoToElse := shouldGoToElse
 				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -267,11 +267,11 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					//
 					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
 					env.exec(code)
-					require.NotEqual(t, unreachableStatus, env.jitStatus())
+					require.NotEqual(t, unreachableStatus, env.compilerStatus())
 					if shouldGoToElse {
-						require.Equal(t, elseLabelExitStatus, env.jitStatus())
+						require.Equal(t, elseLabelExitStatus, env.compilerStatus())
 					} else {
-						require.Equal(t, thenLabelExitStatus, env.jitStatus())
+						require.Equal(t, thenLabelExitStatus, env.compilerStatus())
 					}
 				})
 			}
@@ -280,7 +280,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 }
 
 func TestCompiler_compileBrTable(t *testing.T) {
-	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c compilerImpl, expValue uint32) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, env *compilerEnv, c compilerImpl, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
@@ -422,7 +422,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 			err := compiler.compilePreamble()
@@ -457,7 +457,7 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compiler
 
 func TestCompiler_compileBr(t *testing.T) {
 	t.Run("return", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -472,10 +472,10 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("back-and-forth br", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -486,7 +486,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
 		exitLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}
@@ -496,7 +496,7 @@ func TestCompiler_compileBr(t *testing.T) {
 		// Emit code for the exitLabel.
 		skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: exitLabel})
 		require.False(t, skip)
-		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 		require.NoError(t, err)
 
 		// Emit code for the forwardLabel.
@@ -512,22 +512,22 @@ func TestCompiler_compileBr(t *testing.T) {
 		//
 		//    ... code from compilePreamble()
 		//    br .forwardLabel
-		//    exit jitCallStatusCodeUnreachable  // must not be reached
+		//    exit compilerCallStatusCodeUnreachable  // must not be reached
 		//    br .exitLabel                      // must not be reached
 		// .exitLabel:
-		//    exit jitCallStatusCodeReturned
+		//    exit compilerCallStatusCodeReturned
 		// .forwardLabel:
 		//    br .exitLabel
 		//
-		// Therefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
+		// Therefore, if we start executing from the top, we must end up exiting compilerCallStatusCodeReturned.
 		env.exec(code)
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 	})
 }
 
 func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		env.addTable(&wasm.TableInstance{References: make([]wasm.Reference, 10)})
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
@@ -547,18 +547,18 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
 
 	t.Run("uninitialized", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
 			Types:     []*wasm.FunctionType{{}},
@@ -582,7 +582,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
 		// Generate the code under test and run.
@@ -590,11 +590,11 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 	})
 
 	t.Run("type not match", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
 			Types:     []*wasm.FunctionType{{}},
@@ -622,7 +622,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
 		// Generate the code under test and run.
@@ -630,7 +630,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall.String(), env.jitStatus().String())
+		require.Equal(t, compilerCallStatusCodeTypeMismatchOnIndirectCall.String(), env.compilerStatus().String())
 	})
 
 	t.Run("ok", func(t *testing.T) {
@@ -644,7 +644,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 
 				table := make([]wasm.Reference, 10)
-				env := newJITEnvironment()
+				env := newCompilerEnvironment()
 				env.addTable(&wasm.TableInstance{References: table})
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
@@ -726,19 +726,19 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 						if growCallFrameStack {
 							// If the call frame stack pointer equals the length of call frame stack length,
 							// we have to call the builtin function to grow the slice.
-							require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+							require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 							require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.builtinFunctionCallAddress())
 
 							// Grow the callFrame stack, and exec again from the return address.
 							ce := env.callEngine()
 							ce.builtinFunctionGrowCallFrameStack()
-							jitcall(
+							compilercall(
 								env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)),
 								uintptr(unsafe.Pointer(env.module())),
 							)
 						}
 
-						require.Equal(t, jitCallStatusCodeReturned.String(), env.jitStatus().String())
+						require.Equal(t, compilerCallStatusCodeReturned.String(), env.compilerStatus().String())
 						require.Equal(t, uint64(1), env.stackPointer())
 						require.Equal(t, expectedReturnValue, uint32(env.ce.popValue()))
 					})
@@ -752,7 +752,7 @@ func TestCompiler_compileCall(t *testing.T) {
 	for _, growCallFrameStack := range []bool{false, true} {
 		growCallFrameStack := growCallFrameStack
 		t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			me := env.moduleEngine()
 			expectedValue := uint32(0)
 
@@ -834,20 +834,20 @@ func TestCompiler_compileCall(t *testing.T) {
 			if growCallFrameStack {
 				// If the call frame stack pointer equals the length of call frame stack length,
 				// we have to call the builtin function to grow the slice.
-				require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 				require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.builtinFunctionCallAddress())
 
 				// Grow the callFrame stack, and exec again from the return address.
 				ce := env.callEngine()
 				ce.builtinFunctionGrowCallFrameStack()
-				jitcall(
+				compilercall(
 					env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)),
 					uintptr(unsafe.Pointer(env.module())),
 				)
 			}
 
 			// Check status and returned values.
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
 			require.Equal(t, uint64(0), env.stackBasePointer())
 			require.Equal(t, expectedValue, env.stackTopAsUint32())
@@ -857,7 +857,7 @@ func TestCompiler_compileCall(t *testing.T) {
 
 func TestCompiler_returnFunction(t *testing.T) {
 	t.Run("exit", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 
 		// Compile code.
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -871,13 +871,13 @@ func TestCompiler_returnFunction(t *testing.T) {
 
 		env.exec(code)
 
-		// JIT status must be returned.
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		// Compiler status must be returned.
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 		// Plus, the call frame stack pointer must be zero after return.
 		require.Equal(t, uint64(0), env.callFrameStackPointer())
 	})
 	t.Run("deep call stack", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		moduleEngine := env.moduleEngine()
 		ce := env.callEngine()
 
@@ -933,7 +933,7 @@ func TestCompiler_returnFunction(t *testing.T) {
 		env.exec(ce.callFrameTop().function.parent.codeSegment)
 
 		// Check the exit status and the values on stack.
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 		for pos, exp := range stackPointerToExpectedValue {
 			require.Equal(t, exp, uint32(env.stack()[pos]))
 		}

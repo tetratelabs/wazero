@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 	} {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				Signature: &wasm.FunctionType{},
 				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},
@@ -69,7 +69,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 	} {
 		tp := tp
 		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				Signature: &wasm.FunctionType{},
 				Globals:   []*wasm.GlobalType{nil, {ValType: tp}},

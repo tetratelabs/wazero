@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			// Compile code.
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -49,7 +49,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(s.peek())
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -59,8 +59,8 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			env.callEngine().builtinFunctionGrowValueStack(tc.stackPointer)
 			env.exec(code)
 
-			// JIT status must be returned and stack pointer must end up the specified one.
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			// Compiler status must be returned and stack pointer must end up the specified one.
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
@@ -86,7 +86,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			// Compile code.
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -130,7 +130,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(loc)
 			require.NoError(t, err)
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -142,8 +142,8 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			env.stack()[tc.stackPointer] = val
 			env.exec(code)
 
-			// JIT status must be returned and stack pointer must end up the specified one.
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			// Compiler status must be returned and stack pointer must end up the specified one.
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
@@ -205,7 +205,7 @@ func TestCompiler_compilePick(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -237,7 +237,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			env.exec(code)
 
 			// Check the returned status and stack pointer.
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(3), env.stackPointer())
 
 			// Verify the top value is the picked one and the pick target's value stays the same.
@@ -254,7 +254,7 @@ func TestCompiler_compilePick(t *testing.T) {
 
 func TestCompiler_compileDrop(t *testing.T) {
 	t.Run("range nil", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		err := compiler.compilePreamble()
@@ -280,14 +280,14 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("start top", func(t *testing.T) {
 		r := &wazeroir.InclusiveRange{Start: 0, End: 2}
 		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
 		liveNum := 5
 
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 		err := compiler.compilePreamble()
@@ -321,7 +321,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(5), env.stackPointer())
 		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
 	})
@@ -334,7 +334,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		total := liveAboveDropStartNum + dropTargetNum + liveBelowDropEndNum
 		liveTotal := liveAboveDropStartNum + liveBelowDropEndNum
 
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		ce := env.callEngine()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
 
@@ -369,7 +369,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(liveTotal), env.stackPointer())
 
 		stack := env.stack()[:env.stackPointer()]
@@ -440,7 +440,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 			} {
 				x1Value, x2Value := vals[0], vals[1]
 				t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", vals[0], vals[1]), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -531,7 +531,7 @@ func TestCompiler_compileSwap(t *testing.T) {
 		{x1OnConditionalRegister: true, x2OnRegister: true},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

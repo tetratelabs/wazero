@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 )
 
 type (
-	// engine is an JIT implementation of wasm.Engine
+	// engine is an Compiler implementation of wasm.Engine
 	engine struct {
 		enabledFeatures wasm.Features
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
@@ -43,7 +43,7 @@ type (
 	// callEngine holds context per moduleEngine.Call, and shared across all the
 	// function calls originating from the same moduleEngine.Call execution.
 	callEngine struct {
-		// These contexts are read and written by JITed code.
+		// These contexts are read and written by compiled code.
 		// Note: structs are embedded to reduce the costs to access fields inside them. Also, this eases field offset
 		// calculation.
 		globalContext
@@ -52,10 +52,10 @@ type (
 		exitContext
 		archContext
 
-		// The following fields are not accessed by JITed code directly.
+		// The following fields are not accessed by compiled code directly.
 
 		// valueStack is the go-allocated stack for holding Wasm values.
-		// Note: We never edit len or cap in JITed code so we won't get screwed when GC comes in.
+		// Note: We never edit len or cap in compiled code so we won't get screwed when GC comes in.
 		valueStack []uint64
 
 		// callFrameStack is initially callFrameStack[callFrameStackPointer].
@@ -87,11 +87,11 @@ type (
 	}
 
 	// moduleContext holds the per-function call specific module information.
-	// This is subject to be manipulated from JITed native code whenever we make function calls.
+	// This is subject to be manipulated from compiled native code whenever we make function calls.
 	moduleContext struct {
 		// moduleInstanceAddress is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
-		// This is only used by JIT code so mark this as nolint.
+		// This is only used by Compiler code so mark this as nolint.
 		moduleInstanceAddress uintptr //nolint
 
 		// globalElement0Address is the address of the first element in the global slice,
@@ -125,7 +125,7 @@ type (
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
 		// each variable in the value stack from the info from compilation.
-		// Therefore, only updated when native code exit from the JIT world and go back to the Go function.
+		// Therefore, only updated when native code exit from the Compiler world and go back to the Go function.
 		stackPointer uint64
 
 		// stackBasePointer is updated whenever we make function calls.
@@ -142,12 +142,12 @@ type (
 		stackBasePointer uint64
 	}
 
-	// exitContext will be manipulated whenever JITed native code returns into the Go function.
+	// exitContext will be manipulated whenever compiled native code returns into the Go function.
 	exitContext struct {
-		// Where we store the status code of JIT execution.
-		statusCode jitCallStatusCode
+		// Where we store the status code of Compiler execution.
+		statusCode compilerCallStatusCode
 
-		// Set when statusCode == jitStatusCallBuiltInFunction}
+		// Set when statusCode == compilerStatusCallBuiltInFunction}
 		// Indicating the function call index.
 		builtinFunctionCallIndex wasm.Index
 	}
@@ -187,7 +187,7 @@ type (
 	}
 
 	// code corresponds to a function in a module (not insantaited one). This holds the machine code
-	// compiled by Wazero's JIT compiler.
+	// compiled by Wazero's compiler.
 	code struct {
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
@@ -249,7 +249,7 @@ const (
 	callEngineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextJITCallStatusCodeOffset          = 128
+	callEngineExitContextCompilerCallStatusCodeOffset     = 128
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
@@ -303,75 +303,75 @@ const (
 	pointerSizeLog2 = 3
 )
 
-// jitCallStatusCode represents the result of `jitcall`.
-// This is set by the jitted native code.
-type jitCallStatusCode uint32
+// compilerCallStatusCode represents the result of `compilercall`.
+// This is set by the compilerted native code.
+type compilerCallStatusCode uint32
 
 const (
-	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
-	jitCallStatusCodeReturned jitCallStatusCode = iota
-	// jitCallStatusCodeCallFunction means the jitcall returns to make a host function call.
-	jitCallStatusCodeCallHostFunction
-	// jitCallStatusCodeCallFunction means the jitcall returns to make a builtin function call.
-	jitCallStatusCodeCallBuiltInFunction
-	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
-	jitCallStatusCodeUnreachable
-	// jitCallStatusCodeInvalidFloatToIntConversion means an invalid conversion of integer to floats happened.
-	jitCallStatusCodeInvalidFloatToIntConversion
-	// jitCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
-	jitCallStatusCodeMemoryOutOfBounds
-	// jitCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
+	// compilerStatusReturned means the compilercall reaches the end of function, and returns successfully.
+	compilerCallStatusCodeReturned compilerCallStatusCode = iota
+	// compilerCallStatusCodeCallFunction means the compilercall returns to make a host function call.
+	compilerCallStatusCodeCallHostFunction
+	// compilerCallStatusCodeCallFunction means the compilercall returns to make a builtin function call.
+	compilerCallStatusCodeCallBuiltInFunction
+	// compilerCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
+	compilerCallStatusCodeUnreachable
+	// compilerCallStatusCodeInvalidFloatToIntConversion means an invalid conversion of integer to floats happened.
+	compilerCallStatusCodeInvalidFloatToIntConversion
+	// compilerCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
+	compilerCallStatusCodeMemoryOutOfBounds
+	// compilerCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
 	// the target element in the table was uninitialized during call_indirect instruction.
-	jitCallStatusCodeInvalidTableAccess
-	// jitCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
-	jitCallStatusCodeTypeMismatchOnIndirectCall
-	jitCallStatusIntegerOverflow
-	jitCallStatusIntegerDivisionByZero
+	compilerCallStatusCodeInvalidTableAccess
+	// compilerCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
+	compilerCallStatusCodeTypeMismatchOnIndirectCall
+	compilerCallStatusIntegerOverflow
+	compilerCallStatusIntegerDivisionByZero
 )
 
 // causePanic causes a panic with the corresponding error to the status code.
-func (s jitCallStatusCode) causePanic() {
+func (s compilerCallStatusCode) causePanic() {
 	var err error
 	switch s {
-	case jitCallStatusIntegerOverflow:
+	case compilerCallStatusIntegerOverflow:
 		err = wasmruntime.ErrRuntimeIntegerOverflow
-	case jitCallStatusIntegerDivisionByZero:
+	case compilerCallStatusIntegerDivisionByZero:
 		err = wasmruntime.ErrRuntimeIntegerDivideByZero
-	case jitCallStatusCodeInvalidFloatToIntConversion:
+	case compilerCallStatusCodeInvalidFloatToIntConversion:
 		err = wasmruntime.ErrRuntimeInvalidConversionToInteger
-	case jitCallStatusCodeUnreachable:
+	case compilerCallStatusCodeUnreachable:
 		err = wasmruntime.ErrRuntimeUnreachable
-	case jitCallStatusCodeMemoryOutOfBounds:
+	case compilerCallStatusCodeMemoryOutOfBounds:
 		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
-	case jitCallStatusCodeInvalidTableAccess:
+	case compilerCallStatusCodeInvalidTableAccess:
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
-	case jitCallStatusCodeTypeMismatchOnIndirectCall:
+	case compilerCallStatusCodeTypeMismatchOnIndirectCall:
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 	}
 	panic(err)
 }
 
-func (s jitCallStatusCode) String() (ret string) {
+func (s compilerCallStatusCode) String() (ret string) {
 	switch s {
-	case jitCallStatusCodeReturned:
+	case compilerCallStatusCodeReturned:
 		ret = "returned"
-	case jitCallStatusCodeCallHostFunction:
+	case compilerCallStatusCodeCallHostFunction:
 		ret = "call_host_function"
-	case jitCallStatusCodeCallBuiltInFunction:
+	case compilerCallStatusCodeCallBuiltInFunction:
 		ret = "call_builtin_function"
-	case jitCallStatusCodeUnreachable:
+	case compilerCallStatusCodeUnreachable:
 		ret = "unreachable"
-	case jitCallStatusCodeInvalidFloatToIntConversion:
+	case compilerCallStatusCodeInvalidFloatToIntConversion:
 		ret = "invalid float to int conversion"
-	case jitCallStatusCodeMemoryOutOfBounds:
+	case compilerCallStatusCodeMemoryOutOfBounds:
 		ret = "memory out of bounds"
-	case jitCallStatusCodeInvalidTableAccess:
+	case compilerCallStatusCodeInvalidTableAccess:
 		ret = "invalid table access"
-	case jitCallStatusCodeTypeMismatchOnIndirectCall:
+	case compilerCallStatusCodeTypeMismatchOnIndirectCall:
 		ret = "type mismatch on indirect call"
-	case jitCallStatusIntegerOverflow:
+	case compilerCallStatusIntegerOverflow:
 		ret = "integer overflow"
-	case jitCallStatusIntegerDivisionByZero:
+	case compilerCallStatusIntegerDivisionByZero:
 		ret = "integer division by zero"
 	default:
 		panic("BUG")
@@ -400,7 +400,7 @@ func releaseCode(compiledFn *code) {
 		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
 		// functions can return errors, they are ignored. To make these visible for troubleshooting, we panic
 		// with additional context. module+funcidx should be enough, but if not, we can add more later.
-		panic(fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", compiledFn.sourceModule.NameSection.ModuleName,
+		panic(fmt.Errorf("compiler: failed to munmap code segment for %s.function[%d]: %w", compiledFn.sourceModule.NameSection.ModuleName,
 			compiledFn.indexInModule, err))
 	}
 }
@@ -641,7 +641,7 @@ func newEngine(enabledFeatures wasm.Features) *engine {
 // raw pointers is safe: As of version 1.18, Go's garbage collector never relocates
 // heap-allocated objects (aka no compaction of memory [2]).
 //
-// On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/wasm/jit/...`.
+// On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/engine/compiler/...`.
 //
 // [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
 // [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
@@ -709,7 +709,7 @@ func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallCo
 	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, function: f}
 	ce.globalContext.callFrameStackPointer++
 
-jitentry:
+compilerentry:
 	{
 		frame := ce.callFrameTop()
 		if buildoptions.IsDebugMode {
@@ -717,14 +717,14 @@ jitentry:
 				frame.String(), ce.valueStackContext.stackBasePointer, ce.valueStackContext.stackPointer)
 		}
 
-		// Call into the JIT code.
-		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
+		// Call into the Compiler code.
+		compilercall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
 
-		// Check the status code from JIT code.
+		// Check the status code from Compiler code.
 		switch status := ce.exitContext.statusCode; status {
-		case jitCallStatusCodeReturned:
+		case compilerCallStatusCodeReturned:
 			// Meaning that all the function frames above the previous call frame stack pointer are executed.
-		case jitCallStatusCodeCallHostFunction:
+		case compilerCallStatusCodeCallHostFunction:
 			calleeHostFunction := ce.callFrameTop().function
 			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
 			// but when making host function calls, we need to pass the memory instance of host function caller.
@@ -740,8 +740,8 @@ jitentry:
 			for _, v := range results {
 				ce.pushValue(v)
 			}
-			goto jitentry
-		case jitCallStatusCodeCallBuiltInFunction:
+			goto compilerentry
+		case compilerCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
 				callerFunction := ce.callFrameTop().function
@@ -760,7 +760,7 @@ jitentry:
 					runtime.Breakpoint()
 				}
 			}
-			goto jitentry
+			goto compilerentry
 		default:
 			status.causePanic()
 		}

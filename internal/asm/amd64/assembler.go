@@ -4,7 +4,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/asm"
 )
 
-// Assembler is the interface used by amd64 JIT compiler.
+// Assembler is the interface used by amd64 compiler.
 type Assembler interface {
 	asm.AssemblerBase
 

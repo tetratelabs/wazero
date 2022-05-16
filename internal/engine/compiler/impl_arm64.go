@@ -7,7 +7,7 @@
 // 64-bit variant ldr, str, stur are all corresponding to arm64.MOVD.
 // Please refer to https://pkg.go.dev/cmd/internal/obj/garm64.
 
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -58,8 +58,8 @@ var (
 	}
 
 	// Note (see arm64 section in https://go.dev/doc/asm):
-	// * REG_R18 is reserved as a platform register, and we don't use it in JIT.
-	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in JIT.
+	// * REG_R18 is reserved as a platform register, and we don't use it in Compiler.
+	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
 	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
 		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
@@ -86,8 +86,8 @@ var (
 )
 
 const (
-	// arm64CallEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	arm64CallEngineArchContextJITCallReturnAddressOffset = 136
+	// arm64CallEngineArchContextCompilerCallReturnAddressOffset is the offset of archContext.compilerCallReturnAddress in callEngine.
+	arm64CallEngineArchContextCompilerCallReturnAddressOffset = 136
 	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
 	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 144
 	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
@@ -259,7 +259,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 
 	// If ceil > valueStackLen - stack base pointer, we need to grow the stack by calling builtin Go function.
 	brIfValueStackOK := c.assembler.CompileJump(arm64.BLS)
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowValueStack); err != nil {
+	if err := c.compileCallGoFunction(compilerCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowValueStack); err != nil {
 		return err
 	}
 
@@ -271,7 +271,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 }
 
 // returnFunction emits instructions to return from the current function frame.
-// If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
+// If the current frame is the bottom, the code goes back to the Go code with compilerCallStatusCodeReturned status.
 // Otherwise, we branch into the caller's return address.
 func (c *arm64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
@@ -302,7 +302,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	// If the values are identical, we return back to the Go code with returned status.
 	brIfNotEqual := c.assembler.CompileJump(arm64.BNE)
-	c.compileExitFromNativeCode(jitCallStatusCodeReturned)
+	c.compileExitFromNativeCode(compilerCallStatusCodeReturned)
 
 	// Otherwise, we have to jump to the caller's return address.
 	c.assembler.SetJumpTargetOnNext(brIfNotEqual)
@@ -370,7 +370,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
-func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
+func (c *arm64Compiler) compileExitFromNativeCode(status compilerCallStatusCode) {
 	// Write the current stack pointer to the ce.stackPointer.
 	c.assembler.CompileConstToRegister(arm64.MOVD, int64(c.locationStack.sp), arm64ReservedRegisterForTemporary)
 	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine,
@@ -378,16 +378,16 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
 
 	if status != 0 {
 		c.assembler.CompileConstToRegister(arm64.MOVW, int64(status), arm64ReservedRegisterForTemporary)
-		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
+		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine, callEngineExitContextCompilerCallStatusCodeOffset)
 	} else {
 		// If the status == 0, we use zero register to store zero.
-		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64.REGZERO, arm64ReservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
+		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64.REGZERO, arm64ReservedRegisterForCallEngine, callEngineExitContextCompilerCallStatusCodeOffset)
 	}
 
-	// The return address to the Go code is stored in archContext.jitReturnAddress which
+	// The return address to the Go code is stored in archContext.compilerReturnAddress which
 	// is embedded in ce. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextJITCallReturnAddressOffset, arm64ReservedRegisterForTemporary)
+	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextCompilerCallReturnAddressOffset, arm64ReservedRegisterForTemporary)
 
 	c.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 }
@@ -401,7 +401,7 @@ func (c *arm64Compiler) compileHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallHostFunction, 0); err != nil {
+	if err := c.compileCallGoFunction(compilerCallStatusCodeCallHostFunction, 0); err != nil {
 		return err
 	}
 	return c.compileReturnFunction()
@@ -449,7 +449,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *arm64Compiler) compileUnreachable() error {
-	c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+	c.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
 	return nil
 }
 
@@ -895,7 +895,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 		c.compileReleaseRegisterToStack(savedOffsetLocation)
 	}
 
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowCallFrameStack); err != nil {
+	if err := c.compileCallGoFunction(compilerCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowCallFrameStack); err != nil {
 		return err
 	}
 
@@ -1115,7 +1115,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// If it exceeds len(table), we exit the execution.
 	brIfOffsetOK := c.assembler.CompileJump(arm64.BLO)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
 
 	// Otherwise, we proceed to do function type check.
 	c.assembler.SetJumpTargetOnNext(brIfOffsetOK)
@@ -1143,7 +1143,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, offset.register)
 	brIfInitialized := c.assembler.CompileJump(arm64.BNE)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
 
 	c.assembler.SetJumpTargetOnNext(brIfInitialized)
 	// Next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
@@ -1167,7 +1167,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, tmp, tmp2)
 	brIfTypeMatched := c.assembler.CompileJump(arm64.BEQ)
-	c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
+	c.compileExitFromNativeCode(compilerCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(brIfTypeMatched)
 
@@ -1548,7 +1548,7 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		c.compileExitFromNativeCode(compilerCallStatusIntegerDivisionByZero)
 		return nil
 	}
 
@@ -1604,9 +1604,9 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	}
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.REGZERO, divisor)
 
-	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	// If it is zero, we exit with compilerCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BNE)
-	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+	c.compileExitFromNativeCode(compilerCallStatusIntegerDivisionByZero)
 
 	// Otherwise, we proceed.
 	c.assembler.SetJumpTargetOnNext(brIfDivisorNonZero)
@@ -1635,7 +1635,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		brIfDividendNotMinInt := c.assembler.CompileJump(arm64.BNE)
 
 		// Otherwise, we raise overflow error.
-		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
 
 		c.assembler.SetJumpTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
 	}
@@ -1656,7 +1656,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		c.compileExitFromNativeCode(compilerCallStatusIntegerDivisionByZero)
 		return nil
 	}
 
@@ -1683,9 +1683,9 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	// We check the divisor value equals zero.
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.REGZERO, divisorReg)
 
-	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	// If it is zero, we exit with compilerCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BNE)
-	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+	c.compileExitFromNativeCode(compilerCallStatusIntegerDivisionByZero)
 
 	// Otherwise, we proceed.
 	c.assembler.SetJumpTargetOnNext(brIfDivisorNonZero)
@@ -2123,11 +2123,11 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		brIfSourceNaN := c.assembler.CompileJump(arm64.BVS)
 
 		// If the source value is not NaN, the operation was overflow.
-		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
 
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
 		c.assembler.SetJumpTargetOnNext(brIfSourceNaN)
-		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidFloatToIntConversion)
 
 		// Otherwise, we branch into the next instruction.
 		c.assembler.SetJumpTargetOnNext(brOK)
@@ -2638,7 +2638,7 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst asm.Instruc
 // as memory.Buffer[offset: offset+targetSizeInBytes].
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
-// In other words, if the offset+targetSizeInBytes exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+// In other words, if the offset+targetSizeInBytes exceeds the memory size, the code exits with compilerCallStatusCodeMemoryOutOfBounds status.
 func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetSizeInBytes int64) (offsetRegister asm.Register, err error) {
 	base, err := c.popValueOnRegister()
 	if err != nil {
@@ -2658,8 +2658,8 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 		// "offsetRegister = base + offsetArg + targetSizeInBytes"
 		c.assembler.CompileConstToRegister(arm64.ADD, offsetConst, offsetRegister)
 	} else {
-		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
-		c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+		// If the offset const is too large, we exit with compilerCallStatusCodeMemoryOutOfBounds.
+		c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
 		return
 	}
 
@@ -2673,8 +2673,8 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 	boundsOK := c.assembler.CompileJump(arm64.BLS)
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
-	//  we exit the function with jitCallStatusCodeMemoryOutOfBounds.
-	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+	//  we exit the function with compilerCallStatusCodeMemoryOutOfBounds.
+	c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
 
 	// Otherwise, we subtract targetSizeInBytes from offsetRegister.
 	c.assembler.SetJumpTargetOnNext(boundsOK)
@@ -2686,7 +2686,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 func (c *arm64Compiler) compileMemoryGrow() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexMemoryGrow); err != nil {
+	if err := c.compileCallGoFunction(compilerCallStatusCodeCallBuiltInFunction, builtinFunctionIndexMemoryGrow); err != nil {
 		return err
 	}
 
@@ -2725,9 +2725,9 @@ func (c *arm64Compiler) compileMemorySize() error {
 }
 
 // compileCallGoFunction adds instructions to call a Go function whose address equals the addr parameter.
-// jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
-// jitCallStatusCodeCallHostFunction.
-func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, builtinFunction wasm.Index) error {
+// compilerStatus is set before making call, and it should be either compilerCallStatusCodeCallBuiltInFunction or
+// compilerCallStatusCodeCallHostFunction.
+func (c *arm64Compiler) compileCallGoFunction(compilerStatus compilerCallStatusCode, builtinFunction wasm.Index) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -2743,7 +2743,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	tmp, currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister, returnAddressRegister :=
 		freeRegs[0], freeRegs[1], freeRegs[2], freeRegs[3]
 
-	if jitStatus == jitCallStatusCodeCallBuiltInFunction {
+	if compilerStatus == compilerCallStatusCodeCallBuiltInFunction {
 		// Set the target function address to ce.functionCallAddress
 		// "tmp = $index"
 		c.assembler.CompileConstToRegister(
@@ -2782,7 +2782,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	)
 
 	c.markRegisterUnused(freeRegs...)
-	c.compileExitFromNativeCode(jitStatus)
+	c.compileExitFromNativeCode(compilerStatus)
 	return nil
 }
 
@@ -2881,9 +2881,9 @@ func (c *arm64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
 func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) error {
-	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
+	outOfBoundsErrorStatus := compilerCallStatusCodeMemoryOutOfBounds
 	if isTable {
-		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
+		outOfBoundsErrorStatus = compilerCallStatusCodeInvalidTableAccess
 	}
 
 	copySize, err := c.popValueOnRegister()
@@ -3099,9 +3099,9 @@ func (c *arm64Compiler) compileMemoryCopy() error {
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
 func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableIndex uint32) error {
-	outOfBoundsErrorStatus := jitCallStatusCodeMemoryOutOfBounds
+	outOfBoundsErrorStatus := compilerCallStatusCodeMemoryOutOfBounds
 	if isTable {
-		outOfBoundsErrorStatus = jitCallStatusCodeInvalidTableAccess
+		outOfBoundsErrorStatus = compilerCallStatusCodeInvalidTableAccess
 	}
 
 	copySize, err := c.popValueOnRegister()
@@ -3422,9 +3422,9 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 
 	// If not, raise the runtime error.
 	if isTable {
-		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
 	} else {
-		c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+		c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
 	}
 
 	// Otherwise, ready to copy the value from destination to source.
@@ -3591,7 +3591,7 @@ func (c *arm64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 
 	// If it exceeds len(table), we exit the execution.
 	brIfBoundsOK := c.assembler.CompileJump(arm64.BLO)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(brIfBoundsOK)
 
 	// ref = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
@@ -3652,7 +3652,7 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 
 	// If it exceeds len(table), we exit the execution.
 	brIfBoundsOK := c.assembler.CompileJump(arm64.BLO)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(brIfBoundsOK)
 
 	// tmp = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
@@ -3684,7 +3684,7 @@ func (c *arm64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 	// Table grow cannot be done in assembly just like memory grow as it involves with allocation in Go.
 	// Therefore, call out to the built function for this purpose.
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexTableGrow); err != nil {
+	if err := c.compileCallGoFunction(compilerCallStatusCodeCallBuiltInFunction, builtinFunctionIndexTableGrow); err != nil {
 		return err
 	}
 

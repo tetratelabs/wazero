@@ -18,8 +18,8 @@ func BenchmarkAllocation(b *testing.B) {
 	vs.RunBenchmarkAllocation(b, runtime)
 }
 
-func TestBenchmarkAllocation_Call_JITFastest(t *testing.T) {
-	vs.RunTestBenchmarkAllocation_Call_JITFastest(t, runtime())
+func TestBenchmarkAllocation_Call_CompilerFastest(t *testing.T) {
+	vs.RunTestBenchmarkAllocation_Call_CompilerFastest(t, runtime())
 }
 
 func TestFactorial(t *testing.T) {
@@ -30,6 +30,6 @@ func BenchmarkFactorial(b *testing.B) {
 	vs.RunBenchmarkFactorial(b, runtime)
 }
 
-func TestBenchmarkFactorial_Call_JITFastest(t *testing.T) {
-	vs.RunTestBenchmarkFactorial_Call_JITFastest(t, runtime())
+func TestBenchmarkFactorial_Call_CompilerFastest(t *testing.T) {
+	vs.RunTestBenchmarkFactorial_Call_CompilerFastest(t, runtime())
 }

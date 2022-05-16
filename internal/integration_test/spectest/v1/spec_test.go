@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/engine/compiler"
+	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
-	"github.com/tetratelabs/wazero/internal/wasm/jit"
 )
 
 //go:embed testdata/*.wasm
@@ -17,12 +17,12 @@ var testcases embed.FS
 
 const enabledFeatures = wasm.Features20191205
 
-func TestJIT(t *testing.T) {
+func TestCompiler(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
 
-	spectest.Run(t, testcases, jit.NewEngine, enabledFeatures, func(string) bool { return true })
+	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures, func(string) bool { return true })
 }
 
 func TestInterpreter(t *testing.T) {

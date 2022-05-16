@@ -69,8 +69,8 @@ func testAllocationCall(t *testing.T, m Module, instantiation, iteration int) {
 	require.NoError(t, err, "instantiation[%d] iteration[%d] failed: %v", instantiation, iteration, err)
 }
 
-func RunTestBenchmarkAllocation_Call_JITFastest(t *testing.T, vsRuntime Runtime) {
-	runTestBenchmark_Call_JITFastest(t, allocationConfig, "Allocation", allocationCall, vsRuntime)
+func RunTestBenchmarkAllocation_Call_CompilerFastest(t *testing.T, vsRuntime Runtime) {
+	runTestBenchmark_Call_CompilerFastest(t, allocationConfig, "Allocation", allocationCall, vsRuntime)
 }
 
 func RunBenchmarkAllocation(b *testing.B, runtime func() Runtime) {

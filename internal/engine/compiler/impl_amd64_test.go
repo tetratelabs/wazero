@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"testing"
@@ -65,7 +65,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 				} {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
-						env := newJITEnvironment()
+						env := newCompilerEnvironment()
 
 						const x1Value uint32 = 1 << 11
 						const x2Value uint32 = 51
@@ -192,7 +192,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						const x2Value uint64 = 51
 						const dxValue uint64 = 111111
 
-						env := newJITEnvironment()
+						env := newCompilerEnvironment()
 						compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 
 func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("invalid", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
@@ -287,7 +287,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		env := newJITEnvironment()
+		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
 		err := compiler.compilePreamble()
@@ -321,7 +321,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		// Run code.
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(1), env.stackPointer())
 		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 	})

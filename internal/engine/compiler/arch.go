@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 var (
 	// newArchContext returns a new archContext which is architecture-specific type to be embedded in callEngine.
@@ -6,9 +6,9 @@ var (
 	newArchContext func() archContext
 )
 
-// jitcall is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
+// compilercall is used by callEngine.execWasmFunction and the entrypoint to enter the compiled native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
 // ce is "*callEngine" as uintptr.
 //
 // Note: this is implemented in per-arch Go assembler file. For example, arch_amd64.s implements this for amd64.
-func jitcall(codeSegment, ce uintptr, moduleInstanceAddress uintptr)
+func compilercall(codeSegment, ce uintptr, moduleInstanceAddress uintptr)

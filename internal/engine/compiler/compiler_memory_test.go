@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"encoding/binary"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestCompiler_compileMemoryGrow(t *testing.T) {
-	env := newJITEnvironment()
+	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -35,22 +35,22 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
-	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 	require.Equal(t, builtinFunctionIndexMemoryGrow, env.builtinFunctionCallAddress())
 
 	// Reenter from the return address.
-	jitcall(
+	compilercall(
 		env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
 		uintptr(unsafe.Pointer(env.module())),
 	)
 
 	// Check if the code successfully executed the code after builtin function call.
 	require.Equal(t, expValue, env.stackTopAsUint32())
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 }
 
 func TestCompiler_compileMemorySize(t *testing.T) {
-	env := newJITEnvironment()
+	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 	err := compiler.compilePreamble()
@@ -71,7 +71,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	require.NoError(t, err)
 	env.exec(code)
 
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
 
@@ -234,7 +234,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -369,7 +369,7 @@ func TestCompiler_compileStore(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -433,7 +433,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 			for _, targetSizeInByte := range targetSizeInBytes {
 				targetSizeInByte := targetSizeInByte
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
-					env := newJITEnvironment()
+					env := newCompilerEnvironment()
 					compiler := env.requireNewCompiler(t, newCompiler, nil)
 
 					err := compiler.compilePreamble()
@@ -469,8 +469,8 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					mem := env.memory()
 					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
 						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
-						// with jitCallStatusCodeMemoryOutOfBounds status code.
-						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+						// with compilerCallStatusCodeMemoryOutOfBounds status code.
+						require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 					}
 				})
 			}

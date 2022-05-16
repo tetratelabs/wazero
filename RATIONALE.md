@@ -248,9 +248,8 @@ If later, we have demand for multiple stores, that can be accomplished by overlo
 `Runtime.Store(name) Store`.
 
 ## wazeroir
-wazero's intermediate representation (IR) is called `wazeroir`. Compiling into an IR provides us a faster interpreter
-and a building block for a future JIT compilation engine. Both of these help answer demands for a more performant
-runtime vs interpreting Wasm directly (the `naivevm` interpreter).
+wazero's intermediate representation (IR) is called `wazeroir`. Lowering into an IR provides us a faster interpreter
+and a closer to assembly representation for used by our compiler.
 
 ### Intermediate Representation (IR) design
 `wazeroir`'s initial design borrowed heavily from the defunct `microwasm` format (a.k.a. LightbeamIR). Notably,
@@ -407,15 +406,15 @@ means that we have 1 GiB size of slice which seems large enough for most applica
 
 While the the spec says that a module can have up to 2^32 tables, wazero limits this to 2^27 = 134,217,728.
 One of the reasons is even that number would occupy 1GB in the pointers tables alone. Not only that, we access tables slice by
-table index by using 32-bit signed offset in the JIT implementation, which means that the table index of 2^27 can reach 2^27 * 8 (pointer size on 64-bit machines) = 2^30 offsets in bytes.
+table index by using 32-bit signed offset in the compiler implementation, which means that the table index of 2^27 can reach 2^27 * 8 (pointer size on 64-bit machines) = 2^30 offsets in bytes.
 
 We _believe_ that all use cases are fine with the limitation, but also note that we have no way to test wazero runtimes under these unusual circumstances.
 
 If a module reaches this limit, an error is returned at the compilation phase.
 
-## JIT engine implementation
+## Compiler engine implementation
 
-See [wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md).
+See [wasm/compiler/RATIONALE.md](internal/compiler/RATIONALE.md).
 
 ## Golang patterns
 

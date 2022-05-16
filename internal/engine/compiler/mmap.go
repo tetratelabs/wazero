@@ -1,6 +1,6 @@
 //go:build !windows
 
-package jit
+package compiler
 
 import (
 	"errors"

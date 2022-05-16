@@ -16,16 +16,16 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-// ensureJITFastest is overridable via ldflags. Ex.
-//	-ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureJITFastest=true'
-var ensureJITFastest = "false"
+// ensureCompilerFastest is overridable via ldflags. Ex.
+//	-ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
+var ensureCompilerFastest = "false"
 
-const jitRuntime = "wazero-jit"
+const compilerRuntime = "wazero-compiler"
 
-// runTestBenchmark_Call_JITFastest ensures that JIT is the fastest engine for function invocations.
-// This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
-func runTestBenchmark_Call_JITFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module) error, vsRuntime Runtime) {
-	if ensureJITFastest != "true" {
+// runTestBenchmark_Call_CompilerFastest ensures that Compiler is the fastest engine for function invocations.
+// This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureCompilerFastest=true'.
+func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module) error, vsRuntime Runtime) {
+	if ensureCompilerFastest != "true" {
 		t.Skip()
 	}
 
@@ -35,9 +35,9 @@ func runTestBenchmark_Call_JITFastest(t *testing.T, rtCfg *RuntimeConfig, name s
 	}
 
 	results := make([]benchResult, 0, 2)
-	// Add the result for JIT
-	jitNsOp := runCallBenchmark(NewWazeroJITRuntime(), rtCfg, call)
-	results = append(results, benchResult{name: jitRuntime, nsOp: jitNsOp})
+	// Add the result for Compiler
+	compilerNsOp := runCallBenchmark(NewWazeroCompilerRuntime(), rtCfg, call)
+	results = append(results, benchResult{name: compilerRuntime, nsOp: compilerNsOp})
 
 	// Add a result for the runtime we're comparing against
 	vsNsOp := runCallBenchmark(vsRuntime, rtCfg, call)
@@ -55,10 +55,10 @@ func runTestBenchmark_Call_JITFastest(t *testing.T, rtCfg *RuntimeConfig, name s
 	}
 	_ = w.Flush()
 
-	// Fail if jit wasn't fastest!
-	require.Equal(t, jitRuntime, results[0].name, "%s is faster than %s. "+
-		"Run with ensureJITFastest=false instead to see the detailed result",
-		results[0].name, jitRuntime)
+	// Fail if compiler wasn't fastest!
+	require.Equal(t, compilerRuntime, results[0].name, "%s is faster than %s. "+
+		"Run with ensureCompilerFastest=false instead to see the detailed result",
+		results[0].name, compilerRuntime)
 }
 
 func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module) error) float64 {
@@ -79,8 +79,8 @@ func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call 
 		benchmarkInstantiate(b, rt, rtCfg)
 	})
 
-	// Don't burn CPU when this is already going to be called in runTestBenchmark_Call_JITFastest
-	if ensureJITFastest != "true" || rt.Name() == jitRuntime {
+	// Don't burn CPU when this is already going to be called in runTestBenchmark_Call_CompilerFastest
+	if ensureCompilerFastest != "true" || rt.Name() == compilerRuntime {
 		b.Run("Call", func(b *testing.B) {
 			benchmarkCall(b, rt, rtCfg, call)
 		})

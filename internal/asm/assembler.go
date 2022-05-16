@@ -120,7 +120,7 @@ type AssemblerBase interface {
 // JumpTableMaximumOffset represents the limit on the size of jump table in bytes.
 // When users try loading an extremely large WebAssembly binary which contains a br_table
 // statement with approximately 4294967296 (2^32) targets. Realistically speaking, that kind of binary
-// could result in more than ten gigabytes of native JITed code where we have to care about
+// could result in more than ten gigabytes of native compiled code where we have to care about
 // huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
 // current implementation.
 const JumpTableMaximumOffset = math.MaxUint32

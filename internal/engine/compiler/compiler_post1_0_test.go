@@ -1,4 +1,4 @@
-package jit
+package compiler
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
-				env := newJITEnvironment()
+				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
-				env := newJITEnvironment()
+				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -223,10 +223,10 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, mem[:checkCeil])
 			} else {
-				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -259,7 +259,7 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -302,10 +302,10 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 				}
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, mem[:checkCeil])
 			} else {
-				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -318,7 +318,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 
 	for i := 0; i < len(origins); i++ {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			env.module().DataInstances = make([][]byte, len(origins))
 			copy(env.module().DataInstances, origins)
@@ -343,7 +343,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 
 			// Check if the target data instance is dropped from the dataInstances slice.
 			for j := 0; j < len(origins); j++ {
@@ -392,7 +392,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			env.module().DataInstances = dataInstances
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
@@ -432,7 +432,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 				}
 				require.Equal(t, exp[:20], mem[:20])
 			} else {
-				require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -449,7 +449,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 
 	for i := 0; i < len(origins); i++ {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			insts := make([]wasm.ElementInstance, len(origins))
 			copy(insts, origins)
@@ -480,7 +480,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 
 			for j := 0; j < len(insts); j++ {
 				if i == j {
@@ -530,7 +530,7 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasTable: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -572,10 +572,10 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, table)
 			} else {
-				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			}
 		})
 	}
@@ -615,7 +615,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 			env.module().ElementInstances = elementInstances
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
@@ -655,7 +655,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			env.exec(code)
 
 			if !tc.expOutOfBounds {
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				exp := make([]wasm.Reference, tableSize)
 				for i := 0; i < tableSize; i++ {
 					exp[i] = uintptr(i)
@@ -665,7 +665,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 				}
 				require.Equal(t, exp, table)
 			} else {
-				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			}
 		})
 	}
@@ -736,7 +736,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			for _, table := range tables {
 				env.addTable(table)
@@ -768,9 +768,9 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			env.exec(code)
 
 			if tc.expError {
-				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, uint64(0), env.stackPointer())
 
 				if tc.expExtern {
@@ -866,7 +866,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			env := newJITEnvironment()
+			env := newCompilerEnvironment()
 
 			for _, table := range tables {
 				env.addTable(table)
@@ -895,9 +895,9 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			env.exec(code)
 
 			if tc.expError {
-				require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, uint64(tc.exp), env.stackTopAsUint64())
 			}
@@ -906,7 +906,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 }
 
 func TestCompiler_compileRefFunc(t *testing.T) {
-	env := newJITEnvironment()
+	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: &wasm.FunctionType{}})
 
 	err := compiler.compilePreamble()
@@ -938,7 +938,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(1), env.stackPointer())
 			require.Equal(t, uintptr(unsafe.Pointer(me.functions[i])), uintptr(env.stackTopAsUint64()))
 		})
