@@ -48,6 +48,28 @@ func decodeConstantExpression(r *bytes.Reader, enabledFeatures wasm.Features) (*
 		}
 		// Parsing index.
 		_, _, err = leb128.DecodeUint32(r)
+	case wasm.OpcodeVecPrefix:
+		if err := enabledFeatures.Require(wasm.FeatureSIMD); err != nil {
+			return nil, fmt.Errorf("vector instructions are not supported as %w", err)
+		}
+		opcode, err = r.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("read vector instruction opcode suffix: %w", err)
+		}
+
+		if opcode != wasm.OpcodeVecV128Const {
+			return nil, fmt.Errorf("invalid vector opcode for const expression: %#x", opcode)
+		}
+
+		remainingBeforeData = int64(r.Len())
+		offsetAtData = r.Size() - remainingBeforeData
+
+		n, err := r.Read(make([]byte, 16))
+		if err != nil {
+			return nil, fmt.Errorf("read vector const instruction immediates: %w", err)
+		} else if n != 16 {
+			return nil, fmt.Errorf("read vector const instruction immediates: needs 16 bytes but was %d bytes", n)
+		}
 	default:
 		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b)
 	}

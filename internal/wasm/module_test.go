@@ -732,7 +732,7 @@ func TestModule_validateExports(t *testing.T) {
 	}
 }
 
-func TestModule_buildGlobalInstances(t *testing.T) {
+func TestModule_buildGlobals(t *testing.T) {
 	m := Module{GlobalSection: []*Global{
 		{
 			Type: &GlobalType{Mutable: true, ValType: ValueTypeF64},
@@ -744,17 +744,27 @@ func TestModule_buildGlobalInstances(t *testing.T) {
 			Init: &ConstantExpression{Opcode: OpcodeI32Const,
 				Data: leb128.EncodeInt32(math.MaxInt32)},
 		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeVector},
+			Init: &ConstantExpression{Opcode: OpcodeVecV128Const,
+				Data: []byte{
+					1, 0, 0, 0, 0, 0, 0, 0,
+					2, 0, 0, 0, 0, 0, 0, 0,
+				},
+			},
+		},
 	}}
 
 	globals := m.buildGlobals(nil)
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: math.MaxInt32},
+		{Type: &GlobalType{ValType: ValueTypeVector, Mutable: false}, Val: 0x1, ValHi: 0x2},
 	}
 	require.Equal(t, expectedGlobals, globals)
 }
 
-func TestModule_buildFunctionInstances(t *testing.T) {
+func TestModule_buildFunctions(t *testing.T) {
 	nopCode := &Code{nil, []byte{OpcodeEnd}}
 	m := Module{
 		TypeSection:   []*FunctionType{{}},

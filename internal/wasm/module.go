@@ -526,6 +526,11 @@ func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *Const
 			return fmt.Errorf("ref.func index out of range [%d] with length %d", index, numFuncs-1)
 		}
 		actualType = ValueTypeFuncref
+	case OpcodeVecV128Const:
+		if len(expr.Data) != 16 {
+			return fmt.Errorf("%s needs 16 bytes but was %d bytes", OpcodeVecV128ConstName, len(expr.Data))
+		}
+		actualType = ValueTypeVector
 	default:
 		return fmt.Errorf("invalid opcode for const expression: 0x%x", expr.Opcode)
 	}
@@ -547,20 +552,22 @@ func (m *Module) validateDataCountSection() (err error) {
 
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
 	for _, gs := range m.GlobalSection {
-		var gv uint64
+		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case int32:
-			gv = uint64(v)
+			g.Val = uint64(v)
 		case int64:
-			gv = uint64(v)
+			g.Val = uint64(v)
 		case float32:
-			gv = api.EncodeF32(v)
+			g.Val = api.EncodeF32(v)
 		case float64:
-			gv = api.EncodeF64(v)
+			g.Val = api.EncodeF64(v)
+		case [2]uint64:
+			g.Val, g.ValHi = v[0], v[1]
 		default:
 			panic(fmt.Errorf("BUG: invalid conversion %d", v))
 		}
-		globals = append(globals, &GlobalInstance{Type: gs.Type, Val: gv})
+		globals = append(globals, g)
 	}
 	return
 }

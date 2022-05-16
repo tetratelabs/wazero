@@ -3,6 +3,7 @@ package wasm
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
@@ -163,6 +164,8 @@ type (
 		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
 		Val uint64
+		// ValHi is only used for vector type globals, and holds the higher bits of the vector.
+		ValHi uint64
 		// ^^ TODO: this should be guarded with atomics when mutable
 	}
 
@@ -590,7 +593,7 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 
 // Global initialization constant expression can only reference the imported globals.
 // See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
-func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
+func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
 	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
@@ -605,7 +608,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		v, _ = ieee754.DecodeFloat64(r)
 	case OpcodeGlobalGet:
 		id, _, _ := leb128.DecodeUint32(r)
-		g := globals[id]
+		g := importedGlobals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
@@ -615,6 +618,8 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 			v = api.DecodeF32(g.Val)
 		case ValueTypeF64:
 			v = api.DecodeF64(g.Val)
+		case ValueTypeVector:
+			v = [2]uint64{g.Val, g.ValHi}
 		}
 	case OpcodeRefNull:
 		switch expr.Data[0] {
@@ -630,6 +635,8 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		// and if this is the const expr for global, the value will be further downed to
 		// opaque pointer of the engine-specific compiled function.
 		v, _, _ = leb128.DecodeInt32(r)
+	case OpcodeVecV128Const:
+		v = [2]uint64{binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])}
 	}
 	return
 }
