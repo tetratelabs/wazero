@@ -395,8 +395,8 @@ func DecodeF64(input uint64) float64 {
 
 // EncodeI8x16 encodes the input as a ValueTypeV128.
 func EncodeI8x16(i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16 int8) (low uint64, hi uint64) {
-	low = uint64(i1) | uint64(i2)<<8 | uint64(i3)<<16 | uint64(i4)<<24 | uint64(i5)<<32 | uint64(i6)<<40 | uint64(i7)<<48 | uint64(i8)<<56
-	hi = uint64(i9) | uint64(i10)<<8 | uint64(i11)<<16 | uint64(i12)<<24 | uint64(i13)<<32 | uint64(i14)<<40 | uint64(i15)<<48 | uint64(i16)<<56
+	low = uint64(uint8(i1)) | uint64(uint8(i2))<<8 | uint64(uint8(i3))<<16 | uint64(uint8(i4))<<24 | uint64(uint8(i5))<<32 | uint64(uint8(i6))<<40 | uint64(uint8(i7))<<48 | uint64(uint8(i8))<<56
+	hi = uint64(uint8(i9)) | uint64(uint8(i10))<<8 | uint64(uint8(i11))<<16 | uint64(uint8(i12))<<24 | uint64(uint8(i13))<<32 | uint64(uint8(i14))<<40 | uint64(uint8(i15))<<48 | uint64(uint8(i16))<<56
 	return
 }
 
@@ -425,8 +425,8 @@ func DecodeI16x8(low uint64, hi uint64) (i1, i2, i3, i4, i5, i6, i7, i8 int16) {
 
 // EncodeI32x4 encodes the input as a ValueTypeV128.
 func EncodeI32x4(i1, i2, i3, i4 int32) (low uint64, hi uint64) {
-	low = uint64(i1) | uint64(i2)<<32
-	hi = uint64(i3) | uint64(i4)<<32
+	low = uint64(uint32(i1)) | uint64(uint32(i2))<<32
+	hi = uint64(uint32(i3)) | uint64(uint32(i4))<<32
 	return
 }
 

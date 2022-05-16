@@ -140,6 +140,25 @@ func TestEncodeCastI64(t *testing.T) {
 	}
 }
 
+func TestEncodeDecodeI8x16(t *testing.T) {
+	for _, v := range [][2]uint64{
+		{0, 0},
+		{0, 0xffffffff_ffffffff},
+		{0xffffffff_ffffffff, 0},
+		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_ffffffff},
+		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0xffff_ffff, 0xffff_ffff},
+		{0x1 << 4, 0x1 << 3},
+	} {
+		v := v
+		t.Run(fmt.Sprintf("%x", v), func(t *testing.T) {
+			low, hi := EncodeI8x16(DecodeI8x16(v[0], v[1]))
+			require.Equal(t, v, [2]uint64{low, hi})
+		})
+	}
+}
+
 func TestEncodeDecodeI16x8(t *testing.T) {
 	for _, v := range [][2]uint64{
 		{0, 0},
@@ -148,6 +167,7 @@ func TestEncodeDecodeI16x8(t *testing.T) {
 		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
 		{0xffffffff_efffffff, 0xffffffff_ffffffff},
 		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0xffff_ffff, 0xffff_ffff},
 		{0x1 << 4, 0x1 << 3},
 	} {
 		v := v
@@ -166,6 +186,7 @@ func TestEncodeDecodeI32x4(t *testing.T) {
 		{0xffffffff_ffffffff, 0xffffffff_ffffffff},
 		{0xffffffff_efffffff, 0xffffffff_ffffffff},
 		{0xffffffff_efffffff, 0xffffffff_efffffff},
+		{0xffff_ffff, 0xffff_ffff},
 		{0x1 << 4, 0x1 << 3},
 	} {
 		v := v
