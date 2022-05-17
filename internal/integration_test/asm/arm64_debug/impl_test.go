@@ -58,7 +58,7 @@ func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 				expErr: "invalid destination register: nil is not integer",
 			},
 			{
-				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.RET, DstReg: asm_arm64.REG_F0},
+				n:      &asm_arm64.NodeImpl{Instruction: asm_arm64.RET, DstReg: asm_arm64.REG_V0},
 				expErr: "invalid destination register: F0 is not integer",
 			},
 		} {
@@ -118,17 +118,17 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			},
 			{
 				n: &asm_arm64.NodeImpl{Instruction: asm_arm64.ADD,
-					SrcConst: -1, SrcReg: asm_arm64.REG_F0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_R0},
+					SrcConst: -1, SrcReg: asm_arm64.REG_V0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_R0},
 				expErr: "F0 is not integer",
 			},
 			{
 				n: &asm_arm64.NodeImpl{Instruction: asm_arm64.ADD,
-					SrcConst: -1, SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_F0, DstReg: asm_arm64.REG_R0},
+					SrcConst: -1, SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_V0, DstReg: asm_arm64.REG_R0},
 				expErr: "F0 is not integer",
 			},
 			{
 				n: &asm_arm64.NodeImpl{Instruction: asm_arm64.ADD,
-					SrcConst: -1, SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_F0},
+					SrcConst: -1, SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_R0, DstReg: asm_arm64.REG_V0},
 				expErr: "F0 is not integer",
 			},
 		} {
@@ -229,12 +229,12 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 			},
 			{
 				n: &asm_arm64.NodeImpl{Instruction: asm_arm64.CMP,
-					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_F0},
+					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_V0},
 				expErr: "F0 is not integer",
 			},
 			{
 				n: &asm_arm64.NodeImpl{Instruction: asm_arm64.FCMPS,
-					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_F0},
+					SrcReg: asm_arm64.REG_R0, SrcReg2: asm_arm64.REG_V0},
 				expErr: "R0 is not float",
 			},
 		} {
@@ -245,7 +245,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 	})
 
 	intRegs := []asm.Register{asm_arm64.REGZERO, asm_arm64.REG_R0, asm_arm64.REG_R10, asm_arm64.REG_R30}
-	floatRegs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F12, asm_arm64.REG_F31}
+	floatRegs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V12, asm_arm64.REG_V31}
 	for _, tc := range []struct {
 		instruction asm.Instruction
 		regs        []asm.Register
@@ -332,7 +332,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	intRegs := []asm.Register{asm_arm64.REGZERO, asm_arm64.REG_R1, asm_arm64.REG_R10, asm_arm64.REG_R30}
 	intRegsWithoutZero := intRegs[1:]
 	conditionalRegs := []asm.Register{asm_arm64.REG_COND_EQ, asm_arm64.REG_COND_NE, asm_arm64.REG_COND_HS, asm_arm64.REG_COND_LO, asm_arm64.REG_COND_MI, asm_arm64.REG_COND_PL, asm_arm64.REG_COND_VS, asm_arm64.REG_COND_VC, asm_arm64.REG_COND_HI, asm_arm64.REG_COND_LS, asm_arm64.REG_COND_GE, asm_arm64.REG_COND_LT, asm_arm64.REG_COND_GT, asm_arm64.REG_COND_LE, asm_arm64.REG_COND_AL, asm_arm64.REG_COND_NV}
-	floatRegs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F15, asm_arm64.REG_F31}
+	floatRegs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V15, asm_arm64.REG_V31}
 
 	for _, tc := range []struct {
 		inst             asm.Instruction
@@ -462,7 +462,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	})
 
 	intRegs := []asm.Register{asm_arm64.REGZERO, asm_arm64.REG_R1, asm_arm64.REG_R10, asm_arm64.REG_R30}
-	floatRegs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F15, asm_arm64.REG_F31}
+	floatRegs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V15, asm_arm64.REG_V31}
 
 	for _, tc := range []struct {
 		inst             asm.Instruction
@@ -750,7 +750,7 @@ func TestAssemblerImpl_EncodeSIMDByteToSIMDByte(t *testing.T) {
 
 	const inst = asm_arm64.VCNT
 	t.Run(asm_arm64.InstructionName(inst), func(t *testing.T) {
-		floatRegs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F10, asm_arm64.REG_F21, asm_arm64.REG_F31}
+		floatRegs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V10, asm_arm64.REG_V21, asm_arm64.REG_V31}
 		for _, src := range floatRegs {
 			for _, dst := range floatRegs {
 				src, dst := src, dst
@@ -792,7 +792,7 @@ func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
 
 	const inst = asm_arm64.VUADDLV
 	t.Run(asm_arm64.InstructionName(inst), func(t *testing.T) {
-		floatRegs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F10, asm_arm64.REG_F21, asm_arm64.REG_F31}
+		floatRegs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V10, asm_arm64.REG_V21, asm_arm64.REG_V31}
 		for _, src := range floatRegs {
 			for _, dst := range floatRegs {
 				src, dst := src, dst
@@ -842,8 +842,8 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		asm_arm64.REG_R30,
 	}
 	floatRegs := []asm.Register{
-		asm_arm64.REG_F0, asm_arm64.REG_F10,
-		asm_arm64.REG_F30,
+		asm_arm64.REG_V0, asm_arm64.REG_V10,
+		asm_arm64.REG_V30,
 	}
 	for _, tc := range []struct {
 		inst    asm.Instruction
@@ -937,8 +937,8 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		asm_arm64.REG_R30,
 	}
 	floatRegs := []asm.Register{
-		asm_arm64.REG_F0, asm_arm64.REG_F10,
-		asm_arm64.REG_F30,
+		asm_arm64.REG_V0, asm_arm64.REG_V10,
+		asm_arm64.REG_V30,
 	}
 	for _, tc := range []struct {
 		inst    asm.Instruction
@@ -1190,7 +1190,7 @@ func TestAssemblerImpl_EncodeTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 	})
 
 	for _, inst := range []asm.Instruction{asm_arm64.VBIT} {
-		regs := []asm.Register{asm_arm64.REG_F0, asm_arm64.REG_F10, asm_arm64.REG_F30}
+		regs := []asm.Register{asm_arm64.REG_V0, asm_arm64.REG_V10, asm_arm64.REG_V30}
 		for _, src1 := range regs {
 			for _, src2 := range regs {
 				for _, dst := range regs {

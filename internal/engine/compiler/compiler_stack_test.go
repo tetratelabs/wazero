@@ -101,9 +101,9 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			require.Zero(t, len(compiler.valueLocationStack().usedRegisters))
 			loc := compiler.valueLocationStack().pushValueLocationOnStack()
 			if tc.isFloat {
-				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+				loc.setRegisterType(registerTypeVector)
 			} else {
-				loc.setRegisterType(generalPurposeRegisterTypeInt)
+				loc.setRegisterType(registerTypeGeneralPurpose)
 			}
 			// At this point the value must be recorded as being on stack.
 			require.True(t, loc.onStack())
@@ -184,7 +184,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			name: "float on stack",
 			pickTargetSetupFunc: func(compiler compilerImpl, ce *callEngine) error {
 				pickTargetLocation := compiler.valueLocationStack().pushValueLocationOnStack()
-				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
+				pickTargetLocation.setRegisterType(registerTypeVector)
 				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},
@@ -195,7 +195,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			name: "int on stack",
 			pickTargetSetupFunc: func(compiler compilerImpl, ce *callEngine) error {
 				pickTargetLocation := compiler.valueLocationStack().pushValueLocationOnStack()
-				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
+				pickTargetLocation.setRegisterType(registerTypeGeneralPurpose)
 				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},

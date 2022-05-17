@@ -47,20 +47,20 @@ func newArm64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 }
 
 var (
-	arm64UnreservedGeneralPurposeFloatRegisters = []asm.Register{ // nolint
-		arm64.REG_F0, arm64.REG_F1, arm64.REG_F2, arm64.REG_F3,
-		arm64.REG_F4, arm64.REG_F5, arm64.REG_F6, arm64.REG_F7, arm64.REG_F8,
-		arm64.REG_F9, arm64.REG_F10, arm64.REG_F11, arm64.REG_F12, arm64.REG_F13,
-		arm64.REG_F14, arm64.REG_F15, arm64.REG_F16, arm64.REG_F17, arm64.REG_F18,
-		arm64.REG_F19, arm64.REG_F20, arm64.REG_F21, arm64.REG_F22, arm64.REG_F23,
-		arm64.REG_F24, arm64.REG_F25, arm64.REG_F26, arm64.REG_F27, arm64.REG_F28,
-		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
+	arm64UnreservedVectorRegisters = []asm.Register{ // nolint
+		arm64.REG_V0, arm64.REG_V1, arm64.REG_V2, arm64.REG_V3,
+		arm64.REG_V4, arm64.REG_V5, arm64.REG_V6, arm64.REG_V7, arm64.REG_V8,
+		arm64.REG_V9, arm64.REG_V10, arm64.REG_V11, arm64.REG_V12, arm64.REG_V13,
+		arm64.REG_V14, arm64.REG_V15, arm64.REG_V16, arm64.REG_V17, arm64.REG_V18,
+		arm64.REG_V19, arm64.REG_V20, arm64.REG_V21, arm64.REG_V22, arm64.REG_V23,
+		arm64.REG_V24, arm64.REG_V25, arm64.REG_V26, arm64.REG_V27, arm64.REG_V28,
+		arm64.REG_V29, arm64.REG_V30, arm64.REG_V31,
 	}
 
 	// Note (see arm64 section in https://go.dev/doc/asm):
 	// * REG_R18 is reserved as a platform register, and we don't use it in Compiler.
 	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
-	arm64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
+	arm64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
 		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
 		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R19,
@@ -182,9 +182,9 @@ func (c *arm64Compiler) pushFunctionParams() {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
+			loc.setRegisterType(registerTypeGeneralPurpose)
 		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			loc.setRegisterType(registerTypeVector)
 		}
 	}
 }
@@ -217,7 +217,7 @@ func (c *arm64Compiler) compilePreamble() error {
 // and if so, make the builtin function call to do so. These instructions are called in the function's
 // preamble.
 func (c *arm64Compiler) compileMaybeGrowValueStack() error {
-	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	tmpRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
@@ -284,7 +284,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.locationStack.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.locationStack.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
-	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	tmpRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
@@ -504,7 +504,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// further into the float register.
 	resultReg := intReg
 	if floatMov != arm64.NOP {
-		resultReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		resultReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
@@ -556,7 +556,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 	// TODO: rethink about the type used in store `globals []*GlobalInstance`.
 	// If we use `[]GlobalInstance` instead, we could reduce one MOV instruction here.
 
-	destinationRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+	destinationRegister, err = c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return
 	}
@@ -731,7 +731,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	}
 
 	if isZeroRegister(index.register) {
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -742,7 +742,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, reg)
 	}
 
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmpReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -860,7 +860,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 		return err
 	}
 
-	freeRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
+	freeRegisters, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 5)
 	if !found {
 		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
@@ -1032,9 +1032,9 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
+			loc.setRegisterType(registerTypeGeneralPurpose)
 		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			loc.setRegisterType(registerTypeVector)
 		}
 	}
 
@@ -1073,7 +1073,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	}
 
 	if isZeroRegister(offset.register) {
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -1084,13 +1084,13 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, reg)
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
 	c.markRegisterUsed(tmp)
 
-	tmp2, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp2, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -1262,7 +1262,7 @@ func (c *arm64Compiler) compileSelect() error {
 		// Mark x2 and cv's registers are used so they won't be chosen.
 		c.markRegisterUsed(x2.register)
 		// Pick the non-zero register for x1.
-		x1Reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		x1Reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -1277,7 +1277,7 @@ func (c *arm64Compiler) compileSelect() error {
 	brIfNotZero := c.assembler.CompileJump(arm64.BNE)
 
 	// If cv == 0, we move the value of x2 to the x1.register.
-	if x1.registerType() == generalPurposeRegisterTypeInt {
+	if x1.registerType() == registerTypeGeneralPurpose {
 		c.assembler.CompileRegisterToRegister(arm64.MOVD, x2.register, x1.register)
 	} else {
 		c.assembler.CompileRegisterToRegister(arm64.FMOVD, x2.register, x1.register)
@@ -1305,9 +1305,9 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	if pickTarget.onRegister() { // Copy the value to the pickedRegister.
 		var inst asm.Instruction
 		switch pickTarget.registerType() {
-		case generalPurposeRegisterTypeInt:
+		case registerTypeGeneralPurpose:
 			inst = arm64.MOVD
-		case generalPurposeRegisterTypeFloat:
+		case registerTypeVector:
 			inst = arm64.FMOVD
 		}
 		c.assembler.CompileRegisterToRegister(inst, pickTarget.register, pickedRegister)
@@ -1438,7 +1438,7 @@ func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	if isZeroRegister(v.register) {
 		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
 		// so we allocate a register and put the const on it.
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -1472,7 +1472,7 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	if isZeroRegister(reg) {
 		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
 		// so we allocate a register and put the const on it.
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -1512,7 +1512,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 		return nil
 	}
 
-	freg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	freg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
@@ -1693,7 +1693,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	// Temporarily mark them used to allocate a result register while keeping these values.
 	c.markRegisterUsed(dividend.register, divisor.register)
 
-	resultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	resultReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2023,7 +2023,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	}
 
 	c.markRegisterUsed(x1.register, x2.register)
-	freg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	freg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
@@ -2092,7 +2092,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		return err
 	}
 
-	destinationReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	destinationReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2155,7 +2155,7 @@ func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
 		convinst = arm64.UCVTFD
 	}
-	return c.compileSimpleConversion(convinst, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(convinst, registerTypeVector)
 }
 
 // compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
@@ -2172,43 +2172,43 @@ func (c *arm64Compiler) compileF64PromoteFromF32() error {
 func (c *arm64Compiler) compileI32ReinterpretFromF32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		peek.setRegisterType(registerTypeGeneralPurpose)
 		return nil
 	}
-	return c.compileSimpleConversion(arm64.FMOVS, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(arm64.FMOVS, registerTypeGeneralPurpose)
 }
 
 // compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileI64ReinterpretFromF64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		peek.setRegisterType(registerTypeGeneralPurpose)
 		return nil
 	}
-	return c.compileSimpleConversion(arm64.FMOVD, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(arm64.FMOVD, registerTypeGeneralPurpose)
 }
 
 // compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the arm64 architecture.
 func (c *arm64Compiler) compileF32ReinterpretFromI32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		peek.setRegisterType(registerTypeVector)
 		return nil
 	}
-	return c.compileSimpleConversion(arm64.FMOVS, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(arm64.FMOVS, registerTypeVector)
 }
 
 // compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileF64ReinterpretFromI64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		peek.setRegisterType(registerTypeVector)
 		return nil
 	}
-	return c.compileSimpleConversion(arm64.FMOVD, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(arm64.FMOVD, registerTypeVector)
 }
 
-func (c *arm64Compiler) compileSimpleConversion(inst asm.Instruction, destinationRegType generalPurposeRegisterType) error {
+func (c *arm64Compiler) compileSimpleConversion(inst asm.Instruction, destinationRegType registerType) error {
 	source, err := c.popValueOnRegister()
 	if err != nil {
 		return err
@@ -2554,7 +2554,7 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst asm.Instructi
 
 	resultRegister := offsetReg
 	if isFloat {
-		resultRegister, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		resultRegister, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
@@ -2647,7 +2647,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	offsetRegister = base.register
 	if isZeroRegister(base.register) {
-		offsetRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		offsetRegister, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return
 		}
@@ -2700,7 +2700,7 @@ func (c *arm64Compiler) compileMemoryGrow() error {
 func (c *arm64Compiler) compileMemorySize() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2733,7 +2733,7 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus compilerCallStatusC
 		return err
 	}
 
-	freeRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 4)
+	freeRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 4)
 	if !found {
 		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
@@ -2806,7 +2806,7 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 		c.pushZeroValue()
 	} else {
 		// Take a register to load the value.
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -2841,7 +2841,7 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
 	// Take a register to load the value.
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	reg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
@@ -2897,7 +2897,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		return err
 	}
 	if isZeroRegister(sourceOffset.register) {
-		sourceOffset.register, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		sourceOffset.register, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -2910,7 +2910,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		return err
 	}
 	if isZeroRegister(destinationOffset.register) {
-		destinationOffset.register, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		destinationOffset.register, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -2920,7 +2920,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	var tableInstanceAddressReg asm.Register = asm.NilRegister
 	if isTable {
-		tableInstanceAddressReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		tableInstanceAddressReg, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -2934,7 +2934,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		c.assembler.CompileRegisterToRegister(arm64.ADD, copySize.register, destinationOffset.register)
 	}
 
-	instanceAddr, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	instanceAddr, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3059,7 +3059,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 // compileDataDrop implements compiler.compileDataDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3115,7 +3115,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		return err
 	}
 	if isZeroRegister(sourceOffset.register) {
-		sourceOffset.register, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		sourceOffset.register, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -3128,7 +3128,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		return err
 	}
 	if isZeroRegister(destinationOffset.register) {
-		destinationOffset.register, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		destinationOffset.register, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -3383,7 +3383,7 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 		return err
 	}
 	if isZeroRegister(destinationOffset.register) {
-		destinationOffset.register, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		destinationOffset.register, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
 			return err
 		}
@@ -3502,7 +3502,7 @@ func (c *arm64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
 func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3534,7 +3534,7 @@ func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 
 // compileRefFunc implements compiler.compileRefFunc for the arm64 architecture.
 func (c *arm64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
-	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3558,7 +3558,7 @@ func (c *arm64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 
 // compileTableGet implements compiler.compileTableGet for the arm64 architecture.
 func (c *arm64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
-	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3625,7 +3625,7 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 		return err
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3703,7 +3703,7 @@ func (c *arm64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 // compileTableSize implements compiler.compileTableSize for the arm64 architecture.
 func (c *arm64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3780,10 +3780,10 @@ func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation
 	if loc.onStack() {
 		var reg asm.Register
 		switch loc.regType {
-		case generalPurposeRegisterTypeInt:
-			reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
-		case generalPurposeRegisterTypeFloat:
-			reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		case registerTypeGeneralPurpose:
+			reg, err = c.allocateRegister(registerTypeGeneralPurpose)
+		case registerTypeVector:
+			reg, err = c.allocateRegister(registerTypeVector)
 		}
 
 		if err != nil {
@@ -3821,7 +3821,7 @@ func (c *arm64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegist
 func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *valueLocation) {
 	// There must be always at least one free register at this point, as the conditional register located value
 	// is always pushed after consuming at least one value (eqz) or two values for most cases (gt, ge, etc.).
-	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	reg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	c.markRegisterUsed(reg)
 
 	c.assembler.CompileConditionalRegisterSet(loc.conditionalRegister, reg)
@@ -3834,9 +3834,9 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
 	var inst asm.Instruction
 	switch loc.regType {
-	case generalPurposeRegisterTypeInt:
+	case registerTypeGeneralPurpose:
 		inst = arm64.MOVD
-	case generalPurposeRegisterTypeFloat:
+	case registerTypeVector:
 		inst = arm64.FMOVD
 	}
 	c.assembler.CompileMemoryToRegister(inst, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, loc.register)
@@ -3849,7 +3849,7 @@ func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
 //
 // TODO: we’d usually prefix this with compileXXX as this might end up emitting instructions,
 // but the name seems awkward.
-func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg asm.Register, err error) {
+func (c *arm64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
 	reg, ok = c.locationStack.takeFreeRegister(t)
@@ -3888,7 +3888,7 @@ func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
 func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
 	var inst asm.Instruction = arm64.MOVD
-	if loc.regType == generalPurposeRegisterTypeFloat {
+	if loc.regType == registerTypeVector {
 		inst = arm64.FMOVD
 	}
 
@@ -3937,7 +3937,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}

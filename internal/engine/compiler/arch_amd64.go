@@ -17,8 +17,8 @@ type archContext struct{}
 func newArchContextImpl() (ret archContext) { return }
 
 func init() {
-	unreservedGeneralPurposeIntRegisters = amd64UnreservedGeneralPurposeIntRegisters
-	unreservedGeneralPurposeFloatRegisters = amd64UnreservedGeneralPurposeFloatRegisters
+	unreservedGeneralPurposeRegisters = amd64UnreservedGeneralPurposeIntRegisters
+	unreservedVectorRegisters = amd64UnreservedGeneralPurposeFloatRegisters
 }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.

@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	// unreservedGeneralPurposeIntRegisters contains unreserved general purpose registers of integer type.
-	unreservedGeneralPurposeIntRegisters []asm.Register
+	// unreservedGeneralPurposeRegisters contains unreserved general purpose registers.
+	unreservedGeneralPurposeRegisters []asm.Register
 
-	// unreservedGeneralPurposeFloatRegisters contains unreserved general purpose registers of scalar float type.
-	unreservedGeneralPurposeFloatRegisters []asm.Register
+	// unreservedVectorRegisters contains unreserved vector registers.
+	unreservedVectorRegisters []asm.Register
 )
 
 func isNilRegister(r asm.Register) bool {
@@ -20,31 +20,31 @@ func isNilRegister(r asm.Register) bool {
 }
 
 func isIntRegister(r asm.Register) bool {
-	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
+	return unreservedGeneralPurposeRegisters[0] <= r && r <= unreservedGeneralPurposeRegisters[len(unreservedGeneralPurposeRegisters)-1]
 }
 
-func isFloatRegister(r asm.Register) bool {
-	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
+func isVectorRegister(r asm.Register) bool {
+	return unreservedVectorRegisters[0] <= r && r <= unreservedVectorRegisters[len(unreservedVectorRegisters)-1]
 }
 
 // valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
-	regType generalPurposeRegisterType
-	// Set to asm.NilRegister if the value is stored in the memory stack.
+	regType registerType
+	// register is set to asm.NilRegister if the value is stored in the memory stack.
 	register asm.Register
-	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
+	// conditionalRegister is set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister asm.ConditionalRegisterState
-	// This is the location of this value in the memory stack at runtime,
+	// stackPointer is the location of this value in the memory stack at runtime.
 	stackPointer uint64
 }
 
-func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
+func (v *valueLocation) registerType() (t registerType) {
 	return v.regType
 }
 
-func (v *valueLocation) setRegisterType(t generalPurposeRegisterType) {
+func (v *valueLocation) setRegisterType(t registerType) {
 	v.regType = t
 }
 
@@ -139,9 +139,9 @@ func (v *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc 
 	loc = &valueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
 
 	if isIntRegister(reg) {
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
-	} else if isFloatRegister(reg) {
-		loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		loc.setRegisterType(registerTypeGeneralPurpose)
+	} else if isVectorRegister(reg) {
+		loc.setRegisterType(registerTypeVector)
 	}
 	v.push(loc)
 	return
@@ -207,31 +207,40 @@ func (v *valueLocationStack) markRegisterUsed(regs ...asm.Register) {
 	}
 }
 
-type generalPurposeRegisterType byte
+type registerType byte
 
 const (
-	generalPurposeRegisterTypeInt generalPurposeRegisterType = iota
-	generalPurposeRegisterTypeFloat
+	registerTypeGeneralPurpose registerType = iota
+	// registerTypeVector represents a vector register which can be used for either scalar float
+	// operation or SIMD vector operation depending on the instrcution by which the register is used.
+	//
+	// Note: In normal assembly language, scalar float and vector register have different notations as
+	// Vn is for vectors and Qn is for scalara floats on arm64 for example. But on phyisical hardware,
+	// they are placed on the same locations. (Qn means the lower 64-bit of Vn vector register on arm64).
+	//
+	// In wazero, for the sake of simplicity in the register allocation, we intentionally ambiguate the two types
+	// and delegate the decision to the assembler which is aware of the instruction types for which these registers are used.
+	registerTypeVector
 )
 
-func (tp generalPurposeRegisterType) String() (ret string) {
+func (tp registerType) String() (ret string) {
 	switch tp {
-	case generalPurposeRegisterTypeInt:
-		ret = "int"
-	case generalPurposeRegisterTypeFloat:
-		ret = "float"
+	case registerTypeGeneralPurpose:
+		ret = "gp"
+	case registerTypeVector:
+		ret = "vector"
 	}
 	return
 }
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
-func (v *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg asm.Register, found bool) {
+func (v *valueLocationStack) takeFreeRegister(tp registerType) (reg asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
-	case generalPurposeRegisterTypeFloat:
-		targetRegs = unreservedGeneralPurposeFloatRegisters
-	case generalPurposeRegisterTypeInt:
-		targetRegs = unreservedGeneralPurposeIntRegisters
+	case registerTypeVector:
+		targetRegs = unreservedVectorRegisters
+	case registerTypeGeneralPurpose:
+		targetRegs = unreservedGeneralPurposeRegisters
 	}
 	for _, candidate := range targetRegs {
 		if _, ok := v.usedRegisters[candidate]; ok {
@@ -242,13 +251,13 @@ func (v *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	return 0, false
 }
 
-func (v *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []asm.Register, found bool) {
+func (v *valueLocationStack) takeFreeRegisters(tp registerType, num int) (regs []asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
-	case generalPurposeRegisterTypeFloat:
-		targetRegs = unreservedGeneralPurposeFloatRegisters
-	case generalPurposeRegisterTypeInt:
-		targetRegs = unreservedGeneralPurposeIntRegisters
+	case registerTypeVector:
+		targetRegs = unreservedVectorRegisters
+	case registerTypeGeneralPurpose:
+		targetRegs = unreservedGeneralPurposeRegisters
 	}
 
 	regs = make([]asm.Register, 0, num)
@@ -267,16 +276,16 @@ func (v *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (v *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
+func (v *valueLocationStack) takeStealTargetFromUsedRegister(tp registerType) (*valueLocation, bool) {
 	for i := uint64(0); i < v.sp; i++ {
 		loc := v.stack[i]
 		if loc.onRegister() {
 			switch tp {
-			case generalPurposeRegisterTypeFloat:
-				if isFloatRegister(loc.register) {
+			case registerTypeVector:
+				if isVectorRegister(loc.register) {
 					return loc, true
 				}
-			case generalPurposeRegisterTypeInt:
+			case registerTypeGeneralPurpose:
 				if isIntRegister(loc.register) {
 					return loc, true
 				}

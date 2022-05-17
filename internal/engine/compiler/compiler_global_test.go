@@ -38,7 +38,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 			switch tp {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
-				require.True(t, isFloatRegister(global.register))
+				require.True(t, isVectorRegister(global.register))
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
@@ -85,9 +85,9 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			loc := compiler.valueLocationStack().pushValueLocationOnStack()
 			switch tp {
 			case wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
-				loc.setRegisterType(generalPurposeRegisterTypeInt)
+				loc.setRegisterType(registerTypeGeneralPurpose)
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
-				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+				loc.setRegisterType(registerTypeVector)
 			}
 			env.stack()[loc.stackPointer] = valueToSet
 

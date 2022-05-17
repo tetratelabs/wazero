@@ -107,7 +107,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+						require.Equal(t, registerTypeGeneralPurpose, compiler.valueLocationStack().peek().regType)
 						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
 						require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
@@ -229,7 +229,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+						require.Equal(t, registerTypeGeneralPurpose, compiler.valueLocationStack().peek().regType)
 						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
 						require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.

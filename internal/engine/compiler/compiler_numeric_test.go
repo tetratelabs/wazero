@@ -160,9 +160,9 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							require.True(t, resultLocation.onRegister())
 							// Also, the result must have an appropriate register type.
 							if unsignedType == wazeroir.UnsignedTypeF32 || unsignedType == wazeroir.UnsignedTypeF64 {
-								require.Equal(t, generalPurposeRegisterTypeFloat, resultLocation.regType)
+								require.Equal(t, registerTypeVector, resultLocation.regType)
 							} else {
-								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+								require.Equal(t, registerTypeGeneralPurpose, resultLocation.regType)
 							}
 
 							err = compiler.compileReturnFunction()
@@ -333,7 +333,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
 								resultLocation := compiler.valueLocationStack().peek()
 								// Also, the result must have an appropriate register type.
-								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+								require.Equal(t, registerTypeGeneralPurpose, resultLocation.regType)
 
 								err = compiler.compileReturnFunction()
 								require.NoError(t, err)
@@ -450,7 +450,7 @@ func TestCompiler_compileShr(t *testing.T) {
 						// Plus the result must be located on a register.
 						require.True(t, resultLocation.onRegister())
 						// Also, the result must have an appropriate register type.
-						require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+						require.Equal(t, registerTypeGeneralPurpose, resultLocation.regType)
 
 						err = compiler.compileReturnFunction()
 						require.NoError(t, err)

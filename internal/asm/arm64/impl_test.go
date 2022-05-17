@@ -48,7 +48,7 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "BNE {NOP}",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: REG_F0, DstReg: REG_F10},
+			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: REG_V0, DstReg: REG_V10},
 			exp: "ADD F0, F10",
 		},
 		{
@@ -94,15 +94,15 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: REG_F1, DstReg: REG_F2},
+			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: REG_V1, DstReg: REG_V2},
 			exp: "VCNT F1.B8, F2.B8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: REG_F1, DstReg: REG_F2},
+			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: REG_V1, DstReg: REG_V2},
 			exp: "VUADDLV F1.B8, F2",
 		},
 		{
-			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: REG_F1, SrcReg2: REG_F2, DstReg: REG_F3},
+			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: REG_V1, SrcReg2: REG_V2, DstReg: REG_V3},
 			exp: "VBIT (F1.B8, F2.B8), F3.B8",
 		},
 	} {
@@ -318,34 +318,34 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 
 func Test_CompileSIMDByteToSIMDByte(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToSIMDByte(VCNT, REG_F0, REG_F2)
+	a.CompileSIMDByteToSIMDByte(VCNT, REG_V0, REG_V2)
 	actualNode := a.Current
 	require.Equal(t, VCNT, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F2, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V2, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, REG_F0, REG_F10, REG_F2)
+	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, REG_V0, REG_V10, REG_V2)
 	actualNode := a.Current
 	require.Equal(t, VBIT, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F10, actualNode.SrcReg2)
-	require.Equal(t, REG_F2, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V10, actualNode.SrcReg2)
+	require.Equal(t, REG_V2, actualNode.DstReg)
 	require.Equal(t, OperandTypeTwoSIMDBytes, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileSIMDByteToRegister(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToRegister(VUADDLV, REG_F0, REG_F10)
+	a.CompileSIMDByteToRegister(VUADDLV, REG_V0, REG_V10)
 	actualNode := a.Current
 	require.Equal(t, VUADDLV, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F10, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V10, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
@@ -372,20 +372,20 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 		{src: REG_R10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
 		{src: REG_R10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_R10, dst: REG_F30, requireSrcInt: true, requireDstInt: false, expErr: ""},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got F30"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: ""},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got F30"},
 
-		{src: REG_F10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: ""},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: ""},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_F10, dst: REG_F30, requireSrcInt: false, requireDstInt: false, expErr: ""},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got F30"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: ""},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got F30"},
 	} {
 		actual := checkRegisterToRegisterType(tc.src, tc.dst, tc.requireSrcInt, tc.requireDstInt)
 		if tc.expErr != "" {

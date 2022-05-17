@@ -42,7 +42,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 	}
 
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	a.AddInstruction(inst)
 	return golang_asm.NewGolangAsmNode(inst)
 }
@@ -52,10 +52,10 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = castAsGolangAsmRegister[sourceBaseReg]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[sourceBaseReg]
 	inst.From.Offset = sourceOffsetConst
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	a.AddInstruction(inst)
 }
 
@@ -64,11 +64,11 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instructi
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = castAsGolangAsmRegister[sourceBaseReg]
-	inst.From.Index = castAsGolangAsmRegister[sourceOffsetReg]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[sourceBaseReg]
+	inst.From.Index = castAsGolangAsmNonVectorRegister[sourceOffsetReg]
 	inst.From.Scale = 1
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	a.AddInstruction(inst)
 }
 
@@ -77,10 +77,10 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = castAsGolangAsmRegister[destinationBaseReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationBaseReg]
 	inst.To.Offset = destinationOffsetConst
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[sourceReg]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[sourceReg]
 	a.AddInstruction(inst)
 }
 
@@ -89,11 +89,11 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffset(instructi
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = castAsGolangAsmRegister[destinationBaseReg]
-	inst.To.Index = castAsGolangAsmRegister[destinationOffsetReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationBaseReg]
+	inst.To.Index = castAsGolangAsmNonVectorRegister[destinationOffsetReg]
 	inst.To.Scale = 1
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[sourceReg]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[sourceReg]
 	a.AddInstruction(inst)
 }
 
@@ -102,9 +102,9 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instructi
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[to]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[to]
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[from]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[from]
 	a.AddInstruction(inst)
 }
 
@@ -113,10 +113,10 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instr
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destination]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destination]
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[src1]
-	inst.Reg = castAsGolangAsmRegister[src2]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[src1]
+	inst.Reg = castAsGolangAsmNonVectorRegister[src2]
 	a.AddInstruction(inst)
 }
 
@@ -125,11 +125,11 @@ func (a *assemblerGoAsmImpl) CompileThreeRegistersToRegister(instruction asm.Ins
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[dst]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[dst]
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[src1]
-	inst.Reg = castAsGolangAsmRegister[src2]
-	inst.RestArgs = append(inst.RestArgs, obj.Addr{Type: obj.TYPE_REG, Reg: castAsGolangAsmRegister[src3]})
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[src1]
+	inst.Reg = castAsGolangAsmNonVectorRegister[src2]
+	inst.RestArgs = append(inst.RestArgs, obj.Addr{Type: obj.TYPE_REG, Reg: castAsGolangAsmNonVectorRegister[src3]})
 	a.AddInstruction(inst)
 }
 
@@ -141,8 +141,8 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instructi
 	// Note: this line is deletable as the value equals zero anyway.
 	inst.To.Type = obj.TYPE_NONE
 	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = castAsGolangAsmRegister[src1]
-	inst.Reg = castAsGolangAsmRegister[src2]
+	inst.From.Reg = castAsGolangAsmNonVectorRegister[src1]
+	inst.Reg = castAsGolangAsmNonVectorRegister[src2]
 	a.AddInstruction(inst)
 }
 
@@ -155,7 +155,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterAndConstToNone(instruction asm.Instr
 	inst.To.Type = obj.TYPE_NONE
 	inst.From.Type = obj.TYPE_CONST
 	inst.From.Offset = srcConst
-	inst.Reg = castAsGolangAsmRegister[src]
+	inst.Reg = castAsGolangAsmNonVectorRegister[src]
 	a.AddInstruction(inst)
 }
 
@@ -173,7 +173,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	br := a.NewProg()
 	br.As = castAsGolangAsmInstruction[jmpInstruction]
 	br.To.Type = obj.TYPE_MEM
-	br.To.Reg = castAsGolangAsmRegister[baseReg]
+	br.To.Reg = castAsGolangAsmNonVectorRegister[baseReg]
 	a.AddInstruction(br)
 }
 
@@ -182,7 +182,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instructio
 	ret := a.NewProg()
 	ret.As = castAsGolangAsmInstruction[jmpInstruction]
 	ret.To.Type = obj.TYPE_REG
-	ret.To.Reg = castAsGolangAsmRegister[reg]
+	ret.To.Reg = castAsGolangAsmNonVectorRegister[reg]
 	a.AddInstruction(ret)
 }
 
@@ -199,11 +199,11 @@ func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(instruction as
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
 	inst.From.Type = obj.TYPE_SHIFT
-	inst.From.Offset = (int64(castAsGolangAsmRegister[shiftedSourceReg])&31)<<16 | 0<<22 | (shiftNum&63)<<10
-	inst.Reg = castAsGolangAsmRegister[srcReg]
+	inst.From.Offset = (int64(castAsGolangAsmNonVectorRegister[shiftedSourceReg])&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	inst.Reg = castAsGolangAsmNonVectorRegister[srcReg]
 	a.AddInstruction(inst)
 }
 
@@ -219,7 +219,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Re
 	readAddress.As = arm64.AADR
 	readAddress.From.Type = obj.TYPE_BRANCH
 	readAddress.To.Type = obj.TYPE_REG
-	readAddress.To.Reg = castAsGolangAsmRegister[destinationReg]
+	readAddress.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	a.AddInstruction(readAddress)
 
 	// Setup the callback to modify the instruction bytes after compilation.
@@ -272,7 +272,7 @@ func (a *assemblerGoAsmImpl) CompileConditionalRegisterSet(cond asm.ConditionalR
 	inst := a.NewProg()
 	inst.As = arm64.ACSET
 	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.To.Reg = castAsGolangAsmNonVectorRegister[destinationReg]
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = castAsGolangAsmConditionalRegister[cond]
 	a.AddInstruction(inst)
@@ -286,7 +286,7 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 
 // CompileTwoSIMDBytesToSIMDByteRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
-	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
+	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmNonVectorRegister[srcReg1], castAsGolangAsmNonVectorRegister[srcReg2], castAsGolangAsmNonVectorRegister[dstReg]
 	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
 
 	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
@@ -304,7 +304,7 @@ func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction a
 
 // CompileSIMDByteToSIMDByte implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
+	srcFloatReg, dstFloatReg := castAsGolangAsmNonVectorRegister[srcReg], castAsGolangAsmNonVectorRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
 
 	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
@@ -320,7 +320,7 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instructi
 
 // CompileSIMDByteToRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
+	srcFloatReg, dstFlaotReg := castAsGolangAsmNonVectorRegister[srcReg], castAsGolangAsmNonVectorRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFlaotReg)
 
 	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
@@ -354,8 +354,8 @@ var castAsGolangAsmConditionalRegister = [...]int16{
 	asm_arm64.COND_NV: arm64.COND_NV,
 }
 
-// castAsGolangAsmRegister maps the registers to golang-asm specific registers values.
-var castAsGolangAsmRegister = [...]int16{
+// castAsGolangAsmNonVectorRegister maps the registers to golang-asm specific registers values.
+var castAsGolangAsmNonVectorRegister = [...]int16{
 	asm_arm64.REG_R0:   arm64.REG_R0,
 	asm_arm64.REG_R1:   arm64.REG_R1,
 	asm_arm64.REG_R2:   arm64.REG_R2,
@@ -388,38 +388,38 @@ var castAsGolangAsmRegister = [...]int16{
 	asm_arm64.REG_R29:  arm64.REG_R29,
 	asm_arm64.REG_R30:  arm64.REG_R30,
 	asm_arm64.REGZERO:  arm64.REGZERO,
-	asm_arm64.REG_F0:   arm64.REG_F0,
-	asm_arm64.REG_F1:   arm64.REG_F1,
-	asm_arm64.REG_F2:   arm64.REG_F2,
-	asm_arm64.REG_F3:   arm64.REG_F3,
-	asm_arm64.REG_F4:   arm64.REG_F4,
-	asm_arm64.REG_F5:   arm64.REG_F5,
-	asm_arm64.REG_F6:   arm64.REG_F6,
-	asm_arm64.REG_F7:   arm64.REG_F7,
-	asm_arm64.REG_F8:   arm64.REG_F8,
-	asm_arm64.REG_F9:   arm64.REG_F9,
-	asm_arm64.REG_F10:  arm64.REG_F10,
-	asm_arm64.REG_F11:  arm64.REG_F11,
-	asm_arm64.REG_F12:  arm64.REG_F12,
-	asm_arm64.REG_F13:  arm64.REG_F13,
-	asm_arm64.REG_F14:  arm64.REG_F14,
-	asm_arm64.REG_F15:  arm64.REG_F15,
-	asm_arm64.REG_F16:  arm64.REG_F16,
-	asm_arm64.REG_F17:  arm64.REG_F17,
-	asm_arm64.REG_F18:  arm64.REG_F18,
-	asm_arm64.REG_F19:  arm64.REG_F19,
-	asm_arm64.REG_F20:  arm64.REG_F20,
-	asm_arm64.REG_F21:  arm64.REG_F21,
-	asm_arm64.REG_F22:  arm64.REG_F22,
-	asm_arm64.REG_F23:  arm64.REG_F23,
-	asm_arm64.REG_F24:  arm64.REG_F24,
-	asm_arm64.REG_F25:  arm64.REG_F25,
-	asm_arm64.REG_F26:  arm64.REG_F26,
-	asm_arm64.REG_F27:  arm64.REG_F27,
-	asm_arm64.REG_F28:  arm64.REG_F28,
-	asm_arm64.REG_F29:  arm64.REG_F29,
-	asm_arm64.REG_F30:  arm64.REG_F30,
-	asm_arm64.REG_F31:  arm64.REG_F31,
+	asm_arm64.REG_V0:   arm64.REG_F0,
+	asm_arm64.REG_V1:   arm64.REG_F1,
+	asm_arm64.REG_V2:   arm64.REG_F2,
+	asm_arm64.REG_V3:   arm64.REG_F3,
+	asm_arm64.REG_V4:   arm64.REG_F4,
+	asm_arm64.REG_V5:   arm64.REG_F5,
+	asm_arm64.REG_V6:   arm64.REG_F6,
+	asm_arm64.REG_V7:   arm64.REG_F7,
+	asm_arm64.REG_V8:   arm64.REG_F8,
+	asm_arm64.REG_V9:   arm64.REG_F9,
+	asm_arm64.REG_V10:  arm64.REG_F10,
+	asm_arm64.REG_V11:  arm64.REG_F11,
+	asm_arm64.REG_V12:  arm64.REG_F12,
+	asm_arm64.REG_V13:  arm64.REG_F13,
+	asm_arm64.REG_V14:  arm64.REG_F14,
+	asm_arm64.REG_V15:  arm64.REG_F15,
+	asm_arm64.REG_V16:  arm64.REG_F16,
+	asm_arm64.REG_V17:  arm64.REG_F17,
+	asm_arm64.REG_V18:  arm64.REG_F18,
+	asm_arm64.REG_V19:  arm64.REG_F19,
+	asm_arm64.REG_V20:  arm64.REG_F20,
+	asm_arm64.REG_V21:  arm64.REG_F21,
+	asm_arm64.REG_V22:  arm64.REG_F22,
+	asm_arm64.REG_V23:  arm64.REG_F23,
+	asm_arm64.REG_V24:  arm64.REG_F24,
+	asm_arm64.REG_V25:  arm64.REG_F25,
+	asm_arm64.REG_V26:  arm64.REG_F26,
+	asm_arm64.REG_V27:  arm64.REG_F27,
+	asm_arm64.REG_V28:  arm64.REG_F28,
+	asm_arm64.REG_V29:  arm64.REG_F29,
+	asm_arm64.REG_V30:  arm64.REG_F30,
+	asm_arm64.REG_V31:  arm64.REG_F31,
 	asm_arm64.REG_FPSR: arm64.REG_FPSR,
 }
 

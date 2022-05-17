@@ -1451,11 +1451,11 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	case FCMPS, FCMPD:
 		// "Floating-point compare" section in:
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		src1RegBits, err := floatRegisterBits(n.SrcReg)
+		src1RegBits, err := vectorRegisterBits(n.SrcReg)
 		if err != nil {
 			return err
 		}
-		src2RegBits, err := floatRegisterBits(n.SrcReg2)
+		src2RegBits, err := vectorRegisterBits(n.SrcReg2)
 		if err != nil {
 			return err
 		}
@@ -1665,7 +1665,7 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 
 	var srcRegBits byte
 	if inst.isTargetFloat {
-		srcRegBits, err = floatRegisterBits(n.SrcReg)
+		srcRegBits, err = vectorRegisterBits(n.SrcReg)
 	} else {
 		srcRegBits, err = intRegisterBits(n.SrcReg)
 	}
@@ -1755,7 +1755,7 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 
 	var dstRegBits byte
 	if inst.isTargetFloat {
-		dstRegBits, err = floatRegisterBits(n.DstReg)
+		dstRegBits, err = vectorRegisterBits(n.DstReg)
 	} else {
 		dstRegBits, err = intRegisterBits(n.DstReg)
 	}
@@ -2325,12 +2325,12 @@ func (a *AssemblerImpl) EncodeSIMDByteToSIMDByte(n *NodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	srcRegBits, err := floatRegisterBits(n.SrcReg)
+	srcRegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2352,12 +2352,12 @@ func (a *AssemblerImpl) EncodeSIMDByteToRegister(n *NodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	srcRegBits, err := floatRegisterBits(n.SrcReg)
+	srcRegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2379,17 +2379,17 @@ func (a *AssemblerImpl) EncodeTwoSIMDBytesToSIMDByteRegister(n *NodeImpl) (err e
 		return errorEncodingUnsupported(n)
 	}
 
-	src1RegBits, err := floatRegisterBits(n.SrcReg)
+	src1RegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	src2RegBits, err := floatRegisterBits(n.SrcReg2)
+	src2RegBits, err := vectorRegisterBits(n.SrcReg2)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2410,8 +2410,8 @@ func isIntRegister(r asm.Register) bool {
 	return REG_R0 <= r && r <= REGZERO
 }
 
-func isFloatRegister(r asm.Register) bool {
-	return REG_F0 <= r && r <= REG_F31
+func isVectorRegister(r asm.Register) bool {
+	return REG_V0 <= r && r <= REG_V31
 }
 
 func isConditionalRegister(r asm.Register) bool {
@@ -2427,11 +2427,11 @@ func intRegisterBits(r asm.Register) (ret byte, err error) {
 	return
 }
 
-func floatRegisterBits(r asm.Register) (ret byte, err error) {
-	if !isFloatRegister(r) {
+func vectorRegisterBits(r asm.Register) (ret byte, err error) {
+	if !isVectorRegister(r) {
 		err = fmt.Errorf("%s is not float", RegisterName(r))
 	} else {
-		ret = byte((r - REG_F0))
+		ret = byte((r - REG_V0))
 	}
 	return
 }
@@ -2440,7 +2440,7 @@ func registerBits(r asm.Register) (ret byte) {
 	if isIntRegister(r) {
 		ret = byte((r - REG_R0))
 	} else {
-		ret = byte((r - REG_F0))
+		ret = byte((r - REG_V0))
 	}
 	return
 }

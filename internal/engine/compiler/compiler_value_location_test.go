@@ -9,14 +9,14 @@ import (
 )
 
 func Test_isIntRegister(t *testing.T) {
-	for _, r := range unreservedGeneralPurposeIntRegisters {
+	for _, r := range unreservedGeneralPurposeRegisters {
 		require.True(t, isIntRegister(r))
 	}
 }
 
-func Test_isFloatRegister(t *testing.T) {
-	for _, r := range unreservedGeneralPurposeFloatRegisters {
-		require.True(t, isFloatRegister(r))
+func Test_isVectorRegister(t *testing.T) {
+	for _, r := range unreservedVectorRegisters {
+		require.True(t, isVectorRegister(r))
 	}
 }
 
@@ -27,13 +27,13 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, uint64(1), s.sp)
 	require.Equal(t, uint64(0), loc.stackPointer)
 	// Push the register value.
-	tmpReg := unreservedGeneralPurposeIntRegisters[0]
+	tmpReg := unreservedGeneralPurposeRegisters[0]
 	loc = s.pushValueLocationOnRegister(tmpReg)
 	require.Equal(t, uint64(2), s.sp)
 	require.Equal(t, uint64(1), loc.stackPointer)
 	require.Equal(t, tmpReg, loc.register)
 	// markRegisterUsed.
-	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
+	tmpReg2 := unreservedGeneralPurposeRegisters[1]
 	s.markRegisterUsed(tmpReg2)
 	require.NotNil(t, s.usedRegisters[tmpReg2], tmpReg2)
 	// releaseRegister.
@@ -62,57 +62,57 @@ func TestValueLocationStack_basic(t *testing.T) {
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	s := newValueLocationStack()
 	// For int registers.
-	r, ok := s.takeFreeRegister(generalPurposeRegisterTypeInt)
+	r, ok := s.takeFreeRegister(registerTypeGeneralPurpose)
 	require.True(t, ok)
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
-	for _, r := range unreservedGeneralPurposeIntRegisters {
+	for _, r := range unreservedGeneralPurposeRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for int.
-	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeInt)
+	_, ok = s.takeFreeRegister(registerTypeGeneralPurpose)
 	require.False(t, ok)
 	// But we still should be able to take float regs.
-	r, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
+	r, ok = s.takeFreeRegister(registerTypeVector)
 	require.True(t, ok)
-	require.True(t, isFloatRegister(r))
+	require.True(t, isVectorRegister(r))
 	// Mark all the float registers used.
-	for _, r := range unreservedGeneralPurposeFloatRegisters {
+	for _, r := range unreservedVectorRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.
-	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
+	_, ok = s.takeFreeRegister(registerTypeVector)
 	require.False(t, ok)
 }
 
 func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newValueLocationStack()
-	intReg := unreservedGeneralPurposeIntRegisters[0]
+	intReg := unreservedGeneralPurposeRegisters[0]
 	intLocation := &valueLocation{register: intReg}
-	floatReg := unreservedGeneralPurposeFloatRegisters[0]
+	floatReg := unreservedVectorRegisters[0]
 	floatLocation := &valueLocation{register: floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)
 	// Take for float.
-	target, ok := s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
+	target, ok := s.takeStealTargetFromUsedRegister(registerTypeVector)
 	require.True(t, ok)
 	require.Equal(t, floatLocation, target)
 	// Take for ints.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeGeneralPurpose)
 	require.True(t, ok)
 	require.Equal(t, intLocation, target)
 	// Pop float value.
 	popped := s.pop()
 	require.Equal(t, floatLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeVector)
 	require.False(t, ok)
 	require.Nil(t, target)
 	// Pop int value.
 	popped = s.pop()
 	require.Equal(t, intLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeGeneralPurpose)
 	require.False(t, ok)
 	require.Nil(t, target)
 }

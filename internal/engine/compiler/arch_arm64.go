@@ -42,8 +42,8 @@ func newArchContextImpl() archContext {
 }
 
 func init() {
-	unreservedGeneralPurposeIntRegisters = arm64UnreservedGeneralPurposeIntRegisters
-	unreservedGeneralPurposeFloatRegisters = arm64UnreservedGeneralPurposeFloatRegisters
+	unreservedGeneralPurposeRegisters = arm64UnreservedGeneralPurposeRegisters
+	unreservedVectorRegisters = arm64UnreservedVectorRegisters
 }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.

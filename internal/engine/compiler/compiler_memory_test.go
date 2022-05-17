@@ -61,7 +61,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	require.NoError(t, err)
 	// At this point, the size of memory should be pushed onto the stack.
 	require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-	require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().registerType())
+	require.Equal(t, registerTypeGeneralPurpose, compiler.valueLocationStack().peek().registerType())
 
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -254,9 +254,9 @@ func TestCompiler_compileLoad(t *testing.T) {
 			loadedLocation := compiler.valueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
 			if tc.isFloatTarget {
-				require.Equal(t, generalPurposeRegisterTypeFloat, loadedLocation.registerType())
+				require.Equal(t, registerTypeVector, loadedLocation.registerType())
 			} else {
-				require.Equal(t, generalPurposeRegisterTypeInt, loadedLocation.registerType())
+				require.Equal(t, registerTypeGeneralPurpose, loadedLocation.registerType())
 			}
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
