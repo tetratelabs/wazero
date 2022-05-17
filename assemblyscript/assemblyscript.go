@@ -146,7 +146,7 @@ func readAssemblyScriptString(ctx context.Context, m api.Module, pointer uint32)
 	start := pointer
 	buf, ok := m.Memory().Read(ctx, start, end-start)
 	if !ok {
-		panic("Could not read memory")
+		return "", fmt.Errorf("could not read string from memory")
 	}
 	return decodeUTF16(buf), nil
 }
