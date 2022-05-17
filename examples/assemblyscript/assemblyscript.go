@@ -25,10 +25,10 @@ func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	// Create a new WebAssembly Runtime. AssemblyScript enables bulk-memory operations by default
-	// so we enable it in the runtime too.
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler().
-		WithFeatureBulkMemoryOperations(true))
+	// Create a new WebAssembly Runtime. AssemblyScript enables certain wasm 2.0 features by default, so
+	// we go ahead and configure the runtime for wasm 2.0 compatibility.
+	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().
+		WithWasmCore2())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a module implementing functions used by AssemblyScript.
