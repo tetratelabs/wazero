@@ -1,4 +1,4 @@
-package asm_amd64
+package amd64
 
 import (
 	"bytes"
