@@ -1015,8 +1015,9 @@ const (
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
 	if t == ValueTypeFuncref {
-		// TODO: funcref is not exposed in the API pkg yet.
 		return "funcref"
+	} else if t == ValueTypeV128 {
+		return "v128"
 	}
 	return api.ValueTypeName(t)
 }
