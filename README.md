@@ -186,7 +186,7 @@ wazero is a registered trademark of Tetrate.io, Inc. in the United States and/or
 
 [1]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 [2]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-[3]: ./internal/integration_test/post1_0/multi-value/testdata/fac.wat
+[3]: ./internal/integration_test/vs/testdata/fac.wat
 [4]: https://github.com/WebAssembly/meetings/blob/main/process/subgroups.md
 [5]: https://github.com/WebAssembly/WASI
 [6]: https://pkg.go.dev/golang.org/x/sys/unix
