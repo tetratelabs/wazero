@@ -142,9 +142,7 @@ func readAssemblyScriptString(ctx context.Context, m api.Module, pointer uint32)
 	if size%2 != 0 {
 		return "", fmt.Errorf("odd number of bytes for utf-16 string")
 	}
-	end := pointer + size
-	start := pointer
-	buf, ok := m.Memory().Read(ctx, start, end-start)
+	buf, ok := m.Memory().Read(ctx, pointer, size)
 	if !ok {
 		return "", fmt.Errorf("could not read string from memory")
 	}
