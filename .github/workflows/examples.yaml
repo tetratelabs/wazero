@@ -6,6 +6,7 @@ on:
       - '.github/workflows/examples.yaml'
       - 'examples/*/testdata/*.go'
       - 'examples/*/*/testdata/*.go'
+      - 'examples/*/testdata/*.ts'
       - 'Makefile'
   push:
     branches: [main]

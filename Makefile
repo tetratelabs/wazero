@@ -24,9 +24,13 @@ bench_testdata_dir := internal/integration_test/bench/testdata
 build.bench:
 	@tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none --no-debug -target=wasi $(bench_testdata_dir)/case.go
 
+.PHONY: build.examples.as
+build.examples.as:
+	@cd ./examples/assemblyscript/testdata && npm install && npm run build
+
 tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go)
 .PHONY: build.examples
-build.examples: $(tinygo_sources)
+build.examples: $(tinygo_sources) build.examples.as
 	@for f in $^; do \
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
