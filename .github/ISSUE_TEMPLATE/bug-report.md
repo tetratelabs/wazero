@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Create a report to help us improve wazeroe.
+about: Create a report to help us improve wazero.
 title: ''
 labels: bug
 assignees: ''
