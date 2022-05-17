@@ -30,7 +30,7 @@ build.examples.as:
 
 tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go)
 .PHONY: build.examples
-build.examples: $(tinygo_sources) build.examples.as
+build.examples: $(tinygo_sources)
 	@for f in $^; do \
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
