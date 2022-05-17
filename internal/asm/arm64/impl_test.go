@@ -1,4 +1,4 @@
-package asm_arm64
+package arm64
 
 import (
 	"testing"
