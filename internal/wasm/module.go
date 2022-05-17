@@ -1009,7 +1009,7 @@ const (
 	ValueTypeV128 = 0x7b
 	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
-	ValueTypeExternref ValueType = api.ValueTypeExternref
+	ValueTypeExternref           = api.ValueTypeExternref
 )
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
