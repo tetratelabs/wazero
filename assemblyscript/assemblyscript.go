@@ -47,6 +47,7 @@ type ModuleBuilder interface {
 	Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error)
 }
 
+// NewModuleBuilder returns a ModuleBuilder for configuring a AssemblyScript host module.
 func NewModuleBuilder() ModuleBuilder {
 	return &moduleBuilder{
 		abortWriter: os.Stderr,
