@@ -1001,21 +1001,23 @@ func SectionIDName(sectionID SectionID) string {
 type ValueType = api.ValueType
 
 const (
-	ValueTypeI32  = api.ValueTypeI32
-	ValueTypeI64  = api.ValueTypeI64
-	ValueTypeF32  = api.ValueTypeF32
-	ValueTypeF64  = api.ValueTypeF64
-	ValueTypeV128 = api.ValueTypeV128
+	ValueTypeI32 = api.ValueTypeI32
+	ValueTypeI64 = api.ValueTypeI64
+	ValueTypeF32 = api.ValueTypeF32
+	ValueTypeF64 = api.ValueTypeF64
+	// TODO: ValueTypeV128 is not exposed in the api pkg yet.
+	ValueTypeV128 = 0x7b
 	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
-	ValueTypeExternref ValueType = api.ValueTypeExternref
+	ValueTypeExternref           = api.ValueTypeExternref
 )
 
 // ValueTypeName is an alias of api.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
 	if t == ValueTypeFuncref {
-		// TODO: funcref is not exposed in the API pkg yet.
 		return "funcref"
+	} else if t == ValueTypeV128 {
+		return "v128"
 	}
 	return api.ValueTypeName(t)
 }
