@@ -82,17 +82,26 @@ func (m *moduleBuilder) WithSeedSource(reader io.Reader) ModuleBuilder {
 
 // Instantiate implements ModuleBuilder.Instantiate
 func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error) {
-	return runtime.NewModuleBuilder("env").
+	mod := runtime.NewModuleBuilder("env").
 		ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
 			abort(ctx, mod, message, fileName, lineNumber, columnNumber, m.abortWriter)
 		}).
-		ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, m.traceWriter)
-		}).
 		ExportFunction("seed", func() float64 {
 			return seed(m.seedSource)
-		}).
-		Instantiate(ctx)
+		})
+
+	// Optimize for our default which discards traces. No need to execute any logic in the host function.
+	if m.traceWriter != io.Discard {
+		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
+			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, m.traceWriter)
+		})
+	} else {
+		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
+			// no-op
+		})
+	}
+
+	return mod.Instantiate(ctx)
 }
 
 // readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
