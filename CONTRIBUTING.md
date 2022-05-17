@@ -5,7 +5,7 @@ We welcome contributions from the community. Please read the following guideline
 ## Coding Style
 
 - To ensure your change passes format checks, run `make check`. To format your files, you can run `make format`.
-- We follow standard Go table-driven tests and use an internal [testing library](./internal/testing/require) library to assert correctness. To verify all tests pass, you can run `make test`.
+- We follow standard Go table-driven tests and use an internal [testing library](./internal/testing/require) to assert correctness. To verify all tests pass, you can run `make test`.
 
 ## DCO
 
