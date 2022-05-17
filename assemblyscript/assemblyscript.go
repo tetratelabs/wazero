@@ -84,50 +84,13 @@ func (m *moduleBuilder) WithSeedSource(reader io.Reader) ModuleBuilder {
 func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error) {
 	return runtime.NewModuleBuilder("env").
 		ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
-			msg, err := readAssemblyScriptString(ctx, mod, message)
-			if err != nil {
-				return
-			}
-			fn, err := readAssemblyScriptString(ctx, mod, fileName)
-			if err != nil {
-				return
-			}
-			_, _ = fmt.Fprintf(m.abortWriter, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+			abort(ctx, mod, message, fileName, lineNumber, columnNumber, m.abortWriter)
 		}).
 		ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			msg, err := readAssemblyScriptString(ctx, mod, message)
-			if err != nil {
-				return
-			}
-			_, _ = fmt.Fprintf(m.traceWriter, "trace: %s", msg)
-			if nArgs >= 1 {
-				_, _ = fmt.Fprintf(m.traceWriter, " %v", arg0)
-			}
-			if nArgs >= 2 {
-				_, _ = fmt.Fprintf(m.traceWriter, ",%v", arg1)
-			}
-			if nArgs >= 3 {
-				_, _ = fmt.Fprintf(m.traceWriter, ",%v", arg2)
-			}
-			if nArgs >= 4 {
-				_, _ = fmt.Fprintf(m.traceWriter, ",%v", arg3)
-			}
-			if nArgs >= 5 {
-				_, _ = fmt.Fprintf(m.traceWriter, ",%v", arg4)
-			}
-			_, _ = fmt.Fprintln(m.traceWriter)
+			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, m.traceWriter)
 		}).
 		ExportFunction("seed", func() float64 {
-			b := make([]byte, 8)
-			n, err := m.seedSource.Read(b)
-			if n != 8 || err != nil {
-				// AssemblyScript default JS bindings just use Date.now for a seed which is not a good seed at all.
-				// We should almost always be able to read the seed, but if it fails for some reason we fallback to
-				// current time as a simplest default.
-				return float64(time.Now().UnixMilli())
-			}
-			bits := binary.LittleEndian.Uint64(b)
-			return math.Float64frombits(bits)
+			return seed(m.seedSource)
 		}).
 		Instantiate(ctx)
 }
@@ -158,4 +121,53 @@ func decodeUTF16(b []byte) string {
 	}
 
 	return string(utf16.Decode(u16s))
+}
+
+func abort(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32, writer io.Writer) {
+	msg, err := readAssemblyScriptString(ctx, mod, message)
+	if err != nil {
+		return
+	}
+	fn, err := readAssemblyScriptString(ctx, mod, fileName)
+	if err != nil {
+		return
+	}
+	_, _ = fmt.Fprintf(writer, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+}
+
+func seed(source io.Reader) float64 {
+	b := make([]byte, 8)
+	n, err := source.Read(b)
+	if n != 8 || err != nil {
+		// AssemblyScript default JS bindings just use Date.now for a seed which is not a good seed at all.
+		// We should almost always be able to read the seed, but if it fails for some reason we fallback to
+		// current time as a simplest default.
+		return float64(time.Now().UnixMilli())
+	}
+	bits := binary.LittleEndian.Uint64(b)
+	return math.Float64frombits(bits)
+}
+
+func trace(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64, writer io.Writer) {
+	msg, err := readAssemblyScriptString(ctx, mod, message)
+	if err != nil {
+		return
+	}
+	_, _ = fmt.Fprintf(writer, "trace: %s", msg)
+	if nArgs >= 1 {
+		_, _ = fmt.Fprintf(writer, " %v", arg0)
+	}
+	if nArgs >= 2 {
+		_, _ = fmt.Fprintf(writer, ",%v", arg1)
+	}
+	if nArgs >= 3 {
+		_, _ = fmt.Fprintf(writer, ",%v", arg2)
+	}
+	if nArgs >= 4 {
+		_, _ = fmt.Fprintf(writer, ",%v", arg3)
+	}
+	if nArgs >= 5 {
+		_, _ = fmt.Fprintf(writer, ",%v", arg4)
+	}
+	_, _ = fmt.Fprintln(writer)
 }
