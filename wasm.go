@@ -194,57 +194,6 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 	return c, nil
 }
 
-//
-//func (c *compileConfig) replaceImports(compile *wasm.Compile) *wasm.Compile {
-//	if (c.replacedImportCompiles == nil && c.replacedImports == nil) || compile.ImportSection == nil {
-//		return compile
-//	}
-//
-//	changed := false
-//
-//	ret := *compile // shallow copy
-//	replacedImports := make([]*wasm.Import, len(compile.ImportSection))
-//	copy(replacedImports, compile.ImportSection)
-//
-//	// First, replace any import.Compile
-//	for oldCompile, newCompile := range c.replacedImportCompiles {
-//		for i, imp := range replacedImports {
-//			if imp.Compile == oldCompile {
-//				changed = true
-//				cp := *imp // shallow copy
-//				cp.Compile = newCompile
-//				replacedImports[i] = &cp
-//			} else {
-//				replacedImports[i] = imp
-//			}
-//		}
-//	}
-//
-//	// Now, replace any import.Compile+import.Name
-//	for oldImport, newImport := range c.replacedImports {
-//		for i, imp := range replacedImports {
-//			nulIdx := strings.IndexByte(oldImport, 0)
-//			oldCompile := oldImport[0:nulIdx]
-//			oldName := oldImport[nulIdx+1:]
-//			if imp.Compile == oldCompile && imp.Name == oldName {
-//				changed = true
-//				cp := *imp // shallow copy
-//				cp.Compile = newImport[0]
-//				cp.Name = newImport[1]
-//				replacedImports[i] = &cp
-//			} else {
-//				replacedImports[i] = imp
-//			}
-//		}
-//	}
-//
-//	if !changed {
-//		return compile
-//	}
-//	ret.ImportSection = replacedImports
-//	return &ret
-//}
-
 // InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
 func (r *runtime) InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error) {
 	if compiled, err := r.CompileModule(ctx, source, NewCompileConfig()); err != nil {
