@@ -1468,7 +1468,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 					DstReg:      arm64.REG_V3,
 					VectorIndex: 0, VectorArrangement: arm64.VectorArrangement1D,
 				},
-				expErr: "unsupported arragement for VMOV: 1D",
+				expErr: "unsupported arrangement for VMOV: 1D",
 			},
 		} {
 			a := arm64.NewAssemblerImpl(asm.NilRegister)

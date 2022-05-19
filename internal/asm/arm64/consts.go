@@ -511,7 +511,7 @@ func (v VectorArrangement) String() (ret string) {
 	case VectorArrangement2D:
 		ret = "2D"
 	case VectorArrangementB:
-		ret = ""
+		ret = "B"
 	case VectorArrangementH:
 		ret = "H"
 	case VectorArrangementS:

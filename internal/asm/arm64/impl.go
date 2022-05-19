@@ -2531,7 +2531,7 @@ func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) 
 			imm5 |= byte(n.VectorIndex) << 1
 		case VectorArrangementH:
 			imm5 |= 0b10
-			imm5 |= byte(n.VectorIndex) << 02
+			imm5 |= byte(n.VectorIndex) << 2
 		case VectorArrangementS:
 			imm5 |= 0b100
 			imm5 |= byte(n.VectorIndex) << 3
@@ -2539,7 +2539,7 @@ func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) 
 			imm5 |= 0b1000
 			imm5 |= byte(n.VectorIndex) << 4
 		default:
-			return fmt.Errorf("unsupported arragement for VMOV: %s", n.VectorArrangement)
+			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
 		}
 		a.Buf.Write([]byte{
 			(srcRegBits << 5) | dstVectorRegBits,
