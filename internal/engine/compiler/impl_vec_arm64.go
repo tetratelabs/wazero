@@ -79,6 +79,6 @@ func (c *arm64Compiler) compileAddV128(o *wazeroir.OperationAddV128) error {
 	c.pushRuntimeValueLocationOnRegister(resultReg, runtimeValueTypeV128Lo)
 	c.pushRuntimeValueLocationOnRegister(resultReg, runtimeValueTypeV128Hi)
 
-	// TODO: free
+	c.markRegisterUnused(x1Low.register)
 	return nil
 }
