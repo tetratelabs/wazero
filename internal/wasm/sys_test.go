@@ -20,6 +20,7 @@ func TestDefaultSysContext(t *testing.T) {
 		nil, // stdin
 		nil, // stdout
 		nil, // stderr
+		nil, // randSource
 		nil, // openedFiles
 	)
 	require.NoError(t, err)
@@ -81,6 +82,7 @@ func TestNewSysContext_Args(t *testing.T) {
 				bytes.NewReader(make([]byte, 0)), // stdin
 				nil,                              // stdout
 				nil,                              // stderr
+				nil,                              // randSource
 				nil,                              // openedFiles
 			)
 			if tc.expectedErr == "" {
@@ -139,6 +141,7 @@ func TestNewSysContext_Environ(t *testing.T) {
 				bytes.NewReader(make([]byte, 0)), // stdin
 				nil,                              // stdout
 				nil,                              // stderr
+				nil,                              // randSource
 				nil,                              // openedFiles
 			)
 			if tc.expectedErr == "" {
@@ -170,6 +173,7 @@ func TestSysContext_Close(t *testing.T) {
 			nil, // stdin
 			nil, // stdout
 			nil, // stderr
+			nil, // randSource
 			map[uint32]*FileEntry{ // openedFiles
 				3: {Path: "/", FS: testFS},
 				4: {Path: ".", FS: testFS},
@@ -199,6 +203,7 @@ func TestSysContext_Close(t *testing.T) {
 			nil, // stdin
 			nil, // stdout
 			nil, // stderr
+			nil, // randSource
 			map[uint32]*FileEntry{ // no openedFiles
 				3: {Path: "/", FS: testFS},
 				4: {Path: ".", FS: testFS},
@@ -223,6 +228,7 @@ func TestSysContext_Close(t *testing.T) {
 			nil, // stdin
 			nil, // stdout
 			nil, // stderr
+			nil, // randSource
 			map[uint32]*FileEntry{ // openedFiles
 				3: {Path: "/", FS: testFS},
 				4: {Path: ".", FS: testFS},

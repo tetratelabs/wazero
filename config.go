@@ -416,6 +416,14 @@ type ModuleConfig interface {
 	// See https://linux.die.net/man/3/stdout
 	WithStdout(io.Writer) ModuleConfig
 
+	// WithRandSource configures a source of random bytes. Defaults to crypto/rand.Reader.
+	//
+	// This reader is most commonly used by the functions like "random_get" in "wasi_snapshot_preview1" or "seed" in
+	// AssemblyScript standard "env" although it could be used by functions imported from other modules.
+	//
+	// Note: The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
+	WithRandSource(io.Reader) ModuleConfig
+
 	// WithWorkDirFS indicates the file system to use for any paths beginning at "./". Defaults to the same as WithFS.
 	//
 	// Ex. This sets a read-only, embedded file-system as the root ("/"), and a mutable one as the working directory ("."):
@@ -437,6 +445,7 @@ type moduleConfig struct {
 	stdin          io.Reader
 	stdout         io.Writer
 	stderr         io.Writer
+	randSource     io.Reader
 	args           []string
 	// environ is pair-indexed to retain order similar to os.Environ.
 	environ []string
@@ -523,6 +532,13 @@ func (c *moduleConfig) WithStdout(stdout io.Writer) ModuleConfig {
 	return &ret
 }
 
+// WithRandSource implements ModuleConfig.WithRandSource
+func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
+	ret := *c // copy
+	ret.randSource = source
+	return &ret
+}
+
 // WithWorkDirFS implements ModuleConfig.WithWorkDirFS
 func (c *moduleConfig) WithWorkDirFS(fs fs.FS) ModuleConfig {
 	ret := *c // copy
@@ -582,5 +598,5 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 		preopens[c.preopenFD] = &wasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
 	}
 
-	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
+	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, c.randSource, preopens)
 }

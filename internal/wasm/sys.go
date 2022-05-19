@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ type SysContext struct {
 	argsSize, environSize uint32
 	stdin                 io.Reader
 	stdout, stderr        io.Writer
+	randSource            io.Reader
 
 	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
@@ -110,7 +112,7 @@ func (eofReader) Read([]byte) (int, error) {
 // Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
 // TODO: Make it an error to open or close files when no FS was assigned.
 func DefaultSysContext() *SysContext {
-	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil); err != nil {
+	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
 	} else {
 		return sys
@@ -121,7 +123,7 @@ var _ = DefaultSysContext() // Force panic on bug.
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
+func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
 	sys = &SysContext{args: args, environ: environ}
 
 	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
@@ -148,6 +150,12 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sys.stderr = io.Discard
 	} else {
 		sys.stderr = stderr
+	}
+
+	if randSource == nil {
+		sys.randSource = rand.Reader
+	} else {
+		sys.randSource = randSource
 	}
 
 	if openedFiles == nil {

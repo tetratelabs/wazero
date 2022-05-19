@@ -2057,7 +2057,7 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
 }
 
 func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sysCtx *wasm.SysContext, err error) {
-	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
+	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, nil, openedFiles)
 }
 
 func createFile(t *testing.T, pathName string, data []byte) (fs.File, fs.FS) {

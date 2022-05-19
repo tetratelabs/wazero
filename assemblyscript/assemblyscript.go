@@ -74,24 +74,21 @@ type moduleBuilder struct {
 
 // WithAbortDisabled implements ModuleBuilder.WithAbortWriter
 func (m *moduleBuilder) WithAbortDisabled() ModuleBuilder {
-	// copy
-	ret := *m
+	ret := *m // copy
 	ret.abortEnabled = false
 	return &ret
 }
 
 // WithTraceToStdout implements ModuleBuilder.WithTraceToStdout
 func (m *moduleBuilder) WithTraceToStdout() ModuleBuilder {
-	// copy
-	ret := *m
+	ret := *m // copy
 	ret.traceMode = traceStdout
 	return &ret
 }
 
 // WithTraceToStderr implements ModuleBuilder.WithTraceToStderr
 func (m *moduleBuilder) WithTraceToStderr() ModuleBuilder {
-	// copy
-	ret := *m
+	ret := *m // copy
 	ret.traceMode = traceStderr
 	return &ret
 }
