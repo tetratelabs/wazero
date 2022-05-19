@@ -152,6 +152,7 @@ func TestCallContext_Close(t *testing.T) {
 			nil, // stdin
 			nil, // stdout
 			nil, // stderr
+			nil, // randSource
 			map[uint32]*FileEntry{ // openedFiles
 				3: {Path: "."},
 				4: {Path: path.Join(".", pathName), File: file},

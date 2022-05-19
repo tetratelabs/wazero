@@ -6,7 +6,6 @@ package wasi
 
 import (
 	"context"
-	crand "crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -1302,8 +1301,9 @@ func (a *snapshotPreview1) SchedYield(m api.Module) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 func (a *snapshotPreview1) RandomGet(ctx context.Context, m api.Module, buf uint32, bufLen uint32) (errno Errno) {
 	randomBytes := make([]byte, bufLen)
-	err := a.sys.RandSource(randomBytes)
-	if err != nil {
+	sys := sysCtx(m)
+	n, err := sys.RandSource().Read(randomBytes)
+	if n != int(bufLen) || err != nil {
 		// TODO: handle different errors that syscal to entropy source can return
 		return ErrnoIo
 	}
@@ -1343,11 +1343,6 @@ type defaultSys struct{}
 
 func (d *defaultSys) TimeNowUnixNano() uint64 {
 	return uint64(time.Now().UnixNano())
-}
-
-func (d *defaultSys) RandSource(bytes []byte) error {
-	_, err := crand.Read(bytes)
-	return err
 }
 
 func newSnapshotPreview1(ctx context.Context) *snapshotPreview1 {

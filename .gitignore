@@ -22,3 +22,7 @@ go.work
 
 # Goland
 .idea
+
+# AssemblyScript
+node_modules
+package-lock.json

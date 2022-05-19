@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ type SysContext struct {
 	argsSize, environSize uint32
 	stdin                 io.Reader
 	stdout, stderr        io.Writer
+	randSource            io.Reader
 
 	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
@@ -47,7 +49,7 @@ func (c *SysContext) nextFD() uint32 {
 // Args is like os.Args and defaults to nil.
 //
 // Note: The count will never be more than math.MaxUint32.
-// See wazero.SysConfig WithArgs
+// See wazero.ModuleConfig WithArgs
 func (c *SysContext) Args() []string {
 	return c.args
 }
@@ -55,7 +57,7 @@ func (c *SysContext) Args() []string {
 // ArgsSize is the size to encode Args as Null-terminated strings.
 //
 // Note: To get the size without null-terminators, subtract the length of Args from this value.
-// See wazero.SysConfig WithArgs
+// See wazero.ModuleConfig WithArgs
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (c *SysContext) ArgsSize() uint32 {
 	return c.argsSize
@@ -64,7 +66,7 @@ func (c *SysContext) ArgsSize() uint32 {
 // Environ are "key=value" entries like os.Environ and default to nil.
 //
 // Note: The count will never be more than math.MaxUint32.
-// See wazero.SysConfig WithEnviron
+// See wazero.ModuleConfig WithEnv
 func (c *SysContext) Environ() []string {
 	return c.environ
 }
@@ -72,28 +74,34 @@ func (c *SysContext) Environ() []string {
 // EnvironSize is the size to encode Environ as Null-terminated strings.
 //
 // Note: To get the size without null-terminators, subtract the length of Environ from this value.
-// See wazero.SysConfig WithEnviron
+// See wazero.ModuleConfig WithEnv
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (c *SysContext) EnvironSize() uint32 {
 	return c.environSize
 }
 
 // Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
-// See wazero.SysConfig WithStdin
+// See wazero.ModuleConfig WithStdin
 func (c *SysContext) Stdin() io.Reader {
 	return c.stdin
 }
 
 // Stdout is like exec.Cmd Stdout and defaults to io.Discard.
-// See wazero.SysConfig WithStdout
+// See wazero.ModuleConfig WithStdout
 func (c *SysContext) Stdout() io.Writer {
 	return c.stdout
 }
 
 // Stderr is like exec.Cmd Stderr and defaults to io.Discard.
-// See wazero.SysConfig WithStderr
+// See wazero.ModuleConfig WithStderr
 func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
+}
+
+// RandSource is a source of random bytes and defaults to crypto/rand.Reader.
+// see wazero.ModuleConfig WithRandSource
+func (c *SysContext) RandSource() io.Reader {
+	return c.randSource
 }
 
 // eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
@@ -110,7 +118,7 @@ func (eofReader) Read([]byte) (int, error) {
 // Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
 // TODO: Make it an error to open or close files when no FS was assigned.
 func DefaultSysContext() *SysContext {
-	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil); err != nil {
+	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
 	} else {
 		return sys
@@ -121,7 +129,7 @@ var _ = DefaultSysContext() // Force panic on bug.
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
+func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
 	sys = &SysContext{args: args, environ: environ}
 
 	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
@@ -148,6 +156,12 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sys.stderr = io.Discard
 	} else {
 		sys.stderr = stderr
+	}
+
+	if randSource == nil {
+		sys.randSource = rand.Reader
+	} else {
+		sys.randSource = randSource
 	}
 
 	if openedFiles == nil {

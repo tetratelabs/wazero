@@ -310,6 +310,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				nil,            // openedFiles
 			),
 		},
@@ -323,6 +324,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // stdin
 				nil,                 // stdout
 				nil,                 // stderr
+				nil,                 // randSource
 				nil,                 // openedFiles
 			),
 		},
@@ -336,6 +338,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                // stdin
 				nil,                // stdout
 				nil,                // stderr
+				nil,                // randSource
 				nil,                // openedFiles
 			),
 		},
@@ -349,6 +352,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // stdin
 				nil,                 // stdout
 				nil,                 // stderr
+				nil,                 // randSource
 				nil,                 // openedFiles
 			),
 		},
@@ -362,6 +366,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,             // stdin
 				nil,             // stdout
 				nil,             // stderr
+				nil,             // randSource
 				nil,             // openedFiles
 			),
 		},
@@ -375,6 +380,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				nil,            // openedFiles
 			),
 		},
@@ -388,6 +394,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // stdin
 				nil,                     // stdout
 				nil,                     // stderr
+				nil,                     // randSource
 				nil,                     // openedFiles
 			),
 		},
@@ -401,6 +408,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                      // stdin
 				nil,                      // stdout
 				nil,                      // stderr
+				nil,                      // randSource
 				nil,                      // openedFiles
 			),
 		},
@@ -415,6 +423,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // stdin
 				nil,                     // stdout
 				nil,                     // stderr
+				nil,                     // randSource
 				nil,                     // openedFiles
 			),
 		},
@@ -428,6 +437,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS},
@@ -444,6 +454,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS2},
 					4: {Path: ".", FS: testFS2},
@@ -460,6 +471,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 				},
@@ -475,6 +487,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS2},
@@ -491,6 +504,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdin
 				nil,            // stdout
 				nil,            // stderr
+				nil,            // randSource
 				map[uint32]*wasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 					4: {Path: "/", FS: testFS2},
@@ -562,8 +576,8 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 }
 
 // requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
-func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*wasm.FileEntry) *wasm.SysContext {
-	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, openedFiles)
+func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randsource io.Reader, openedFiles map[uint32]*wasm.FileEntry) *wasm.SysContext {
+	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, randsource, openedFiles)
 	require.NoError(t, err)
 	return sys
 }
