@@ -82,12 +82,13 @@ func TestRandom(t *testing.T) {
 
 	seed := []byte{0, 1, 2, 3, 4, 5, 6, 7}
 
-	_, err := NewModuleBuilder().
-		WithSeedSource(bytes.NewReader(seed)).
-		Instantiate(testCtx, r)
+	_, err := Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateModuleFromCode(testCtx, randomWasm)
+	code, err := r.CompileModule(testCtx, randomWasm, wazero.NewCompileConfig())
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(testCtx, code, wazero.NewModuleConfig().WithRandSource(bytes.NewReader(seed)))
 	require.NoError(t, err)
 
 	rand := mod.ExportedFunction("rand")

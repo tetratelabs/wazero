@@ -2,10 +2,8 @@ package assemblyscript
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"io"
 	"math"
 	"time"
@@ -13,12 +11,14 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // Instantiate instantiates a module implementing abort, trace, and seed for use from AssemblyScript programs.
 // The instantiated module will output abort messages to the io.Writer configured by wazero.ModuleConfig.WithStderr,
-// not output trace messages, and use crypto/rand as the source for seed values. If the AssemblyScript program is
-// configured to use WASI, by calling "import wasi" in any file, these functions will not be used.
+// not output trace messages, and use the io.Reader configured by wazero.ModuleConfig.WithRandSource as the source for
+// seed values. If the AssemblyScript program is configured to use WASI, by calling "import wasi" in any file, these
+// functions will not be used.
 //
 // To customize behavior, use NewModuleBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
@@ -40,11 +40,6 @@ type ModuleBuilder interface {
 	// to use WithTraceToStdout instead.
 	WithTraceToStderr() ModuleBuilder
 
-	// WithSeedSource sets the io.Reader to read bytes from for seeding random number generation.
-	//
-	// Defaults to crypto/rand.Reader to seed using cryptographically random bytes.
-	WithSeedSource(reader io.Reader) ModuleBuilder
-
 	// Instantiate instantiates the module so that AssemblyScript can import from it.
 	Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error)
 }
@@ -54,7 +49,6 @@ func NewModuleBuilder() ModuleBuilder {
 	return &moduleBuilder{
 		abortEnabled: true,
 		traceMode:    traceDisabled,
-		seedSource:   rand.Reader,
 	}
 }
 
@@ -69,7 +63,6 @@ const (
 type moduleBuilder struct {
 	abortEnabled bool
 	traceMode    traceMode
-	seedSource   io.Reader
 }
 
 // WithAbortDisabled implements ModuleBuilder.WithAbortWriter
@@ -91,12 +84,6 @@ func (m *moduleBuilder) WithTraceToStderr() ModuleBuilder {
 	ret := *m // copy
 	ret.traceMode = traceStderr
 	return &ret
-}
-
-// WithSeedSource implements ModuleBuilder.WithSeedSource
-func (m *moduleBuilder) WithSeedSource(reader io.Reader) ModuleBuilder {
-	m.seedSource = reader
-	return m
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
@@ -131,8 +118,9 @@ func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime)
 		})
 	}
 
-	mod.ExportFunction("seed", func() float64 {
-		return seed(m.seedSource)
+	mod.ExportFunction("seed", func(mod api.Module) float64 {
+		sys := sysCtx(mod)
+		return seed(sys.RandSource())
 	})
 
 	return mod.Instantiate(ctx)

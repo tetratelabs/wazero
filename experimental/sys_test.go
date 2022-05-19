@@ -24,13 +24,6 @@ func (d fakeSys) TimeNowUnixNano() uint64 {
 	return epochNanos
 }
 
-func (d fakeSys) RandSource(p []byte) error {
-	s := rand.NewSource(seed)
-	rng := rand.New(s)
-	_, err := rng.Read(p)
-	return err
-}
-
 // This is a very basic integration of sys config. The main goal is to show how it is configured.
 func Example_sys() {
 	// Set context to one that has experimental sys config
@@ -54,7 +47,9 @@ func Example_sys() {
 		log.Panicln(err)
 	}
 
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
+	randSource := rand.New(rand.NewSource(seed))
+
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout).WithRandSource(randSource))
 	if err != nil {
 		log.Panicln(err)
 	}

@@ -14,6 +14,7 @@ import (
 	"path"
 	"testing"
 	"testing/fstest"
+	"testing/iotest"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -35,13 +36,6 @@ const (
 
 func (d fakeSys) TimeNowUnixNano() uint64 {
 	return epochNanos
-}
-
-func (d fakeSys) RandSource(p []byte) error {
-	s := rand.NewSource(seed)
-	rng := rand.New(s)
-	_, err := rng.Read(p)
-	return err
 }
 
 // testCtx ensures fakeSys is used for WASI functions.
@@ -1875,10 +1869,14 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	length := uint32(5) // arbitrary length,
 	offset := uint32(1) // offset,
 
-	a, mod, fn := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, nil)
-	defer mod.Close(testCtx)
-
 	t.Run("snapshotPreview1.RandomGet", func(t *testing.T) {
+		source := rand.New(rand.NewSource(seed))
+		sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, source, nil)
+		require.NoError(t, err)
+
+		a, mod, _ := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, sysCtx)
+		defer mod.Close(testCtx)
+
 		maskMemory(t, testCtx, mod, len(expectedMemory))
 
 		// Invoke RandomGet directly and check the memory side effects!
@@ -1891,6 +1889,13 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	})
 
 	t.Run(functionRandomGet, func(t *testing.T) {
+		source := rand.New(rand.NewSource(seed))
+		sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, source, nil)
+		require.NoError(t, err)
+
+		_, mod, fn := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, sysCtx)
+		defer mod.Close(testCtx)
+
 		maskMemory(t, testCtx, mod, len(expectedMemory))
 
 		results, err := fn.Call(testCtx, uint64(offset), uint64(length))
@@ -1949,18 +1954,33 @@ func (d *fakeSysErr) TimeNowUnixNano() uint64 {
 	panic(errors.New("TimeNowUnixNano error"))
 }
 
-func (d *fakeSysErr) RandSource([]byte) error {
-	return errors.New("RandSource error")
-}
-
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
-	var errCtx = context.WithValue(context.Background(), experimental.SysKey{}, &fakeSysErr{})
+	for _, tc := range []struct {
+		name       string
+		randSource io.Reader
+	}{
+		{
+			name:       "error",
+			randSource: iotest.ErrReader(errors.New("RandSource error")),
+		},
+		{
+			name:       "incomplete",
+			randSource: bytes.NewReader([]byte{1, 2}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var errCtx = context.WithValue(context.Background(), experimental.SysKey{}, &fakeSysErr{})
 
-	a, mod, _ := instantiateModule(errCtx, t, functionRandomGet, importRandomGet, nil)
-	defer mod.Close(errCtx)
+			sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, tc.randSource, nil)
+			require.NoError(t, err)
 
-	errno := a.RandomGet(errCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
-	require.Equal(t, ErrnoIo, errno, ErrnoName(errno))
+			a, mod, _ := instantiateModule(errCtx, t, functionRandomGet, importRandomGet, sysCtx)
+			defer mod.Close(errCtx)
+
+			errno := a.RandomGet(errCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
+			require.Equal(t, ErrnoIo, errno, ErrnoName(errno))
+		})
+	}
 }
 
 // TestSnapshotPreview1_SockRecv only tests it is stubbed for GrainLang per #271

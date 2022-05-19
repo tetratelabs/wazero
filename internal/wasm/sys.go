@@ -49,7 +49,7 @@ func (c *SysContext) nextFD() uint32 {
 // Args is like os.Args and defaults to nil.
 //
 // Note: The count will never be more than math.MaxUint32.
-// See wazero.SysConfig WithArgs
+// See wazero.ModuleConfig WithArgs
 func (c *SysContext) Args() []string {
 	return c.args
 }
@@ -57,7 +57,7 @@ func (c *SysContext) Args() []string {
 // ArgsSize is the size to encode Args as Null-terminated strings.
 //
 // Note: To get the size without null-terminators, subtract the length of Args from this value.
-// See wazero.SysConfig WithArgs
+// See wazero.ModuleConfig WithArgs
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (c *SysContext) ArgsSize() uint32 {
 	return c.argsSize
@@ -66,7 +66,7 @@ func (c *SysContext) ArgsSize() uint32 {
 // Environ are "key=value" entries like os.Environ and default to nil.
 //
 // Note: The count will never be more than math.MaxUint32.
-// See wazero.SysConfig WithEnviron
+// See wazero.ModuleConfig WithEnv
 func (c *SysContext) Environ() []string {
 	return c.environ
 }
@@ -74,28 +74,34 @@ func (c *SysContext) Environ() []string {
 // EnvironSize is the size to encode Environ as Null-terminated strings.
 //
 // Note: To get the size without null-terminators, subtract the length of Environ from this value.
-// See wazero.SysConfig WithEnviron
+// See wazero.ModuleConfig WithEnv
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (c *SysContext) EnvironSize() uint32 {
 	return c.environSize
 }
 
 // Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
-// See wazero.SysConfig WithStdin
+// See wazero.ModuleConfig WithStdin
 func (c *SysContext) Stdin() io.Reader {
 	return c.stdin
 }
 
 // Stdout is like exec.Cmd Stdout and defaults to io.Discard.
-// See wazero.SysConfig WithStdout
+// See wazero.ModuleConfig WithStdout
 func (c *SysContext) Stdout() io.Writer {
 	return c.stdout
 }
 
 // Stderr is like exec.Cmd Stderr and defaults to io.Discard.
-// See wazero.SysConfig WithStderr
+// See wazero.ModuleConfig WithStderr
 func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
+}
+
+// RandSource is a source of random bytes and defaults to crypto/rand.Reader.
+// see wazero.ModuleConfig WithRandSource
+func (c *SysContext) RandSource() io.Reader {
+	return c.randSource
 }
 
 // eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.

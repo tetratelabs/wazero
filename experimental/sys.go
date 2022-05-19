@@ -9,7 +9,4 @@ type SysKey struct{}
 type Sys interface {
 	// TimeNowUnixNano allows you to control the value otherwise returned by time.Now().UnixNano()
 	TimeNowUnixNano() uint64
-
-	// RandSource allows you to control the value returned by rand.Read().
-	RandSource([]byte) error
 }
