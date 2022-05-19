@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/asm"
 	"math"
+
+	"github.com/tetratelabs/wazero/internal/asm"
 )
 
 type NodeImpl struct {
