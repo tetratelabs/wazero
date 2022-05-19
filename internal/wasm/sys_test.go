@@ -32,7 +32,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, eofReader{}, sys.Stdin())
 	require.Equal(t, io.Discard, sys.Stdout())
 	require.Equal(t, io.Discard, sys.Stderr())
-	require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
+	require.Equal(t, 0, len(sys.FS().openedFiles), "expected no opened files")
 
 	require.Equal(t, sys, DefaultSysContext())
 }
@@ -158,7 +158,7 @@ func TestNewSysContext_Environ(t *testing.T) {
 func TestSysContext_Close(t *testing.T) {
 	t.Run("no files", func(t *testing.T) {
 		sys := DefaultSysContext()
-		require.NoError(t, sys.Close())
+		require.NoError(t, sys.FS().Close(testCtx))
 	})
 
 	t.Run("open files", func(t *testing.T) {
@@ -182,16 +182,18 @@ func TestSysContext_Close(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		fsCtx := sys.FS()
+
 		// Closing should delete the file descriptors after closing the files.
-		require.NoError(t, sys.Close())
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
+		require.NoError(t, fsCtx.Close(testCtx))
+		require.Equal(t, 0, len(fsCtx.openedFiles), "expected no opened files")
 
 		// Verify it was actually closed, by trying to close it again.
 		err = file.(*os.File).Close()
 		require.Contains(t, err.Error(), "file already closed")
 
 		// No problem closing config again because the descriptors were removed, so they won't be called again.
-		require.NoError(t, sys.Close())
+		require.NoError(t, fsCtx.Close(testCtx))
 	})
 
 	t.Run("FS never used", func(t *testing.T) {
@@ -211,9 +213,11 @@ func TestSysContext_Close(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		fsCtx := sys.FS()
+
 		// Even if there are no open files, the descriptors for the file-system mappings should be removed.
-		require.NoError(t, sys.Close())
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
+		require.NoError(t, fsCtx.Close(testCtx))
+		require.Equal(t, 0, len(fsCtx.openedFiles), "expected no opened files")
 	})
 
 	t.Run("open file externally closed", func(t *testing.T) {
@@ -237,14 +241,16 @@ func TestSysContext_Close(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		fsCtx := sys.FS()
+
 		// Close the file externally
 		file.Close()
 
 		// Closing should err as it expected to be open
-		require.Contains(t, sys.Close().Error(), "file already closed")
+		require.Contains(t, fsCtx.Close(testCtx).Error(), "file already closed")
 
 		// However, cleanup should still occur.
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
+		require.Equal(t, 0, len(fsCtx.openedFiles), "expected no opened files")
 	})
 }
 

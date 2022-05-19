@@ -19,6 +19,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	expfs "github.com/tetratelabs/wazero/experimental/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -558,11 +559,11 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 
 	verify := func(mod api.Module) {
 		// Verify fdToClose is closed and removed from the opened FDs.
-		_, ok := sysCtx(mod).OpenedFile(fdToClose)
+		_, ok := fsCtx(testCtx, mod).OpenedFile(fdToClose)
 		require.False(t, ok)
 
 		// Verify fdToKeep is not closed
-		_, ok = sysCtx(mod).OpenedFile(fdToKeep)
+		_, ok = fsCtx(testCtx, mod).OpenedFile(fdToKeep)
 		require.True(t, ok)
 	}
 
@@ -1142,6 +1143,8 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	fsCtx := sysCtx.FS()
+
 	a, mod, fn := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
 	defer mod.Close(testCtx)
 
@@ -1214,7 +1217,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 					maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 					// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-					f, ok := sysCtx.OpenedFile(fd)
+					f, ok := fsCtx.OpenedFile(fd)
 					require.True(t, ok)
 					seeker := f.File.(io.Seeker)
 
@@ -1553,30 +1556,42 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 }
 
 func TestSnapshotPreview1_PathOpen(t *testing.T) {
-	workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	dirflags := uint32(0)  // arbitrary dirflags
-	oflags := uint32(0)    // arbitrary oflags
-	fdFlags := uint32(0)
+	type pathOpenArgs struct {
+		fd                 uint32
+		dirflags           uint32
+		pathPtr            uint32
+		pathLen            uint32
+		oflags             uint32
+		fsRightsBase       uint64
+		fsRightsInheriting uint64
+		fdflags            uint32
+		resultOpenedFd     uint32
+	}
 
-	// Setup the initial memory to include the path name starting at an offset.
-	pathName := "wazero"
-	path := uint32(1)
-	pathLen := uint32(len(pathName))
-	initialMemory := append([]byte{'?'}, pathName...)
+	setup := func(workdirFD uint32, pathName string) (*snapshotPreview1, api.Module, api.Function, pathOpenArgs, []byte, uint32) {
+		// Setup the initial memory to include the path name starting at an offset.
+		initialMemory := append([]byte{'?'}, pathName...)
 
-	expectedFD := byte(workdirFD + 1)
-	resultOpenedFd := uint32(len(initialMemory) + 1)
-	expectedMemory := append(
-		initialMemory,
-		'?', // `resultOpenedFd` is after this
-		expectedFD, 0, 0, 0,
-		'?',
-	)
+		expectedFD := workdirFD + 1
+		expectedMemory := append(
+			initialMemory,
+			'?', // `resultOpenedFd` is after this
+			byte(expectedFD), 0, 0, 0,
+			'?',
+		)
 
-	// rights are ignored per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-	fsRightsBase, fsRightsInheriting := uint64(1), uint64(2)
+		args := pathOpenArgs{
+			fd:                 workdirFD,
+			dirflags:           0,
+			pathPtr:            1,
+			pathLen:            uint32(len(pathName)),
+			oflags:             0,
+			fsRightsBase:       1, // rights are ignored per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+			fsRightsInheriting: 2,
+			fdflags:            0,
+			resultOpenedFd:     uint32(len(initialMemory) + 1),
+		}
 
-	setup := func() (*snapshotPreview1, api.Module, api.Function) {
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
 		sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
 			workdirFD: {Path: ".", FS: testFS},
@@ -1586,10 +1601,10 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		maskMemory(t, testCtx, mod, len(expectedMemory))
 		ok := mod.Memory().Write(testCtx, 0, initialMemory)
 		require.True(t, ok)
-		return a, mod, fn
+		return a, mod, fn, args, expectedMemory, expectedFD
 	}
 
-	verify := func(errno Errno, mod api.Module) {
+	verify := func(ctx context.Context, errno Errno, mod api.Module, pathName string, expectedMemory []byte, expectedFD uint32) {
 		require.Zero(t, errno, ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -1597,23 +1612,54 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		require.Equal(t, expectedMemory, actual)
 
 		// verify the file was actually opened
-		f, ok := sysCtx(mod).OpenedFile(uint32(expectedFD))
+		f, ok := fsCtx(ctx, mod).OpenedFile(expectedFD)
 		require.True(t, ok)
 		require.Equal(t, pathName, f.Path)
 	}
 
 	t.Run("snapshotPreview1.PathOpen", func(t *testing.T) {
-		a, mod, _ := setup()
-		errno := a.PathOpen(testCtx, mod, workdirFD, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
-		verify(errno, mod)
+		workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+		pathName := "wazero"
+
+		a, mod, _, args, expectedMemory, expectedFD := setup(workdirFD, pathName)
+		errno := a.PathOpen(testCtx, mod, args.fd, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
+			args.fsRightsBase, args.fsRightsInheriting, args.fdflags, args.resultOpenedFd)
+		verify(testCtx, errno, mod, pathName, expectedMemory, expectedFD)
 	})
 
 	t.Run(functionPathOpen, func(t *testing.T) {
-		_, mod, fn := setup()
-		results, err := fn.Call(testCtx, uint64(workdirFD), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdFlags), uint64(resultOpenedFd))
+		workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+		pathName := "wazero"
+
+		_, mod, fn, args, expectedMemory, expectedFD := setup(workdirFD, pathName)
+		results, err := fn.Call(testCtx, uint64(args.fd), uint64(args.dirflags), uint64(args.pathPtr), uint64(args.pathLen),
+			uint64(args.oflags), args.fsRightsBase, args.fsRightsInheriting, uint64(args.fdflags), uint64(args.resultOpenedFd))
 		require.NoError(t, err)
 		errno := Errno(results[0])
-		verify(errno, mod)
+		verify(testCtx, errno, mod, pathName, expectedMemory, expectedFD)
+	})
+
+	t.Run("snapshotPreview1.PathOpen.WithFS", func(t *testing.T) {
+		workdirFD := uint32(100) // dummy fd as it is not used
+		pathName := "wazero"
+
+		// The filesystem initialized in setup() is not used as it will be overridden.
+		a, mod, _, args, expectedMemory, _ := setup(workdirFD, pathName)
+
+		// Override fs.FS through context
+		workdirFD = uint32(4) // 3 is '/' and 4 is '.'
+		expectedFD := workdirFD + 1
+		expectedMemory[8] = byte(expectedFD) // replace expected memory with expected fd
+		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
+		ctx, closer, err := expfs.WithFS(testCtx, testFS)
+		require.NoError(t, err)
+		defer closer.Close(ctx)
+
+		errno := a.PathOpen(ctx, mod, workdirFD, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
+			args.fsRightsBase, args.fsRightsInheriting, args.fdflags, args.resultOpenedFd)
+		require.Zero(t, errno, ErrnoName(errno))
+
+		verify(ctx, errno, mod, pathName, expectedMemory, expectedFD)
 	})
 }
 

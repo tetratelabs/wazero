@@ -90,7 +90,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (e
 
 // close marks this CallContext as closed and releases underlying system resources without removing
 // from the store.
-func (m *CallContext) close(_ context.Context, exitCode uint32) (c bool, err error) {
+func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err error) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
@@ -98,7 +98,7 @@ func (m *CallContext) close(_ context.Context, exitCode uint32) (c bool, err err
 		return false, nil
 	}
 	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
-		return true, sys.Close()
+		return true, sys.FS().Close(ctx)
 	}
 	return true, nil
 }

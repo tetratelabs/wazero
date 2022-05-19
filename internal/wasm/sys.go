@@ -5,20 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"math"
-	"sync/atomic"
 )
-
-// FileEntry maps a path to an open file in a file system.
-//
-// Note: This does not introduce cycles because the types here are in the package "wasi" not "internalwasi".
-type FileEntry struct {
-	Path string
-	FS   fs.FS
-	// File when nil this is a mount like "." or "/".
-	File fs.File
-}
 
 // SysContext holds module-scoped system resources currently only used by internalwasi.
 type SysContext struct {
@@ -28,22 +15,7 @@ type SysContext struct {
 	stdout, stderr        io.Writer
 	randSource            io.Reader
 
-	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
-	// TODO: This is unguarded, so not goroutine-safe!
-	openedFiles map[uint32]*FileEntry
-
-	// lastFD is not meant to be read directly. Rather by nextFD.
-	lastFD uint32
-}
-
-// nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
-// TODO: opendFiles is still not goroutine safe!
-// TODO: This can return zero if we ran out of file descriptors. A future change can optimize by re-using an FD pool.
-func (c *SysContext) nextFD() uint32 {
-	if c.lastFD == math.MaxUint32 {
-		return 0
-	}
-	return atomic.AddUint32(&c.lastFD, 1)
+	fs *FSContext
 }
 
 // Args is like os.Args and defaults to nil.
@@ -96,6 +68,13 @@ func (c *SysContext) Stdout() io.Writer {
 // See wazero.ModuleConfig WithStderr
 func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
+}
+
+func (c *SysContext) FS() *FSContext {
+	if c.fs == nil {
+		return &FSContext{}
+	}
+	return c.fs
 }
 
 // RandSource is a source of random bytes and defaults to crypto/rand.Reader.
@@ -164,18 +143,8 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sys.randSource = randSource
 	}
 
-	if openedFiles == nil {
-		sys.openedFiles = map[uint32]*FileEntry{}
-		sys.lastFD = 2 // STDERR
-	} else {
-		sys.openedFiles = openedFiles
-		sys.lastFD = 2 // STDERR
-		for fd := range openedFiles {
-			if fd > sys.lastFD {
-				sys.lastFD = fd
-			}
-		}
-	}
+	sys.fs = NewFSContext(openedFiles)
+
 	return
 }
 
@@ -206,51 +175,4 @@ func nullTerminatedByteCount(max uint32, elements []string) (uint32, error) {
 
 	}
 	return uint32(bufSize), nil
-}
-
-// Close implements io.Closer
-func (c *SysContext) Close() (err error) {
-	// Close any files opened in this context
-	for fd, entry := range c.openedFiles {
-		delete(c.openedFiles, fd)
-		if entry.File != nil { // File is nil for a mount like "." or "/"
-			if e := entry.File.Close(); e != nil {
-				err = e // This means the err returned == the last non-nil error.
-			}
-		}
-	}
-	return
-}
-
-// CloseFile returns true if a file was opened and closed without error, or false if not.
-func (c *SysContext) CloseFile(fd uint32) (bool, error) {
-	f, ok := c.openedFiles[fd]
-	if !ok {
-		return false, nil
-	}
-	delete(c.openedFiles, fd)
-
-	if f.File == nil { // TODO: currently, this means it is a pre-opened filesystem, but this may change later.
-		return true, nil
-	}
-	if err := f.File.Close(); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// OpenedFile returns a file and true if it was opened or nil and false, if not.
-func (c *SysContext) OpenedFile(fd uint32) (*FileEntry, bool) {
-	f, ok := c.openedFiles[fd]
-	return f, ok
-}
-
-// OpenFile returns the file descriptor of the new file or false if we ran out of file descriptors
-func (c *SysContext) OpenFile(f *FileEntry) (uint32, bool) {
-	newFD := c.nextFD()
-	if newFD == 0 {
-		return 0, false
-	}
-	c.openedFiles[newFD] = f
-	return newFD, true
 }
