@@ -176,7 +176,6 @@ func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Registe
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
 	c.locationStack.markRegisterUsed(reg)
-	return
 }
 
 type amd64LabelInfo struct {
