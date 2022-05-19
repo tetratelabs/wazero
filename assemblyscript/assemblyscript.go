@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"io"
 	"math"
-	"os"
 	"time"
 	"unicode/utf16"
 
@@ -16,27 +16,29 @@ import (
 )
 
 // Instantiate instantiates a module implementing abort, trace, and seed for use from AssemblyScript programs.
-// The instantiated module will output abort messages to os.Stderr, not output trace messages, and use
-// crypto/rand as the source for seed values. If the AssemblyScript program is configured to use WASI, by
-// calling "import wasi" in any file, these functions will not be used.
+// The instantiated module will output abort messages to the io.Writer configured by wazero.ModuleConfig.WithStderr,
+// not output trace messages, and use crypto/rand as the source for seed values. If the AssemblyScript program is
+// configured to use WASI, by calling "import wasi" in any file, these functions will not be used.
+//
+// To customize behavior, use NewModuleBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	return NewModuleBuilder().Instantiate(ctx, r)
 }
 
 // ModuleBuilder allows configuring the module that will export functions used automatically by AssemblyScript.
 type ModuleBuilder interface {
-	// WithAbortWriter sets the io.Writer that should be used to write abort messages to.
-	// Abort messages are written when an error is thrown within an AssemblyScript program.
-	//
-	// Defaults to os.Stderr.
-	WithAbortWriter(writer io.Writer) ModuleBuilder
+	// WithAbortDisabled configures the AssemblyScript abort function to be disabled. Any abort messages will
+	// be discarded.
+	WithAbortDisabled() ModuleBuilder
 
-	// WithTraceWriter sets the io.Writer that should be used to write trace messages to.
-	// Trace messages are written when the built-in trace function is called within an
-	// AssemblyScript program.
-	//
-	// Defaults to io.Discard meaning trace messages are not written.
-	WithTraceWriter(writer io.Writer) ModuleBuilder
+	// WithTraceToStdout configures the AssemblyScript trace function to output messages to Stdout, as configured by
+	// wazero.ModuleConfig.WithStdout.
+	WithTraceToStdout() ModuleBuilder
+
+	// WithTraceToStderr configures the AssemblyScript trace function to output messages to Stderr, as configured by
+	// wazero.ModuleConfig.WithStderr. Because of the potential volume of trace messages, it is often more appropriate
+	// to use WithTraceToStdout instead.
+	WithTraceToStderr() ModuleBuilder
 
 	// WithSeedSource sets the io.Reader to read bytes from for seeding random number generation.
 	//
@@ -50,28 +52,48 @@ type ModuleBuilder interface {
 // NewModuleBuilder returns a ModuleBuilder for configuring a AssemblyScript host module.
 func NewModuleBuilder() ModuleBuilder {
 	return &moduleBuilder{
-		abortWriter: os.Stderr,
-		traceWriter: io.Discard,
-		seedSource:  rand.Reader,
+		abortEnabled: true,
+		traceMode:    traceDisabled,
+		seedSource:   rand.Reader,
 	}
 }
 
+type traceMode int
+
+const (
+	traceDisabled traceMode = 0
+	traceStdout   traceMode = 1
+	traceStderr   traceMode = 2
+)
+
 type moduleBuilder struct {
-	abortWriter io.Writer
-	traceWriter io.Writer
-	seedSource  io.Reader
+	abortEnabled bool
+	traceMode    traceMode
+	seedSource   io.Reader
 }
 
-// WithAbortWriter implements ModuleBuilder.WithAbortWriter
-func (m *moduleBuilder) WithAbortWriter(writer io.Writer) ModuleBuilder {
-	m.abortWriter = writer
-	return m
+// WithAbortDisabled implements ModuleBuilder.WithAbortWriter
+func (m *moduleBuilder) WithAbortDisabled() ModuleBuilder {
+	// copy
+	ret := *m
+	ret.abortEnabled = false
+	return &ret
 }
 
-// WithTraceWriter implements ModuleBuilder.WithTraceWriter
-func (m *moduleBuilder) WithTraceWriter(writer io.Writer) ModuleBuilder {
-	m.traceWriter = writer
-	return m
+// WithTraceToStdout implements ModuleBuilder.WithTraceToStdout
+func (m *moduleBuilder) WithTraceToStdout() ModuleBuilder {
+	// copy
+	ret := *m
+	ret.traceMode = traceStdout
+	return &ret
+}
+
+// WithTraceToStderr implements ModuleBuilder.WithTraceToStderr
+func (m *moduleBuilder) WithTraceToStderr() ModuleBuilder {
+	// copy
+	ret := *m
+	ret.traceMode = traceStderr
+	return &ret
 }
 
 // WithSeedSource implements ModuleBuilder.WithSeedSource
@@ -82,24 +104,42 @@ func (m *moduleBuilder) WithSeedSource(reader io.Reader) ModuleBuilder {
 
 // Instantiate implements ModuleBuilder.Instantiate
 func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error) {
-	mod := runtime.NewModuleBuilder("env").
-		ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
-			abort(ctx, mod, message, fileName, lineNumber, columnNumber, m.abortWriter)
-		}).
-		ExportFunction("seed", func() float64 {
-			return seed(m.seedSource)
-		})
+	if ctx != nil {
 
-	// Optimize for our default which discards traces. No need to execute any logic in the host function.
-	if m.traceWriter != io.Discard {
-		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, m.traceWriter)
+	}
+	mod := runtime.NewModuleBuilder("env")
+
+	if m.abortEnabled {
+		mod.ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
+			sys := sysCtx(mod)
+			abort(ctx, mod, message, fileName, lineNumber, columnNumber, sys.Stderr())
 		})
 	} else {
-		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			// no-op
+		mod.ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
+			// stub for no-op
 		})
 	}
+
+	switch m.traceMode {
+	case traceStderr:
+		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
+			sys := sysCtx(mod)
+			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, sys.Stderr())
+		})
+	case traceStdout:
+		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
+			sys := sysCtx(mod)
+			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, sys.Stdout())
+		})
+	case traceDisabled:
+		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
+			// stub for no-op
+		})
+	}
+
+	mod.ExportFunction("seed", func() float64 {
+		return seed(m.seedSource)
+	})
 
 	return mod.Instantiate(ctx)
 }
@@ -179,4 +219,12 @@ func trace(ctx context.Context, mod api.Module, message uint32, nArgs uint32, ar
 		_, _ = fmt.Fprintf(writer, ",%v", arg4)
 	}
 	_, _ = fmt.Fprintln(writer)
+}
+
+func sysCtx(m api.Module) *wasm.SysContext {
+	if internal, ok := m.(*wasm.CallContext); !ok {
+		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
+	} else {
+		return internal.Sys
+	}
 }

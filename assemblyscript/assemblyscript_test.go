@@ -31,24 +31,49 @@ var traceWasm []byte
 var testCtx = context.Background()
 
 func TestAbort(t *testing.T) {
-	r := wazero.NewRuntime()
-	defer r.Close(testCtx)
+	for _, tc := range []struct {
+		name     string
+		enabled  bool
+		expected string
+	}{
+		{
+			name:     "enabled",
+			enabled:  true,
+			expected: "error thrown at abort.ts:4:5\n",
+		},
+		{
+			name:     "disabled",
+			enabled:  false,
+			expected: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime()
+			defer r.Close(testCtx)
 
-	out := &bytes.Buffer{}
+			out := &bytes.Buffer{}
 
-	_, err := NewModuleBuilder().
-		WithAbortWriter(out).
-		Instantiate(testCtx, r)
-	require.NoError(t, err)
+			if tc.enabled {
+				_, err := Instantiate(testCtx, r)
+				require.NoError(t, err)
+			} else {
+				_, err := NewModuleBuilder().WithAbortDisabled().Instantiate(testCtx, r)
+				require.NoError(t, err)
+			}
 
-	mod, err := r.InstantiateModuleFromCode(testCtx, abortWasm)
-	require.NoError(t, err)
+			code, err := r.CompileModule(testCtx, abortWasm, wazero.NewCompileConfig())
+			require.NoError(t, err)
 
-	run := mod.ExportedFunction("run")
-	_, err = run.Call(testCtx)
-	require.Error(t, err)
+			mod, err := r.InstantiateModule(testCtx, code, wazero.NewModuleConfig().WithStderr(out))
+			require.NoError(t, err)
 
-	require.Equal(t, "error thrown at abort.ts:4:5\n", out.String())
+			run := mod.ExportedFunction("run")
+			_, err = run.Call(testCtx)
+			require.Error(t, err)
+
+			require.Equal(t, tc.expected, out.String())
+		})
+	}
 }
 
 func TestRandom(t *testing.T) {
@@ -82,21 +107,7 @@ func TestRandom(t *testing.T) {
 }
 
 func TestTrace(t *testing.T) {
-	r := wazero.NewRuntime()
-	defer r.Close(testCtx)
-
-	out := &bytes.Buffer{}
-
-	_, err := NewModuleBuilder().
-		WithTraceWriter(out).
-		Instantiate(testCtx, r)
-	require.NoError(t, err)
-
-	// _start will execute the calls to trace
-	_, err = r.InstantiateModuleFromCode(testCtx, traceWasm)
-	require.NoError(t, err)
-
-	require.Equal(t, `trace: zero_implicit
+	const traceOutput = `trace: zero_implicit
 trace: zero_explicit
 trace: one_int 1
 trace: two_int 1,2
@@ -104,7 +115,63 @@ trace: three_int 1,2,3
 trace: four_int 1,2,3,4
 trace: five_int 1,2,3,4,5
 trace: five_dbl 1.1,2.2,3.3,4.4,5.5
-`, out.String())
+`
+
+	for _, tc := range []struct {
+		name     string
+		mode     traceMode
+		expected string
+	}{
+		{
+			name:     "stderr",
+			mode:     traceStderr,
+			expected: traceOutput,
+		},
+		{
+			name:     "stdout",
+			mode:     traceStdout,
+			expected: traceOutput,
+		},
+		{
+			name:     "disabled",
+			mode:     traceDisabled,
+			expected: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime()
+			defer r.Close(testCtx)
+
+			out := &bytes.Buffer{}
+
+			as := NewModuleBuilder()
+			modConfig := wazero.NewModuleConfig()
+			switch tc.mode {
+			case traceStderr:
+				as = as.WithTraceToStderr()
+				modConfig = modConfig.WithStderr(out)
+			case traceStdout:
+				as = as.WithTraceToStdout()
+				modConfig = modConfig.WithStdout(out)
+			case traceDisabled:
+				// Set but not used
+				modConfig = modConfig.WithStderr(out)
+				modConfig = modConfig.WithStdout(out)
+			}
+
+			_, err := as.Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			code, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
+			require.NoError(t, err)
+
+			// _start will execute the calls to trace
+			_, err = r.InstantiateModule(testCtx, code, modConfig)
+			require.NoError(t, err)
+
+			require.Equal(t, tc.expected, out.String())
+		})
+	}
 }
 
 func TestReadAssemblyScriptString(t *testing.T) {
