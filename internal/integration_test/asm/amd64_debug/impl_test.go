@@ -780,8 +780,16 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	for _, tc := range []struct {
 		instruction      asm.Instruction
 		srcRegs, DstRegs []asm.Register
-		Mode             byte
+		arg              byte
 	}{
+		{instruction: amd64.PADDB, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PADDW, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PADDL, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PADDQ, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.ADDPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.ADDPD, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PINSRQ, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PINSRQ, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 0},
 		{instruction: amd64.ADDL, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.ADDQ, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.ADDSD, srcRegs: floatRegisters, DstRegs: floatRegisters},
@@ -837,16 +845,16 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.ROLQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
 		{instruction: amd64.RORL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
 		{instruction: amd64.RORQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x00},
-		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x00},
-		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x01},
-		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x01},
-		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x02},
-		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x02},
-		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x03},
-		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x03},
-		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x04},
-		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, Mode: 0x04},
+		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x00},
+		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x00},
+		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x01},
+		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x01},
+		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x02},
+		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x02},
+		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x03},
+		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x03},
+		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x04},
+		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x04},
 		{instruction: amd64.SARL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
 		{instruction: amd64.SARQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
 		{instruction: amd64.SHLL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
@@ -873,7 +881,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		tc := tc
 		t.Run(amd64.InstructionName(tc.instruction), func(t *testing.T) {
 			t.Run("error", func(t *testing.T) {
-				srcFloat, dstFloat := amd64.IsFloatRegister(tc.srcRegs[0]), amd64.IsFloatRegister(tc.DstRegs[0])
+				srcFloat, dstFloat := amd64.IsVectorRegister(tc.srcRegs[0]), amd64.IsVectorRegister(tc.DstRegs[0])
 				isMOV := tc.instruction == amd64.MOVL || tc.instruction == amd64.MOVQ
 				a := amd64.NewAssemblerImpl()
 				if _, isShiftOp := amd64.RegisterToRegisterShiftOpcode[tc.instruction]; isShiftOp {
@@ -923,8 +931,8 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 							// TODO: remove golang-asm dependency in tests.
 							goasm, err := newGolangAsmAssembler()
 							require.NoError(t, err)
-							if tc.instruction == amd64.ROUNDSD || tc.instruction == amd64.ROUNDSS {
-								goasm.CompileRegisterToRegisterWithMode(tc.instruction, srcReg, DstReg, tc.Mode)
+							if tc.instruction == amd64.ROUNDSD || tc.instruction == amd64.ROUNDSS || tc.instruction == amd64.PINSRQ {
+								goasm.CompileRegisterToRegisterWithArg(tc.instruction, srcReg, DstReg, tc.arg)
 							} else {
 								goasm.CompileRegisterToRegister(tc.instruction, srcReg, DstReg)
 							}
@@ -934,7 +942,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 							a := amd64.NewAssemblerImpl()
 							err = a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
 								Types: amd64.OperandTypesRegisterToRegister, SrcReg: srcReg, DstReg: DstReg,
-								Mode: tc.Mode,
+								Arg: tc.arg,
 							})
 							require.NoError(t, err)
 							// fmt.Printf("modRM: want: 0b%b, got: 0b%b\n", bs[1], a.Buf.Bytes()[1])
@@ -976,14 +984,15 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 	t.Run("non shift", func(t *testing.T) {
 		scales := []byte{1, 4}
-		for _, instruction := range []asm.Instruction{amd64.CMPL, amd64.CMPQ, amd64.MOVB, amd64.MOVL, amd64.MOVQ, amd64.MOVW} {
-			regs := []asm.Register{
-				amd64.REG_AX, amd64.REG_BP, amd64.REG_SI,
-			}
+		for _, instruction := range []asm.Instruction{
+			amd64.CMPL, amd64.CMPQ, amd64.MOVB, amd64.MOVL, amd64.MOVQ, amd64.MOVW,
+		} {
+			regs := []asm.Register{amd64.REG_R12, amd64.REG_AX, amd64.REG_BP, amd64.REG_SI}
 			srcRegs := regs
 			if instruction == amd64.MOVL || instruction == amd64.MOVQ {
 				srcRegs = append(srcRegs, amd64.REG_X0, amd64.REG_X10)
 			}
+
 			for _, srcReg := range srcRegs {
 				srcReg := srcReg
 				for _, DstReg := range regs {
@@ -1211,7 +1220,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
 		require.EqualError(t, a.EncodeMemoryToRegister(n), "JMP is unsupported for from:memory,to:register type")
 	})
-	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI, amd64.REG_R8}
+	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI, amd64.REG_R10}
 	floatRegs := []asm.Register{amd64.REG_X0, amd64.REG_X8}
 	scales := []byte{1, 4}
 	for _, tc := range []struct {

@@ -48,9 +48,9 @@ func formatOperation(w io.StringWriter, b Operation) {
 	case *OperationSelect:
 		str = "select"
 	case *OperationPick:
-		str = fmt.Sprintf("pick %d", o.Depth)
+		str = fmt.Sprintf("pick %d (is_vector=%v)", o.Depth, o.IsTargetVector)
 	case *OperationSwap:
-		str = fmt.Sprintf("swap %d", o.Depth)
+		str = fmt.Sprintf("swap %d (is_vector=%v)", o.Depth, o.IsTargetVector)
 	case *OperationGlobalGet:
 		str = fmt.Sprintf("global.get %d", o.Index)
 	case *OperationGlobalSet:
@@ -183,6 +183,8 @@ func formatOperation(w io.StringWriter, b Operation) {
 		str = fmt.Sprintf("%s.extend_from.%s", out, in)
 	case *OperationConstV128:
 		str = fmt.Sprintf("v128.const [%#x, %#x]", o.Lo, o.Hi)
+	case *OperationAddV128:
+		str = fmt.Sprintf("v128.add (shape=%s)", shapeName(o.Shape))
 	default:
 		panic("unreachable: a bug in wazeroir implementation")
 	}

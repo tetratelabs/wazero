@@ -159,6 +159,14 @@ const (
 	JMP
 	NOP
 	UD2
+	MOVDQU
+	PINSRQ
+	PADDB
+	PADDW
+	PADDL
+	PADDQ
+	ADDPS
+	ADDPD
 )
 
 func InstructionName(instruction asm.Instruction) string {
@@ -423,6 +431,22 @@ func InstructionName(instruction asm.Instruction) string {
 		return "NOP"
 	case UD2:
 		return "UD2"
+	case MOVDQU:
+		return "MOVDQU"
+	case PINSRQ:
+		return "PINSRQ"
+	case PADDB:
+		return "PADDB"
+	case PADDW:
+		return "PADDW"
+	case PADDL:
+		return "PADDL"
+	case PADDQ:
+		return "PADDQ"
+	case ADDPS:
+		return "ADDPS"
+	case ADDPD:
+		return "ADDPD"
 	}
 	return "Unknown"
 }
@@ -433,7 +457,7 @@ func InstructionName(instruction asm.Instruction) string {
 // See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
 // See https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 const (
-	REG_AX asm.Register = asm.NilRegister + 1 + iota
+	REG_AX = asm.NilRegister + 1 + iota
 	REG_CX
 	REG_DX
 	REG_BX

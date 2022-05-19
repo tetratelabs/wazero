@@ -49,6 +49,11 @@ func (j *compilerEnv) stackTopAsFloat64() float64 {
 	return math.Float64frombits(j.stack()[j.stackPointer()-1])
 }
 
+func (j *compilerEnv) stackTopAsV128() (lo uint64, hi uint64) {
+	st := j.stack()
+	return st[j.stackPointer()-2], st[j.stackPointer()-1]
+}
+
 func (j *compilerEnv) memory() []byte {
 	return j.moduleInstance.Memory.Buffer
 }
@@ -57,7 +62,7 @@ func (j *compilerEnv) stack() []uint64 {
 	return j.ce.valueStack
 }
 
-func (j *compilerEnv) compilerStatus() compilerCallStatusCode {
+func (j *compilerEnv) compilerStatus() nativeCallStatusCode {
 	return j.ce.exitContext.statusCode
 }
 
@@ -81,8 +86,8 @@ func (j *compilerEnv) addGlobals(g ...*wasm.GlobalInstance) {
 	j.moduleInstance.Globals = append(j.moduleInstance.Globals, g...)
 }
 
-func (j *compilerEnv) getGlobal(index uint32) uint64 {
-	return j.moduleInstance.Globals[index].Val
+func (j *compilerEnv) globals() []*wasm.GlobalInstance {
+	return j.moduleInstance.Globals
 }
 
 func (j *compilerEnv) addTable(table *wasm.TableInstance) {
@@ -132,7 +137,7 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
 	j.ce.globalContext.callFrameStackPointer++
 
-	compilercall(
+	nativecall(
 		uintptr(unsafe.Pointer(&codeSegment[0])),
 		uintptr(unsafe.Pointer(j.ce)),
 		uintptr(unsafe.Pointer(j.moduleInstance)),
@@ -164,15 +169,15 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *w
 // This is currently implemented by amd64 and arm64.
 type compilerImpl interface {
 	compiler
-	compileExitFromNativeCode(compilerCallStatusCode)
+	compileExitFromNativeCode(nativeCallStatusCode)
 	compileMaybeGrowValueStack() error
 	compileReturnFunction() error
 	getOnStackPointerCeilDeterminedCallBack() func(uint64)
 	setStackPointerCeil(uint64)
-	compileReleaseRegisterToStack(loc *valueLocation)
-	valueLocationStack() *valueLocationStack
-	setValueLocationStack(*valueLocationStack)
-	compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error
+	compileReleaseRegisterToStack(loc *runtimeValueLocation)
+	runtimeValueLocationStack() *runtimeValueLocationStack
+	setRuntimeValueLocationStack(*runtimeValueLocationStack)
+	compileEnsureOnGeneralPurposeRegister(loc *runtimeValueLocation) error
 	compileModuleContextInitialization() error
 	compileNOP()
 }

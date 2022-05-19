@@ -21,7 +21,6 @@ func TestCompiler(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-
 	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures, func(string) bool { return true })
 }
 

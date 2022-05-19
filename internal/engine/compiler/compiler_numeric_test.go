@@ -17,6 +17,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 		wazeroir.OperationKindConstI64,
 		wazeroir.OperationKindConstF32,
 		wazeroir.OperationKindConstF64,
+		wazeroir.OperationKindConstV128,
 	} {
 		op := op
 		t.Run(op.String(), func(t *testing.T) {
@@ -50,12 +51,18 @@ func TestCompiler_compileConsts(t *testing.T) {
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(val))})
 					case wazeroir.OperationKindConstF64:
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+					case wazeroir.OperationKindConstV128:
+						err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: val, Hi: ^val})
 					}
 					require.NoError(t, err)
 
 					// After compiling const operations, we must see the register allocated value on the top of value.
-					loc := compiler.valueLocationStack().peek()
+					loc := compiler.runtimeValueLocationStack().peek()
 					require.True(t, loc.onRegister())
+
+					if op == wazeroir.OperationKindConstV128 {
+						require.Equal(t, runtimeValueTypeV128Hi, loc.valueType)
+					}
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -68,14 +75,22 @@ func TestCompiler_compileConsts(t *testing.T) {
 					env.exec(code)
 
 					// Compiler status must be returned.
-					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
-					require.Equal(t, uint64(1), env.stackPointer())
+					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
+					if op == wazeroir.OperationKindConstV128 {
+						require.Equal(t, uint64(2), env.stackPointer()) // a vector value consists of two uint64.
+					} else {
+						require.Equal(t, uint64(1), env.stackPointer())
+					}
 
 					switch op {
 					case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstF32:
 						require.Equal(t, uint32(val), env.stackTopAsUint32())
 					case wazeroir.OperationKindConstI64, wazeroir.OperationKindConstF64:
 						require.Equal(t, val, env.stackTopAsUint64())
+					case wazeroir.OperationKindConstV128:
+						lo, hi := env.stackTopAsV128()
+						require.Equal(t, val, lo)
+						require.Equal(t, ^val, hi)
 					}
 				})
 			}
@@ -140,7 +155,7 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							}
 
 							// At this point, two values exist.
-							require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+							require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 
 							// Emit the operation.
 							switch kind {
@@ -154,15 +169,15 @@ func TestCompiler_compile_Add_Sub_Mul(t *testing.T) {
 							require.NoError(t, err)
 
 							// We consumed two values, but push the result back.
-							require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-							resultLocation := compiler.valueLocationStack().peek()
+							require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+							resultLocation := compiler.runtimeValueLocationStack().peek()
 							// Plus the result must be located on a register.
 							require.True(t, resultLocation.onRegister())
 							// Also, the result must have an appropriate register type.
 							if unsignedType == wazeroir.UnsignedTypeF32 || unsignedType == wazeroir.UnsignedTypeF64 {
-								require.Equal(t, generalPurposeRegisterTypeFloat, resultLocation.regType)
+								require.Equal(t, registerTypeVector, resultLocation.getRegisterType())
 							} else {
-								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+								require.Equal(t, registerTypeGeneralPurpose, resultLocation.getRegisterType())
 							}
 
 							err = compiler.compileReturnFunction()
@@ -289,18 +304,18 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								require.NoError(t, err)
 
 								// Emit consts operands.
-								var x1Location *valueLocation
+								var x1Location *runtimeValueLocation
 								switch unsignedInt {
 								case wazeroir.UnsignedInt32:
 									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(x1)})
 									require.NoError(t, err)
-									x1Location = compiler.valueLocationStack().peek()
+									x1Location = compiler.runtimeValueLocationStack().peek()
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
 									require.NoError(t, err)
 								case wazeroir.UnsignedInt64:
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1})
 									require.NoError(t, err)
-									x1Location = compiler.valueLocationStack().peek()
+									x1Location = compiler.runtimeValueLocationStack().peek()
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2})
 									require.NoError(t, err)
 								}
@@ -310,7 +325,7 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								}
 
 								// At this point, two values exist.
-								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 
 								// Emit the operation.
 								switch kind {
@@ -330,10 +345,10 @@ func TestCompiler_compile_And_Or_Xor_Shl_Rotl_Rotr(t *testing.T) {
 								require.NoError(t, err)
 
 								// We consumed two values, but push the result back.
-								require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-								resultLocation := compiler.valueLocationStack().peek()
+								require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+								resultLocation := compiler.runtimeValueLocationStack().peek()
 								// Also, the result must have an appropriate register type.
-								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+								require.Equal(t, registerTypeGeneralPurpose, resultLocation.getRegisterType())
 
 								err = compiler.compileReturnFunction()
 								require.NoError(t, err)
@@ -438,19 +453,19 @@ func TestCompiler_compileShr(t *testing.T) {
 						}
 
 						// At this point, two values exist.
-						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+						require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 
 						// Emit the operation.
 						err = compiler.compileShr(&wazeroir.OperationShr{Type: signedInt})
 						require.NoError(t, err)
 
 						// We consumed two values, but push the result back.
-						require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-						resultLocation := compiler.valueLocationStack().peek()
+						require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+						resultLocation := compiler.runtimeValueLocationStack().peek()
 						// Plus the result must be located on a register.
 						require.True(t, resultLocation.onRegister())
 						// Also, the result must have an appropriate register type.
-						require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+						require.Equal(t, registerTypeGeneralPurpose, resultLocation.getRegisterType())
 
 						err = compiler.compileReturnFunction()
 						require.NoError(t, err)
@@ -559,11 +574,11 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 
 							if isEqz {
 								// Eqz only needs one value, so pop the top one (x2).
-								compiler.valueLocationStack().pop()
-								require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
+								compiler.runtimeValueLocationStack().pop()
+								require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
 							} else {
 								// At this point, two values exist for comparison.
-								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 							}
 
 							// Emit the operation.
@@ -612,7 +627,7 @@ func TestCompiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							require.NoError(t, err)
 
 							// We consumed two values, but push the result back.
-							require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
+							require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
 
 							err = compiler.compileReturnFunction()
 							require.NoError(t, err)
@@ -957,14 +972,14 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					}
 
 					// At this point two values are pushed.
-					require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
-					require.Equal(t, 2, len(compiler.valueLocationStack().usedRegisters))
+					require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+					require.Equal(t, 2, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 					tc.setupFunc(t, compiler)
 
 					// We consumed two values, but push one value after operation.
-					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+					require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+					require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -974,7 +989,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 					require.NoError(t, err)
 					env.exec(code)
 
-					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
 
 					tc.verifyFunc(t, x1, x2, env.stackTopAsUint64())
@@ -1258,14 +1273,14 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					}
 
 					// At this point two values are pushed.
-					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+					require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+					require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 					tc.setupFunc(t, compiler)
 
 					// We consumed one value, but push the result after operation.
-					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-					require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+					require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+					require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -1275,7 +1290,7 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 					require.NoError(t, err)
 					env.exec(code)
 
-					require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
 
 					tc.verifyFunc(t, v, env.stackTopAsUint64())
@@ -1354,7 +1369,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								switch signedType {
 								case wazeroir.SignedTypeUint32:
 									// In order to test zero value on non-zero register, we directly assign an register.
-									loc := compiler.valueLocationStack().pushValueLocationOnStack()
+									loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 									err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
 									require.NoError(t, err)
 									env.stack()[loc.stackPointer] = uint64(v)
@@ -1371,7 +1386,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 							}
 
 							// At this point, two values exist for comparison.
-							require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+							require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 
 							switch kind {
 							case wazeroir.OperationKindDiv:
@@ -1409,31 +1424,31 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								switch signedType {
 								case wazeroir.SignedTypeUint32:
 									if uint32(x2) == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeInt32:
 									v1, v2 := int32(x1), int32(x2)
 									if v2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else if v1 == math.MinInt32 && v2 == -1 {
-										require.Equal(t, compilerCallStatusIntegerOverflow, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerOverflow, env.compilerStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt32())
 									}
 								case wazeroir.SignedTypeUint64:
 									if x2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, x1/x2, env.stackTopAsUint64())
 									}
 								case wazeroir.SignedTypeInt64:
 									v1, v2 := int64(x1), int64(x2)
 									if v2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else if v1 == math.MinInt64 && v2 == -1 {
-										require.Equal(t, compilerCallStatusIntegerOverflow, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerOverflow, env.compilerStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt64())
 									}
@@ -1459,27 +1474,27 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								case wazeroir.SignedTypeInt32:
 									v1, v2 := int32(x1), int32(x2)
 									if v2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsInt32())
 									}
 								case wazeroir.SignedTypeInt64:
 									v1, v2 := int64(x1), int64(x2)
 									if v2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsInt64())
 									}
 								case wazeroir.SignedTypeUint32:
 									v1, v2 := uint32(x1), uint32(x2)
 									if v2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, v1%v2, env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeUint64:
 									if x2 == 0 {
-										require.Equal(t, compilerCallStatusIntegerDivisionByZero, env.compilerStatus())
+										require.Equal(t, nativeCallStatusIntegerDivisionByZero, env.compilerStatus())
 									} else {
 										require.Equal(t, x1%x2, env.stackTopAsUint64())
 									}

@@ -1,6 +1,7 @@
 package arm64
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
@@ -48,8 +49,8 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "BNE {NOP}",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: REG_F0, DstReg: REG_F10},
-			exp: "ADD F0, F10",
+			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: REG_V0, DstReg: REG_V10},
+			exp: "ADD V0, V10",
 		},
 		{
 			in: &NodeImpl{Instruction: ADD, Types: OperandTypesLeftShiftedRegisterToRegister,
@@ -94,16 +95,36 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: REG_F1, DstReg: REG_F2},
-			exp: "VCNT F1.B8, F2.B8",
+			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: REG_V1, DstReg: REG_V2},
+			exp: "VCNT V1.B8, V2.B8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: REG_F1, DstReg: REG_F2},
-			exp: "VUADDLV F1.B8, F2",
+			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: REG_V1, DstReg: REG_V2},
+			exp: "VUADDLV V1.B8, V2",
 		},
 		{
-			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: REG_F1, SrcReg2: REG_F2, DstReg: REG_F3},
-			exp: "VBIT (F1.B8, F2.B8), F3.B8",
+			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: REG_V1, SrcReg2: REG_V2, DstReg: REG_V3},
+			exp: "VBIT (V1.B8, V2.B8), V3.B8",
+		},
+		{
+			in: &NodeImpl{Instruction: VLD1, Types: OperandTypesMemoryToVectorRegister,
+				SrcReg: REG_R1, DstReg: REG_V29, VectorArrangement: VectorArrangement2S},
+			exp: "VLD1 [R1], V29.2S",
+		},
+		{
+			in: &NodeImpl{Instruction: VST1, Types: OperandTypesVectorRegisterToMemory,
+				DstReg: REG_R1, SrcReg: REG_V29, VectorArrangement: VectorArrangement2S},
+			exp: "VST1 V29.2S, [R1]",
+		},
+		{
+			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesRegisterToVectorRegister,
+				SrcReg: REG_R1, DstReg: REG_V29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
+			exp: "VMOV R1, V29.2D[1]",
+		},
+		{
+			in: &NodeImpl{Instruction: VCNT, Types: OperandTypesVectorRegisterToVectorRegister,
+				SrcReg: REG_V3, DstReg: REG_V29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
+			exp: "VCNT V3.V3, V29.V3",
 		},
 	} {
 		require.Equal(t, tc.exp, tc.in.String())
@@ -318,34 +339,34 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 
 func Test_CompileSIMDByteToSIMDByte(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToSIMDByte(VCNT, REG_F0, REG_F2)
+	a.CompileSIMDByteToSIMDByte(VCNT, REG_V0, REG_V2)
 	actualNode := a.Current
 	require.Equal(t, VCNT, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F2, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V2, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, REG_F0, REG_F10, REG_F2)
+	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, REG_V0, REG_V10, REG_V2)
 	actualNode := a.Current
 	require.Equal(t, VBIT, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F10, actualNode.SrcReg2)
-	require.Equal(t, REG_F2, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V10, actualNode.SrcReg2)
+	require.Equal(t, REG_V2, actualNode.DstReg)
 	require.Equal(t, OperandTypeTwoSIMDBytes, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileSIMDByteToRegister(t *testing.T) {
 	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToRegister(VUADDLV, REG_F0, REG_F10)
+	a.CompileSIMDByteToRegister(VUADDLV, REG_V0, REG_V10)
 	actualNode := a.Current
 	require.Equal(t, VUADDLV, actualNode.Instruction)
-	require.Equal(t, REG_F0, actualNode.SrcReg)
-	require.Equal(t, REG_F10, actualNode.DstReg)
+	require.Equal(t, REG_V0, actualNode.SrcReg)
+	require.Equal(t, REG_V10, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
@@ -361,6 +382,55 @@ func Test_CompileConditionalRegisterSet(t *testing.T) {
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
+func Test_CompileMemoryToVectorRegister(t *testing.T) {
+	a := NewAssemblerImpl(REG_R10)
+	a.CompileMemoryToVectorRegister(VMOV, REG_R10, REG_V3, VectorArrangement1D)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.Instruction)
+	require.Equal(t, REG_R10, actualNode.SrcReg)
+	require.Equal(t, REG_V3, actualNode.DstReg)
+	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+}
+
+func Test_CompileVectorRegisterToMemory(t *testing.T) {
+	a := NewAssemblerImpl(REG_R10)
+	a.CompileVectorRegisterToMemory(VMOV, REG_V3, REG_R10, VectorArrangement1D)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.Instruction)
+	require.Equal(t, REG_V3, actualNode.SrcReg)
+	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
+	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+}
+
+func Test_CompileRegisterToVectorRegister(t *testing.T) {
+	a := NewAssemblerImpl(REG_R10)
+	a.CompileRegisterToVectorRegister(VMOV, REG_V3, REG_R10, VectorArrangement1D, 10)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.Instruction)
+	require.Equal(t, REG_V3, actualNode.SrcReg)
+	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+	require.Equal(t, VectorIndex(10), actualNode.VectorIndex)
+}
+
+func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
+	a := NewAssemblerImpl(REG_R10)
+	a.CompileVectorRegisterToVectorRegister(VMOV, REG_V3, REG_V10, VectorArrangement1D)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.Instruction)
+	require.Equal(t, REG_V3, actualNode.SrcReg)
+	require.Equal(t, REG_V10, actualNode.DstReg)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+}
+
 func Test_checkRegisterToRegisterType(t *testing.T) {
 	for _, tc := range []struct {
 		src, dst                     asm.Register
@@ -372,20 +442,20 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 		{src: REG_R10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
 		{src: REG_R10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_R10, dst: REG_F30, requireSrcInt: true, requireDstInt: false, expErr: ""},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_F30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got F30"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: ""},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
+		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got V30"},
 
-		{src: REG_F10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: ""},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: ""},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
+		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_F10, dst: REG_F30, requireSrcInt: false, requireDstInt: false, expErr: ""},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got F10"},
-		{src: REG_F10, dst: REG_F30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got F30"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: ""},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
+		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got V30"},
 	} {
 		actual := checkRegisterToRegisterType(tc.src, tc.dst, tc.requireSrcInt, tc.requireDstInt)
 		if tc.expErr != "" {
@@ -411,5 +481,36 @@ func Test_validateMemoryOffset(t *testing.T) {
 		} else {
 			require.EqualError(t, actual, tc.expErr)
 		}
+	}
+}
+
+func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
+	x1, x2 := REG_V2, REG_V10
+	for _, tc := range []struct {
+		inst asm.Instruction
+		exp  []byte
+	}{
+		// These are not supported in golang-asm, so test it here instead of integration tests.
+		{inst: VFADDD, exp: []byte{
+			0x4a, 0xd4, 0x6a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}},
+		{inst: VFADDS, exp: []byte{
+			0x4a, 0xd4, 0x2a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}},
+	} {
+		tc := tc
+		t.Run(InstructionName(tc.inst), func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeVectorRegisterToVectorRegister(&NodeImpl{
+				Instruction: tc.inst,
+				SrcReg:      x1,
+				DstReg:      x2,
+			})
+			require.NoError(t, err)
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
 	}
 }

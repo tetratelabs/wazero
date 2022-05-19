@@ -17,7 +17,7 @@ import (
 )
 
 type (
-	// engine is an Compiler implementation of wasm.Engine
+	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
 		enabledFeatures wasm.Features
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
@@ -55,7 +55,7 @@ type (
 		// The following fields are not accessed by compiled code directly.
 
 		// valueStack is the go-allocated stack for holding Wasm values.
-		// Note: We never edit len or cap in compiled code so we won't get screwed when GC comes in.
+		// Note: We never edit len or cap in compiled code, so we won't get screwed when GC comes in.
 		valueStack []uint64
 
 		// callFrameStack is initially callFrameStack[callFrameStackPointer].
@@ -115,8 +115,8 @@ type (
 		// dataInstancesElement0Address holds the &ModuleInstance.DataInstances[0] as uintptr.
 		dataInstancesElement0Address uintptr
 
-		// elementInstancesElemen0Address holds the &ModuleInstance.ElementInstances[0] as uintptr.
-		elementInstancesElemen0Address uintptr
+		// elementInstancesElement0Address holds the &ModuleInstance.ElementInstances[0] as uintptr.
+		elementInstancesElement0Address uintptr
 	}
 
 	// valueStackContext stores the data to access engine.valueStack.
@@ -132,7 +132,7 @@ type (
 		// Background: Functions might be compiled as if they use the stack from the bottom.
 		// However, in reality, they have to use it from the middle of the stack depending on
 		// when these function calls are made. So instead of accessing stack via stackPointer alone,
-		// functions are compiled so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
+		// functions are compiled, so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
 		// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's params].
 		// This way, compiled functions can be independent of the timing of functions calls made against them.
 		//
@@ -145,7 +145,7 @@ type (
 	// exitContext will be manipulated whenever compiled native code returns into the Go function.
 	exitContext struct {
 		// Where we store the status code of Compiler execution.
-		statusCode compilerCallStatusCode
+		statusCode nativeCallStatusCode
 
 		// Set when statusCode == compilerStatusCallBuiltInFunction}
 		// Indicating the function call index.
@@ -249,7 +249,7 @@ const (
 	callEngineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextCompilerCallStatusCodeOffset     = 128
+	callEngineExitContextnativeCallStatusCodeOffset       = 128
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
@@ -303,75 +303,75 @@ const (
 	pointerSizeLog2 = 3
 )
 
-// compilerCallStatusCode represents the result of `compilercall`.
-// This is set by the compilerted native code.
-type compilerCallStatusCode uint32
+// nativeCallStatusCode represents the result of `nativecall`.
+// This is set by the native code.
+type nativeCallStatusCode uint32
 
 const (
-	// compilerStatusReturned means the compilercall reaches the end of function, and returns successfully.
-	compilerCallStatusCodeReturned compilerCallStatusCode = iota
-	// compilerCallStatusCodeCallFunction means the compilercall returns to make a host function call.
-	compilerCallStatusCodeCallHostFunction
-	// compilerCallStatusCodeCallFunction means the compilercall returns to make a builtin function call.
-	compilerCallStatusCodeCallBuiltInFunction
-	// compilerCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
-	compilerCallStatusCodeUnreachable
-	// compilerCallStatusCodeInvalidFloatToIntConversion means an invalid conversion of integer to floats happened.
-	compilerCallStatusCodeInvalidFloatToIntConversion
-	// compilerCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
-	compilerCallStatusCodeMemoryOutOfBounds
-	// compilerCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
+	// nativeCallStatusCodeReturned means the nativecall reaches the end of function, and returns successfully.
+	nativeCallStatusCodeReturned nativeCallStatusCode = iota
+	// nativeCallStatusCodeCallHostFunction means the nativecall returns to make a host function call.
+	nativeCallStatusCodeCallHostFunction
+	// nativeCallStatusCodeCallBuiltInFunction means the nativecall returns to make a builtin function call.
+	nativeCallStatusCodeCallBuiltInFunction
+	// nativeCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
+	nativeCallStatusCodeUnreachable
+	// nativeCallStatusCodeInvalidFloatToIntConversion means an invalid conversion of integer to floats happened.
+	nativeCallStatusCodeInvalidFloatToIntConversion
+	// nativeCallStatusCodeMemoryOutOfBounds means an out-of-bounds memory access happened.
+	nativeCallStatusCodeMemoryOutOfBounds
+	// nativeCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
 	// the target element in the table was uninitialized during call_indirect instruction.
-	compilerCallStatusCodeInvalidTableAccess
-	// compilerCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
-	compilerCallStatusCodeTypeMismatchOnIndirectCall
-	compilerCallStatusIntegerOverflow
-	compilerCallStatusIntegerDivisionByZero
+	nativeCallStatusCodeInvalidTableAccess
+	// nativeCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
+	nativeCallStatusCodeTypeMismatchOnIndirectCall
+	nativeCallStatusIntegerOverflow
+	nativeCallStatusIntegerDivisionByZero
 )
 
 // causePanic causes a panic with the corresponding error to the status code.
-func (s compilerCallStatusCode) causePanic() {
+func (s nativeCallStatusCode) causePanic() {
 	var err error
 	switch s {
-	case compilerCallStatusIntegerOverflow:
+	case nativeCallStatusIntegerOverflow:
 		err = wasmruntime.ErrRuntimeIntegerOverflow
-	case compilerCallStatusIntegerDivisionByZero:
+	case nativeCallStatusIntegerDivisionByZero:
 		err = wasmruntime.ErrRuntimeIntegerDivideByZero
-	case compilerCallStatusCodeInvalidFloatToIntConversion:
+	case nativeCallStatusCodeInvalidFloatToIntConversion:
 		err = wasmruntime.ErrRuntimeInvalidConversionToInteger
-	case compilerCallStatusCodeUnreachable:
+	case nativeCallStatusCodeUnreachable:
 		err = wasmruntime.ErrRuntimeUnreachable
-	case compilerCallStatusCodeMemoryOutOfBounds:
+	case nativeCallStatusCodeMemoryOutOfBounds:
 		err = wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess
-	case compilerCallStatusCodeInvalidTableAccess:
+	case nativeCallStatusCodeInvalidTableAccess:
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
-	case compilerCallStatusCodeTypeMismatchOnIndirectCall:
+	case nativeCallStatusCodeTypeMismatchOnIndirectCall:
 		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
 	}
 	panic(err)
 }
 
-func (s compilerCallStatusCode) String() (ret string) {
+func (s nativeCallStatusCode) String() (ret string) {
 	switch s {
-	case compilerCallStatusCodeReturned:
+	case nativeCallStatusCodeReturned:
 		ret = "returned"
-	case compilerCallStatusCodeCallHostFunction:
+	case nativeCallStatusCodeCallHostFunction:
 		ret = "call_host_function"
-	case compilerCallStatusCodeCallBuiltInFunction:
+	case nativeCallStatusCodeCallBuiltInFunction:
 		ret = "call_builtin_function"
-	case compilerCallStatusCodeUnreachable:
+	case nativeCallStatusCodeUnreachable:
 		ret = "unreachable"
-	case compilerCallStatusCodeInvalidFloatToIntConversion:
+	case nativeCallStatusCodeInvalidFloatToIntConversion:
 		ret = "invalid float to int conversion"
-	case compilerCallStatusCodeMemoryOutOfBounds:
+	case nativeCallStatusCodeMemoryOutOfBounds:
 		ret = "memory out of bounds"
-	case compilerCallStatusCodeInvalidTableAccess:
+	case nativeCallStatusCodeInvalidTableAccess:
 		ret = "invalid table access"
-	case compilerCallStatusCodeTypeMismatchOnIndirectCall:
+	case nativeCallStatusCodeTypeMismatchOnIndirectCall:
 		ret = "type mismatch on indirect call"
-	case compilerCallStatusIntegerOverflow:
+	case nativeCallStatusIntegerOverflow:
 		ret = "integer overflow"
-	case compilerCallStatusIntegerDivisionByZero:
+	case nativeCallStatusIntegerDivisionByZero:
 		ret = "integer division by zero"
 	default:
 		panic("BUG")
@@ -485,7 +485,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 
 	for _, init := range tableInits {
 		references := tables[init.TableIndex].References
-		if int(init.Offset)+int(len(init.FunctionIndexes)) > len(references) {
+		if int(init.Offset)+(len(init.FunctionIndexes)) > len(references) {
 			return me, wasm.ErrElementOffsetOutOfBounds
 		}
 
@@ -518,16 +518,16 @@ func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
 }
 
 // Name implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Name() string {
-	return me.name
+func (e *moduleEngine) Name() string {
+	return e.name
 }
 
 // CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.ElementInstance {
+func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.ElementInstance {
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = uintptr(unsafe.Pointer(me.functions[*index]))
+			refs[i] = uintptr(unsafe.Pointer(e.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
@@ -537,38 +537,37 @@ func (me *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.E
 }
 
 // InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
-func (me *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
+func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
 	for _, g := range globals {
 		if g.Type.ValType == wasm.ValueTypeFuncref {
 			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
 				g.Val = 0 // Null funcref is expressed as zero.
 			} else {
 				// Lowers the stored function index into the interpreter specific function's opaque pointer.
-				g.Val = uint64(uintptr(unsafe.Pointer(me.functions[g.Val])))
+				g.Val = uint64(uintptr(unsafe.Pointer(e.functions[g.Val])))
 			}
 		}
 	}
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (me *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := me.functions[f.Idx]
+	compiled := e.functions[f.Idx]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
 		if err = callCtx.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", me.name, f.Idx))
+			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
 		}
 		return
 	}
 
-	paramSignature := f.Type.Params
 	paramCount := len(params)
-	if len(paramSignature) != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
+	if f.Type.ParamNumInUint64 != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", f.Type.ParamNumInUint64, paramCount)
 	}
 
-	ce := me.newCallEngine()
+	ce := e.newCallEngine()
 
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
@@ -633,7 +632,7 @@ func newEngine(enabledFeatures wasm.Features) *engine {
 // On the other hand, we hold pointers to the data region of value stack and
 // call-frame stack slices and use these raw pointers from native code.
 // Therefore, it is dangerous if these two stacks are allocated on stack
-// as these stack's address might be changed by Goruntime which we cannot
+// as these stack's address might be changed by Goroutine which we cannot
 // detect.
 //
 // By declaring these values as `var`, slices created via `make([]..., var)`
@@ -643,16 +642,16 @@ func newEngine(enabledFeatures wasm.Features) *engine {
 //
 // On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/engine/compiler/...`.
 //
-// [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
-// [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
-// [3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
-// [4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
+//  [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
+//  [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
+//  [3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
+//  [4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
 var (
 	initialValueStackSize     = 64
 	initialCallFrameStackSize = 16
 )
 
-func (me *moduleEngine) newCallEngine() *callEngine {
+func (e *moduleEngine) newCallEngine() *callEngine {
 	ce := &callEngine{
 		valueStack:     make([]uint64, initialValueStackSize),
 		callFrameStack: make([]callFrame, initialCallFrameStackSize),
@@ -709,7 +708,7 @@ func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallCo
 	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, function: f}
 	ce.globalContext.callFrameStackPointer++
 
-compilerentry:
+entry:
 	{
 		frame := ce.callFrameTop()
 		if buildoptions.IsDebugMode {
@@ -717,14 +716,14 @@ compilerentry:
 				frame.String(), ce.valueStackContext.stackBasePointer, ce.valueStackContext.stackPointer)
 		}
 
-		// Call into the Compiler code.
-		compilercall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
+		// Call into the native code.
+		nativecall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
 
 		// Check the status code from Compiler code.
 		switch status := ce.exitContext.statusCode; status {
-		case compilerCallStatusCodeReturned:
+		case nativeCallStatusCodeReturned:
 			// Meaning that all the function frames above the previous call frame stack pointer are executed.
-		case compilerCallStatusCodeCallHostFunction:
+		case nativeCallStatusCodeCallHostFunction:
 			calleeHostFunction := ce.callFrameTop().function
 			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
 			// but when making host function calls, we need to pass the memory instance of host function caller.
@@ -740,15 +739,15 @@ compilerentry:
 			for _, v := range results {
 				ce.pushValue(v)
 			}
-			goto compilerentry
-		case compilerCallStatusCodeCallBuiltInFunction:
+			goto entry
+		case nativeCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
 				callerFunction := ce.callFrameTop().function
 				ce.builtinFunctionMemoryGrow(ctx, callerFunction.source.Module.Memory)
 			case builtinFunctionIndexGrowValueStack:
-				callercode := ce.callFrameTop().function
-				ce.builtinFunctionGrowValueStack(callercode.stackPointerCeil)
+				callerFunction := ce.callFrameTop().function
+				ce.builtinFunctionGrowValueStack(callerFunction.stackPointerCeil)
 			case builtinFunctionIndexGrowCallFrameStack:
 				ce.builtinFunctionGrowCallFrameStack()
 			case builtinFunctionIndexTableGrow:
@@ -760,7 +759,7 @@ compilerentry:
 					runtime.Breakpoint()
 				}
 			}
-			goto compilerentry
+			goto entry
 		default:
 			status.causePanic()
 		}
@@ -840,7 +839,7 @@ func compileHostFunction(sig *wasm.FunctionType) (*code, error) {
 	return &code{codeSegment: c}, nil
 }
 
-func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.CompilationResult) (*code, error) {
+func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code, error) {
 	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
@@ -1041,6 +1040,10 @@ func compileWasmFunction(enabledFeatures wasm.Features, ir *wazeroir.Compilation
 			err = compiler.compileTableSize(o)
 		case *wazeroir.OperationTableFill:
 			err = compiler.compileTableFill(o)
+		case *wazeroir.OperationConstV128:
+			err = compiler.compileConstV128(o)
+		case *wazeroir.OperationAddV128:
+			err = compiler.compileAddV128(o)
 		default:
 			err = errors.New("unsupported")
 		}

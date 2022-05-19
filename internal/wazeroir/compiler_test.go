@@ -3,6 +3,7 @@ package wazeroir
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -872,14 +873,14 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 	}
 }
 
-func TestCompile_Locals_vector(t *testing.T) {
+func TestCompile_Locals(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		mod      *wasm.Module
 		expected []Operation
 	}{
 		{
-			name: "local.get - func param",
+			name: "local.get - func param - v128",
 			mod: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
@@ -889,14 +890,29 @@ func TestCompile_Locals_vector(t *testing.T) {
 				}}},
 			},
 			expected: []Operation{
-				&OperationPick{Depth: 1}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low]
-				&OperationPick{Depth: 1}, // [param[0].low, param[0].high, param[0].low] ->  [param[0].low, param[0].high, param[0].low, param[0].high]
+				&OperationPick{Depth: 1, IsTargetVector: true}, // [param[0].low, param[0].high] -> [param[0].low, param[0].high, param[0].low, param[0].high]
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
 		{
-			name: "local.get - non func param",
+			name: "local.get - func param - i64",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI64}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				&OperationPick{Depth: 0, IsTargetVector: false}, // [param[0]] -> [param[0], param[0]]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.get - non func param - v128",
 			mod: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{}},
 				FunctionSection: []wasm.Index{0},
@@ -909,16 +925,14 @@ func TestCompile_Locals_vector(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstI64{Value: 0},
-				&OperationConstI64{Value: 0},
-				&OperationPick{Depth: 1}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low]
-				&OperationPick{Depth: 1}, // [p[0].low, p[0].high, p[0].low] ->  [p[0].low, p[0].high, p[0].low, p[0].high]
+				&OperationConstV128{Lo: 0, Hi: 0},
+				&OperationPick{Depth: 1, IsTargetVector: true}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
 		{
-			name: "local.set - func param",
+			name: "local.set - func param - v128",
 			mod: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
@@ -933,20 +947,35 @@ func TestCompile_Locals_vector(t *testing.T) {
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationConstV128{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
-				&OperationSwap{Depth: 2},
-				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				// [p[0].lo, 0x02, 0x01] -> [0x01, 0x02, p[0].lo]
-				&OperationSwap{Depth: 2},
-				// [0x01, 0x02, p[0].lo] -> [0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
+				&OperationSwap{Depth: 3, IsTargetVector: true},
+				// [0x01, 0x02, p[0].lo, p[1].hi] -> [0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
 		{
-			name: "local.set - non func param",
+			name: "local.set - func param - i32",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeI32}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeI32Const, 0x1, // [] -> [0x01]
+					wasm.OpcodeLocalSet, 0, // [0x01] -> []
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				&OperationConstI32{Value: 0x1},
+				&OperationSwap{Depth: 1, IsTargetVector: false},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.set - non func param - v128",
 			mod: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{}},
 				FunctionSection: []wasm.Index{0},
@@ -962,24 +991,19 @@ func TestCompile_Locals_vector(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstI64{Value: 0},
-				&OperationConstI64{Value: 0},
+				&OperationConstV128{Lo: 0, Hi: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationConstV128{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, p[1].hi]
-				&OperationSwap{Depth: 2},
-				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [p[0].lo, 0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				// [p[0].lo, 0x02, 0x01] -> [0x01, 0x02, p[0].lo]
-				&OperationSwap{Depth: 2},
-				// [0x01, 0x02, p[0].lo] -> [0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
+				&OperationSwap{Depth: 3, IsTargetVector: true},
+				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [0x02, 0x01]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
 		{
-			name: "local.tee - func param",
+			name: "local.tee - func param - v128",
 			mod: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeV128}}},
 				FunctionSection: []wasm.Index{0},
@@ -994,19 +1018,33 @@ func TestCompile_Locals_vector(t *testing.T) {
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationConstV128{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
-				&OperationPick{Depth: 1},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				&OperationPick{Depth: 1},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi]
-				&OperationSwap{Depth: 4},
-				// [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi] ->  [p[0].lo, 0x02, 0x01, 0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				// [p[0].lo, 0x02, 0x01, 0x02, 0x01] -> [0x10, 0x02, 0x01, 0x02, p[0].lo]
-				&OperationSwap{Depth: 4},
-				// [0x10, 0x02, 0x01, 0x02, p[0].lo] -> [0x10, 0x02, 0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
+				&OperationPick{Depth: 1, IsTargetVector: true},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]
+				&OperationSwap{Depth: 5, IsTargetVector: true},
+				// [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi] ->  [0x01, 0x02, 0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
+				&OperationBr{Target: &BranchTarget{}}, // return!
+			},
+		},
+		{
+			name: "local.tee - func param - f32",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{wasm.ValueTypeF32}}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeF32Const, 1, 0, 0, 0,
+					wasm.OpcodeLocalTee, 0, // [0x01, 0x02] ->  [0x01, 0x02]
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				&OperationConstF32{math.Float32frombits(1)},
+				&OperationPick{Depth: 0, IsTargetVector: false},
+				&OperationSwap{Depth: 2, IsTargetVector: false},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
@@ -1027,22 +1065,15 @@ func TestCompile_Locals_vector(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstI64{Value: 0},
-				&OperationConstI64{Value: 0},
+				&OperationConstV128{Lo: 0, Hi: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationConstV128{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01]
-				&OperationPick{Depth: 1},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
-				&OperationPick{Depth: 1},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi]
-				&OperationSwap{Depth: 4},
-				// [p[0].lo, 0x02, 0x01, 0x02, 0x01, p[1].hi] ->  [p[0].lo, 0x02, 0x01, 0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				// [p[0].lo, 0x02, 0x01, 0x02, 0x01] -> [0x10, 0x02, 0x01, 0x02, p[0].lo]
-				&OperationSwap{Depth: 4},
-				// [0x10, 0x02, 0x01, 0x02, p[0].lo] -> [0x10, 0x02, 0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
+				&OperationPick{Depth: 1, IsTargetVector: true},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]
+				&OperationSwap{Depth: 5, IsTargetVector: true},
+				// [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi] ->  [0x01, 0x02, 0x01, 0x02]
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},

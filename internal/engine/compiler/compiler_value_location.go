@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	// unreservedGeneralPurposeIntRegisters contains unreserved general purpose registers of integer type.
-	unreservedGeneralPurposeIntRegisters []asm.Register
+	// unreservedGeneralPurposeRegisters contains unreserved general purpose registers of integer type.
+	unreservedGeneralPurposeRegisters []asm.Register
 
-	// unreservedGeneralPurposeFloatRegisters contains unreserved general purpose registers of scalar float type.
-	unreservedGeneralPurposeFloatRegisters []asm.Register
+	// unreservedVectorRegisters contains unreserved vector registers.
+	unreservedVectorRegisters []asm.Register
 )
 
 func isNilRegister(r asm.Register) bool {
@@ -20,52 +20,84 @@ func isNilRegister(r asm.Register) bool {
 }
 
 func isIntRegister(r asm.Register) bool {
-	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
+	return unreservedGeneralPurposeRegisters[0] <= r && r <= unreservedGeneralPurposeRegisters[len(unreservedGeneralPurposeRegisters)-1]
 }
 
-func isFloatRegister(r asm.Register) bool {
-	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
+func isVectorRegister(r asm.Register) bool {
+	return unreservedVectorRegisters[0] <= r && r <= unreservedVectorRegisters[len(unreservedVectorRegisters)-1]
 }
 
-// valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
+// runtimeValueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
-type valueLocation struct {
-	regType generalPurposeRegisterType
-	// Set to asm.NilRegister if the value is stored in the memory stack.
+type runtimeValueLocation struct {
+	valueType runtimeValueType
+	// register is set to asm.NilRegister if the value is stored in the memory stack.
 	register asm.Register
-	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
+	// conditionalRegister is set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister asm.ConditionalRegisterState
-	// This is the location of this value in the memory stack at runtime,
+	// stackPointer is the location of this value in the memory stack at runtime,
 	stackPointer uint64
 }
 
-func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
-	return v.regType
+func (v *runtimeValueLocation) getRegisterType() (ret registerType) {
+	switch v.valueType {
+	case runtimeValueTypeI32, runtimeValueTypeI64:
+		ret = registerTypeGeneralPurpose
+	case runtimeValueTypeF32, runtimeValueTypeF64,
+		runtimeValueTypeV128Lo, runtimeValueTypeV128Hi:
+		ret = registerTypeVector
+	}
+	return
 }
 
-func (v *valueLocation) setRegisterType(t generalPurposeRegisterType) {
-	v.regType = t
+type runtimeValueType byte
+
+const (
+	runtimeValueTypeI32 runtimeValueType = iota
+	runtimeValueTypeI64
+	runtimeValueTypeF32
+	runtimeValueTypeF64
+	runtimeValueTypeV128Lo
+	runtimeValueTypeV128Hi
+)
+
+func (r runtimeValueType) String() (ret string) {
+	switch r {
+	case runtimeValueTypeI32:
+		ret = "i32"
+	case runtimeValueTypeI64:
+		ret = "i64"
+	case runtimeValueTypeF32:
+		ret = "f32"
+	case runtimeValueTypeF64:
+		ret = "f64"
+	case runtimeValueTypeV128Lo:
+		ret = "v128.lo"
+	case runtimeValueTypeV128Hi:
+		ret = "v128.hi"
+	}
+	return
 }
 
-func (v *valueLocation) setRegister(reg asm.Register) {
+func (v *runtimeValueLocation) setRegister(reg asm.Register) {
 	v.register = reg
 	v.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
-func (v *valueLocation) onRegister() bool {
+func (v *runtimeValueLocation) onRegister() bool {
 	return v.register != asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
-func (v *valueLocation) onStack() bool {
+func (v *runtimeValueLocation) onStack() bool {
 	return v.register == asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
-func (v *valueLocation) onConditionalRegister() bool {
+func (v *runtimeValueLocation) onConditionalRegister() bool {
 	return v.conditionalRegister != asm.ConditionalRegisterStateUnset
 }
 
-func (v *valueLocation) String() string {
+func (v *runtimeValueLocation) String() string {
 	var location string
 	if v.onStack() {
 		location = fmt.Sprintf("stack(%d)", v.stackPointer)
@@ -74,14 +106,14 @@ func (v *valueLocation) String() string {
 	} else if v.onRegister() {
 		location = fmt.Sprintf("register(%d)", v.register)
 	}
-	return fmt.Sprintf("{type=%s,location=%s}", v.regType, location)
+	return fmt.Sprintf("{type=%s,location=%s}", v.valueType, location)
 }
 
-func newValueLocationStack() *valueLocationStack {
-	return &valueLocationStack{usedRegisters: map[asm.Register]struct{}{}}
+func newRuntimeValueLocationStack() *runtimeValueLocationStack {
+	return &runtimeValueLocationStack{usedRegisters: map[asm.Register]struct{}{}}
 }
 
-// valueLocationStack represents the wazeroir virtual stack
+// runtimeValueLocationStack represents the wazeroir virtual stack
 // where each item holds the location information about where it exists
 // on the physical machine at runtime.
 // Notably this is only used in the compilation phase, not runtime,
@@ -90,9 +122,9 @@ func newValueLocationStack() *valueLocationStack {
 // two variables for wazeroir add operation.) exist and check the necessity for
 // moving the variable to registers to perform actual CPU instruction
 // to achieve wazeroir's add operation.
-type valueLocationStack struct {
+type runtimeValueLocationStack struct {
 	// stack holds all the variables.
-	stack []*valueLocation
+	stack []*runtimeValueLocation
 	// sp is the current stack pointer.
 	sp uint64
 	// usedRegisters stores the used registers.
@@ -101,7 +133,7 @@ type valueLocationStack struct {
 	stackPointerCeil uint64
 }
 
-func (v *valueLocationStack) String() string {
+func (v *runtimeValueLocationStack) String() string {
 	var stackStr []string
 	for i := uint64(0); i < v.sp; i++ {
 		stackStr = append(stackStr, v.stack[i].String())
@@ -113,17 +145,17 @@ func (v *valueLocationStack) String() string {
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
-func (v *valueLocationStack) clone() *valueLocationStack {
-	ret := &valueLocationStack{}
+func (v *runtimeValueLocationStack) clone() *runtimeValueLocationStack {
+	ret := &runtimeValueLocationStack{}
 	ret.sp = v.sp
 	ret.usedRegisters = make(map[asm.Register]struct{}, len(ret.usedRegisters))
 	for r := range v.usedRegisters {
 		ret.markRegisterUsed(r)
 	}
-	ret.stack = make([]*valueLocation, len(v.stack))
+	ret.stack = make([]*runtimeValueLocation, len(v.stack))
 	for i, v := range v.stack {
-		ret.stack[i] = &valueLocation{
-			regType:             v.regType,
+		ret.stack[i] = &runtimeValueLocation{
+			valueType:           v.valueType,
 			conditionalRegister: v.conditionalRegister,
 			stackPointer:        v.stackPointer,
 			register:            v.register,
@@ -133,37 +165,33 @@ func (v *valueLocationStack) clone() *valueLocationStack {
 	return ret
 }
 
-// pushValueLocationOnRegister creates a new valueLocation with a given register and pushes onto
+// pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given register and pushes onto
 // the location stack.
-func (v *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc *valueLocation) {
-	loc = &valueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
+func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (loc *runtimeValueLocation) {
+	loc = &runtimeValueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
+	loc.valueType = vt
 
-	if isIntRegister(reg) {
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
-	} else if isFloatRegister(reg) {
-		loc.setRegisterType(generalPurposeRegisterTypeFloat)
-	}
 	v.push(loc)
 	return
 }
 
-// pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
-func (v *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
+// pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation and pushes onto the location stack.
+func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnStack() (loc *runtimeValueLocation) {
+	loc = &runtimeValueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
 	v.push(loc)
 	return
 }
 
-// pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
+// pushRuntimeValueLocationOnRegister creates a new runtimeValueLocation with a given conditional register state
 // and pushes onto the location stack.
-func (v *valueLocationStack) pushValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *valueLocation) {
-	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: state}
+func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *runtimeValueLocation) {
+	loc = &runtimeValueLocation{register: asm.NilRegister, conditionalRegister: state}
 	v.push(loc)
 	return
 }
 
-// push pushes to a given valueLocation onto the stack.
-func (v *valueLocationStack) push(loc *valueLocation) {
+// push pushes to a given runtimeValueLocation onto the stack.
+func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
 	loc.stackPointer = v.sp
 	if v.sp >= uint64(len(v.stack)) {
 		// This case we need to grow the stack capacity by appending the item,
@@ -178,60 +206,69 @@ func (v *valueLocationStack) push(loc *valueLocation) {
 	v.sp++
 }
 
-func (v *valueLocationStack) pop() (loc *valueLocation) {
+func (v *runtimeValueLocationStack) pop() (loc *runtimeValueLocation) {
 	v.sp--
 	loc = v.stack[v.sp]
 	return
 }
 
-func (v *valueLocationStack) peek() (loc *valueLocation) {
+func (v *runtimeValueLocationStack) peek() (loc *runtimeValueLocation) {
 	loc = v.stack[v.sp-1]
 	return
 }
 
-func (v *valueLocationStack) releaseRegister(loc *valueLocation) {
+func (v *runtimeValueLocationStack) releaseRegister(loc *runtimeValueLocation) {
 	v.markRegisterUnused(loc.register)
 	loc.register = asm.NilRegister
 	loc.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
-func (v *valueLocationStack) markRegisterUnused(regs ...asm.Register) {
+func (v *runtimeValueLocationStack) markRegisterUnused(regs ...asm.Register) {
 	for _, reg := range regs {
 		delete(v.usedRegisters, reg)
 	}
 }
 
-func (v *valueLocationStack) markRegisterUsed(regs ...asm.Register) {
+func (v *runtimeValueLocationStack) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
 		v.usedRegisters[reg] = struct{}{}
 	}
 }
 
-type generalPurposeRegisterType byte
+type registerType byte
 
 const (
-	generalPurposeRegisterTypeInt generalPurposeRegisterType = iota
-	generalPurposeRegisterTypeFloat
+	registerTypeGeneralPurpose registerType = iota
+	// registerTypeVector represents a vector register which can be used for either scalar float
+	// operation or SIMD vector operation depending on the instruction by which the register is used.
+	//
+	// Note: In normal assembly language, scalar float and vector register have different notations as
+	// Vn is for vectors and Qn is for scalar floats on arm64 for example. But on physical hardware,
+	// they are placed on the same locations. (Qn means the lower 64-bit of Vn vector register on arm64).
+	//
+	// In wazero, for the sake of simplicity in the register allocation, we intentionally conflate these two types
+	// and delegate the decision to the assembler which is aware of the instruction types for which these registers are used.
+	registerTypeVector
 )
 
-func (tp generalPurposeRegisterType) String() (ret string) {
+func (tp registerType) String() (ret string) {
 	switch tp {
-	case generalPurposeRegisterTypeInt:
+	case registerTypeGeneralPurpose:
 		ret = "int"
-	case generalPurposeRegisterTypeFloat:
-		ret = "float"
+	case registerTypeVector:
+		ret = "vector"
 	}
 	return
 }
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
-func (v *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg asm.Register, found bool) {
+func (v *runtimeValueLocationStack) takeFreeRegister(tp registerType) (reg asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
-	case generalPurposeRegisterTypeFloat:
-		targetRegs = unreservedGeneralPurposeFloatRegisters
-	case generalPurposeRegisterTypeInt:
-		targetRegs = unreservedGeneralPurposeIntRegisters
+	case registerTypeVector:
+		targetRegs = unreservedVectorRegisters
+	case registerTypeGeneralPurpose:
+		targetRegs = unreservedGeneralPurposeRegisters
 	}
 	for _, candidate := range targetRegs {
 		if _, ok := v.usedRegisters[candidate]; ok {
@@ -242,13 +279,13 @@ func (v *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	return 0, false
 }
 
-func (v *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []asm.Register, found bool) {
+func (v *runtimeValueLocationStack) takeFreeRegisters(tp registerType, num int) (regs []asm.Register, found bool) {
 	var targetRegs []asm.Register
 	switch tp {
-	case generalPurposeRegisterTypeFloat:
-		targetRegs = unreservedGeneralPurposeFloatRegisters
-	case generalPurposeRegisterTypeInt:
-		targetRegs = unreservedGeneralPurposeIntRegisters
+	case registerTypeVector:
+		targetRegs = unreservedVectorRegisters
+	case registerTypeGeneralPurpose:
+		targetRegs = unreservedGeneralPurposeRegisters
 	}
 
 	regs = make([]asm.Register, 0, num)
@@ -267,16 +304,19 @@ func (v *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (v *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
+func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerType) (*runtimeValueLocation, bool) {
 	for i := uint64(0); i < v.sp; i++ {
 		loc := v.stack[i]
 		if loc.onRegister() {
 			switch tp {
-			case generalPurposeRegisterTypeFloat:
-				if isFloatRegister(loc.register) {
+			case registerTypeVector:
+				if loc.valueType == runtimeValueTypeV128Hi {
+					panic("BUG: V128Hi must be above the corresponding V128Lo")
+				}
+				if isVectorRegister(loc.register) {
 					return loc, true
 				}
-			case generalPurposeRegisterTypeInt:
+			case registerTypeGeneralPurpose:
 				if isIntRegister(loc.register) {
 					return loc, true
 				}

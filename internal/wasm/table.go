@@ -22,9 +22,9 @@ type RefType = byte
 
 const (
 	// RefTypeFuncref represents a reference to a function.
-	RefTypeFuncref RefType = ValueTypeFuncref
+	RefTypeFuncref = ValueTypeFuncref
 	// RefTypeExternref represents a reference to a host object, which is not currently supported in wazero.
-	RefTypeExternref RefType = ValueTypeExternref
+	RefTypeExternref = ValueTypeExternref
 )
 
 func RefTypeName(t RefType) (ret string) {
@@ -62,7 +62,7 @@ type ElementSegment struct {
 	// Note: This is only set when Mode is active.
 	OffsetExpr *ConstantExpression
 
-	// TableIndex is the tables's index to which this element segment is applied.
+	// TableIndex is the table's index to which this element segment is applied.
 	// Note: This is used if and only if the Mode is active.
 	TableIndex Index
 
@@ -90,7 +90,7 @@ func (e *ElementSegment) IsActive() bool {
 type TableInstance struct {
 	// References holds references whose type is either RefTypeFuncref or RefTypeExternref (unsupported).
 	//
-	// Currently only function references are supported.
+	// Currently, only function references are supported.
 	References []Reference
 
 	// Min is the minimum (function) elements in this table and cannot grow to accommodate ElementSegment.
@@ -307,7 +307,7 @@ func (m *Module) verifyImportGlobalI32(sectionID SectionID, sectionIdx Index, id
 	return fmt.Errorf("%s[%d] (global.get %d): out of range of imported globals", SectionIDName(sectionID), sectionIdx, idx)
 }
 
-// Grow appends the `initialRef` by `delta` times into the .References slice.
+// Grow appends the `initialRef` by `delta` times into the References slice.
 // Returns -1 if the operation is not valid, otherwise the old length of the table.
 //
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-grow-x
@@ -321,7 +321,7 @@ func (t *TableInstance) Grow(_ context.Context, delta uint32, initialRef Referen
 		return
 	}
 
-	if newLen := int64(currentLen) + int64(delta); // adding as 64bit ints to avoide overflow.
+	if newLen := int64(currentLen) + int64(delta); // adding as 64bit ints to avoid overflow.
 	newLen >= math.MaxUint32 || (t.Max != nil && newLen > int64(*t.Max)) {
 		return 0xffffffff // = -1 in signed 32-bit integer.
 	}

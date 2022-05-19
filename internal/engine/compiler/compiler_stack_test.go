@@ -32,14 +32,14 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the location stack so that we push the const on the specified height.
-			s := &valueLocationStack{
+			s := &runtimeValueLocationStack{
 				sp:            tc.stackPointer,
-				stack:         make([]*valueLocation, tc.stackPointer),
+				stack:         make([]*runtimeValueLocation, tc.stackPointer),
 				usedRegisters: map[asm.Register]struct{}{},
 			}
 			// Peek must be non-nil. Otherwise, compileConst* would fail.
-			s.stack[s.sp-1] = &valueLocation{}
-			compiler.setValueLocationStack(s)
+			s.stack[s.sp-1] = &runtimeValueLocation{}
+			compiler.setRuntimeValueLocationStack(s)
 
 			if tc.isFloat {
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
@@ -49,7 +49,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(s.peek())
-			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -60,7 +60,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			env.exec(code)
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
@@ -94,16 +94,15 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			require.NoError(t, err)
 
 			// Setup the location stack so that we push the const on the specified height.
-			compiler.valueLocationStack().sp = tc.stackPointer
-			compiler.valueLocationStack().stack = make([]*valueLocation, tc.stackPointer)
+			compiler.runtimeValueLocationStack().sp = tc.stackPointer
+			compiler.runtimeValueLocationStack().stack = make([]*runtimeValueLocation, tc.stackPointer)
 
-			// Record that that top value is on top.
-			require.Zero(t, len(compiler.valueLocationStack().usedRegisters))
-			loc := compiler.valueLocationStack().pushValueLocationOnStack()
+			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
+			loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			if tc.isFloat {
-				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+				loc.valueType = runtimeValueTypeF64
 			} else {
-				loc.setRegisterType(generalPurposeRegisterTypeInt)
+				loc.valueType = runtimeValueTypeI64
 			}
 			// At this point the value must be recorded as being on stack.
 			require.True(t, loc.onStack())
@@ -111,7 +110,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Release the stack-allocated value to register.
 			err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
 			require.NoError(t, err)
-			require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 			require.True(t, loc.onRegister())
 
 			// To verify the behavior, increment the value on the register.
@@ -130,7 +129,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(loc)
 			require.NoError(t, err)
-			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 			require.NoError(t, err)
 
 			// Generate the code under test.
@@ -143,7 +142,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			env.exec(code)
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
@@ -155,10 +154,79 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 	}
 }
 
+func TestCompiler_compilePick_v128(t *testing.T) {
+	const pickTargetLo, pickTargetHi uint64 = 12345, 6789
+
+	op := &wazeroir.OperationPick{Depth: 2, IsTargetVector: true}
+	for _, tc := range []struct {
+		name                   string
+		isPickTargetOnRegister bool
+	}{
+		{name: "target on register", isPickTargetOnRegister: false},
+		{name: "target on stack", isPickTargetOnRegister: true},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Set up the stack before picking.
+			if tc.isPickTargetOnRegister {
+				err = compiler.compileConstV128(&wazeroir.OperationConstV128{
+					Lo: pickTargetLo, Hi: pickTargetHi,
+				})
+				require.NoError(t, err)
+			} else {
+				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
+				lo.valueType = runtimeValueTypeV128Lo
+				env.stack()[lo.stackPointer] = pickTargetLo
+				hi := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // hi
+				hi.valueType = runtimeValueTypeV128Hi
+				env.stack()[hi.stackPointer] = pickTargetHi
+			}
+
+			// Push the unused median value.
+			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+			require.Equal(t, uint64(3), compiler.runtimeValueLocationStack().sp)
+
+			// Now ready to compile Pick operation.
+			err = compiler.compilePick(op)
+			require.NoError(t, err)
+			require.Equal(t, uint64(5), compiler.runtimeValueLocationStack().sp)
+
+			hiLoc := compiler.runtimeValueLocationStack().peek()
+			loLoc := compiler.runtimeValueLocationStack().stack[hiLoc.stackPointer-1]
+			require.True(t, hiLoc.onRegister())
+			require.Equal(t, runtimeValueTypeV128Hi, hiLoc.valueType)
+			require.Equal(t, runtimeValueTypeV128Lo, loLoc.valueType)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Compile and execute the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			// Check the returned status and stack pointer.
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, uint64(5), env.stackPointer())
+
+			// Verify the top value is the picked one and the pick target's value stays the same.
+			lo, hi := env.stackTopAsV128()
+			require.Equal(t, pickTargetLo, lo)
+			require.Equal(t, pickTargetHi, hi)
+			require.Equal(t, pickTargetLo, env.stack()[loLoc.stackPointer])
+			require.Equal(t, pickTargetHi, env.stack()[hiLoc.stackPointer])
+		})
+	}
+}
+
 func TestCompiler_compilePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
 	op := &wazeroir.OperationPick{Depth: 1}
-
 	for _, tc := range []struct {
 		name                                      string
 		pickTargetSetupFunc                       func(compiler compilerImpl, ce *callEngine) error
@@ -183,8 +251,8 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "float on stack",
 			pickTargetSetupFunc: func(compiler compilerImpl, ce *callEngine) error {
-				pickTargetLocation := compiler.valueLocationStack().pushValueLocationOnStack()
-				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
+				pickTargetLocation := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+				pickTargetLocation.valueType = runtimeValueTypeF64
 				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},
@@ -194,8 +262,8 @@ func TestCompiler_compilePick(t *testing.T) {
 		{
 			name: "int on stack",
 			pickTargetSetupFunc: func(compiler compilerImpl, ce *callEngine) error {
-				pickTargetLocation := compiler.valueLocationStack().pushValueLocationOnStack()
-				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
+				pickTargetLocation := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+				pickTargetLocation.valueType = runtimeValueTypeI64
 				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},
@@ -213,20 +281,20 @@ func TestCompiler_compilePick(t *testing.T) {
 			// Set up the stack before picking.
 			err = tc.pickTargetSetupFunc(compiler, env.callEngine())
 			require.NoError(t, err)
-			pickTargetLocation := compiler.valueLocationStack().peek()
+			pickTargetLocation := compiler.runtimeValueLocationStack().peek()
 
 			// Push the unused median value.
-			_ = compiler.valueLocationStack().pushValueLocationOnStack()
-			require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
 
 			// Now ready to compile Pick operation.
 			err = compiler.compilePick(op)
 			require.NoError(t, err)
-			require.Equal(t, uint64(3), compiler.valueLocationStack().sp)
+			require.Equal(t, uint64(3), compiler.runtimeValueLocationStack().sp)
 
-			pickedLocation := compiler.valueLocationStack().peek()
+			pickedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, pickedLocation.onRegister())
-			require.Equal(t, pickTargetLocation.registerType(), pickedLocation.registerType())
+			require.Equal(t, pickTargetLocation.getRegisterType(), pickedLocation.getRegisterType())
 
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -237,7 +305,7 @@ func TestCompiler_compilePick(t *testing.T) {
 			env.exec(code)
 
 			// Check the returned status and stack pointer.
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(3), env.stackPointer())
 
 			// Verify the top value is the picked one and the pick target's value stays the same.
@@ -263,15 +331,15 @@ func TestCompiler_compileDrop(t *testing.T) {
 		// Put existing contents on stack.
 		liveNum := 10
 		for i := 0; i < liveNum; i++ {
-			compiler.valueLocationStack().pushValueLocationOnStack()
+			compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 		}
-		require.Equal(t, uint64(liveNum), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(liveNum), compiler.runtimeValueLocationStack().sp)
 
 		err = compiler.compileDrop(&wazeroir.OperationDrop{Depth: nil})
 		require.NoError(t, err)
 
 		// After the nil range drop, the stack must remain the same.
-		require.Equal(t, uint64(liveNum), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(liveNum), compiler.runtimeValueLocationStack().sp)
 
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
@@ -280,7 +348,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 	t.Run("start top", func(t *testing.T) {
 		r := &wazeroir.InclusiveRange{Start: 0, End: 2}
@@ -300,18 +368,18 @@ func TestCompiler_compileDrop(t *testing.T) {
 				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
 				require.NoError(t, err)
 			} else {
-				compiler.valueLocationStack().pushValueLocationOnStack()
+				compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			}
 		}
-		require.Equal(t, uint64(liveNum+dropTargetNum), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(liveNum+dropTargetNum), compiler.runtimeValueLocationStack().sp)
 
 		err = compiler.compileDrop(&wazeroir.OperationDrop{Depth: r})
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
-		require.Equal(t, uint64(liveNum), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(liveNum), compiler.runtimeValueLocationStack().sp)
 		// Plus, the top value must stay on a register.
-		top := compiler.valueLocationStack().peek()
+		top := compiler.runtimeValueLocationStack().peek()
 		require.True(t, top.onRegister())
 
 		err = compiler.compileReturnFunction()
@@ -321,7 +389,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(5), env.stackPointer())
 		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
 	})
@@ -343,7 +411,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		// Put existing contents except the top on stack
 		for i := 0; i < total-1; i++ {
-			loc := compiler.valueLocationStack().pushValueLocationOnStack()
+			loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			ce.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
 		}
 
@@ -352,15 +420,15 @@ func TestCompiler_compileDrop(t *testing.T) {
 		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
 		require.NoError(t, err)
 
-		require.Equal(t, uint64(total), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(total), compiler.runtimeValueLocationStack().sp)
 
 		err = compiler.compileDrop(&wazeroir.OperationDrop{Depth: r})
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
-		require.Equal(t, uint64(liveTotal), compiler.valueLocationStack().sp)
+		require.Equal(t, uint64(liveTotal), compiler.runtimeValueLocationStack().sp)
 		// Plus, the top value must stay on a register.
-		require.True(t, compiler.valueLocationStack().peek().onRegister())
+		require.True(t, compiler.runtimeValueLocationStack().peek().onRegister())
 
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
@@ -369,7 +437,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 		require.NoError(t, err)
 
 		env.exec(code)
-		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(liveTotal), env.stackPointer())
 
 		stack := env.stack()[:env.stackPointer()]
@@ -445,30 +513,30 @@ func TestCompiler_compileSelect(t *testing.T) {
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
-					x1 := compiler.valueLocationStack().pushValueLocationOnStack()
+					x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					env.stack()[x1.stackPointer] = x1Value
 					if tc.x1OnRegister {
 						err = compiler.compileEnsureOnGeneralPurposeRegister(x1)
 						require.NoError(t, err)
 					}
 
-					x2 := compiler.valueLocationStack().pushValueLocationOnStack()
+					x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					env.stack()[x2.stackPointer] = x2Value
 					if tc.x2OnRegister {
 						err = compiler.compileEnsureOnGeneralPurposeRegister(x2)
 						require.NoError(t, err)
 					}
 
-					var c *valueLocation
+					var c *runtimeValueLocation
 					if tc.condlValueOnStack {
-						c = compiler.valueLocationStack().pushValueLocationOnStack()
+						c = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 						if tc.selectX1 {
 							env.stack()[c.stackPointer] = 1
 						} else {
 							env.stack()[c.stackPointer] = 0
 						}
 					} else if tc.condValueOnGPRegister {
-						c = compiler.valueLocationStack().pushValueLocationOnStack()
+						c = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 						if tc.selectX1 {
 							env.stack()[c.stackPointer] = 1
 						} else {
@@ -494,7 +562,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					require.NoError(t, err)
 
 					// x1 should be top of the stack.
-					require.Equal(t, x1, compiler.valueLocationStack().peek())
+					require.Equal(t, x1, compiler.runtimeValueLocationStack().peek())
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -507,12 +575,82 @@ func TestCompiler_compileSelect(t *testing.T) {
 					// Check the selected value.
 					require.Equal(t, uint64(1), env.stackPointer())
 					if tc.selectX1 {
-						require.Equal(t, env.stack()[x1.stackPointer], uint64(x1Value))
+						require.Equal(t, env.stack()[x1.stackPointer], x1Value)
 					} else {
-						require.Equal(t, env.stack()[x1.stackPointer], uint64(x2Value))
+						require.Equal(t, env.stack()[x1.stackPointer], x2Value)
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestCompiler_compileSwap_v128(t *testing.T) {
+	const x1Lo, x1Hi uint64 = 100000, 200000
+	const x2Lo, x2Hi uint64 = 1, 2
+
+	for _, tc := range []struct {
+		x1OnRegister, x2OnRegister bool
+	}{
+		{x1OnRegister: true, x2OnRegister: true},
+		{x1OnRegister: true, x2OnRegister: false},
+		{x1OnRegister: false, x2OnRegister: true},
+		{x1OnRegister: false, x2OnRegister: false},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("x1_register=%v, x2_register=%v", tc.x1OnRegister, tc.x2OnRegister), func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			if tc.x1OnRegister {
+				err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: x1Lo, Hi: x1Hi})
+				require.NoError(t, err)
+			} else {
+				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
+				lo.valueType = runtimeValueTypeV128Lo
+				env.stack()[lo.stackPointer] = x1Lo
+				hi := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // hi
+				hi.valueType = runtimeValueTypeV128Hi
+				env.stack()[hi.stackPointer] = x1Hi
+			}
+
+			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // Dummy value!
+
+			if tc.x2OnRegister {
+				err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: x2Lo, Hi: x2Hi})
+				require.NoError(t, err)
+			} else {
+				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
+				lo.valueType = runtimeValueTypeV128Lo
+				env.stack()[lo.stackPointer] = x2Lo
+				hi := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // hi
+				hi.valueType = runtimeValueTypeV128Hi
+				env.stack()[hi.stackPointer] = x2Hi
+			}
+
+			// Swap x1 and x2.
+			err = compiler.compileSwap(&wazeroir.OperationSwap{Depth: 4, IsTargetVector: true})
+			require.NoError(t, err)
+
+			require.NoError(t, compiler.compileReturnFunction())
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, uint64(5), env.stackPointer())
+
+			st := env.stack()
+			require.Equal(t, x2Lo, st[0])
+			require.Equal(t, x2Hi, st[1])
+			require.Equal(t, x1Lo, st[3])
+			require.Equal(t, x1Hi, st[4])
 		})
 	}
 }
@@ -536,21 +674,21 @@ func TestCompiler_compileSwap(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			x2 := compiler.valueLocationStack().pushValueLocationOnStack()
+			x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			env.stack()[x2.stackPointer] = uint64(x2Value)
 			if tc.x2OnRegister {
 				err = compiler.compileEnsureOnGeneralPurposeRegister(x2)
 				require.NoError(t, err)
 			}
 
-			_ = compiler.valueLocationStack().pushValueLocationOnStack() // Dummy value!
+			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // Dummy value!
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
-				x1 := compiler.valueLocationStack().pushValueLocationOnStack()
+				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 				err = compiler.compileEnsureOnGeneralPurposeRegister(x1)
 				require.NoError(t, err)
 			} else if !tc.x1OnConditionalRegister {
-				x1 := compiler.valueLocationStack().pushValueLocationOnStack()
+				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 			} else {
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})

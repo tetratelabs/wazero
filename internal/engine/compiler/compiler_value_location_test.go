@@ -9,31 +9,32 @@ import (
 )
 
 func Test_isIntRegister(t *testing.T) {
-	for _, r := range unreservedGeneralPurposeIntRegisters {
+	for _, r := range unreservedGeneralPurposeRegisters {
 		require.True(t, isIntRegister(r))
 	}
 }
 
-func Test_isFloatRegister(t *testing.T) {
-	for _, r := range unreservedGeneralPurposeFloatRegisters {
-		require.True(t, isFloatRegister(r))
+func Test_isVectorRegister(t *testing.T) {
+	for _, r := range unreservedVectorRegisters {
+		require.True(t, isVectorRegister(r))
 	}
 }
 
-func TestValueLocationStack_basic(t *testing.T) {
-	s := newValueLocationStack()
+func TestRuntimeValueLocationStack_basic(t *testing.T) {
+	s := newRuntimeValueLocationStack()
 	// Push stack value.
-	loc := s.pushValueLocationOnStack()
+	loc := s.pushRuntimeValueLocationOnStack()
 	require.Equal(t, uint64(1), s.sp)
 	require.Equal(t, uint64(0), loc.stackPointer)
 	// Push the register value.
-	tmpReg := unreservedGeneralPurposeIntRegisters[0]
-	loc = s.pushValueLocationOnRegister(tmpReg)
+	tmpReg := unreservedGeneralPurposeRegisters[0]
+	loc = s.pushRuntimeValueLocationOnRegister(tmpReg, runtimeValueTypeI64)
 	require.Equal(t, uint64(2), s.sp)
 	require.Equal(t, uint64(1), loc.stackPointer)
 	require.Equal(t, tmpReg, loc.register)
+	require.Equal(t, loc.valueType, runtimeValueTypeI64)
 	// markRegisterUsed.
-	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
+	tmpReg2 := unreservedGeneralPurposeRegisters[1]
 	s.markRegisterUsed(tmpReg2)
 	require.NotNil(t, s.usedRegisters[tmpReg2], tmpReg2)
 	// releaseRegister.
@@ -51,7 +52,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 	}
 	// Check the max stack pointer.
 	for i := 0; i < 1000; i++ {
-		s.pushValueLocationOnStack()
+		s.pushRuntimeValueLocationOnStack()
 	}
 	for i := 0; i < 1000; i++ {
 		s.pop()
@@ -59,60 +60,60 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, uint64(1001), s.stackPointerCeil)
 }
 
-func TestValueLocationStack_takeFreeRegister(t *testing.T) {
-	s := newValueLocationStack()
+func TestRuntimeValueLocationStack_takeFreeRegister(t *testing.T) {
+	s := newRuntimeValueLocationStack()
 	// For int registers.
-	r, ok := s.takeFreeRegister(generalPurposeRegisterTypeInt)
+	r, ok := s.takeFreeRegister(registerTypeGeneralPurpose)
 	require.True(t, ok)
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
-	for _, r := range unreservedGeneralPurposeIntRegisters {
+	for _, r := range unreservedGeneralPurposeRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for int.
-	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeInt)
+	_, ok = s.takeFreeRegister(registerTypeGeneralPurpose)
 	require.False(t, ok)
 	// But we still should be able to take float regs.
-	r, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
+	r, ok = s.takeFreeRegister(registerTypeVector)
 	require.True(t, ok)
-	require.True(t, isFloatRegister(r))
+	require.True(t, isVectorRegister(r))
 	// Mark all the float registers used.
-	for _, r := range unreservedGeneralPurposeFloatRegisters {
+	for _, r := range unreservedVectorRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.
-	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
+	_, ok = s.takeFreeRegister(registerTypeVector)
 	require.False(t, ok)
 }
 
-func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
-	s := newValueLocationStack()
-	intReg := unreservedGeneralPurposeIntRegisters[0]
-	intLocation := &valueLocation{register: intReg}
-	floatReg := unreservedGeneralPurposeFloatRegisters[0]
-	floatLocation := &valueLocation{register: floatReg}
+func TestRuntimeValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
+	s := newRuntimeValueLocationStack()
+	intReg := unreservedGeneralPurposeRegisters[0]
+	intLocation := &runtimeValueLocation{register: intReg}
+	floatReg := unreservedVectorRegisters[0]
+	floatLocation := &runtimeValueLocation{register: floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)
 	// Take for float.
-	target, ok := s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
+	target, ok := s.takeStealTargetFromUsedRegister(registerTypeVector)
 	require.True(t, ok)
 	require.Equal(t, floatLocation, target)
 	// Take for ints.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeGeneralPurpose)
 	require.True(t, ok)
 	require.Equal(t, intLocation, target)
 	// Pop float value.
 	popped := s.pop()
 	require.Equal(t, floatLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeVector)
 	require.False(t, ok)
 	require.Nil(t, target)
 	// Pop int value.
 	popped = s.pop()
 	require.Equal(t, intLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(registerTypeGeneralPurpose)
 	require.False(t, ok)
 	require.Nil(t, target)
 }

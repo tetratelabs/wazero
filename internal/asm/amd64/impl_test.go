@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"encoding/hex"
 	"strconv"
 	"testing"
 
@@ -270,14 +271,14 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
 }
 
-func TestAssemblerImpl_CompileRegisterToRegisterWithMode(t *testing.T) {
+func TestAssemblerImpl_CompileRegisterToRegisterWithArg(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToRegisterWithMode(MOVQ, REG_BX, REG_AX, 123)
+	a.CompileRegisterToRegisterWithArg(MOVQ, REG_BX, REG_AX, 123)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
 	require.Equal(t, REG_BX, actualNode.SrcReg)
 	require.Equal(t, REG_AX, actualNode.DstReg)
-	require.Equal(t, byte(123), actualNode.Mode)
+	require.Equal(t, byte(123), actualNode.Arg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
@@ -378,6 +379,135 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, tc.exp, a.Buf.Bytes())
 			}
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
+	// These are not supported by golang-asm, so we test here instead of integration tests.
+	for _, tc := range []struct {
+		n   *NodeImpl
+		exp []byte
+	}{
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesMemoryToRegister,
+				SrcReg:      REG_AX,
+				DstReg:      REG_X3,
+				SrcConst:    10,
+			},
+			exp: []byte{0xf3, 0xf, 0x6f, 0x58, 0xa},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesMemoryToRegister,
+				SrcReg:      REG_R13,
+				DstReg:      REG_X3,
+				SrcConst:    10,
+			},
+			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0x5d, 0xa},
+		},
+	} {
+		tc := tc
+		t.Run(tc.n.String(), func(t *testing.T) {
+			a := NewAssemblerImpl()
+			err := a.EncodeMemoryToRegister(tc.n)
+			require.NoError(t, err)
+
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
+	// These are not supported by golang-asm, so we test here instead of integration tests.
+	for _, tc := range []struct {
+		n   *NodeImpl
+		exp []byte
+	}{
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesRegisterToMemory,
+				SrcReg:      REG_X3,
+				DstReg:      REG_AX,
+				SrcConst:    10,
+			},
+			exp: []byte{0xf3, 0xf, 0x7f, 0x18},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesRegisterToMemory,
+				SrcReg:      REG_X3,
+				DstReg:      REG_R13,
+				SrcConst:    10,
+			},
+			exp: []byte{0xf3, 0x41, 0xf, 0x7f, 0x5d, 0x0},
+		},
+	} {
+		tc := tc
+		t.Run(tc.n.String(), func(t *testing.T) {
+			a := NewAssemblerImpl()
+			err := a.EncodeRegisterToMemory(tc.n)
+			require.NoError(t, err)
+
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
+	// These are not supported by golang-asm, so we test here instead of integration tests.
+	for _, tc := range []struct {
+		n   *NodeImpl
+		exp []byte
+	}{
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      REG_X3,
+				DstReg:      REG_X10,
+			},
+			exp: []byte{0xf3, 0x44, 0xf, 0x6f, 0xd3},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      REG_X10,
+				DstReg:      REG_X3,
+			},
+			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0xda},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQU,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      REG_X10,
+				DstReg:      REG_X15,
+			},
+			exp: []byte{0xf3, 0x45, 0xf, 0x6f, 0xfa},
+		},
+	} {
+		tc := tc
+		t.Run(tc.n.String(), func(t *testing.T) {
+			a := NewAssemblerImpl()
+			err := a.EncodeRegisterToRegister(tc.n)
+			require.NoError(t, err)
+
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
 }

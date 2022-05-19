@@ -51,6 +51,8 @@ type Assembler interface {
 	// CompileSIMDByteToSIMDByte adds an instruction where source and destination operand is the SIMD register
 	// specified as `srcReg.B8` and `dstReg.B8` where `.B8` part of register is called "arrangement".
 	// See https://stackoverflow.com/questions/57294672/what-is-arrangement-specifier-16b-8b-in-arm-assembly-language-instructions
+	//
+	// TODO: implement this in CompileVectorRegisterToVectorRegister.
 	CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register)
 
 	// CompileTwoSIMDBytesToSIMDByteRegister adds an instruction where source operand is two SIMD registers specified as `srcReg1.B8`,
@@ -64,4 +66,13 @@ type Assembler interface {
 	// CompileConditionalRegisterSet adds an instruction to set 1 on dstReg if the condition satisfies,
 	// otherwise set 0.
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register)
+	// CompileMemoryToVectorRegister TODO
+	CompileMemoryToVectorRegister(instruction asm.Instruction, srcOffsetReg, dstReg asm.Register, arrangement VectorArrangement)
+	// CompileVectorRegisterToMemory TODO
+	CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstOffsetReg asm.Register, arrangement VectorArrangement)
+	// CompileRegisterToVectorRegister TODO
+	CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+		arrangement VectorArrangement, index VectorIndex)
+	// CompileVectorRegisterToVectorRegister TODO
+	CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement)
 }

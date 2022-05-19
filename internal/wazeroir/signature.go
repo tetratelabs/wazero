@@ -23,8 +23,8 @@ var (
 	signature_None_I64 = &signature{
 		out: []UnsignedType{UnsignedTypeI64},
 	}
-	signature_None_I64I64 = &signature{
-		out: []UnsignedType{UnsignedTypeI64, UnsignedTypeI64},
+	signature_None_V128 = &signature{
+		out: []UnsignedType{UnsignedTypeV128},
 	}
 	signature_None_F32 = &signature{
 		out: []UnsignedType{UnsignedTypeF32},
@@ -154,9 +154,9 @@ var (
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeUnknown},
 	}
-	signature_I64I64I64I64_I64I64 = &signature{
-		in:  []UnsignedType{UnsignedTypeI64, UnsignedTypeI64, UnsignedTypeI64, UnsignedTypeI64},
-		out: []UnsignedType{UnsignedTypeI64, UnsignedTypeI64},
+	signature_V128V128_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeV128},
 	}
 )
 
@@ -410,9 +410,9 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 	case wasm.OpcodeVecPrefix:
 		switch vecOp := c.body[c.pc+1]; vecOp {
 		case wasm.OpcodeVecV128Const:
-			return signature_None_I64I64, nil
+			return signature_None_V128, nil
 		case wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
-			return signature_I64I64I64I64_I64I64, nil
+			return signature_V128V128_V128, nil
 		default:
 			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
 		}
@@ -445,7 +445,7 @@ func wasmValueTypeToUnsignedType(vt wasm.ValueType) []UnsignedType {
 	case wasm.ValueTypeF64:
 		return []UnsignedType{UnsignedTypeF64}
 	case wasm.ValueTypeV128:
-		return []UnsignedType{UnsignedTypeI64, UnsignedTypeI64}
+		return []UnsignedType{UnsignedTypeV128}
 	}
 	panic("unreachable")
 }
