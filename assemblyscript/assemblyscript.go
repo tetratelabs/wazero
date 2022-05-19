@@ -104,9 +104,6 @@ func (m *moduleBuilder) WithSeedSource(reader io.Reader) ModuleBuilder {
 
 // Instantiate implements ModuleBuilder.Instantiate
 func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error) {
-	if ctx != nil {
-
-	}
 	mod := runtime.NewModuleBuilder("env")
 
 	if m.abortEnabled {
