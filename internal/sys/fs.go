@@ -1,4 +1,4 @@
-package fs
+package sys
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 )
 
-// Key is a context.Context Value key. It allows overriding fs.FS for WASI.
+// FSKey is a context.Context Value key. It allows overriding fs.FS for WASI.
 //
 // See https://github.com/tetratelabs/wazero/issues/491
-type Key struct{}
+type FSKey struct{}
 
 // FileEntry maps a path to an open file in a file system.
 //

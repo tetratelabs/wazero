@@ -25,7 +25,7 @@ func Test_EnvironGet(t *testing.T) {
 	require.NoError(t, err)
 
 	m := newModule(make([]byte, 20), sys)
-	environGet := newSnapshotPreview1(testCtx).EnvironGet
+	environGet := (&snapshotPreview1{}).EnvironGet
 
 	require.Equal(t, ErrnoSuccess, environGet(testCtx, m, 11, 1))
 	require.Equal(t, m.Memory(), testMem)
@@ -47,7 +47,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 		0,
 	}, sys)
 
-	environGet := newSnapshotPreview1(testCtx).EnvironGet
+	environGet := (&snapshotPreview1{}).EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			if environGet(testCtx, m, 0, 4) != ErrnoSuccess {

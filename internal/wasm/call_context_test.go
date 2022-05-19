@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -149,7 +149,7 @@ func TestCallContext_Close(t *testing.T) {
 			nil, // stdout
 			nil, // stderr
 			nil, // randSource
-			map[uint32]*fs.FileEntry{ // openedFiles
+			map[uint32]*sys.FileEntry{ // openedFiles
 				3: {Path: "."},
 			},
 		)

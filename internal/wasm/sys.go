@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 )
 
 // SysContext holds module-scoped system resources currently only used by internalwasi.
@@ -17,7 +17,7 @@ type SysContext struct {
 	stdout, stderr        io.Writer
 	randSource            io.Reader
 
-	fs *fs.Context
+	fs *sys.Context
 }
 
 // Args is like os.Args and defaults to nil.
@@ -72,9 +72,9 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
-func (c *SysContext) FS() *fs.Context {
+func (c *SysContext) FS() *sys.Context {
 	if c.fs == nil {
-		return &fs.Context{}
+		return &sys.Context{}
 	}
 	return c.fs
 }
@@ -110,42 +110,42 @@ var _ = DefaultSysContext() // Force panic on bug.
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*fs.FileEntry) (sys *SysContext, err error) {
-	sys = &SysContext{args: args, environ: environ}
+func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*sys.FileEntry) (sysCtx *SysContext, err error) {
+	sysCtx = &SysContext{args: args, environ: environ}
 
-	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
+	if sysCtx.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
 		return nil, fmt.Errorf("args invalid: %w", err)
 	}
 
-	if sys.environSize, err = nullTerminatedByteCount(max, environ); err != nil {
+	if sysCtx.environSize, err = nullTerminatedByteCount(max, environ); err != nil {
 		return nil, fmt.Errorf("environ invalid: %w", err)
 	}
 
 	if stdin == nil {
-		sys.stdin = eofReader{}
+		sysCtx.stdin = eofReader{}
 	} else {
-		sys.stdin = stdin
+		sysCtx.stdin = stdin
 	}
 
 	if stdout == nil {
-		sys.stdout = io.Discard
+		sysCtx.stdout = io.Discard
 	} else {
-		sys.stdout = stdout
+		sysCtx.stdout = stdout
 	}
 
 	if stderr == nil {
-		sys.stderr = io.Discard
+		sysCtx.stderr = io.Discard
 	} else {
-		sys.stderr = stderr
+		sysCtx.stderr = stderr
 	}
 
 	if randSource == nil {
-		sys.randSource = rand.Reader
+		sysCtx.randSource = rand.Reader
 	} else {
-		sys.randSource = randSource
+		sysCtx.randSource = randSource
 	}
 
-	sys.fs = fs.NewContext(openedFiles)
+	sysCtx.fs = sys.NewContext(openedFiles)
 
 	return
 }

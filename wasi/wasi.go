@@ -15,8 +15,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
-	internalfs "github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -437,15 +436,13 @@ const (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 // See https://github.com/WebAssembly/WASI/issues/215
 // See https://wwa.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
-type snapshotPreview1 struct {
-	sys experimental.Sys
-}
+type snapshotPreview1 struct{}
 
 // snapshotPreview1Functions returns all go functions that implement snapshotPreview1.
 // These should be exported in the module named "wasi_snapshot_preview1".
 // See wasm.NewHostModule
 func snapshotPreview1Functions(ctx context.Context) (a *snapshotPreview1, nameToGoFunc map[string]interface{}) {
-	a = newSnapshotPreview1(ctx)
+	a = &snapshotPreview1{}
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -689,7 +686,16 @@ func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uin
 // See https://linux.die.net/man/3/clock_gettime
 func (a *snapshotPreview1) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: id and precision are currently ignored.
-	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, a.sys.TimeNowUnixNano()) {
+	// Override Context when it is passed via context
+	clock := timeNowUnixNano
+	if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
+		clockCtx, ok := clockVal.(func() uint64)
+		if !ok {
+			panic(fmt.Errorf("unsupported clock key: %v", clockVal))
+		}
+		clock = clockCtx
+	}
+	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, clock()) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1359,22 +1365,8 @@ const (
 	fdStderr = 2
 )
 
-// compile-time check to ensure defaultSys implements experimental.Sys.
-var _ experimental.Sys = &defaultSys{}
-
-type defaultSys struct{}
-
-func (d *defaultSys) TimeNowUnixNano() uint64 {
+func timeNowUnixNano() uint64 {
 	return uint64(time.Now().UnixNano())
-}
-
-func newSnapshotPreview1(ctx context.Context) *snapshotPreview1 {
-	if ctx != nil { // Test to see if internal code are using an experimental feature.
-		if sys := ctx.Value(experimental.SysKey{}); sys != nil {
-			return &snapshotPreview1{sys: sys.(experimental.Sys)}
-		}
-	}
-	return &snapshotPreview1{sys: &defaultSys{}}
 }
 
 func sysCtx(m api.Module) *wasm.SysContext {
@@ -1385,13 +1377,13 @@ func sysCtx(m api.Module) *wasm.SysContext {
 	}
 }
 
-func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *internalfs.Context) {
+func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *sys.Context) {
 	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {
 		// Override Context when it is passed via context
-		if fsValue := ctx.Value(internalfs.Key{}); fsValue != nil {
-			fsCtx, ok := fsValue.(*internalfs.Context)
+		if fsValue := ctx.Value(sys.FSKey{}); fsValue != nil {
+			fsCtx, ok := fsValue.(*sys.Context)
 			if !ok {
 				panic(fmt.Errorf("unsupported fs key: %v", fsValue))
 			}
@@ -1401,7 +1393,7 @@ func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *internalfs.
 	}
 }
 
-func openFileEntry(rootFS fs.FS, pathName string) (*internalfs.FileEntry, Errno) {
+func openFileEntry(rootFS fs.FS, pathName string) (*sys.FileEntry, Errno) {
 	f, err := rootFS.Open(pathName)
 	if err != nil {
 		switch {
@@ -1417,7 +1409,7 @@ func openFileEntry(rootFS fs.FS, pathName string) (*internalfs.FileEntry, Errno)
 	// TODO: verify if oflags is a directory and fail with wasi.ErrnoNotdir if not
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
 
-	return &internalfs.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
+	return &sys.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
 }
 
 func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {
