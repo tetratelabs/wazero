@@ -319,7 +319,7 @@ const (
 	OpcodeMiscTableFill OpcodeMisc = 0x11
 )
 
-// OpcodeVec represents an opcode of a vector instructions whic has
+// OpcodeVec represents an opcode of a vector instructions which has
 // multi-byte encoding and is prefixed by OpcodeMiscPrefix.
 //
 // These opcodes are toggled with FeatureSIMD.

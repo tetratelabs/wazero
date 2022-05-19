@@ -114,7 +114,7 @@ func (p *typeParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 	switch tok {
 	case tokenLParen:
 		return p.beginParamOrResult, nil // start fields, ex. (param or (result
-	case tokenRParen: //empty
+	case tokenRParen: // empty
 		return p.parseFuncEnd(tok, tokenBytes, line, col)
 	default:
 		return nil, unexpectedToken(tok, tokenBytes)

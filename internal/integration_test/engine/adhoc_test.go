@@ -524,7 +524,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(memoryCapacityPages), results[0])
 
-	// Now the store instruction at the memory capcity bound should suceed.
+	// Now the store instruction at the memory capcity bound should succeed.
 	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8) // i64.store needs 8 bytes from offset.
 	require.NoError(t, err)
 }

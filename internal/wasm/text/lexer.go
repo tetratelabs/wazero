@@ -160,7 +160,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 		c := col // the start column of the token (fixed)
 
 		switch tok {
-		//case tokenLParen, tokenRParen: // min/max 1 byte
+		// case tokenLParen, tokenRParen: // min/max 1 byte
 		case tokenSN: // min 2 bytes for sign and number; ambiguous: could be tokenFN
 			return line, c, errors.New("TODO: signed")
 		case tokenUN: // min 1 byte; ambiguous when >=3 bytes as could be tokenFN
