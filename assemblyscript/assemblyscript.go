@@ -6,60 +6,53 @@ package assemblyscript
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
-	"time"
+	"strconv"
+	"strings"
 	"unicode/utf16"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // Instantiate instantiates a module implementing special functions defined by AssemblyScript:
-// * "env.abort"
-// * "env.trace"
-// * "env.seed"
-//abort, trace, and seed for use from AssemblyScript programs.
-// The instantiated module will output abort messages to the io.Writer configured by wazero.ModuleConfig.WithStderr,
-// not output trace messages, and use the io.Reader configured by wazero.ModuleConfig.WithRandSource as the source for
-// seed values.
+// * "env.abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
+// * "env.trace" - no output unless.
+// * "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
 //
-// To customize behavior, use NewModuleBuilder instead.
+// Note: To customize behavior, use NewModuleBuilder instead.
 // Note: If the AssemblyScript program is configured to use WASI, by calling "import wasi" in any file, these
 // functions will not be used.
+// See NewModuleBuilder
 // See wasi.InstantiateSnapshotPreview1
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return NewModuleBuilder().Instantiate(ctx, r)
+	return NewModuleBuilder(r).Instantiate(ctx)
 }
 
 // ModuleBuilder allows configuring the module that will export functions used automatically by AssemblyScript.
 type ModuleBuilder interface {
-	// WithAbortDisabled configures the AssemblyScript abort function to be disabled. Any abort messages will
-	// be discarded.
-	WithAbortDisabled() ModuleBuilder
+	// WithAbortMessageDisabled configures the AssemblyScript abort function to discard any message.
+	WithAbortMessageDisabled() ModuleBuilder
 
 	// WithTraceToStdout configures the AssemblyScript trace function to output messages to Stdout, as configured by
-	// wazero.ModuleConfig.WithStdout.
+	// wazero.ModuleConfig WithStdout.
 	WithTraceToStdout() ModuleBuilder
 
 	// WithTraceToStderr configures the AssemblyScript trace function to output messages to Stderr, as configured by
-	// wazero.ModuleConfig.WithStderr. Because of the potential volume of trace messages, it is often more appropriate
+	// wazero.ModuleConfig WithStderr. Because of the potential volume of trace messages, it is often more appropriate
 	// to use WithTraceToStdout instead.
 	WithTraceToStderr() ModuleBuilder
 
 	// Instantiate instantiates the module so that AssemblyScript can import from it.
-	Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error)
+	Instantiate(context.Context) (api.Closer, error)
 }
 
-// NewModuleBuilder returns a ModuleBuilder for configuring a AssemblyScript host module.
-func NewModuleBuilder() ModuleBuilder {
-	return &moduleBuilder{
-		abortEnabled: true,
-		traceMode:    traceDisabled,
-	}
+// NewModuleBuilder is an alternative to Instantiate which allows customization via ModuleBuilder.
+func NewModuleBuilder(r wazero.Runtime) ModuleBuilder {
+	return &moduleBuilder{r: r, traceMode: traceDisabled}
 }
 
 type traceMode int
@@ -71,14 +64,15 @@ const (
 )
 
 type moduleBuilder struct {
-	abortEnabled bool
-	traceMode    traceMode
+	r                    wazero.Runtime
+	abortMessageDisabled bool
+	traceMode            traceMode
 }
 
-// WithAbortDisabled implements ModuleBuilder.WithAbortWriter
-func (m *moduleBuilder) WithAbortDisabled() ModuleBuilder {
+// WithAbortMessageDisabled implements ModuleBuilder.WithAbortMessageDisabled
+func (m *moduleBuilder) WithAbortMessageDisabled() ModuleBuilder {
 	ret := *m // copy
-	ret.abortEnabled = false
+	ret.abortMessageDisabled = true
 	return &ret
 }
 
@@ -97,58 +91,139 @@ func (m *moduleBuilder) WithTraceToStderr() ModuleBuilder {
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
-func (m *moduleBuilder) Instantiate(ctx context.Context, runtime wazero.Runtime) (api.Closer, error) {
-	mod := runtime.NewModuleBuilder("env")
+func (m *moduleBuilder) Instantiate(ctx context.Context) (api.Closer, error) {
+	env := &assemblyscript{abortMessageDisabled: m.abortMessageDisabled, traceMode: m.traceMode}
+	return m.r.NewModuleBuilder("env").
+		ExportFunction("abort", env.abort).
+		ExportFunction("trace", env.trace).
+		ExportFunction("seed", env.seed).
+		Instantiate(ctx)
+}
 
-	if m.abortEnabled {
-		mod.ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
-			sys := sysCtx(mod)
-			abort(ctx, mod, message, fileName, lineNumber, columnNumber, sys.Stderr())
-		})
-	} else {
-		mod.ExportFunction("abort", func(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32) {
-			// stub for no-op
-		})
-	}
+// assemblyscript implements the AssemblyScript special functions.
+type assemblyscript struct {
+	abortMessageDisabled bool
+	traceMode            traceMode
+}
 
-	switch m.traceMode {
-	case traceStderr:
-		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			sys := sysCtx(mod)
-			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, sys.Stderr())
-		})
-	case traceStdout:
-		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			sys := sysCtx(mod)
-			trace(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, sys.Stdout())
-		})
-	case traceDisabled:
-		mod.ExportFunction("trace", func(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64) {
-			// stub for no-op
-		})
-	}
-
-	mod.ExportFunction("seed", func(mod api.Module) float64 {
+// abort is called on unrecoverable errors. This is typically present in Wasm compiled from AssemblyScript, if
+// assertions are enabled or errors are thrown.
+//
+// The implementation writes the message to stderr, unless abortMessageDisabled, and closes the module with exit code
+// 255.
+//
+// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+//	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
+//
+// See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
+func (a *assemblyscript) abort(
+	ctx context.Context,
+	mod api.Module,
+	message uint32,
+	fileName uint32,
+	lineNumber uint32,
+	columnNumber uint32,
+) {
+	if !a.abortMessageDisabled {
 		sys := sysCtx(mod)
-		return seed(sys.RandSource())
-	})
+		msg, err := readAssemblyScriptString(ctx, mod, message)
+		if err != nil {
+			return
+		}
+		fn, err := readAssemblyScriptString(ctx, mod, fileName)
+		if err != nil {
+			return
+		}
+		_, _ = fmt.Fprintf(sys.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+	}
+	_ = mod.CloseWithExitCode(ctx, 255)
+}
 
-	return mod.Instantiate(ctx)
+// trace implements the same named function in AssemblyScript (ex. trace('Hello World!'))
+//
+// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+//	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
+//
+// See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
+func (a *assemblyscript) trace(
+	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
+) {
+	var writer io.Writer
+	switch a.traceMode {
+	case traceDisabled:
+		return
+	case traceStdout:
+		writer = sysCtx(mod).Stdout()
+	case traceStderr:
+		writer = sysCtx(mod).Stderr()
+	}
+
+	msg, err := readAssemblyScriptString(ctx, mod, message)
+	if err != nil {
+		panic(err)
+	}
+	var ret strings.Builder
+	ret.WriteString("trace: ")
+	ret.WriteString(msg)
+	if nArgs >= 1 {
+		ret.WriteString(" ")
+		ret.WriteString(formatFloat(arg0))
+	}
+	if nArgs >= 2 {
+		ret.WriteString(",")
+		ret.WriteString(formatFloat(arg1))
+	}
+	if nArgs >= 3 {
+		ret.WriteString(",")
+		ret.WriteString(formatFloat(arg2))
+	}
+	if nArgs >= 4 {
+		ret.WriteString(",")
+		ret.WriteString(formatFloat(arg3))
+	}
+	if nArgs >= 5 {
+		ret.WriteString(",")
+		ret.WriteString(formatFloat(arg4))
+	}
+	ret.WriteByte('\n')
+	_, err = writer.Write([]byte(ret.String()))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'g', -1, 64)
+}
+
+// seed is called when the AssemblyScript's random number generator needs to be seeded
+//
+// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+//	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
+//
+// See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
+func (a *assemblyscript) seed(mod api.Module) float64 {
+	source := sysCtx(mod).RandSource()
+	v, err := ieee754.DecodeFloat64(source)
+	if err != nil {
+		panic(fmt.Errorf("error reading Module.RandSource: %w", err))
+	}
+	return v
 }
 
 // readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
-func readAssemblyScriptString(ctx context.Context, m api.Module, pointer uint32) (string, error) {
+func readAssemblyScriptString(ctx context.Context, m api.Module, offset uint32) (string, error) {
 	// Length is four bytes before pointer.
-	size, ok := m.Memory().ReadUint32Le(ctx, pointer-4)
+	byteCount, ok := m.Memory().ReadUint32Le(ctx, offset-4)
 	if !ok {
-		return "", fmt.Errorf("could not read size from memory")
+		return "", fmt.Errorf("Memory.ReadUint32Le(%d) out of range", offset-4)
 	}
-	if size%2 != 0 {
-		return "", fmt.Errorf("odd number of bytes for utf-16 string")
+	if byteCount%2 != 0 {
+		return "", fmt.Errorf("read an odd number of bytes for utf-16 string: %d", byteCount)
 	}
-	buf, ok := m.Memory().Read(ctx, pointer, size)
+	buf, ok := m.Memory().Read(ctx, offset, byteCount)
 	if !ok {
-		return "", fmt.Errorf("could not read string from memory")
+		return "", fmt.Errorf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}
 	return decodeUTF16(buf), nil
 }
@@ -162,55 +237,6 @@ func decodeUTF16(b []byte) string {
 	}
 
 	return string(utf16.Decode(u16s))
-}
-
-func abort(ctx context.Context, mod api.Module, message uint32, fileName uint32, lineNumber uint32, columnNumber uint32, writer io.Writer) {
-	msg, err := readAssemblyScriptString(ctx, mod, message)
-	if err != nil {
-		return
-	}
-	fn, err := readAssemblyScriptString(ctx, mod, fileName)
-	if err != nil {
-		return
-	}
-	_, _ = fmt.Fprintf(writer, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
-}
-
-func seed(source io.Reader) float64 {
-	b := make([]byte, 8)
-	n, err := source.Read(b)
-	if n != 8 || err != nil {
-		// AssemblyScript default JS bindings just use Date.now for a seed which is not a good seed at all.
-		// We should almost always be able to read the seed, but if it fails for some reason we fallback to
-		// current time as a simplest default.
-		return float64(time.Now().UnixMilli())
-	}
-	bits := binary.LittleEndian.Uint64(b)
-	return math.Float64frombits(bits)
-}
-
-func trace(ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0 float64, arg1 float64, arg2 float64, arg3 float64, arg4 float64, writer io.Writer) {
-	msg, err := readAssemblyScriptString(ctx, mod, message)
-	if err != nil {
-		return
-	}
-	_, _ = fmt.Fprintf(writer, "trace: %s", msg)
-	if nArgs >= 1 {
-		_, _ = fmt.Fprintf(writer, " %v", arg0)
-	}
-	if nArgs >= 2 {
-		_, _ = fmt.Fprintf(writer, ",%v", arg1)
-	}
-	if nArgs >= 3 {
-		_, _ = fmt.Fprintf(writer, ",%v", arg2)
-	}
-	if nArgs >= 4 {
-		_, _ = fmt.Fprintf(writer, ",%v", arg3)
-	}
-	if nArgs >= 5 {
-		_, _ = fmt.Fprintf(writer, ",%v", arg4)
-	}
-	_, _ = fmt.Fprintln(writer)
 }
 
 func sysCtx(m api.Module) *wasm.SysContext {
