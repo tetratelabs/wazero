@@ -35,18 +35,18 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
-	require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
+	require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 	require.Equal(t, builtinFunctionIndexMemoryGrow, env.builtinFunctionCallAddress())
 
 	// Reenter from the return address.
-	compilercall(
+	nativecall(
 		env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
 		uintptr(unsafe.Pointer(env.module())),
 	)
 
 	// Check if the code successfully executed the code after builtin function call.
 	require.Equal(t, expValue, env.stackTopAsUint32())
-	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
 func TestCompiler_compileMemorySize(t *testing.T) {
@@ -60,8 +60,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	err = compiler.compileMemorySize()
 	require.NoError(t, err)
 	// At this point, the size of memory should be pushed onto the stack.
-	require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-	require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().registerType())
+	require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
 
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -71,7 +70,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	require.NoError(t, err)
 	env.exec(code)
 
-	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
 
@@ -249,14 +248,14 @@ func TestCompiler_compileLoad(t *testing.T) {
 			tc.operationSetupFn(t, compiler)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
-			require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
-			require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
-			loadedLocation := compiler.valueLocationStack().peek()
+			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+			loadedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
 			if tc.isFloatTarget {
-				require.Equal(t, generalPurposeRegisterTypeFloat, loadedLocation.registerType())
+				require.Equal(t, registerTypeVector, loadedLocation.getRegisterType())
 			} else {
-				require.Equal(t, generalPurposeRegisterTypeInt, loadedLocation.registerType())
+				require.Equal(t, registerTypeGeneralPurpose, loadedLocation.getRegisterType())
 			}
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -388,8 +387,8 @@ func TestCompiler_compileStore(t *testing.T) {
 			tc.operationSetupFn(t, compiler)
 
 			// At this point, no registers must be in use, and no values on the stack since we consumed two values.
-			require.Zero(t, len(compiler.valueLocationStack().usedRegisters))
-			require.Equal(t, uint64(0), compiler.valueLocationStack().sp)
+			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
+			require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
 
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
@@ -469,8 +468,8 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					mem := env.memory()
 					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
 						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
-						// with compilerCallStatusCodeMemoryOutOfBounds status code.
-						require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
+						// with nativeCallStatusCodeMemoryOutOfBounds status code.
+						require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 					}
 				})
 			}

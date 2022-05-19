@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/internal/asm"
-	asm_arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
+	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/integration_test/asm/golang_asm"
 )
 
@@ -15,12 +15,12 @@ import (
 //
 // TODO: this will be removed after golang-asm removal.
 // Note: this is intentionally exported in order to suppress bunch of "unused" lint errors on this function, testAssembler and testNode.
-func NewDebugAssembler(temporaryRegister asm.Register) (asm_arm64.Assembler, error) {
+func NewDebugAssembler(temporaryRegister asm.Register) (arm64.Assembler, error) {
 	goasm, err := newAssembler(temporaryRegister)
 	if err != nil {
 		return nil, err
 	}
-	a := asm_arm64.NewAssemblerImpl(temporaryRegister)
+	a := arm64.NewAssemblerImpl(temporaryRegister)
 	return &testAssembler{a: a, goasm: goasm}, nil
 }
 
@@ -31,14 +31,14 @@ func NewDebugAssembler(temporaryRegister asm.Register) (asm_arm64.Assembler, err
 // TODO: this will be removed after golang-asm removal.
 type testAssembler struct {
 	goasm *assemblerGoAsmImpl
-	a     *asm_arm64.AssemblerImpl
+	a     *arm64.AssemblerImpl
 }
 
 // testNode implements asm.Node for the usage with testAssembler.
 //
 // TODO: this will be removed after golang-asm removal.
 type testNode struct {
-	n     *asm_arm64.NodeImpl
+	n     *arm64.NodeImpl
 	goasm *golang_asm.GolangAsmNode
 }
 
@@ -71,7 +71,7 @@ func (tn *testNode) OffsetInBinary() asm.NodeOffsetInBinary {
 	return tn.goasm.OffsetInBinary()
 }
 
-// Assemble implements the same method as documented on asm_arm64.Assembler.
+// Assemble implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) Assemble() ([]byte, error) {
 	ret, err := ta.goasm.Assemble()
 	if err != nil {
@@ -91,7 +91,7 @@ func (ta *testAssembler) Assemble() ([]byte, error) {
 	return ret, nil
 }
 
-// SetJumpTargetOnNext implements the same method as documented on asm_arm64.Assembler.
+// SetJumpTargetOnNext implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	for _, n := range nodes {
 		targetTestNode := n.(*testNode)
@@ -100,7 +100,7 @@ func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 	}
 }
 
-// BuildJumpTable implements the same method as documented on asm_arm64.Assembler.
+// BuildJumpTable implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.Node) {
 	ta.goasm.BuildJumpTable(table, initialInstructions)
 	ta.a.BuildJumpTable(table, initialInstructions)
@@ -110,10 +110,10 @@ func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.
 func (ta *testAssembler) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileStandAlone(instruction)
 	ret2 := ta.a.CompileStandAlone(instruction)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_arm64.NodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*arm64.NodeImpl)}
 }
 
-// CompileConstToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileConstToRegister implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileConstToRegister(
 	instruction asm.Instruction,
 	value asm.ConstantValue,
@@ -121,16 +121,16 @@ func (ta *testAssembler) CompileConstToRegister(
 ) asm.Node {
 	ret := ta.goasm.CompileConstToRegister(instruction, value, destinationReg)
 	ret2 := ta.a.CompileConstToRegister(instruction, value, destinationReg)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_arm64.NodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*arm64.NodeImpl)}
 }
 
-// CompileRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToRegister implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	ta.goasm.CompileRegisterToRegister(instruction, from, to)
 	ta.a.CompileRegisterToRegister(instruction, from, to)
 }
 
-// CompileMemoryToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryToRegister implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileMemoryToRegister(
 	instruction asm.Instruction,
 	sourceBaseReg asm.Register,
@@ -141,7 +141,7 @@ func (ta *testAssembler) CompileMemoryToRegister(
 	ta.a.CompileMemoryToRegister(instruction, sourceBaseReg, sourceOffsetConst, destinationReg)
 }
 
-// CompileRegisterToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToMemory implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileRegisterToMemory(
 	instruction asm.Instruction,
 	sourceRegister, destinationBaseRegister asm.Register,
@@ -151,26 +151,26 @@ func (ta *testAssembler) CompileRegisterToMemory(
 	ta.a.CompileRegisterToMemory(instruction, sourceRegister, destinationBaseRegister, destinationOffsetConst)
 }
 
-// CompileJump implements the same method as documented on asm_arm64.Assembler.
+// CompileJump implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	ret := ta.goasm.CompileJump(jmpInstruction)
 	ret2 := ta.a.CompileJump(jmpInstruction)
-	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_arm64.NodeImpl)}
+	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*arm64.NodeImpl)}
 }
 
-// CompileJumpToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileJumpToMemory implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register) {
 	ta.goasm.CompileJumpToMemory(jmpInstruction, baseReg)
 	ta.a.CompileJumpToMemory(jmpInstruction, baseReg)
 }
 
-// CompileJumpToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileJumpToRegister implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ta.goasm.CompileJumpToRegister(jmpInstruction, reg)
 	ta.a.CompileJumpToRegister(jmpInstruction, reg)
 }
 
-// CompileReadInstructionAddress implements the same method as documented on asm_arm64.Assembler.
+// CompileReadInstructionAddress implements the same method as documented on arm64.Assembler.
 func (ta *testAssembler) CompileReadInstructionAddress(
 	destinationRegister asm.Register,
 	beforeAcquisitionTargetInstruction asm.Instruction,
@@ -253,4 +253,28 @@ func (ta *testAssembler) CompileSIMDByteToRegister(instruction asm.Instruction, 
 func (ta *testAssembler) CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register) {
 	ta.goasm.CompileConditionalRegisterSet(cond, dstReg)
 	ta.a.CompileConditionalRegisterSet(cond, dstReg)
+}
+
+func (ta *testAssembler) CompileMemoryToVectorRegister(instruction asm.Instruction, srcOffsetReg, dstReg asm.Register,
+	arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileMemoryToVectorRegister(instruction, srcOffsetReg, dstReg, arrangement)
+	ta.a.CompileMemoryToVectorRegister(instruction, srcOffsetReg, dstReg, arrangement)
+}
+
+func (ta *testAssembler) CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstOffsetReg asm.Register,
+	arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, arrangement)
+	ta.a.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, arrangement)
+}
+
+func (ta *testAssembler) CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement arm64.VectorArrangement, index arm64.VectorIndex) {
+	ta.goasm.CompileRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement, index)
+	ta.a.CompileRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement, index)
+}
+
+func (ta *testAssembler) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement)
+	ta.a.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement)
 }

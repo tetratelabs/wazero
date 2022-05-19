@@ -66,6 +66,7 @@ const (
 	UnsignedTypeI64
 	UnsignedTypeF32
 	UnsignedTypeF64
+	UnsignedTypeV128
 	UnsignedTypeUnknown
 )
 
@@ -79,6 +80,8 @@ func (s UnsignedType) String() (ret string) {
 		ret = "f32"
 	case UnsignedTypeF64:
 		ret = "f64"
+	case UnsignedTypeV128:
+		ret = "v128"
 	case UnsignedTypeUnknown:
 		ret = "unknown"
 	}
@@ -289,6 +292,8 @@ func (o OperationKind) String() (ret string) {
 		ret = "TableFill"
 	case OperationKindConstV128:
 		ret = "ConstV128"
+	case OperationKindV128Add:
+		ret = "V128Add"
 	default:
 		panic("BUG")
 	}
@@ -384,8 +389,7 @@ const (
 	OperationKindTableGrow
 	OperationKindTableFill
 	OperationKindConstV128
-	OperationKindI32x4Add
-	OperationKindI64x2Add
+	OperationKindV128Add
 )
 
 type Label struct {
@@ -516,7 +520,10 @@ func (o *OperationCallIndirect) Kind() OperationKind {
 	return OperationKindCallIndirect
 }
 
-type OperationDrop struct{ Depth *InclusiveRange }
+type OperationDrop struct {
+	// Depths spans across the uint64 value stack at runtime to be dopped by this operation.
+	Depth *InclusiveRange
+}
 
 func (o *OperationDrop) Kind() OperationKind {
 	return OperationKindDrop
@@ -528,13 +535,23 @@ func (o *OperationSelect) Kind() OperationKind {
 	return OperationKindSelect
 }
 
-type OperationPick struct{ Depth int }
+type OperationPick struct {
+	// Depth is the location of the pick target in the uint64 value stack at runtime.
+	// If IsTargetVector=true, this points to the location of the lower 64-bits of the vector.
+	Depth          int
+	IsTargetVector bool
+}
 
 func (o *OperationPick) Kind() OperationKind {
 	return OperationKindPick
 }
 
-type OperationSwap struct{ Depth int }
+type OperationSwap struct {
+	// Depth is the location of the pick target in the uint64 value stack at runtime.
+	// If IsTargetVector=true, this points the location of the lower 64-bits of the vector.
+	Depth          int
+	IsTargetVector bool
+}
 
 func (o *OperationSwap) Kind() OperationKind {
 	return OperationKindSwap
@@ -1160,18 +1177,43 @@ func (o *OperationConstV128) Kind() OperationKind {
 	return OperationKindConstV128
 }
 
-// OperationI32x4Add implements Operation.
-type OperationI32x4Add struct{}
+// Shape corresponds to a shape of v128 values.
+// https://webassembly.github.io/spec/core/syntax/instructions.html#syntax-shape
+type Shape = byte
 
-// Kind implements Operation.Kind.
-func (o *OperationI32x4Add) Kind() OperationKind {
-	return OperationKindI32x4Add
+const (
+	ShapeI8x16 Shape = iota
+	ShapeI16x8
+	ShapeI32x4
+	ShapeI64x2
+	ShapeF32x4
+	ShapeF64x2
+)
+
+func shapeName(s Shape) (ret string) {
+	switch s {
+	case ShapeI8x16:
+		ret = "I8x16"
+	case ShapeI16x8:
+		ret = "I16x8"
+	case ShapeI32x4:
+		ret = "I32x4"
+	case ShapeI64x2:
+		ret = "I64x2"
+	case ShapeF32x4:
+		ret = "F32x4"
+	case ShapeF64x2:
+		ret = "F64x2"
+	}
+	return
 }
 
-// OperationI64x2Add implements Operation.
-type OperationI64x2Add struct{}
+// OperationAddV128 implements Operation.
+type OperationAddV128 struct {
+	Shape Shape
+}
 
 // Kind implements Operation.Kind.
-func (o *OperationI64x2Add) Kind() OperationKind {
-	return OperationKindI64x2Add
+func (o *OperationAddV128) Kind() OperationKind {
+	return OperationKindV128Add
 }

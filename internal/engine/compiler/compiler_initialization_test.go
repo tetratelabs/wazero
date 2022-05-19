@@ -127,9 +127,9 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
-			require.Equal(t, 0, len(compiler.valueLocationStack().usedRegisters), "expected no usedRegisters")
+			require.Equal(t, 0, len(compiler.runtimeValueLocationStack().usedRegisters), "expected no usedRegisters")
 
-			compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -138,7 +138,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			env.exec(code)
 
 			// Check the exit status.
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
 			// Check if the fields of callEngine.moduleContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
@@ -165,8 +165,8 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 
 			if len(tc.moduleInstance.ElementInstances) > 0 {
 				elementInstancesHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.ElementInstances))
-				require.Equal(t, elementInstancesHeader.Data, ce.moduleContext.elementInstancesElemen0Address)
-				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.ElementInstances[0])), ce.moduleContext.elementInstancesElemen0Address)
+				require.Equal(t, elementInstancesHeader.Data, ce.moduleContext.elementInstancesElement0Address)
+				require.Equal(t, uintptr(unsafe.Pointer(&tc.moduleInstance.ElementInstances[0])), ce.moduleContext.elementInstancesElement0Address)
 			}
 
 			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[0])), ce.moduleContext.functionsElement0Address)
@@ -195,7 +195,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				compiler.getOnStackPointerCeilDeterminedCallBack()(stackPointerCeil)
 				env.setValueStackBasePointer(stackBasePointer)
 
-				compiler.compileExitFromNativeCode(compilerCallStatusCodeReturned)
+				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -203,7 +203,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env.exec(code)
 
 				// The status code must be "Returned", not "BuiltinFunctionCall".
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			})
 		}
 	})
@@ -234,17 +234,17 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		env.exec(code)
 
 		// Check if the call exits with builtin function call status.
-		require.Equal(t, compilerCallStatusCodeCallBuiltInFunction, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.True(t, returnAddress != 0, "returnAddress was non-zero %d", returnAddress)
-		compilercall(
+		nativecall(
 			returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
 			uintptr(unsafe.Pointer(env.module())),
 		)
 
 		// Check the result. This should be "Returned".
-		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	})
 }

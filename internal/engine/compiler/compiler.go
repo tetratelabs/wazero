@@ -23,7 +23,7 @@ type compiler interface {
 	// Return true if the compiler decided to skip the entire label.
 	// See wazeroir.OperationLabel
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
-	// compileUnreachable adds instructions to return to engine with compilerCallStatusCodeUnreachable status.
+	// compileUnreachable adds instructions to return to engine with nativeCallStatusCodeUnreachable status.
 	// See wasm.OpcodeUnreachable
 	compileUnreachable() error
 	// compileSwap adds instruction to swap the stack top value with the target in the Wasm value stack.
@@ -65,8 +65,8 @@ type compiler interface {
 	// Note: This is called indirect function call in the sense that the target function is indirectly
 	// determined by the current state (top value) of the stack.
 	// Therefore, two checks are performed at runtime before entering the target function:
-	// 1) If "offset" exceeds the length of table, the function exits with compilerCallStatusCodeInvalidTableAccess.
-	// 2) If the type of the function table[offset] doesn't match the specified function type, the function exits with compilerCallStatusCodeTypeMismatchOnIndirectCall.
+	// 1) If "offset" exceeds the length of table, the function exits with nativeCallStatusCodeInvalidTableAccess.
+	// 2) If the type of the function table[offset] doesn't match the specified function type, the function exits with nativeCallStatusCodeTypeMismatchOnIndirectCall.
 	// Otherwise, we successfully enter the target function.
 	//
 	// See wasm.CallIndirect
@@ -203,7 +203,7 @@ type compiler interface {
 	// Please refer to [1] and [2] for when we encounter undefined behavior in the WebAssembly specification.
 	// To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
 	// then the runtime behavior is undefined. In wazero, we exit the function in these undefined cases with
-	// compilerCallStatusCodeInvalidFloatToIntConversion or compilerCallStatusIntegerOverflow status code.
+	// nativeCallStatusCodeInvalidFloatToIntConversion or nativeCallStatusIntegerOverflow status code.
 	// [1] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-umathrmtruncmathsfu_m-n-z for unsigned integers.
 	// [2] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-smathrmtruncmathsfs_m-n-z for signed integers.
 	// See OpcodeI32TruncF32S OpcodeI32TruncF32U OpcodeI32TruncF64S OpcodeI32TruncF64U
@@ -270,35 +270,35 @@ type compiler interface {
 	// See wasm.OpcodeI32Load wasm.OpcodeI64Load wasm.OpcodeF32Load wasm.OpcodeF64Load
 	compileLoad(o *wazeroir.OperationLoad) error
 	// compileLoad8 adds instructions to perform load8 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
 	// See wasm.OpcodeI32Load8S wasm.OpcodeI32Load8U wasm.OpcodeI64Load8S wasm.OpcodeI64Load8U
 	compileLoad8(o *wazeroir.OperationLoad8) error
 	// compileLoad16 adds instructions to perform load16 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
 	// See wasm.OpcodeI32Load16S wasm.OpcodeI32Load16U wasm.OpcodeI64Load16S wasm.OpcodeI64Load16U
 	compileLoad16(o *wazeroir.OperationLoad16) error
 	// compileLoad32 adds instructions to perform load32 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds
 	// if out-of-bounds access happens.
 	// See wasm.OpcodeI64Load32S wasm.OpcodeI64Load32U
 	compileLoad32(o *wazeroir.OperationLoad32) error
 	// compileStore adds instructions to perform store instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds
 	// if out-of-bounds access happens.
 	// See wasm.OpcodeI32Store wasm.OpcodeI64Store wasm.OpcodeF32Store wasm.OpcodeF64Store
 	compileStore(o *wazeroir.OperationStore) error
 	// compileStore8 adds instructions to perform store8 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds
 	// if out-of-bounds access happens.
 	// See wasm.OpcodeI32Store8S wasm.OpcodeI32Store8U wasm.OpcodeI64Store8S wasm.OpcodeI64Store8U
 	compileStore8(o *wazeroir.OperationStore8) error
 	// compileStore16 adds instructions to perform store16 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds
 	// if out-of-bounds access happens.
 	// See wasm.OpcodeI32Store16S wasm.OpcodeI32Store16U wasm.OpcodeI64Store16S wasm.OpcodeI64Store16U
 	compileStore16(o *wazeroir.OperationStore16) error
 	// compileStore32 adds instructions to perform store32 instruction in WebAssembly.
-	// The resulting code checks the memory boundary at runtime, and exit the function with compilerCallStatusCodeMemoryOutOfBounds
+	// The resulting code checks the memory boundary at runtime, and exit the function with nativeCallStatusCodeMemoryOutOfBounds
 	// if out-of-bounds access happens.
 	// See wasm.OpcodeI64Store32S wasm.OpcodeI64Store32U
 	compileStore32(o *wazeroir.OperationStore32) error
@@ -375,7 +375,7 @@ type compiler interface {
 	// wasm.FeatureReferenceTypes.
 	//
 	// Note: in wazero, we express any reference types (funcref or externref) as opaque pointers which is uint64.
-	// Thefore, the compilers implementations emit instructions to push the address of *function onto the stack.
+	// Therefore, the compilers implementations emit instructions to push the address of *function onto the stack.
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-ref-mathsf-ref-func-x
 	compileRefFunc(*wazeroir.OperationRefFunc) error
@@ -404,4 +404,9 @@ type compiler interface {
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-fill-x
 	compileTableFill(*wazeroir.OperationTableFill) error
+	// compileConstV128 adds instructions to push a constant V128 value onto the stack.
+	// See wasm.OpcodeVecV128Const
+	compileConstV128(*wazeroir.OperationConstV128) error
+	// compileAddV128 adds instruction to add two vector values whose shape is specified as `o.Shape`.
+	compileAddV128(o *wazeroir.OperationAddV128) error
 }

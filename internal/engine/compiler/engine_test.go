@@ -38,14 +38,14 @@ func TestCompiler_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.functionsElement0Address)), callEngineModuleContextFunctionsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.elementInstancesElemen0Address)), callEngineModuleContextElementInstancesElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.elementInstancesElement0Address)), callEngineModuleContextElementInstancesElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
 
 	// Offsets for callEngine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextCompilerCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextnativeCallStatusCodeOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.

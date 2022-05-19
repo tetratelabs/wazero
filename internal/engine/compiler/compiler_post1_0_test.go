@@ -223,10 +223,10 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, mem[:checkCeil])
 			} else {
-				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -302,10 +302,10 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 				}
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, mem[:checkCeil])
 			} else {
-				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -343,7 +343,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
 			// Check if the target data instance is dropped from the dataInstances slice.
 			for j := 0; j < len(origins); j++ {
@@ -432,7 +432,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 				}
 				require.Equal(t, exp[:20], mem[:20])
 			} else {
-				require.Equal(t, compilerCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
 	}
@@ -480,7 +480,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 
 			for j := 0; j < len(insts); j++ {
 				if i == j {
@@ -572,10 +572,10 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 					exp[tc.sourceOffset:tc.sourceOffset+tc.size])
 
 				// Check the status code and the destination memory region.
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, table)
 			} else {
-				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			}
 		})
 	}
@@ -655,7 +655,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			env.exec(code)
 
 			if !tc.expOutOfBounds {
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				exp := make([]wasm.Reference, tableSize)
 				for i := 0; i < tableSize; i++ {
 					exp[i] = uintptr(i)
@@ -665,7 +665,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 				}
 				require.Equal(t, exp, table)
 			} else {
-				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			}
 		})
 	}
@@ -768,9 +768,9 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			env.exec(code)
 
 			if tc.expError {
-				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, uint64(0), env.stackPointer())
 
 				if tc.expExtern {
@@ -895,9 +895,9 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			env.exec(code)
 
 			if tc.expError {
-				require.Equal(t, compilerCallStatusCodeInvalidTableAccess, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
-				require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, uint64(tc.exp), env.stackTopAsUint64())
 			}
@@ -938,7 +938,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(1), env.stackPointer())
 			require.Equal(t, uintptr(unsafe.Pointer(me.functions[i])), uintptr(env.stackTopAsUint64()))
 		})

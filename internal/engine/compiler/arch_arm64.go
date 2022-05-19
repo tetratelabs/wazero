@@ -13,8 +13,8 @@ func init() {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
-	// compilerCallReturnAddress holds the absolute return address for compilercall.
-	// The value is set whenever compilercall is executed and done in compiler_arm64.s
+	// compilerCallReturnAddress holds the absolute return address for nativecall.
+	// The value is set whenever nativecall is executed and done in compiler_arm64.s
 	// Native code can return back to the ce.execWasmFunction's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	// Note: this is only used by Compiler code so mark this as nolint.
@@ -42,8 +42,8 @@ func newArchContextImpl() archContext {
 }
 
 func init() {
-	unreservedGeneralPurposeIntRegisters = arm64UnreservedGeneralPurposeIntRegisters
-	unreservedGeneralPurposeFloatRegisters = arm64UnreservedGeneralPurposeFloatRegisters
+	unreservedGeneralPurposeRegisters = arm64UnreservedGeneralPurposeRegisters
+	unreservedVectorRegisters = arm64UnreservedVectorRegisters
 }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.

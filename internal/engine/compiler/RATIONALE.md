@@ -37,10 +37,10 @@ marked as executable via mmap system call.
 
 Assuming that we have a native code as `[]byte`, it is straightforward to enter
 the native code region via Go assembly code. In this package, we have the
-function without body called `compilercall`
+function without body called `nativecall`
 
 ```go
-func compilercall(codeSegment, engine, memory uintptr)
+func nativecall(codeSegment, engine, memory uintptr)
 ```
 
 where we pass `codeSegment uintptr` as a first argument. This pointer is to the
@@ -51,10 +51,10 @@ first instruction to be executed. The pointer can be easily derived from
 code := []byte{}
 /* ...Compilation ...*/
 codeSegment := uintptr(unsafe.Pointer(&code[0]))
-compilercall(codeSegment, ...)
+nativecall(codeSegment, ...)
 ```
 
-And `compilercall` is actually implemented in [arch_amd64.s](./arch_amd64.s)
+And `nativecall` is actually implemented in [arch_amd64.s](./arch_amd64.s)
 as a convenience layer to comply with the Go's official calling convention.
 We delegate the task to jump into the code segment to the Go assembler code.
 

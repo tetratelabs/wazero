@@ -69,38 +69,38 @@ const (
 
 	// Scalar floating point registers.
 
-	REG_F0
-	REG_F1
-	REG_F2
-	REG_F3
-	REG_F4
-	REG_F5
-	REG_F6
-	REG_F7
-	REG_F8
-	REG_F9
-	REG_F10
-	REG_F11
-	REG_F12
-	REG_F13
-	REG_F14
-	REG_F15
-	REG_F16
-	REG_F17
-	REG_F18
-	REG_F19
-	REG_F20
-	REG_F21
-	REG_F22
-	REG_F23
-	REG_F24
-	REG_F25
-	REG_F26
-	REG_F27
-	REG_F28
-	REG_F29
-	REG_F30
-	REG_F31
+	REG_V0
+	REG_V1
+	REG_V2
+	REG_V3
+	REG_V4
+	REG_V5
+	REG_V6
+	REG_V7
+	REG_V8
+	REG_V9
+	REG_V10
+	REG_V11
+	REG_V12
+	REG_V13
+	REG_V14
+	REG_V15
+	REG_V16
+	REG_V17
+	REG_V18
+	REG_V19
+	REG_V20
+	REG_V21
+	REG_V22
+	REG_V23
+	REG_V24
+	REG_V25
+	REG_V26
+	REG_V27
+	REG_V28
+	REG_V29
+	REG_V30
+	REG_V31
 
 	// Floating point status register.
 
@@ -236,70 +236,70 @@ func RegisterName(r asm.Register) string {
 		return "R30"
 	case REGZERO:
 		return "ZERO"
-	case REG_F0:
-		return "F0"
-	case REG_F1:
-		return "F1"
-	case REG_F2:
-		return "F2"
-	case REG_F3:
-		return "F3"
-	case REG_F4:
-		return "F4"
-	case REG_F5:
-		return "F5"
-	case REG_F6:
-		return "F6"
-	case REG_F7:
-		return "F7"
-	case REG_F8:
-		return "F8"
-	case REG_F9:
-		return "F9"
-	case REG_F10:
-		return "F10"
-	case REG_F11:
-		return "F11"
-	case REG_F12:
-		return "F12"
-	case REG_F13:
-		return "F13"
-	case REG_F14:
-		return "F14"
-	case REG_F15:
-		return "F15"
-	case REG_F16:
-		return "F16"
-	case REG_F17:
-		return "F17"
-	case REG_F18:
-		return "F18"
-	case REG_F19:
-		return "F19"
-	case REG_F20:
-		return "F20"
-	case REG_F21:
-		return "F21"
-	case REG_F22:
-		return "F22"
-	case REG_F23:
-		return "F23"
-	case REG_F24:
-		return "F24"
-	case REG_F25:
-		return "F25"
-	case REG_F26:
-		return "F26"
-	case REG_F27:
-		return "F27"
-	case REG_F28:
-		return "F28"
-	case REG_F29:
-		return "F29"
-	case REG_F30:
-		return "F30"
-	case REG_F31:
-		return "F31"
+	case REG_V0:
+		return "V0"
+	case REG_V1:
+		return "V1"
+	case REG_V2:
+		return "V2"
+	case REG_V3:
+		return "V3"
+	case REG_V4:
+		return "V4"
+	case REG_V5:
+		return "V5"
+	case REG_V6:
+		return "V6"
+	case REG_V7:
+		return "V7"
+	case REG_V8:
+		return "V8"
+	case REG_V9:
+		return "V9"
+	case REG_V10:
+		return "V10"
+	case REG_V11:
+		return "V11"
+	case REG_V12:
+		return "V12"
+	case REG_V13:
+		return "V13"
+	case REG_V14:
+		return "V14"
+	case REG_V15:
+		return "V15"
+	case REG_V16:
+		return "V16"
+	case REG_V17:
+		return "V17"
+	case REG_V18:
+		return "V18"
+	case REG_V19:
+		return "V19"
+	case REG_V20:
+		return "V20"
+	case REG_V21:
+		return "V21"
+	case REG_V22:
+		return "V22"
+	case REG_V23:
+		return "V23"
+	case REG_V24:
+		return "V24"
+	case REG_V25:
+		return "V25"
+	case REG_V26:
+		return "V26"
+	case REG_V27:
+		return "V27"
+	case REG_V28:
+		return "V28"
+	case REG_V29:
+		return "V29"
+	case REG_V30:
+		return "V30"
+	case REG_V31:
+		return "V31"
 	case REG_FPSR:
 		return "FPSR"
 	case REG_COND_EQ:
@@ -461,10 +461,70 @@ const (
 	UDIV
 	UDIVW
 	UXTW
+
+	// Vector instructions.
 	VBIT
 	VCNT
+	VMOV
 	VUADDLV
+	VLD1
+	VST1
+	VADD
+	VFADDS
+	VFADDD
 )
+
+type VectorArrangement byte
+
+const (
+	VectorArrangementNone VectorArrangement = iota
+	VectorArrangement8B
+	VectorArrangement16B
+	VectorArrangement4H
+	VectorArrangement8H
+	VectorArrangement2S
+	VectorArrangement4S
+	VectorArrangement1D
+	VectorArrangement2D
+	VectorArrangementB
+	VectorArrangementH
+	VectorArrangementS
+	VectorArrangementD
+)
+
+func (v VectorArrangement) String() (ret string) {
+	switch v {
+	case VectorArrangement8B:
+		ret = "8B"
+	case VectorArrangement16B:
+		ret = "16B"
+	case VectorArrangement4H:
+		ret = "4H"
+	case VectorArrangement8H:
+		ret = "8H"
+	case VectorArrangement2S:
+		ret = "2S"
+	case VectorArrangement4S:
+		ret = "4S"
+	case VectorArrangement1D:
+		ret = "1D"
+	case VectorArrangement2D:
+		ret = "2D"
+	case VectorArrangementB:
+		ret = ""
+	case VectorArrangementH:
+		ret = "H"
+	case VectorArrangementS:
+		ret = "S"
+	case VectorArrangementD:
+		ret = "D"
+	default:
+		ret = "unknown"
+	}
+	return
+}
+
+type VectorIndex byte
 
 func InstructionName(i asm.Instruction) string {
 	switch i {
@@ -710,6 +770,18 @@ func InstructionName(i asm.Instruction) string {
 		return "VCNT"
 	case VUADDLV:
 		return "VUADDLV"
+	case VMOV:
+		return "VMOV"
+	case VST1:
+		return "VST1"
+	case VLD1:
+		return "VLD1"
+	case VADD:
+		return "VADD"
+	case VFADDS:
+		return "VFADDS"
+	case VFADDD:
+		return "VFADDD"
 	}
 	return "UNKNOWN"
 }

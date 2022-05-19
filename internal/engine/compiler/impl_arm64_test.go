@@ -25,7 +25,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	// If we fail to branch, we reach here and exit with unreachable status,
 	// so the assertion would fail.
-	compiler.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
+	compiler.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 
 	// This could be the read instruction target as this is the
 	// right after RET. Therefore, the branch instruction above
@@ -38,11 +38,11 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 	env.exec(code)
 
-	require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
+// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
 	return c.locationStack
 }
 
@@ -56,11 +56,11 @@ func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
 }
 
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
+// compile implements compilerImpl.setRuntimeValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) setRuntimeValueLocationStack(s *runtimeValueLocationStack) {
 	c.locationStack = s
 }
 
-func (a *arm64Compiler) compileNOP() {
-	a.assembler.CompileStandAlone(arm64.NOP)
+func (c *arm64Compiler) compileNOP() {
+	c.assembler.CompileStandAlone(arm64.NOP)
 }

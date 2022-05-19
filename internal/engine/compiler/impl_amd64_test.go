@@ -79,21 +79,21 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
 						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
-						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
+						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.REG_DX, runtimeValueTypeI32)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
-							compiler.pushValueLocationOnRegister(tc.x1Reg)
+							compiler.pushRuntimeValueLocationOnRegister(tc.x1Reg, runtimeValueTypeI32)
 						} else {
-							loc := compiler.valueLocationStack().pushValueLocationOnStack()
+							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
-							compiler.pushValueLocationOnRegister(tc.x2Reg)
+							compiler.pushRuntimeValueLocationOnRegister(tc.x2Reg, runtimeValueTypeI32)
 						} else {
-							loc := compiler.valueLocationStack().pushValueLocationOnStack()
+							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x2Value)
 						}
 
@@ -107,9 +107,9 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
-						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
-						require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
+						require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())
 
@@ -201,21 +201,21 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
 						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
-						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
+						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.REG_DX, runtimeValueTypeI64)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
-							compiler.pushValueLocationOnRegister(tc.x1Reg)
+							compiler.pushRuntimeValueLocationOnRegister(tc.x1Reg, runtimeValueTypeI64)
 						} else {
-							loc := compiler.valueLocationStack().pushValueLocationOnStack()
+							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
-							compiler.pushValueLocationOnRegister(tc.x2Reg)
+							compiler.pushRuntimeValueLocationOnRegister(tc.x2Reg, runtimeValueTypeI64)
 						} else {
-							loc := compiler.valueLocationStack().pushValueLocationOnStack()
+							loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x2Value)
 						}
 
@@ -229,9 +229,9 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
-						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
-						require.Equal(t, 1, len(compiler.valueLocationStack().usedRegisters))
+						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
+						require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())
 
@@ -321,14 +321,14 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		// Run code.
 		env.exec(code)
 
-		require.Equal(t, compilerCallStatusCodeReturned, env.compilerStatus())
+		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 		require.Equal(t, uint64(1), env.stackPointer())
 		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 	})
 }
 
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) valueLocationStack() *valueLocationStack {
+// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
 	return c.locationStack
 }
 
@@ -342,11 +342,11 @@ func (c *amd64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
 }
 
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) setValueLocationStack(s *valueLocationStack) {
+// compile implements compilerImpl.setRuntimeValueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) setRuntimeValueLocationStack(s *runtimeValueLocationStack) {
 	c.locationStack = s
 }
 
-func (a *amd64Compiler) compileNOP() {
-	a.assembler.CompileStandAlone(amd64.NOP)
+func (c *amd64Compiler) compileNOP() {
+	c.assembler.CompileStandAlone(amd64.NOP)
 }

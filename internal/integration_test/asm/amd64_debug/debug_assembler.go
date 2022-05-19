@@ -187,14 +187,14 @@ func (ta *testAssembler) CompileReadInstructionAddress(
 	ta.a.CompileReadInstructionAddress(destinationRegister, beforeAcquisitionTargetInstruction)
 }
 
-// CompileRegisterToRegisterWithMode implements the same method as documented on asm_amd64.Assembler.
-func (ta *testAssembler) CompileRegisterToRegisterWithMode(
+// CompileRegisterToRegisterWithArg implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToRegisterWithArg(
 	instruction asm.Instruction,
 	from, to asm.Register,
 	mode asm_amd64.Mode,
 ) {
-	ta.goasm.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
-	ta.a.CompileRegisterToRegisterWithMode(instruction, from, to, mode)
+	ta.goasm.CompileRegisterToRegisterWithArg(instruction, from, to, mode)
+	ta.a.CompileRegisterToRegisterWithArg(instruction, from, to, mode)
 }
 
 // CompileMemoryWithIndexToRegister implements the same method as documented on asm_amd64.Assembler.

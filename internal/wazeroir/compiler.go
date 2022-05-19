@@ -107,10 +107,10 @@ func (c *controlFrames) push(frame *controlFrame) {
 
 // localIndexToStackHeight initializes localIndexToStackHeight field. See the comment on localIndexToStackHeight.
 func (c *compiler) calcLocalIndexToStackHeight() {
-	c.localIndexToStackHeight = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
+	c.localIndexToStackHeightInUint64 = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
 	var current int
 	for index, lt := range c.sig.Params {
-		c.localIndexToStackHeight[wasm.Index(index)] = current
+		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -119,7 +119,7 @@ func (c *compiler) calcLocalIndexToStackHeight() {
 
 	for index, lt := range c.localTypes {
 		index += len(c.sig.Params)
-		c.localIndexToStackHeight[wasm.Index(index)] = current
+		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
 		if lt == wasm.ValueTypeV128 {
 			current++
 		}
@@ -145,9 +145,9 @@ type compiler struct {
 	sig *wasm.FunctionType
 	// localTypes holds the target function locals' value types except function params.
 	localTypes []wasm.ValueType
-	// localIndexToStackHeight maps the local index (starting with function params) to the stack height
+	// localIndexToStackHeightInUint64 maps the local index (starting with function params) to the stack height
 	// where the local is places. This is the necessary mapping for functions who contain vector type locals.
-	localIndexToStackHeight map[wasm.Index]int
+	localIndexToStackHeightInUint64 map[wasm.Index]int
 
 	// types hold all the function types in the module where the targe function exists.
 	types []*wasm.FunctionType
@@ -347,7 +347,7 @@ operatorSwitch:
 		// Create a new frame -- entering this block.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindBlockWithoutContinuationLabel,
 			blockType:                    bt,
 		}
@@ -370,7 +370,7 @@ operatorSwitch:
 		// Create a new frame -- entering loop.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			kind:                         controlFrameKindLoop,
 			blockType:                    bt,
 		}
@@ -405,7 +405,7 @@ operatorSwitch:
 		// Create a new frame -- entering if.
 		frame := &controlFrame{
 			frameID:                      c.nextID(),
-			originalStackLenWithoutParam: len(c.stack) - bt.ParamNumInUint64,
+			originalStackLenWithoutParam: len(c.stack) - len(bt.Params),
 			// Note this will be set to controlFrameKindIfWithElse
 			// when else opcode found later.
 			kind:      controlFrameKindIfWithoutElse,
@@ -727,18 +727,17 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeV128 {
-			c.emit(
-				// -2 because we already pushed the result of this operation into the c.stack before
-				// called localDepth ^^,
-				&OperationPick{Depth: depth - 2},
-				&OperationPick{Depth: depth - 2},
-			)
-		} else {
+		if isVector := c.localType(id) == wasm.ValueTypeV128; !isVector {
 			c.emit(
 				// -1 because we already manipulated the stack before
 				// called localDepth ^^.
-				&OperationPick{Depth: depth - 1},
+				&OperationPick{Depth: depth - 1, IsTargetVector: isVector},
+			)
+		} else {
+			c.emit(
+				// -2 because we already manipulated the stack before
+				// called localDepth ^^.
+				&OperationPick{Depth: depth - 2, IsTargetVector: isVector},
 			)
 		}
 	case wasm.OpcodeLocalSet:
@@ -747,20 +746,20 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeV128 {
+
+		isVector := c.localType(id) == wasm.ValueTypeV128
+		if isVector {
 			c.emit(
-				// +1 because we already popped the operands for this operation from the c.stack before
+				// +2 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				&OperationSwap{Depth: depth + 1},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				&OperationSwap{Depth: depth + 1},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSwap{Depth: depth + 2, IsTargetVector: isVector},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 			)
 		} else {
 			c.emit(
 				// +1 because we already popped the operands for this operation from the c.stack before
 				// called localDepth ^^,
-				&OperationSwap{Depth: depth + 1},
+				&OperationSwap{Depth: depth + 1, IsTargetVector: isVector},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 			)
 		}
@@ -770,19 +769,17 @@ operatorSwitch:
 		}
 		id := *index
 		depth := c.localDepth(id)
-		if c.localType(id) == wasm.ValueTypeV128 {
+		isVector := c.localType(id) == wasm.ValueTypeV128
+		if isVector {
 			c.emit(
-				&OperationPick{Depth: 1},
-				&OperationPick{Depth: 1},
-				&OperationSwap{Depth: depth + 1},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
-				&OperationSwap{Depth: depth + 1},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationPick{Depth: 1, IsTargetVector: isVector},
+				&OperationSwap{Depth: depth + 2, IsTargetVector: isVector},
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 			)
 		} else {
 			c.emit(
-				&OperationPick{Depth: 0},
-				&OperationSwap{Depth: depth + 1},
+				&OperationPick{Depth: 0, IsTargetVector: isVector},
+				&OperationSwap{Depth: depth + 1, IsTargetVector: isVector},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 			)
 		}
@@ -1735,11 +1732,11 @@ operatorSwitch:
 			c.pc += 7
 		case wasm.OpcodeVecI32x4Add:
 			c.emit(
-				&OperationI32x4Add{},
+				&OperationAddV128{Shape: ShapeI32x4},
 			)
 		case wasm.OpcodeVecI64x2Add:
 			c.emit(
-				&OperationI64x2Add{},
+				&OperationAddV128{Shape: ShapeI64x2},
 			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
@@ -1884,21 +1881,19 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 		c.stackPush(UnsignedTypeF64)
 		c.emit(&OperationConstF64{Value: 0})
 	case wasm.ValueTypeV128:
-		c.stackPush(UnsignedTypeI64)
-		c.emit(&OperationConstI64{Value: 0})
-		c.stackPush(UnsignedTypeI64)
-		c.emit(&OperationConstI64{Value: 0})
+		c.stackPush(UnsignedTypeV128)
+		c.emit(&OperationConstV128{Hi: 0, Lo: 0})
 	}
 }
 
 // Returns the "depth" (starting from top of the stack)
 // of the n-th local.
 func (c *compiler) localDepth(index wasm.Index) int {
-	height, ok := c.localIndexToStackHeight[index]
+	height, ok := c.localIndexToStackHeightInUint64[index]
 	if !ok {
 		panic("BUG")
 	}
-	return int(len(c.stack)) - 1 - int(height)
+	return c.stackLenInUint64(len(c.stack)) - 1 - int(height)
 }
 
 func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
@@ -1910,7 +1905,7 @@ func (c *compiler) localType(index wasm.Index) (t wasm.ValueType) {
 	return
 }
 
-// getFrameDropRange returns the range (starting from top of the stack) that spans across the stack. The range is
+// getFrameDropRange returns the range (starting from top of the stack) that spans across the (uint64) stack. The range is
 // supposed to be dropped from the stack when the given frame exists or branch into it.
 //
 // * frame is the control frame which the call-site is trying to branch into or exit.
@@ -1929,14 +1924,25 @@ func (c *compiler) getFrameDropRange(frame *controlFrame, isEnd bool) *Inclusive
 	if frame.kind == controlFrameKindFunction {
 		// On the function return, we eliminate all the contents on the stack
 		// including locals (existing below of frame.originalStackLen)
-		end = len(c.stack) - 1
+		end = c.stackLenInUint64(len(c.stack)) - 1
 	} else {
-		end = len(c.stack) - 1 - frame.originalStackLenWithoutParam
+		end = c.stackLenInUint64(len(c.stack)) - 1 - c.stackLenInUint64(frame.originalStackLenWithoutParam)
 	}
 	if start <= end {
 		return &InclusiveRange{Start: start, End: end}
 	}
 	return nil
+}
+
+func (c *compiler) stackLenInUint64(ceil int) (ret int) {
+	for i := 0; i < ceil; i++ {
+		if c.stack[i] == UnsignedTypeV128 {
+			ret += 2
+		} else {
+			ret++
+		}
+	}
+	return
 }
 
 func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {

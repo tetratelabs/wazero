@@ -1,8 +1,8 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// compilercall(codeSegment, ce, moduleInstanceAddress)
-TEXT ·compilercall(SB),NOSPLIT|NOFRAME,$0-24
+// nativecall(codeSegment, ce, moduleInstanceAddress)
+TEXT ·nativecall(SB),NOSPLIT|NOFRAME,$0-24
         // Load the address of *callEngine into arm64ReservedRegisterForCallEngine.
         MOVD ce+8(FP),R0
         // In arm64, return address is stored in R30 after jumping into the code.

@@ -33,7 +33,7 @@ func TestCompiler_compileReinterpret(t *testing.T) {
 							require.NoError(t, err)
 
 							if originOnStack {
-								loc := compiler.valueLocationStack().pushValueLocationOnStack()
+								loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 								env.stack()[loc.stackPointer] = v
 								env.setStackPointer(1)
 							}
@@ -218,12 +218,12 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 					env.exec(code)
 
 					// Check the result.
-					expStatus := compilerCallStatusCodeReturned
+					expStatus := nativeCallStatusCodeReturned
 					if math.IsNaN(v) {
 						if tc.nonTrapping {
 							v = 0
 						} else {
-							expStatus = compilerCallStatusCodeInvalidFloatToIntConversion
+							expStatus = nativeCallStatusCodeInvalidFloatToIntConversion
 						}
 					}
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
@@ -237,10 +237,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt32
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
@@ -254,10 +254,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt64
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
@@ -269,10 +269,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									v = math.MaxInt32
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(v)), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
@@ -285,10 +285,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxInt64
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
@@ -302,10 +302,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint32
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
@@ -318,10 +318,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint32
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
@@ -335,10 +335,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint64
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
@@ -351,10 +351,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 									exp = math.MaxUint64
 								}
 							} else {
-								expStatus = compilerCallStatusIntegerOverflow
+								expStatus = nativeCallStatusIntegerOverflow
 							}
 						}
-						if expStatus == compilerCallStatusCodeReturned {
+						if expStatus == nativeCallStatusCodeReturned {
 							require.Equal(t, exp, env.stackTopAsUint64())
 						}
 					}

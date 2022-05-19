@@ -12,9 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/integration_test/asm/golang_asm"
 )
 
-// TODO: this comment seems wrong
-// newAssembler implements asm.NewAssembler and is used by default.
-// This returns an implementation of Assembler interface via our homemade assembler implementation.
+// newAssembler implements asm.NewAssembler by golang-asm.
 func newAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
 	g, err := golang_asm.NewGolangAsmBaseAssembler("arm64")
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
@@ -334,6 +332,117 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
+func createOffsetForVectorRegList(arr asm_arm64.VectorArrangement, reg asm.Register) (offset int64) {
+	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/arch/arm64.go#L372
+	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/arch/arm64.go#L332
+	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/asm/parse.go#L1143-L1148
+	var curQ, curSize int64
+	switch arr {
+	case asm_arm64.VectorArrangement8B:
+		curSize = 0
+		curQ = 0
+	case asm_arm64.VectorArrangement16B:
+		curSize = 0
+		curQ = 1
+	case asm_arm64.VectorArrangement4H:
+		curSize = 1
+		curQ = 0
+	case asm_arm64.VectorArrangement8H:
+		curSize = 1
+		curQ = 1
+	case asm_arm64.VectorArrangement2S:
+		curSize = 2
+		curQ = 0
+	case asm_arm64.VectorArrangement4S:
+		curSize = 2
+		curQ = 1
+	case asm_arm64.VectorArrangement1D:
+		curSize = 3
+		curQ = 0
+	case asm_arm64.VectorArrangement2D:
+		curSize = 3
+		curQ = 1
+	}
+	return (int64(curQ) & 1 << 30) | ((curSize & 3) << 10) | (0x7 << 12) | 1<<60 | int64(castAsGolangAsVectorRegister[reg]&31)
+}
+
+func (a *assemblerGoAsmImpl) CompileMemoryToVectorRegister(
+	instruction asm.Instruction, srcOffsetReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement,
+) {
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_REGLIST
+	inst.To.Offset = createOffsetForVectorRegList(arrangement, dstReg)
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = castAsGolangAsmRegister[srcOffsetReg]
+	a.AddInstruction(inst)
+}
+
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstOffsetReg asm.Register,
+	arrangement asm_arm64.VectorArrangement) {
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = castAsGolangAsmRegister[dstOffsetReg]
+	inst.From.Type = obj.TYPE_REGLIST
+	inst.From.Offset = createOffsetForVectorRegList(arrangement, srcReg)
+	a.AddInstruction(inst)
+}
+
+func (a *assemblerGoAsmImpl) CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement asm_arm64.VectorArrangement, index asm_arm64.VectorIndex) {
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = (castAsGolangAsVectorRegister[dstReg] & 31) + arm64.REG_ELEM +
+		(castAsGolangAsmArrangement[arrangement]&15)<<5
+	inst.To.Index = int16(index)
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = castAsGolangAsmRegister[srcReg]
+	a.AddInstruction(inst)
+}
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement) {
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+
+	switch instruction {
+	case asm_arm64.VMOV:
+		// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+		// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.From.Type = obj.TYPE_REG
+		inst.From.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		a.AddInstruction(inst)
+	case asm_arm64.VADD:
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.From.Type = obj.TYPE_REG
+		inst.From.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		a.AddInstruction(inst)
+	case asm_arm64.VFADDD:
+		panic("Unsupported in golang-asm")
+	case asm_arm64.VFADDS:
+		panic("Unsupported in golang-asm")
+	}
+}
+
+var castAsGolangAsmArrangement = [...]int16{
+	asm_arm64.VectorArrangement1D:  arm64.ARNG_1D,
+	asm_arm64.VectorArrangement2D:  arm64.ARNG_2D,
+	asm_arm64.VectorArrangement2S:  arm64.ARNG_2S,
+	asm_arm64.VectorArrangement4S:  arm64.ARNG_4S,
+	asm_arm64.VectorArrangement8H:  arm64.ARNG_8H,
+	asm_arm64.VectorArrangement4H:  arm64.ARNG_4H,
+	asm_arm64.VectorArrangement16B: arm64.ARNG_16B,
+	asm_arm64.VectorArrangement8B:  arm64.ARNG_8B,
+	asm_arm64.VectorArrangementB:   arm64.ARNG_B,
+	asm_arm64.VectorArrangementH:   arm64.ARNG_H,
+	asm_arm64.VectorArrangementS:   arm64.ARNG_S,
+	asm_arm64.VectorArrangementD:   arm64.ARNG_D,
+}
+
 // castAsGolangAsmConditionalRegister maps the conditional states to golang-asm specific conditional state register values.
 var castAsGolangAsmConditionalRegister = [...]int16{
 	asm_arm64.COND_EQ: arm64.COND_EQ,
@@ -352,6 +461,41 @@ var castAsGolangAsmConditionalRegister = [...]int16{
 	asm_arm64.COND_LE: arm64.COND_LE,
 	asm_arm64.COND_AL: arm64.COND_AL,
 	asm_arm64.COND_NV: arm64.COND_NV,
+}
+
+var castAsGolangAsVectorRegister = [...]int16{
+	asm_arm64.REG_V0:  arm64.REG_V0,
+	asm_arm64.REG_V1:  arm64.REG_V1,
+	asm_arm64.REG_V2:  arm64.REG_V2,
+	asm_arm64.REG_V3:  arm64.REG_V3,
+	asm_arm64.REG_V4:  arm64.REG_V4,
+	asm_arm64.REG_V5:  arm64.REG_V5,
+	asm_arm64.REG_V6:  arm64.REG_V6,
+	asm_arm64.REG_V7:  arm64.REG_V7,
+	asm_arm64.REG_V8:  arm64.REG_V8,
+	asm_arm64.REG_V9:  arm64.REG_V9,
+	asm_arm64.REG_V10: arm64.REG_V10,
+	asm_arm64.REG_V11: arm64.REG_V11,
+	asm_arm64.REG_V12: arm64.REG_V12,
+	asm_arm64.REG_V13: arm64.REG_V13,
+	asm_arm64.REG_V14: arm64.REG_V14,
+	asm_arm64.REG_V15: arm64.REG_V15,
+	asm_arm64.REG_V16: arm64.REG_V16,
+	asm_arm64.REG_V17: arm64.REG_V17,
+	asm_arm64.REG_V18: arm64.REG_V18,
+	asm_arm64.REG_V19: arm64.REG_V19,
+	asm_arm64.REG_V20: arm64.REG_V20,
+	asm_arm64.REG_V21: arm64.REG_V21,
+	asm_arm64.REG_V22: arm64.REG_V22,
+	asm_arm64.REG_V23: arm64.REG_V23,
+	asm_arm64.REG_V24: arm64.REG_V24,
+	asm_arm64.REG_V25: arm64.REG_V25,
+	asm_arm64.REG_V26: arm64.REG_V26,
+	asm_arm64.REG_V27: arm64.REG_V27,
+	asm_arm64.REG_V28: arm64.REG_V28,
+	asm_arm64.REG_V29: arm64.REG_V29,
+	asm_arm64.REG_V30: arm64.REG_V30,
+	asm_arm64.REG_V31: arm64.REG_V31,
 }
 
 // castAsGolangAsmRegister maps the registers to golang-asm specific registers values.
@@ -388,38 +532,38 @@ var castAsGolangAsmRegister = [...]int16{
 	asm_arm64.REG_R29:  arm64.REG_R29,
 	asm_arm64.REG_R30:  arm64.REG_R30,
 	asm_arm64.REGZERO:  arm64.REGZERO,
-	asm_arm64.REG_F0:   arm64.REG_F0,
-	asm_arm64.REG_F1:   arm64.REG_F1,
-	asm_arm64.REG_F2:   arm64.REG_F2,
-	asm_arm64.REG_F3:   arm64.REG_F3,
-	asm_arm64.REG_F4:   arm64.REG_F4,
-	asm_arm64.REG_F5:   arm64.REG_F5,
-	asm_arm64.REG_F6:   arm64.REG_F6,
-	asm_arm64.REG_F7:   arm64.REG_F7,
-	asm_arm64.REG_F8:   arm64.REG_F8,
-	asm_arm64.REG_F9:   arm64.REG_F9,
-	asm_arm64.REG_F10:  arm64.REG_F10,
-	asm_arm64.REG_F11:  arm64.REG_F11,
-	asm_arm64.REG_F12:  arm64.REG_F12,
-	asm_arm64.REG_F13:  arm64.REG_F13,
-	asm_arm64.REG_F14:  arm64.REG_F14,
-	asm_arm64.REG_F15:  arm64.REG_F15,
-	asm_arm64.REG_F16:  arm64.REG_F16,
-	asm_arm64.REG_F17:  arm64.REG_F17,
-	asm_arm64.REG_F18:  arm64.REG_F18,
-	asm_arm64.REG_F19:  arm64.REG_F19,
-	asm_arm64.REG_F20:  arm64.REG_F20,
-	asm_arm64.REG_F21:  arm64.REG_F21,
-	asm_arm64.REG_F22:  arm64.REG_F22,
-	asm_arm64.REG_F23:  arm64.REG_F23,
-	asm_arm64.REG_F24:  arm64.REG_F24,
-	asm_arm64.REG_F25:  arm64.REG_F25,
-	asm_arm64.REG_F26:  arm64.REG_F26,
-	asm_arm64.REG_F27:  arm64.REG_F27,
-	asm_arm64.REG_F28:  arm64.REG_F28,
-	asm_arm64.REG_F29:  arm64.REG_F29,
-	asm_arm64.REG_F30:  arm64.REG_F30,
-	asm_arm64.REG_F31:  arm64.REG_F31,
+	asm_arm64.REG_V0:   arm64.REG_F0,
+	asm_arm64.REG_V1:   arm64.REG_F1,
+	asm_arm64.REG_V2:   arm64.REG_F2,
+	asm_arm64.REG_V3:   arm64.REG_F3,
+	asm_arm64.REG_V4:   arm64.REG_F4,
+	asm_arm64.REG_V5:   arm64.REG_F5,
+	asm_arm64.REG_V6:   arm64.REG_F6,
+	asm_arm64.REG_V7:   arm64.REG_F7,
+	asm_arm64.REG_V8:   arm64.REG_F8,
+	asm_arm64.REG_V9:   arm64.REG_F9,
+	asm_arm64.REG_V10:  arm64.REG_F10,
+	asm_arm64.REG_V11:  arm64.REG_F11,
+	asm_arm64.REG_V12:  arm64.REG_F12,
+	asm_arm64.REG_V13:  arm64.REG_F13,
+	asm_arm64.REG_V14:  arm64.REG_F14,
+	asm_arm64.REG_V15:  arm64.REG_F15,
+	asm_arm64.REG_V16:  arm64.REG_F16,
+	asm_arm64.REG_V17:  arm64.REG_F17,
+	asm_arm64.REG_V18:  arm64.REG_F18,
+	asm_arm64.REG_V19:  arm64.REG_F19,
+	asm_arm64.REG_V20:  arm64.REG_F20,
+	asm_arm64.REG_V21:  arm64.REG_F21,
+	asm_arm64.REG_V22:  arm64.REG_F22,
+	asm_arm64.REG_V23:  arm64.REG_F23,
+	asm_arm64.REG_V24:  arm64.REG_F24,
+	asm_arm64.REG_V25:  arm64.REG_F25,
+	asm_arm64.REG_V26:  arm64.REG_F26,
+	asm_arm64.REG_V27:  arm64.REG_F27,
+	asm_arm64.REG_V28:  arm64.REG_F28,
+	asm_arm64.REG_V29:  arm64.REG_F29,
+	asm_arm64.REG_V30:  arm64.REG_F30,
+	asm_arm64.REG_V31:  arm64.REG_F31,
 	asm_arm64.REG_FPSR: arm64.REG_FPSR,
 }
 
@@ -545,4 +689,8 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_arm64.VBIT:     arm64.AVBIT,
 	asm_arm64.VCNT:     arm64.AVCNT,
 	asm_arm64.VUADDLV:  arm64.AVUADDLV,
+	asm_arm64.VMOV:     arm64.AVMOV,
+	asm_arm64.VLD1:     arm64.AVLD1,
+	asm_arm64.VST1:     arm64.AVST1,
+	asm_arm64.VADD:     arm64.AVADD,
 }

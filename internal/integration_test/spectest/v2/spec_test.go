@@ -26,7 +26,10 @@ func TestCompiler(t *testing.T) {
 
 	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures, func(jsonname string) bool {
 		// TODO: remove after SIMD proposal
-		return !strings.Contains(jsonname, "simd")
+		if strings.Contains(jsonname, "simd") {
+			return path.Base(jsonname) == "simd_const.json"
+		}
+		return true
 	})
 }
 

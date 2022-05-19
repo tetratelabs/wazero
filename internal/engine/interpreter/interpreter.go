@@ -385,9 +385,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationPick:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.Depth)
+			op.b3 = o.IsTargetVector
 		case *wazeroir.OperationSwap:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.Depth)
+			op.b3 = o.IsTargetVector
 		case *wazeroir.OperationGlobalGet:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.Index)
@@ -579,8 +581,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.us = make([]uint64, 2)
 			op.us[0] = o.Lo
 			op.us[1] = o.Hi
-		case *wazeroir.OperationI32x4Add:
-		case *wazeroir.OperationI64x2Add:
+		case *wazeroir.OperationAddV128:
+			op.b1 = byte(o.Shape)
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -808,13 +810,23 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 		case wazeroir.OperationKindPick:
 			{
-				ce.pushValue(ce.stack[len(ce.stack)-1-int(op.us[0])])
+				index := len(ce.stack) - 1 - int(op.us[0])
+				ce.pushValue(ce.stack[index])
+				if op.b3 { // V128 value target.
+					ce.pushValue(ce.stack[index+1])
+				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindSwap:
 			{
-				index := len(ce.stack) - 1 - int(op.us[0])
-				ce.stack[len(ce.stack)-1], ce.stack[index] = ce.stack[index], ce.stack[len(ce.stack)-1]
+				if op.b3 { // V128 value target.
+					lowIndex := len(ce.stack) - 1 - int(op.us[0])
+					ce.stack[len(ce.stack)-2], ce.stack[lowIndex] = ce.stack[lowIndex], ce.stack[len(ce.stack)-2]
+					ce.stack[len(ce.stack)-1], ce.stack[lowIndex+1] = ce.stack[lowIndex+1], ce.stack[len(ce.stack)-1]
+				} else {
+					index := len(ce.stack) - 1 - int(op.us[0])
+					ce.stack[len(ce.stack)-1], ce.stack[index] = ce.stack[index], ce.stack[len(ce.stack)-1]
+				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindGlobalGet:
@@ -1940,17 +1952,19 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(lo)
 			ce.pushValue(hi)
 			frame.pc++
-		case wazeroir.OperationKindI32x4Add:
-			xHigh, xLow := ce.popValue(), ce.popValue()
-			yHigh, yLow := ce.popValue(), ce.popValue()
-			ce.pushValue(uint64((uint64(uint32(xLow>>32+yLow>>32)) << 32)) + uint64((uint32(xLow) + uint32(yLow))))
-			ce.pushValue(uint64((uint64(uint32(xHigh>>32+yHigh>>32)) << 32)) + uint64((uint32(xHigh) + uint32(yHigh))))
-			frame.pc++
-		case wazeroir.OperationKindI64x2Add:
-			xHigh, xLow := ce.popValue(), ce.popValue()
-			yHigh, yLow := ce.popValue(), ce.popValue()
-			ce.pushValue(xLow + yLow)
-			ce.pushValue(xHigh + yHigh)
+		case wazeroir.OperationKindV128Add:
+			switch op.b1 {
+			case wazeroir.ShapeI32x4:
+				xHigh, xLow := ce.popValue(), ce.popValue()
+				yHigh, yLow := ce.popValue(), ce.popValue()
+				ce.pushValue(uint64(uint32(xLow>>32+yLow>>32))<<32 + uint64(uint32(xLow)+uint32(yLow)))
+				ce.pushValue(uint64(uint32(xHigh>>32+yHigh>>32))<<32 + uint64(uint32(xHigh)+uint32(yHigh)))
+			case wazeroir.ShapeI64x2:
+				xHigh, xLow := ce.popValue(), ce.popValue()
+				yHigh, yLow := ce.popValue(), ce.popValue()
+				ce.pushValue(xLow + yLow)
+				ce.pushValue(xHigh + yHigh)
+			}
 			frame.pc++
 		}
 	}

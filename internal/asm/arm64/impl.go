@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
-
 	"github.com/tetratelabs/wazero/internal/asm"
+	"math"
 )
 
 type NodeImpl struct {
@@ -24,6 +23,9 @@ type NodeImpl struct {
 	Types                            OperandTypes
 	SrcReg, SrcReg2, DstReg, DstReg2 asm.Register
 	SrcConst, DstConst               asm.ConstantValue
+
+	VectorArrangement VectorArrangement
+	VectorIndex       VectorIndex
 
 	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
@@ -102,6 +104,14 @@ func (n *NodeImpl) String() (ret string) {
 		ret = fmt.Sprintf("%s %s.B8, %s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg))
 	case OperandTypesTwoSIMDBytesToSIMDByteRegister:
 		ret = fmt.Sprintf("%s (%s.B8, %s.B8), %s.B8", instName, RegisterName(n.SrcReg), RegisterName(n.SrcReg2), RegisterName(n.DstReg))
+	case OperandTypesRegisterToVectorRegister:
+		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement, n.VectorIndex)
+	case OperandTypesVectorRegisterToMemory:
+		ret = fmt.Sprintf("%s %s.%s, [%s]", instName, RegisterName(n.SrcReg), n.VectorArrangement, RegisterName(n.DstReg))
+	case OperandTypesMemoryToVectorRegister:
+		ret = fmt.Sprintf("%s [%s], %s.%s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement)
+	case OperandTypesVectorRegisterToVectorRegister:
+		ret = fmt.Sprintf("%s %s.%[2]s, %s.%[2]s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement)
 	}
 	return
 }
@@ -122,6 +132,7 @@ const (
 	OperandTypeBranch
 	OperandTypeSIMDByte
 	OperandTypeTwoSIMDBytes
+	OperandTypeVectorRegister
 )
 
 // String implements fmt.Stringer.
@@ -147,6 +158,8 @@ func (o OperandType) String() (ret string) {
 		ret = "simd-byte"
 	case OperandTypeTwoSIMDBytes:
 		ret = "two-simd-bytes"
+	case OperandTypeVectorRegister:
+		ret = "vector-register"
 	}
 	return
 }
@@ -171,6 +184,10 @@ var (
 	OperandTypesSIMDByteToSIMDByte             = OperandTypes{OperandTypeSIMDByte, OperandTypeSIMDByte}
 	OperandTypesSIMDByteToRegister             = OperandTypes{OperandTypeSIMDByte, OperandTypeRegister}
 	OperandTypesTwoSIMDBytesToSIMDByteRegister = OperandTypes{OperandTypeTwoSIMDBytes, OperandTypeSIMDByte}
+	OperandTypesRegisterToVectorRegister       = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
+	OperandTypesMemoryToVectorRegister         = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
+	OperandTypesVectorRegisterToMemory         = OperandTypes{OperandTypeVectorRegister, OperandTypeMemory}
+	OperandTypesVectorRegisterToVectorRegister = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
 )
 
 // String implements fmt.Stringer
@@ -373,6 +390,14 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeSIMDByteToRegister(n)
 	case OperandTypesTwoSIMDBytesToSIMDByteRegister:
 		err = a.EncodeTwoSIMDBytesToSIMDByteRegister(n)
+	case OperandTypesRegisterToVectorRegister:
+		err = a.EncodeRegisterToVectorRegister(n)
+	case OperandTypesMemoryToVectorRegister:
+		err = a.EncodeMemoryToVectorRegister(n)
+	case OperandTypesVectorRegisterToMemory:
+		err = a.EncodeVectorRegisterToMemory(n)
+	case OperandTypesVectorRegisterToVectorRegister:
+		err = a.EncodeVectorRegisterToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -564,6 +589,39 @@ func (a *AssemblerImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegist
 	n.DstReg = dstReg
 }
 
+func (a *AssemblerImpl) CompileMemoryToVectorRegister(
+	instruction asm.Instruction, srcOffsetReg, dstReg asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesMemoryToVectorRegister)
+	n.SrcReg = srcOffsetReg
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+}
+
+func (a *AssemblerImpl) CompileVectorRegisterToMemory(
+	instruction asm.Instruction, srcReg, dstOffsetReg asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
+	n.SrcReg = srcReg
+	n.DstReg = dstOffsetReg
+	n.VectorArrangement = arrangement
+}
+
+func (a *AssemblerImpl) CompileRegisterToVectorRegister(
+	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, index VectorIndex) {
+	n := a.newNode(instruction, OperandTypesRegisterToVectorRegister)
+	n.SrcReg = srcReg
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+	n.VectorIndex = index
+}
+
+func (a *AssemblerImpl) CompileVectorRegisterToVectorRegister(
+	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToVectorRegister)
+	n.SrcReg = srcReg
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+}
+
 func errorEncodingUnsupported(n *NodeImpl) error {
 	return fmt.Errorf("%s is unsupported for %s type", InstructionName(n.Instruction), n.Types)
 }
@@ -735,7 +793,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		srcRegBits, dstRegBits := registerBits(n.SrcReg), registerBits(n.DstReg)
 		a.Buf.Write([]byte{
 			(dstRegBits << 5) | dstRegBits,
-			(dstRegBits >> 3),
+			dstRegBits >> 3,
 			srcRegBits,
 			(sfops << 5) | 0b01011,
 		})
@@ -981,7 +1039,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			}
 			a.Buf.Write([]byte{
 				(srcRegBits << 5) | dstRegBits,
-				(srcRegBits >> 3),
+				srcRegBits >> 3,
 				tp<<6 | 0b00_1_00_111,
 				sf<<7 | 0b0_00_11110,
 			})
@@ -992,7 +1050,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			}
 			a.Buf.Write([]byte{
 				(srcRegBits << 5) | dstRegBits,
-				(srcRegBits >> 3),
+				srcRegBits >> 3,
 				tp<<6 | 0b00_1_00_110,
 				sf<<7 | 0b0_00_11110,
 			})
@@ -1023,7 +1081,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			}
 			a.Buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
-				(zeroRegisterBits >> 3),
+				zeroRegisterBits >> 3,
 				0b000_00000 | srcRegBits,
 				sf<<7 | 0b0_01_01010,
 			})
@@ -1097,7 +1155,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 
 		a.Buf.Write([]byte{
 			(zeroRegisterBits << 5) | dstRegBits,
-			(zeroRegisterBits >> 3),
+			zeroRegisterBits >> 3,
 			srcRegBits,
 			sf<<7 | 0b0_10_00000 | 0b0_00_01011,
 		})
@@ -1161,7 +1219,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 
 		a.Buf.Write([]byte{
 			(srcRegBits << 5) | dstRegBits,
-			(srcRegBits >> 3),
+			srcRegBits >> 3,
 			tp<<6 | 0b00_1_00_000 | opcode,
 			sf<<7 | 0b0_0_0_11110,
 		})
@@ -1180,7 +1238,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			}
 			a.Buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
-				(zeroRegisterBits >> 3),
+				zeroRegisterBits >> 3,
 				0b000_00000 | srcRegBits,
 				sf<<7 | 0b0_01_01010,
 			})
@@ -1282,7 +1340,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 		}
 		a.Buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
-			(srcReg2Bits >> 3),
+			srcReg2Bits >> 3,
 			srcRegBits,
 			sf<<7 | opc<<5 | 0b01010,
 		})
@@ -1351,7 +1409,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 
 		a.Buf.Write([]byte{
 			(srcReg2Bits << 5) | dstRegBits,
-			(srcReg2Bits >> 3),
+			srcReg2Bits >> 3,
 			srcRegBits,
 			sf<<7 | 0b0_10_01011,
 		})
@@ -1444,18 +1502,18 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 
 		a.Buf.Write([]byte{
 			(src2RegBits << 5) | zeroRegisterBits,
-			(src2RegBits >> 3),
+			src2RegBits >> 3,
 			src1RegBits,
 			0b01011 | (op << 5),
 		})
 	case FCMPS, FCMPD:
 		// "Floating-point compare" section in:
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		src1RegBits, err := floatRegisterBits(n.SrcReg)
+		src1RegBits, err := vectorRegisterBits(n.SrcReg)
 		if err != nil {
 			return err
 		}
-		src2RegBits, err := floatRegisterBits(n.SrcReg2)
+		src2RegBits, err := vectorRegisterBits(n.SrcReg2)
 		if err != nil {
 			return err
 		}
@@ -1465,7 +1523,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 			ftype = 0b01
 		}
 		a.Buf.Write([]byte{
-			(src2RegBits << 5),
+			src2RegBits << 5,
 			0b001000_00 | (src2RegBits >> 3),
 			ftype<<6 | 0b1_00000 | src1RegBits,
 			0b000_11110,
@@ -1665,7 +1723,7 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 
 	var srcRegBits byte
 	if inst.isTargetFloat {
-		srcRegBits, err = floatRegisterBits(n.SrcReg)
+		srcRegBits, err = vectorRegisterBits(n.SrcReg)
 	} else {
 		srcRegBits, err = intRegisterBits(n.SrcReg)
 	}
@@ -1755,7 +1813,7 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 
 	var dstRegBits byte
 	if inst.isTargetFloat {
-		dstRegBits, err = floatRegisterBits(n.DstReg)
+		dstRegBits, err = vectorRegisterBits(n.DstReg)
 	} else {
 		dstRegBits, err = intRegisterBits(n.DstReg)
 	}
@@ -1815,15 +1873,15 @@ func isBitMaskImmediate(x uint64) bool {
 	case x != x>>16|x<<48:
 		// e = 32 (x == x>>32|x<<32).
 		// e.g. 0x00ff_ff00_00ff_ff00
-		x = uint64(int64(int32(x)))
+		x = uint64(int32(x))
 	case x != x>>8|x<<56:
 		// e = 16 (x == x>>16|x<<48).
 		// e.g. 0x00ff_00ff_00ff_00ff
-		x = uint64(int64(int16(x)))
+		x = uint64(int16(x))
 	case x != x>>4|x<<60:
 		// e = 8 (x == x>>8|x<<56).
 		// e.g. 0x0f0f_0f0f_0f0f_0f0f
-		x = uint64(int64(int8(x)))
+		x = uint64(int8(x))
 	default:
 		// e = 4 or 2.
 		return true
@@ -1850,7 +1908,7 @@ func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, src1RegBits byte, src
 	// src1Reg = src1Reg +/- src2Reg
 	a.Buf.Write([]byte{
 		(src1RegBits << 5) | src1RegBits,
-		(src1RegBits >> 3),
+		src1RegBits >> 3,
 		src2RegBits,
 		sfops<<5 | 0b01011,
 	})
@@ -1927,7 +1985,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			tmpRegBits := registerBits(a.temporaryRegister)
 
 			// MOVN $c, tmpReg with shifting.
-			a.load16bitAlignedConst((^c >> (16 * t)), byte(t), tmpRegBits, true, true)
+			a.load16bitAlignedConst(^c>>(16*t), byte(t), tmpRegBits, true, true)
 
 			// ADD/SUB tmpReg, dstReg
 			a.addOrSub64BitRegisters(sfops, dstRegBits, tmpRegBits)
@@ -1974,7 +2032,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		if c == 0 {
 			a.Buf.Write([]byte{
 				(zeroRegisterBits << 5) | dstRegBits,
-				(zeroRegisterBits >> 3),
+				zeroRegisterBits >> 3,
 				0b000_00000 | zeroRegisterBits,
 				0b0_01_01010,
 			})
@@ -1998,7 +2056,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			a.load16bitAlignedConst(int64(c32)>>(16*t), byte(t), dstRegBits, false, false)
 		} else if t := const16bitAligned(int64(^c32)); t >= 0 {
 			// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
-			a.load16bitAlignedConst((int64(^c32) >> (16 * t)), byte(t), dstRegBits, true, false)
+			a.load16bitAlignedConst(int64(^c32)>>(16*t), byte(t), dstRegBits, true, false)
 		} else if isBitMaskImmediate(uint64(c)) {
 			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, false)
 		} else {
@@ -2037,9 +2095,9 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			// If the const can fit within 16-bit alignment, for example, 0xffff, 0xffff_0000 or 0xffff_0000_0000_0000
 			// We could load it into temporary with movk.
 			a.load16bitAlignedConst(c>>(16*t), byte(t), dstRegBits, false, true)
-		} else if t := const16bitAligned(int64(^c)); t >= 0 {
+		} else if t := const16bitAligned(^c); t >= 0 {
 			// Also, if the reverse of the const can fit within 16-bit range, do the same ^^.
-			a.load16bitAlignedConst((int64(^c) >> (16 * t)), byte(t), dstRegBits, true, true)
+			a.load16bitAlignedConst((^c)>>(16*t), byte(t), dstRegBits, true, true)
 		} else if isBitMaskImmediate(uint64(c)) {
 			a.loadConstViaBitMaskImmediate(uint64(c), dstRegBits, true)
 		} else {
@@ -2235,7 +2293,7 @@ func (a *AssemblerImpl) load16bitAlignedConst(c int64, shiftNum byte, regBits by
 	a.Buf.Write([]byte{
 		(byte(c) << 5) | regBits,
 		byte(c >> 3),
-		1<<7 | (byte(shiftNum) << 5) | byte(c>>11),
+		1<<7 | (shiftNum << 5) | byte(c>>11),
 		lastByte,
 	})
 }
@@ -2249,13 +2307,13 @@ func (a *AssemblerImpl) loadConstViaBitMaskImmediate(c uint64, regBits byte, dst
 		size = 64
 	case c != c>>16|c<<48:
 		size = 32
-		c = uint64(int64(int32(c)))
+		c = uint64(int32(c))
 	case c != c>>8|c<<56:
 		size = 16
-		c = uint64(int64(int16(c)))
+		c = uint64(int16(c))
 	case c != c>>4|c<<60:
 		size = 8
-		c = uint64(int64(int8(c)))
+		c = uint64(int8(c))
 	case c != c>>2|c<<62:
 		size = 4
 		c = uint64(int64(c<<60) >> 60)
@@ -2325,12 +2383,12 @@ func (a *AssemblerImpl) EncodeSIMDByteToSIMDByte(n *NodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	srcRegBits, err := floatRegisterBits(n.SrcReg)
+	srcRegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2352,12 +2410,12 @@ func (a *AssemblerImpl) EncodeSIMDByteToRegister(n *NodeImpl) (err error) {
 		return errorEncodingUnsupported(n)
 	}
 
-	srcRegBits, err := floatRegisterBits(n.SrcReg)
+	srcRegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2379,17 +2437,17 @@ func (a *AssemblerImpl) EncodeTwoSIMDBytesToSIMDByteRegister(n *NodeImpl) (err e
 		return errorEncodingUnsupported(n)
 	}
 
-	src1RegBits, err := floatRegisterBits(n.SrcReg)
+	src1RegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
 
-	src2RegBits, err := floatRegisterBits(n.SrcReg2)
+	src2RegBits, err := vectorRegisterBits(n.SrcReg2)
 	if err != nil {
 		return err
 	}
 
-	dstRegBits, err := floatRegisterBits(n.DstReg)
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
@@ -2404,14 +2462,247 @@ func (a *AssemblerImpl) EncodeTwoSIMDBytesToSIMDByteRegister(n *NodeImpl) (err e
 	return
 }
 
+func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err error) {
+	if arr == VectorArrangementNone {
+		return nil
+	}
+	var valid bool
+	switch arr {
+	case VectorArrangement8B:
+		valid = index < 8
+	case VectorArrangement16B:
+		valid = index < 16
+	case VectorArrangement4H:
+		valid = index < 4
+	case VectorArrangement8H:
+		valid = index < 8
+	case VectorArrangement2S:
+		valid = index < 2
+	case VectorArrangement4S:
+		valid = index < 4
+	case VectorArrangement1D:
+		valid = index < 1
+	case VectorArrangement2D:
+		valid = index < 2
+	case VectorArrangementB:
+		valid = index < 16
+	case VectorArrangementH:
+		valid = index < 8
+	case VectorArrangementS:
+		valid = index < 4
+	case VectorArrangementD:
+		valid = index < 2
+	}
+	if !valid {
+		err = fmt.Errorf("invalid arrangement and index pair: %s[%d]", arr, index)
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
+	if n.Instruction != VMOV {
+		return errorEncodingUnsupported(n)
+	}
+
+	if err = checkArrangementIndexPair(n.VectorArrangement, n.VectorIndex); err != nil {
+		return
+	}
+
+	srcRegBits, err := intRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	switch n.Instruction {
+	case VMOV:
+		// VMOV is translated as "INS(Vector, Element)"
+		// Description: https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
+		// Encoding: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--general---Insert-vector-element-from-general-purpose-register-?lang=en
+		var imm5 byte
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(n.VectorIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(n.VectorIndex) << 02
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(n.VectorIndex) << 3
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(n.VectorIndex) << 4
+		default:
+			return fmt.Errorf("unsupported arragement for VMOV: %s", n.VectorArrangement)
+		}
+		a.Buf.Write([]byte{
+			(srcRegBits << 5) | dstVectorRegBits,
+			0b000111_00 | srcRegBits>>3,
+			imm5,
+			0b01001110,
+		})
+	default:
+		return errorEncodingUnsupported(n)
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeMemoryToVectorRegister(n *NodeImpl) (err error) {
+	srcRegBits, err := intRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	switch n.Instruction {
+	case VLD1:
+		if !(n.VectorArrangement >= VectorArrangement8B && n.VectorArrangement <= VectorArrangement2D) {
+			return fmt.Errorf("unsupported arrangement for VLD1: %s", n.VectorArrangement)
+		}
+
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LD1--multiple-structures---Load-multiple-single-element-structures-to-one--two--three--or-four-registers-?lang=en
+		var opcode byte = 0b0111 // One register destination.
+		size, q := arrangementSizeQ(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(srcRegBits << 5) | dstVectorRegBits,
+			opcode<<4 | (size << 2) | srcRegBits>>3,
+			0b0100_0000,
+			q<<6 | 0b00001100,
+		})
+	default:
+		return errorEncodingUnsupported(n)
+	}
+	return
+}
+
+func arrangementSizeQ(arr VectorArrangement) (size, q byte) {
+	switch arr {
+	case VectorArrangement8B:
+		size, q = 0b00, 0
+	case VectorArrangement16B:
+		size, q = 0b00, 1
+	case VectorArrangement4H:
+		size, q = 0b01, 0
+	case VectorArrangement8H:
+		size, q = 0b01, 1
+	case VectorArrangement2S:
+		size, q = 0b10, 0
+	case VectorArrangement4S:
+		size, q = 0b10, 1
+	case VectorArrangement1D:
+		size, q = 0b11, 0
+	case VectorArrangement2D:
+		size, q = 0b11, 1
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeVectorRegisterToMemory(n *NodeImpl) (err error) {
+	srcVectorRegBits, err := vectorRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstRegBits, err := intRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	switch n.Instruction {
+	case VST1:
+		if !(n.VectorArrangement >= VectorArrangement8B && n.VectorArrangement <= VectorArrangement2D) {
+			return fmt.Errorf("unsupported arrangement for VST1: %s", n.VectorArrangement)
+		}
+
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ST1--multiple-structures---Store-multiple-single-element-structures-from-one--two--three--or-four-registers-?lang=en
+		var opcode byte = 0b0111 // One register destination.
+		size, q := arrangementSizeQ(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(dstRegBits << 5) | srcVectorRegBits,
+			opcode<<4 | (size << 2) | dstRegBits>>3,
+			0x0,
+			q<<6 | 0b00001100,
+		})
+	default:
+		return errorEncodingUnsupported(n)
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error {
+	srcVectorRegBits, err := vectorRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	switch n.Instruction {
+	case VMOV:
+		if n.VectorArrangement != VectorArrangement16B {
+			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
+		}
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--vector---Move-vector--an-alias-of-ORR--vector--register--
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			0b000111<<2 | srcVectorRegBits>>3,
+			0b101<<5 | srcVectorRegBits,
+			0b0100_1110,
+		})
+	case VADD:
+		if n.VectorArrangement == VectorArrangementNone || (n.VectorArrangement >= VectorArrangementB && n.VectorArrangement <= VectorArrangementD) ||
+			(n.VectorArrangement == VectorArrangement1D) {
+			return fmt.Errorf("unsupported arrangement for VADD: %s", n.VectorArrangement)
+		}
+
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ADD--vector---Add--vector--
+		size, q := arrangementSizeQ(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			0b100001<<2 | srcVectorRegBits>>3,
+			size<<6 | 0b1<<5 | dstVectorRegBits,
+			q<<6 | 0b1110,
+		})
+	case VFADDS, VFADDD:
+		var sz byte
+		if n.Instruction == VFADDD {
+			sz = 0b1
+		}
+
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			0b110101<<2 | srcVectorRegBits>>3,
+			sz<<6 | 0b1<<5 | dstVectorRegBits,
+			0b1<<6 | 0b1110,
+		})
+	default:
+		return errorEncodingUnsupported(n)
+	}
+
+	return nil
+}
+
 var zeroRegisterBits byte = 0b11111
 
 func isIntRegister(r asm.Register) bool {
 	return REG_R0 <= r && r <= REGZERO
 }
 
-func isFloatRegister(r asm.Register) bool {
-	return REG_F0 <= r && r <= REG_F31
+func isVectorRegister(r asm.Register) bool {
+	return REG_V0 <= r && r <= REG_V31
 }
 
 func isConditionalRegister(r asm.Register) bool {
@@ -2422,25 +2713,25 @@ func intRegisterBits(r asm.Register) (ret byte, err error) {
 	if !isIntRegister(r) {
 		err = fmt.Errorf("%s is not integer", RegisterName(r))
 	} else {
-		ret = byte((r - REG_R0))
+		ret = byte(r - REG_R0)
 	}
 	return
 }
 
-func floatRegisterBits(r asm.Register) (ret byte, err error) {
-	if !isFloatRegister(r) {
+func vectorRegisterBits(r asm.Register) (ret byte, err error) {
+	if !isVectorRegister(r) {
 		err = fmt.Errorf("%s is not float", RegisterName(r))
 	} else {
-		ret = byte((r - REG_F0))
+		ret = byte(r - REG_V0)
 	}
 	return
 }
 
 func registerBits(r asm.Register) (ret byte) {
 	if isIntRegister(r) {
-		ret = byte((r - REG_R0))
+		ret = byte(r - REG_R0)
 	} else {
-		ret = byte((r - REG_F0))
+		ret = byte(r - REG_V0)
 	}
 	return
 }

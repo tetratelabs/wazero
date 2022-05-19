@@ -13,7 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
+	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -35,28 +35,28 @@ var (
 	maximum64BitUnsignedInt                       uint64 = math.MaxUint64
 	maximum64BitUnsignedIntAddress                uintptr
 	float32SignBitMask                            uint32 = 1 << 31
-	float32RestBitMask                            uint32 = ^float32SignBitMask
+	float32RestBitMask                                   = ^float32SignBitMask
 	float32SignBitMaskAddress                     uintptr
 	float32RestBitMaskAddress                     uintptr
 	float64SignBitMask                            uint64 = 1 << 63
-	float64RestBitMask                            uint64 = ^float64SignBitMask
+	float64RestBitMask                                   = ^float64SignBitMask
 	float64SignBitMaskAddress                     uintptr
 	float64RestBitMaskAddress                     uintptr
-	float32ForMinimumSigned32bitInteger           float32 = math.Float32frombits(0xCF00_0000)
+	float32ForMinimumSigned32bitInteger           = math.Float32frombits(0xCF00_0000)
 	float32ForMinimumSigned32bitIntegerAddress    uintptr
-	float64ForMinimumSigned32bitInteger           float64 = math.Float64frombits(0xC1E0_0000_0020_0000)
+	float64ForMinimumSigned32bitInteger           = math.Float64frombits(0xC1E0_0000_0020_0000)
 	float64ForMinimumSigned32bitIntegerAddress    uintptr
-	float32ForMinimumSigned64bitInteger           float32 = math.Float32frombits(0xDF00_0000)
+	float32ForMinimumSigned64bitInteger           = math.Float32frombits(0xDF00_0000)
 	float32ForMinimumSigned64bitIntegerAddress    uintptr
-	float64ForMinimumSigned64bitInteger           float64 = math.Float64frombits(0xC3E0_0000_0000_0000)
+	float64ForMinimumSigned64bitInteger           = math.Float64frombits(0xC3E0_0000_0000_0000)
 	float64ForMinimumSigned64bitIntegerAddress    uintptr
-	float32ForMaximumSigned32bitIntPlusOne        float32 = math.Float32frombits(0x4F00_0000)
+	float32ForMaximumSigned32bitIntPlusOne        = math.Float32frombits(0x4F00_0000)
 	float32ForMaximumSigned32bitIntPlusOneAddress uintptr
-	float64ForMaximumSigned32bitIntPlusOne        float64 = math.Float64frombits(0x41E0_0000_0000_0000)
+	float64ForMaximumSigned32bitIntPlusOne        = math.Float64frombits(0x41E0_0000_0000_0000)
 	float64ForMaximumSigned32bitIntPlusOneAddress uintptr
-	float32ForMaximumSigned64bitIntPlusOne        float32 = math.Float32frombits(0x5F00_0000)
+	float32ForMaximumSigned64bitIntPlusOne        = math.Float32frombits(0x5F00_0000)
 	float32ForMaximumSigned64bitIntPlusOneAddress uintptr
-	float64ForMaximumSigned64bitIntPlusOne        float64 = math.Float64frombits(0x43E0_0000_0000_0000)
+	float64ForMaximumSigned64bitIntPlusOne        = math.Float64frombits(0x43E0_0000_0000_0000)
 	float64ForMaximumSigned64bitIntPlusOneAddress uintptr
 )
 
@@ -96,7 +96,7 @@ var (
 )
 
 var (
-	amd64UnreservedGeneralPurposeFloatRegisters = []asm.Register{ // nolint
+	amd64UnreservedVectorRegisters = []asm.Register{ // nolint
 		amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3,
 		amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
 		amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11,
@@ -107,7 +107,7 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in compiled functions and write them back before returns.
-	amd64UnreservedGeneralPurposeIntRegisters = []asm.Register{ // nolint
+	amd64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
 		amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX,
 		amd64.REG_SI, amd64.REG_DI, amd64.REG_R8, amd64.REG_R9,
 		amd64.REG_R10, amd64.REG_R11, amd64.REG_R12,
@@ -130,10 +130,10 @@ type amd64Compiler struct {
 	ir        *wazeroir.CompilationResult
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
-	locationStack *valueLocationStack
+	locationStack *runtimeValueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*amd64LabelInfo
-	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
+	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel string
@@ -145,7 +145,7 @@ type amd64Compiler struct {
 func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	c := &amd64Compiler{
 		assembler:     amd64.NewAssemblerImpl(),
-		locationStack: newValueLocationStack(),
+		locationStack: newRuntimeValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,
 		labels:        map[string]*amd64LabelInfo{},
@@ -153,10 +153,10 @@ func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return c, nil
 }
 
-// setLocationStack sets the given valueLocationStack to .locationStack field,
-// while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
+// setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
+// while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *amd64Compiler) setLocationStack(newStack *valueLocationStack) {
+func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -167,8 +167,14 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 	c.staticData = append(c.staticData, d)
 }
 
-func (c *amd64Compiler) pushValueLocationOnRegister(reg asm.Register) (ret *valueLocation) {
-	ret = c.locationStack.pushValueLocationOnRegister(reg)
+func (c *amd64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation) {
+	ret = c.locationStack.pushRuntimeValueLocationOnRegister(reg, vt)
+	c.locationStack.markRegisterUsed(reg)
+	return
+}
+func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) {
+	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
+	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
 	c.locationStack.markRegisterUsed(reg)
 	return
 }
@@ -177,7 +183,7 @@ type amd64LabelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
-	initialStack *valueLocationStack
+	initialStack *runtimeValueLocationStack
 	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
 	labelBeginningCallbacks []func(asm.Node)
 }
@@ -206,7 +212,7 @@ func (c *amd64Compiler) compileHostFunction() error {
 
 // compile implements compiler.compile for the amd64 architecture.
 func (c *amd64Compiler) compile() (code []byte, staticData codeStaticData, stackPointerCeil uint64, err error) {
-	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
+	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all runtimeValueLocationStack(s)
 	// used for all labels (via setLocationStack), excluding the current one.
 	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
 	stackPointerCeil = c.stackPointerCeil
@@ -236,105 +242,54 @@ func (c *amd64Compiler) compile() (code []byte, staticData codeStaticData, stack
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	if c.ir != nil {
-		for _, t := range c.ir.Signature.Params {
-			loc := c.locationStack.pushValueLocationOnStack()
-			switch t {
-			case wasm.ValueTypeI32, wasm.ValueTypeI64:
-				loc.setRegisterType(generalPurposeRegisterTypeInt)
-			case wasm.ValueTypeF32, wasm.ValueTypeF64:
-				loc.setRegisterType(generalPurposeRegisterTypeFloat)
-			}
+	for _, t := range c.ir.Signature.Params {
+		loc := c.locationStack.pushRuntimeValueLocationOnStack()
+		switch t {
+		case wasm.ValueTypeI32:
+			loc.valueType = runtimeValueTypeI32
+		case wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref:
+			loc.valueType = runtimeValueTypeI64
+		case wasm.ValueTypeF32:
+			loc.valueType = runtimeValueTypeF32
+		case wasm.ValueTypeF64:
+			loc.valueType = runtimeValueTypeF64
+		case wasm.ValueTypeV128:
+			loc.valueType = runtimeValueTypeV128Lo
+			hi := c.locationStack.pushRuntimeValueLocationOnStack()
+			hi.valueType = runtimeValueTypeV128Hi
+		default:
+			panic("BUG")
 		}
 	}
 }
 
 // compileUnreachable implements compiler.compileUnreachable for the amd64 architecture.
 func (c *amd64Compiler) compileUnreachable() error {
-	c.compileExitFromNativeCode(compilerCallStatusCodeUnreachable)
+	c.compileExitFromNativeCode(nativeCallStatusCodeUnreachable)
 	return nil
 }
 
-// compileUnreachable implements compiler.compileUnreachable for the amd64 architecture.
+// compileSwap implements compiler.compileSwap for the amd64 architecture.
 func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	index := int(c.locationStack.sp) - 1 - o.Depth
-	// Note that, in theory, the register types and value types
-	// are the same between these swap targets as swap operations
-	// are generated from local.set,tee instructions in Wasm.
-	x1 := c.locationStack.peek()
-	x2 := c.locationStack.stack[index]
+	var x1, x2 *runtimeValueLocation
+	if o.IsTargetVector {
+		x1, x2 = c.locationStack.stack[c.locationStack.sp-2], c.locationStack.stack[index]
+	} else {
+		x1, x2 = c.locationStack.peek(), c.locationStack.stack[index]
+	}
 
-	// If x1 is on the conditional register, we must move it to a gp
-	// register before swap.
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
 
-	if x1.onRegister() && x2.onRegister() {
+	x1.register, x2.register = x2.register, x1.register
+	if o.IsTargetVector {
+		x1, x2 = c.locationStack.peek(), c.locationStack.stack[index+1]
 		x1.register, x2.register = x2.register, x1.register
-	} else if x1.onRegister() && x2.onStack() {
-		reg := x1.register
-		c.locationStack.markRegisterUnused(reg)
-		// Save x1's value to the temporary top of the stack.
-		tmpStackLocation := c.pushValueLocationOnRegister(reg)
-		c.compileReleaseRegisterToStack(tmpStackLocation)
-		// Then move the x2's value to the x1's register location.
-		x2.register = reg
-		c.compileLoadValueOnStackToRegister(x2)
-		// Now move the x1's value to the x1's stack location.
-		c.compileReleaseRegisterToStack(x1)
-		// Next we move the saved x1's value to the register.
-		tmpStackLocation.setRegister(reg)
-		c.compileLoadValueOnStackToRegister(tmpStackLocation)
-		// Finally move the x1's value in the register to the x2's stack location.
-		c.locationStack.releaseRegister(x1)
-		c.locationStack.releaseRegister(tmpStackLocation)
-		x2.setRegister(reg)
-		c.locationStack.markRegisterUsed(reg)
-		_ = c.locationStack.pop() // Delete tmpStackLocation.
-	} else if x1.onStack() && x2.onRegister() {
-		reg := x2.register
-		c.locationStack.markRegisterUnused(reg)
-		// Save x2's value to the temporary top of the stack.
-		tmpStackLocation := c.pushValueLocationOnRegister(reg)
-		c.compileReleaseRegisterToStack(tmpStackLocation)
-		// Then move the x1's value to the x2's register location.
-		x1.register = reg
-		c.compileLoadValueOnStackToRegister(x1)
-		// Now move the x1's value to the x2's stack location.
-		c.compileReleaseRegisterToStack(x2)
-		// Next we move the saved x2's value to the register.
-		tmpStackLocation.setRegister(reg)
-		c.compileLoadValueOnStackToRegister(tmpStackLocation)
-		// Finally move the x2's value in the register to the x2's stack location.
-		c.locationStack.releaseRegister(x2)
-		c.locationStack.releaseRegister(tmpStackLocation)
-		x1.setRegister(reg)
-		c.locationStack.markRegisterUsed(reg)
-		_ = c.locationStack.pop() // Delete tmpStackLocation.
-	} else if x1.onStack() && x2.onStack() {
-		reg, err := c.allocateRegister(x1.registerType())
-		if err != nil {
-			return err
-		}
-		// First we move the x2's value to the temp register.
-		x2.setRegister(reg)
-		c.compileLoadValueOnStackToRegister(x2)
-		// Save x2's value to the temporary top of the stack.
-		tmpStackLocation := c.pushValueLocationOnRegister(reg)
-		c.compileReleaseRegisterToStack(tmpStackLocation)
-		// Then move the x1's value to the x2's register location.
-		x1.register = reg
-		c.compileLoadValueOnStackToRegister(x1)
-		// Now move the x1's value to the x2's stack location.
-		c.compileReleaseRegisterToStack(x2)
-		// Next we move the saved x2's value to the register.
-		tmpStackLocation.setRegister(reg)
-		c.compileLoadValueOnStackToRegister(tmpStackLocation)
-		// Finally move the x2's value in the register to the x2's stack location.
-		c.locationStack.releaseRegister(x2)
-		c.locationStack.releaseRegister(tmpStackLocation)
-		x1.setRegister(reg)
-		c.locationStack.markRegisterUsed(reg)
-		_ = c.locationStack.pop() // Delete tmpStackLocation.
 	}
 	return nil
 }
@@ -343,7 +298,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	intReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	intReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -359,39 +314,63 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
-	wasmType := c.ir.Globals[o.Index].ValType
-	switch wasmType {
-	case wasm.ValueTypeF32, wasm.ValueTypeF64:
-		valueReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+	var vt runtimeValueType
+	var inst = amd64.MOVQ
+	switch c.ir.Globals[o.Index].ValType {
+	case wasm.ValueTypeI32:
+		vt = runtimeValueTypeI32
+	case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		vt = runtimeValueTypeI64
+	case wasm.ValueTypeF32:
+		vt = runtimeValueTypeF32
+		valueReg, err = c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+	case wasm.ValueTypeF64:
+		vt = runtimeValueTypeF64
+		valueReg, err = c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+	case wasm.ValueTypeV128:
+		inst = amd64.MOVDQU
+		vt = runtimeValueTypeV128Lo
+		valueReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Using the register holding the pointer to the target instance, move its value into a register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, globalInstanceValueOffset, valueReg)
+	c.assembler.CompileMemoryToRegister(inst, intReg, globalInstanceValueOffset, valueReg)
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
-	loc := c.pushValueLocationOnRegister(valueReg)
-	switch wasmType {
-	case wasm.ValueTypeI32, wasm.ValueTypeI64:
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
-	case wasm.ValueTypeF32, wasm.ValueTypeF64:
-		loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	if vt == runtimeValueTypeV128Lo {
+		c.pushVectorRuntimeValueLocationOnRegister(valueReg)
+	} else {
+		c.pushRuntimeValueLocationOnRegister(valueReg, vt)
 	}
 	return nil
 }
 
 // compileGlobalSet implements compiler.compileGlobalSet for the amd64 architecture.
 func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
+	wasmValueType := c.ir.Globals[o.Index].ValType
+	isV128 := wasmValueType == wasm.ValueTypeV128
+
 	// First, move the value to set into a temporary register.
 	val := c.locationStack.pop()
+	if isV128 {
+		// The previous val is higher 64-bits, and have to use lower 64-bit's runtimeValueLocation for allocation, etc.
+		val = c.locationStack.pop()
+	}
 	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
 		return err
 	}
 
 	// Allocate a register to hold the memory location of the target global instance.
-	intReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	intReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -406,7 +385,11 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
 
 	// Now ready to write the value to the global instance location.
-	c.assembler.CompileRegisterToMemory(amd64.MOVQ, val.register, intReg, globalInstanceValueOffset)
+	inst := amd64.MOVQ
+	if isV128 {
+		inst = amd64.MOVDQU
+	}
+	c.assembler.CompileRegisterToMemory(inst, val.register, intReg, globalInstanceValueOffset)
 
 	// Since the value is now written to memory, release the value register.
 	c.locationStack.releaseRegister(val)
@@ -585,7 +568,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		return err
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -660,7 +643,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
 		labelInitialInstructions[i] = c.assembler.CompileStandAlone(amd64.NOP)
 
-		var locationStack *valueLocationStack
+		var locationStack *runtimeValueLocationStack
 		var target *wazeroir.BranchTargetDrop
 		if i < len(o.Targets) {
 			target = o.Targets[i]
@@ -748,18 +731,26 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(targetType.Params); i++ {
+	for i := 0; i < targetType.ParamNumInUint64; i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
 	for _, t := range targetType.Results {
-		loc := c.locationStack.pushValueLocationOnStack()
+		loc := c.locationStack.pushRuntimeValueLocationOnStack()
 		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		case wasm.ValueTypeI32:
+			loc.valueType = runtimeValueTypeI32
+		case wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref:
+			loc.valueType = runtimeValueTypeI64
+		case wasm.ValueTypeF32:
+			loc.valueType = runtimeValueTypeF32
+		case wasm.ValueTypeF64:
+			loc.valueType = runtimeValueTypeF64
+		case wasm.ValueTypeV128:
+			loc.valueType = runtimeValueTypeV128Lo
+			hi := c.locationStack.pushRuntimeValueLocationOnStack()
+			hi.valueType = runtimeValueTypeV128Hi
 		}
 	}
 	return nil
@@ -772,13 +763,13 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		return nil
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
 	c.locationStack.markRegisterUsed(tmp)
 
-	tmp2, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp2, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -793,8 +784,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
 	notLengthExceedJump := c.assembler.CompileJump(amd64.JHI)
 
-	// If it exceeds, we return the function with compilerCallStatusCodeInvalidTableAccess.
-	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
+	// If it exceeds, we return the function with nativeCallStatusCodeInvalidTableAccess.
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(notLengthExceedJump)
 
 	// Next we check if the target's type matches the operation's one.
@@ -818,8 +809,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Jump if the target is initialized element.
 	jumpIfInitialized := c.assembler.CompileJump(amd64.JNE)
 
-	// If not initialized, we return the function with compilerCallStatusCodeInvalidTableAccess.
-	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
+	// If not initialized, we return the function with nativeCallStatusCodeInvalidTableAccess.
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfInitialized)
 
@@ -839,7 +830,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	jumpIfTypeMatch := c.assembler.CompileJump(amd64.JEQ)
 
 	// Otherwise, exit with type mismatch status.
-	c.compileExitFromNativeCode(compilerCallStatusCodeTypeMismatchOnIndirectCall)
+	c.compileExitFromNativeCode(nativeCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
 	targetFunctionType := c.ir.Types[o.TypeIndex]
@@ -851,18 +842,26 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.locationStack.markRegisterUnused(offset.register, tmp, tmp2)
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(targetFunctionType.Params); i++ {
+	for i := 0; i < targetFunctionType.ParamNumInUint64; i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
 	for _, t := range targetFunctionType.Results {
-		loc := c.locationStack.pushValueLocationOnStack()
+		loc := c.locationStack.pushRuntimeValueLocationOnStack()
 		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		case wasm.ValueTypeI32:
+			loc.valueType = runtimeValueTypeI32
+		case wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref:
+			loc.valueType = runtimeValueTypeI64
+		case wasm.ValueTypeF32:
+			loc.valueType = runtimeValueTypeF32
+		case wasm.ValueTypeF64:
+			loc.valueType = runtimeValueTypeF64
+		case wasm.ValueTypeV128:
+			loc.valueType = runtimeValueTypeV128Lo
+			hi := c.locationStack.pushRuntimeValueLocationOnStack()
+			hi.valueType = runtimeValueTypeV128Hi
 		}
 	}
 	return nil
@@ -885,7 +884,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 		return nil
 	}
 
-	var liveValues []*valueLocation
+	var liveValues []*runtimeValueLocation
 	for i := 0; i < r.Start; i++ {
 		live := c.locationStack.pop()
 		liveValues = append(liveValues, live)
@@ -974,22 +973,36 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
 	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
-	reg, err := c.allocateRegister(pickTarget.registerType())
+	reg, err := c.allocateRegister(pickTarget.getRegisterType())
 	if err != nil {
 		return err
 	}
 
 	if pickTarget.onRegister() {
-		c.assembler.CompileRegisterToRegister(amd64.MOVQ, pickTarget.register, reg)
+		if o.IsTargetVector {
+			c.assembler.CompileRegisterToRegister(amd64.MOVDQU, pickTarget.register, reg)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.MOVQ, pickTarget.register, reg)
+		}
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
+		var inst asm.Instruction
+		if o.IsTargetVector {
+			inst = amd64.MOVDQU
+		} else {
+			inst = amd64.MOVQ
+		}
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
-		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForStackBasePointerAddress, int64(pickTarget.stackPointer)*8, reg)
+		c.assembler.CompileMemoryToRegister(inst, amd64ReservedRegisterForStackBasePointerAddress,
+			int64(pickTarget.stackPointer)*8, reg)
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
-	loc := c.pushValueLocationOnRegister(reg)
-	loc.setRegisterType(pickTarget.registerType())
+	if o.IsTargetVector {
+		c.pushVectorRuntimeValueLocationOnRegister(reg)
+	} else {
+		c.pushRuntimeValueLocationOnRegister(reg, pickTarget.valueType)
+	}
 	return nil
 }
 
@@ -1102,7 +1115,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instr
 	x2 := c.locationStack.pop()
 	x1 := c.locationStack.pop()
 
-	var valueOnAX *valueLocation
+	var valueOnAX *runtimeValueLocation
 	if x1.register == resultRegister {
 		valueOnAX = x1
 	} else if x2.register == resultRegister {
@@ -1160,8 +1173,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instr
 
 	// Now we have the result in the AX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(resultRegister)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(resultRegister, x1.valueType)
 	return nil
 }
 
@@ -1244,8 +1256,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 	// We reused the same register of target for the result.
 	c.locationStack.markRegisterUnused(target.register)
-	result := c.pushValueLocationOnRegister(target.register)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(target.register, target.valueType)
 	return nil
 }
 
@@ -1297,8 +1308,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 	// We reused the same register of target for the result.
 	c.locationStack.markRegisterUnused(target.register)
-	result := c.pushValueLocationOnRegister(target.register)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(target.register, target.valueType)
 	return nil
 }
 
@@ -1317,8 +1327,7 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 
 	// We reused the same register of target for the result.
 	c.locationStack.markRegisterUnused(target.register)
-	result := c.pushValueLocationOnRegister(target.register)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(target.register, target.valueType)
 	return nil
 }
 
@@ -1351,22 +1360,31 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	}
 	// Now we have the quotient of the division result in the AX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(amd64.REG_AX)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	if is32Bit {
+		c.pushRuntimeValueLocationOnRegister(amd64.REG_AX, runtimeValueTypeI32)
+	} else {
+		c.pushRuntimeValueLocationOnRegister(amd64.REG_AX, runtimeValueTypeI64)
+	}
 	return nil
 }
 
 // compileRem implements compiler.compileRem for the amd64 architecture.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
+
+	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
 		err = c.performDivisionOnInts(true, true, true)
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedInt64:
 		err = c.performDivisionOnInts(true, false, true)
+		vt = runtimeValueTypeI64
 	case wazeroir.SignedUint32:
 		err = c.performDivisionOnInts(true, true, false)
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedUint64:
 		err = c.performDivisionOnInts(true, false, false)
+		vt = runtimeValueTypeI64
 	}
 	if err != nil {
 		return err
@@ -1374,8 +1392,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 
 	// Now we have the remainder of the division result in the DX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(amd64.REG_DX)
-	result.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(amd64.REG_DX, vt)
 	return
 }
 
@@ -1431,8 +1448,8 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	// Jump if the divisor is not zero.
 	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
 
-	// Otherwise, we return with compilerCallStatusIntegerDivisionByZero status.
-	c.compileExitFromNativeCode(compilerCallStatusIntegerDivisionByZero)
+	// Otherwise, we return with nativeCallStatusIntegerDivisionByZero status.
+	c.compileExitFromNativeCode(nativeCallStatusIntegerDivisionByZero)
 
 	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
 
@@ -1519,7 +1536,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// Otherwise, we are trying to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1),
 		// and that is the overflow in division as the result becomes 2^31 which is larger than
 		// the maximum of signed 32-bit int (2^31-1).
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// Set the normal case's jump target.
 		c.assembler.SetJumpTargetOnNext(nonMinusOneDivisorJmp, jmpOK)
@@ -1627,8 +1644,7 @@ func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error
 	// We already stored the result in the register used by x1
 	// so we record it.
 	c.locationStack.markRegisterUnused(x1.register)
-	result := c.pushValueLocationOnRegister(x1.register)
-	result.setRegisterType(x1.registerType())
+	c.pushRuntimeValueLocationOnRegister(x1.register, x1.valueType)
 	return nil
 }
 
@@ -1757,7 +1773,7 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 		return err
 	}
 
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	tmpReg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
@@ -1835,9 +1851,9 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 	}
 
 	if is32Bit {
-		c.assembler.CompileRegisterToRegisterWithMode(amd64.ROUNDSS, target.register, target.register, byte(mode))
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.ROUNDSS, target.register, target.register, byte(mode))
 	} else {
-		c.assembler.CompileRegisterToRegisterWithMode(amd64.ROUNDSD, target.register, target.register, byte(mode))
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.ROUNDSD, target.register, target.register, byte(mode))
 	}
 	return nil
 }
@@ -1933,7 +1949,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.In
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
 	c.locationStack.markRegisterUnused(x1.register)
-	c.pushValueLocationOnRegister(x1.register)
+	c.pushRuntimeValueLocationOnRegister(x1.register, x1.valueType)
 	return nil
 }
 
@@ -1949,7 +1965,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
 		return err
 	}
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	tmpReg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
@@ -1992,7 +2008,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// Record that we consumed the x2 and placed the copysign result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
 	c.locationStack.markRegisterUnused(x1.register)
-	c.pushValueLocationOnRegister(x1.register)
+	c.pushRuntimeValueLocationOnRegister(x1.register, x1.valueType)
 	return nil
 }
 
@@ -2056,7 +2072,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 		return err
 	}
 
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2073,7 +2089,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	var nonTrappingNaNJump asm.Node
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidFloatToIntConversion)
+		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
 	} else {
 		// In non trapping case, NaN is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2099,7 +2115,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	var nonTrappingMinusJump asm.Node
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 	} else {
 		// In non trapping case, the minus value is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2137,7 +2153,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
 	jmpIfPlusInf := c.assembler.CompileJump(amd64.JMI)
 
-	// Otherwise, we successfully converted the the source float minus (math.MaxInt32+1) to int.
+	// Otherwise, we successfully converted the source float minus (math.MaxInt32+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
 	c.assembler.CompileMemoryToRegister(amd64.ADDL, asm.NilRegister, int64(float32SignBitMaskAddress), result)
 
@@ -2145,7 +2161,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	c.assembler.SetJumpTargetOnNext(jmpIfPlusInf)
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 	} else {
 		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(maximum32BitUnsignedIntAddress), result)
 	}
@@ -2159,8 +2175,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
 	c.locationStack.markRegisterUnused(source.register)
-	loc := c.pushValueLocationOnRegister(result)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
 	return nil
 }
 
@@ -2171,7 +2186,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 		return err
 	}
 
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2188,7 +2203,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	var nonTrappingNaNJump asm.Node
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidFloatToIntConversion)
+		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
 	} else {
 		// In non trapping case, NaN is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2214,7 +2229,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	var nonTrappingMinusJump asm.Node
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 	} else {
 		// In non trapping case, the minus value is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2260,7 +2275,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 
 	c.assembler.SetJumpTargetOnNext(jmpIfPlusInf)
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 	} else {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(maximum64BitUnsignedIntAddress), result)
 	}
@@ -2274,8 +2289,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
 	c.locationStack.markRegisterUnused(source.register)
-	loc := c.pushValueLocationOnRegister(result)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI64)
 	return nil
 }
 
@@ -2286,7 +2300,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 		return err
 	}
 
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2320,8 +2334,8 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 
 	var nontrappingNanJump asm.Node
 	if !nonTrapping {
-		// If the value is NaN, we return the function with compilerCallStatusCodeInvalidFloatToIntConversion.
-		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidFloatToIntConversion)
+		// If the value is NaN, we return the function with nativeCallStatusCodeInvalidFloatToIntConversion.
+		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
 	} else {
 		// In non trapping case, NaN is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2358,7 +2372,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 32-bit int).
 
 		c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
 		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
@@ -2393,7 +2407,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
 	c.locationStack.markRegisterUnused(source.register)
-	c.pushValueLocationOnRegister(result)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
 	return nil
 }
 
@@ -2404,7 +2418,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 		return err
 	}
 
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2438,7 +2452,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 
 	var nontrappingNanJump asm.Node
 	if !nonTrapping {
-		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidFloatToIntConversion)
+		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidFloatToIntConversion)
 	} else {
 		// In non trapping case, NaN is casted as zero.
 		// Zero out the result register by XOR itsself.
@@ -2470,7 +2484,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
 
 		c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
-		c.compileExitFromNativeCode(compilerCallStatusIntegerOverflow)
+		c.compileExitFromNativeCode(nativeCallStatusIntegerOverflow)
 
 		// We jump to the next instructions for valid cases.
 		c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
@@ -2502,21 +2516,20 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bo
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
 	c.locationStack.markRegisterUnused(source.register)
-	loc := c.pushValueLocationOnRegister(result)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI64)
 	return nil
 }
 
 // compileFConvertFromI implements compiler.compileFConvertFromI for the amd64 architecture.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
-		err = c.compileSimpleConversion(amd64.CVTSL2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 32bit int
+		err = c.compileSimpleConversion(amd64.CVTSL2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 32bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
-		err = c.compileSimpleConversion(amd64.CVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int
+		err = c.compileSimpleConversion(amd64.CVTSQ2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 64bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
-		err = c.compileSimpleConversion(amd64.CVTSL2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 32bit int
+		err = c.compileSimpleConversion(amd64.CVTSL2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 32bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
-		err = c.compileSimpleConversion(amd64.CVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int
+		err = c.compileSimpleConversion(amd64.CVTSQ2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 64bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
@@ -2526,10 +2539,10 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
-		err = c.compileSimpleConversion(amd64.CVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int.
+		err = c.compileSimpleConversion(amd64.CVTSQ2SS, registerTypeVector, runtimeValueTypeF32) // = CVTSI2SS for 64bit int.
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
-		err = c.compileSimpleConversion(amd64.CVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int.
+		err = c.compileSimpleConversion(amd64.CVTSQ2SD, registerTypeVector, runtimeValueTypeF64) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(true)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
@@ -2578,14 +2591,14 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 		return err
 	}
 
-	dest, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	dest, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
 
 	c.locationStack.markRegisterUsed(dest)
 
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmpReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2638,14 +2651,18 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	// We consumed the origin's register and placed the conversion result
 	// in the dest register.
 	c.locationStack.markRegisterUnused(origin.register)
-	loc := c.pushValueLocationOnRegister(dest)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	if isFloat32bit {
+		c.pushRuntimeValueLocationOnRegister(dest, runtimeValueTypeF32)
+	} else {
+		c.pushRuntimeValueLocationOnRegister(dest, runtimeValueTypeF64)
+	}
 	return nil
 }
 
 // compileSimpleConversion pops a value type from the stack, and applies the
 // given instruction on it, and push the result onto a register of the given type.
-func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction, destinationRegisterType generalPurposeRegisterType) error {
+func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction,
+	destinationRegisterType registerType, destinationValueType runtimeValueType) error {
 	origin := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
 		return err
@@ -2659,8 +2676,7 @@ func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction,
 	c.assembler.CompileRegisterToRegister(convInstruction, origin.register, dest)
 
 	c.locationStack.markRegisterUnused(origin.register)
-	loc := c.pushValueLocationOnRegister(dest)
-	loc.setRegisterType(destinationRegisterType)
+	c.pushRuntimeValueLocationOnRegister(dest, destinationValueType)
 	return nil
 }
 
@@ -2690,40 +2706,40 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		peek.valueType = runtimeValueTypeI32
 		return nil
 	}
-	return c.compileSimpleConversion(amd64.MOVL, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(amd64.MOVL, registerTypeGeneralPurpose, runtimeValueTypeI32)
 }
 
 // compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the amd64 architecture.
 func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		peek.valueType = runtimeValueTypeI64
 		return nil
 	}
-	return c.compileSimpleConversion(amd64.MOVQ, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(amd64.MOVQ, registerTypeGeneralPurpose, runtimeValueTypeI64)
 }
 
 // compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the amd64 architecture.
 func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		peek.valueType = runtimeValueTypeF32
 		return nil
 	}
-	return c.compileSimpleConversion(amd64.MOVL, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(amd64.MOVL, registerTypeVector, runtimeValueTypeF32)
 }
 
 // compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the amd64 architecture.
 func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
 		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		peek.valueType = runtimeValueTypeF64
 		return nil
 	}
-	return c.compileSimpleConversion(amd64.MOVQ, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(amd64.MOVQ, registerTypeVector, runtimeValueTypeF64)
 }
 
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
@@ -2813,7 +2829,8 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 	return
 }
 
-func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction, shouldEqual bool) error {
+func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction,
+	shouldEqual bool) error {
 	c.assembler.CompileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
 
 	// Record that the result is on the conditional register.
@@ -2823,8 +2840,8 @@ func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstr
 	} else {
 		condReg = amd64.ConditionalRegisterStateNE
 	}
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(condReg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(condReg)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -2833,12 +2850,12 @@ func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstr
 // the result must be zero for EQ or one for NE.
 func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction, shouldEqual bool) error {
 	// Before we allocate the result, we have to reserve two int registers.
-	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	nanFragReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
 	c.locationStack.markRegisterUsed(nanFragReg)
-	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	cmpResultReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -2876,8 +2893,7 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpIns
 	c.assembler.CompileRegisterToRegister(amd64.MOVBLZX, cmpResultReg, cmpResultReg)
 
 	// Now we have the result in cmpResultReg register, so we record it.
-	loc := c.pushValueLocationOnRegister(cmpResultReg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(cmpResultReg, runtimeValueTypeI32)
 	// Also, we no longer need nanFragRegister.
 	c.locationStack.markRegisterUnused(nanFragReg)
 	return nil
@@ -2901,8 +2917,8 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	c.locationStack.releaseRegister(v)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateE)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateE)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -2948,8 +2964,8 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	c.locationStack.releaseRegister(x2)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(resultConditionState)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(resultConditionState)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -2993,8 +3009,8 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	c.locationStack.releaseRegister(x2)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(resultConditionState)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(resultConditionState)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -3040,8 +3056,8 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	c.locationStack.releaseRegister(x2)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(resultConditionState)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(resultConditionState)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -3085,8 +3101,8 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	c.locationStack.releaseRegister(x2)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(resultConditionState)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	loc := c.locationStack.pushRuntimeValueLocationOnConditionalRegister(resultConditionState)
+	loc.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -3096,24 +3112,29 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		isIntType         bool
 		movInst           asm.Instruction
 		targetSizeInBytes int64
+		vt                runtimeValueType
 	)
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = amd64.MOVL
 		targetSizeInBytes = 32 / 8
+		vt = runtimeValueTypeI32
 	case wazeroir.UnsignedTypeI64:
 		isIntType = true
 		movInst = amd64.MOVQ
 		targetSizeInBytes = 64 / 8
+		vt = runtimeValueTypeI64
 	case wazeroir.UnsignedTypeF32:
 		isIntType = false
 		movInst = amd64.MOVL
 		targetSizeInBytes = 32 / 8
+		vt = runtimeValueTypeF32
 	case wazeroir.UnsignedTypeF64:
 		isIntType = false
 		movInst = amd64.MOVQ
 		targetSizeInBytes = 64 / 8
+		vt = runtimeValueTypeF64
 	}
 
 	reg, err := c.compileMemoryAccessCeilSetup(o.Arg.Offset, targetSizeInBytes)
@@ -3128,11 +3149,10 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 			// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 			amd64ReservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 			reg)
-		top := c.pushValueLocationOnRegister(reg)
-		top.setRegisterType(generalPurposeRegisterTypeInt)
+		c.pushRuntimeValueLocationOnRegister(reg, vt)
 	} else {
 		// For float types, we read the value to the float register.
-		floatReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+		floatReg, err := c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
@@ -3140,8 +3160,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 			// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 			amd64ReservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 			floatReg)
-		top := c.pushValueLocationOnRegister(floatReg)
-		top.setRegisterType(generalPurposeRegisterTypeFloat)
+		c.pushRuntimeValueLocationOnRegister(floatReg, vt)
 		// We no longer need the int register so mark it unused.
 		c.locationStack.markRegisterUnused(reg)
 	}
@@ -3159,15 +3178,20 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	// Then move a byte at the offset to the register.
 	// Note that Load8 is only for integer types.
 	var inst asm.Instruction
+	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVBLSX
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedUint32:
 		inst = amd64.MOVBLZX
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedInt64:
 		inst = amd64.MOVBQSX
+		vt = runtimeValueTypeI64
 	case wazeroir.SignedUint64:
 		inst = amd64.MOVBQZX
+		vt = runtimeValueTypeI64
 	}
 
 	c.assembler.CompileMemoryWithIndexToRegister(inst,
@@ -3175,10 +3199,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 		amd64ReservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
 
-	top := c.pushValueLocationOnRegister(reg)
-
-	// The result of load8 is always int type.
-	top.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(reg, vt)
 	return nil
 }
 
@@ -3193,24 +3214,28 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	// Then move 2 bytes at the offset to the register.
 	// Note that Load16 is only for integer types.
 	var inst asm.Instruction
+	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
 		inst = amd64.MOVWLSX
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedInt64:
 		inst = amd64.MOVWQSX
+		vt = runtimeValueTypeI64
 	case wazeroir.SignedUint32:
 		inst = amd64.MOVWLZX
+		vt = runtimeValueTypeI32
 	case wazeroir.SignedUint64:
 		inst = amd64.MOVWQZX
+		vt = runtimeValueTypeI64
 	}
+
 	c.assembler.CompileMemoryWithIndexToRegister(inst,
 		// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 		amd64ReservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
 
-	top := c.pushValueLocationOnRegister(reg)
-	// The result of load16 is always int type.
-	top.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(reg, vt)
 	return nil
 }
 
@@ -3233,10 +3258,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 		// We access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 		amd64ReservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
-	top := c.pushValueLocationOnRegister(reg)
-
-	// The result of load32 is always int type.
-	top.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI64)
 	return nil
 }
 
@@ -3245,7 +3267,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 // as memory.Buffer[ceil-targetSizeInBytes: ceil].
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
-// In other words, if the ceil exceeds the memory size, the code exits with compilerCallStatusCodeMemoryOutOfBounds status.
+// In other words, if the ceil exceeds the memory size, the code exits with nativeCallStatusCodeMemoryOutOfBounds status.
 func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (asm.Register, error) {
 	base := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(base); err != nil {
@@ -3256,8 +3278,8 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
 		c.assembler.CompileConstToRegister(amd64.ADDQ, offsetConst, result)
 	} else {
-		// If the offset const is too large, we exit with compilerCallStatusCodeMemoryOutOfBounds.
-		c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
+		// If the offset const is too large, we exit with nativeCallStatusCodeMemoryOutOfBounds.
+		c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 		return result, nil
 	}
 
@@ -3269,7 +3291,7 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	okJmp := c.assembler.CompileJump(amd64.JCC)
 
 	// Otherwise, we exit the function with out of bounds status code.
-	c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
+	c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 
 	c.assembler.SetJumpTargetOnNext(okJmp)
 
@@ -3348,11 +3370,11 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 func (c *amd64Compiler) compileMemorySize() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
-	loc := c.pushValueLocationOnRegister(reg)
+	loc := c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
 
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, loc.register)
 
@@ -3373,9 +3395,9 @@ func (c *amd64Compiler) compileMemoryInit(o *wazeroir.OperationMemoryInit) error
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
 func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) error {
-	outOfBoundsErrorStatus := compilerCallStatusCodeMemoryOutOfBounds
+	outOfBoundsErrorStatus := nativeCallStatusCodeMemoryOutOfBounds
 	if isTable {
-		outOfBoundsErrorStatus = compilerCallStatusCodeInvalidTableAccess
+		outOfBoundsErrorStatus = nativeCallStatusCodeInvalidTableAccess
 	}
 
 	copySize := c.locationStack.pop()
@@ -3393,7 +3415,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		return err
 	}
 
-	instanceAddr, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	instanceAddr, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3404,7 +3426,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		c.compileLoadDataInstanceAddress(index, instanceAddr)
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3502,7 +3524,7 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 // compileDataDrop implements compiler.compileDataDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3539,9 +3561,9 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
 func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableIndex uint32) error {
-	outOfBoundsErrorStatus := compilerCallStatusCodeMemoryOutOfBounds
+	outOfBoundsErrorStatus := nativeCallStatusCodeMemoryOutOfBounds
 	if isTable {
-		outOfBoundsErrorStatus = compilerCallStatusCodeInvalidTableAccess
+		outOfBoundsErrorStatus = nativeCallStatusCodeInvalidTableAccess
 	}
 
 	copySize := c.locationStack.pop()
@@ -3559,7 +3581,7 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		return err
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3730,7 +3752,7 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 		return err
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3761,9 +3783,9 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	}
 	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
 	if isTable {
-		c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
+		c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 	} else {
-		c.compileExitFromNativeCode(compilerCallStatusCodeMemoryOutOfBounds)
+		c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 	}
 	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
 
@@ -3829,7 +3851,7 @@ func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 
 // compileElemDrop implements compiler.compileElemDrop for the amd64 architecture.
 func (c *amd64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3858,7 +3880,7 @@ func (c *amd64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 
 // compileTableGet implements compiler.compileTableGet for the amd64 architecture.
 func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
-	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3883,7 +3905,7 @@ func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 	// Out of bounds check.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, ref, tableInstanceTableLenOffset, offset.register)
 	boundOKJmp := c.assembler.CompileJump(amd64.JHI)
-	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(boundOKJmp)
 
 	// ref = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
@@ -3898,7 +3920,7 @@ func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 	)
 
 	c.locationStack.markRegisterUnused(offset.register)
-	c.pushValueLocationOnRegister(ref)
+	c.pushRuntimeValueLocationOnRegister(ref, runtimeValueTypeI64) // table elements are opaque 64-bit at runtime.
 	return nil
 }
 
@@ -3914,7 +3936,7 @@ func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 		return err
 	}
 
-	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -3932,7 +3954,7 @@ func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 	// Out of bounds check.
 	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, offset.register)
 	boundOKJmp := c.assembler.CompileJump(amd64.JHI)
-	c.compileExitFromNativeCode(compilerCallStatusCodeInvalidTableAccess)
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(boundOKJmp)
 
 	// tmp = [&tables[TableIndex] + tableInstanceTableOffset] = &tables[TableIndex].References[0]
@@ -3971,7 +3993,7 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 	}
 
 	// Then, the previous length was pushed as the result.
-	c.locationStack.pushValueLocationOnStack()
+	c.locationStack.pushRuntimeValueLocationOnStack()
 
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerInitialization()
@@ -3980,7 +4002,7 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 // compileTableSize implements compiler.compileTableSize for the amd64 architecture.
 func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
-	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -4000,7 +4022,7 @@ func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
 	//        = len(tables[TableIndex])
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, result, tableInstanceTableLenOffset, result)
 
-	c.pushValueLocationOnRegister(result)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
 	return nil
 }
 
@@ -4011,7 +4033,7 @@ func (c *amd64Compiler) compileTableFill(o *wazeroir.OperationTableFill) error {
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
 func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
-	ref, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -4030,7 +4052,7 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 		ref, int64(o.FunctionIndex)*8, // * 8 because the size of *code equals 8 bytes.
 		ref,
 	)
-	c.pushValueLocationOnRegister(ref)
+	c.pushRuntimeValueLocationOnRegister(ref, runtimeValueTypeI64)
 	return nil
 }
 
@@ -4038,13 +4060,11 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
-	loc := c.pushValueLocationOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
-
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI32)
 	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.Value), reg)
 	return nil
 }
@@ -4053,12 +4073,11 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
-	loc := c.pushValueLocationOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeI64)
 
 	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.Value), reg)
 	return nil
@@ -4068,21 +4087,20 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	reg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
-	loc := c.pushValueLocationOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF32)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmpReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
 
-	c.assembler.CompileConstToRegister(amd64.MOVL, int64(uint64(math.Float32bits(o.Value))), tmpReg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(math.Float32bits(o.Value)), tmpReg)
 	c.assembler.CompileRegisterToRegister(amd64.MOVL, tmpReg, reg)
 	return nil
 }
@@ -4091,16 +4109,15 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	reg, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
-	loc := c.pushValueLocationOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF32)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmpReg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}
@@ -4110,12 +4127,27 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return nil
 }
 
-func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
+func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
+	var inst asm.Instruction
+	switch loc.valueType {
+	case runtimeValueTypeV128Lo:
+		inst = amd64.MOVDQU
+	case runtimeValueTypeV128Hi:
+		panic("BUG: V128Hi must be be loaded to a register along with V128Lo")
+	default:
+		inst = amd64.MOVQ
+	}
 	// Copy the value from the stack.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
+	c.assembler.CompileMemoryToRegister(inst,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		amd64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8,
 		loc.register)
+
+	if loc.valueType == runtimeValueTypeV128Lo {
+		// Higher 64-bits are loaded as well ^^.
+		hi := c.locationStack.stack[loc.stackPointer+1]
+		hi.setRegister(loc.register)
+	}
 }
 
 // maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
@@ -4135,13 +4167,13 @@ func (c *amd64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegist
 
 // loadConditionalRegisterToGeneralPurposeRegister saves the conditional register value
 // to a general purpose register.
-func (c *amd64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *valueLocation) {
+func (c *amd64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *runtimeValueLocation) {
 	// Get the free register.
-	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	reg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 	c.compileMoveConditionalToGeneralPurposeRegister(loc, reg)
 }
 
-func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valueLocation, reg asm.Register) {
+func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *runtimeValueLocation, reg asm.Register) {
 	// Set the flag bit to the destination. See
 	// - https://c9x.me/x86/html/file_module_x86_id_288.html
 	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
@@ -4181,7 +4213,6 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valu
 
 	// Mark it uses the register.
 	loc.setRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	c.locationStack.markRegisterUsed(reg)
 }
 
@@ -4189,7 +4220,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valu
 // either from the free register pool or by stealing an used register.
 // Note that resulting registers are NOT marked as used so the call site should
 // mark it used if necessary.
-func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg asm.Register, err error) {
+func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
 	reg, ok = c.locationStack.takeFreeRegister(t)
@@ -4226,7 +4257,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, codeAddressReg
 	}
 
 	// Obtain the temporary registers to be used in the followings.
-	freeRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 4)
+	freeRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 4)
 	if !found {
 		// This in theory never happen as all the registers must be free except codeAddressRegister.
 		return fmt.Errorf("could not find enough free registers")
@@ -4253,7 +4284,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, codeAddressReg
 	if !isNilRegister(codeAddressRegister) {
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
 		// call-frame stack, as the register is not saved across function calls.
-		savedOffsetLocation := c.pushValueLocationOnRegister(codeAddressRegister)
+		savedOffsetLocation := c.pushRuntimeValueLocationOnRegister(codeAddressRegister, runtimeValueTypeI64)
 		c.compileReleaseRegisterToStack(savedOffsetLocation)
 	}
 
@@ -4335,7 +4366,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, codeAddressReg
 	}
 
 	// 2) Set callEngine.valueStackContext.stackBasePointer for the next function.
-	if offset := int64(c.locationStack.sp) - int64(len(functype.Params)); offset > 0 {
+	if offset := int64(c.locationStack.sp) - int64(functype.ParamNumInUint64); offset > 0 {
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in callEngine.pushCallFrame which does exactly the same calculation in Go.
@@ -4433,7 +4464,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	defer c.locationStack.markRegisterUnused(amd64CallingConventionModuleInstanceAddressRegister)
 
 	// Obtain the temporary registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
@@ -4442,7 +4473,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Alias these free tmp registers for readability.
 	decrementedCallFrameStackPointerRegister, callFrameStackTopAddressRegister, tmpRegister := regs[0], regs[1], regs[2]
 
-	// Since we return from the function, we need to decement the callframe stack pointer.
+	// Since we return from the function, we need to decrement the callframe stack pointer.
 	c.assembler.CompileNoneToMemory(amd64.DECQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Next, get the decremented callframe stack pointer into decrementedCallFrameStackPointerRegister.
@@ -4457,7 +4488,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 
 	// If the callframe stack pointer equals the previous one,
 	// we exit the Compiler call with returned status.
-	c.compileExitFromNativeCode(compilerCallStatusCodeReturned)
+	c.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 	// Otherwise, we return back to the top call frame.
 	//
@@ -4533,21 +4564,21 @@ func (c *amd64Compiler) compileReturnFunction() error {
 }
 
 func (c *amd64Compiler) compileCallHostFunction() error {
-	return c.compileCallGoFunction(compilerCallStatusCodeCallHostFunction)
+	return c.compileCallGoFunction(nativeCallStatusCodeCallHostFunction)
 }
 
 func (c *amd64Compiler) compileCallBuiltinFunction(index wasm.Index) error {
 	// Set the functionAddress to the callEngine.exitContext functionCallAddress.
 	c.assembler.CompileConstToMemory(amd64.MOVL, int64(index), amd64ReservedRegisterForCallEngine, callEngineExitContextBuiltinFunctionCallAddressOffset)
-	return c.compileCallGoFunction(compilerCallStatusCodeCallBuiltInFunction)
+	return c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction)
 }
 
-func (c *amd64Compiler) compileCallGoFunction(compilerStatus compilerCallStatusCode) error {
+func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCode) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	c.compileReleaseAllRegistersToStack()
 
 	// Obtain the temporary registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
 		// This in theory never happen as all the registers must be free except indexReg.
 		return fmt.Errorf("could not find enough free registers")
@@ -4609,18 +4640,33 @@ func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	}
 }
 
-func (c *amd64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
-	// Push value.
-	c.assembler.CompileRegisterToMemory(amd64.MOVQ, loc.register,
+func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
+	var inst asm.Instruction
+	switch loc.valueType {
+	case runtimeValueTypeV128Lo:
+		inst = amd64.MOVDQU
+	case runtimeValueTypeV128Hi:
+		panic("BUG: V128Hi must be released to the stack along with V128Lo")
+	default:
+		inst = amd64.MOVQ
+	}
+
+	c.assembler.CompileRegisterToMemory(inst, loc.register,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		amd64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
+
+	if loc.valueType == runtimeValueTypeV128Lo {
+		// Higher 64-bits are released as well ^^.
+		hi := c.locationStack.stack[loc.stackPointer+1]
+		c.locationStack.releaseRegister(hi)
+	}
 }
 
-func (c *amd64Compiler) compileExitFromNativeCode(status compilerCallStatusCode) {
-	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), amd64ReservedRegisterForCallEngine, callEngineExitContextCompilerCallStatusCodeOffset)
+func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
+	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), amd64ReservedRegisterForCallEngine, callEngineExitContextnativeCallStatusCodeOffset)
 
 	// Write back the cached SP to the actual eng.stackPointer.
 	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp), amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)
@@ -4657,7 +4703,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 
 	// Since initializeReservedRegisters is called at the beginning of function
 	// calls (or right after they return), we have free registers at this point.
-	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	tmpReg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 
 	// Next we move the base pointer (callEngine.stackBasePointer) to the tmp register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
@@ -4685,7 +4731,7 @@ func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
 // and if so, make the builtin function call to do so. These instructions are called in the function's
 // preamble.
 func (c *amd64Compiler) compileMaybeGrowValueStack() error {
-	tmpRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
+	tmpRegister, _ := c.allocateRegister(registerTypeGeneralPurpose)
 
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset, tmpRegister)
 	c.assembler.CompileMemoryToRegister(amd64.SUBQ, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
@@ -4718,7 +4764,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	defer c.locationStack.markRegisterUnused(amd64CallingConventionModuleInstanceAddressRegister)
 
 	// Obtain the temporary registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
 		// This in theory never happen as all the registers must be free except indexReg.
 		return fmt.Errorf("could not find enough free registers")
@@ -4868,10 +4914,10 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 
 // compileEnsureOnGeneralPurposeRegister ensures that the given value is located on a
 // general purpose register of an appropriate type.
-func (c *amd64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error {
+func (c *amd64Compiler) compileEnsureOnGeneralPurposeRegister(loc *runtimeValueLocation) error {
 	if loc.onStack() {
 		// Allocate the register.
-		reg, err := c.allocateRegister(loc.registerType())
+		reg, err := c.allocateRegister(loc.getRegisterType())
 		if err != nil {
 			return err
 		}
