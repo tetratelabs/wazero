@@ -49,9 +49,9 @@ func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, n
 
 	// Print results before deciding if this failed
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	_, _ = w.Write([]byte(fmt.Sprintf("Benchmark%s/Call-16\n", name)))
+	_, _ = fmt.Fprintf(w, "Benchmark%s/Call-16\n", name)
 	for _, result := range results {
-		_, _ = w.Write([]byte(fmt.Sprintf("%s\t%.2f\tns/op\n", result.name, result.nsOp)))
+		_, _ = fmt.Fprintf(w, "%s\t%.2f\tns/op\n", result.name, result.nsOp)
 	}
 	_ = w.Flush()
 

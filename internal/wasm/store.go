@@ -641,7 +641,7 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 	return
 }
 
-// GlobalInstanceNullFuncRefValue is the temporarly value for ValueTypeFuncref globals which are initialized via ref.null.
+// GlobalInstanceNullFuncRefValue is the temporary value for ValueTypeFuncref globals which are initialized via ref.null.
 const GlobalInstanceNullFuncRefValue int64 = -1
 
 func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {

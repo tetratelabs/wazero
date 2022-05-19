@@ -8,7 +8,7 @@ import "github.com/tetratelabs/wazero/internal/asm"
 // See https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf
 const (
 	ConditionalRegisterStateE  = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
-	ConditionalRegisterStateNE                                                //˜ZF not equal to zero
+	ConditionalRegisterStateNE                                                // ˜ZF not equal to zero
 	ConditionalRegisterStateS                                                 // SF negative
 	ConditionalRegisterStateNS                                                // ˜SF non-negative
 	ConditionalRegisterStateG                                                 // ˜(SF xor OF) & ˜ ZF greater (signed >)

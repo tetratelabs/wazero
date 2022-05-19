@@ -335,7 +335,7 @@ func RegisterName(r asm.Register) string {
 	case REG_COND_NV:
 		return "COND_NV"
 	}
-	return "UNKOWN"
+	return "UNKNOWN"
 }
 
 // Arm64-specific instructions.
