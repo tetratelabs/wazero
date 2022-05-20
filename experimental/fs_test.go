@@ -1,4 +1,4 @@
-package fs_test
+package experimental_test
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/tetratelabs/wazero/experimental/fs"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // This is a very basic integration of fs config. The main goal is to show how it is configured.
@@ -18,15 +18,15 @@ func TestWithFS(t *testing.T) {
 	mapfs := fstest.MapFS{fileName: &fstest.MapFile{Data: []byte(`animals`)}}
 
 	// Set context to one that has experimental fs config
-	ctx, closer, err := fs.WithFS(context.Background(), mapfs)
+	ctx, closer, err := experimental.WithFS(context.Background(), mapfs)
 	if err != nil {
 		log.Panicln(err)
 	}
 	defer closer.Close(ctx)
 
-	v := ctx.Value(fs.FSKey{})
+	v := ctx.Value(fs.Key{})
 	require.NotNil(t, v)
-	fsCtx, ok := v.(*wasm.FSContext)
+	fsCtx, ok := v.(*fs.Context)
 	require.True(t, ok)
 
 	entry, ok := fsCtx.OpenedFile(3)

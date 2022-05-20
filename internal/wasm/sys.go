@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/tetratelabs/wazero/internal/fs"
 )
 
 // SysContext holds module-scoped system resources currently only used by internalwasi.
@@ -15,7 +17,7 @@ type SysContext struct {
 	stdout, stderr        io.Writer
 	randSource            io.Reader
 
-	fs *FSContext
+	fs *fs.Context
 }
 
 // Args is like os.Args and defaults to nil.
@@ -70,9 +72,9 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
-func (c *SysContext) FS() *FSContext {
+func (c *SysContext) FS() *fs.Context {
 	if c.fs == nil {
-		return &FSContext{}
+		return &fs.Context{}
 	}
 	return c.fs
 }
@@ -108,7 +110,7 @@ var _ = DefaultSysContext() // Force panic on bug.
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
+func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*fs.FileEntry) (sys *SysContext, err error) {
 	sys = &SysContext{args: args, environ: environ}
 
 	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
@@ -143,7 +145,7 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sys.randSource = randSource
 	}
 
-	sys.fs = NewFSContext(openedFiles)
+	sys.fs = fs.NewContext(openedFiles)
 
 	return
 }

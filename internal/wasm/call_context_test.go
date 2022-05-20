@@ -3,9 +3,9 @@ package wasm
 import (
 	"context"
 	"fmt"
-	"path"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -141,10 +141,6 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls SysContext.Close()", func(t *testing.T) {
-		tempDir := t.TempDir()
-		pathName := "test"
-		file, _ := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
-
 		sys, err := NewSysContext(
 			0,   // max
 			nil, // args
@@ -153,9 +149,8 @@ func TestCallContext_Close(t *testing.T) {
 			nil, // stdout
 			nil, // stderr
 			nil, // randSource
-			map[uint32]*FileEntry{ // openedFiles
+			map[uint32]*fs.FileEntry{ // openedFiles
 				3: {Path: "."},
-				4: {Path: path.Join(".", pathName), File: file},
 			},
 		)
 		require.NoError(t, err)
@@ -168,13 +163,15 @@ func TestCallContext_Close(t *testing.T) {
 
 		// We use side effects to determine if Close in fact called SysContext.Close (without repeating sys_test.go).
 		// One side effect of SysContext.Close is that it clears the openedFiles map. Verify our base case.
-		require.True(t, len(fsCtx.openedFiles) > 0, "sys.openedFiles was empty")
+		_, ok := fsCtx.OpenedFile(3)
+		require.True(t, ok, "sys.openedFiles was empty")
 
 		// Closing should not err.
 		require.NoError(t, m.Close(testCtx))
 
 		// Verify our intended side-effect
-		require.Equal(t, 0, len(fsCtx.openedFiles), "expected no opened files")
+		_, ok = fsCtx.OpenedFile(3)
+		require.False(t, ok, "expected no opened files")
 
 		// Verify no error closing again.
 		require.NoError(t, m.Close(testCtx))

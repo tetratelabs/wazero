@@ -1,4 +1,4 @@
-package wasm
+package fs
 
 import (
 	"context"
@@ -7,6 +7,11 @@ import (
 	"math"
 	"sync/atomic"
 )
+
+// Key is a context.Context Value key. It allows overriding fs.FS for WASI.
+//
+// See https://github.com/tetratelabs/wazero/issues/491
+type Key struct{}
 
 // FileEntry maps a path to an open file in a file system.
 //
@@ -18,7 +23,7 @@ type FileEntry struct {
 	File fs.File
 }
 
-type FSContext struct {
+type Context struct {
 	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles map[uint32]*FileEntry
@@ -27,8 +32,8 @@ type FSContext struct {
 	lastFD uint32
 }
 
-func NewFSContext(openedFiles map[uint32]*FileEntry) *FSContext {
-	var fsCtx FSContext
+func NewContext(openedFiles map[uint32]*FileEntry) *Context {
+	var fsCtx Context
 	if openedFiles == nil {
 		fsCtx.openedFiles = map[uint32]*FileEntry{}
 		fsCtx.lastFD = 2 // STDERR
@@ -47,7 +52,7 @@ func NewFSContext(openedFiles map[uint32]*FileEntry) *FSContext {
 // nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
 // TODO: opendFiles is still not goroutine safe!
 // TODO: This can return zero if we ran out of file descriptors. A future change can optimize by re-using an FD pool.
-func (c *FSContext) nextFD() uint32 {
+func (c *Context) nextFD() uint32 {
 	if c.lastFD == math.MaxUint32 {
 		return 0
 	}
@@ -55,7 +60,7 @@ func (c *FSContext) nextFD() uint32 {
 }
 
 // Close implements io.Closer
-func (c *FSContext) Close(_ context.Context) (err error) {
+func (c *Context) Close(_ context.Context) (err error) {
 	// Close any files opened in this context
 	for fd, entry := range c.openedFiles {
 		delete(c.openedFiles, fd)
@@ -69,7 +74,7 @@ func (c *FSContext) Close(_ context.Context) (err error) {
 }
 
 // CloseFile returns true if a file was opened and closed without error, or false if not.
-func (c *FSContext) CloseFile(fd uint32) (bool, error) {
+func (c *Context) CloseFile(fd uint32) (bool, error) {
 	f, ok := c.openedFiles[fd]
 	if !ok {
 		return false, nil
@@ -86,13 +91,13 @@ func (c *FSContext) CloseFile(fd uint32) (bool, error) {
 }
 
 // OpenedFile returns a file and true if it was opened or nil and false, if not.
-func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
+func (c *Context) OpenedFile(fd uint32) (*FileEntry, bool) {
 	f, ok := c.openedFiles[fd]
 	return f, ok
 }
 
 // OpenFile returns the file descriptor of the new file or false if we ran out of file descriptors
-func (c *FSContext) OpenFile(f *FileEntry) (uint32, bool) {
+func (c *Context) OpenFile(f *FileEntry) (uint32, bool) {
 	newFD := c.nextFD()
 	if newFD == 0 {
 		return 0, false

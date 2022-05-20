@@ -19,7 +19,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	expfs "github.com/tetratelabs/wazero/experimental/fs"
+	fs2 "github.com/tetratelabs/wazero/internal/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -547,7 +547,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		entry2, errno := openFileEntry(testFs, path2)
 		require.Zero(t, errno, ErrnoName(errno))
 
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 			fdToClose: entry1,
 			fdToKeep:  entry2,
 		})
@@ -559,11 +559,12 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 
 	verify := func(mod api.Module) {
 		// Verify fdToClose is closed and removed from the opened FDs.
-		_, ok := fsCtx(testCtx, mod).OpenedFile(fdToClose)
+		_, fsc := sysFSCtx(testCtx, mod)
+		_, ok := fsc.OpenedFile(fdToClose)
 		require.False(t, ok)
 
 		// Verify fdToKeep is not closed
-		_, ok = fsCtx(testCtx, mod).OpenedFile(fdToKeep)
+		_, ok = fsc.OpenedFile(fdToKeep)
 		require.True(t, ok)
 	}
 
@@ -732,7 +733,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	pathName := "/tmp"
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: pathName}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: pathName}})
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
@@ -777,7 +778,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
@@ -819,7 +820,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
@@ -860,7 +861,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 
 func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
@@ -982,7 +983,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to read the contents from
 			file, testFS := createFile(t, "test_path", []byte("wazero"))
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+			sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 				fd: {Path: "test_path", FS: testFS, File: file},
 			})
 			require.NoError(t, err)
@@ -1009,7 +1010,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	validFD := uint32(3)                                 // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, testFS := createFile(t, "test_path", []byte{}) // file with empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1138,7 +1139,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	resultNewoffset := uint32(1)                                 // arbitrary offset in `ctx.Memory` for the new offset value
 	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 		fd: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1246,7 +1247,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 	validFD := uint32(3)                                         // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1377,7 +1378,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			// Create a fresh file to write the contents to
 			pathName := "test_path"
 			file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+			sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 				fd: {Path: pathName, FS: testFS, File: file},
 			})
 			require.NoError(t, err)
@@ -1412,7 +1413,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	pathName := "test_path"
 	file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 		validFD: {Path: pathName, FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1593,7 +1594,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		}
 
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 			workdirFD: {Path: ".", FS: testFS},
 		})
 		require.NoError(t, err)
@@ -1612,7 +1613,8 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		require.Equal(t, expectedMemory, actual)
 
 		// verify the file was actually opened
-		f, ok := fsCtx(ctx, mod).OpenedFile(expectedFD)
+		_, fsc := sysFSCtx(ctx, mod)
+		f, ok := fsc.OpenedFile(expectedFD)
 		require.True(t, ok)
 		require.Equal(t, pathName, f.Path)
 	}
@@ -1651,7 +1653,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		expectedFD := workdirFD + 1
 		expectedMemory[8] = byte(expectedFD) // replace expected memory with expected fd
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-		ctx, closer, err := expfs.WithFS(testCtx, testFS)
+		ctx, closer, err := experimental.WithFS(testCtx, testFS)
 		require.NoError(t, err)
 		defer closer.Close(ctx)
 
@@ -1668,7 +1670,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	pathName := "wazero"
 	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
 		validFD: {Path: ".", FS: testFS},
 	})
 	require.NoError(t, err)
@@ -2122,7 +2124,7 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
 	return a, mod, fn
 }
 
-func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sysCtx *wasm.SysContext, err error) {
+func newSysContext(args, environ []string, openedFiles map[uint32]*fs2.FileEntry) (sysCtx *wasm.SysContext, err error) {
 	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, nil, openedFiles)
 }
 
