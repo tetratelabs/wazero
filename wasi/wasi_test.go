@@ -2003,7 +2003,7 @@ func (d *fakeSysErr) TimeNowUnixNano() uint64 {
 }
 
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		randSource io.Reader
 	}{
@@ -2015,7 +2015,10 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 			name:       "incomplete",
 			randSource: bytes.NewReader([]byte{1, 2}),
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			var errCtx = context.WithValue(context.Background(), experimental.SysKey{}, &fakeSysErr{})
 

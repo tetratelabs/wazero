@@ -293,7 +293,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 		}
 	})
 	t.Run("errors", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			body                []byte
 			dataSection         []*DataSegment
 			elementSection      []*ElementSegment
@@ -635,7 +635,10 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 				tables:      []*Table{{}},
 				expectedErr: "cannot pop the operand for table.copy: i32 missing",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expectedErr, func(t *testing.T) {
 				m := &Module{
 					TypeSection:     []*FunctionType{v_v},
@@ -2231,7 +2234,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 }
 
 func TestModule_funcValidation_RefTypes(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name                    string
 		body                    []byte
 		flag                    Features
@@ -2310,8 +2313,10 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 			},
 			expectedErr: "ref.func invalid as feature \"reference-types\" is disabled",
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},
@@ -2330,7 +2335,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 
 func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 	tables := []*Table{{Type: RefTypeFuncref}, {Type: RefTypeExternref}}
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		body        []byte
 		flag        Features
@@ -2476,8 +2481,10 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 			flag:        FeatureReferenceTypes,
 			expectedErr: `table of index 10 not found`,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},
@@ -2496,7 +2503,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 
 func TestModule_funcValidation_TableGetSet(t *testing.T) {
 	tables := []*Table{{Type: RefTypeFuncref}, {Type: RefTypeExternref}}
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		body        []byte
 		flag        Features
@@ -2586,8 +2593,10 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 			flag:        Features20191205,
 			expectedErr: `table.set is invalid as feature "reference-types" is disabled`,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},
@@ -2605,7 +2614,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 }
 
 func TestModule_funcValidation_Select_error(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		body        []byte
 		flag        Features
@@ -2641,8 +2650,10 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 			flag:        FeatureReferenceTypes,
 			expectedErr: `invalid type unknown for typed_select`,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},
@@ -2656,7 +2667,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 }
 
 func TestModule_funcValidation_SIMD(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		body        []byte
 		expectedErr string
@@ -2706,8 +2717,10 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				OpcodeEnd,
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},
@@ -2721,7 +2734,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 }
 
 func TestModule_funcValidation_SIMD_error(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		body        []byte
 		flag        Features
@@ -2787,8 +2800,10 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			flag:        FeatureSIMD,
 			expectedErr: "TODO: SIMD instruction f32x4.demote_f64x2_zero will be implemented in #506",
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := &Module{
 				TypeSection:     []*FunctionType{v_v},

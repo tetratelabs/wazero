@@ -67,7 +67,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 	thenBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}}
 	elseBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name      string
 		setupFunc func(t *testing.T, compiler compilerImpl, shouldGoElse bool)
 	}{
@@ -223,8 +223,10 @@ func TestCompiler_compileBrIf(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			for _, shouldGoToElse := range []bool{false, true} {
 				shouldGoToElse := shouldGoToElse
@@ -308,7 +310,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		}
 	}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name          string
 		index         int64
 		o             *wazeroir.OperationBrTable
@@ -419,8 +421,10 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			index:         4,
 			expectedValue: 5,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)

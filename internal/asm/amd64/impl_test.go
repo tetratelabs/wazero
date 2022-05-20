@@ -29,7 +29,7 @@ func TestNodeImpl_AssignSourceConstant(t *testing.T) {
 }
 
 func TestNodeImpl_String(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		in  *NodeImpl
 		exp string
 	}{
@@ -101,7 +101,10 @@ func TestNodeImpl_String(t *testing.T) {
 			in:  &NodeImpl{Instruction: MOVQ, Types: OperandTypesConstToRegister, SrcConst: 123, DstReg: REG_AX},
 			exp: "MOVQ 0x7b, AX",
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		require.Equal(t, tc.exp, tc.in.String())
 	}
 }
@@ -142,7 +145,7 @@ func TestAssemblerImpl_encodeNode(t *testing.T) {
 }
 
 func TestAssemblerImpl_padNOP(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		num      int
 		expected []byte
 	}{
@@ -164,8 +167,10 @@ func TestAssemblerImpl_padNOP(t *testing.T) {
 		{num: 16, expected: append(nopOpcodes[8][:9], nopOpcodes[6][:7]...)},
 		{num: 17, expected: append(nopOpcodes[8][:9], nopOpcodes[7][:8]...)},
 		{num: 18, expected: append(nopOpcodes[8][:9], nopOpcodes[8][:9]...)},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(tc.num), func(t *testing.T) {
 			a := NewAssemblerImpl()
 			a.padNOP(tc.num)
@@ -358,7 +363,7 @@ func TestAssemblerImpl_CompileMemoryToConst(t *testing.T) {
 }
 
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		inst   asm.Instruction
 		exp    []byte
 		expErr bool
@@ -368,8 +373,10 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		{inst: CQO, exp: []byte{0x48, 0x99}},
 		{inst: NOP, exp: nil},
 		{inst: RET, exp: []byte{0xc3}},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(InstructionName(tc.inst), func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.encodeNoneToNone(&NodeImpl{Instruction: tc.inst, Types: OperandTypesNoneToNone})
@@ -385,7 +392,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 
 func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
-	for _, tc := range []struct {
+	tests := []struct {
 		n   *NodeImpl
 		exp []byte
 	}{
@@ -409,8 +416,10 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			},
 			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0x5d, 0xa},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.n.String(), func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.EncodeMemoryToRegister(tc.n)
@@ -426,7 +435,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
-	for _, tc := range []struct {
+	tests := []struct {
 		n   *NodeImpl
 		exp []byte
 	}{
@@ -450,8 +459,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			},
 			exp: []byte{0xf3, 0x41, 0xf, 0x7f, 0x5d, 0x0},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.n.String(), func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.EncodeRegisterToMemory(tc.n)
@@ -467,7 +478,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
-	for _, tc := range []struct {
+	tests := []struct {
 		n   *NodeImpl
 		exp []byte
 	}{
@@ -498,8 +509,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 			exp: []byte{0xf3, 0x45, 0xf, 0x6f, 0xfa},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.n.String(), func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.EncodeRegisterToRegister(tc.n)

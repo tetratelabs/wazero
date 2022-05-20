@@ -824,7 +824,7 @@ func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 }
 
 func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		is32bit    bool
 		setupFunc  func(t *testing.T, compiler compilerImpl)
@@ -932,8 +932,10 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				}
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			for _, vs := range [][2]float64{
 				{100, -1.1}, {100, 0}, {0, 0}, {1, 1},
@@ -1000,7 +1002,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 }
 
 func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		is32bit    bool
 		setupFunc  func(t *testing.T, compiler compilerImpl)
@@ -1244,8 +1246,10 @@ func TestCompiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 				}
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			for _, v := range []float64{
 				0, 1 << 63, 1<<63 | 12345, 1 << 31,

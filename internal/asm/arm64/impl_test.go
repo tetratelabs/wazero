@@ -28,7 +28,7 @@ func TestNodeImpl_AssignSourceConstant(t *testing.T) {
 }
 
 func TestNodeImpl_String(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		in  *NodeImpl
 		exp string
 	}{
@@ -126,7 +126,10 @@ func TestNodeImpl_String(t *testing.T) {
 				SrcReg: REG_V3, DstReg: REG_V29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
 			exp: "VCNT V3.V3, V29.V3",
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		require.Equal(t, tc.exp, tc.in.String())
 	}
 }
@@ -432,7 +435,7 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 }
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		src, dst                     asm.Register
 		requireSrcInt, requireDstInt bool
 		expErr                       string
@@ -456,7 +459,10 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
 		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
 		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got V30"},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		actual := checkRegisterToRegisterType(tc.src, tc.dst, tc.requireSrcInt, tc.requireDstInt)
 		if tc.expErr != "" {
 			require.EqualError(t, actual, tc.expErr)
@@ -467,14 +473,17 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 }
 
 func Test_validateMemoryOffset(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		offset int64
 		expErr string
 	}{
 		{offset: 0}, {offset: -256}, {offset: 255}, {offset: 123 * 8},
 		{offset: -257, expErr: "negative memory offset must be larget than or equal -256 but got -257"},
 		{offset: 257, expErr: "large memory offset (>255) must be a multiple of 8 but got 257"},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		actual := validateMemoryOffset(tc.offset)
 		if tc.expErr == "" {
 			require.NoError(t, actual)
@@ -486,7 +495,7 @@ func Test_validateMemoryOffset(t *testing.T) {
 
 func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	x1, x2 := REG_V2, REG_V10
-	for _, tc := range []struct {
+	tests := []struct {
 		inst asm.Instruction
 		exp  []byte
 	}{
@@ -497,8 +506,10 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		{inst: VFADDS, exp: []byte{
 			0x4a, 0xd4, 0x2a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 		}},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(InstructionName(tc.inst), func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeVectorRegisterToVectorRegister(&NodeImpl{

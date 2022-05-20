@@ -12,7 +12,7 @@ import (
 
 func TestCompiler_releaseRegisterToStack(t *testing.T) {
 	const val = 10000
-	for _, tc := range []struct {
+	tests := []struct {
 		name         string
 		stackPointer uint64
 		isFloat      bool
@@ -21,8 +21,10 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 		{name: "float", stackPointer: 10, isFloat: true},
 		{name: "int-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: false},
 		{name: "float-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: true},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 
@@ -74,7 +76,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 
 func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 	const val = 123
-	for _, tc := range []struct {
+	tests := []struct {
 		name         string
 		stackPointer uint64
 		isFloat      bool
@@ -83,8 +85,10 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 		{name: "float", stackPointer: 10, isFloat: true},
 		{name: "int-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: false},
 		{name: "float-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: true},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 
@@ -158,14 +162,16 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 	const pickTargetLo, pickTargetHi uint64 = 12345, 6789
 
 	op := &wazeroir.OperationPick{Depth: 2, IsTargetVector: true}
-	for _, tc := range []struct {
+	tests := []struct {
 		name                   string
 		isPickTargetOnRegister bool
 	}{
 		{name: "target on register", isPickTargetOnRegister: false},
 		{name: "target on stack", isPickTargetOnRegister: true},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -227,7 +233,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 func TestCompiler_compilePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
 	op := &wazeroir.OperationPick{Depth: 1}
-	for _, tc := range []struct {
+	tests := []struct {
 		name                                      string
 		pickTargetSetupFunc                       func(compiler compilerImpl, ce *callEngine) error
 		isPickTargetFloat, isPickTargetOnRegister bool
@@ -270,8 +276,10 @@ func TestCompiler_compilePick(t *testing.T) {
 			isPickTargetFloat:      false,
 			isPickTargetOnRegister: false,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -466,7 +474,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 	// And for each case, we have to test with
 	// three conditional value location: stack, gp register, conditional register.
 	// So in total we have 24 cases.
-	for i, tc := range []struct {
+	tests := []struct {
 		x1OnRegister, x2OnRegister                                        bool
 		selectX1                                                          bool
 		condlValueOnStack, condValueOnGPRegister, condValueOnCondRegister bool
@@ -498,7 +506,10 @@ func TestCompiler_compileSelect(t *testing.T) {
 		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
 		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
 		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
-	} {
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			for _, vals := range [][2]uint64{
 				{1, 2}, {0, 1}, {1, 0},
@@ -589,15 +600,17 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 	const x1Lo, x1Hi uint64 = 100000, 200000
 	const x2Lo, x2Hi uint64 = 1, 2
 
-	for _, tc := range []struct {
+	tests := []struct {
 		x1OnRegister, x2OnRegister bool
 	}{
 		{x1OnRegister: true, x2OnRegister: true},
 		{x1OnRegister: true, x2OnRegister: false},
 		{x1OnRegister: false, x2OnRegister: true},
 		{x1OnRegister: false, x2OnRegister: false},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("x1_register=%v, x2_register=%v", tc.x1OnRegister, tc.x2OnRegister), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -657,7 +670,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 
 func TestCompiler_compileSwap(t *testing.T) {
 	var x1Value, x2Value int64 = 100, 200
-	for i, tc := range []struct {
+	tests := []struct {
 		x1OnConditionalRegister, x1OnRegister, x2OnRegister bool
 	}{
 		{x1OnRegister: true, x2OnRegister: true},
@@ -667,7 +680,10 @@ func TestCompiler_compileSwap(t *testing.T) {
 		// x1 on conditional register
 		{x1OnConditionalRegister: true, x2OnRegister: false},
 		{x1OnConditionalRegister: true, x2OnRegister: true},
-	} {
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, nil)

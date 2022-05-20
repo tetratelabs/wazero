@@ -12,7 +12,7 @@ import (
 )
 
 func TestCompiler_compileModuleContextInitialization(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
 	}{
@@ -101,8 +101,10 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			name:           "all nil except mod engine",
 			moduleInstance: &wasm.ModuleInstance{},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			env.moduleInstance = tc.moduleInstance

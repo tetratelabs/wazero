@@ -19,7 +19,7 @@ func Test_ensureElementKindFuncRef(t *testing.T) {
 }
 
 func Test_decodeElementInitValueVector(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		in  []byte
 		exp []*wasm.Index
 	}{
@@ -31,7 +31,10 @@ func Test_decodeElementInitValueVector(t *testing.T) {
 			in:  []byte{5, 1, 2, 3, 4, 5},
 			exp: []*wasm.Index{uint32Ptr(1), uint32Ptr(2), uint32Ptr(3), uint32Ptr(4), uint32Ptr(5)},
 		},
-	} {
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			actual, err := decodeElementInitValueVector(bytes.NewReader(tc.in))
 			require.NoError(t, err)
@@ -41,7 +44,7 @@ func Test_decodeElementInitValueVector(t *testing.T) {
 }
 
 func Test_decodeElementConstExprVector(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		in       []byte
 		exp      []*wasm.Index
 		features wasm.Features
@@ -72,7 +75,10 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 			exp:      []*wasm.Index{nil, uint32Ptr(165675008), nil},
 			features: wasm.FeatureBulkMemoryOperations,
 		},
-	} {
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			actual, err := decodeElementConstExprVector(bytes.NewReader(tc.in), tc.features)
 			require.NoError(t, err)
@@ -82,7 +88,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 }
 
 func TestDecodeElementSegment(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		in       []byte
 		exp      *wasm.ElementSegment
@@ -357,8 +363,10 @@ func TestDecodeElementSegment(t *testing.T) {
 			},
 			features: wasm.FeatureBulkMemoryOperations,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := decodeElementSegment(bytes.NewReader(tc.in), tc.features)
 			if tc.expErr != "" {

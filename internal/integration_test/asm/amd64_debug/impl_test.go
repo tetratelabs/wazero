@@ -80,7 +80,7 @@ func TestAssemblerImpl_Assemble(t *testing.T) {
 
 func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 	t.Run("non relative jumps", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			name    string
 			setupFn func(assembler amd64.Assembler)
 		}{
@@ -116,8 +116,10 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 					}
 				},
 			},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
 				// TODO: remove golang-asm dependency in tests.
 				goasm, err := newGolangAsmAssembler()
@@ -183,7 +185,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 }
 
 func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name    string
 		setupFn func(assembler amd64.Assembler)
 	}{
@@ -307,8 +309,10 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 				assembler.CompileNoneToMemory(amd64.DECQ, amd64.REG_R10, 0)
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			for _, jmpInst := range []asm.Instruction{amd64.JCC, amd64.JCS, amd64.JEQ, amd64.JGE, amd64.JGT, amd64.JHI, amd64.JLE, amd64.JLS, amd64.JLT, amd64.JMI, amd64.JNE, amd64.JPC, amd64.JPS} {
 				t.Run(amd64.InstructionName(jmpInst), func(t *testing.T) {
@@ -363,7 +367,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 		require.Error(t, err)
 
 		t.Run("error", func(t *testing.T) {
-			for _, tc := range []struct {
+			tests := []struct {
 				n      *amd64.NodeImpl
 				expErr string
 			}{
@@ -375,7 +379,10 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 					n:      &amd64.NodeImpl{Instruction: amd64.JMP, Types: amd64.OperandTypesNoneToRegister},
 					expErr: "invalid register [nil]",
 				},
-			} {
+			}
+
+			for _, tt := range tests {
+				tc := tt
 				t.Run(tc.expErr, func(t *testing.T) {
 					tc := tc
 					a := amd64.NewAssemblerImpl()
@@ -416,7 +423,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -424,7 +431,10 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesNoneToMemory, DstReg: amd64.REG_AX},
 				expErr: "ADDL is unsupported for from:none,to:memory type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -476,7 +486,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 		})
 		t.Run("ok", func(t *testing.T) {
 			originOffset := uint64(0)
-			for _, tc := range []struct {
+			tests := []struct {
 				instruction                asm.Instruction
 				targetOffset               uint64
 				expectedOffsetFromEIP      int32
@@ -492,7 +502,10 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 					writtenOffsetIndexInBinary: 2,        // Conditional jumps has two opcode for long jump.
 					expectedOffsetFromEIP:      1234 - 6, // the instruction length of long relative amd64.JCC
 				},
-			} {
+			}
+
+			for _, tt := range tests {
+				tc := tt
 				origin := &amd64.NodeImpl{Instruction: tc.instruction, OffsetInBinaryField: originOffset}
 				target := &amd64.NodeImpl{OffsetInBinaryField: tc.targetOffset, JumpOrigins: map[*amd64.NodeImpl]struct{}{origin: {}}}
 				a := amd64.NewAssemblerImpl()
@@ -511,7 +524,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 	t.Run("short jump", func(t *testing.T) {
 		t.Run("reassemble", func(t *testing.T) {
 			originOffset := uint64(0)
-			for _, tc := range []struct {
+			tests := []struct {
 				instruction  asm.Instruction
 				targetOffset uint64
 			}{
@@ -533,7 +546,10 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 					// Relative jump offset = 130 - len(amd64.JCC instruction bytes) = 130 -2 = 128 > math.MaxInt8.
 					targetOffset: 130,
 				},
-			} {
+			}
+
+			for _, tt := range tests {
+				tc := tt
 				origin := &amd64.NodeImpl{Instruction: tc.instruction, OffsetInBinaryField: originOffset, Flag: amd64.NodeFlagShortForwardJump}
 				target := &amd64.NodeImpl{OffsetInBinaryField: tc.targetOffset, JumpOrigins: map[*amd64.NodeImpl]struct{}{origin: {}}}
 				origin.JumpTarget = target
@@ -548,7 +564,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 		})
 		t.Run("ok", func(t *testing.T) {
 			originOffset := uint64(0)
-			for _, tc := range []struct {
+			tests := []struct {
 				instruction           asm.Instruction
 				targetOffset          uint64
 				expectedOffsetFromEIP byte
@@ -561,7 +577,10 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 					instruction: amd64.JCC, targetOffset: 129,
 					expectedOffsetFromEIP: 129 - 2, // short jumps are of 2 bytes.
 				},
-			} {
+			}
+
+			for _, tt := range tests {
+				tc := tt
 				origin := &amd64.NodeImpl{Instruction: tc.instruction, OffsetInBinaryField: originOffset, Flag: amd64.NodeFlagShortForwardJump}
 				target := &amd64.NodeImpl{OffsetInBinaryField: tc.targetOffset, JumpOrigins: map[*amd64.NodeImpl]struct{}{origin: {}}}
 				origin.JumpTarget = target
@@ -583,7 +602,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 
 func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -591,7 +610,10 @@ func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 				n:      &amd64.NodeImpl{Types: amd64.OperandTypesNoneToBranch, Instruction: amd64.JMP},
 				expErr: "jump target must not be nil for relative JMP",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -695,7 +717,7 @@ func TestAssemblerImpl_encodeNoneToBranch(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -707,7 +729,10 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.DIVQ, Types: amd64.OperandTypesRegisterToNone},
 				expErr: "invalid register [nil]",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -745,7 +770,7 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -764,7 +789,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.MOVL, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_X1},
 				expErr: "MOVL for float to float is undefined",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -777,7 +805,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	intRegisters := []asm.Register{amd64.REG_AX, amd64.REG_R8}
 	floatRegisters := []asm.Register{amd64.REG_X0, amd64.REG_X8}
 	allRegisters := append(intRegisters, floatRegisters...)
-	for _, tc := range []struct {
+	tests := []struct {
 		instruction      asm.Instruction
 		srcRegs, DstRegs []asm.Register
 		arg              byte
@@ -877,8 +905,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.XORPD, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.XORPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.XORQ, srcRegs: intRegisters, DstRegs: intRegisters},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(amd64.InstructionName(tc.instruction), func(t *testing.T) {
 			t.Run("error", func(t *testing.T) {
 				srcFloat, dstFloat := amd64.IsVectorRegister(tc.srcRegs[0]), amd64.IsVectorRegister(tc.DstRegs[0])
@@ -957,7 +987,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -973,7 +1003,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 					SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX},
 				expErr: "shifting instruction SHLQ require CX register as src but got AX",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 
 				a := amd64.NewAssemblerImpl()
@@ -1101,7 +1134,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -1113,7 +1146,10 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.DIVQ, Types: amd64.OperandTypesRegisterToConst},
 				expErr: "invalid register [nil]",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -1223,7 +1259,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI, amd64.REG_R10}
 	floatRegs := []asm.Register{amd64.REG_X0, amd64.REG_X8}
 	scales := []byte{1, 4}
-	for _, tc := range []struct {
+	tests := []struct {
 		instruction asm.Instruction
 		isFloatInst bool
 	}{
@@ -1249,8 +1285,10 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		{instruction: amd64.SUBSS, isFloatInst: true},
 		{instruction: amd64.UCOMISD, isFloatInst: true},
 		{instruction: amd64.UCOMISS, isFloatInst: true},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		for _, srcReg := range intRegs {
 			srcReg := srcReg
 			DstRegs := intRegs
@@ -1311,7 +1349,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -1343,7 +1381,10 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.PSRLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_X0, SrcConst: 32768},
 				expErr: "constant must fit in signed 8-bit integer for PSRLQ, but got 32768",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -1422,7 +1463,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -1430,7 +1471,10 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToConst, DstReg: amd64.REG_AX},
 				expErr: "ADDL is unsupported for from:memory,to:const type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -1477,7 +1521,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 
 func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -1497,7 +1541,10 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 					DstReg:   amd64.REG_AX, DstConst: 0xff_ff},
 				expErr: "too large load target const 9223372036854775807 for MOVL",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				a := amd64.NewAssemblerImpl()
@@ -1558,7 +1605,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 
 func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *amd64.NodeImpl
 			expErr string
 		}{
@@ -1581,7 +1628,10 @@ func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 					SrcConst: 10, SrcReg: amd64.REG_AX, SrcMemIndex: amd64.REG_R9, SrcMemScale: 3, DstReg: amd64.REG_R10},
 				expErr: "scale in SIB must be one of 1, 2, 4, 8 but got 3",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
 				_, _, _, _, err := tc.n.GetMemoryLocation()

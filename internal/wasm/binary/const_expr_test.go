@@ -10,7 +10,7 @@ import (
 )
 
 func TestDecodeConstantExpression(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		in  []byte
 		exp *wasm.ConstantExpression
 	}{
@@ -78,8 +78,10 @@ func TestDecodeConstantExpression(t *testing.T) {
 				},
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			actual, err := decodeConstantExpression(bytes.NewReader(tc.in),
 				wasm.FeatureBulkMemoryOperations|wasm.FeatureSIMD)
@@ -90,7 +92,7 @@ func TestDecodeConstantExpression(t *testing.T) {
 }
 
 func TestDecodeConstantExpression_errors(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		in          []byte
 		expectedErr string
 		features    wasm.Features
@@ -174,7 +176,10 @@ func TestDecodeConstantExpression_errors(t *testing.T) {
 			expectedErr: "read vector const instruction immediates: needs 16 bytes but was 8 bytes",
 			features:    wasm.FeatureSIMD,
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.expectedErr, func(t *testing.T) {
 			_, err := decodeConstantExpression(bytes.NewReader(tc.in), tc.features)
 			require.EqualError(t, err, tc.expectedErr)

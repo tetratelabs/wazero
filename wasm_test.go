@@ -530,7 +530,7 @@ func TestInstantiateModule_ExitError(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		exitCode uint32
 	}{
@@ -542,7 +542,10 @@ func TestClose(t *testing.T) {
 			name:     "exit code 2",
 			exitCode: uint32(2),
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRuntime()
 

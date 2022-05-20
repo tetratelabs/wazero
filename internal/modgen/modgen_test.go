@@ -89,7 +89,7 @@ func newGenerator(size int, ints []int, bufs [][]byte) *generator {
 }
 
 func TestGenerator_newFunctionType(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		params, results int
 		exp             *wasm.FunctionType
 	}{
@@ -108,7 +108,10 @@ func TestGenerator_newFunctionType(t *testing.T) {
 			Results: []wasm.ValueType{i64, f32, f64, i32, i32, i64},
 		},
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.exp.String(), func(t *testing.T) {
 			g := newGenerator(0, []int{0, 1, 2, 3, 4}, nil)
 			actual := g.newFunctionType(tc.params, tc.results)
@@ -152,7 +155,7 @@ func TestGenerator_typeSection(t *testing.T) {
 
 func TestGenerator_importSection(t *testing.T) {
 	five := uint32(5)
-	for i, tc := range []struct {
+	tests := []struct {
 		ints       []int
 		numImports uint32
 		types      []*wasm.FunctionType
@@ -255,7 +258,10 @@ func TestGenerator_importSection(t *testing.T) {
 				{Type: wasm.ExternTypeFunc, DescFunc: 1, Module: "module-2", Name: "2"},
 			},
 		},
-	} {
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			g := newGenerator(100, tc.ints, nil)
 			g.numImports = uint32(tc.numImports)
@@ -321,7 +327,7 @@ func TestGenerator_memorySection(t *testing.T) {
 }
 
 func TestGenerator_newConstExpr(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		ints    []int
 		bufs    [][]byte
 		imports []*wasm.Import
@@ -413,8 +419,10 @@ func TestGenerator_newConstExpr(t *testing.T) {
 			exp:     &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: leb128.EncodeInt32(100)},
 			expType: i32,
 		},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			g := newGenerator(100, tc.ints, tc.bufs)
 			g.m.ImportSection = tc.imports
@@ -540,7 +548,7 @@ func TestGenerator_startSection(t *testing.T) {
 
 		takePtr := func(v uint32) *uint32 { return &v }
 
-		for i, tc := range []struct {
+		tests := []struct {
 			ints []int
 			exp  *wasm.Index
 		}{
@@ -548,8 +556,10 @@ func TestGenerator_startSection(t *testing.T) {
 			{ints: []int{1}, exp: takePtr(3)},
 			{ints: []int{2}, exp: takePtr(6)},
 			{ints: []int{3}, exp: takePtr(1)},
-		} {
-			tc := tc
+		}
+
+		for i, tt := range tests {
+			tc := tt
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				g := newGenerator(100, tc.ints, nil)
 				g.needStartSection = true
@@ -603,7 +613,7 @@ func TestGenerator_elementSection(t *testing.T) {
 		require.Nil(t, g.m.ElementSection)
 	})
 	t.Run("ok", func(t *testing.T) {
-		for i, tc := range []struct {
+		tests := []struct {
 			ints        []int
 			numElements uint32
 			exps        []*wasm.ElementSegment
@@ -647,8 +657,10 @@ func TestGenerator_elementSection(t *testing.T) {
 					},
 				},
 			},
-		} {
-			tc := tc
+		}
+
+		for i, tt := range tests {
+			tc := tt
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				g := newGenerator(100, tc.ints, nil)
 				g.m = &wasm.Module{
@@ -681,7 +693,7 @@ func TestGenerator_dataSection(t *testing.T) {
 		require.Nil(t, g.m.DataSection)
 	})
 	t.Run("ok", func(t *testing.T) {
-		for i, tc := range []struct {
+		tests := []struct {
 			ints    []int
 			bufs    [][]byte
 			numData uint32
@@ -721,8 +733,10 @@ func TestGenerator_dataSection(t *testing.T) {
 					},
 				},
 			},
-		} {
-			tc := tc
+		}
+
+		for i, tt := range tests {
+			tc := tt
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				g := newGenerator(100, tc.ints, tc.bufs)
 				g.m.MemorySection = &wasm.Memory{Min: 1}

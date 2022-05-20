@@ -119,7 +119,7 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 	_0x8000000000000000 := uint64(0x8000000000000000)
 	_0xffffffffffffffff := uint64(0xffffffffffffffff)
 
-	for _, tc := range []struct {
+	tests := []struct {
 		op            wasm.OpcodeMisc
 		inputType     wazeroir.Float
 		outputType    wazeroir.SignedInt
@@ -257,8 +257,10 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 				0x0000000000000000, 0, 0, 0, 0,
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(wasm.MiscInstructionName(tc.op), func(t *testing.T) {
 			in32bit := len(tc.input32bit) > 0
 			casenum := len(tc.input32bit)
@@ -325,7 +327,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 		return
 	}
 	t.Run("32bit", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			in       int32
 			expected int32
 			opcode   wasm.Opcode
@@ -347,8 +349,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			{in: 0x0123_0000, expected: 0, opcode: wasm.OpcodeI32Extend16S},
 			{in: -19103744 /* = 0xfedc_8000 bit pattern */, expected: -0x8000, opcode: wasm.OpcodeI32Extend16S},
 			{in: -1, expected: -1, opcode: wasm.OpcodeI32Extend16S},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{
@@ -365,7 +369,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 		}
 	})
 	t.Run("64bit", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			in       int64
 			expected int64
 			opcode   wasm.Opcode
@@ -399,8 +403,10 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 			{in: 0x01234567_00000000, expected: 0, opcode: wasm.OpcodeI64Extend32S},
 			{in: -81985529054232576 /* = 0xfedcba98_80000000 bit pattern */, expected: -0x80000000, opcode: wasm.OpcodeI64Extend32S},
 			{in: -1, expected: -1, opcode: wasm.OpcodeI64Extend32S},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(fmt.Sprintf("%s(i64.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &function{

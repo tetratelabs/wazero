@@ -10,7 +10,7 @@ import (
 )
 
 func Test_decodeDataSegment(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		in       []byte
 		exp      *wasm.DataSegment
 		features wasm.Features
@@ -112,8 +112,10 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: wasm.FeatureMutableGlobal,
 			expErr:   "non-zero prefix for data segment is invalid as feature \"bulk-memory-operations\" is disabled",
 		},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			actual, err := decodeDataSegment(bytes.NewReader(tc.in), tc.features)
 			if tc.expErr == "" {

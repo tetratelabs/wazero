@@ -18,7 +18,7 @@ func (e *notExitError) Error() string {
 
 func TestIs(t *testing.T) {
 	err := NewExitError("some module", 2)
-	for _, tc := range []struct {
+	tests := []struct {
 		name    string
 		target  error
 		matches bool
@@ -51,7 +51,10 @@ func TestIs(t *testing.T) {
 			},
 			matches: false,
 		},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			matches := errors.Is(err, tc.target)
 			require.Equal(t, tc.matches, matches)

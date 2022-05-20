@@ -649,7 +649,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 }
 
 func TestCompile_Refs(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		body     []byte
 		expected []Operation
@@ -723,8 +723,10 @@ func TestCompile_Refs(t *testing.T) {
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{}},
@@ -739,7 +741,7 @@ func TestCompile_Refs(t *testing.T) {
 }
 
 func TestCompile_TableGetOrSet(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		body     []byte
 		expected []Operation
@@ -789,8 +791,10 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{}},
@@ -806,7 +810,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 }
 
 func TestCompile_TableGrowFillSize(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		body     []byte
 		expected []Operation
@@ -856,8 +860,10 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{{}},
@@ -874,7 +880,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 }
 
 func TestCompile_Locals(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name     string
 		mod      *wasm.Module
 		expected []Operation
@@ -1078,8 +1084,10 @@ func TestCompile_Locals(t *testing.T) {
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
 			require.NoError(t, err)
