@@ -16,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	internalfs "github.com/tetratelabs/wazero/internal/fs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -691,9 +692,9 @@ func (a *snapshotPreview1) FdAllocate(ctx context.Context, m api.Module, fd uint
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // See https://linux.die.net/man/3/close
 func (a *snapshotPreview1) FdClose(ctx context.Context, m api.Module, fd uint32) Errno {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
-	if ok, err := sys.CloseFile(fd); err != nil {
+	if ok, err := fsc.CloseFile(fd); err != nil {
 		return ErrnoIo
 	} else if !ok {
 		return ErrnoBadf
@@ -740,9 +741,9 @@ func (a *snapshotPreview1) FdDatasync(ctx context.Context, m api.Module, fd uint
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
 // See https://linux.die.net/man/3/fsync
 func (a *snapshotPreview1) FdFdstatGet(ctx context.Context, m api.Module, fd uint32, resultStat uint32) Errno {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
-	if _, ok := sys.OpenedFile(fd); !ok {
+	if _, ok := fsc.OpenedFile(fd); !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
@@ -776,9 +777,9 @@ func (a *snapshotPreview1) FdFdstatGet(ctx context.Context, m api.Module, fd uin
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
 func (a *snapshotPreview1) FdPrestatGet(ctx context.Context, m api.Module, fd uint32, resultPrestat uint32) Errno {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
-	entry, ok := sys.OpenedFile(fd)
+	entry, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -851,9 +852,9 @@ func (a *snapshotPreview1) FdPread(ctx context.Context, m api.Module, fd, iovs, 
 // See FdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 func (a *snapshotPreview1) FdPrestatDirName(ctx context.Context, m api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
-	f, ok := sys.OpenedFile(fd)
+	f, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -919,13 +920,13 @@ func (a *snapshotPreview1) FdPwrite(ctx context.Context, m api.Module, fd, iovs,
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
 // See https://linux.die.net/man/3/readv
 func (a *snapshotPreview1) FdRead(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sys := sysCtx(m)
+	sys, fsc := sysFSCtx(ctx, m)
 
 	var reader io.Reader
 
 	if fd == fdStdin {
 		reader = sys.Stdin()
-	} else if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
+	} else if f, ok := fsc.OpenedFile(fd); !ok || f.File == nil {
 		return ErrnoBadf
 	} else {
 		reader = f.File
@@ -1002,11 +1003,11 @@ func (a *snapshotPreview1) FdRenumber(ctx context.Context, m api.Module, fd, to 
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
 // See https://linux.die.net/man/3/lseek
 func (a *snapshotPreview1) FdSeek(ctx context.Context, m api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
-	if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
+	if f, ok := fsc.OpenedFile(fd); !ok || f.File == nil {
 		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
@@ -1088,7 +1089,7 @@ func (a *snapshotPreview1) FdTell(ctx context.Context, m api.Module, fd, resultO
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 // See https://linux.die.net/man/3/writev
 func (a *snapshotPreview1) FdWrite(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sys := sysCtx(m)
+	sys, fsc := sysFSCtx(ctx, m)
 
 	var writer io.Writer
 
@@ -1099,7 +1100,7 @@ func (a *snapshotPreview1) FdWrite(ctx context.Context, m api.Module, fd, iovs, 
 		writer = sys.Stderr()
 	default:
 		// Check to see if the file descriptor is available
-		if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
+		if f, ok := fsc.OpenedFile(fd); !ok || f.File == nil {
 			return ErrnoBadf
 			// fs.FS doesn't declare io.Writer, but implementations such as os.File implement it.
 		} else if writer, ok = f.File.(io.Writer); !ok {
@@ -1201,9 +1202,9 @@ func (a *snapshotPreview1) PathLink(ctx context.Context, m api.Module, oldFd, ol
 // See https://linux.die.net/man/3/openat
 func (a *snapshotPreview1) PathOpen(ctx context.Context, m api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
-	sys := sysCtx(m)
+	_, fsc := sysFSCtx(ctx, m)
 
-	dir, ok := sys.OpenedFile(fd)
+	dir, ok := fsc.OpenedFile(fd)
 	if !ok || dir.FS == nil {
 		return ErrnoBadf
 	}
@@ -1221,7 +1222,7 @@ func (a *snapshotPreview1) PathOpen(ctx context.Context, m api.Module, fd, dirfl
 		return errno
 	}
 
-	if newFD, ok := sys.OpenFile(entry); !ok {
+	if newFD, ok := fsc.OpenFile(entry); !ok {
 		_ = entry.File.Close()
 		return ErrnoIo
 	} else if !m.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
@@ -1362,7 +1363,23 @@ func sysCtx(m api.Module) *wasm.SysContext {
 	}
 }
 
-func openFileEntry(rootFS fs.FS, pathName string) (*wasm.FileEntry, Errno) {
+func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *internalfs.Context) {
+	if internal, ok := m.(*wasm.CallContext); !ok {
+		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
+	} else {
+		// Override Context when it is passed via context
+		if fsValue := ctx.Value(internalfs.Key{}); fsValue != nil {
+			fsCtx, ok := fsValue.(*internalfs.Context)
+			if !ok {
+				panic(fmt.Errorf("unsupported fs key: %v", fsValue))
+			}
+			return internal.Sys, fsCtx
+		}
+		return internal.Sys, internal.Sys.FS()
+	}
+}
+
+func openFileEntry(rootFS fs.FS, pathName string) (*internalfs.FileEntry, Errno) {
 	f, err := rootFS.Open(pathName)
 	if err != nil {
 		switch {
@@ -1378,7 +1395,7 @@ func openFileEntry(rootFS fs.FS, pathName string) (*wasm.FileEntry, Errno) {
 	// TODO: verify if oflags is a directory and fail with wasi.ErrnoNotdir if not
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
 
-	return &wasm.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
+	return &internalfs.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
 }
 
 func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {

@@ -3,11 +3,7 @@ package wasm
 import (
 	"bytes"
 	"io"
-	"io/fs"
-	"os"
-	"path"
 	"testing"
-	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -32,8 +28,6 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, eofReader{}, sys.Stdin())
 	require.Equal(t, io.Discard, sys.Stdout())
 	require.Equal(t, io.Discard, sys.Stderr())
-	require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
-
 	require.Equal(t, sys, DefaultSysContext())
 }
 
@@ -153,109 +147,4 @@ func TestNewSysContext_Environ(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSysContext_Close(t *testing.T) {
-	t.Run("no files", func(t *testing.T) {
-		sys := DefaultSysContext()
-		require.NoError(t, sys.Close())
-	})
-
-	t.Run("open files", func(t *testing.T) {
-		tempDir := t.TempDir()
-		pathName := "test"
-		file, testFS := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
-
-		sys, err := NewSysContext(
-			0,   // max
-			nil, // args
-			nil, // environ
-			nil, // stdin
-			nil, // stdout
-			nil, // stderr
-			nil, // randSource
-			map[uint32]*FileEntry{ // openedFiles
-				3: {Path: "/", FS: testFS},
-				4: {Path: ".", FS: testFS},
-				5: {Path: path.Join(".", pathName), File: file, FS: testFS},
-			},
-		)
-		require.NoError(t, err)
-
-		// Closing should delete the file descriptors after closing the files.
-		require.NoError(t, sys.Close())
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
-
-		// Verify it was actually closed, by trying to close it again.
-		err = file.(*os.File).Close()
-		require.Contains(t, err.Error(), "file already closed")
-
-		// No problem closing config again because the descriptors were removed, so they won't be called again.
-		require.NoError(t, sys.Close())
-	})
-
-	t.Run("FS never used", func(t *testing.T) {
-		testFS := fstest.MapFS{}
-		sys, err := NewSysContext(
-			0,   // max
-			nil, // args
-			nil, // environ
-			nil, // stdin
-			nil, // stdout
-			nil, // stderr
-			nil, // randSource
-			map[uint32]*FileEntry{ // no openedFiles
-				3: {Path: "/", FS: testFS},
-				4: {Path: ".", FS: testFS},
-			},
-		)
-		require.NoError(t, err)
-
-		// Even if there are no open files, the descriptors for the file-system mappings should be removed.
-		require.NoError(t, sys.Close())
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
-	})
-
-	t.Run("open file externally closed", func(t *testing.T) {
-		tempDir := t.TempDir()
-		pathName := "test"
-		file, testFS := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
-
-		sys, err := NewSysContext(
-			0,   // max
-			nil, // args
-			nil, // environ
-			nil, // stdin
-			nil, // stdout
-			nil, // stderr
-			nil, // randSource
-			map[uint32]*FileEntry{ // openedFiles
-				3: {Path: "/", FS: testFS},
-				4: {Path: ".", FS: testFS},
-				5: {Path: path.Join(".", pathName), File: file, FS: testFS},
-			},
-		)
-		require.NoError(t, err)
-
-		// Close the file externally
-		file.Close()
-
-		// Closing should err as it expected to be open
-		require.Contains(t, sys.Close().Error(), "file already closed")
-
-		// However, cleanup should still occur.
-		require.Equal(t, 0, len(sys.openedFiles), "expected no opened files")
-	})
-}
-
-// createWriteableFile uses real files when io.Writer tests are needed.
-func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (fs.File, fs.FS) {
-	require.NotNil(t, data)
-	absolutePath := path.Join(tmpDir, pathName)
-	require.NoError(t, os.WriteFile(absolutePath, data, 0o600))
-
-	// open the file for writing in a custom way until #390
-	f, err := os.OpenFile(absolutePath, os.O_RDWR, 0o600)
-	require.NoError(t, err)
-	return f, os.DirFS(tmpDir)
 }

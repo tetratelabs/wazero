@@ -3,7 +3,6 @@ package wazero
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -11,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	fs2 "github.com/tetratelabs/wazero/internal/fs"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -452,21 +452,15 @@ type moduleConfig struct {
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
 
-	// preopenFD has the next FD number to use
-	preopenFD uint32
-	// preopens are keyed on file descriptor and only include the Path and FS fields.
-	preopens map[uint32]*wasm.FileEntry
-	// preopenPaths allow overwriting of existing paths.
-	preopenPaths map[string]uint32
+	fs *fs2.FSConfig
 }
 
 func NewModuleConfig() ModuleConfig {
 	return &moduleConfig{
 		startFunctions: []string{"_start"},
 		environKeys:    map[string]int{},
-		preopenFD:      uint32(3), // after stdin/stdout/stderr
-		preopens:       map[uint32]*wasm.FileEntry{},
-		preopenPaths:   map[string]uint32{},
+
+		fs: fs2.NewFSConfig(),
 	}
 }
 
@@ -493,7 +487,7 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 // WithFS implements ModuleConfig.WithFS
 func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
 	ret := *c // copy
-	ret.setFS("/", fs)
+	ret.fs = ret.fs.WithFS(fs)
 	return &ret
 }
 
@@ -542,21 +536,8 @@ func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 // WithWorkDirFS implements ModuleConfig.WithWorkDirFS
 func (c *moduleConfig) WithWorkDirFS(fs fs.FS) ModuleConfig {
 	ret := *c // copy
-	ret.setFS(".", fs)
+	ret.fs = ret.fs.WithWorkDirFS(fs)
 	return &ret
-}
-
-// setFS maps a path to a file-system. This is only used for base paths: "/" and ".".
-func (c *moduleConfig) setFS(path string, fs fs.FS) {
-	// Check to see if this key already exists and update it.
-	entry := &wasm.FileEntry{Path: path, FS: fs}
-	if fd, ok := c.preopenPaths[path]; ok {
-		c.preopens[fd] = entry
-	} else {
-		c.preopens[c.preopenFD] = entry
-		c.preopenPaths[path] = c.preopenFD
-		c.preopenFD++
-	}
 }
 
 // toSysContext creates a baseline wasm.SysContext configured by ModuleConfig.
@@ -578,24 +559,9 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 		environ = append(environ, key+"="+value)
 	}
 
-	// Ensure no-one set a nil FD. We do this here instead of at the call site to allow chaining as nil is unexpected.
-	rootFD := uint32(0) // zero is invalid
-	setWorkDirFS := false
-	preopens := c.preopens
-	for fd, entry := range preopens {
-		if entry.FS == nil {
-			err = fmt.Errorf("FS for %s is nil", entry.Path)
-			return
-		} else if entry.Path == "/" {
-			rootFD = fd
-		} else if entry.Path == "." {
-			setWorkDirFS = true
-		}
-	}
-
-	// Default the working directory to the root FS if it exists.
-	if rootFD != 0 && !setWorkDirFS {
-		preopens[c.preopenFD] = &wasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
+	preopens, err := c.fs.Preopens()
+	if err != nil {
+		return nil, err
 	}
 
 	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, c.randSource, preopens)
