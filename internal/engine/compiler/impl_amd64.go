@@ -4420,6 +4420,11 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, codeAddressReg
 	// So we increment the call frame stack pointer.
 	c.assembler.CompileNoneToMemory(amd64.INCQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
+	if amd64CallingConventionModuleInstanceAddressRegister == targetcodeAddressRegister {
+		c.assembler.CompileRegisterToRegister(amd64.MOVQ, targetcodeAddressRegister, tmpRegister)
+		targetcodeAddressRegister = tmpRegister
+	}
+
 	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConventionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, targetcodeAddressRegister, functionModuleInstanceAddressOffset,
 		amd64CallingConventionModuleInstanceAddressRegister)
