@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
-	amd64 "github.com/tetratelabs/wazero/internal/asm/amd64"
+	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )

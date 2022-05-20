@@ -4433,7 +4433,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 	// And jump into the initial address of the target function.
 	c.assembler.CompileJumpToMemory(amd64.JMP, targetFunctionAddressRegister, functionCodeInitialAddressOffset)
 
-	// All the registers used are temporary so we mark them unused.
+	// All the registers used are temporary, so we mark them unused.
 	c.locationStack.markRegisterUnused(freeRegs...)
 
 	// On the function return, we have to initialize the state.
@@ -4453,11 +4453,11 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 }
 
 // returnFunction adds instructions to return from the current callframe back to the caller's frame.
-// If this is the current one is the origin, we return back to the callEngine.execWasmFunction with the Returned status.
+// If this is the current one is the origin, we return to the callEngine.execWasmFunction with the Returned status.
 // Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
 // up all the necessary change on the callEngine's state.
 //
-// Note: this is the counter part for callFunction, and see the comments there as well
+// Note: this is the counterpart for callFunction, and see the comments there as well
 // to understand how the function calls are achieved.
 func (c *amd64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
