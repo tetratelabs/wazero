@@ -81,7 +81,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 	arg := &wazeroir.MemoryImmediate{Offset: 361}
 	offset := baseOffset + arg.Offset
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name                string
 		isFloatTarget       bool
 		operationSetupFn    func(t *testing.T, compiler compilerImpl)
@@ -229,9 +229,10 @@ func TestCompiler_compileLoad(t *testing.T) {
 				require.Equal(t, uint64(uint32(loadedValueAsUint64)), loadedValueAsUint64)
 			},
 		},
-	} {
+	}
 
-		tc := tc
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
@@ -279,7 +280,7 @@ func TestCompiler_compileStore(t *testing.T) {
 	arg := &wazeroir.MemoryImmediate{Offset: 361}
 	offset := arg.Offset + baseOffset
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name                string
 		isFloatTarget       bool
 		targetSizeInBytes   uint32
@@ -365,8 +366,10 @@ func TestCompiler_compileStore(t *testing.T) {
 				require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})

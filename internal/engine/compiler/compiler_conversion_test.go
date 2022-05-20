@@ -140,7 +140,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 }
 
 func TestCompiler_compileITruncFromF(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		outputType  wazeroir.SignedInt
 		inputType   wazeroir.Float
 		nonTrapping bool
@@ -161,8 +161,10 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64, nonTrapping: true},
 		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32, nonTrapping: true},
 		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64, nonTrapping: true},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%s from %s (non-trapping=%v)", tc.outputType, tc.inputType, tc.nonTrapping), func(t *testing.T) {
 			for _, v := range []float64{
 				1.0, 100, -100, 1, -1, 100.01234124, -100.01234124, 200.12315,
@@ -366,7 +368,7 @@ func TestCompiler_compileITruncFromF(t *testing.T) {
 }
 
 func TestCompiler_compileFConvertFromI(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		inputType  wazeroir.SignedInt
 		outputType wazeroir.Float
 	}{
@@ -378,8 +380,10 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 		{inputType: wazeroir.SignedUint32, outputType: wazeroir.Float64},
 		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float32},
 		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float64},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
 			for _, v := range []uint64{
 				0, 1, 12345, 1 << 31, 1 << 32, 1 << 54, 1 << 63,

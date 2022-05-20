@@ -29,7 +29,10 @@ func TestInstantiateModule(t *testing.T) {
 	defer compiled.Close(testCtx)
 
 	// Re-use the same module many times.
-	for _, tc := range []string{"a", "b", "c"} {
+	tests := []string{"a", "b", "c"}
+
+	for _, tt := range tests {
+		tc := tt
 		mod, err := r.InstantiateModule(testCtx, compiled, sys.WithArgs(tc).WithName(tc))
 		require.NoError(t, err)
 

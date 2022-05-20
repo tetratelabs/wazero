@@ -16,7 +16,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 	from8, from16, from32 := fromKind(0), fromKind(1), fromKind(2)
 
 	t.Run("32bit", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			in       int32
 			expected int32
 			fromKind fromKind
@@ -38,8 +38,10 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			{in: 0x0123_0000, expected: 0, fromKind: from16},
 			{in: -19103744 /* = 0xfedc_8000 bit pattern */, expected: -0x8000, fromKind: from16},
 			{in: -1, expected: -1, fromKind: from16},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -73,7 +75,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 		}
 	})
 	t.Run("64bit", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			in       int64
 			expected int64
 			fromKind fromKind
@@ -107,8 +109,10 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 			{in: 0x01234567_00000000, expected: 0, fromKind: from32},
 			{in: -81985529054232576 /* = 0xfedcba98_80000000 bit pattern */, expected: -0x80000000, fromKind: from32},
 			{in: -1, expected: -1, fromKind: from32},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
 				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
@@ -147,7 +151,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 
 func TestCompiler_compileMemoryCopy(t *testing.T) {
 	const checkCeil = 100
-	for i, tc := range []struct {
+	tests := []struct {
 		sourceOffset, destOffset, size uint32
 		requireOutOfBoundsError        bool
 	}{
@@ -179,8 +183,10 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize + 1, size: 0, requireOutOfBoundsError: true},
 		{sourceOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 99, destOffset: 0, size: 100, requireOutOfBoundsError: true},
 		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 99, size: 100, requireOutOfBoundsError: true},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
@@ -235,7 +241,7 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 func TestCompiler_compileMemoryFill(t *testing.T) {
 	const checkCeil = 50
 
-	for i, tc := range []struct {
+	tests := []struct {
 		v, destOffset           uint32
 		size                    uint32
 		requireOutOfBoundsError bool
@@ -256,8 +262,10 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 		{v: 10, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, size: 5, requireOutOfBoundsError: true},
 		{v: 10, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, size: 1, requireOutOfBoundsError: true},
 		{v: 10, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize + 1, size: 0, requireOutOfBoundsError: true},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
@@ -362,7 +370,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 		nil, {1, 2, 3, 4, 5},
 	}
 
-	for i, tc := range []struct {
+	tests := []struct {
 		sourceOffset, destOffset uint32
 		dataIndex                uint32
 		copySize                 uint32
@@ -389,8 +397,10 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest * wasm.MemoryPageSize, copySize: 5, dataIndex: 1, expOutOfBounds: true},
 		{sourceOffset: 0, destOffset: defaultMemoryPageNumInTest*wasm.MemoryPageSize - 3, copySize: 5, dataIndex: 1, expOutOfBounds: true},
 		{sourceOffset: 6, destOffset: 0, copySize: 0, dataIndex: 1, expOutOfBounds: true},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			env.module().DataInstances = dataInstances
@@ -495,7 +505,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 
 func TestCompiler_compileTableCopy(t *testing.T) {
 	const tableSize = 100
-	for i, tc := range []struct {
+	tests := []struct {
 		sourceOffset, destOffset, size uint32
 		requireOutOfBoundsError        bool
 	}{
@@ -527,8 +537,10 @@ func TestCompiler_compileTableCopy(t *testing.T) {
 		{sourceOffset: 0, destOffset: tableSize + 1, size: 0, requireOutOfBoundsError: true},
 		{sourceOffset: tableSize - 99, destOffset: 0, size: 100, requireOutOfBoundsError: true},
 		{sourceOffset: 0, destOffset: tableSize - 99, size: 100, requireOutOfBoundsError: true},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{HasTable: true, Signature: &wasm.FunctionType{}})
@@ -587,7 +599,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 	}
 
 	const tableSize = 100
-	for i, tc := range []struct {
+	tests := []struct {
 		sourceOffset, destOffset uint32
 		elemIndex                uint32
 		copySize                 uint32
@@ -612,8 +624,10 @@ func TestCompiler_compileTableInit(t *testing.T) {
 		{sourceOffset: 0, destOffset: 10, copySize: 5, elemIndex: 1},
 		{sourceOffset: 0, destOffset: 0, copySize: 6, elemIndex: 1, expOutOfBounds: true},
 		{sourceOffset: 6, destOffset: 0, copySize: 0, elemIndex: 1, expOutOfBounds: true},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			env := newCompilerEnvironment()
 			env.module().ElementInstances = elementInstances
@@ -683,7 +697,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 	funcrefTable := &wasm.TableInstance{Type: wasm.RefTypeFuncref, References: []wasm.Reference{0, 0, 0, 0, funcrefOpaque}}
 	tables := []*wasm.TableInstance{externTable, funcrefTable}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		tableIndex uint32
 		offset     uint32
@@ -733,8 +747,10 @@ func TestCompiler_compileTableSet(t *testing.T) {
 			in:         0,
 			expError:   true,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 
@@ -820,7 +836,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 		{Type: wasm.RefTypeFuncref, References: []wasm.Reference{0, 0, 0, 0, funcrefOpaque}},
 	}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		tableIndex uint32
 		offset     uint32
@@ -863,8 +879,10 @@ func TestCompiler_compileTableGet(t *testing.T) {
 			offset:     1000,
 			expError:   true,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCompilerEnvironment()
 

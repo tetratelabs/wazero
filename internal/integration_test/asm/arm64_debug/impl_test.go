@@ -46,7 +46,7 @@ var intRegisters = []asm.Register{
 
 func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -62,7 +62,10 @@ func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.RET, DstReg: arm64.REG_V0},
 				expErr: "invalid destination register: V0 is not integer",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeJumpToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -103,7 +106,7 @@ func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -132,7 +135,10 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 					SrcConst: -1, SrcReg: arm64.REG_R0, SrcReg2: arm64.REG_R0, DstReg: arm64.REG_V0},
 				expErr: "V0 is not integer",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeLeftShiftedRegisterToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -140,7 +146,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 	})
 
 	const inst = arm64.ADD
-	for _, tc := range []struct {
+	tests := []struct {
 		srcReg, shiftedSrcReg, dstReg asm.Register
 		shiftNum                      int64
 	}{
@@ -192,8 +198,10 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			shiftNum:      64,
 			dstReg:        arm64.REGZERO,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("src=%s,shifted_src=%s,shift_num=%d,dst=%s",
 			arm64.RegisterName(tc.srcReg), arm64.RegisterName(tc.shiftedSrcReg),
 			tc.shiftNum, arm64.RegisterName(tc.srcReg)), func(t *testing.T) {
@@ -219,7 +227,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -238,7 +246,10 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 					SrcReg: arm64.REG_R0, SrcReg2: arm64.REG_V0},
 				expErr: "R0 is not float",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeTwoRegistersToNone(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -247,7 +258,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 
 	intRegs := []asm.Register{arm64.REGZERO, arm64.REG_R0, arm64.REG_R10, arm64.REG_R30}
 	floatRegs := []asm.Register{arm64.REG_V0, arm64.REG_V12, arm64.REG_V31}
-	for _, tc := range []struct {
+	tests := []struct {
 		instruction asm.Instruction
 		regs        []asm.Register
 	}{
@@ -255,7 +266,10 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 		{instruction: arm64.CMPW, regs: intRegs},
 		{instruction: arm64.FCMPD, regs: floatRegs},
 		{instruction: arm64.FCMPS, regs: floatRegs},
-	} {
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.instruction), func(t *testing.T) {
 			for _, src := range tc.regs {
 				for _, src2 := range tc.regs {
@@ -314,7 +328,7 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -323,7 +337,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 					SrcReg: arm64.REG_R0, SrcReg2: arm64.REG_R0, DstReg: arm64.REG_R0},
 				expErr: "ADR is unsupported for from:register,to:register type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeRegisterToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -335,7 +352,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	conditionalRegs := []asm.Register{arm64.REG_COND_EQ, arm64.REG_COND_NE, arm64.REG_COND_HS, arm64.REG_COND_LO, arm64.REG_COND_MI, arm64.REG_COND_PL, arm64.REG_COND_VS, arm64.REG_COND_VC, arm64.REG_COND_HI, arm64.REG_COND_LS, arm64.REG_COND_GE, arm64.REG_COND_LT, arm64.REG_COND_GT, arm64.REG_COND_LE, arm64.REG_COND_AL, arm64.REG_COND_NV}
 	floatRegs := []asm.Register{arm64.REG_V0, arm64.REG_V15, arm64.REG_V31}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		inst             asm.Instruction
 		srcRegs, dstRegs []asm.Register
 	}{
@@ -412,9 +429,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{inst: arm64.SXTH, srcRegs: intRegs, dstRegs: intRegs},
 		{inst: arm64.SXTHW, srcRegs: intRegs, dstRegs: intRegs},
 		{inst: arm64.SXTW, srcRegs: intRegs, dstRegs: intRegs},
-	} {
+	}
 
-		tc := tc
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, src := range tc.srcRegs {
 				for _, dst := range tc.dstRegs {
@@ -446,7 +464,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -455,7 +473,10 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 					SrcReg: arm64.REG_R0, SrcReg2: arm64.REG_R0, DstReg: arm64.REG_R0},
 				expErr: "ADR is unsupported for from:two-registers,to:register type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeThreeRegistersToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -465,7 +486,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	intRegs := []asm.Register{arm64.REGZERO, arm64.REG_R1, arm64.REG_R10, arm64.REG_R30}
 	floatRegs := []asm.Register{arm64.REG_V0, arm64.REG_V15, arm64.REG_V31}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		inst             asm.Instruction
 		srcRegs, dstRegs []asm.Register
 	}{
@@ -491,8 +512,10 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 		{inst: arm64.SUBW, srcRegs: intRegs, dstRegs: intRegs},
 		{inst: arm64.FSUBD, srcRegs: floatRegs, dstRegs: floatRegs},
 		{inst: arm64.FSUBS, srcRegs: floatRegs, dstRegs: floatRegs},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, src := range tc.srcRegs {
 				for _, src2 := range tc.srcRegs {
@@ -520,7 +543,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -539,7 +562,10 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 					SrcReg: arm64.REGZERO, SrcConst: 123},
 				expErr: "zero register is not supported for CMP (immediate)",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeRegisterAndConstToNone(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -573,7 +599,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 
 func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -590,7 +616,10 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.LSL, Types: arm64.OperandTypesConstToRegister, DstReg: arm64.REG_R0},
 				expErr: "LSL with zero constant should be optimized out",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeConstToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -644,7 +673,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		0xffffff,
 	}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		inst   asm.Instruction
 		consts []int64
 	}{
@@ -696,8 +725,10 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			inst:   arm64.LSR,
 			consts: []int64{1, 2, 4, 16, 31, 32, 63},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, r := range []asm.Register{
 				arm64.REG_R0, arm64.REG_R10,
@@ -734,7 +765,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeSIMDByteToSIMDByte(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -742,7 +773,10 @@ func TestAssemblerImpl_EncodeSIMDByteToSIMDByte(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesSIMDByteToSIMDByte},
 				expErr: "ADR is unsupported for from:simd-byte,to:simd-byte type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeSIMDByteToSIMDByte(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -776,7 +810,7 @@ func TestAssemblerImpl_EncodeSIMDByteToSIMDByte(t *testing.T) {
 
 func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -784,7 +818,10 @@ func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesSIMDByteToRegister},
 				expErr: "ADR is unsupported for from:simd-byte,to:register type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeSIMDByteToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -818,7 +855,7 @@ func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -826,7 +863,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesRegisterToMemory},
 				expErr: "ADR is unsupported for from:register,to:memory type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeRegisterToMemory(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -846,7 +886,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		arm64.REG_V0, arm64.REG_V10,
 		arm64.REG_V30,
 	}
-	for _, tc := range []struct {
+	tests := []struct {
 		inst    asm.Instruction
 		srcRegs []asm.Register
 		offsets []int64
@@ -858,8 +898,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		{inst: arm64.MOVB, srcRegs: intRegs, offsets: offsets},
 		{inst: arm64.FMOVD, srcRegs: floatRegs, offsets: offsets},
 		{inst: arm64.FMOVS, srcRegs: floatRegs, offsets: offsets},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, srcReg := range tc.srcRegs {
 				for _, baseReg := range intRegs {
@@ -911,7 +953,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -919,7 +961,10 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.SUB, Types: arm64.OperandTypesMemoryToRegister},
 				expErr: "SUB is unsupported for from:memory,to:register type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeMemoryToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -941,7 +986,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		arm64.REG_V0, arm64.REG_V10,
 		arm64.REG_V30,
 	}
-	for _, tc := range []struct {
+	tests := []struct {
 		inst    asm.Instruction
 		dstRegs []asm.Register
 		offsets []int64
@@ -955,8 +1000,10 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		{inst: arm64.MOVBU, dstRegs: intRegs, offsets: offsets},
 		{inst: arm64.FMOVD, dstRegs: floatRegs, offsets: offsets},
 		{inst: arm64.FMOVS, dstRegs: floatRegs, offsets: offsets},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, dstReg := range tc.dstRegs {
 				for _, baseReg := range intRegs {
@@ -1063,7 +1110,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1075,7 +1122,10 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.SUB, Types: arm64.OperandTypesNoneToBranch},
 				expErr: "SUB is unsupported for from:none,to:branch type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeRelativeBranch(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1089,7 +1139,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	} {
 		inst := inst
 		t.Run(arm64.InstructionName(inst), func(t *testing.T) {
-			for _, tc := range []struct {
+			tests := []struct {
 				forward                                                                   bool
 				instructionsInPreamble, instructionsBeforeBranch, instructionsAfterBranch int
 			}{
@@ -1113,7 +1163,10 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 				{forward: false, instructionsInPreamble: 123, instructionsBeforeBranch: 1234, instructionsAfterBranch: 1234},
 				{forward: true, instructionsInPreamble: 123, instructionsBeforeBranch: 123, instructionsAfterBranch: 65536},
 				{forward: false, instructionsInPreamble: 123, instructionsBeforeBranch: 65536, instructionsAfterBranch: 0},
-			} {
+			}
+
+			for _, tt := range tests {
+				tc := tt
 				t.Run(fmt.Sprintf("foward=%v(before=%d,after=%d)", tc.forward,
 					tc.instructionsBeforeBranch, tc.instructionsAfterBranch), func(t *testing.T) {
 					goasm := newGoasmAssembler(t, asm.NilRegister)
@@ -1175,7 +1228,7 @@ func TestAssemblerImpl_multipleLargeOffest(t *testing.T) {
 
 func TestAssemblerImpl_EncodeTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1183,7 +1236,10 @@ func TestAssemblerImpl_EncodeTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 				n:      &arm64.NodeImpl{Instruction: arm64.B, Types: arm64.OperandTypesTwoSIMDBytesToSIMDByteRegister},
 				expErr: "B is unsupported for from:two-simd-bytes,to:simd-byte type",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeTwoSIMDBytesToSIMDByteRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1217,7 +1273,7 @@ func TestAssemblerImpl_EncodeTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1254,7 +1310,10 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 				},
 				expErr: "unsupported arrangement for VADD: 1D",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeVectorRegisterToVectorRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1262,7 +1321,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	})
 
 	vectorRegs := []asm.Register{arm64.REG_V10, arm64.REG_V2, arm64.REG_V30}
-	for _, tc := range []struct {
+	tests := []struct {
 		inst asm.Instruction
 		arr  arm64.VectorArrangement
 	}{
@@ -1271,8 +1330,10 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		{inst: arm64.VADD, arr: arm64.VectorArrangement4S},
 		{inst: arm64.VADD, arr: arm64.VectorArrangement8H},
 		{inst: arm64.VADD, arr: arm64.VectorArrangement16B},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%s.%s", arm64.InstructionName(tc.inst), tc.arr), func(t *testing.T) {
 			for _, src := range vectorRegs {
 				for _, dst := range vectorRegs {
@@ -1301,7 +1362,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1321,7 +1382,10 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 				},
 				expErr: "unsupported arrangement for VLD1: unknown",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeMemoryToVectorRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1373,7 +1437,7 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 
 func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1393,7 +1457,10 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 				},
 				expErr: "unsupported arrangement for VST1: unknown",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeVectorRegisterToMemory(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1446,7 +1513,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 
 func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			n      *arm64.NodeImpl
 			expErr string
 		}{
@@ -1470,7 +1537,10 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 				},
 				expErr: "unsupported arrangement for VMOV: 1D",
 			},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			a := arm64.NewAssemblerImpl(asm.NilRegister)
 			err := a.EncodeRegisterToVectorRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
@@ -1480,7 +1550,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	regs := []asm.Register{arm64.REG_R0, arm64.REG_R10, arm64.REG_R30}
 	vectorRegs := []asm.Register{arm64.REG_V0, arm64.REG_V10, arm64.REG_V30}
 
-	for _, tc := range []struct {
+	tests := []struct {
 		inst        asm.Instruction
 		arrangement arm64.VectorArrangement
 		index       arm64.VectorIndex
@@ -1515,8 +1585,10 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 			arrangement: arm64.VectorArrangementH,
 			index:       4,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
 			for _, r := range regs {
 				for _, vr := range vectorRegs {

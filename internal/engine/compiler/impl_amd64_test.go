@@ -18,7 +18,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
 			t.Run("int32", func(t *testing.T) {
-				for _, tc := range []struct {
+				tests := []struct {
 					name         string
 					x1Reg, x2Reg asm.Register
 				}{
@@ -62,8 +62,10 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						x1Reg: asm.NilRegister,
 						x2Reg: asm.NilRegister,
 					},
-				} {
-					tc := tc
+				}
+
+				for _, tt := range tests {
+					tc := tt
 					t.Run(tc.name, func(t *testing.T) {
 						env := newCompilerEnvironment()
 
@@ -141,7 +143,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 				}
 			})
 			t.Run("int64", func(t *testing.T) {
-				for _, tc := range []struct {
+				tests := []struct {
 					name         string
 					x1Reg, x2Reg asm.Register
 				}{
@@ -185,8 +187,10 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						x1Reg: asm.NilRegister,
 						x2Reg: asm.NilRegister,
 					},
-				} {
-					tc := tc
+				}
+
+				for _, tt := range tests {
+					tc := tt
 					t.Run(tc.name, func(t *testing.T) {
 						const x1Value uint64 = 1 << 35
 						const x2Value uint64 = 51

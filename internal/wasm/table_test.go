@@ -946,7 +946,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 func TestTableInstance_Grow(t *testing.T) {
 	expOnErr := uint32(0xffff_ffff) // -1 as signed i32.
 	max10 := uint32(10)
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		currentLen int
 		max        *uint32
@@ -991,8 +991,10 @@ func TestTableInstance_Grow(t *testing.T) {
 			max:        &max10,
 			exp:        expOnErr,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			table := &TableInstance{References: make([]uintptr, tc.currentLen), Max: tc.max}
 			actual := table.Grow(testCtx, tc.delta, 0)

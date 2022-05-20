@@ -13,7 +13,7 @@ import (
 )
 
 func TestFunctionType_String(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		functype *FunctionType
 		exp      string
 	}{
@@ -27,8 +27,10 @@ func TestFunctionType_String(t *testing.T) {
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}}, exp: "i32_i64"},
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32}, Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "i64f32_i64f32"},
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32, ValueTypeF64}, Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "i64f32f64_f32i32f64"},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.functype.String(), func(t *testing.T) {
 			require.Equal(t, tc.exp, tc.functype.String())
 			require.Equal(t, tc.exp, tc.functype.key())
@@ -120,7 +122,7 @@ func TestMemory_Validate(t *testing.T) {
 }
 
 func TestModule_allDeclarations(t *testing.T) {
-	for i, tc := range []struct {
+	tests := []struct {
 		module            *Module
 		expectedFunctions []Index
 		expectedGlobals   []*GlobalType
@@ -193,8 +195,10 @@ func TestModule_allDeclarations(t *testing.T) {
 			},
 			expectedTables: []*Table{{Min: 10}},
 		},
-	} {
-		tc := tc
+	}
+
+	for i, tt := range tests {
+		tc := tt
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			functions, globals, memory, tables, err := tc.module.AllDeclarations()
 			require.NoError(t, err)
@@ -575,7 +579,7 @@ func TestModule_validateMemory(t *testing.T) {
 }
 
 func TestModule_validateImports(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name            string
 		enabledFeatures Features
 		i               *Import
@@ -618,8 +622,10 @@ func TestModule_validateImports(t *testing.T) {
 				DescMem: &Memory{Min: 1},
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := Module{}
 			if tc.i != nil {
@@ -636,7 +642,7 @@ func TestModule_validateImports(t *testing.T) {
 }
 
 func TestModule_validateExports(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name            string
 		enabledFeatures Features
 		exportSection   []*Export
@@ -718,8 +724,10 @@ func TestModule_validateExports(t *testing.T) {
 			tables:          []*Table{},
 			expectedErr:     `memory for export["e"] out of range`,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			m := Module{ExportSection: tc.exportSection}
 			err := m.validateExports(tc.enabledFeatures, tc.functions, tc.globals, tc.memory, tc.tables)
@@ -840,7 +848,7 @@ func TestModule_validateDataCountSection(t *testing.T) {
 }
 
 func TestModule_declaredFunctionIndexes(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name   string
 		mod    *Module
 		exp    map[Index]struct{}
@@ -943,8 +951,10 @@ func TestModule_declaredFunctionIndexes(t *testing.T) {
 			name:   "invalid global",
 			expErr: `global[0] failed to initialize: EOF`,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := tc.mod.declaredFunctionIndexes()
 			if tc.expErr != "" {

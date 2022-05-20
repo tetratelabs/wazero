@@ -116,7 +116,7 @@ func TestStore_CloseModule(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name        string
 		initializer func(t *testing.T, s *Store)
 	}{
@@ -147,8 +147,10 @@ func TestStore_CloseModule(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			s := newStore()
 			tc.initializer(t, s)
@@ -186,7 +188,7 @@ func TestStore_CloseStore(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	for _, tc := range []struct {
+	tests := []struct {
 		name       string
 		testClosed bool
 	}{
@@ -198,8 +200,10 @@ func TestStore_CloseStore(t *testing.T) {
 			name:       "partially closed",
 			testClosed: true,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			s := newStore()
 
@@ -487,13 +491,15 @@ func TestStore_getFunctionTypeID(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		for _, tc := range []*FunctionType{
+		tests := []*FunctionType{
 			{Params: []ValueType{}},
 			{Params: []ValueType{ValueTypeF32}},
 			{Results: []ValueType{ValueTypeF64}},
 			{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.String(), func(t *testing.T) {
 				s := newStore()
 				actual, err := s.getFunctionTypeID(tc)
@@ -552,7 +558,7 @@ func TestExecuteConstExpression(t *testing.T) {
 		}
 	})
 	t.Run("reference types", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			name string
 			expr *ConstantExpression
 			exp  interface{}
@@ -581,8 +587,10 @@ func TestExecuteConstExpression(t *testing.T) {
 				},
 				exp: int32(1),
 			},
-		} {
-			tc := tc
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
 				val := executeConstExpression(nil, tc.expr)
 				require.Equal(t, tc.exp, val)
@@ -590,7 +598,7 @@ func TestExecuteConstExpression(t *testing.T) {
 		}
 	})
 	t.Run("global expr", func(t *testing.T) {
-		for _, tc := range []struct {
+		tests := []struct {
 			valueType  ValueType
 			val, valHi uint64
 		}{
@@ -599,7 +607,10 @@ func TestExecuteConstExpression(t *testing.T) {
 			{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
 			{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
 			{valueType: ValueTypeV128, val: 0x1, valHi: 0x2},
-		} {
+		}
+
+		for _, tt := range tests {
+			tc := tt
 			t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 				// The index specified in Data equals zero.
 				expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
@@ -774,7 +785,7 @@ func TestStore_resolveImports(t *testing.T) {
 
 func TestModuleInstance_validateData(t *testing.T) {
 	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
-	for _, tc := range []struct {
+	tests := []struct {
 		name   string
 		data   []*DataSegment
 		expErr bool
@@ -800,8 +811,10 @@ func TestModuleInstance_validateData(t *testing.T) {
 			},
 			expErr: true,
 		},
-	} {
-		tc := tc
+	}
+
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			err := m.validateData(tc.data)
 			if tc.expErr {

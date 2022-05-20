@@ -8,7 +8,7 @@ import (
 )
 
 func TestCompiler_wasmOpcodeSignature(t *testing.T) {
-	for _, tc := range []struct {
+	tests := []struct {
 		name string
 		body []byte
 		exp  *signature
@@ -88,8 +88,10 @@ func TestCompiler_wasmOpcodeSignature(t *testing.T) {
 			body: []byte{wasm.OpcodeMiscPrefix, wasm.OpcodeMiscTableCopy},
 			exp:  signature_I32I32I32_None,
 		},
-	} {
+	}
 
+	for _, tt := range tests {
+		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			c := &compiler{body: tc.body}
 			actual, err := c.wasmOpcodeSignature(tc.body[0], 0)
