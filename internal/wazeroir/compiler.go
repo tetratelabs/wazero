@@ -228,13 +228,13 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 	}
 
 	var ret []*CompilationResult
-	for funcInxdex := range module.FunctionSection {
-		typeID := module.FunctionSection[funcInxdex]
+	for funcIndex := range module.FunctionSection {
+		typeID := module.FunctionSection[funcIndex]
 		sig := module.TypeSection[typeID]
-		code := module.CodeSection[funcInxdex]
+		code := module.CodeSection[funcIndex]
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
-			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcInxdex, len(functions)-1, err)
+			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcIndex, len(functions)-1, err)
 		}
 		r.Globals = globals
 		r.Functions = functions

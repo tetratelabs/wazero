@@ -907,7 +907,7 @@ func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
-func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister asm.Register, functype *wasm.FunctionType) error {
+func (c *arm64Compiler) compileCallImpl(index wasm.Index, targetFunctionAddressRegister asm.Register, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -920,7 +920,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 	c.markRegisterUsed(freeRegisters...)
 
 	// Alias for readability.
-	callFrameStackPointerRegister, callFrameStackTopAddressRegister, codeRegister, oldStackBasePointer,
+	callFrameStackPointerRegister, callFrameStackTopAddressRegister, targetFunctionRegister, oldStackBasePointer,
 		tmp := freeRegisters[0], freeRegisters[1], freeRegisters[2], freeRegisters[3], freeRegisters[4]
 
 	// First, we have to check if we need to grow the callFrame stack.
@@ -941,10 +941,10 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 
 	// If these values equal, we need to grow the callFrame stack.
 	// For call_indirect, we need to push the value back to the register.
-	if !isNilRegister(codeAddressRegister) {
+	if !isNilRegister(targetFunctionAddressRegister) {
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
 		// call-frame stack, as the register is not saved across function calls.
-		savedOffsetLocation := c.pushRuntimeValueLocationOnRegister(codeAddressRegister, runtimeValueTypeI64)
+		savedOffsetLocation := c.pushRuntimeValueLocationOnRegister(targetFunctionAddressRegister, runtimeValueTypeI64)
 		c.compileReleaseRegisterToStack(savedOffsetLocation)
 	}
 
@@ -953,13 +953,13 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 	}
 
 	// For call_indirect, we need to push the value back to the register.
-	if !isNilRegister(codeAddressRegister) {
+	if !isNilRegister(targetFunctionAddressRegister) {
 		// Since this is right after callGoFunction, we have to initialize the stack base pointer
 		// to properly load the value on memory stack.
 		c.compileReservedStackBasePointerRegisterInitialization()
 
 		savedOffsetLocation := c.locationStack.pop()
-		savedOffsetLocation.setRegister(codeAddressRegister)
+		savedOffsetLocation.setRegister(targetFunctionAddressRegister)
 		c.compileLoadValueOnStackToRegister(savedOffsetLocation)
 	}
 
@@ -1025,18 +1025,18 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 
 	// Next, read the index of the target function (= &ce.functions[offset])
 	// into codeIndexRegister.
-	if isNilRegister(codeAddressRegister) {
+	if isNilRegister(targetFunctionAddressRegister) {
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
 			tmp, int64(index)*8, // * 8 because the size of *function equals 8 bytes.
-			codeRegister)
+			targetFunctionRegister)
 	} else {
-		codeRegister = codeAddressRegister
+		targetFunctionRegister = targetFunctionAddressRegister
 	}
 
 	// Finally, we are ready to write the address of the target function's *function into the new call-frame.
 	c.assembler.CompileRegisterToMemory(arm64.MOVD,
-		codeRegister,
+		targetFunctionRegister,
 		callFrameStackTopAddressRegister, callFrameFunctionOffset)
 
 	// 4) Set ra.current so that we can return back to this function properly.
@@ -1059,15 +1059,23 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, codeAddressRegister as
 		tmp,
 		arm64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
-	// Also, we have to put the code's moduleinstance address into arm64CallingConventionModuleInstanceAddressRegister.
+	if targetFunctionRegister == arm64CallingConventionModuleInstanceAddressRegister {
+		// This case we must move the value on targetFunctionAddressRegister to another register, otherwise
+		// the address (jump target below) will be modified and result in segfault.
+		// See #526.
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, targetFunctionRegister, tmp)
+		targetFunctionRegister = tmp
+	}
+
+	// Also, we have to put the code's moduleInstance address into arm64CallingConventionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		codeRegister, functionModuleInstanceAddressOffset,
+		targetFunctionRegister, functionModuleInstanceAddressOffset,
 		arm64CallingConventionModuleInstanceAddressRegister,
 	)
 
 	// Then, br into the target function's initial address.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
-		codeRegister, functionCodeInitialAddressOffset,
+		targetFunctionRegister, functionCodeInitialAddressOffset,
 		tmp)
 
 	c.assembler.CompileJumpToMemory(arm64.B, tmp)
