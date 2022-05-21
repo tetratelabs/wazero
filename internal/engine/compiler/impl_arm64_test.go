@@ -1,13 +1,13 @@
 package compiler
 
 import (
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"testing"
 	"unsafe"
 
 	arm64 "github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // TestArm64Compiler_indirectCallWithTargetOnCallingConvReg is the regression test for #526.
