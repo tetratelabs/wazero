@@ -4422,6 +4422,9 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 	c.assembler.CompileNoneToMemory(amd64.INCQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	if amd64CallingConventionModuleInstanceAddressRegister == targetFunctionAddressRegister {
+		// This case we must move the value on targetFunctionAddressRegister to another register, otherwise
+		// the address (jump target below) will be modified and result in segfault.
+		// See $526.
 		c.assembler.CompileRegisterToRegister(amd64.MOVQ, targetFunctionAddressRegister, tmpRegister)
 		targetFunctionAddressRegister = tmpRegister
 	}
