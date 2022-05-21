@@ -4426,7 +4426,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 		// the address (jump target below) will be modified and result in segfault.
 		// See $526.
 		c.assembler.CompileRegisterToRegister(amd64.MOVQ, targetFunctionAddressRegister, tmpRegister)
-		targetFunctionAddressRegister = tmpRegisterm
+		targetFunctionAddressRegister = tmpRegister
 	}
 
 	// Also, we have to put the target function's *wasm.ModuleInstance into amd64CallingConventionModuleInstanceAddressRegister.
