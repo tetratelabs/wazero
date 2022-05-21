@@ -48,7 +48,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	t.Run("call", func(t *testing.T) {
 		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 			Signature: &wasm.FunctionType{},
-			Types:     []*wasm.FunctionType{&wasm.FunctionType{}},
+			Types:     []*wasm.FunctionType{{}},
 			HasTable:  true,
 		}).(*amd64Compiler)
 		err := compiler.compilePreamble()
