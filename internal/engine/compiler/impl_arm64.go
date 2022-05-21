@@ -1062,7 +1062,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, targetFunctionAddressR
 	if targetFunctionRegister == arm64CallingConventionModuleInstanceAddressRegister {
 		// This case we must move the value on targetFunctionAddressRegister to another register, otherwise
 		// the address (jump target below) will be modified and result in segfault.
-		// See $526.
+		// See #526.
 		c.assembler.CompileRegisterToRegister(arm64.MOVD, targetFunctionRegister, tmp)
 		targetFunctionRegister = tmp
 	}
