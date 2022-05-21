@@ -44,29 +44,28 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		table[0] = uintptr(unsafe.Pointer(f))
 	}
 
-	t.Run("call", func(t *testing.T) {
-		compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-			Signature: &wasm.FunctionType{},
-			Types:     []*wasm.FunctionType{{}},
-			HasTable:  true,
-		}).(*arm64Compiler)
-		err := compiler.compilePreamble()
-		require.NoError(t, err)
+	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+		Signature: &wasm.FunctionType{},
+		Types:     []*wasm.FunctionType{{}},
+		HasTable:  true,
+	}).(*arm64Compiler)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
 
-		offsetLoc := compiler.pushRuntimeValueLocationOnRegister(arm64CallingConventionModuleInstanceAddressRegister,
-			runtimeValueTypeI32)
-		compiler.assembler.CompileConstToRegister(arm64.MOVD, 0, offsetLoc.register)
+	// Place the offset into the calling-convention reserved register.
+	offsetLoc := compiler.pushRuntimeValueLocationOnRegister(arm64CallingConventionModuleInstanceAddressRegister,
+		runtimeValueTypeI32)
+	compiler.assembler.CompileConstToRegister(arm64.MOVD, 0, offsetLoc.register)
 
-		require.NoError(t, compiler.compileCallIndirect(operation))
+	require.NoError(t, compiler.compileCallIndirect(operation))
 
-		err = compiler.compileReturnFunction()
-		require.NoError(t, err)
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
 
-		// Generate the code under test and run.
-		code, _, _, err := compiler.compile()
-		require.NoError(t, err)
-		env.exec(code)
-	})
+	// Generate the code under test and run.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
