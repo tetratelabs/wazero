@@ -1063,7 +1063,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.SrcReg), registerBits(n.DstReg)
-		if n.SrcReg == RegZERO && inst == MOVD {
+		if n.SrcReg == RegRZR && inst == MOVD {
 			// If this is 64-bit mov from zero register, then we encode this as MOVK.
 			// See "Move wide (immediate)" in
 			// https://developer.arm.com/documentation/ddi0602/2021-06/Index-by-Encoding/Data-Processing----Immediate
@@ -1231,7 +1231,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.SrcReg), registerBits(n.DstReg)
-		if n.SrcReg == RegZERO {
+		if n.SrcReg == RegRZR {
 			// If the source is zero register, we encode as MOV dst, zero.
 			var sf byte
 			if inst == MOVD {
@@ -1545,7 +1545,7 @@ func (a *AssemblerImpl) EncodeRegisterAndConstToNone(n *NodeImpl) (err error) {
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/CMP--immediate---Compare--immediate---an-alias-of-SUBS--immediate--?lang=en
 	if n.SrcConst < 0 || n.SrcConst > 4095 {
 		return fmt.Errorf("immediate for CMP must fit in 0 to 4095 but got %d", n.SrcConst)
-	} else if n.SrcReg == RegZERO {
+	} else if n.SrcReg == RegRZR {
 		return errors.New("zero register is not supported for CMP (immediate)")
 	}
 
@@ -2699,7 +2699,7 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error 
 var zeroRegisterBits byte = 0b11111
 
 func isIntRegister(r asm.Register) bool {
-	return RegR0 <= r && r <= RegZERO
+	return RegR0 <= r && r <= RegRZR
 }
 
 func isVectorRegister(r asm.Register) bool {

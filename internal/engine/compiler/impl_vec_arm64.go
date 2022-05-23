@@ -17,7 +17,7 @@ func (c *arm64Compiler) compileConstV128(o *wazeroir.OperationConstV128) error {
 	// Moves the lower 64-bits as a scalar float.
 	var intReg = arm64ReservedRegisterForTemporary
 	if o.Lo == 0 {
-		intReg = arm64.RegZERO
+		intReg = arm64.RegRZR
 	} else {
 		c.assembler.CompileConstToRegister(arm64.MOVD, int64(o.Lo), arm64ReservedRegisterForTemporary)
 	}
@@ -26,7 +26,7 @@ func (c *arm64Compiler) compileConstV128(o *wazeroir.OperationConstV128) error {
 	// Then, insert the higher bits with VMOV (translated as "ins" instruction).
 	intReg = arm64ReservedRegisterForTemporary
 	if o.Hi == 0 {
-		intReg = arm64.RegZERO
+		intReg = arm64.RegRZR
 	} else {
 		c.assembler.CompileConstToRegister(arm64.MOVD, int64(o.Hi), arm64ReservedRegisterForTemporary)
 	}

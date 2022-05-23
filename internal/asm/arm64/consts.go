@@ -112,8 +112,8 @@ const (
 	RegR29
 	// RegR30 is the R30 register
 	RegR30
-	// RegZERO is the RZR register (read-only, always returning zero)
-	RegZERO
+	// RegRZR is the RZR register (read-only, always returning zero)
+	RegRZR
 
 	// Scalar floating point registers.
 
@@ -334,8 +334,8 @@ func RegisterName(r asm.Register) string {
 		return "R29"
 	case RegR30:
 		return "R30"
-	case RegZERO:
-		return "ZERO"
+	case RegRZR:
+		return "RZR"
 	case RegV0:
 		return "V0"
 	case RegV1:

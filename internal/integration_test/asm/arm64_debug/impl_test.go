@@ -181,22 +181,22 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			dstReg:        arm64.RegR21,
 		},
 		{
-			srcReg:        arm64.RegZERO,
+			srcReg:        arm64.RegRZR,
 			shiftedSrcReg: arm64.RegR0,
 			shiftNum:      64,
 			dstReg:        arm64.RegR21,
 		},
 		{
-			srcReg:        arm64.RegZERO,
-			shiftedSrcReg: arm64.RegZERO,
+			srcReg:        arm64.RegRZR,
+			shiftedSrcReg: arm64.RegRZR,
 			shiftNum:      64,
 			dstReg:        arm64.RegR21,
 		},
 		{
-			srcReg:        arm64.RegZERO,
-			shiftedSrcReg: arm64.RegZERO,
+			srcReg:        arm64.RegRZR,
+			shiftedSrcReg: arm64.RegRZR,
 			shiftNum:      64,
-			dstReg:        arm64.RegZERO,
+			dstReg:        arm64.RegRZR,
 		},
 	}
 
@@ -256,7 +256,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 		}
 	})
 
-	intRegs := []asm.Register{arm64.RegZERO, arm64.RegR0, arm64.RegR10, arm64.RegR30}
+	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR0, arm64.RegR10, arm64.RegR30}
 	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV12, arm64.RegV31}
 	tests := []struct {
 		instruction asm.Instruction
@@ -294,7 +294,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
-	intRegs := []asm.Register{arm64.RegZERO, arm64.RegR1, arm64.RegR10, arm64.RegR30}
+	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
 	for _, inst := range []asm.Instruction{arm64.MSUB, arm64.MSUBW} {
 		inst := inst
 		t.Run(arm64.InstructionName(inst), func(t *testing.T) {
@@ -347,7 +347,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		}
 	})
 
-	intRegs := []asm.Register{arm64.RegZERO, arm64.RegR1, arm64.RegR10, arm64.RegR30}
+	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
 	intRegsWithoutZero := intRegs[1:]
 	conditionalRegs := []asm.Register{arm64.RegCondEQ, arm64.RegCondNE, arm64.RegCondHS, arm64.RegCondLO, arm64.RegCondMI, arm64.RegCondPL, arm64.RegCondVS, arm64.RegCondVC, arm64.RegCondHI, arm64.RegCondLS, arm64.RegCondGE, arm64.RegCondLT, arm64.RegCondGT, arm64.RegCondLE, arm64.RegCondAL, arm64.RegCondNV}
 	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV15, arm64.RegV31}
@@ -483,7 +483,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 		}
 	})
 
-	intRegs := []asm.Register{arm64.RegZERO, arm64.RegR1, arm64.RegR10, arm64.RegR30}
+	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
 	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV15, arm64.RegV31}
 
 	tests := []struct {
@@ -559,7 +559,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.CMP, Types: arm64.OperandTypesRegisterAndConstToNone,
-					SrcReg: arm64.RegZERO, SrcConst: 123},
+					SrcReg: arm64.RegRZR, SrcConst: 123},
 				expErr: "zero register is not supported for CMP (immediate)",
 			},
 		}

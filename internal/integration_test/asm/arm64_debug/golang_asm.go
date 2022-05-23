@@ -531,7 +531,7 @@ var castAsGolangAsmRegister = [...]int16{
 	asm_arm64.RegR28:  arm64.REG_R28,
 	asm_arm64.RegR29:  arm64.REG_R29,
 	asm_arm64.RegR30:  arm64.REG_R30,
-	asm_arm64.RegZERO: arm64.REGZERO,
+	asm_arm64.RegRZR:  arm64.REGZERO,
 	asm_arm64.RegV0:   arm64.REG_F0,
 	asm_arm64.RegV1:   arm64.REG_F1,
 	asm_arm64.RegV2:   arm64.REG_F2,
