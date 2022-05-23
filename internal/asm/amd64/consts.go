@@ -7,18 +7,30 @@ import "github.com/tetratelabs/wazero/internal/asm"
 // See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
 // See https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf
 const (
-	ConditionalRegisterStateE  = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
-	ConditionalRegisterStateNE                                                // ˜ZF not equal to zero
-	ConditionalRegisterStateS                                                 // SF negative
-	ConditionalRegisterStateNS                                                // ˜SF non-negative
-	ConditionalRegisterStateG                                                 // ˜(SF xor OF) & ˜ ZF greater (signed >)
-	ConditionalRegisterStateGE                                                // ˜(SF xor OF) greater or equal (signed >=)
-	ConditionalRegisterStateL                                                 // SF xor OF less (signed <)
-	ConditionalRegisterStateLE                                                // (SF xor OF) | ZF less or equal (signed <=)
-	ConditionalRegisterStateA                                                 // ˜CF & ˜ZF above (unsigned >)
-	ConditionalRegisterStateAE                                                // ˜CF above or equal (unsigned >=)
-	ConditionalRegisterStateB                                                 // CF below (unsigned <)
-	ConditionalRegisterStateBE                                                // CF | ZF below or equal (unsigned <=)
+	// ConditionalRegisterStateE is the e (equal to zero) condition code
+	ConditionalRegisterStateE = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
+	// ConditionalRegisterStateNE is the ne (not equal to zero) condition code
+	ConditionalRegisterStateNE // ˜ZF not equal to zero
+	// ConditionalRegisterStateS is the s (negative) condition code
+	ConditionalRegisterStateS // SF negative
+	// ConditionalRegisterStateNS is the ns (non-negative) condition code
+	ConditionalRegisterStateNS // ˜SF non-negative
+	// ConditionalRegisterStateG is the g (greater) condition code
+	ConditionalRegisterStateG // ˜(SF xor OF) & ˜ ZF greater (signed >)
+	// ConditionalRegisterStateGE is the ge (greater or equal) condition code
+	ConditionalRegisterStateGE // ˜(SF xor OF) greater or equal (signed >=)
+	// ConditionalRegisterStateL is the l (less) condition code
+	ConditionalRegisterStateL // SF xor OF less (signed <)
+	// ConditionalRegisterStateLE is the le (less or equal) condition code
+	ConditionalRegisterStateLE // (SF xor OF) | ZF less or equal (signed <=)
+	// ConditionalRegisterStateA is the a (above) condition code
+	ConditionalRegisterStateA // ˜CF & ˜ZF above (unsigned >)
+	// ConditionalRegisterStateAE is the ae (above or equal) condition code
+	ConditionalRegisterStateAE // ˜CF above or equal (unsigned >=)
+	// ConditionalRegisterStateB is the b (below) condition code
+	ConditionalRegisterStateB // CF below (unsigned <)
+	// ConditionalRegisterStateBE is the be (below or equal) condition code
+	ConditionalRegisterStateBE // CF | ZF below or equal (unsigned <=)
 )
 
 // AMD64-specific instructions.
@@ -27,148 +39,289 @@ const (
 // Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 // See https://www.felixcloutier.com/x86/index.html
 const (
+	// NONE is not a real instruction but represents the lack of an instruction
 	NONE asm.Instruction = iota
+	// ADDL is the ADD instruction in 32-bit mode. https://www.felixcloutier.com/x86/add
 	ADDL
+	// ADDQ is the ADD instruction in 64-bit mode. https://www.felixcloutier.com/x86/add
 	ADDQ
+	// ADDSD is the ADDSD instruction. https://www.felixcloutier.com/x86/addsd
 	ADDSD
+	// ADDSS is the ADDSS instruction. https://www.felixcloutier.com/x86/addss
 	ADDSS
+	// ANDL is the AND instruction in 32-bit mode. https://www.felixcloutier.com/x86/and
 	ANDL
+	// ANDPD is the ANDPD instruction. https://www.felixcloutier.com/x86/andpd
 	ANDPD
+	// ANDPS is the ANDPS instruction. https://www.felixcloutier.com/x86/andps
 	ANDPS
+	// ANDQ is the AND instruction in 64-bit mode. https://www.felixcloutier.com/x86/and
 	ANDQ
+	// BSRL is the BSR instruction in 32-bit mode. https://www.felixcloutier.com/x86/bsr
 	BSRL
+	// BSRQ is the BSR instruction in 64-bit mode. https://www.felixcloutier.com/x86/bsr
 	BSRQ
+	// CDQ is the CDQ instruction. https://www.felixcloutier.com/x86/cwd:cdq:cqo
 	CDQ
+	// CMOVQCS is the CMOVC (move if carry) instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmovcc
 	CMOVQCS
+	// CMPL is the CMP instruction in 32-bit mode. https://www.felixcloutier.com/x86/cmp
 	CMPL
+	// CMPQ is the CMP instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmp
 	CMPQ
+	// COMISD is the COMISD instruction. https://www.felixcloutier.com/x86/comisd
 	COMISD
+	// COMISS is the COMISS instruction. https://www.felixcloutier.com/x86/comiss
 	COMISS
+	// CQO is the CQO instruction. https://www.felixcloutier.com/x86/cwd:cdq:cqo
 	CQO
+	// CVTSD2SS is the CVTSD2SS instruction. https://www.felixcloutier.com/x86/cvtsd2ss
 	CVTSD2SS
+	// CVTSL2SD is the CVTSI2SD instruction in 32-bit mode. https://www.felixcloutier.com/x86/cvtsi2sd
 	CVTSL2SD
+	// CVTSL2SS is the CVTSI2SS instruction in 32-bit mode. https://www.felixcloutier.com/x86/cvtsi2ss
 	CVTSL2SS
+	// CVTSL2SD is the CVTSI2SD instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2sd
 	CVTSQ2SD
+	// CVTSL2SS is the CVTSI2SS instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2ss
 	CVTSQ2SS
+	// CVTSS2SD is the CVTSS2SD instruction. https://www.felixcloutier.com/x86/cvtss2sd
 	CVTSS2SD
+	// CVTTSD2SL is the CVTTSD2SI instruction in 32-bit mode. https://www.felixcloutier.com/x86/cvttsd2si
 	CVTTSD2SL
+	// CVTTSD2SQ is the CVTTSD2SI instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvttsd2si
 	CVTTSD2SQ
+	// CVTTSS2SL is the CVTTSS2SI instruction in 32-bit mode. https://www.felixcloutier.com/x86/cvttss2si
 	CVTTSS2SL
+	// CVTTSS2SQ is the CVTTSS2SI instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvttss2si
 	CVTTSS2SQ
+	// DECQ is the DEC instruction in 64-bit mode. https://www.felixcloutier.com/x86/dec
 	DECQ
+	// DIVL is the DIV instruction in 32-bit mode. https://www.felixcloutier.com/x86/div
 	DIVL
+	// DIVQ is the DIV instruction in 64-bit mode. https://www.felixcloutier.com/x86/div
 	DIVQ
+	// DIVSD is the DIVSD instruction. https://www.felixcloutier.com/x86/divsd
 	DIVSD
+	// DIVSS is the DIVSS instruction. https://www.felixcloutier.com/x86/divss
 	DIVSS
+	// IDIVL is the IDIV instruction in 32-bit mode. https://www.felixcloutier.com/x86/idiv
 	IDIVL
+	// IDIVQ is the IDIV instruction in 64-bit mode. https://www.felixcloutier.com/x86/idiv
 	IDIVQ
+	// INCQ is the INC instruction in 64-bit mode. https://www.felixcloutier.com/x86/inc
 	INCQ
+	// JCC is the JAE (jump if above or equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JCC
+	// JCS is the JB (jump if below) instruction. https://www.felixcloutier.com/x86/jcc
 	JCS
+	// JEQ is the JE (jump if equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JEQ
+	// JGE is the JGE (jump if greater or equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JGE
+	// JGT is the JG (jump if greater) instruction. https://www.felixcloutier.com/x86/jcc
 	JGT
+	// JHI is the JNBE (jump if not below or equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JHI
+	// JLE is the JLE (jump if less or equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JLE
+	// JLS is the JNA (jump if not above) instruction. https://www.felixcloutier.com/x86/jcc
 	JLS
+	// JLT is the JL (jump if less) instruction. https://www.felixcloutier.com/x86/jcc
 	JLT
+	// JMI is the JS (jump if sign) instruction. https://www.felixcloutier.com/x86/jcc
 	JMI
+	// JNE is the JNE (jump if not equal) instruction. https://www.felixcloutier.com/x86/jcc
 	JNE
+	// JPC is the JPO (jump if parity odd) instruction. https://www.felixcloutier.com/x86/jcc
 	JPC
+	// JPL is the JNS (jump if not sign) instruction. https://www.felixcloutier.com/x86/jcc
 	JPL
+	// JPS is the JPE (jump if parity even) instruction. https://www.felixcloutier.com/x86/jcc
 	JPS
+	// LEAQ is the LEA instruction in 64-bit mode. https://www.felixcloutier.com/x86/lea
 	LEAQ
+	// LZCNTL is the LZCNT instruction in 32-bit mode. https://www.felixcloutier.com/x86/lzcnt
 	LZCNTL
+	// LZCNTQ is the LZCNT instruction in 64-bit mode. https://www.felixcloutier.com/x86/lzcnt
 	LZCNTQ
+	// MAXSD is the MAXSD instruction. https://www.felixcloutier.com/x86/maxsd
 	MAXSD
+	// MAXSS is the MAXSS instruction. https://www.felixcloutier.com/x86/maxss
 	MAXSS
+	// MINSD is the MINSD instruction. https://www.felixcloutier.com/x86/minsd
 	MINSD
+	// MINSS is the MINSS instruction. https://www.felixcloutier.com/x86/minss
 	MINSS
+	// MOVB is the MOV instruction for a single byte. https://www.felixcloutier.com/x86/mov
 	MOVB
+	// MOVBLSX is the MOVSX instruction for single byte in 32-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVBLSX
+	// MOVBLZX is the MOVZX instruction for single-byte in 32-bit mode. https://www.felixcloutier.com/x86/movzx
 	MOVBLZX
+	// MOVBQSX is the MOVSX instruction for single byte in 64-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVBQSX
+	// MOVBQZX is the MOVZX instruction for single-byte in 64-bit mode. https://www.felixcloutier.com/x86/movzx
 	MOVBQZX
+	// MOVL is the MOV instruction for a word.
 	MOVL
+	// MOVLQSX is the MOVSXD instruction. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVLQSX
+	// MOVLQZX is the MOVZX instruction for a word to a doubleword. https://www.felixcloutier.com/x86/movzx
 	MOVLQZX
+	// MOVQ is the MOV instruction for a doubleword. https://www.felixcloutier.com/x86/mov
 	MOVQ
+	// MOVW is the MOV instruction for a word. https://www.felixcloutier.com/x86/mov
 	MOVW
+	// MOVWLSX is the MOVSX instruction for a word in 32-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWLSX
+	// MOVWLZX is the MOVZX instruction for a word in 32-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWLZX
+	// MOVWQSX is the MOVSX instruction for a word in 64-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWQSX
+	// MOVWQZX is the MOVZX instruction for a word in 64-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWQZX
+	// MULL is the MUL instruction in 32-bit mode. https://www.felixcloutier.com/x86/mul
 	MULL
+	// MULQ is the MUL instruction in 64-bit mode. https://www.felixcloutier.com/x86/mul
 	MULQ
+	// MULSD is the MULSD instruction. https://www.felixcloutier.com/x86/mulsd
 	MULSD
+	// MULSS is the MULSS instruction. https://www.felixcloutier.com/x86/mulss
 	MULSS
+	// NEGQ is the NEG instruction in 64-bit mode. https://www.felixcloutier.com/x86/neg
 	NEGQ
+	// ORL is the OR instruction in 32-bit mode. https://www.felixcloutier.com/x86/or
 	ORL
+	// ORPD is the ORPD instruction. https://www.felixcloutier.com/x86/orpd
 	ORPD
+	// ORPS is the ORPS instruction. https://www.felixcloutier.com/x86/orps
 	ORPS
+	// ORQ is the OR instruction in 64-bit mode. https://www.felixcloutier.com/x86/or
 	ORQ
+	// POPCNTL is the POPCNT instruction in 32-bit mode. https://www.felixcloutier.com/x86/popcnt
 	POPCNTL
+	// POPCNTQ is the POPCNT instruction in 64-bit mode. https://www.felixcloutier.com/x86/popcnt
 	POPCNTQ
+	// PSLLL is the PSLLW instruction. https://www.felixcloutier.com/x86/psllw:pslld:psllq
 	PSLLL
+	// PSLLQ is the PSLLQ instruction. https://www.felixcloutier.com/x86/psllw:pslld:psllq
 	PSLLQ
+	// PSRLL is the PSRLW instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLL
+	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
+	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
+	// ROLQ is the ROL instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLQ
+	// RORL is the ROR instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	RORL
+	// RORQ is the ROR instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	RORQ
+	// ROUNDSD is the ROUNDSD instruction. https://www.felixcloutier.com/x86/roundsd
 	ROUNDSD
+	// ROUNDSS is the ROUNDSS instruction. https://www.felixcloutier.com/x86/roundss
 	ROUNDSS
+	// SARL is the SAR instruction in 32-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SARL
+	// SARQ is the SAR instruction in 64-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SARQ
+	// SETCC is the SETAE (set if above or equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETCC
+	// SETCS is the SETB (set if below) instruction. https://www.felixcloutier.com/x86/setcc
 	SETCS
+	// SETEQ is the SETE (set if equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETEQ
+	// SETGE is the SETGE (set if greater or equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETGE
+	// SETGT is the SETG (set if greater) instruction. https://www.felixcloutier.com/x86/setcc
 	SETGT
+	// SETHI is the SETNBE (set if not below or equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETHI
+	// SETLE is the SETLE (set if less or equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETLE
+	// SETLS is the SETNA (set if not above) instruction. https://www.felixcloutier.com/x86/setcc
 	SETLS
+	// SETLT is the SETL (set if less) instruction. https://www.felixcloutier.com/x86/setcc
 	SETLT
+	// SETMI is the SETS (set if sign) instruction. https://www.felixcloutier.com/x86/setcc
 	SETMI
+	// SETNE is the SETNE (set if not equal) instruction. https://www.felixcloutier.com/x86/setcc
 	SETNE
+	// SETPC is the SETNP (set if not parity) instruction. https://www.felixcloutier.com/x86/setcc
 	SETPC
+	// SETPL is the SETNS (set if not sign) instruction. https://www.felixcloutier.com/x86/setcc
 	SETPL
+	// SETPS is the SETP (set if parity) instruction. https://www.felixcloutier.com/x86/setcc
 	SETPS
+	// SHLL is the SHL instruction in 32-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SHLL
+	// SHLQ is the SHL instruction in 64-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SHLQ
+	// SHRL is the SHR instruction in 32-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SHRL
+	// SHRQ is the SHR instruction in 64-bit mode. https://www.felixcloutier.com/x86/sal:sar:shl:shr
 	SHRQ
+	// SQRTSD is the SQRTSD instruction. https://www.felixcloutier.com/x86/sqrtsd
 	SQRTSD
+	// SQRTSS is the SQRTSS instruction. https://www.felixcloutier.com/x86/sqrtss
 	SQRTSS
+	// SUBL is the SUB instruction in 32-bit mode. https://www.felixcloutier.com/x86/sub
 	SUBL
+	// SUBQ is the SUB instruction in 64-bit mode. https://www.felixcloutier.com/x86/sub
 	SUBQ
+	// SUBSD is the SUBSD instruction. https://www.felixcloutier.com/x86/subsd
 	SUBSD
+	// SUBSS is the SUBSS instruction. https://www.felixcloutier.com/x86/subss
 	SUBSS
+	// TESTL is the TEST instruction in 32-bit mode. https://www.felixcloutier.com/x86/test
 	TESTL
+	// TESTQ is the TEST instruction in 64-bit mode. https://www.felixcloutier.com/x86/test
 	TESTQ
+	// TZCNTL is the TZCNT instruction in 32-bit mode. https://www.felixcloutier.com/x86/tzcnt
 	TZCNTL
+	// TZCNTQ is the TZCNT instruction in 64-bit mode. https://www.felixcloutier.com/x86/tzcnt
 	TZCNTQ
+	// UCOMISD is the UCOMISD instruction. https://www.felixcloutier.com/x86/ucomisd
 	UCOMISD
+	// UCOMISS is the UCOMISS instruction. https://www.felixcloutier.com/x86/ucomisd
 	UCOMISS
+	// XORL is the XOR instruction in 32-bit mode. https://www.felixcloutier.com/x86/xor
 	XORL
+	// XORPD is the XORPD instruction. https://www.felixcloutier.com/x86/xorpd
 	XORPD
+	// XORPS is the XORPS instruction. https://www.felixcloutier.com/x86/xorps
 	XORPS
+	// XORQ is the XOR instruction in 64-bit mode. https://www.felixcloutier.com/x86/xor
 	XORQ
+	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	RET
+	// JMP is the JMP instruction. https://www.felixcloutier.com/x86/jmp
 	JMP
+	// NOP is the NOP instruction. https://www.felixcloutier.com/x86/nop
 	NOP
+	// UD2 is the UD2 instruction. https://www.felixcloutier.com/x86/ud
 	UD2
+	// MOVDQU is the MOVDQU instruction. https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU
+	// PINSRQ is the PINSQR instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 	PINSRQ
+	// PADDB is the PADDB instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDB
+	// PADDW is the PADDW instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDW
+	// PADDL is the PADDD instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDL
+	// PADDQ is the PADDQ instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDQ
+	// ADDPS is the ADDPS instruction. https://www.felixcloutier.com/x86/addps
 	ADDPS
+	// ADDPD is the ADDPD instruction. https://www.felixcloutier.com/x86/addpd
 	ADDPD
 )
 
+// InstructionName returns the name for an instruction
 func InstructionName(instruction asm.Instruction) string {
 	switch instruction {
 	case ADDL:
@@ -451,111 +604,144 @@ func InstructionName(instruction asm.Instruction) string {
 	return "Unknown"
 }
 
-// Arm64-specific registers.
+// Amd64-specific registers.
 //
 // Note: naming convention intentionally matches the Go assembler: https://go.dev/doc/asm
 // See https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
 // See https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 const (
-	REG_AX = asm.NilRegister + 1 + iota
-	REG_CX
-	REG_DX
-	REG_BX
-	REG_SP
-	REG_BP
-	REG_SI
-	REG_DI
-	REG_R8
-	REG_R9
-	REG_R10
-	REG_R11
-	REG_R12
-	REG_R13
-	REG_R14
-	REG_R15
-	REG_X0
-	REG_X1
-	REG_X2
-	REG_X3
-	REG_X4
-	REG_X5
-	REG_X6
-	REG_X7
-	REG_X8
-	REG_X9
-	REG_X10
-	REG_X11
-	REG_X12
-	REG_X13
-	REG_X14
-	REG_X15
+	// RegAX is the ax register
+	RegAX = asm.NilRegister + 1 + iota
+	// RegCX is the cx register
+	RegCX
+	// RegDX is the dx register
+	RegDX
+	// RegBX is the bx register
+	RegBX
+	// RegSP is the sp register
+	RegSP
+	// RegBP is the bp register
+	RegBP
+	// RegSI is the si register
+	RegSI
+	// RegDI is the di register
+	RegDI
+	// RegR8 is the r8 register
+	RegR8
+	// RegR9 is the r9 register
+	RegR9
+	// RegR10 is the r10 register
+	RegR10
+	// RegR11 is the r11 register
+	RegR11
+	// RegR12 is the r12 register
+	RegR12
+	// RegR13 is the r13 register
+	RegR13
+	// RegR14 is the r14 register
+	RegR14
+	// RegR15 is the r15 register
+	RegR15
+	// RegX0 is the x0 register
+	RegX0
+	// RegX1 is the x1 register
+	RegX1
+	// RegX2 is the x2 register
+	RegX2
+	// RegX3 is the x3 register
+	RegX3
+	// RegX4 is the x4 register
+	RegX4
+	// RegX5 is the x5 register
+	RegX5
+	// RegX6 is the x6 register
+	RegX6
+	// RegX7 is the x7 register
+	RegX7
+	// RegX8 is the x8 register
+	RegX8
+	// RegX9 is the x9 register
+	RegX9
+	// RegX10 is the x10 register
+	RegX10
+	// RegX11 is the x11 register
+	RegX11
+	// RegX12 is the x12 register
+	RegX12
+	// RegX13 is the x13 register
+	RegX13
+	// RegX14 is the x14 register
+	RegX14
+	// Regx15 is the x15 register
+	RegX15
 )
 
+// RegisterName returns the name for a register
 func RegisterName(reg asm.Register) string {
 	switch reg {
-	case REG_AX:
+	case RegAX:
 		return "AX"
-	case REG_CX:
+	case RegCX:
 		return "CX"
-	case REG_DX:
+	case RegDX:
 		return "DX"
-	case REG_BX:
+	case RegBX:
 		return "BX"
-	case REG_SP:
+	case RegSP:
 		return "SP"
-	case REG_BP:
+	case RegBP:
 		return "BP"
-	case REG_SI:
+	case RegSI:
 		return "SI"
-	case REG_DI:
+	case RegDI:
 		return "DI"
-	case REG_R8:
+	case RegR8:
 		return "R8"
-	case REG_R9:
+	case RegR9:
 		return "R9"
-	case REG_R10:
+	case RegR10:
 		return "R10"
-	case REG_R11:
+	case RegR11:
 		return "R11"
-	case REG_R12:
+	case RegR12:
 		return "R12"
-	case REG_R13:
+	case RegR13:
 		return "R13"
-	case REG_R14:
+	case RegR14:
 		return "R14"
-	case REG_R15:
+	case RegR15:
 		return "R15"
-	case REG_X0:
+	case RegX0:
 		return "X0"
-	case REG_X1:
+	case RegX1:
 		return "X1"
-	case REG_X2:
+	case RegX2:
 		return "X2"
-	case REG_X3:
+	case RegX3:
 		return "X3"
-	case REG_X4:
+	case RegX4:
 		return "X4"
-	case REG_X5:
+	case RegX5:
 		return "X5"
-	case REG_X6:
+	case RegX6:
 		return "X6"
-	case REG_X7:
+	case RegX7:
 		return "X7"
-	case REG_X8:
+	case RegX8:
 		return "X8"
-	case REG_X9:
+	case RegX9:
 		return "X9"
-	case REG_X10:
+	case RegX10:
 		return "X10"
-	case REG_X11:
+	case RegX11:
 		return "X11"
-	case REG_X12:
+	case RegX12:
 		return "X12"
-	case REG_X13:
+	case RegX13:
 		return "X13"
-	case REG_X14:
+	case RegX14:
 		return "X14"
-	case REG_X15:
+	case RegX15:
 		return "X15"
 	default:
 		return "nil"

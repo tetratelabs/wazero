@@ -287,7 +287,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(
 	// after return instruction.
 	readInstructionAddress.From.Offset = 0xffff
 	// Since the assembler cannot directly emit "LEA destination [RIP + offset]", we use the some hack here:
-	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
+	// We intentionally use x86.RegBP here so that the resulting instruction sequence becomes
 	// exactly the same as "LEA destination [RIP + offset]" except the most significant bit of the third byte.
 	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
 	readInstructionAddress.From.Reg = x86.REG_BP
@@ -330,38 +330,38 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(
 
 // castAsGolangAsmRegister maps the registers to golang-asm specific register values.
 var castAsGolangAsmRegister = [...]int16{
-	amd64.REG_AX:  x86.REG_AX,
-	amd64.REG_CX:  x86.REG_CX,
-	amd64.REG_DX:  x86.REG_DX,
-	amd64.REG_BX:  x86.REG_BX,
-	amd64.REG_SP:  x86.REG_SP,
-	amd64.REG_BP:  x86.REG_BP,
-	amd64.REG_SI:  x86.REG_SI,
-	amd64.REG_DI:  x86.REG_DI,
-	amd64.REG_R8:  x86.REG_R8,
-	amd64.REG_R9:  x86.REG_R9,
-	amd64.REG_R10: x86.REG_R10,
-	amd64.REG_R11: x86.REG_R11,
-	amd64.REG_R12: x86.REG_R12,
-	amd64.REG_R13: x86.REG_R13,
-	amd64.REG_R14: x86.REG_R14,
-	amd64.REG_R15: x86.REG_R15,
-	amd64.REG_X0:  x86.REG_X0,
-	amd64.REG_X1:  x86.REG_X1,
-	amd64.REG_X2:  x86.REG_X2,
-	amd64.REG_X3:  x86.REG_X3,
-	amd64.REG_X4:  x86.REG_X4,
-	amd64.REG_X5:  x86.REG_X5,
-	amd64.REG_X6:  x86.REG_X6,
-	amd64.REG_X7:  x86.REG_X7,
-	amd64.REG_X8:  x86.REG_X8,
-	amd64.REG_X9:  x86.REG_X9,
-	amd64.REG_X10: x86.REG_X10,
-	amd64.REG_X11: x86.REG_X11,
-	amd64.REG_X12: x86.REG_X12,
-	amd64.REG_X13: x86.REG_X13,
-	amd64.REG_X14: x86.REG_X14,
-	amd64.REG_X15: x86.REG_X15,
+	amd64.RegAX:  x86.REG_AX,
+	amd64.RegCX:  x86.REG_CX,
+	amd64.RegDX:  x86.REG_DX,
+	amd64.RegBX:  x86.REG_BX,
+	amd64.RegSP:  x86.REG_SP,
+	amd64.RegBP:  x86.REG_BP,
+	amd64.RegSI:  x86.REG_SI,
+	amd64.RegDI:  x86.REG_DI,
+	amd64.RegR8:  x86.REG_R8,
+	amd64.RegR9:  x86.REG_R9,
+	amd64.RegR10: x86.REG_R10,
+	amd64.RegR11: x86.REG_R11,
+	amd64.RegR12: x86.REG_R12,
+	amd64.RegR13: x86.REG_R13,
+	amd64.RegR14: x86.REG_R14,
+	amd64.RegR15: x86.REG_R15,
+	amd64.RegX0:  x86.REG_X0,
+	amd64.RegX1:  x86.REG_X1,
+	amd64.RegX2:  x86.REG_X2,
+	amd64.RegX3:  x86.REG_X3,
+	amd64.RegX4:  x86.REG_X4,
+	amd64.RegX5:  x86.REG_X5,
+	amd64.RegX6:  x86.REG_X6,
+	amd64.RegX7:  x86.REG_X7,
+	amd64.RegX8:  x86.REG_X8,
+	amd64.RegX9:  x86.REG_X9,
+	amd64.RegX10: x86.REG_X10,
+	amd64.RegX11: x86.REG_X11,
+	amd64.RegX12: x86.REG_X12,
+	amd64.RegX13: x86.REG_X13,
+	amd64.RegX14: x86.REG_X14,
+	amd64.RegX15: x86.REG_X15,
 }
 
 // castAsGolangAsmRegister maps the instructions to golang-asm specific instruction values.

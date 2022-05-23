@@ -38,67 +38,67 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "NOP",
 		},
 		{
-			in:  &NodeImpl{Instruction: SETCC, Types: OperandTypesNoneToRegister, DstReg: REG_AX},
+			in:  &NodeImpl{Instruction: SETCC, Types: OperandTypesNoneToRegister, DstReg: RegAX},
 			exp: "SETCC AX",
 		},
 		{
-			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: REG_AX, DstConst: 100},
+			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: RegAX, DstConst: 100},
 			exp: "JMP [AX + 0x64]",
 		},
 		{
-			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: REG_AX, DstConst: 100, DstMemScale: 8, DstMemIndex: REG_R11},
+			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: RegAX, DstConst: 100, DstMemScale: 8, DstMemIndex: RegR11},
 			exp: "JMP [AX + 0x64 + R11*0x8]",
 		},
 		{
-			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: REG_AX, DstConst: 100}},
+			in:  &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: JMP, Types: OperandTypesNoneToMemory, DstReg: RegAX, DstConst: 100}},
 			exp: "JMP {JMP [AX + 0x64]}",
 		},
 		{
-			in:  &NodeImpl{Instruction: IDIVQ, Types: OperandTypesRegisterToNone, SrcReg: REG_DX},
+			in:  &NodeImpl{Instruction: IDIVQ, Types: OperandTypesRegisterToNone, SrcReg: RegDX},
 			exp: "IDIVQ DX",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADDL, Types: OperandTypesRegisterToRegister, SrcReg: REG_DX, DstReg: REG_R14},
+			in:  &NodeImpl{Instruction: ADDL, Types: OperandTypesRegisterToRegister, SrcReg: RegDX, DstReg: RegR14},
 			exp: "ADDL DX, R14",
 		},
 		{
 			in: &NodeImpl{Instruction: MOVQ, Types: OperandTypesRegisterToMemory,
-				SrcReg: REG_DX, DstReg: REG_R14, DstConst: 100},
+				SrcReg: RegDX, DstReg: RegR14, DstConst: 100},
 			exp: "MOVQ DX, [R14 + 0x64]",
 		},
 		{
 			in: &NodeImpl{Instruction: MOVQ, Types: OperandTypesRegisterToMemory,
-				SrcReg: REG_DX, DstReg: REG_R14, DstConst: 100, DstMemIndex: REG_CX, DstMemScale: 4},
+				SrcReg: RegDX, DstReg: RegR14, DstConst: 100, DstMemIndex: RegCX, DstMemScale: 4},
 			exp: "MOVQ DX, [R14 + 0x64 + CX*0x4]",
 		},
 		{
 			in: &NodeImpl{Instruction: CMPL, Types: OperandTypesRegisterToConst,
-				SrcReg: REG_DX, DstConst: 100},
+				SrcReg: RegDX, DstConst: 100},
 			exp: "CMPL DX, 0x64",
 		},
 		{
 			in: &NodeImpl{Instruction: MOVL, Types: OperandTypesMemoryToRegister,
-				SrcReg: REG_DX, SrcConst: 1, DstReg: REG_AX},
+				SrcReg: RegDX, SrcConst: 1, DstReg: RegAX},
 			exp: "MOVL [DX + 0x1], AX",
 		},
 		{
 			in: &NodeImpl{Instruction: MOVL, Types: OperandTypesMemoryToRegister,
-				SrcReg: REG_DX, SrcConst: 1, SrcMemIndex: REG_R12, SrcMemScale: 2,
-				DstReg: REG_AX},
+				SrcReg: RegDX, SrcConst: 1, SrcMemIndex: RegR12, SrcMemScale: 2,
+				DstReg: RegAX},
 			exp: "MOVL [DX + 1 + R12*0x2], AX",
 		},
 		{
 			in: &NodeImpl{Instruction: CMPQ, Types: OperandTypesMemoryToConst,
-				SrcReg: REG_DX, SrcConst: 1, SrcMemIndex: REG_R12, SrcMemScale: 2,
+				SrcReg: RegDX, SrcConst: 1, SrcMemIndex: RegR12, SrcMemScale: 2,
 				DstConst: 123},
 			exp: "CMPQ [DX + 1 + R12*0x2], 0x7b",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVQ, Types: OperandTypesConstToMemory, SrcConst: 123, DstReg: REG_AX, DstConst: 100, DstMemScale: 8, DstMemIndex: REG_R11},
+			in:  &NodeImpl{Instruction: MOVQ, Types: OperandTypesConstToMemory, SrcConst: 123, DstReg: RegAX, DstConst: 100, DstMemScale: 8, DstMemIndex: RegR11},
 			exp: "MOVQ 0x7b, [AX + 0x64 + R11*0x8]",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVQ, Types: OperandTypesConstToRegister, SrcConst: 123, DstReg: REG_AX},
+			in:  &NodeImpl{Instruction: MOVQ, Types: OperandTypesConstToRegister, SrcConst: 123, DstReg: RegAX},
 			exp: "MOVQ 0x7b, AX",
 		},
 	} {
@@ -186,45 +186,45 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileConstToRegister(MOVQ, 1000, REG_AX)
+	a.CompileConstToRegister(MOVQ, 1000, RegAX)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
 	require.Equal(t, int64(1000), actualNode.SrcConst)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, OperandTypeConst, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToRegister(MOVQ, REG_BX, REG_AX)
+	a.CompileRegisterToRegister(MOVQ, RegBX, RegAX)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
-	require.Equal(t, REG_BX, actualNode.SrcReg)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileMemoryToRegister(MOVQ, REG_BX, 100, REG_AX)
+	a.CompileMemoryToRegister(MOVQ, RegBX, 100, RegAX)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
-	require.Equal(t, REG_BX, actualNode.SrcReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
 	require.Equal(t, int64(100), actualNode.SrcConst)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToMemory(MOVQ, REG_BX, REG_AX, 100)
+	a.CompileRegisterToMemory(MOVQ, RegBX, RegAX, 100)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
-	require.Equal(t, REG_BX, actualNode.SrcReg)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, int64(100), actualNode.DstConst)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
@@ -241,20 +241,20 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileJumpToRegister(JNE, REG_AX)
+	a.CompileJumpToRegister(JNE, RegAX)
 	actualNode := a.Current
 	require.Equal(t, JNE, actualNode.Instruction)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileJumpToMemory(JNE, REG_AX, 100)
+	a.CompileJumpToMemory(JNE, RegAX, 100)
 	actualNode := a.Current
 	require.Equal(t, JNE, actualNode.Instruction)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, int64(100), actualNode.DstConst)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
@@ -262,10 +262,10 @@ func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileReadInstructionAddress(REG_R10, RET)
+	a.CompileReadInstructionAddress(RegR10, RET)
 	actualNode := a.Current
 	require.Equal(t, LEAQ, actualNode.Instruction)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
@@ -273,11 +273,11 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 
 func TestAssemblerImpl_CompileRegisterToRegisterWithArg(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToRegisterWithArg(MOVQ, REG_BX, REG_AX, 123)
+	a.CompileRegisterToRegisterWithArg(MOVQ, RegBX, RegAX, 123)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
-	require.Equal(t, REG_BX, actualNode.SrcReg)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, byte(123), actualNode.Arg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
@@ -285,23 +285,23 @@ func TestAssemblerImpl_CompileRegisterToRegisterWithArg(t *testing.T) {
 
 func TestAssemblerImpl_CompileMemoryWithIndexToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileMemoryWithIndexToRegister(MOVQ, REG_BX, 100, REG_R10, 8, REG_AX)
+	a.CompileMemoryWithIndexToRegister(MOVQ, RegBX, 100, RegR10, 8, RegAX)
 	actualNode := a.Current
 	require.Equal(t, MOVQ, actualNode.Instruction)
-	require.Equal(t, REG_BX, actualNode.SrcReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
 	require.Equal(t, int64(100), actualNode.SrcConst)
-	require.Equal(t, REG_R10, actualNode.SrcMemIndex)
+	require.Equal(t, RegR10, actualNode.SrcMemIndex)
 	require.Equal(t, byte(8), actualNode.SrcMemScale)
-	require.Equal(t, REG_AX, actualNode.DstReg)
+	require.Equal(t, RegAX, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToConst(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToConst(MOVQ, REG_BX, 123)
+	a.CompileRegisterToConst(MOVQ, RegBX, 123)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.SrcReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
 	require.Equal(t, int64(123), actualNode.DstConst)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeConst, actualNode.Types.dst)
@@ -309,27 +309,27 @@ func TestAssemblerImpl_CompileRegisterToConst(t *testing.T) {
 
 func TestAssemblerImpl_CompileRegisterToNone(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileRegisterToNone(MOVQ, REG_BX)
+	a.CompileRegisterToNone(MOVQ, RegBX)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.SrcReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileNoneToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileNoneToRegister(MOVQ, REG_BX)
+	a.CompileNoneToRegister(MOVQ, RegBX)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileNoneToMemory(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileNoneToMemory(MOVQ, REG_BX, 1234)
+	a.CompileNoneToMemory(MOVQ, RegBX, 1234)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.DstReg)
 	require.Equal(t, int64(1234), actualNode.DstConst)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
@@ -337,9 +337,9 @@ func TestAssemblerImpl_CompileNoneToMemory(t *testing.T) {
 
 func TestAssemblerImpl_CompileConstToMemory(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileConstToMemory(MOVQ, -9999, REG_BX, 1234)
+	a.CompileConstToMemory(MOVQ, -9999, RegBX, 1234)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.DstReg)
+	require.Equal(t, RegBX, actualNode.DstReg)
 	require.Equal(t, int64(-9999), actualNode.SrcConst)
 	require.Equal(t, int64(1234), actualNode.DstConst)
 	require.Equal(t, OperandTypeConst, actualNode.Types.src)
@@ -348,9 +348,9 @@ func TestAssemblerImpl_CompileConstToMemory(t *testing.T) {
 
 func TestAssemblerImpl_CompileMemoryToConst(t *testing.T) {
 	a := NewAssemblerImpl()
-	a.CompileMemoryToConst(MOVQ, REG_BX, 1234, -9999)
+	a.CompileMemoryToConst(MOVQ, RegBX, 1234, -9999)
 	actualNode := a.Current
-	require.Equal(t, REG_BX, actualNode.SrcReg)
+	require.Equal(t, RegBX, actualNode.SrcReg)
 	require.Equal(t, int64(1234), actualNode.SrcConst)
 	require.Equal(t, int64(-9999), actualNode.DstConst)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
@@ -393,8 +393,8 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesMemoryToRegister,
-				SrcReg:      REG_AX,
-				DstReg:      REG_X3,
+				SrcReg:      RegAX,
+				DstReg:      RegX3,
 				SrcConst:    10,
 			},
 			exp: []byte{0xf3, 0xf, 0x6f, 0x58, 0xa},
@@ -403,8 +403,8 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesMemoryToRegister,
-				SrcReg:      REG_R13,
-				DstReg:      REG_X3,
+				SrcReg:      RegR13,
+				DstReg:      RegX3,
 				SrcConst:    10,
 			},
 			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0x5d, 0xa},
@@ -434,8 +434,8 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToMemory,
-				SrcReg:      REG_X3,
-				DstReg:      REG_AX,
+				SrcReg:      RegX3,
+				DstReg:      RegAX,
 				SrcConst:    10,
 			},
 			exp: []byte{0xf3, 0xf, 0x7f, 0x18},
@@ -444,8 +444,8 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToMemory,
-				SrcReg:      REG_X3,
-				DstReg:      REG_R13,
+				SrcReg:      RegX3,
+				DstReg:      RegR13,
 				SrcConst:    10,
 			},
 			exp: []byte{0xf3, 0x41, 0xf, 0x7f, 0x5d, 0x0},
@@ -475,8 +475,8 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
-				SrcReg:      REG_X3,
-				DstReg:      REG_X10,
+				SrcReg:      RegX3,
+				DstReg:      RegX10,
 			},
 			exp: []byte{0xf3, 0x44, 0xf, 0x6f, 0xd3},
 		},
@@ -484,8 +484,8 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
-				SrcReg:      REG_X10,
-				DstReg:      REG_X3,
+				SrcReg:      RegX10,
+				DstReg:      RegX3,
 			},
 			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0xda},
 		},
@@ -493,8 +493,8 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
-				SrcReg:      REG_X10,
-				DstReg:      REG_X15,
+				SrcReg:      RegX10,
+				DstReg:      RegX15,
 			},
 			exp: []byte{0xf3, 0x45, 0xf, 0x6f, 0xfa},
 		},
