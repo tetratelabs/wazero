@@ -57,7 +57,7 @@ func WasmCompatMax(x, y float64) float64 {
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF32(f float32) float32 {
 	// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
-	if f != -0 && f != 0 {
+	if f != 0 {
 		ceil := float32(math.Ceil(float64(f)))
 		floor := float32(math.Floor(float64(f)))
 		distToCeil := math.Abs(float64(f - ceil))
@@ -82,7 +82,7 @@ func WasmCompatNearestF32(f float32) float32 {
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF64(f float64) float64 {
 	// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
-	if f != -0 && f != 0 {
+	if f != 0 {
 		ceil := math.Ceil(f)
 		floor := math.Floor(f)
 		distToCeil := math.Abs(f - ceil)
