@@ -753,6 +753,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 }
 
 // TestCompiler_callIndirect_largeTypeIndex ensures that non-trivial large type index works well during call_indirect.
+// Note: any index larger than 8-bit range is considered as large for arm64 compiler.
 func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	env := newCompilerEnvironment()
 	table := make([]wasm.Reference, 1)
