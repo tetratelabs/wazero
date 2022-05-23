@@ -415,15 +415,32 @@ func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 	a, mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
 	defer mod.Close(testCtx)
 
+	resultResultion := uint32(1) // arbitrary offset
+	expectedMemory := []byte{
+		'?',                                     // resultResultion is after this
+		0xe8, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // little endian-encoded resolution (fixed to 1000).
+		'?', // stopped after encoding
+	}
 	t.Run("snapshotPreview1.ClockResGet", func(t *testing.T) {
-		require.Equal(t, ErrnoNosys, a.ClockResGet(testCtx, mod, 0, 0))
+		maskMemory(t, testCtx, mod, len(expectedMemory))
+		require.Equal(t, ErrnoSuccess, a.ClockResGet(testCtx, mod, 0, resultResultion))
+
+		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(functionClockResGet, func(t *testing.T) {
-		results, err := fn.Call(testCtx, 0, 0)
+		maskMemory(t, testCtx, mod, len(expectedMemory))
+
+		results, err := fn.Call(testCtx, 0, uint64(resultResultion))
 		require.NoError(t, err)
 		errno := Errno(results[0]) // results[0] is the errno
-		require.Equal(t, ErrnoNosys, errno, ErrnoName(errno))
+		require.Equal(t, ErrnoSuccess, errno, ErrnoName(errno))
+
+		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
