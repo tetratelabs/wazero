@@ -477,9 +477,9 @@ func Test_validateMemoryOffset(t *testing.T) {
 		offset int64
 		expErr string
 	}{
-		{offset: 0}, {offset: -256}, {offset: 255}, {offset: 123 * 8},
+		{offset: 0}, {offset: -256}, {offset: 255}, {offset: 123 * 8}, {offset: 123 * 4},
 		{offset: -257, expErr: "negative memory offset must be larget than or equal -256 but got -257"},
-		{offset: 257, expErr: "large memory offset (>255) must be a multiple of 8 but got 257"},
+		{offset: 257, expErr: "large memory offset (>255) must be a multiple of 4 but got 257"},
 	}
 
 	for _, tt := range tests {

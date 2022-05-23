@@ -822,7 +822,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineModuleContextTypeIDsElement0AddressOffset,
 		tmp2)
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp2, int64(o.TypeIndex)*4, tmp2)
+	c.assembler.CompileMemoryToRegister(amd64.MOVL, tmp2, int64(o.TypeIndex)*4, tmp2)
 
 	// Jump if the type matches.
 	c.assembler.CompileMemoryToRegister(amd64.CMPL, tmp, functionInstanceTypeIDOffset, tmp2)

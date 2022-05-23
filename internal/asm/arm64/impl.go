@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
-
 	"github.com/tetratelabs/wazero/internal/asm"
+	"math"
 )
 
 type NodeImpl struct {
@@ -1583,10 +1582,10 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
 // In theory, offset can be any, but for simplicity of our homemade assembler, we limit the offset range
 // that can be encoded enough for supporting compiler.
 func validateMemoryOffset(offset int64) (err error) {
-	if offset > 255 && offset%8 != 0 {
-		// This is because we only have large offsets for load/store with Wasm value stack, and its offset
-		// is always multiplied by 8 (== the size of uint64, the type of value stack in Go).
-		err = fmt.Errorf("large memory offset (>255) must be a multiple of 8 but got %d", offset)
+	if offset > 255 && offset%4 != 0 {
+		// This is because we only have large offsets for load/store with Wasm value stack or reading type IDs, and its offset
+		// is always multiplied by 4.
+		err = fmt.Errorf("large memory offset (>255) must be a multiple of 4 but got %d", offset)
 	} else if offset < -256 { // 9-bit signed integer's minimum = 2^8.
 		err = fmt.Errorf("negative memory offset must be larget than or equal -256 but got %d", offset)
 	} else if offset > 1<<31-1 {
