@@ -752,6 +752,65 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 	})
 }
 
+// TestCompiler_callIndirect_largeTypeIndex ensures that non-trivial large type index works well during call_indirect.
+func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
+	env := newCompilerEnvironment()
+	table := make([]wasm.Reference, 1)
+	env.addTable(&wasm.TableInstance{References: table})
+	// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+	// and the typeID  matches the table[targetOffset]'s type ID.
+	const typeIndex, typeID = 12345, 0
+	operation := &wazeroir.OperationCallIndirect{TypeIndex: typeIndex}
+	env.module().TypeIDs = make([]wasm.FunctionTypeID, typeIndex+1)
+	env.module().TypeIDs[typeIndex] = typeID
+	env.module().Engine = &moduleEngine{functions: []*function{}}
+
+	types := make([]*wasm.FunctionType, typeIndex+1)
+	types[typeIndex] = &wasm.FunctionType{}
+
+	me := env.moduleEngine()
+	{ // Compiling call target.
+		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
+
+		c, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		f := &function{
+			parent:                &code{codeSegment: c},
+			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
+			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
+			source:                &wasm.FunctionInstance{TypeID: 0},
+		}
+		me.functions = append(me.functions, f)
+		table[0] = uintptr(unsafe.Pointer(f))
+	}
+
+	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
+		Signature: &wasm.FunctionType{},
+		Types:     types,
+		HasTable:  true,
+	})
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+	require.NoError(t, err)
+
+	require.NoError(t, compiler.compileCallIndirect(operation))
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate the code under test and run.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+}
+
 func TestCompiler_compileCall(t *testing.T) {
 	for _, growCallFrameStack := range []bool{false, true} {
 		growCallFrameStack := growCallFrameStack
