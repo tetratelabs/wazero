@@ -1585,7 +1585,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithRegisterOffset(
 func validateMemoryOffset(offset int64) (err error) {
 	if offset > 255 && offset%4 != 0 {
 		// This is because we only have large offsets for load/store with Wasm value stack or reading type IDs, and its offset
-		// is always multiplied by 4 or 8 (== the size of uint32 or uint64 == the type of wasm.FunctionTypeID / value stack in Go)
+		// is always multiplied by 4 or 8 (== the size of uint32 or uint64 == the type of wasm.FunctionTypeID or value stack in Go)
 		err = fmt.Errorf("large memory offset (>255) must be a multiple of 4 but got %d", offset)
 	} else if offset < -256 { // 9-bit signed integer's minimum = 2^8.
 		err = fmt.Errorf("negative memory offset must be larget than or equal -256 but got %d", offset)
