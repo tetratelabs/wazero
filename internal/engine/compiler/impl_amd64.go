@@ -88,19 +88,19 @@ func init() {
 
 var (
 	// amd64ReservedRegisterForCallEngine: pointer to callEngine (i.e. *callEngine as uintptr)
-	amd64ReservedRegisterForCallEngine = amd64.REG_R13
+	amd64ReservedRegisterForCallEngine = amd64.RegR13
 	// amd64ReservedRegisterForStackBasePointerAddress: stack base pointer's address (callEngine.stackBasePointer) in the current function call.
-	amd64ReservedRegisterForStackBasePointerAddress = amd64.REG_R14
+	amd64ReservedRegisterForStackBasePointerAddress = amd64.RegR14
 	// amd64ReservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	amd64ReservedRegisterForMemory = amd64.REG_R15
+	amd64ReservedRegisterForMemory = amd64.RegR15
 )
 
 var (
 	amd64UnreservedVectorRegisters = []asm.Register{ // nolint
-		amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3,
-		amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
-		amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11,
-		amd64.REG_X12, amd64.REG_X13, amd64.REG_X14, amd64.REG_X15,
+		amd64.RegX0, amd64.RegX1, amd64.RegX2, amd64.RegX3,
+		amd64.RegX4, amd64.RegX5, amd64.RegX6, amd64.RegX7,
+		amd64.RegX8, amd64.RegX9, amd64.RegX10, amd64.RegX11,
+		amd64.RegX12, amd64.RegX13, amd64.RegX14, amd64.RegX15,
 	}
 	// Note that we never invoke "call" instruction,
 	// so we don't need to care about the calling convention.
@@ -108,9 +108,9 @@ var (
 	// in Go-allocated variables, and reuse these registers
 	// in compiled functions and write them back before returns.
 	amd64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
-		amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX,
-		amd64.REG_SI, amd64.REG_DI, amd64.REG_R8, amd64.REG_R9,
-		amd64.REG_R10, amd64.REG_R11, amd64.REG_R12,
+		amd64.RegAX, amd64.RegCX, amd64.RegDX, amd64.RegBX,
+		amd64.RegSI, amd64.RegDI, amd64.RegR8, amd64.RegR9,
+		amd64.RegR10, amd64.RegR11, amd64.RegR12,
 	}
 )
 
@@ -118,7 +118,7 @@ var (
 	// amd64CallingConventionModuleInstanceAddressRegister holds *wasm.ModuleInstance of the
 	// next executing function instance. The value is set and used when making function calls
 	// or function returns in the ModuleContextInitialization. See compileModuleContextInitialization.
-	amd64CallingConventionModuleInstanceAddressRegister = amd64.REG_R12
+	amd64CallingConventionModuleInstanceAddressRegister = amd64.RegR12
 )
 
 func (c *amd64Compiler) String() string {
@@ -1107,8 +1107,8 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instruction) error {
 	const (
-		resultRegister   = amd64.REG_AX
-		reservedRegister = amd64.REG_DX
+		resultRegister   = amd64.RegAX
+		reservedRegister = amd64.RegDX
 	)
 
 	x2 := c.locationStack.pop()
@@ -1360,9 +1360,9 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	// Now we have the quotient of the division result in the AX register,
 	// so we record it.
 	if is32Bit {
-		c.pushRuntimeValueLocationOnRegister(amd64.REG_AX, runtimeValueTypeI32)
+		c.pushRuntimeValueLocationOnRegister(amd64.RegAX, runtimeValueTypeI32)
 	} else {
-		c.pushRuntimeValueLocationOnRegister(amd64.REG_AX, runtimeValueTypeI64)
+		c.pushRuntimeValueLocationOnRegister(amd64.RegAX, runtimeValueTypeI64)
 	}
 	return nil
 }
@@ -1391,7 +1391,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 
 	// Now we have the remainder of the division result in the DX register,
 	// so we record it.
-	c.pushRuntimeValueLocationOnRegister(amd64.REG_DX, vt)
+	c.pushRuntimeValueLocationOnRegister(amd64.RegDX, vt)
 	return
 }
 
@@ -1411,8 +1411,8 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 // where AX holds the quotient while DX the remainder of the division result.
 func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error {
 	const (
-		quotientRegister  = amd64.REG_AX
-		remainderRegister = amd64.REG_DX
+		quotientRegister  = amd64.RegAX
+		remainderRegister = amd64.RegDX
 	)
 
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
@@ -1551,7 +1551,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.assembler.CompileRegisterToNone(amd64.IDIVL, x2.register)
 	} else if is32Bit && !signed {
 		// Zeros DX register to have 64 bit dividend over DX and AX registers.
-		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
+		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.RegDX, amd64.RegDX)
 		c.assembler.CompileRegisterToNone(amd64.DIVL, x2.register)
 	} else if !is32Bit && signed {
 		// Emits sign-extension to have 128 bit dividend over DX and AX registers.
@@ -1559,7 +1559,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.assembler.CompileRegisterToNone(amd64.IDIVQ, x2.register)
 	} else if !is32Bit && !signed {
 		// Zeros DX register to have 128 bit dividend over DX and AX registers.
-		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
+		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.RegDX, amd64.RegDX)
 		c.assembler.CompileRegisterToNone(amd64.DIVQ, x2.register)
 	}
 
@@ -1703,7 +1703,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 	x2 := c.locationStack.pop()
 
 	// Ensures that x2 (holding shift counts) is placed on the CX register.
-	const shiftCountRegister = amd64.REG_CX
+	const shiftCountRegister = amd64.RegCX
 	if (x2.onRegister() && x2.register != shiftCountRegister) || x2.onStack() {
 		// If another value lives on the CX register, we release it to the stack.
 		c.onValueReleaseRegisterToStack(shiftCountRegister)

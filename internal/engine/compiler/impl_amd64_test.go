@@ -84,37 +84,37 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",
-						x1Reg: amd64.REG_AX,
-						x2Reg: amd64.REG_R10,
+						x1Reg: amd64.RegAX,
+						x2Reg: amd64.RegR10,
 					},
 					{
 						name:  "x1:ax,x2:stack",
-						x1Reg: amd64.REG_AX,
+						x1Reg: amd64.RegAX,
 						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
-						x1Reg: amd64.REG_R10,
-						x2Reg: amd64.REG_AX,
+						x1Reg: amd64.RegR10,
+						x2Reg: amd64.RegAX,
 					},
 					{
 						name:  "x1:stack,x2:ax",
 						x1Reg: asm.NilRegister,
-						x2Reg: amd64.REG_AX,
+						x2Reg: amd64.RegAX,
 					},
 					{
 						name:  "x1:random_reg,x2:random_reg",
-						x1Reg: amd64.REG_R10,
-						x2Reg: amd64.REG_R9,
+						x1Reg: amd64.RegR10,
+						x2Reg: amd64.RegR9,
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
 						x1Reg: asm.NilRegister,
-						x2Reg: amd64.REG_R9,
+						x2Reg: amd64.RegR9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
-						x1Reg: amd64.REG_R9,
+						x1Reg: amd64.RegR9,
 						x2Reg: asm.NilRegister,
 					},
 					{
@@ -140,8 +140,8 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
-						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.REG_DX, runtimeValueTypeI32)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.RegDX)
+						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.RegDX, runtimeValueTypeI32)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
@@ -209,37 +209,37 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",
-						x1Reg: amd64.REG_AX,
-						x2Reg: amd64.REG_R10,
+						x1Reg: amd64.RegAX,
+						x2Reg: amd64.RegR10,
 					},
 					{
 						name:  "x1:ax,x2:stack",
-						x1Reg: amd64.REG_AX,
+						x1Reg: amd64.RegAX,
 						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
-						x1Reg: amd64.REG_R10,
-						x2Reg: amd64.REG_AX,
+						x1Reg: amd64.RegR10,
+						x2Reg: amd64.RegAX,
 					},
 					{
 						name:  "x1:stack,x2:ax",
 						x1Reg: asm.NilRegister,
-						x2Reg: amd64.REG_AX,
+						x2Reg: amd64.RegAX,
 					},
 					{
 						name:  "x1:random_reg,x2:random_reg",
-						x1Reg: amd64.REG_R10,
-						x2Reg: amd64.REG_R9,
+						x1Reg: amd64.RegR10,
+						x2Reg: amd64.RegR9,
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
 						x1Reg: asm.NilRegister,
-						x2Reg: amd64.REG_R9,
+						x2Reg: amd64.RegR9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
-						x1Reg: amd64.REG_R9,
+						x1Reg: amd64.RegR9,
 						x2Reg: asm.NilRegister,
 					},
 					{
@@ -264,8 +264,8 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
-						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.REG_DX, runtimeValueTypeI64)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.RegDX)
+						prevOnDX := compiler.pushRuntimeValueLocationOnRegister(amd64.RegDX, runtimeValueTypeI64)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
@@ -342,7 +342,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.assembler.CompileReadInstructionAddress(amd64.REG_AX, amd64.JMP)
+		compiler.assembler.CompileReadInstructionAddress(amd64.RegAX, amd64.JMP)
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
@@ -357,7 +357,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		const destinationRegister = amd64.REG_AX
+		const destinationRegister = amd64.RegAX
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
 		compiler.assembler.CompileReadInstructionAddress(destinationRegister, amd64.RET)

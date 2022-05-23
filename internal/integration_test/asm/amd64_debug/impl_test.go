@@ -96,7 +96,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 				name: "JMP to register",
 				setupFn: func(assembler amd64.Assembler) {
 					for i := 0; i < 128; i++ {
-						assembler.CompileJumpToRegister(amd64.JMP, amd64.REG_AX)
+						assembler.CompileJumpToRegister(amd64.JMP, amd64.RegAX)
 					}
 				},
 			},
@@ -104,7 +104,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 				name: "JMP to memory",
 				setupFn: func(assembler amd64.Assembler) {
 					for i := 0; i < 128; i++ {
-						assembler.CompileJumpToMemory(amd64.JMP, amd64.REG_AX, 10)
+						assembler.CompileJumpToMemory(amd64.JMP, amd64.RegAX, 10)
 					}
 				},
 			},
@@ -112,7 +112,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 				name: "JMP to memory large offset",
 				setupFn: func(assembler amd64.Assembler) {
 					for i := 0; i < 128; i++ {
-						assembler.CompileJumpToMemory(amd64.JMP, amd64.REG_AX, math.MaxInt32)
+						assembler.CompileJumpToMemory(amd64.JMP, amd64.RegAX, math.MaxInt32)
 					}
 				},
 			},
@@ -192,121 +192,121 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 		{
 			name: "CMPL(register to const)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToConst(amd64.CMPL, amd64.REG_AX, math.MaxInt16)
+				assembler.CompileRegisterToConst(amd64.CMPL, amd64.RegAX, math.MaxInt16)
 			},
 		},
 		{
 			name: "CMPL(memory to const)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileMemoryToConst(amd64.CMPL, amd64.REG_AX, 1, 10)
+				assembler.CompileMemoryToConst(amd64.CMPL, amd64.RegAX, 1, 10)
 			},
 		},
 		{
 			name: "CMPL(register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.CMPL, amd64.REG_R14, amd64.REG_R10)
+				assembler.CompileRegisterToRegister(amd64.CMPL, amd64.RegR14, amd64.RegR10)
 			},
 		},
 		{
 			name: "CMPQ(register to const)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToConst(amd64.CMPQ, amd64.REG_AX, math.MaxInt16)
+				assembler.CompileRegisterToConst(amd64.CMPQ, amd64.RegAX, math.MaxInt16)
 			},
 		},
 		{
 			name: "CMPQ(register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.CMPQ, amd64.REG_R14, amd64.REG_R10)
+				assembler.CompileRegisterToRegister(amd64.CMPQ, amd64.RegR14, amd64.RegR10)
 			},
 		},
 		{
 			name: "TESTL",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.TESTL, amd64.REG_AX, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.TESTL, amd64.RegAX, amd64.RegAX)
 			},
 		},
 		{
 			name: "TESTQ",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.TESTQ, amd64.REG_AX, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.TESTQ, amd64.RegAX, amd64.RegAX)
 			},
 		},
 		{
 			name: "ADDL (register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.ADDL, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.ADDL, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "ADDL(memory to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileMemoryToRegister(amd64.ADDL, amd64.REG_R10, 1234, amd64.REG_AX)
+				assembler.CompileMemoryToRegister(amd64.ADDL, amd64.RegR10, 1234, amd64.RegAX)
 			},
 		},
 		{
 			name: "ADDQ (register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.ADDQ, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.ADDQ, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "ADDQ(memory to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileMemoryToRegister(amd64.ADDQ, amd64.REG_R10, 1234, amd64.REG_AX)
+				assembler.CompileMemoryToRegister(amd64.ADDQ, amd64.RegR10, 1234, amd64.RegAX)
 			},
 		},
 		{
 			name: "ADDQ(const to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileConstToRegister(amd64.ADDQ, 1234, amd64.REG_R10)
+				assembler.CompileConstToRegister(amd64.ADDQ, 1234, amd64.RegR10)
 			},
 		},
 		{
 			name: "SUBL",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.SUBL, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.SUBL, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "SUBQ (register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.SUBQ, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.SUBQ, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "SUBQ (memory to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileMemoryToRegister(amd64.SUBQ, amd64.REG_R10, math.MaxInt16, amd64.REG_AX)
+				assembler.CompileMemoryToRegister(amd64.SUBQ, amd64.RegR10, math.MaxInt16, amd64.RegAX)
 			},
 		},
 		{
 			name: "ANDL",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.ANDL, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.ANDL, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "ANDQ (register to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileRegisterToRegister(amd64.ANDQ, amd64.REG_R10, amd64.REG_AX)
+				assembler.CompileRegisterToRegister(amd64.ANDQ, amd64.RegR10, amd64.RegAX)
 			},
 		},
 		{
 			name: "ANDQ (const to register)",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileConstToRegister(amd64.ANDQ, -123, amd64.REG_R10)
+				assembler.CompileConstToRegister(amd64.ANDQ, -123, amd64.RegR10)
 			},
 		},
 		{
 			name: "INCQ",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileNoneToMemory(amd64.INCQ, amd64.REG_R10, 123)
+				assembler.CompileNoneToMemory(amd64.INCQ, amd64.RegR10, 123)
 			},
 		},
 		{
 			name: "DECQ",
 			setupFn: func(assembler amd64.Assembler) {
-				assembler.CompileNoneToMemory(amd64.DECQ, amd64.REG_R10, 0)
+				assembler.CompileNoneToMemory(amd64.DECQ, amd64.RegR10, 0)
 			},
 		},
 	}
@@ -350,20 +350,20 @@ func TestAssemblerImpl_Assemble_NOPPadding_fusedJumps(t *testing.T) {
 }
 
 var intRegisters = []asm.Register{
-	amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX, amd64.REG_SP, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI,
-	amd64.REG_R8, amd64.REG_R9, amd64.REG_R10, amd64.REG_R11, amd64.REG_R12, amd64.REG_R13, amd64.REG_R14, amd64.REG_R15,
+	amd64.RegAX, amd64.RegCX, amd64.RegDX, amd64.RegBX, amd64.RegSP, amd64.RegBP, amd64.RegSI, amd64.RegDI,
+	amd64.RegR8, amd64.RegR9, amd64.RegR10, amd64.RegR11, amd64.RegR12, amd64.RegR13, amd64.RegR14, amd64.RegR15,
 }
 
 var floatRegisters = []asm.Register{
-	amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3, amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
-	amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11, amd64.REG_X12, amd64.REG_X13, amd64.REG_X14, amd64.REG_X15,
+	amd64.RegX0, amd64.RegX1, amd64.RegX2, amd64.RegX3, amd64.RegX4, amd64.RegX5, amd64.RegX6, amd64.RegX7,
+	amd64.RegX8, amd64.RegX9, amd64.RegX10, amd64.RegX11, amd64.RegX12, amd64.RegX13, amd64.RegX14, amd64.RegX15,
 }
 
 func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
 		err := a.EncodeNoneToRegister(&amd64.NodeImpl{Instruction: amd64.ADDL,
-			Types: amd64.OperandTypesNoneToRegister, DstReg: amd64.REG_AX})
+			Types: amd64.OperandTypesNoneToRegister, DstReg: amd64.RegAX})
 		require.Error(t, err)
 
 		t.Run("error", func(t *testing.T) {
@@ -372,7 +372,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 				expErr string
 			}{
 				{
-					n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesNoneToRegister, DstReg: amd64.REG_AX},
+					n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesNoneToRegister, DstReg: amd64.RegAX},
 					expErr: "ADDL is unsupported for from:none,to:register type",
 				},
 				{
@@ -428,7 +428,7 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesNoneToMemory, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesNoneToMemory, DstReg: amd64.RegAX},
 				expErr: "ADDL is unsupported for from:none,to:memory type",
 			},
 		}
@@ -722,7 +722,7 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToNone, SrcReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToNone, SrcReg: amd64.RegAX},
 				expErr: "ADDL is unsupported for from:register,to:none type",
 			},
 			{
@@ -775,18 +775,18 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.JMP, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.JMP, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegAX},
 				expErr: "JMP is unsupported for from:register,to:register type",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToRegister, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToRegister, DstReg: amd64.RegAX},
 				expErr: "invalid register [nil]",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX},
 				expErr: "invalid register [nil]",
 			}, {
-				n:      &amd64.NodeImpl{Instruction: amd64.MOVL, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_X1},
+				n:      &amd64.NodeImpl{Instruction: amd64.MOVL, Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegX1},
 				expErr: "MOVL for float to float is undefined",
 			},
 		}
@@ -802,8 +802,8 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		}
 	})
 
-	intRegisters := []asm.Register{amd64.REG_AX, amd64.REG_R8}
-	floatRegisters := []asm.Register{amd64.REG_X0, amd64.REG_X8}
+	intRegisters := []asm.Register{amd64.RegAX, amd64.RegR8}
+	floatRegisters := []asm.Register{amd64.RegX0, amd64.RegX8}
 	allRegisters := append(intRegisters, floatRegisters...)
 	tests := []struct {
 		instruction      asm.Instruction
@@ -869,10 +869,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.ORQ, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.POPCNTL, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.POPCNTQ, srcRegs: intRegisters, DstRegs: intRegisters},
-		{instruction: amd64.ROLL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.ROLQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.RORL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.RORQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
+		{instruction: amd64.ROLL, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.ROLQ, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.RORL, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.RORQ, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
 		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x00},
 		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x00},
 		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x01},
@@ -883,12 +883,12 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x03},
 		{instruction: amd64.ROUNDSD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x04},
 		{instruction: amd64.ROUNDSS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0x04},
-		{instruction: amd64.SARL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.SARQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.SHLL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.SHLQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.SHRL, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
-		{instruction: amd64.SHRQ, srcRegs: []asm.Register{amd64.REG_CX}, DstRegs: intRegisters},
+		{instruction: amd64.SARL, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.SARQ, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.SHLL, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.SHLQ, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.SHRL, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
+		{instruction: amd64.SHRQ, srcRegs: []asm.Register{amd64.RegCX}, DstRegs: intRegisters},
 		{instruction: amd64.SQRTSD, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.SQRTSS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.SUBL, srcRegs: intRegisters, DstRegs: intRegisters},
@@ -916,39 +916,39 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				a := amd64.NewAssemblerImpl()
 				if _, isShiftOp := amd64.RegisterToRegisterShiftOpcode[tc.instruction]; isShiftOp {
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_CX, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegCX, DstReg: amd64.RegX0}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegX0}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_CX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegCX}))
 				} else if srcFloat && dstFloat && !isMOV { // Float to Float
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegAX}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegAX}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegX0}))
 				} else if srcFloat && !dstFloat && !isMOV { // Float to Int
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_X1}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegX1}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_X1}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegX1}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegAX}))
 				} else if !srcFloat && dstFloat && !isMOV { // Int to Float
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegAX}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegAX}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegX0}))
 				} else if !isMOV { // Int to Int
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegX0}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_X0, DstReg: amd64.REG_AX}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegX0, DstReg: amd64.RegAX}))
 					require.Error(t, a.EncodeRegisterToRegister(&amd64.NodeImpl{Instruction: tc.instruction,
-						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.REG_AX, DstReg: amd64.REG_X0}))
+						Types: amd64.OperandTypesRegisterToRegister, SrcReg: amd64.RegAX, DstReg: amd64.RegX0}))
 				}
 			})
 			for _, srcReg := range tc.srcRegs {
@@ -994,13 +994,13 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.JMP,
 					Types:  amd64.OperandTypesRegisterToMemory,
-					SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX},
+					SrcReg: amd64.RegAX, DstReg: amd64.RegAX},
 				expErr: "JMP is unsupported for from:register,to:memory type",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.SHLQ,
 					Types:  amd64.OperandTypesRegisterToMemory,
-					SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX},
+					SrcReg: amd64.RegAX, DstReg: amd64.RegAX},
 				expErr: "shifting instruction SHLQ require CX register as src but got AX",
 			},
 		}
@@ -1020,10 +1020,10 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		for _, instruction := range []asm.Instruction{
 			amd64.CMPL, amd64.CMPQ, amd64.MOVB, amd64.MOVL, amd64.MOVQ, amd64.MOVW,
 		} {
-			regs := []asm.Register{amd64.REG_R12, amd64.REG_AX, amd64.REG_BP, amd64.REG_SI}
+			regs := []asm.Register{amd64.RegR12, amd64.RegAX, amd64.RegBP, amd64.RegSI}
 			srcRegs := regs
 			if instruction == amd64.MOVL || instruction == amd64.MOVQ {
-				srcRegs = append(srcRegs, amd64.REG_X0, amd64.REG_X10)
+				srcRegs = append(srcRegs, amd64.RegX0, amd64.RegX10)
 			}
 
 			for _, srcReg := range srcRegs {
@@ -1077,7 +1077,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		}
 	})
 	t.Run("shift", func(t *testing.T) {
-		regs := []asm.Register{amd64.REG_AX, amd64.REG_R8}
+		regs := []asm.Register{amd64.RegAX, amd64.RegR8}
 		scales := []byte{1, 4}
 		for _, instruction := range []asm.Instruction{
 			amd64.SARL, amd64.SARQ, amd64.SHLL, amd64.SHLQ, amd64.SHRL, amd64.SHRQ,
@@ -1091,13 +1091,13 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 					offset := offset
 					n := &amd64.NodeImpl{Instruction: instruction,
 						Types:  amd64.OperandTypesRegisterToMemory,
-						SrcReg: amd64.REG_CX, DstReg: DstReg, DstConst: offset}
+						SrcReg: amd64.RegCX, DstReg: DstReg, DstConst: offset}
 
 					// Without index.
 					t.Run(n.String(), func(t *testing.T) {
 						goasm, err := newGolangAsmAssembler()
 						require.NoError(t, err)
-						goasm.CompileRegisterToMemory(instruction, amd64.REG_CX, DstReg, offset)
+						goasm.CompileRegisterToMemory(instruction, amd64.RegCX, DstReg, offset)
 						bs, err := goasm.Assemble()
 						require.NoError(t, err)
 
@@ -1115,7 +1115,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 							t.Run(n.String(), func(t *testing.T) {
 								goasm, err := newGolangAsmAssembler()
 								require.NoError(t, err)
-								goasm.CompileRegisterToMemoryWithIndex(instruction, amd64.REG_CX, DstReg, offset, indexReg, int16(scale))
+								goasm.CompileRegisterToMemoryWithIndex(instruction, amd64.RegCX, DstReg, offset, indexReg, int16(scale))
 								bs, err := goasm.Assemble()
 								require.NoError(t, err)
 
@@ -1139,7 +1139,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToConst, SrcReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesRegisterToConst, SrcReg: amd64.RegAX},
 				expErr: "ADDL is unsupported for from:register,to:const type",
 			},
 			{
@@ -1192,7 +1192,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		const targetBeforeInstruction = amd64.RET
-		for _, DstReg := range []asm.Register{amd64.REG_AX, amd64.REG_R8} {
+		for _, DstReg := range []asm.Register{amd64.RegAX, amd64.RegR8} {
 			DstReg := DstReg
 			t.Run(amd64.RegisterName(DstReg), func(t *testing.T) {
 				goasm, err := newGolangAsmAssembler()
@@ -1219,14 +1219,14 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	})
 	t.Run("not found", func(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
-		a.CompileReadInstructionAddress(amd64.REG_R10, amd64.NOP)
+		a.CompileReadInstructionAddress(amd64.RegR10, amd64.NOP)
 		a.CompileStandAlone(amd64.CDQ)
 		_, err := a.Assemble()
 		require.EqualError(t, err, "BUG: target instruction not found for read instruction address")
 	})
 	t.Run("offset too large", func(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
-		a.CompileReadInstructionAddress(amd64.REG_R10, amd64.RET)
+		a.CompileReadInstructionAddress(amd64.RegR10, amd64.RET)
 		a.CompileStandAlone(amd64.RET)
 		a.CompileStandAlone(amd64.CDQ)
 
@@ -1252,12 +1252,12 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		n := &amd64.NodeImpl{Instruction: amd64.JMP,
 			Types:  amd64.OperandTypesMemoryToRegister,
-			SrcReg: amd64.REG_AX, DstReg: amd64.REG_AX}
+			SrcReg: amd64.RegAX, DstReg: amd64.RegAX}
 		a := amd64.NewAssemblerImpl()
 		require.EqualError(t, a.EncodeMemoryToRegister(n), "JMP is unsupported for from:memory,to:register type")
 	})
-	intRegs := []asm.Register{amd64.REG_AX, amd64.REG_BP, amd64.REG_SI, amd64.REG_DI, amd64.REG_R10}
-	floatRegs := []asm.Register{amd64.REG_X0, amd64.REG_X8}
+	intRegs := []asm.Register{amd64.RegAX, amd64.RegBP, amd64.RegSI, amd64.RegDI, amd64.RegR10}
+	floatRegs := []asm.Register{amd64.RegX0, amd64.RegX8}
 	scales := []byte{1, 4}
 	tests := []struct {
 		instruction asm.Instruction
@@ -1354,7 +1354,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.RET, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.RET, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegAX},
 				expErr: "RET is unsupported for from:const,to:register type",
 			},
 			{
@@ -1362,23 +1362,23 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 				expErr: "invalid register [nil]",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegAX},
 				expErr: "PSLLL needs float register but got AX",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_X0},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0},
 				expErr: "ADDQ needs int register but got X0",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_X0, SrcConst: 2199023255552},
+				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0, SrcConst: 2199023255552},
 				expErr: "constant must fit in 32-bit integer for PSLLL, but got 2199023255552",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.SHLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_R10, SrcConst: 32768},
+				n:      &amd64.NodeImpl{Instruction: amd64.SHLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegR10, SrcConst: 32768},
 				expErr: "constant must fit in positive 8-bit integer for SHLQ, but got 32768",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSRLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.REG_X0, SrcConst: 32768},
+				n:      &amd64.NodeImpl{Instruction: amd64.PSRLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0, SrcConst: 32768},
 				expErr: "constant must fit in signed 8-bit integer for PSRLQ, but got 32768",
 			},
 		}
@@ -1468,7 +1468,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToConst, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToConst, DstReg: amd64.RegAX},
 				expErr: "ADDL is unsupported for from:memory,to:const type",
 			},
 		}
@@ -1486,7 +1486,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 
 	const inst = amd64.CMPL
 	t.Run("ok", func(t *testing.T) {
-		for _, reg := range []asm.Register{amd64.REG_AX, amd64.REG_R8} {
+		for _, reg := range []asm.Register{amd64.RegAX, amd64.RegR8} {
 			reg := reg
 			t.Run(amd64.RegisterName(reg), func(t *testing.T) {
 				for _, offset := range []int64{0, 1, -1, 1243, -1234, math.MaxInt32, math.MinInt32, math.MaxInt16, math.MinInt16} {
@@ -1526,19 +1526,19 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesConstToMemory, DstReg: amd64.REG_AX},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesConstToMemory, DstReg: amd64.RegAX},
 				expErr: "ADDL is unsupported for from:const,to:memory type",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.MOVB, Types: amd64.OperandTypesConstToMemory,
 					SrcConst: math.MaxInt16,
-					DstReg:   amd64.REG_AX, DstConst: 0xff_ff},
+					DstReg:   amd64.RegAX, DstConst: 0xff_ff},
 				expErr: "too large load target const 32767 for MOVB",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.MOVL, Types: amd64.OperandTypesConstToMemory,
 					SrcConst: math.MaxInt64,
-					DstReg:   amd64.REG_AX, DstConst: 0xff_ff},
+					DstReg:   amd64.RegAX, DstConst: 0xff_ff},
 				expErr: "too large load target const 9223372036854775807 for MOVL",
 			},
 		}
@@ -1570,7 +1570,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 				consts = constsMOVQ
 			}
 			t.Run(amd64.InstructionName(inst), func(t *testing.T) {
-				for _, reg := range []asm.Register{amd64.REG_AX, amd64.REG_R8} {
+				for _, reg := range []asm.Register{amd64.RegAX, amd64.RegR8} {
 					reg := reg
 					t.Run(amd64.RegisterName(reg), func(t *testing.T) {
 						for _, offset := range []int64{0, 1, -1, 1243, -1234, math.MaxInt32, math.MinInt32, math.MaxInt16, math.MinInt16} {
@@ -1610,22 +1610,22 @@ func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToRegister, SrcConst: math.MaxInt64, SrcReg: amd64.REG_AX, DstReg: amd64.REG_R10},
+				n:      &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToRegister, SrcConst: math.MaxInt64, SrcReg: amd64.RegAX, DstReg: amd64.RegR10},
 				expErr: "offset does not fit in 32-bit integer",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToRegister,
-					SrcConst: 10, SrcReg: asm.NilRegister, SrcMemIndex: amd64.REG_R12, SrcMemScale: 1, DstReg: amd64.REG_R10},
+					SrcConst: 10, SrcReg: asm.NilRegister, SrcMemIndex: amd64.RegR12, SrcMemScale: 1, DstReg: amd64.RegR10},
 				expErr: "addressing without base register but with index is not implemented",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToRegister,
-					SrcConst: 10, SrcReg: amd64.REG_AX, SrcMemIndex: amd64.REG_SP, SrcMemScale: 1, DstReg: amd64.REG_R10},
+					SrcConst: 10, SrcReg: amd64.RegAX, SrcMemIndex: amd64.RegSP, SrcMemScale: 1, DstReg: amd64.RegR10},
 				expErr: "SP cannot be used for SIB index",
 			},
 			{
 				n: &amd64.NodeImpl{Instruction: amd64.ADDL, Types: amd64.OperandTypesMemoryToRegister,
-					SrcConst: 10, SrcReg: amd64.REG_AX, SrcMemIndex: amd64.REG_R9, SrcMemScale: 3, DstReg: amd64.REG_R10},
+					SrcConst: 10, SrcReg: amd64.RegAX, SrcMemIndex: amd64.RegR9, SrcMemScale: 3, DstReg: amd64.RegR10},
 				expErr: "scale in SIB must be one of 1, 2, 4, 8 but got 3",
 			},
 		}
@@ -1647,7 +1647,7 @@ func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 			t.Run(fmt.Sprintf("%d", offset), func(t *testing.T) {
 				goasm, err := newGolangAsmAssembler()
 				require.NoError(t, err)
-				goasm.CompileRegisterToMemory(amd64.CMPL, amd64.REG_AX, asm.NilRegister, offset)
+				goasm.CompileRegisterToMemory(amd64.CMPL, amd64.RegAX, asm.NilRegister, offset)
 				require.NoError(t, err)
 
 				expectedBytes, err := goasm.Assemble()
@@ -1695,7 +1695,7 @@ func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 				for _, indexReg := range append(intRegisters,
 					// Without index.
 					asm.NilRegister) {
-					if indexReg == amd64.REG_SP {
+					if indexReg == amd64.RegSP {
 						continue
 					}
 					n.SrcMemIndex = indexReg
@@ -1704,7 +1704,7 @@ func TestNodeImpl_GetMemoryLocation(t *testing.T) {
 						t.Run(n.String(), func(t *testing.T) {
 							goasm, err := newGolangAsmAssembler()
 							require.NoError(t, err)
-							goasm.CompileMemoryWithIndexToRegister(amd64.ADDL, srcReg, offset, indexReg, int16(scale), amd64.REG_AX)
+							goasm.CompileMemoryWithIndexToRegister(amd64.ADDL, srcReg, offset, indexReg, int16(scale), amd64.RegAX)
 							expectedBytes, err := goasm.Assemble()
 							require.NoError(t, err)
 

@@ -755,7 +755,7 @@ func (a *AssemblerImpl) EncodeNoneToRegister(n *NodeImpl) (err error) {
 		prefix |= RexPrefixW
 		modRM |= 0b00_001_000
 	} else {
-		if REG_SP <= n.DstReg && n.DstReg <= REG_DI {
+		if RegSP <= n.DstReg && n.DstReg <= RegDI {
 			// If the destination is one byte length register, we need to have the default prefix.
 			// https: //wiki.osdev.org/X86-64_Instruction_Encoding#Registers
 			prefix |= RexPrefixDefault
@@ -1256,7 +1256,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 		rexPrefix |= op.rPrefix
 
-		if op.isSrc8bit && REG_SP <= n.SrcReg && n.SrcReg <= REG_DI {
+		if op.isSrc8bit && RegSP <= n.SrcReg && n.SrcReg <= RegDI {
 			// If an operand register is 8-bit length of SP, BP, DI, or SI register, we need to have the default prefix.
 			// https: //wiki.osdev.org/X86-64_Instruction_Encoding#Registers
 			rexPrefix |= RexPrefixDefault
@@ -1278,7 +1278,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 		return nil
 	} else if op, ok := RegisterToRegisterShiftOpcode[inst]; ok {
-		if n.SrcReg != REG_CX {
+		if n.SrcReg != RegCX {
 			return fmt.Errorf("shifting instruction %s require CX register as src but got %s", InstructionName(inst), RegisterName(n.SrcReg))
 		} else if IsVectorRegister(n.DstReg) {
 			return fmt.Errorf("shifting instruction %s require integer register as dst but got %s", InstructionName(inst), RegisterName(n.SrcReg))
@@ -1326,7 +1326,7 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/mov
 		opcode = []byte{0x88}
 		// 1 byte register operands need default prefix for the following registers.
-		if n.SrcReg >= REG_SP && n.SrcReg <= REG_DI {
+		if n.SrcReg >= RegSP && n.SrcReg <= RegDI {
 			rexPrefix |= RexPrefixDefault
 		}
 	case MOVL:
@@ -1424,7 +1424,7 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		rexPrefix |= prefix
 		modRM |= srcReg3Bits << 3 // Place the source register on ModRM:reg
 	} else {
-		if n.SrcReg != REG_CX {
+		if n.SrcReg != RegCX {
 			return fmt.Errorf("shifting instruction %s require CX register as src but got %s", InstructionName(n.Instruction), RegisterName(n.SrcReg))
 		}
 	}
@@ -1468,7 +1468,7 @@ func (a *AssemblerImpl) EncodeRegisterToConst(n *NodeImpl) (err error) {
 		}
 		is8bitConst := fitInSigned8bit(n.DstConst)
 		// https://www.felixcloutier.com/x86/cmp
-		if n.SrcReg == REG_AX && !is8bitConst {
+		if n.SrcReg == RegAX && !is8bitConst {
 			a.Buf.Write([]byte{0x3d})
 		} else {
 			// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
@@ -1718,7 +1718,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 	case ADDQ:
 		// https://www.felixcloutier.com/x86/add
 		rexPrefix |= RexPrefixW
-		if n.DstReg == REG_AX && !isSigned8bitConst {
+		if n.DstReg == RegAX && !isSigned8bitConst {
 			a.Buf.Write([]byte{rexPrefix, 0x05})
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
@@ -1737,7 +1737,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 	case ANDQ:
 		// https://www.felixcloutier.com/x86/and
 		rexPrefix |= RexPrefixW
-		if n.DstReg == REG_AX && !isSigned8bitConst {
+		if n.DstReg == RegAX && !isSigned8bitConst {
 			a.Buf.Write([]byte{rexPrefix, 0x25})
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
@@ -1862,7 +1862,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		if rexPrefix != RexPrefixNone {
 			a.Buf.WriteByte(rexPrefix)
 		}
-		if n.DstReg == REG_AX && !isSigned8bitConst {
+		if n.DstReg == RegAX && !isSigned8bitConst {
 			a.Buf.Write([]byte{0x35})
 		} else {
 			modRM := 0b11_000_000 | // Specifying that opeand is register.
@@ -2039,7 +2039,7 @@ func (n *NodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 			// If the target register is R13 or BP, we have to keep [R/M + displacement] even if the value
 			// is zero since it's not [R/M] operand is not defined for these two registers.
 			// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
-			baseReg != REG_R13 && baseReg != REG_BP
+			baseReg != RegR13 && baseReg != RegBP
 		if withoutDisplacement {
 			// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 			modRM |= 0b00_000_000 // Specifying that operand is memory without displacement
@@ -2059,12 +2059,12 @@ func (n *NodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 		//
 		// Thefore we emit the SIB byte before the const so that [SIB + displacement] ends up [register + displacement].
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing_2
-		if baseReg == REG_SP || baseReg == REG_R12 {
+		if baseReg == RegSP || baseReg == RegR12 {
 			sbiValue := byte(0b00_100_100)
 			sbi = &sbiValue
 		}
 	} else {
-		if indexReg == REG_SP {
+		if indexReg == RegSP {
 			err = errors.New("SP cannot be used for SIB index")
 			return
 		}
@@ -2073,7 +2073,7 @@ func (n *NodeImpl) GetMemoryLocation() (p RexPrefix, modRM byte, sbi *byte, disp
 
 		withoutDisplacement := offset == 0 &&
 			// For R13 and BP, base registers cannot be encoded "without displacement" mod (i.e. 0b00 mod).
-			baseReg != REG_R13 && baseReg != REG_BP
+			baseReg != RegR13 && baseReg != RegBP
 		if withoutDisplacement {
 			// https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
 			modRM |= 0b00_000_000 // Specifying that operand is SIB without displacement
@@ -2197,7 +2197,7 @@ func register3bits(
 	registerSpecifierPosition registerSpecifierPosition,
 ) (bits byte, prefix RexPrefix, err error) {
 	prefix = RexPrefixNone
-	if REG_R8 <= reg && reg <= REG_R15 || REG_X8 <= reg && reg <= REG_X15 {
+	if RegR8 <= reg && reg <= RegR15 || RegX8 <= reg && reg <= RegX15 {
 		// https://wiki.osdev.org/X86-64_Instruction_Encoding#REX_prefix
 		switch registerSpecifierPosition {
 		case registerSpecifierPositionModRMFieldReg:
@@ -2211,21 +2211,21 @@ func register3bits(
 
 	// https://wiki.osdev.org/X86-64_Instruction_Encoding#Registers
 	switch reg {
-	case REG_AX, REG_R8, REG_X0, REG_X8:
+	case RegAX, RegR8, RegX0, RegX8:
 		bits = 0b000
-	case REG_CX, REG_R9, REG_X1, REG_X9:
+	case RegCX, RegR9, RegX1, RegX9:
 		bits = 0b001
-	case REG_DX, REG_R10, REG_X2, REG_X10:
+	case RegDX, RegR10, RegX2, RegX10:
 		bits = 0b010
-	case REG_BX, REG_R11, REG_X3, REG_X11:
+	case RegBX, RegR11, RegX3, RegX11:
 		bits = 0b011
-	case REG_SP, REG_R12, REG_X4, REG_X12:
+	case RegSP, RegR12, RegX4, RegX12:
 		bits = 0b100
-	case REG_BP, REG_R13, REG_X5, REG_X13:
+	case RegBP, RegR13, RegX5, RegX13:
 		bits = 0b101
-	case REG_SI, REG_R14, REG_X6, REG_X14:
+	case RegSI, RegR14, RegX6, RegX14:
 		bits = 0b110
-	case REG_DI, REG_R15, REG_X7, REG_X15:
+	case RegDI, RegR15, RegX7, RegX15:
 		bits = 0b111
 	default:
 		err = fmt.Errorf("invalid register [%s]", RegisterName(reg))
@@ -2242,5 +2242,5 @@ func fitInSigned8bit(v int64) bool {
 }
 
 func IsVectorRegister(r asm.Register) bool {
-	return REG_X0 <= r && r <= REG_X15
+	return RegX0 <= r && r <= RegX15
 }
