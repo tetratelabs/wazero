@@ -37,11 +37,11 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "NOP",
 		},
 		{
-			in:  &NodeImpl{Instruction: BEQ, Types: OperandTypesNoneToRegister, DstReg: REG_R1},
+			in:  &NodeImpl{Instruction: BEQ, Types: OperandTypesNoneToRegister, DstReg: RegR1},
 			exp: "BEQ R1",
 		},
 		{
-			in:  &NodeImpl{Instruction: BNE, Types: OperandTypesNoneToMemory, DstReg: REG_R1, DstConst: 0x1234},
+			in:  &NodeImpl{Instruction: BNE, Types: OperandTypesNoneToMemory, DstReg: RegR1, DstConst: 0x1234},
 			exp: "BNE [R1 + 0x1234]",
 		},
 		{
@@ -49,81 +49,81 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "BNE {NOP}",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: REG_V0, DstReg: REG_V10},
+			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: RegV0, DstReg: RegV10},
 			exp: "ADD V0, V10",
 		},
 		{
 			in: &NodeImpl{Instruction: ADD, Types: OperandTypesLeftShiftedRegisterToRegister,
-				SrcReg: REG_R0, SrcReg2: REG_R11, SrcConst: 4, DstReg: REG_R10},
+				SrcReg: RegR0, SrcReg2: RegR11, SrcConst: 4, DstReg: RegR10},
 			exp: "ADD (R0, R11 << 4), R10",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesTwoRegistersToRegister, SrcReg: REG_R0, SrcReg2: REG_R8, DstReg: REG_R10},
+			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesTwoRegistersToRegister, SrcReg: RegR0, SrcReg2: RegR8, DstReg: RegR10},
 			exp: "ADD (R0, R8), R10",
 		},
 		{
 			in: &NodeImpl{Instruction: MSUB, Types: OperandTypesThreeRegistersToRegister,
-				SrcReg: REG_R0, SrcReg2: REG_R8, DstReg: REG_R10, DstReg2: REG_R1},
+				SrcReg: RegR0, SrcReg2: RegR8, DstReg: RegR10, DstReg2: RegR1},
 			exp: "MSUB (R0, R8, R10), R1)",
 		},
 		{
-			in:  &NodeImpl{Instruction: CMPW, Types: OperandTypesTwoRegistersToNone, SrcReg: REG_R0, SrcReg2: REG_R8},
+			in:  &NodeImpl{Instruction: CMPW, Types: OperandTypesTwoRegistersToNone, SrcReg: RegR0, SrcReg2: RegR8},
 			exp: "CMPW (R0, R8)",
 		},
 		{
-			in:  &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone, SrcReg: REG_R0, SrcConst: 0x123},
+			in:  &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone, SrcReg: RegR0, SrcConst: 0x123},
 			exp: "CMP (R0, 0x123)",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: REG_R0, DstReg: REG_R8, DstConst: 0x123},
+			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: RegR0, DstReg: RegR8, DstConst: 0x123},
 			exp: "MOVD R0, [R8 + 0x123]",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: REG_R0, DstReg: REG_R8, DstReg2: REG_R6},
+			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: RegR0, DstReg: RegR8, DstReg2: RegR6},
 			exp: "MOVD R0, [R8 + R6]",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: REG_R0, SrcConst: 0x123, DstReg: REG_R8},
+			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: RegR0, SrcConst: 0x123, DstReg: RegR8},
 			exp: "MOVD [R0 + 0x123], R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: REG_R0, SrcReg2: REG_R6, DstReg: REG_R8},
+			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: RegR0, SrcReg2: RegR6, DstReg: RegR8},
 			exp: "MOVD [R0 + R6], R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesConstToRegister, SrcConst: 0x123, DstReg: REG_R8},
+			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesConstToRegister, SrcConst: 0x123, DstReg: RegR8},
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: REG_V1, DstReg: REG_V2},
+			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: RegV1, DstReg: RegV2},
 			exp: "VCNT V1.B8, V2.B8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: REG_V1, DstReg: REG_V2},
+			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: RegV1, DstReg: RegV2},
 			exp: "VUADDLV V1.B8, V2",
 		},
 		{
-			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: REG_V1, SrcReg2: REG_V2, DstReg: REG_V3},
+			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: RegV1, SrcReg2: RegV2, DstReg: RegV3},
 			exp: "VBIT (V1.B8, V2.B8), V3.B8",
 		},
 		{
 			in: &NodeImpl{Instruction: VLD1, Types: OperandTypesMemoryToVectorRegister,
-				SrcReg: REG_R1, DstReg: REG_V29, VectorArrangement: VectorArrangement2S},
+				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2S},
 			exp: "VLD1 [R1], V29.2S",
 		},
 		{
 			in: &NodeImpl{Instruction: VST1, Types: OperandTypesVectorRegisterToMemory,
-				DstReg: REG_R1, SrcReg: REG_V29, VectorArrangement: VectorArrangement2S},
+				DstReg: RegR1, SrcReg: RegV29, VectorArrangement: VectorArrangement2S},
 			exp: "VST1 V29.2S, [R1]",
 		},
 		{
 			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesRegisterToVectorRegister,
-				SrcReg: REG_R1, DstReg: REG_V29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
+				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
 			exp: "VMOV R1, V29.2D[1]",
 		},
 		{
 			in: &NodeImpl{Instruction: VCNT, Types: OperandTypesVectorRegisterToVectorRegister,
-				SrcReg: REG_V3, DstReg: REG_V29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
+				SrcReg: RegV3, DstReg: RegV29, VectorArrangement: VectorArrangement2D, VectorIndex: 1},
 			exp: "VCNT V3.V3, V29.V3",
 		},
 	}
@@ -135,7 +135,7 @@ func TestNodeImpl_String(t *testing.T) {
 }
 
 func TestAssemblerImpl_addNode(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
+	a := NewAssemblerImpl(RegR10)
 
 	root := &NodeImpl{}
 	a.addNode(root)
@@ -152,7 +152,7 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 }
 
 func TestAssemblerImpl_newNode(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
+	a := NewAssemblerImpl(RegR10)
 	actual := a.newNode(MOVD, OperandTypesMemoryToRegister)
 	require.Equal(t, MOVD, actual.Instruction)
 	require.Equal(t, OperandTypeMemory, actual.Types.src)
@@ -162,7 +162,7 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
+	a := NewAssemblerImpl(RegR10)
 	a.CompileStandAlone(RET)
 	actualNode := a.Current
 	require.Equal(t, RET, actualNode.Instruction)
@@ -171,53 +171,53 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileConstToRegister(MOVD, 1000, REG_R10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileConstToRegister(MOVD, 1000, RegR10)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
 	require.Equal(t, int64(1000), actualNode.SrcConst)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeConst, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileRegisterToRegister(MOVD, REG_R15, REG_R27)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileRegisterToRegister(MOVD, RegR15, RegR27)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R15, actualNode.SrcReg)
-	require.Equal(t, REG_R27, actualNode.DstReg)
+	require.Equal(t, RegR15, actualNode.SrcReg)
+	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileMemoryToRegister(MOVD, REG_R15, 100, REG_R27)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileMemoryToRegister(MOVD, RegR15, 100, RegR27)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R15, actualNode.SrcReg)
+	require.Equal(t, RegR15, actualNode.SrcReg)
 	require.Equal(t, int64(100), actualNode.SrcConst)
-	require.Equal(t, REG_R27, actualNode.DstReg)
+	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileRegisterToMemory(MOVD, REG_R15, REG_R27, 100)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileRegisterToMemory(MOVD, RegR15, RegR27, 100)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R15, actualNode.SrcReg)
-	require.Equal(t, REG_R27, actualNode.DstReg)
+	require.Equal(t, RegR15, actualNode.SrcReg)
+	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, int64(100), actualNode.DstConst)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileJump(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
+	a := NewAssemblerImpl(RegR10)
 	a.CompileJump(B)
 	actualNode := a.Current
 	require.Equal(t, B, actualNode.Instruction)
@@ -226,196 +226,196 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileJumpToRegister(BNE, REG_R27)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileJumpToRegister(BNE, RegR27)
 	actualNode := a.Current
 	require.Equal(t, BNE, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.DstReg)
+	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileJumpToMemory(BNE, REG_R27)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileJumpToMemory(BNE, RegR27)
 	actualNode := a.Current
 	require.Equal(t, BNE, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.DstReg)
+	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileReadInstructionAddress(REG_R10, RET)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileReadInstructionAddress(RegR10, RET)
 	actualNode := a.Current
 	require.Equal(t, ADR, actualNode.Instruction)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
 }
 
 func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileMemoryWithRegisterOffsetToRegister(MOVD, REG_R27, REG_R10, REG_R0)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileMemoryWithRegisterOffsetToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.SrcReg2)
-	require.Equal(t, REG_R0, actualNode.DstReg)
+	require.Equal(t, RegR27, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.SrcReg2)
+	require.Equal(t, RegR0, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, REG_R27, REG_R10, REG_R0)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.DstReg)
-	require.Equal(t, REG_R0, actualNode.DstReg2)
+	require.Equal(t, RegR27, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
+	require.Equal(t, RegR0, actualNode.DstReg2)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
 }
 
 func Test_CompileTwoRegistersToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileTwoRegistersToRegister(MOVD, REG_R27, REG_R10, REG_R0)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileTwoRegistersToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.SrcReg2)
-	require.Equal(t, REG_R0, actualNode.DstReg)
+	require.Equal(t, RegR27, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.SrcReg2)
+	require.Equal(t, RegR0, actualNode.DstReg)
 	require.Equal(t, OperandTypeTwoRegisters, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileThreeRegistersToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileThreeRegistersToRegister(MOVD, REG_R27, REG_R10, REG_R0, REG_R28)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileThreeRegistersToRegister(MOVD, RegR27, RegR10, RegR0, RegR28)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.SrcReg2)
-	require.Equal(t, REG_R0, actualNode.DstReg)
-	require.Equal(t, REG_R28, actualNode.DstReg2)
+	require.Equal(t, RegR27, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.SrcReg2)
+	require.Equal(t, RegR0, actualNode.DstReg)
+	require.Equal(t, RegR28, actualNode.DstReg2)
 	require.Equal(t, OperandTypeThreeRegisters, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileTwoRegistersToNone(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileTwoRegistersToNone(CMP, REG_R27, REG_R10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileTwoRegistersToNone(CMP, RegR27, RegR10)
 	actualNode := a.Current
 	require.Equal(t, CMP, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.SrcReg2)
+	require.Equal(t, RegR27, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.SrcReg2)
 	require.Equal(t, OperandTypeTwoRegisters, actualNode.Types.src)
 	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
 }
 
 func Test_CompileRegisterAndConstToNone(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileRegisterAndConstToNone(CMP, REG_R27, 10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileRegisterAndConstToNone(CMP, RegR27, 10)
 	actualNode := a.Current
 	require.Equal(t, CMP, actualNode.Instruction)
-	require.Equal(t, REG_R27, actualNode.SrcReg)
+	require.Equal(t, RegR27, actualNode.SrcReg)
 	require.Equal(t, int64(10), actualNode.SrcConst)
 	require.Equal(t, OperandTypeRegisterAndConst, actualNode.Types.src)
 	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
 }
 
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileLeftShiftedRegisterToRegister(ADD, REG_R27, 10, REG_R28, REG_R5)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileLeftShiftedRegisterToRegister(ADD, RegR27, 10, RegR28, RegR5)
 	actualNode := a.Current
 	require.Equal(t, ADD, actualNode.Instruction)
-	require.Equal(t, REG_R28, actualNode.SrcReg)
-	require.Equal(t, REG_R27, actualNode.SrcReg2)
+	require.Equal(t, RegR28, actualNode.SrcReg)
+	require.Equal(t, RegR27, actualNode.SrcReg2)
 	require.Equal(t, int64(10), actualNode.SrcConst)
-	require.Equal(t, REG_R5, actualNode.DstReg)
+	require.Equal(t, RegR5, actualNode.DstReg)
 	require.Equal(t, OperandTypeLeftShiftedRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileSIMDByteToSIMDByte(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToSIMDByte(VCNT, REG_V0, REG_V2)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileSIMDByteToSIMDByte(VCNT, RegV0, RegV2)
 	actualNode := a.Current
 	require.Equal(t, VCNT, actualNode.Instruction)
-	require.Equal(t, REG_V0, actualNode.SrcReg)
-	require.Equal(t, REG_V2, actualNode.DstReg)
+	require.Equal(t, RegV0, actualNode.SrcReg)
+	require.Equal(t, RegV2, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, REG_V0, REG_V10, REG_V2)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, RegV0, RegV10, RegV2)
 	actualNode := a.Current
 	require.Equal(t, VBIT, actualNode.Instruction)
-	require.Equal(t, REG_V0, actualNode.SrcReg)
-	require.Equal(t, REG_V10, actualNode.SrcReg2)
-	require.Equal(t, REG_V2, actualNode.DstReg)
+	require.Equal(t, RegV0, actualNode.SrcReg)
+	require.Equal(t, RegV10, actualNode.SrcReg2)
+	require.Equal(t, RegV2, actualNode.DstReg)
 	require.Equal(t, OperandTypeTwoSIMDBytes, actualNode.Types.src)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
 }
 
 func Test_CompileSIMDByteToRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileSIMDByteToRegister(VUADDLV, REG_V0, REG_V10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileSIMDByteToRegister(VUADDLV, RegV0, RegV10)
 	actualNode := a.Current
 	require.Equal(t, VUADDLV, actualNode.Instruction)
-	require.Equal(t, REG_V0, actualNode.SrcReg)
-	require.Equal(t, REG_V10, actualNode.DstReg)
+	require.Equal(t, RegV0, actualNode.SrcReg)
+	require.Equal(t, RegV10, actualNode.DstReg)
 	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileConditionalRegisterSet(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileConditionalRegisterSet(COND_NE, REG_R10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileConditionalRegisterSet(CondNE, RegR10)
 	actualNode := a.Current
 	require.Equal(t, CSET, actualNode.Instruction)
-	require.Equal(t, REG_COND_NE, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegCondNE, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
 func Test_CompileMemoryToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileMemoryToVectorRegister(VMOV, REG_R10, REG_V3, VectorArrangement1D)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileMemoryToVectorRegister(VMOV, RegR10, RegV3, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, REG_R10, actualNode.SrcReg)
-	require.Equal(t, REG_V3, actualNode.DstReg)
+	require.Equal(t, RegR10, actualNode.SrcReg)
+	require.Equal(t, RegV3, actualNode.DstReg)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
 	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
 	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
 }
 
 func Test_CompileVectorRegisterToMemory(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileVectorRegisterToMemory(VMOV, REG_V3, REG_R10, VectorArrangement1D)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileVectorRegisterToMemory(VMOV, RegV3, RegR10, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, REG_V3, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegV3, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
 	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
 }
 
 func Test_CompileRegisterToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileRegisterToVectorRegister(VMOV, REG_V3, REG_R10, VectorArrangement1D, 10)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileRegisterToVectorRegister(VMOV, RegV3, RegR10, VectorArrangement1D, 10)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, REG_V3, actualNode.SrcReg)
-	require.Equal(t, REG_R10, actualNode.DstReg)
+	require.Equal(t, RegV3, actualNode.SrcReg)
+	require.Equal(t, RegR10, actualNode.DstReg)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
 	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
@@ -423,12 +423,12 @@ func Test_CompileRegisterToVectorRegister(t *testing.T) {
 }
 
 func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(REG_R10)
-	a.CompileVectorRegisterToVectorRegister(VMOV, REG_V3, REG_V10, VectorArrangement1D)
+	a := NewAssemblerImpl(RegR10)
+	a.CompileVectorRegisterToVectorRegister(VMOV, RegV3, RegV10, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, REG_V3, actualNode.SrcReg)
-	require.Equal(t, REG_V10, actualNode.DstReg)
+	require.Equal(t, RegV3, actualNode.SrcReg)
+	require.Equal(t, RegV10, actualNode.DstReg)
 	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
 	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
 	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
@@ -440,25 +440,25 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 		requireSrcInt, requireDstInt bool
 		expErr                       string
 	}{
-		{src: REG_R10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: ""},
-		{src: REG_R10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "dst requires float register but got R30"},
+		{src: RegR10, dst: RegR30, requireSrcInt: true, requireDstInt: true, expErr: ""},
+		{src: RegR10, dst: RegR30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
+		{src: RegR10, dst: RegR30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
+		{src: RegR10, dst: RegR30, requireSrcInt: true, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: ""},
-		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
-		{src: REG_R10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got V30"},
+		{src: RegR10, dst: RegV30, requireSrcInt: true, requireDstInt: false, expErr: ""},
+		{src: RegR10, dst: RegV30, requireSrcInt: false, requireDstInt: true, expErr: "src requires float register but got R10"},
+		{src: RegR10, dst: RegV30, requireSrcInt: false, requireDstInt: false, expErr: "src requires float register but got R10"},
+		{src: RegR10, dst: RegV30, requireSrcInt: true, requireDstInt: true, expErr: "dst requires int register but got V30"},
 
-		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: true, expErr: ""},
-		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
-		{src: REG_V10, dst: REG_R30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
-		{src: REG_V10, dst: REG_R30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
+		{src: RegV10, dst: RegR30, requireSrcInt: false, requireDstInt: true, expErr: ""},
+		{src: RegV10, dst: RegR30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
+		{src: RegV10, dst: RegR30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
+		{src: RegV10, dst: RegR30, requireSrcInt: false, requireDstInt: false, expErr: "dst requires float register but got R30"},
 
-		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: false, expErr: ""},
-		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
-		{src: REG_V10, dst: REG_V30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
-		{src: REG_V10, dst: REG_V30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got V30"},
+		{src: RegV10, dst: RegV30, requireSrcInt: false, requireDstInt: false, expErr: ""},
+		{src: RegV10, dst: RegV30, requireSrcInt: true, requireDstInt: false, expErr: "src requires int register but got V10"},
+		{src: RegV10, dst: RegV30, requireSrcInt: true, requireDstInt: true, expErr: "src requires int register but got V10"},
+		{src: RegV10, dst: RegV30, requireSrcInt: false, requireDstInt: true, expErr: "dst requires int register but got V30"},
 	}
 
 	for _, tt := range tests {
@@ -494,7 +494,7 @@ func Test_validateMemoryOffset(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
-	x1, x2 := REG_V2, REG_V10
+	x1, x2 := RegV2, RegV10
 	tests := []struct {
 		inst asm.Instruction
 		exp  []byte
