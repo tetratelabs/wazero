@@ -640,9 +640,31 @@ func (a *snapshotPreview1) EnvironSizesGet(ctx context.Context, m api.Module, re
 	return ErrnoSuccess
 }
 
-// ClockResGet is the WASI function named functionClockResGet and is stubbed for GrainLang per #271
+// ClockResGet is the WASI function named functionClockResGet that returns the resolution of time values returned by ClockTimeGet.
+//
+// * id - The clock id for which to return the time.
+// * resultResolution - the offset to write the resolution to m.Memory
+//   * the resolution is an uint64 little-endian encoding.
+//
+// For example, if the resolution is 100ns, this function writes the below to `m.Memory`:
+//
+//                                      uint64le
+//                    +-------------------------------------+
+//                    |                                     |
+//          []byte{?, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, ?}
+//  resultResolution --^
+//
+// Note: importClockResGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+// Note: This is similar to `clock_getres` in POSIX.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
+// See https://linux.die.net/man/3/clock_getres
 func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	return ErrnoNosys // stubbed for GrainLang per #271
+	const resolution uint64 = 1000 // ns
+	// fixed for GrainLang per #271 and Swift per https://github.com/tetratelabs/wazero/issues/526#issuecomment-1134034760
+	if !m.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 // ClockTimeGet is the WASI function named functionClockTimeGet that returns the time value of a clock (time.Now).
