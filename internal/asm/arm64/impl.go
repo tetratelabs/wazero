@@ -845,37 +845,37 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		// https://developer.arm.com/documentation/den0024/a/CHDEEABE
 		var conditionalBits byte
 		switch n.SrcReg {
-		case REG_COND_EQ:
+		case RegCondEQ:
 			conditionalBits = 0b0001
-		case REG_COND_NE:
+		case RegCondNE:
 			conditionalBits = 0b0000
-		case REG_COND_HS:
+		case RegCondHS:
 			conditionalBits = 0b0011
-		case REG_COND_LO:
+		case RegCondLO:
 			conditionalBits = 0b0010
-		case REG_COND_MI:
+		case RegCondMI:
 			conditionalBits = 0b0101
-		case REG_COND_PL:
+		case RegCondPL:
 			conditionalBits = 0b0100
-		case REG_COND_VS:
+		case RegCondVS:
 			conditionalBits = 0b0111
-		case REG_COND_VC:
+		case RegCondVC:
 			conditionalBits = 0b0110
-		case REG_COND_HI:
+		case RegCondHI:
 			conditionalBits = 0b1001
-		case REG_COND_LS:
+		case RegCondLS:
 			conditionalBits = 0b1000
-		case REG_COND_GE:
+		case RegCondGE:
 			conditionalBits = 0b1011
-		case REG_COND_LT:
+		case RegCondLT:
 			conditionalBits = 0b1010
-		case REG_COND_GT:
+		case RegCondGT:
 			conditionalBits = 0b1101
-		case REG_COND_LE:
+		case RegCondLE:
 			conditionalBits = 0b1100
-		case REG_COND_AL:
+		case RegCondAL:
 			conditionalBits = 0b1111
-		case REG_COND_NV:
+		case RegCondNV:
 			conditionalBits = 0b1110
 		}
 
@@ -1063,7 +1063,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.SrcReg), registerBits(n.DstReg)
-		if n.SrcReg == REGZERO && inst == MOVD {
+		if n.SrcReg == RegZERO && inst == MOVD {
 			// If this is 64-bit mov from zero register, then we encode this as MOVK.
 			// See "Move wide (immediate)" in
 			// https://developer.arm.com/documentation/ddi0602/2021-06/Index-by-Encoding/Data-Processing----Immediate
@@ -1089,7 +1089,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		}
 
 	case MRS:
-		if n.SrcReg != REG_FPSR {
+		if n.SrcReg != RegFPSR {
 			return fmt.Errorf("MRS has only support for FPSR register as a src but got %s", RegisterName(n.SrcReg))
 		}
 
@@ -1104,7 +1104,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 		})
 
 	case MSR:
-		if n.DstReg != REG_FPSR {
+		if n.DstReg != RegFPSR {
 			return fmt.Errorf("MSR has only support for FPSR register as a dst but got %s", RegisterName(n.SrcReg))
 		}
 
@@ -1225,13 +1225,13 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 			sf<<7 | 0b0_0_0_11110,
 		})
 
-	case SXTB, SXTBW, SXTH, SXTHW, SXTW, UXTW:
+	case SXTB, SXTBW, SXTH, SXTHW, SXTW:
 		if err = checkRegisterToRegisterType(n.SrcReg, n.DstReg, true, true); err != nil {
 			return
 		}
 
 		srcRegBits, dstRegBits := registerBits(n.SrcReg), registerBits(n.DstReg)
-		if n.SrcReg == REGZERO {
+		if n.SrcReg == RegZERO {
 			// If the source is zero register, we encode as MOV dst, zero.
 			var sf byte
 			if inst == MOVD {
@@ -1545,7 +1545,7 @@ func (a *AssemblerImpl) EncodeRegisterAndConstToNone(n *NodeImpl) (err error) {
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/CMP--immediate---Compare--immediate---an-alias-of-SUBS--immediate--?lang=en
 	if n.SrcConst < 0 || n.SrcConst > 4095 {
 		return fmt.Errorf("immediate for CMP must fit in 0 to 4095 but got %d", n.SrcConst)
-	} else if n.SrcReg == REGZERO {
+	} else if n.SrcReg == RegZERO {
 		return errors.New("zero register is not supported for CMP (immediate)")
 	}
 
@@ -2699,22 +2699,22 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error 
 var zeroRegisterBits byte = 0b11111
 
 func isIntRegister(r asm.Register) bool {
-	return REG_R0 <= r && r <= REGZERO
+	return RegR0 <= r && r <= RegZERO
 }
 
 func isVectorRegister(r asm.Register) bool {
-	return REG_V0 <= r && r <= REG_V31
+	return RegV0 <= r && r <= RegV31
 }
 
 func isConditionalRegister(r asm.Register) bool {
-	return REG_COND_EQ <= r && r <= REG_COND_NV
+	return RegCondEQ <= r && r <= RegCondNV
 }
 
 func intRegisterBits(r asm.Register) (ret byte, err error) {
 	if !isIntRegister(r) {
 		err = fmt.Errorf("%s is not integer", RegisterName(r))
 	} else {
-		ret = byte(r - REG_R0)
+		ret = byte(r - RegR0)
 	}
 	return
 }
@@ -2723,16 +2723,16 @@ func vectorRegisterBits(r asm.Register) (ret byte, err error) {
 	if !isVectorRegister(r) {
 		err = fmt.Errorf("%s is not float", RegisterName(r))
 	} else {
-		ret = byte(r - REG_V0)
+		ret = byte(r - RegV0)
 	}
 	return
 }
 
 func registerBits(r asm.Register) (ret byte) {
 	if isIntRegister(r) {
-		ret = byte(r - REG_R0)
+		ret = byte(r - RegR0)
 	} else {
-		ret = byte(r - REG_V0)
+		ret = byte(r - RegV0)
 	}
 	return
 }

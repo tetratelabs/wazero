@@ -49,41 +49,41 @@ func newArm64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 
 var (
 	arm64UnreservedVectorRegisters = []asm.Register{
-		arm64.REG_V0, arm64.REG_V1, arm64.REG_V2, arm64.REG_V3,
-		arm64.REG_V4, arm64.REG_V5, arm64.REG_V6, arm64.REG_V7, arm64.REG_V8,
-		arm64.REG_V9, arm64.REG_V10, arm64.REG_V11, arm64.REG_V12, arm64.REG_V13,
-		arm64.REG_V14, arm64.REG_V15, arm64.REG_V16, arm64.REG_V17, arm64.REG_V18,
-		arm64.REG_V19, arm64.REG_V20, arm64.REG_V21, arm64.REG_V22, arm64.REG_V23,
-		arm64.REG_V24, arm64.REG_V25, arm64.REG_V26, arm64.REG_V27, arm64.REG_V28,
-		arm64.REG_V29, arm64.REG_V30, arm64.REG_V31,
+		arm64.RegV0, arm64.RegV1, arm64.RegV2, arm64.RegV3,
+		arm64.RegV4, arm64.RegV5, arm64.RegV6, arm64.RegV7, arm64.RegV8,
+		arm64.RegV9, arm64.RegV10, arm64.RegV11, arm64.RegV12, arm64.RegV13,
+		arm64.RegV14, arm64.RegV15, arm64.RegV16, arm64.RegV17, arm64.RegV18,
+		arm64.RegV19, arm64.RegV20, arm64.RegV21, arm64.RegV22, arm64.RegV23,
+		arm64.RegV24, arm64.RegV25, arm64.RegV26, arm64.RegV27, arm64.RegV28,
+		arm64.RegV29, arm64.RegV30, arm64.RegV31,
 	}
 
 	// Note (see arm64 section in https://go.dev/doc/asm):
-	// * REG_R18 is reserved as a platform register, and we don't use it in Compiler.
-	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
+	// * RegR18 is reserved as a platform register, and we don't use it in Compiler.
+	// * RegR28 is reserved for Goroutine by Go runtime, and we don't use it in Compiler.
 	arm64UnreservedGeneralPurposeRegisters = []asm.Register{ // nolint
-		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
-		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
-		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R19,
-		arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23, arm64.REG_R24,
-		arm64.REG_R25, arm64.REG_R26, arm64.REG_R29, arm64.REG_R30,
+		arm64.RegR3, arm64.RegR4, arm64.RegR5, arm64.RegR6, arm64.RegR7, arm64.RegR8,
+		arm64.RegR9, arm64.RegR10, arm64.RegR11, arm64.RegR12, arm64.RegR13,
+		arm64.RegR14, arm64.RegR15, arm64.RegR16, arm64.RegR17, arm64.RegR19,
+		arm64.RegR20, arm64.RegR21, arm64.RegR22, arm64.RegR23, arm64.RegR24,
+		arm64.RegR25, arm64.RegR26, arm64.RegR29, arm64.RegR30,
 	}
 )
 
 const (
 	// arm64ReservedRegisterForCallEngine holds the pointer to callEngine instance (i.e. *callEngine as uintptr)
-	arm64ReservedRegisterForCallEngine = arm64.REG_R0
+	arm64ReservedRegisterForCallEngine = arm64.RegR0
 	// arm64ReservedRegisterForStackBasePointerAddress holds stack base pointer's address (callEngine.stackBasePointer) in the current function call.
-	arm64ReservedRegisterForStackBasePointerAddress = arm64.REG_R1
+	arm64ReservedRegisterForStackBasePointerAddress = arm64.RegR1
 	// arm64ReservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	arm64ReservedRegisterForMemory = arm64.REG_R2
+	arm64ReservedRegisterForMemory = arm64.RegR2
 	// arm64ReservedRegisterForTemporary is the temporary register which is available at any point of execution, but its content shouldn't be supposed to live beyond the single operation.
 	// Note: we choose R27 as that is the temporary register used in Go's assembler.
-	arm64ReservedRegisterForTemporary = arm64.REG_R27
+	arm64ReservedRegisterForTemporary = arm64.RegR27
 )
 
 var (
-	arm64CallingConventionModuleInstanceAddressRegister = arm64.REG_R29
+	arm64CallingConventionModuleInstanceAddressRegister = arm64.RegR29
 )
 
 const (
@@ -96,7 +96,7 @@ const (
 )
 
 func isZeroRegister(r asm.Register) bool {
-	return r == arm64.REGZERO
+	return r == arm64.RegZERO
 }
 
 func (c *arm64Compiler) addStaticData(d []byte) {
@@ -309,7 +309,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.assembler.CompileRegisterToMemory(arm64.MOVD, callFramePointerReg, arm64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Next we compare the decremented call frame stack pointer with zero.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, callFramePointerReg, arm64.REGZERO)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, callFramePointerReg, arm64.RegZERO)
 
 	// If the values are identical, we return back to the Go code with returned status.
 	brIfNotEqual := c.assembler.CompileJump(arm64.BNE)
@@ -392,7 +392,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine, callEngineExitContextnativeCallStatusCodeOffset)
 	} else {
 		// If the status == 0, we use zero register to store zero.
-		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64.REGZERO, arm64ReservedRegisterForCallEngine, callEngineExitContextnativeCallStatusCodeOffset)
+		c.assembler.CompileRegisterToMemory(arm64.MOVWU, arm64.RegZERO, arm64ReservedRegisterForCallEngine, callEngineExitContextnativeCallStatusCodeOffset)
 	}
 
 	// The return address to the Go code is stored in archContext.compilerReturnAddress which
@@ -653,31 +653,31 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// https://developer.arm.com/documentation/dui0801/a/Condition-Codes/Condition-code-suffixes
 		// Here we represent the conditional codes by using arm64.COND_** registers, and that means the
 		// conditional jump can be performed if we use arm64.B**.
-		// For example, if we have arm64.COND_EQ on cond, that means we performed compileEq right before
+		// For example, if we have arm64.CondEQ on cond, that means we performed compileEq right before
 		// this compileBrIf and BrIf can be achieved by arm64.BEQ.
 		var brInst asm.Instruction
 		switch cond.conditionalRegister {
-		case arm64.COND_EQ:
+		case arm64.CondEQ:
 			brInst = arm64.BEQ
-		case arm64.COND_NE:
+		case arm64.CondNE:
 			brInst = arm64.BNE
-		case arm64.COND_HS:
+		case arm64.CondHS:
 			brInst = arm64.BHS
-		case arm64.COND_LO:
+		case arm64.CondLO:
 			brInst = arm64.BLO
-		case arm64.COND_MI:
+		case arm64.CondMI:
 			brInst = arm64.BMI
-		case arm64.COND_HI:
+		case arm64.CondHI:
 			brInst = arm64.BHI
-		case arm64.COND_LS:
+		case arm64.CondLS:
 			brInst = arm64.BLS
-		case arm64.COND_GE:
+		case arm64.CondGE:
 			brInst = arm64.BGE
-		case arm64.COND_LT:
+		case arm64.CondLT:
 			brInst = arm64.BLT
-		case arm64.COND_GT:
+		case arm64.CondGT:
 			brInst = arm64.BGT
-		case arm64.COND_LE:
+		case arm64.CondLE:
 			brInst = arm64.BLE
 		default:
 			// BUG: This means that we use the cond.conditionalRegister somewhere in this file,
@@ -693,7 +693,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		}
 		// Compare the value with zero register. Note that the value is ensured to be i32 by function validation phase,
 		// so we use CMPW (32-bit compare) here.
-		c.assembler.CompileTwoRegistersToNone(arm64.CMPW, cond.register, arm64.REGZERO)
+		c.assembler.CompileTwoRegistersToNone(arm64.CMPW, cond.register, arm64.RegZERO)
 
 		conditionalBR = c.assembler.CompileJump(arm64.BNE)
 
@@ -792,7 +792,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		c.markRegisterUsed(reg)
 
 		// Zero the value on a picked register.
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, reg)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, reg)
 	}
 
 	tmpReg, err := c.allocateRegister(registerTypeGeneralPurpose)
@@ -1150,7 +1150,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		c.markRegisterUsed(reg)
 
 		// Zero the value on a picked register.
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, reg)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, reg)
 	}
 
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
@@ -1210,7 +1210,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.assembler.CompileMemoryToRegister(arm64.MOVD, offset.register, 0, offset.register)
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, offset.register)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegZERO, offset.register)
 	brIfInitialized := c.assembler.CompileJump(arm64.BNE)
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 
@@ -1316,7 +1316,7 @@ func (c *arm64Compiler) compileSelect() error {
 
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
 		// If both values are zero, the result is always zero.
-		c.pushRuntimeValueLocationOnRegister(arm64.REGZERO, x1.valueType)
+		c.pushRuntimeValueLocationOnRegister(arm64.RegZERO, x1.valueType)
 		c.markRegisterUnused(cv.register)
 		return nil
 	}
@@ -1325,7 +1325,7 @@ func (c *arm64Compiler) compileSelect() error {
 	// no matter which of original x1 or x2 is selected.
 	//
 	// If x1 is currently on zero register, we cannot place the result because
-	// "MOV arm64.REGZERO x2.register" results in arm64.REGZERO regardless of the value.
+	// "MOV arm64.RegZERO x2.register" results in arm64.RegZERO regardless of the value.
 	// So we explicitly assign a general purpose register to x1 here.
 	if isZeroRegister(x1.register) {
 		// Mark x2 and cv's registers are used so they won't be chosen.
@@ -1337,12 +1337,12 @@ func (c *arm64Compiler) compileSelect() error {
 		}
 		x1.setRegister(x1Reg)
 		// And zero our the picked register.
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, x1Reg)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, x1Reg)
 	}
 
 	// At this point, x1 is non-zero register, and x2 is either general purpose or zero register.
 
-	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, arm64.REGZERO, cv.register)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, arm64.RegZERO, cv.register)
 	brIfNotZero := c.assembler.CompileJump(arm64.BNE)
 
 	// If cv == 0, we move the value of x2 to the x1.register.
@@ -1464,7 +1464,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 
 	// If both of registers are zeros, this can be nop and push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
-		c.pushRuntimeValueLocationOnRegister(arm64.REGZERO, x1.valueType)
+		c.pushRuntimeValueLocationOnRegister(arm64.RegZERO, x1.valueType)
 		return nil
 	}
 
@@ -1506,7 +1506,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	// Multiplication can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.pushRuntimeValueLocationOnRegister(arm64.REGZERO, x1.valueType)
+		c.pushRuntimeValueLocationOnRegister(arm64.RegZERO, x1.valueType)
 		return nil
 	}
 
@@ -1732,7 +1732,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		movInst = arm64.MOVD
 		minValueOffsetInVM = arm64CallEngineArchContextMinimum64BitSignedIntOffset
 	}
-	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.REGZERO, divisor)
+	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegZERO, divisor)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BNE)
@@ -1811,7 +1811,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	}
 
 	// We check the divisor value equals zero.
-	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.REGZERO, divisorReg)
+	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.RegZERO, divisorReg)
 
 	// If it is zero, we exit with nativeCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.assembler.CompileJump(arm64.BNE)
@@ -1854,7 +1854,7 @@ func (c *arm64Compiler) compileAnd(o *wazeroir.OperationAnd) error {
 	// If either of the registers x1 or x2 is zero,
 	// the result will always be zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.pushRuntimeValueLocationOnRegister(arm64.REGZERO, x1.valueType)
+		c.pushRuntimeValueLocationOnRegister(arm64.RegZERO, x1.valueType)
 		return nil
 	}
 
@@ -2195,7 +2195,7 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
 	// Clear the floating point status register (FPSR).
-	c.assembler.CompileRegisterToRegister(arm64.MSR, arm64.REGZERO, arm64.REG_FPSR)
+	c.assembler.CompileRegisterToRegister(arm64.MSR, arm64.RegZERO, arm64.RegFPSR)
 
 	var vt runtimeValueType
 	var convinst asm.Instruction
@@ -2242,7 +2242,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	if !o.NonTrapping {
 		// Obtain the floating point status register value into the general purpose register,
 		// so that we can check if the conversion resulted in undefined behavior.
-		c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.REG_FPSR, arm64ReservedRegisterForTemporary)
+		c.assembler.CompileRegisterToRegister(arm64.MRS, arm64.RegFPSR, arm64ReservedRegisterForTemporary)
 		// Check if the conversion was undefined by comparing the status with 1.
 		// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 		c.assembler.CompileRegisterAndConstToNone(arm64.CMP, arm64ReservedRegisterForTemporary, 1)
@@ -2447,9 +2447,9 @@ func (c *arm64Compiler) emitEqOrNe(isEq bool, unsignedType wazeroir.UnsignedType
 	c.assembler.CompileTwoRegistersToNone(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	cond := arm64.COND_NE
+	cond := arm64.CondNE
 	if isEq {
-		cond = arm64.COND_EQ
+		cond = arm64.CondEQ
 	}
 	c.locationStack.pushRuntimeValueLocationOnConditionalRegister(cond)
 	return nil
@@ -2470,10 +2470,10 @@ func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 		inst = arm64.CMP
 	}
 
-	c.assembler.CompileTwoRegistersToNone(inst, arm64.REGZERO, x1.register)
+	c.assembler.CompileTwoRegistersToNone(inst, arm64.RegZERO, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	c.locationStack.pushRuntimeValueLocationOnConditionalRegister(arm64.COND_EQ)
+	c.locationStack.pushRuntimeValueLocationOnConditionalRegister(arm64.CondEQ)
 	return nil
 }
 
@@ -2489,22 +2489,22 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_LO
+		conditionalRegister = arm64.CondLO
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_LO
+		conditionalRegister = arm64.CondLO
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_LT
+		conditionalRegister = arm64.CondLT
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_LT
+		conditionalRegister = arm64.CondLT
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = arm64.COND_MI
+		conditionalRegister = arm64.CondMI
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = arm64.COND_MI
+		conditionalRegister = arm64.CondMI
 	}
 
 	c.assembler.CompileTwoRegistersToNone(inst, x2.register, x1.register)
@@ -2526,22 +2526,22 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_HI
+		conditionalRegister = arm64.CondHI
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_HI
+		conditionalRegister = arm64.CondHI
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_GT
+		conditionalRegister = arm64.CondGT
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_GT
+		conditionalRegister = arm64.CondGT
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = arm64.COND_GT
+		conditionalRegister = arm64.CondGT
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = arm64.COND_GT
+		conditionalRegister = arm64.CondGT
 	}
 
 	c.assembler.CompileTwoRegistersToNone(inst, x2.register, x1.register)
@@ -2563,22 +2563,22 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_LS
+		conditionalRegister = arm64.CondLS
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_LS
+		conditionalRegister = arm64.CondLS
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_LE
+		conditionalRegister = arm64.CondLE
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_LE
+		conditionalRegister = arm64.CondLE
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = arm64.COND_LS
+		conditionalRegister = arm64.CondLS
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = arm64.COND_LS
+		conditionalRegister = arm64.CondLS
 	}
 
 	c.assembler.CompileTwoRegistersToNone(inst, x2.register, x1.register)
@@ -2600,22 +2600,22 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_HS
+		conditionalRegister = arm64.CondHS
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_HS
+		conditionalRegister = arm64.CondHS
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = arm64.COND_GE
+		conditionalRegister = arm64.CondGE
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = arm64.COND_GE
+		conditionalRegister = arm64.CondGE
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = arm64.COND_GE
+		conditionalRegister = arm64.CondGE
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = arm64.COND_GE
+		conditionalRegister = arm64.CondGE
 	}
 
 	c.assembler.CompileTwoRegistersToNone(inst, x2.register, x1.register)
@@ -2819,7 +2819,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 		if err != nil {
 			return
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, offsetRegister)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, offsetRegister)
 	}
 
 	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
@@ -2981,7 +2981,7 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 	}
 
 	if value == 0 {
-		c.pushRuntimeValueLocationOnRegister(arm64.REGZERO, vt)
+		c.pushRuntimeValueLocationOnRegister(arm64.RegZERO, vt)
 	} else {
 		// Take a register to load the value.
 		reg, err := c.allocateRegister(registerTypeGeneralPurpose)
@@ -3018,7 +3018,7 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 		return err
 	}
 
-	tmpReg := arm64.REGZERO
+	tmpReg := arm64.RegZERO
 	if value != 0 {
 		tmpReg = arm64ReservedRegisterForTemporary
 		var inst asm.Instruction
@@ -3076,7 +3076,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, sourceOffset.register)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, sourceOffset.register)
 	}
 	c.markRegisterUsed(sourceOffset.register)
 
@@ -3089,7 +3089,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, destinationOffset.register)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, destinationOffset.register)
 	}
 	c.markRegisterUsed(destinationOffset.register)
 
@@ -3166,7 +3166,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 	if !isZeroRegister(copySize.register) {
 		// If the size equals zero, we can skip the entire instructions beflow.
-		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
+		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegZERO, copySize.register)
 		skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
 
 		var movInst asm.Instruction
@@ -3242,9 +3242,9 @@ func (c *arm64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
 	c.compileLoadDataInstanceAddress(o.DataIndex, tmp)
 
 	// Clears the content of DataInstance[o.DataIndex] (== []byte type).
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 0)
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 8)
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 16)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 0)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 8)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 16)
 	return nil
 }
 
@@ -3294,7 +3294,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, sourceOffset.register)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, sourceOffset.register)
 	}
 	c.markRegisterUsed(sourceOffset.register)
 
@@ -3307,7 +3307,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, destinationOffset.register)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, destinationOffset.register)
 	}
 	c.markRegisterUsed(destinationOffset.register)
 
@@ -3388,7 +3388,7 @@ func (c *arm64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 
 	// If the size equals zero, we can skip the entire instructions beflow.
 	if !isZeroRegister(copySize.register) {
-		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, copySize.register)
+		c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegZERO, copySize.register)
 		skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
 
 		// If source offet < destination offset: for (i = size-1; i >= 0; i--) dst[i] = src[i];
@@ -3562,7 +3562,7 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.REGZERO, destinationOffset.register)
+		c.assembler.CompileRegisterToRegister(arm64.MOVD, arm64.RegZERO, destinationOffset.register)
 	}
 	c.markRegisterUsed(destinationOffset.register)
 
@@ -3606,7 +3606,7 @@ func (c *arm64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	c.assembler.SetJumpTargetOnNext(destinationBoundsOK)
 
 	// If the size equals zero, we can skip the entire instructions beflow.
-	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.REGZERO, fillSize.register)
+	c.assembler.CompileTwoRegistersToNone(arm64.CMP, arm64.RegZERO, fillSize.register)
 	skipCopyJump := c.assembler.CompileJump(arm64.BEQ)
 
 	// destinationOffset -= size.
@@ -3685,9 +3685,9 @@ func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
 	c.compileLoadElemInstanceAddress(o.ElemIndex, tmp)
 
 	// Clears the content of ElementInstances[o.ElemIndex] (== []interface{} type).
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 0)
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 8)
-	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.REGZERO, tmp, 16)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 0)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 8)
+	c.assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegZERO, tmp, 16)
 	return nil
 }
 

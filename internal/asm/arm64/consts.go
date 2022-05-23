@@ -9,22 +9,38 @@ import (
 // Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 // See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
 const (
-	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
-	COND_NE
-	COND_HS
-	COND_LO
-	COND_MI
-	COND_PL
-	COND_VS
-	COND_VC
-	COND_HI
-	COND_LS
-	COND_GE
-	COND_LT
-	COND_GT
-	COND_LE
-	COND_AL
-	COND_NV
+	// CondEQ is the eq (equal) condition code
+	CondEQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
+	// CondNE is the ne (not equal) condition code
+	CondNE
+	// CondHS is the hs (unsigned higher or same) condition code
+	CondHS
+	// CondLO is the lo (unsigned lower) condition code
+	CondLO
+	// CondMI is the mi (negative) condition code
+	CondMI
+	// CondPL is the pl (positive or zero) condition code
+	CondPL
+	// CondVS is the vs (signed overflow) condition code
+	CondVS
+	// CondVC is the vc (no signed overflow) condition code
+	CondVC
+	// CondHI is the hi (unsigned higher) condition code
+	CondHI
+	// CondLS is the ls (unsigned lower or same) condition code
+	CondLS
+	// CondGE is the ge (signed greater than or equal) condition code
+	CondGE
+	// CondLT is the lt (signed less than) condition code
+	CondLT
+	// CondGT is the gt (signed greater than) condition code
+	CondGT
+	// CondLE is the le (signed less than or equal) condition code
+	CondLE
+	// CondAL is the al (always executed) condition code
+	CondAL
+	// CondNV has the same meaning as CondAL
+	CondNV
 )
 
 // Arm64-specific registers.
@@ -34,305 +50,389 @@ const (
 const (
 	// Integer registers.
 
-	REG_R0 asm.Register = asm.NilRegister + 1 + iota
-	REG_R1
-	REG_R2
-	REG_R3
-	REG_R4
-	REG_R5
-	REG_R6
-	REG_R7
-	REG_R8
-	REG_R9
-	REG_R10
-	REG_R11
-	REG_R12
-	REG_R13
-	REG_R14
-	REG_R15
-	REG_R16
-	REG_R17
-	REG_R18
-	REG_R19
-	REG_R20
-	REG_R21
-	REG_R22
-	REG_R23
-	REG_R24
-	REG_R25
-	REG_R26
-	REG_R27
-	REG_R28
-	REG_R29
-	REG_R30
-	REGZERO
+	// RegR0 is the R0 register
+	RegR0 asm.Register = asm.NilRegister + 1 + iota
+	// RegR1 is the R1 register
+	RegR1
+	// RegR2 is the R2 register
+	RegR2
+	// RegR3 is the R3 register
+	RegR3
+	// RegR4 is the R4 register
+	RegR4
+	// RegR5 is the R5 register
+	RegR5
+	// RegR6 is the R6 register
+	RegR6
+	// RegR7 is the R7 register
+	RegR7
+	// RegR8 is the R8 register
+	RegR8
+	// RegR9 is the R9 register
+	RegR9
+	// RegR10 is the R10 register
+	RegR10
+	// RegR11 is the R11 register
+	RegR11
+	// RegR12 is the R12 register
+	RegR12
+	// RegR13 is the R13 register
+	RegR13
+	// RegR14 is the R14 register
+	RegR14
+	// RegR15 is the R15 register
+	RegR15
+	// RegR16 is the R16 register
+	RegR16
+	// RegR17 is the R17 register
+	RegR17
+	// RegR18 is the R18 register
+	RegR18
+	// RegR19 is the R19 register
+	RegR19
+	// RegR20 is the R20 register
+	RegR20
+	// RegR21 is the R21 register
+	RegR21
+	// RegR22 is the R22 register
+	RegR22
+	// RegR23 is the R23 register
+	RegR23
+	// RegR24 is the R24 register
+	RegR24
+	// RegR25 is the R25 register
+	RegR25
+	// RegR26 is the R26 register
+	RegR26
+	// RegR27 is the R27 register
+	RegR27
+	// RegR28 is the R28 register
+	RegR28
+	// RegR29 is the R29 register
+	RegR29
+	// RegR30 is the R30 register
+	RegR30
+	// RegZERO is the RZR register (read-only, always returning zero)
+	RegZERO
 
 	// Scalar floating point registers.
 
-	REG_V0
-	REG_V1
-	REG_V2
-	REG_V3
-	REG_V4
-	REG_V5
-	REG_V6
-	REG_V7
-	REG_V8
-	REG_V9
-	REG_V10
-	REG_V11
-	REG_V12
-	REG_V13
-	REG_V14
-	REG_V15
-	REG_V16
-	REG_V17
-	REG_V18
-	REG_V19
-	REG_V20
-	REG_V21
-	REG_V22
-	REG_V23
-	REG_V24
-	REG_V25
-	REG_V26
-	REG_V27
-	REG_V28
-	REG_V29
-	REG_V30
-	REG_V31
+	// RegV0 is the V0 register
+	RegV0
+	// RegV1 is the V1 register
+	RegV1
+	// RegV2 is the V2 register
+	RegV2
+	// RegV3 is the V3 register
+	RegV3
+	// RegV4 is the V4 register
+	RegV4
+	// RegV5 is the V5 register
+	RegV5
+	// RegV6 is the V6 register
+	RegV6
+	// RegV7 is the V7 register
+	RegV7
+	// RegV8 is the V8 register
+	RegV8
+	// RegV9 is the V9 register
+	RegV9
+	// RegV10 is the V10 register
+	RegV10
+	// RegV11 is the V11 register
+	RegV11
+	// RegV12 is the V12 register
+	RegV12
+	// RegV13 is the V13 register
+	RegV13
+	// RegV14 is the V14 register
+	RegV14
+	// RegV15 is the V15 register
+	RegV15
+	// RegV16 is the V16 register
+	RegV16
+	// RegV17 is the V17 register
+	RegV17
+	// RegV18 is the V18 register
+	RegV18
+	// RegV19 is the V19 register
+	RegV19
+	// RegV20 is the V20 register
+	RegV20
+	// RegV21 is the V21 register
+	RegV21
+	// RegV22 is the V22 register
+	RegV22
+	// RegV23 is the V23 register
+	RegV23
+	// RegV24 is the V24 register
+	RegV24
+	// RegV25 is the V25 register
+	RegV25
+	// RegV26 is the V26 register
+	RegV26
+	// RegV27 is the V27 register
+	RegV27
+	// RegV28 is the V28 register
+	RegV28
+	// RegV29 is the V29 register
+	RegV29
+	// RegV30 is the V30 register
+	RegV30
+	// RegV31 is the V31 register
+	RegV31
 
 	// Floating point status register.
 
-	REG_FPSR
+	// RegFPSR is the FPSR register
+	RegFPSR
 
 	// Assign each conditional register state to the unique register ID.
 	// This is to reduce the size of NodeImpl struct without having dedicated field
 	// for conditional register state which would not be used by most nodes.
+	// This is taking advantage of the fact that conditional operations are always
+	// on a single register and condition code, and never two registers.
 
-	REG_COND_EQ
-	REG_COND_NE
-	REG_COND_HS
-	REG_COND_LO
-	REG_COND_MI
-	REG_COND_PL
-	REG_COND_VS
-	REG_COND_VC
-	REG_COND_HI
-	REG_COND_LS
-	REG_COND_GE
-	REG_COND_LT
-	REG_COND_GT
-	REG_COND_LE
-	REG_COND_AL
-	REG_COND_NV
+	// RegCondEQ encodes CondEQ into a field that would otherwise store a register
+	RegCondEQ
+	// RegCondNE encodes CondNE into a field that would otherwise store a register
+	RegCondNE
+	// RegCondHS encodes CondHS into a field that would otherwise store a register
+	RegCondHS
+	// RegCondLO encodes CondLO into a field that would otherwise store a register
+	RegCondLO
+	// RegCondMI encodes CondMI into a field that would otherwise store a register
+	RegCondMI
+	// RegCondPL encodes CondPL into a field that would otherwise store a register
+	RegCondPL
+	// RegCondVS encodes CondVS into a field that would otherwise store a register
+	RegCondVS
+	// RegCondVC encodes CondVC into a field that would otherwise store a register
+	RegCondVC
+	// RegCondHI encodes CondHI into a field that would otherwise store a register
+	RegCondHI
+	// RegCondLS encodes CondLS into a field that would otherwise store a register
+	RegCondLS
+	// RegCondGE encodes CondGE into a field that would otherwise store a register
+	RegCondGE
+	// RegCondLT encodes CondLT into a field that would otherwise store a register
+	RegCondLT
+	// RegCondGT encodes CondGT into a field that would otherwise store a register
+	RegCondGT
+	// RegCondLE encodes CondLE into a field that would otherwise store a register
+	RegCondLE
+	// RegCondAL encodes CondAL into a field that would otherwise store a register
+	RegCondAL
+	// RegCondNV encodes CondNV into a field that would otherwise store a register
+	RegCondNV
 )
 
 // conditionalRegisterStateToRegister cast a conditional register to its unique register ID.
-// See the comment on REG_COND_EQ above.
+// See the comment on RegCondEQ above.
 func conditionalRegisterStateToRegister(c asm.ConditionalRegisterState) asm.Register {
 	switch c {
-	case COND_EQ:
-		return REG_COND_EQ
-	case COND_NE:
-		return REG_COND_NE
-	case COND_HS:
-		return REG_COND_HS
-	case COND_LO:
-		return REG_COND_LO
-	case COND_MI:
-		return REG_COND_MI
-	case COND_PL:
-		return REG_COND_PL
-	case COND_VS:
-		return REG_COND_VS
-	case COND_VC:
-		return REG_COND_VC
-	case COND_HI:
-		return REG_COND_HI
-	case COND_LS:
-		return REG_COND_LS
-	case COND_GE:
-		return REG_COND_GE
-	case COND_LT:
-		return REG_COND_LT
-	case COND_GT:
-		return REG_COND_GT
-	case COND_LE:
-		return REG_COND_LE
-	case COND_AL:
-		return REG_COND_AL
-	case COND_NV:
-		return REG_COND_NV
+	case CondEQ:
+		return RegCondEQ
+	case CondNE:
+		return RegCondNE
+	case CondHS:
+		return RegCondHS
+	case CondLO:
+		return RegCondLO
+	case CondMI:
+		return RegCondMI
+	case CondPL:
+		return RegCondPL
+	case CondVS:
+		return RegCondVS
+	case CondVC:
+		return RegCondVC
+	case CondHI:
+		return RegCondHI
+	case CondLS:
+		return RegCondLS
+	case CondGE:
+		return RegCondGE
+	case CondLT:
+		return RegCondLT
+	case CondGT:
+		return RegCondGT
+	case CondLE:
+		return RegCondLE
+	case CondAL:
+		return RegCondAL
+	case CondNV:
+		return RegCondNV
 	}
 	return asm.NilRegister
 }
 
+// RegisterName returns the name of a given register
 func RegisterName(r asm.Register) string {
 	switch r {
 	case asm.NilRegister:
 		return "nil"
-	case REG_R0:
+	case RegR0:
 		return "R0"
-	case REG_R1:
+	case RegR1:
 		return "R1"
-	case REG_R2:
+	case RegR2:
 		return "R2"
-	case REG_R3:
+	case RegR3:
 		return "R3"
-	case REG_R4:
+	case RegR4:
 		return "R4"
-	case REG_R5:
+	case RegR5:
 		return "R5"
-	case REG_R6:
+	case RegR6:
 		return "R6"
-	case REG_R7:
+	case RegR7:
 		return "R7"
-	case REG_R8:
+	case RegR8:
 		return "R8"
-	case REG_R9:
+	case RegR9:
 		return "R9"
-	case REG_R10:
+	case RegR10:
 		return "R10"
-	case REG_R11:
+	case RegR11:
 		return "R11"
-	case REG_R12:
+	case RegR12:
 		return "R12"
-	case REG_R13:
+	case RegR13:
 		return "R13"
-	case REG_R14:
+	case RegR14:
 		return "R14"
-	case REG_R15:
+	case RegR15:
 		return "R15"
-	case REG_R16:
+	case RegR16:
 		return "R16"
-	case REG_R17:
+	case RegR17:
 		return "R17"
-	case REG_R18:
+	case RegR18:
 		return "R18"
-	case REG_R19:
+	case RegR19:
 		return "R19"
-	case REG_R20:
+	case RegR20:
 		return "R20"
-	case REG_R21:
+	case RegR21:
 		return "R21"
-	case REG_R22:
+	case RegR22:
 		return "R22"
-	case REG_R23:
+	case RegR23:
 		return "R23"
-	case REG_R24:
+	case RegR24:
 		return "R24"
-	case REG_R25:
+	case RegR25:
 		return "R25"
-	case REG_R26:
+	case RegR26:
 		return "R26"
-	case REG_R27:
+	case RegR27:
 		return "R27"
-	case REG_R28:
+	case RegR28:
 		return "R28"
-	case REG_R29:
+	case RegR29:
 		return "R29"
-	case REG_R30:
+	case RegR30:
 		return "R30"
-	case REGZERO:
+	case RegZERO:
 		return "ZERO"
-	case REG_V0:
+	case RegV0:
 		return "V0"
-	case REG_V1:
+	case RegV1:
 		return "V1"
-	case REG_V2:
+	case RegV2:
 		return "V2"
-	case REG_V3:
+	case RegV3:
 		return "V3"
-	case REG_V4:
+	case RegV4:
 		return "V4"
-	case REG_V5:
+	case RegV5:
 		return "V5"
-	case REG_V6:
+	case RegV6:
 		return "V6"
-	case REG_V7:
+	case RegV7:
 		return "V7"
-	case REG_V8:
+	case RegV8:
 		return "V8"
-	case REG_V9:
+	case RegV9:
 		return "V9"
-	case REG_V10:
+	case RegV10:
 		return "V10"
-	case REG_V11:
+	case RegV11:
 		return "V11"
-	case REG_V12:
+	case RegV12:
 		return "V12"
-	case REG_V13:
+	case RegV13:
 		return "V13"
-	case REG_V14:
+	case RegV14:
 		return "V14"
-	case REG_V15:
+	case RegV15:
 		return "V15"
-	case REG_V16:
+	case RegV16:
 		return "V16"
-	case REG_V17:
+	case RegV17:
 		return "V17"
-	case REG_V18:
+	case RegV18:
 		return "V18"
-	case REG_V19:
+	case RegV19:
 		return "V19"
-	case REG_V20:
+	case RegV20:
 		return "V20"
-	case REG_V21:
+	case RegV21:
 		return "V21"
-	case REG_V22:
+	case RegV22:
 		return "V22"
-	case REG_V23:
+	case RegV23:
 		return "V23"
-	case REG_V24:
+	case RegV24:
 		return "V24"
-	case REG_V25:
+	case RegV25:
 		return "V25"
-	case REG_V26:
+	case RegV26:
 		return "V26"
-	case REG_V27:
+	case RegV27:
 		return "V27"
-	case REG_V28:
+	case RegV28:
 		return "V28"
-	case REG_V29:
+	case RegV29:
 		return "V29"
-	case REG_V30:
+	case RegV30:
 		return "V30"
-	case REG_V31:
+	case RegV31:
 		return "V31"
-	case REG_FPSR:
+	case RegFPSR:
 		return "FPSR"
-	case REG_COND_EQ:
+	case RegCondEQ:
 		return "COND_EQ"
-	case REG_COND_NE:
+	case RegCondNE:
 		return "COND_NE"
-	case REG_COND_HS:
+	case RegCondHS:
 		return "COND_HS"
-	case REG_COND_LO:
+	case RegCondLO:
 		return "COND_LO"
-	case REG_COND_MI:
+	case RegCondMI:
 		return "COND_MI"
-	case REG_COND_PL:
+	case RegCondPL:
 		return "COND_PL"
-	case REG_COND_VS:
+	case RegCondVS:
 		return "COND_VS"
-	case REG_COND_VC:
+	case RegCondVC:
 		return "COND_VC"
-	case REG_COND_HI:
+	case RegCondHI:
 		return "COND_HI"
-	case REG_COND_LS:
+	case RegCondLS:
 		return "COND_LS"
-	case REG_COND_GE:
+	case RegCondGE:
 		return "COND_GE"
-	case REG_COND_LT:
+	case RegCondLT:
 		return "COND_LT"
-	case REG_COND_GT:
+	case RegCondGT:
 		return "COND_GT"
-	case REG_COND_LE:
+	case RegCondLE:
 		return "COND_LE"
-	case REG_COND_AL:
+	case RegCondAL:
 		return "COND_AL"
-	case REG_COND_NV:
+	case RegCondNV:
 		return "COND_NV"
 	}
 	return "UNKNOWN"
@@ -343,152 +443,296 @@ func RegisterName(r asm.Register) string {
 // Note: This only defines arm64 instructions used by wazero's compiler.
 // Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
 const (
+	// NOP is the NOP instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NOP
 	NOP asm.Instruction = iota
+	// RET is the RET instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/RET
 	RET
+	// ADD is the ADD instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ADD--shifted-register-
 	ADD
+	// ADDS is the ADDS instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ADDS--shifted-register-
 	ADDS
+	// ADDW is the ADD instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ADD--shifted-register-
 	ADDW
+	// ADR is the ADR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ADR
 	ADR
+	// AND is the AND instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/AND--shifted-register-
 	AND
+	// ANDW is the AND instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/AND--register-
 	ANDW
+	// ASR is the ASR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ASR--register-
 	ASR
+	// ASRW is the ASR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ASR--register-
 	ASRW
+	// B is the B instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B
 	B
+	// BEQ is the B.cond instruction with CondEQ. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BEQ
+	// BGE is the B.cond instruction with CondGE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BGE
+	// BGT is the B.cond instruction with CondGT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BGT
+	// BHI is the B.cond instruction with CondHI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BHI
+	// BHS is the B.cond instruction with CondHS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BHS
+	// BLE is the B.cond instruction with CondLE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BLE
+	// BLO is the B.cond instruction with CondLO. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BLO
+	// BLS is the B.cond instruction with CondLS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BLS
+	// BLT is the B.cond instruction with CondLT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BLT
+	// BMI is the B.cond instruction with CondMI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BMI
+	// BPL is the B.cond instruction with CondPL. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BPL
+	// BNE is the B.cond instruction with CondNE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BNE
+	// BVS is the B.cond instruction with CondVS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
 	BVS
+	// CLZ is the CLZ instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
 	CLZ
+	// CLZW is the CLZ instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
 	CLZW
+	// CMP is the CMP instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CMP--shifted-register-
 	CMP
+	// CMPW is the CMP instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CMP--shifted-register-
 	CMPW
+	// CSET is the CSET instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CSET
 	CSET
+	// EOR is the EOR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/EOR--shifted-register-
 	EOR
+	// EORW is the EOR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/EOR--shifted-register-
 	EORW
+	// FABSD is the FABS instruction, for double-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FABS--scalar-
 	FABSD
+	// FABSS is the FABS instruction, for single-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FABS--scalar-
 	FABSS
+	// FADDD is the FADD instruction, for double-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FADD--scalar-
 	FADDD
+	// FADDS is the FADD instruction, for single-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FADD--scalar-
 	FADDS
+	// FCMPD is the FCMP instruction, for double-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCMP
 	FCMPD
+	// FCMPS is the FCMP instruction, for single-precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCMP
 	FCMPS
+	// FCVTDS is the FCVT instruction, for single to double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVT
 	FCVTDS
+	// FCVTSD is the FCVT instruction, for double to single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVT
 	FCVTSD
+	// FCVTZSD is the FCVTZS instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSD
+	// FCVTZSD is the FCVTZS instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSDW
+	// FCVTZSS is the FCVTZS instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSS
+	// FCVTZSSW is the FCVTZS instruction, for single precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSSW
+	// FCVTZUD is the FCVTZU instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZU--scalar--integer-
 	FCVTZUD
+	// FCVTZUDW is the FCVTZU instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZU--scalar--integer-
 	FCVTZUDW
+	// FCVTZUS is the FCVTZU instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZU--scalar--integer-
 	FCVTZUS
+	// FCVTZUSW is the FCVTZU instruction, for single precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZU--scalar--integer-
 	FCVTZUSW
+	// FDIVD is the FDIV instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FDIV--scalar-
 	FDIVD
+	// FDIVS is the FDIV instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FDIV--scalar-
 	FDIVS
+	// FMAXD is the FMAX instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMAX--scalar-
 	FMAXD
+	// FMAXS is the FMAX instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMAX--scalar-
 	FMAXS
+	// FMIND is the FMIN instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMIN--scalar-
 	FMIND
+	// FMINS is the FMIN instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMIN--scalar-
 	FMINS
+	// FMOVD is the FMOV instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMOV--register-
 	FMOVD
+	// FMOVS is the FMOV instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMOV--register-
 	FMOVS
+	// FMULD is the FMUL instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMUL--scalar-
 	FMULD
+	// FMULS is the FMUL instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FMUL--scalar-
 	FMULS
+	// FNEGD is the FNEG instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FNEG--scalar-
 	FNEGD
+	// FNEGS is the FNEG instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FNEG--scalar-
 	FNEGS
+	// FRINTMD is the FRINTM instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTM--scalar-
 	FRINTMD
+	// FRINTMS is the FRINTM instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTM--scalar-
 	FRINTMS
+	// FRINTND is the FRINTN instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTN--scalar-
 	FRINTND
+	// FRINTNS is the FRINTN instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTN--scalar-
 	FRINTNS
+	// FRINTPD is the FRINTP instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTP--scalar-
 	FRINTPD
+	// FRINTPS is the FRINTP instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTP--scalar-
 	FRINTPS
+	// FRINTZD is the FRINTZ instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTZ--scalar-
 	FRINTZD
+	// FRINTZS is the FRINTZ instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FRINTZ--scalar-
 	FRINTZS
+	// FSQRTD is the FSQRT instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FSQRT--scalar-
 	FSQRTD
+	// FSQRTS is the FSQRT instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FSQRT--scalar-
 	FSQRTS
+	// FSUBD is the FSUB instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FSUB--scalar-
 	FSUBD
+	// FSUBS is the FSUB instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FSUB--scalar-
 	FSUBS
+	// LSL is the LSL instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSL--register-
 	LSL
+	// LSLW is the LSL instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSL--register-
 	LSLW
+	// LSR is the LSR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSR--register-
 	LSR
+	// LSRW is the LSR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSR--register-
 	LSRW
+	// MOVB loads or stores a signed byte. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
 	MOVB
+	// MOVBU loads a byte. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRB--register-
 	MOVBU
+	// MOVD loads or stores a register, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDR--register-
 	MOVD
+	// MOVH loads or stores a signed halfword. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
 	MOVH
+	// MOVHU loads a halfword. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRH--register-
 	MOVHU
+	// MOVW loads or stores a signed word, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSW--register-
 	MOVW
+	// MOVWU loads a word, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDR--register-
 	MOVWU
+	// MRS is the MRS instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MRS
 	MRS
+	// MSR is the MSR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MSR--register-
 	MSR
+	// MSUB is the MSUB instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MSUB
 	MSUB
+	// MSUBW is the MSUB instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MSUB
 	MSUBW
+	// MUL is the MUL instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MUL
 	MUL
+	// MULW is the MUL instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MUL
 	MULW
+	// NEG is the NEG instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NEG
 	NEG
+	// NEGW is the NEG instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NEG
 	NEGW
+	// ORR is the ORR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ORR--shifted-register-
 	ORR
+	// ORRW is the ORR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ORR--shifted-register-
 	ORRW
+	// RBIT is the RBIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/RBIT
 	RBIT
+	// RBITW is the RBIT instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/RBIT
 	RBITW
-	RNG
+	// ROR is the ROR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ROR--register-
 	ROR
+	// RORW is the RORW instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ROR--register-
 	RORW
+	// SCVTFD is the SCVTF instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/SCVTF--scalar--integer-
 	SCVTFD
+	// SCVTFS is the SCVTF instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/SCVTF--scalar--integer-
 	SCVTFS
+	// SCVTFWD is the SCVTF instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/SCVTF--scalar--integer-
 	SCVTFWD
+	// SCVTFWS is the SCVTF instruction, for single precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/SCVTF--scalar--integer-
 	SCVTFWS
+	// SDIV is the SDIV instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SDIV
 	SDIV
+	// SDIVW is the SDIV instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SDIV
 	SDIVW
+	// SUB is the SUB instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SUB--shifted-register-
 	SUB
+	// SUBS is the SUBS instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SUBS--shifted-register-
 	SUBS
+	// SUBW is the SUB instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SUB--shifted-register-
 	SUBW
+	// SXTB is the SXTB instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SXTB
 	SXTB
+	// SXTBW is the SXTB instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SXTB
 	SXTBW
+	// SXTH is the SXTH instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SXTH
 	SXTH
+	// SXTHW is the SXTH instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SXTH
 	SXTHW
+	// SXTW is the SXTW instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/SXTW
 	SXTW
+	// UCVTFD is the UCVTF instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/UCVTF--scalar--integer-
 	UCVTFD
+	// UCVTFS is the UCVTF instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/UCVTF--scalar--integer-
 	UCVTFS
+	// UCVTFWD is the UCVTF instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/UCVTF--scalar--integer-
 	UCVTFWD
+	// UCVTFWS is the UCVTF instruction, for single precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/UCVTF--scalar--integer-
 	UCVTFWS
+	// UDIV is the UDIV instruction .https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIV
+	// UDVIW is the UDIV instruction, in 64-bit mode.https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIVW
-	UXTW
 
 	// Vector instructions.
+
+	// VBIT is the BIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/BIT--vector-
 	VBIT
+	// VCNT is the CNT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/CNT--vector-
 	VCNT
+	// VMOV is the MOV instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
 	VMOV
+	// VUADDLV is the UADDLV instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
 	VUADDLV
+	// VLD1 is the LD1 instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/LD1--vector--single-structure-
 	VLD1
+	// VST1 is the ST1 instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ST1--vector--single-structure-
 	VST1
+	// VADD is the ADD instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
 	VADD
+	// VFADDS is the FADD instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
 	VFADDS
+	// VFADDD is the FADD instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
 	VFADDD
 )
 
+// VectorArrangement is the arrangement of data within a vector register.
 type VectorArrangement byte
 
 const (
+	// VectorArrangmentNone is an arrangement indicating no data is stored.
 	VectorArrangementNone VectorArrangement = iota
+	// VectorArrangement8B is an arrangement of 8 bytes (64-bit vector)
 	VectorArrangement8B
+	// VectorArrangement16B is an arrangement of 16 bytes (128-bit vector)
 	VectorArrangement16B
+	// VectorArrangement4H is an arrangement of 4 halfwords (64-bit vector)
 	VectorArrangement4H
+	// VectorArrangement8H is an arrangement of 8 halfwords (128-bit vector)
 	VectorArrangement8H
+	// VectorArrangement2S is an arrangement of 2 words (64-bit vector)
 	VectorArrangement2S
+	// VectorArrangement4S is an arrangement of 4 words (128-bit vector)
 	VectorArrangement4S
+	// VectorArrangement1D is an arrangement of 1 doubleword (64-bit vector)
 	VectorArrangement1D
+	// VectorArrangement2D is an arrangement of 2 doublewords (128-bit vector)
 	VectorArrangement2D
+
+	// Assign each vector size specifier to a vector arrangement ID.
+	// Instructions can only have an arrangement or a size specifier, but not both, so it
+	// simplifies the internal representation of vector instructions by being able to
+	// store either into the same field.
+
+	// VectorArrangementB is a size specifier of byte
 	VectorArrangementB
+	// VectorArrangementH is a size specifier of halfword
 	VectorArrangementH
+	// VectorArrangementS is a size specifier of word
 	VectorArrangementS
+	// VectorArrangementD is a size specifier of doubleword
 	VectorArrangementD
 )
 
@@ -524,8 +768,10 @@ func (v VectorArrangement) String() (ret string) {
 	return
 }
 
+// VectorIndex is the index of an element of a vector register
 type VectorIndex byte
 
+// InstructionName returns the name of the given instruction
 func InstructionName(i asm.Instruction) string {
 	switch i {
 	case NOP:
@@ -716,8 +962,6 @@ func InstructionName(i asm.Instruction) string {
 		return "RBIT"
 	case RBITW:
 		return "RBITW"
-	case RNG:
-		return "RNG"
 	case ROR:
 		return "ROR"
 	case RORW:
@@ -762,8 +1006,6 @@ func InstructionName(i asm.Instruction) string {
 		return "UDIV"
 	case UDIVW:
 		return "UDIVW"
-	case UXTW:
-		return "UXTW"
 	case VBIT:
 		return "VBIT"
 	case VCNT:
