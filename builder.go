@@ -36,8 +36,11 @@ import (
 //	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
 //
 // Notes:
+//
 // * ModuleBuilder is mutable. WithXXX functions return the same instance for chaining.
+//
 // * WithXXX methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
+//
 // * Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
 type ModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.

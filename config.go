@@ -155,6 +155,7 @@ var engineLessConfig = &runtimeConfig{
 // Note: While this is technically AOT, this does not imply any action on your
 // part. wazero automatically performs ahead-of-time compilation as needed when
 // Runtime.CompileModule is invoked.
+//
 // Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not
 // support Compiler. Use NewRuntimeConfig to safely detect and fallback to
 // NewRuntimeConfigInterpreter if needed.
@@ -241,6 +242,7 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 // CompiledModule is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
 // Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
+//
 // Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0

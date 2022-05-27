@@ -4,7 +4,8 @@ package wazero
 
 const CompilerSupported = false
 
-// NewRuntimeConfig returns NewRuntimeConfigInterpreter
+// NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this
+// environment, or interpreter otherwise.
 func NewRuntimeConfig() RuntimeConfig {
 	return NewRuntimeConfigInterpreter()
 }

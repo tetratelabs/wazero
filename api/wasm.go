@@ -10,7 +10,9 @@ import (
 // ExternType classifies imports and exports with their respective types.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type ExternType = byte
 
@@ -36,6 +38,7 @@ const (
 // ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
 func ExternTypeName(et ExternType) string {
 	switch et {
@@ -121,7 +124,9 @@ func ValueTypeName(t ValueType) string {
 // Module return functions exported in a module, post-instantiation.
 //
 // Note: Closing the wazero.Runtime closes any Module it instantiated.
+//
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {
 	fmt.Stringer

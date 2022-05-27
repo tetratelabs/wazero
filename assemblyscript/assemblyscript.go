@@ -24,10 +24,11 @@ import (
 // * "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
 //
 // Note: To customize behavior, use NewModuleBuilder instead.
+//
 // Note: If the AssemblyScript program is configured to use WASI, by calling "import wasi" in any file, these
 // functions will not be used.
-// See NewModuleBuilder
-// See wasi.InstantiateSnapshotPreview1
+//
+// See NewModuleBuilder and wasi.InstantiateSnapshotPreview1
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	return NewModuleBuilder(r).Instantiate(ctx)
 }
