@@ -88,6 +88,12 @@ test:
 	@go test $$(go list ./... | grep -v spectest) -timeout 120s
 	@cd internal/integration_test/asm && go test ./... -timeout 120s
 
+.PHONY: test-with-coverage
+test-with-coverage:
+	@mkdir -p out
+	@go test -covermode=atomic -coverprofile=out/coverage.out $$(go list ./... | grep -v spectest) -timeout 120s
+	@go tool cover -html=out/coverage.out -o out/coverage.html
+
 .PHONY: spectest
 spectest:
 	@$(MAKE) spectest.v1
