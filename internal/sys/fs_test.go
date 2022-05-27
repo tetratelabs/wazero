@@ -1,4 +1,4 @@
-package fs
+package sys
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func TestContext_Close(t *testing.T) {
 	pathName := "test"
 	file, _ := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
 
-	fsc := NewContext(map[uint32]*FileEntry{
+	fsc := NewFSContext(map[uint32]*FileEntry{
 		3: {Path: "."},
 		4: {Path: path.Join(".", pathName), File: file},
 	})

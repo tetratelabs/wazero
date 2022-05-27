@@ -100,7 +100,13 @@ func (m *moduleBuilder) Instantiate(ctx context.Context) (api.Closer, error) {
 		Instantiate(ctx)
 }
 
-// assemblyscript implements the AssemblyScript special functions.
+// assemblyScript includes "Special imports" only used In AssemblyScript when a user didn't add `import "wasi"` to their
+// entry file.
+//
+// See https://www.assemblyscript.org/concepts.html#special-imports
+// See https://www.assemblyscript.org/concepts.html#targeting-wasi
+// See https://www.assemblyscript.org/compiler.html#compiler-options
+// See https://github.com/AssemblyScript/assemblyscript/issues/1562
 type assemblyscript struct {
 	abortMessageDisabled bool
 	traceMode            traceMode

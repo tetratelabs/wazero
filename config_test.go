@@ -9,7 +9,7 @@ import (
 	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -439,7 +439,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*fs.FileEntry{ // openedFiles
+				map[uint32]*sys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS},
 				},
@@ -456,7 +456,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*fs.FileEntry{ // openedFiles
+				map[uint32]*sys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS2},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -473,7 +473,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*fs.FileEntry{ // openedFiles
+				map[uint32]*sys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 				},
 			),
@@ -489,7 +489,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*fs.FileEntry{ // openedFiles
+				map[uint32]*sys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -506,7 +506,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*fs.FileEntry{ // openedFiles
+				map[uint32]*sys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 					4: {Path: "/", FS: testFS2},
 				},
@@ -577,7 +577,7 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 }
 
 // requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
-func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randsource io.Reader, openedFiles map[uint32]*fs.FileEntry) *wasm.SysContext {
+func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randsource io.Reader, openedFiles map[uint32]*sys.FileEntry) *wasm.SysContext {
 	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, randsource, openedFiles)
 	require.NoError(t, err)
 	return sys

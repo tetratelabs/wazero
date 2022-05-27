@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 var abortWasm = []byte(`(module
@@ -81,6 +82,7 @@ func TestAbort(t *testing.T) {
 
 			_, err = mod.ExportedFunction("abort").Call(testCtx, uint64(messageOff), uint64(filenameOff), 1, 2)
 			require.Error(t, err)
+			require.Equal(t, uint32(255), err.(*sys.ExitError).ExitCode())
 
 			require.Equal(t, tc.expected, out.String())
 		})

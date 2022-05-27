@@ -19,28 +19,19 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	fs2 "github.com/tetratelabs/wazero/internal/fs"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
-
-// compile-time check to ensure fakeSys implements experimental.Sys.
-var _ experimental.Sys = fakeSys{}
-
-type fakeSys struct{}
 
 const (
 	epochNanos = uint64(1640995200000000000) // midnight UTC 2022-01-01
 	seed       = int64(42)                   // fixed seed value
 )
 
-func (d fakeSys) TimeNowUnixNano() uint64 {
-	return epochNanos
-}
-
-// testCtx ensures fakeSys is used for WASI functions.
-var testCtx = context.WithValue(context.Background(), experimental.SysKey{}, fakeSys{})
+// testCtx ensures the fake clock is used for WASI functions.
+var testCtx = experimental.WithTimeNowUnixNano(context.Background(), func() uint64 { return epochNanos })
 
 func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 	sysCtx, err := newSysContext([]string{"a", "bc"}, nil, nil)
@@ -564,7 +555,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		entry2, errno := openFileEntry(testFs, path2)
 		require.Zero(t, errno, ErrnoName(errno))
 
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+		sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 			fdToClose: entry1,
 			fdToKeep:  entry2,
 		})
@@ -750,7 +741,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	pathName := "/tmp"
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: pathName}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: pathName}})
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
@@ -795,7 +786,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
@@ -837,7 +828,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
@@ -878,7 +869,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 
 func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{fd: {Path: "/tmp"}})
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
@@ -1000,7 +991,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to read the contents from
 			file, testFS := createFile(t, "test_path", []byte("wazero"))
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+			sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 				fd: {Path: "test_path", FS: testFS, File: file},
 			})
 			require.NoError(t, err)
@@ -1027,7 +1018,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	validFD := uint32(3)                                 // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, testFS := createFile(t, "test_path", []byte{}) // file with empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1156,7 +1147,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	resultNewoffset := uint32(1)                                 // arbitrary offset in `ctx.Memory` for the new offset value
 	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 		fd: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1264,7 +1255,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 	validFD := uint32(3)                                         // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1395,7 +1386,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			// Create a fresh file to write the contents to
 			pathName := "test_path"
 			file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+			sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 				fd: {Path: pathName, FS: testFS, File: file},
 			})
 			require.NoError(t, err)
@@ -1430,7 +1421,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	pathName := "test_path"
 	file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 		validFD: {Path: pathName, FS: testFS, File: file},
 	})
 	require.NoError(t, err)
@@ -1611,7 +1602,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		}
 
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+		sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 			workdirFD: {Path: ".", FS: testFS},
 		})
 		require.NoError(t, err)
@@ -1687,7 +1678,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	pathName := "wazero"
 	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*fs2.FileEntry{
+	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
 		validFD: {Path: ".", FS: testFS},
 	})
 	require.NoError(t, err)
@@ -2010,15 +2001,6 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 	}
 }
 
-// compile-time check to ensure fakeSysErr implements experimental.Sys.
-var _ experimental.Sys = &fakeSysErr{}
-
-type fakeSysErr struct{}
-
-func (d *fakeSysErr) TimeNowUnixNano() uint64 {
-	panic(errors.New("TimeNowUnixNano error"))
-}
-
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -2037,7 +2019,9 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			var errCtx = context.WithValue(context.Background(), experimental.SysKey{}, &fakeSysErr{})
+			var errCtx = experimental.WithTimeNowUnixNano(context.Background(), func() uint64 {
+				panic(errors.New("TimeNowUnixNano error"))
+			})
 
 			sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, tc.randSource, nil)
 			require.NoError(t, err)
@@ -2144,7 +2128,7 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
 	return a, mod, fn
 }
 
-func newSysContext(args, environ []string, openedFiles map[uint32]*fs2.FileEntry) (sysCtx *wasm.SysContext, err error) {
+func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *wasm.SysContext, err error) {
 	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, nil, openedFiles)
 }
 

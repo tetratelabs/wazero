@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
-	fs2 "github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -452,7 +452,7 @@ type moduleConfig struct {
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
 
-	fs *fs2.FSConfig
+	fs *sys.FSConfig
 }
 
 func NewModuleConfig() ModuleConfig {
@@ -460,7 +460,7 @@ func NewModuleConfig() ModuleConfig {
 		startFunctions: []string{"_start"},
 		environKeys:    map[string]int{},
 
-		fs: fs2.NewFSConfig(),
+		fs: sys.NewFSConfig(),
 	}
 }
 

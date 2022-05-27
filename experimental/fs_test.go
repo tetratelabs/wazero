@@ -8,7 +8,7 @@ import (
 	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/fs"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -24,9 +24,9 @@ func TestWithFS(t *testing.T) {
 	}
 	defer closer.Close(ctx)
 
-	v := ctx.Value(fs.Key{})
+	v := ctx.Value(sys.FSKey{})
 	require.NotNil(t, v)
-	fsCtx, ok := v.(*fs.Context)
+	fsCtx, ok := v.(*sys.FSContext)
 	require.True(t, ok)
 
 	entry, ok := fsCtx.OpenedFile(3)
