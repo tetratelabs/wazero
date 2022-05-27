@@ -26,3 +26,6 @@ go.work
 # AssemblyScript
 node_modules
 package-lock.json
+
+# codecov.io
+/coverage.txt

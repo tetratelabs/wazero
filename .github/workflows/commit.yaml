@@ -82,6 +82,16 @@ jobs:
 
       - run: make test
 
+      - name: "Generate coverage report"  # only once (not per OS)
+        if: runner.os == 'Linux'
+        run: make coverage
+
+      - name: "Upload coverage report"  # only on main push and only once (not per OS)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && runner.os == 'Linux'
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: bash <(curl -s https://codecov.io/bash)
+
   test_scratch:
     name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04

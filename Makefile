@@ -1,7 +1,25 @@
+
+# Make functions strip spaces and use commas to separate parameters. The below variables escape these characters.
+comma := ,
+space :=
+space +=
+
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.0
 # sync this with netlify.toml!
 hugo          := github.com/gohugoio/hugo@v0.99.0
+
+# Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
+all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
+all_testdata  := $(wildcard testdata/* */testdata/* */*/testdata/* */*/*/testdata/*)
+all_testing   := $(wildcard internal/testing/* internal/testing/*/* internal/testing/*/*/*)
+all_examples  := $(wildcard examples/* examples/*/* examples/*/*/*)
+all_it        := $(wildcard internal/integration_test/* internal/integration_test/*/* internal/integration_test/*/*/*)
+# main_sources exclude any test or example related code
+main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing) $(all_examples) $(all_it), $(all_sources)))
+# main_packages collect the unique main source directories (sort will dedupe).
+# Paths need to all start with ./, so we do that manually vs foreach which strips it.
+main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,$(f)),./,./$(f))))
 
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
@@ -71,7 +89,6 @@ build.spectest.v1: # Note: wabt by default uses >1.0 features, so wast2json flag
 			--debug-names $$f; \
 	done
 
-
 .PHONY: build.spectest.v2
 build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 	@mkdir -p $(spectest_v2_testdata_dir)
@@ -87,6 +104,12 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 test:
 	@go test $$(go list ./... | grep -v spectest) -timeout 120s
 	@cd internal/integration_test/asm && go test ./... -timeout 120s
+
+.PHONY: coverage
+coverpkg = $(subst $(space),$(comma),$(main_packages))
+coverage: ## Generate test coverage
+	@go test -coverprofile=coverage.txt -covermode=atomic --coverpkg=$(coverpkg) $(main_packages)
+	@go tool cover -func coverage.txt
 
 .PHONY: spectest
 spectest:
@@ -134,3 +157,8 @@ check:
 site: ## Serve website content
 	@git submodule update --init
 	@cd site && go run $(hugo) server --minify --disableFastRender --baseURL localhost:1313 --cleanDestinationDir -D
+
+.PHONY: clean
+clean: ## Ensure a clean build
+	@rm -rf dist build coverage.txt
+	@go clean -testcache
