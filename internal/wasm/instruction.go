@@ -314,6 +314,7 @@ const (
 	OpcodeMiscTableCopy  OpcodeMisc = 0x0e
 
 	// Below are toggled with FeatureReferenceTypes
+
 	OpcodeMiscTableGrow OpcodeMisc = 0x0f
 	OpcodeMiscTableSize OpcodeMisc = 0x10
 	OpcodeMiscTableFill OpcodeMisc = 0x11
@@ -327,6 +328,7 @@ type OpcodeVec = byte
 
 const (
 	// Loads and stores.
+
 	OpcodeVecV128Load        OpcodeVec = 0x00
 	OpcodeVecV128Load8x8_s   OpcodeVec = 0x01
 	OpcodeVecV128Load8x8_u   OpcodeVec = 0x02
@@ -352,13 +354,14 @@ const (
 	OpcodeVecV128Store32Lane OpcodeVec = 0x5a
 	OpcodeVecV128Store64Lane OpcodeVec = 0x5b
 
-	// Const instruction.
+	// OpcodeVecV128Const is the vector const instruction.
 	OpcodeVecV128Const OpcodeVec = 0x0c
 
-	// Shuffles.
+	// OpcodeVecV128i8x16Shuffle is the vector shuffle instruction.
 	OpcodeVecV128i8x16Shuffle OpcodeVec = 0x0d
 
 	// Extrac and replaces.
+
 	OpcodeVecI8x16ExtractLaneS OpcodeVec = 0x15
 	OpcodeVecI8x16ExtractLaneU OpcodeVec = 0x16
 	OpcodeVecI8x16ReplaceLane  OpcodeVec = 0x17
@@ -375,6 +378,7 @@ const (
 	OpcodeVecF64x2ReplaceLane  OpcodeVec = 0x22
 
 	// Splat and swizzle.
+
 	OpcodeVecI8x16Swizzle OpcodeVec = 0x0e
 	OpcodeVecI8x16Splat   OpcodeVec = 0x0f
 	OpcodeVecI16x8Splat   OpcodeVec = 0x10
@@ -384,6 +388,7 @@ const (
 	OpcodeVecF64x2Splat   OpcodeVec = 0x14
 
 	// i8 comparisons.
+
 	OpcodeVecI8x16Eq  OpcodeVec = 0x23
 	OpcodeVecI8x16Ne  OpcodeVec = 0x24
 	OpcodeVecI8x16LtS OpcodeVec = 0x25
@@ -396,6 +401,7 @@ const (
 	OpcodeVecI8x16GeU OpcodeVec = 0x2c
 
 	// i16 comparisons.
+
 	OpcodeVecI16x8Eq  OpcodeVec = 0x2d
 	OpcodeVecI16x8Ne  OpcodeVec = 0x2e
 	OpcodeVecI16x8LtS OpcodeVec = 0x2f
@@ -408,6 +414,7 @@ const (
 	OpcodeVecI16x8GeU OpcodeVec = 0x36
 
 	// i32 comparisons.
+
 	OpcodeVecI32x4Eq  OpcodeVec = 0x37
 	OpcodeVecI32x4Ne  OpcodeVec = 0x38
 	OpcodeVecI32x4LtS OpcodeVec = 0x39
@@ -420,6 +427,7 @@ const (
 	OpcodeVecI32x4GeU OpcodeVec = 0x40
 
 	// i64 comparisons.
+
 	OpcodeVecI64x2Eq  OpcodeVec = 0xd6
 	OpcodeVecI64x2Ne  OpcodeVec = 0xd7
 	OpcodeVecI64x2LtS OpcodeVec = 0xd8
@@ -428,6 +436,7 @@ const (
 	OpcodeVecI64x2GeS OpcodeVec = 0xdb
 
 	// f32 comparisons.
+
 	OpcodeVecF32x4Eq OpcodeVec = 0x41
 	OpcodeVecF32x4Ne OpcodeVec = 0x42
 	OpcodeVecF32x4Lt OpcodeVec = 0x43
@@ -436,6 +445,7 @@ const (
 	OpcodeVecF32x4Ge OpcodeVec = 0x46
 
 	// f64 comparisons.
+
 	OpcodeVecF64x2Eq OpcodeVec = 0x47
 	OpcodeVecF64x2Ne OpcodeVec = 0x48
 	OpcodeVecF64x2Lt OpcodeVec = 0x49
@@ -444,6 +454,7 @@ const (
 	OpcodeVecF64x2Ge OpcodeVec = 0x4c
 
 	// v128 logical instructions.
+
 	OpcodeVecV128Not       OpcodeVec = 0x4d
 	OpcodeVecV128And       OpcodeVec = 0x4e
 	OpcodeVecV128AndNot    OpcodeVec = 0x4f
@@ -453,6 +464,7 @@ const (
 	OpcodeVecV128AnyTrue   OpcodeVec = 0x53
 
 	// i8 misc.
+
 	OpcodeVecI8x16Abs          OpcodeVec = 0x60
 	OpcodeVecI8x16Neg          OpcodeVec = 0x61
 	OpcodeVecI8x16Popcnt       OpcodeVec = 0x62
@@ -478,6 +490,7 @@ const (
 	OpcodeVecI8x16ArgrU   OpcodeVec = 0x7b
 
 	// i16 misc.
+
 	OpcodeVecI16x8ExtaddPairwiseI8x16S OpcodeVec = 0x7c
 	OpcodeVecI16x8ExtaddPairwiseI8x16U OpcodeVec = 0x7d
 	OpcodeVecI16x8Abs                  OpcodeVec = 0x80
@@ -512,6 +525,7 @@ const (
 	OpcodeVecI16x8ExtMulHighI8x16U     OpcodeVec = 0x9f
 
 	// i32 misc.
+
 	OpcodeVecI32x4ExtaddPairwiseI16x8S OpcodeVec = 0x7e
 	OpcodeVecI32x4ExtaddPairwiseI16x8U OpcodeVec = 0x7f
 	OpcodeVecI32x4Abs                  OpcodeVec = 0xa0
@@ -539,6 +553,7 @@ const (
 	OpcodeVecI32x4ExtMulHighI16x8U     OpcodeVec = 0xbf
 
 	// i64 misc.
+
 	OpcodeVecI64x2Abs              OpcodeVec = 0xc0
 	OpcodeVecI64x2Neg              OpcodeVec = 0xc1
 	OpcodeVecI64x2AllTrue          OpcodeVec = 0xc3
@@ -559,6 +574,7 @@ const (
 	OpcodeVecI64x2ExtMulHighI32x4U OpcodeVec = 0xdf
 
 	// f32 misc.
+
 	OpcodeVecF32x4Ceil    OpcodeVec = 0x67
 	OpcodeVecF32x4Floor   OpcodeVec = 0x68
 	OpcodeVecF32x4Trunc   OpcodeVec = 0x69
@@ -576,6 +592,7 @@ const (
 	OpcodeVecF32x4Pmax    OpcodeVec = 0xeb
 
 	// f64 misc.
+
 	OpcodeVecF64x4Ceil    OpcodeVec = 0x74
 	OpcodeVecF64x4Floor   OpcodeVec = 0x75
 	OpcodeVecF64x4Trunc   OpcodeVec = 0x7a
@@ -593,6 +610,7 @@ const (
 	OpcodeVecF64x4Pmax    OpcodeVec = 0xf7
 
 	// conversions.
+
 	OpcodeVecI32x4TruncSatF32x4S      OpcodeVec = 0xf8
 	OpcodeVecI32x4TruncSatF32x4U      OpcodeVec = 0xf9
 	OpcodeVecF32x4ConvertI32x4S       OpcodeVec = 0xfa
@@ -982,6 +1000,7 @@ var instructionNames = [256]string{
 	OpcodeTableSet: OpcodeTableSetName,
 
 	// Below are toggled with FeatureSignExtensionOps
+
 	OpcodeI32Extend8S:  OpcodeI32Extend8SName,
 	OpcodeI32Extend16S: OpcodeI32Extend16SName,
 	OpcodeI64Extend8S:  OpcodeI64Extend8SName,
@@ -1525,7 +1544,7 @@ var vectorInstructionName = map[OpcodeVec]string{
 	OpcodeVecF64x2PromoteLowF32x4Zero:  OpcodeVecF64x2PromoteLowF32x4ZeroName,
 }
 
-// VectorInstreuctionName returns the instruction name corresponding to the vector Opcode.
-func VectorInstreuctionName(oc OpcodeVec) (ret string) {
+// VectorInstructionName returns the instruction name corresponding to the vector Opcode.
+func VectorInstructionName(oc OpcodeVec) (ret string) {
 	return vectorInstructionName[oc]
 }

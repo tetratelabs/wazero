@@ -292,6 +292,7 @@ type compileConfig struct {
 	memorySizer   api.MemorySizer
 }
 
+// NewCompileConfig returns a CompileConfig that can be used for configuring module compilation.
 func NewCompileConfig() CompileConfig {
 	return &compileConfig{
 		importRenamer: nil,
@@ -455,6 +456,7 @@ type moduleConfig struct {
 	fs *sys.FSConfig
 }
 
+// NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
 func NewModuleConfig() ModuleConfig {
 	return &moduleConfig{
 		startFunctions: []string{"_start"},
