@@ -18,6 +18,6 @@ func WithFS(ctx context.Context, fs fs.FS) (context.Context, api.Closer, error) 
 		return nil, nil, err
 	}
 
-	fsCtx := internalfs.NewContext(preopens)
+	fsCtx := internalfs.NewFSContext(preopens)
 	return context.WithValue(ctx, internalfs.FSKey{}, fsCtx), fsCtx, nil
 }

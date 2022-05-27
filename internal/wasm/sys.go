@@ -17,7 +17,7 @@ type SysContext struct {
 	stdout, stderr        io.Writer
 	randSource            io.Reader
 
-	fs *sys.Context
+	fs *sys.FSContext
 }
 
 // Args is like os.Args and defaults to nil.
@@ -72,9 +72,9 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
-func (c *SysContext) FS() *sys.Context {
+func (c *SysContext) FS() *sys.FSContext {
 	if c.fs == nil {
-		return &sys.Context{}
+		return &sys.FSContext{}
 	}
 	return c.fs
 }
@@ -145,7 +145,7 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sysCtx.randSource = randSource
 	}
 
-	sysCtx.fs = sys.NewContext(openedFiles)
+	sysCtx.fs = sys.NewFSContext(openedFiles)
 
 	return
 }

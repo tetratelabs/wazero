@@ -26,7 +26,7 @@ func TestWithFS(t *testing.T) {
 
 	v := ctx.Value(sys.FSKey{})
 	require.NotNil(t, v)
-	fsCtx, ok := v.(*sys.Context)
+	fsCtx, ok := v.(*sys.FSContext)
 	require.True(t, ok)
 
 	entry, ok := fsCtx.OpenedFile(3)

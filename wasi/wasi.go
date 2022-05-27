@@ -1377,13 +1377,13 @@ func sysCtx(m api.Module) *wasm.SysContext {
 	}
 }
 
-func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *sys.Context) {
+func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *sys.FSContext) {
 	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {
 		// Override Context when it is passed via context
 		if fsValue := ctx.Value(sys.FSKey{}); fsValue != nil {
-			fsCtx, ok := fsValue.(*sys.Context)
+			fsCtx, ok := fsValue.(*sys.FSContext)
 			if !ok {
 				panic(fmt.Errorf("unsupported fs key: %v", fsValue))
 			}
