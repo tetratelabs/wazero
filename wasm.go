@@ -116,6 +116,7 @@ type Runtime interface {
 	api.Closer
 }
 
+// NewRuntime returns a runtime with a configuration assigned by NewRuntimeConfig.
 func NewRuntime() Runtime {
 	return NewRuntimeWithConfig(NewRuntimeConfig())
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+const isSupported = false
+
 // archContext is empty on an unsupported architecture.
 type archContext struct{}
 

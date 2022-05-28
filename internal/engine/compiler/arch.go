@@ -6,6 +6,9 @@ var (
 	newArchContext func() archContext
 )
 
+// IsSupported returns whether the compiler is supported on this architecture.
+const IsSupported = isSupported
+
 // nativecall is used by callEngine.execWasmFunction and the entrypoint to enter the compiled native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
 // ce is "*callEngine" as uintptr.
