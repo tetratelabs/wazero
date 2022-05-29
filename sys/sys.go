@@ -18,8 +18,9 @@ import (
 //
 // Note: While possible the reason of this was "proc_exit" from "wasi_snapshot_preview1", it could be from other host
 // functions, for example an AssemblyScript's abort handler, or any arbitrary caller of CloseWithExitCode.
-// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-// See https://www.assemblyscript.org/concepts.html#special-imports
+//
+// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit and
+// https://www.assemblyscript.org/concepts.html#special-imports
 type ExitError struct {
 	moduleName string
 	exitCode   uint32
@@ -39,6 +40,7 @@ func (e *ExitError) ExitCode() uint32 {
 	return e.exitCode
 }
 
+// Error implements the error interface.
 func (e *ExitError) Error() string {
 	return fmt.Sprintf("module %q closed with exit_code(%d)", e.moduleName, e.exitCode)
 }

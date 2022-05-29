@@ -19,7 +19,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// ModuleSnapshotPreview1 is the module name WASI functions are exported into
+// ModuleSnapshotPreview1 is the module name WASI functions are exported into.
+//
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 
@@ -34,8 +35,10 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 //	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 //	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 //
-// Note: All WASI functions return a single Errno result, ErrnoSuccess on success.
-// Note: Closing the wazero.Runtime closes this instance of WASI as well.
+// Notes
+//
+//	* All WASI functions return a single Errno result, ErrnoSuccess on success.
+//	* Closing the wazero.Runtime closes this instance of WASI as well.
 func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	_, fns := snapshotPreview1Functions(ctx)
 	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)

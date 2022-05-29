@@ -6,10 +6,13 @@ import (
 
 // Errno are the error codes returned by WASI functions.
 //
-// Note: This is not always an error, as ErrnoSuccess is a valid code.
-// Note: Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16
-// See https://linux.die.net/man/3/errno
+// Notes
+//
+//	* This is not always an error, as ErrnoSuccess is a valid code.
+//	* Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
+//
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16 and
+// https://linux.die.net/man/3/errno
 type Errno = uint32 // alias for parity with wasm.ValueType
 
 // ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"

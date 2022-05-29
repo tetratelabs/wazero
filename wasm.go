@@ -38,18 +38,22 @@ type Runtime interface {
 	Module(moduleName string) api.Module
 
 	// CompileModule decodes the WebAssembly text or binary source or errs if invalid.
-	// Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
+	// When the context is nil, it defaults to context.Background.
 	//
 	// There are two main reasons to use CompileModule instead of InstantiateModuleFromCode:
-	//  * Improve performance when the same module is instantiated multiple times under different names
-	//  * Reduce the amount of errors that can occur during InstantiateModule.
+	//	* Improve performance when the same module is instantiated multiple times under different names
+	//	* Reduce the amount of errors that can occur during InstantiateModule.
 	//
-	// Note: When the context is nil, it defaults to context.Background.
-	// Note: The resulting module name defaults to what was binary from the custom name section.
+	// Notes
+	//
+	//	* The resulting module name defaults to what was binary from the custom name section.
+	//	* Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
+	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, source []byte, config CompileConfig) (CompiledModule, error)
 
 	// InstantiateModuleFromCode instantiates a module from the WebAssembly text or binary source or errs if invalid.
+	// When the context is nil, it defaults to context.Background.
 	//
 	// Ex.
 	//	ctx := context.Background()
@@ -58,13 +62,15 @@ type Runtime interface {
 	//
 	//	module, _ := r.InstantiateModuleFromCode(ctx, source)
 	//
-	// Note: When the context is nil, it defaults to context.Background.
-	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
-	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
-	// Note: To avoid using configuration defaults, use InstantiateModule instead.
+	// Notes
+	//
+	//	* This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
+	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
+	//	* To avoid using configuration defaults, use InstantiateModule instead.
 	InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error)
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
+	// When the context is nil, it defaults to context.Background.
 	//
 	// Ex.
 	//	ctx := context.Background()
@@ -75,9 +81,9 @@ type Runtime interface {
 	//	module, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
 	//
 	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
-	//  * The module name is already in use.
-	//  * The module has a table element initializer that resolves to an index outside the Table minimum size.
-	//  * The module has a start function, and it failed to execute.
+	//	* The module name is already in use.
+	//	* The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//	* The module has a start function, and it failed to execute.
 	//
 	// Configuration can also define different args depending on the importing module.
 	//
@@ -95,10 +101,10 @@ type Runtime interface {
 	//	module, _ := r.InstantiateModule(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 	//
 	// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
-	// Note: When the context is nil, it defaults to context.Background.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
+	// When the context is nil, it defaults to context.Background.
 	// An error is returned if any module returns an error when closed.
 	//
 	// Ex.
