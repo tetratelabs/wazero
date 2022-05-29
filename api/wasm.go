@@ -119,7 +119,8 @@ func ValueTypeName(t ValueType) string {
 
 // Module return functions exported in a module, post-instantiation.
 //
-// Notes:
+// Notes
+//
 //	* Closing the wazero.Runtime closes any Module it instantiated.
 //	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //
@@ -239,7 +240,8 @@ type MutableGlobal interface {
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
-// Notes:
+// Notes
+//
 //	* All functions accept a context.Context, which when nil, default to context.Background.
 //	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //	* This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.

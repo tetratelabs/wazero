@@ -392,7 +392,8 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes:
+	// Notes
+	//
 	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
 	//	* This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
 	//
@@ -404,7 +405,8 @@ type ModuleConfig interface {
 	// This reader is most commonly used by the functions like "fd_read" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes:
+	// Notes
+	//
 	//	* The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
 	//	* This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
 	//
@@ -416,7 +418,8 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes:
+	// Notes
+	//
 	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
 	//	* This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
 	//

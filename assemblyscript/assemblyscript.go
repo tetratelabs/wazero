@@ -24,7 +24,8 @@ import (
 //	* "env.trace" - no output unless.
 //	* "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
 //
-// Notes:
+// Notes
+//
 //	* To customize behavior, use NewModuleBuilder instead.
 //	* A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
 //

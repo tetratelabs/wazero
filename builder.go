@@ -35,7 +35,8 @@ import (
 //
 //	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
 //
-// Notes:
+// Notes
+//
 //	* ModuleBuilder is mutable. WithXXX functions return the same instance for chaining.
 //	* WithXXX methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
 //	* Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
@@ -45,7 +46,8 @@ type ModuleBuilder interface {
 	// ExportFunction adds a function written in Go, which a WebAssembly module can import.
 	// If a function is already exported with the same name, this overwrites it.
 	//
-	// Parameters:
+	// Parameters
+	//
 	//	* name - the name to export. Ex "random_get"
 	//	* goFunc - the `func` to export.
 	//
@@ -93,7 +95,8 @@ type ModuleBuilder interface {
 	// ExportMemory adds linear memory, which a WebAssembly module can import and become available via api.Memory.
 	// If a memory is already exported with the same name, this overwrites it.
 	//
-	// Parameters:
+	// Parameters
+	//
 	//	* name - the name to export. Ex "memory" for wasi.ModuleSnapshotPreview1
 	//	* minPages - the possibly zero initial size in pages (65536 bytes per page).
 	//
@@ -101,7 +104,8 @@ type ModuleBuilder interface {
 	//	// (memory (export "memory") 1)
 	//	builder.ExportMemory(1)
 	//
-	// Notes:
+	// Notes
+	//
 	//	* This is allowed to grow to (4GiB) limited by api.MemorySizer. To bound it, use ExportMemoryWithMax.
 	//	* Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
 	//
@@ -170,7 +174,8 @@ type ModuleBuilder interface {
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule, using default configuration.
 	//
-	// Notes:
+	// Notes
+	//
 	//	* Closing the wazero.Runtime closes any api.Module it instantiated.
 	//	* Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
 	//	* To avoid using configuration defaults, use Compile instead.

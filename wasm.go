@@ -44,7 +44,8 @@ type Runtime interface {
 	//	* Improve performance when the same module is instantiated multiple times under different names
 	//	* Reduce the amount of errors that can occur during InstantiateModule.
 	//
-	// Notes:
+	// Notes
+	//
 	//	* The resulting module name defaults to what was binary from the custom name section.
 	//	* Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
 	//
@@ -61,7 +62,8 @@ type Runtime interface {
 	//
 	//	module, _ := r.InstantiateModuleFromCode(ctx, source)
 	//
-	// Notes:
+	// Notes
+	//
 	//	* This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	//	* To avoid using configuration defaults, use InstantiateModule instead.

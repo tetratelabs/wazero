@@ -35,7 +35,8 @@ const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 //	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
 //	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 //
-// Notes:
+// Notes
+//
 //	* All WASI functions return a single Errno result, ErrnoSuccess on success.
 //	* Closing the wazero.Runtime closes this instance of WASI as well.
 func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
