@@ -36,7 +36,7 @@ type Namespace interface {
 	//
 	//	Everything below here can be closed, but will anyway due to above.
 	//	_, _ = wasi_snapshot_preview1.InstantiateSnapshotPreview1(ctx, n)
-	//	mod, _ := n.InstantiateModuleFromCode(ctx, source)
+	//	mod, _ := n.InstantiateModuleFromBinary(ctx, wasm)
 	//
 	// See Closer
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error

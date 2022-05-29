@@ -23,6 +23,7 @@ import (
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/watzero"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -2282,12 +2283,15 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
 	_, err := Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	compiled, err := r.CompileModule(ctx, []byte(fmt.Sprintf(`(module
+	binary, err := watzero.Wat2Wasm(fmt.Sprintf(`(module
   %[2]s
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasifunction, wasiimport)), wazero.NewCompileConfig())
+)`, wasifunction, wasiimport))
+	require.NoError(t, err)
+
+	compiled, err := r.CompileModule(ctx, binary, wazero.NewCompileConfig())
 	require.NoError(t, err)
 	defer compiled.Close(ctx)
 

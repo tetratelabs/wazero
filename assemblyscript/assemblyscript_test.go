@@ -13,26 +13,27 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/watzero"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-var abortWasm = []byte(`(module
+var abortWat = `(module
   (import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
   (memory 1 1)
   (export "abort" (func 0))
-)`)
+)`
 
-var seedWasm = []byte(`(module
+var seedWat = `(module
   (import "env" "seed" (func $~lib/builtins/seed (result f64)))
   (memory 1 1)
   (export "seed" (func 0))
-)`)
+)`
 
-var traceWasm = []byte(`(module
+var traceWat = `(module
   (import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
   (memory 1 1)
   (export "trace" (func 0))
-)`)
+)`
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
@@ -72,6 +73,9 @@ func TestAbort(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			abortWasm, err := watzero.Wat2Wasm(abortWat)
+			require.NoError(t, err)
+
 			code, err := r.CompileModule(testCtx, abortWasm, wazero.NewCompileConfig())
 			require.NoError(t, err)
 
@@ -96,6 +100,9 @@ func TestSeed(t *testing.T) {
 	seed := []byte{0, 1, 2, 3, 4, 5, 6, 7}
 
 	_, err := Instantiate(testCtx, r)
+	require.NoError(t, err)
+
+	seedWasm, err := watzero.Wat2Wasm(seedWat)
 	require.NoError(t, err)
 
 	code, err := r.CompileModule(testCtx, seedWasm, wazero.NewCompileConfig())
@@ -192,6 +199,9 @@ func TestTrace(t *testing.T) {
 			}
 
 			_, err := as.Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			traceWasm, err := watzero.Wat2Wasm(traceWat)
 			require.NoError(t, err)
 
 			code, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
@@ -314,6 +324,9 @@ func TestAbort_error(t *testing.T) {
 			_, err := Instantiate(testCtx, r)
 			require.NoError(t, err)
 
+			abortWasm, err := watzero.Wat2Wasm(abortWat)
+			require.NoError(t, err)
+
 			compiled, err := r.CompileModule(testCtx, abortWasm, wazero.NewCompileConfig())
 			require.NoError(t, err)
 
@@ -381,6 +394,9 @@ wasm stack trace:
 			_, err := Instantiate(testCtx, r)
 			require.NoError(t, err)
 
+			seedWasm, err := watzero.Wat2Wasm(seedWat)
+			require.NoError(t, err)
+
 			compiled, err := r.CompileModule(testCtx, seedWasm, wazero.NewCompileConfig())
 			require.NoError(t, err)
 
@@ -427,6 +443,9 @@ wasm stack trace:
 			defer r.Close(testCtx)
 
 			_, err := NewBuilder(r).WithTraceToStdout().Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			traceWasm, err := watzero.Wat2Wasm(traceWat)
 			require.NoError(t, err)
 
 			compiled, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())

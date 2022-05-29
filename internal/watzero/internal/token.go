@@ -1,4 +1,4 @@
-package text
+package internal
 
 // token is the set of tokens defined by the WebAssembly Text Format 1.0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tokens%E2%91%A0

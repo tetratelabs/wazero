@@ -1,4 +1,4 @@
-package text
+package internal
 
 // decodeUint32 decodes an uint32 from a tokenUN or returns false on overflow
 //

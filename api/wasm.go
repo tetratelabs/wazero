@@ -393,7 +393,7 @@ func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
 }
 
-// ImportRenamer applies during compilation after a module has been decoded from source, but before it is instantiated.
+// ImportRenamer applies during compilation after a module has been decoded from wasm, but before it is instantiated.
 //
 // For example, you may have a module like below, but the exported functions are in two different modules:
 //	(import "js" "increment" (func $increment (result i32)))
@@ -420,7 +420,7 @@ func DecodeF64(input uint64) float64 {
 //
 type ImportRenamer func(externType ExternType, oldModule, oldName string) (newModule, newName string)
 
-// MemorySizer applies during compilation after a module has been decoded from source, but before it is instantiated.
+// MemorySizer applies during compilation after a module has been decoded from wasm, but before it is instantiated.
 // This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
 //
 // Ex. Here's how to set the capacity to max instead of min, when set:

@@ -16,15 +16,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
-// DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
-// an error occurs. The result can be initialized for use via Store.Instantiate.
+// DecodeModule parses the WebAssembly Binary Format (%.wasm) into a Module. This function returns when the input is
+// exhausted or an error occurs. The result can be initialized for use via Store.Instantiate.
 //
 // Here's a description of the return values:
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
 type DecodeModule func(
-	source []byte,
+	wasm []byte,
 	enabledFeatures Features,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
 ) (result *Module, err error)
@@ -175,7 +175,7 @@ type Module struct {
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	DataCountSection *uint32
 
-	// ID is the sha256 value of the source code (text/binary) and is used for caching.
+	// ID is the sha256 value of the source wasm and is used for caching.
 	ID ModuleID
 }
 
@@ -190,9 +190,9 @@ const (
 	MaximumTableIndex    = uint32(1 << 27)
 )
 
-// AssignModuleID calculates a sha256 checksum on `source` and set Module.ID to the result.
-func (m *Module) AssignModuleID(source []byte) {
-	m.ID = sha256.Sum256(source)
+// AssignModuleID calculates a sha256 checksum on `wasm` and set Module.ID to the result.
+func (m *Module) AssignModuleID(wasm []byte) {
+	m.ID = sha256.Sum256(wasm)
 }
 
 // TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.

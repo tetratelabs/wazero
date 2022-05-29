@@ -156,8 +156,8 @@ func runRandomMatMul(b *testing.B, m api.Module) {
 func instantiateHostFunctionModuleWithEngine(b *testing.B, config wazero.RuntimeConfig) api.Module {
 	r := createRuntime(b, config)
 
-	// InstantiateModuleFromCode runs the "_start" function which is what TinyGo compiles "main" to.
-	m, err := r.InstantiateModuleFromCode(testCtx, caseWasm)
+	// InstantiateModuleFromBinary runs the "_start" function which is what TinyGo compiles "main" to.
+	m, err := r.InstantiateModuleFromBinary(testCtx, caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}

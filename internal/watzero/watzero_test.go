@@ -1,23 +1,20 @@
-package vs
+package watzero
 
 import (
 	_ "embed"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
 )
 
-// example holds the latest supported features as described in the comments of exampleText
+// example holds the latest supported features as described in the comments of exampleWat
 var example = newExample()
 
-// exampleText is different from exampleWat because the parser doesn't yet support all features.
+// exampleWat is different from exampleWat because the parser doesn't yet support all features.
 //go:embed testdata/example.wat
-var exampleText []byte
-
-// exampleBinary is the exampleText encoded in the WebAssembly 1.0 binary format.
-var exampleBinary = binary.EncodeModule(example)
+var exampleWat string
 
 func newExample() *wasm.Module {
 	three := wasm.Index(3)
@@ -89,22 +86,16 @@ func newExample() *wasm.Module {
 	}
 }
 
-func BenchmarkWat2Wasm(b *testing.B, vsName string, vsWat2Wasm func([]byte) error) {
-	b.Run("wazero", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText, wasm.Features20220419, wasm.MemorySizer); err != nil {
-				b.Fatal(err)
-			} else {
-				_ = binary.EncodeModule(m)
-			}
+func BenchmarkWat2Wasm(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		if _, err := Wat2Wasm(exampleWat); err != nil {
+			b.Fatal(err)
 		}
-	})
-	b.Run(vsName, func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			err := vsWat2Wasm(exampleText)
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
+	}
+}
+
+func TestWat2Wasm(t *testing.T) {
+	wasm, err := Wat2Wasm(exampleWat)
+	require.NoError(t, err)
+	require.Equal(t, binary.EncodeModule(example), wasm)
 }

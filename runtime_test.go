@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"fmt"
 	"math"
 	"testing"
 
@@ -12,12 +11,17 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/watzero"
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var (
+	binaryNamedZero = binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "0"}})
+	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+	zero    = wasm.Index(0)
+)
 
 func TestNewRuntimeWithConfig_PanicsOnWrongImpl(t *testing.T) {
 	// It causes maintenance to define an impl of RuntimeConfig in tests just to verify the error when it is wrong.
@@ -33,33 +37,20 @@ func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {
 		name         string
 		runtime      Runtime
-		source       []byte
+		wasm         []byte
 		expectedName string
 	}{
 		{
-			name:   "text no name",
-			source: []byte(`(module)`),
+			name: "no name section",
+			wasm: binaryformat.EncodeModule(&wasm.Module{}),
 		},
 		{
-			name:   "text empty name",
-			source: []byte(`(module $)`),
+			name: "empty NameSection.ModuleName",
+			wasm: binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
 		},
 		{
-			name:         "text name",
-			source:       []byte(`(module $test)`),
-			expectedName: "test",
-		},
-		{
-			name:   "binary no name section",
-			source: binary.EncodeModule(&wasm.Module{}),
-		},
-		{
-			name:   "binary empty NameSection.ModuleName",
-			source: binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{}}),
-		},
-		{
-			name:         "binary NameSection.ModuleName",
-			source:       binary.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
+			name:         "NameSection.ModuleName",
+			wasm:         binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "test"}}),
 			expectedName: "test",
 		},
 	}
@@ -71,7 +62,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := r.CompileModule(testCtx, tc.source, NewCompileConfig())
+			m, err := r.CompileModule(testCtx, tc.wasm, NewCompileConfig())
 			require.NoError(t, err)
 			code := m.(*compiledModule)
 			if tc.expectedName != "" {
@@ -82,9 +73,9 @@ func TestRuntime_CompileModule(t *testing.T) {
 	}
 
 	t.Run("WithMemorySizer", func(t *testing.T) {
-		source := []byte(`(module (memory 1))`)
+		testWasm := binaryformat.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 1}})
 
-		m, err := r.CompileModule(testCtx, source, NewCompileConfig().
+		m, err := r.CompileModule(testCtx, testWasm, NewCompileConfig().
 			WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 				return 1, 2, 3
 			}))
@@ -99,14 +90,15 @@ func TestRuntime_CompileModule(t *testing.T) {
 	})
 
 	t.Run("WithImportReplacements", func(t *testing.T) {
-		source := []byte(`(module
+		testBin, err := watzero.Wat2Wasm(`(module
   (import "js" "increment" (func $increment (result i32)))
   (import "js" "decrement" (func $decrement (result i32)))
   (import "js" "wasm_increment" (func $wasm_increment (result i32)))
   (import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
 )`)
+		require.NoError(t, err)
 
-		m, err := r.CompileModule(testCtx, source, NewCompileConfig().
+		m, err := r.CompileModule(testCtx, testBin, NewCompileConfig().
 			WithImportRenamer(func(externType api.ExternType, oldModule, oldName string) (string, string) {
 				if externType != api.ExternTypeFunc {
 					return oldModule, oldName
@@ -152,47 +144,44 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		config      CompileConfig
-		source      []byte
+		wasm        []byte
 		expectedErr string
 	}{
 		{
 			name:        "nil",
-			expectedErr: "source == nil",
+			expectedErr: "binary == nil",
 		},
 		{
 			name:        "invalid binary",
-			source:      append(binary.Magic, []byte("yolo")...),
+			wasm:        append(binaryformat.Magic, []byte("yolo")...),
 			expectedErr: "invalid version header",
-		},
-		{
-			name:        "invalid text",
-			source:      []byte(`(modular)`),
-			expectedErr: "1:2: unexpected field: modular",
-		},
-		{
-			name:        "memory has too many pages text",
-			source:      []byte(`(module (memory 70000))`),
-			expectedErr: "1:17: min 70000 pages (4 Gi) over limit of 65536 pages (4 Gi) in module.memory[0]",
 		},
 		{
 			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
 			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 				return 3, 1, 3
 			}),
-			source:      []byte(`(module (memory 3))`),
-			expectedErr: "1:17: capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki) in module.memory[0]",
+			wasm: binaryformat.EncodeModule(&wasm.Module{
+				MemorySection: &wasm.Memory{Min: 3},
+			}),
+			expectedErr: "section memory: capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
 		},
 		{
 			name: "memory cap < min exported", // only one test to avoid duplicating tests in module_test.go
 			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 				return 3, 2, 3
 			}),
-			source:      []byte(`(module (memory 3) (export "memory" (memory 0)))`),
-			expectedErr: "1:17: capacity 2 pages (128 Ki) less than minimum 3 pages (192 Ki) in module.memory[0]",
+			wasm: binaryformat.EncodeModule(&wasm.Module{
+				MemorySection: &wasm.Memory{},
+				ExportSection: []*wasm.Export{
+					{Name: "memory", Type: api.ExternTypeMemory},
+				},
+			}),
+			expectedErr: "section memory: capacity 2 pages (128 Ki) less than minimum 3 pages (192 Ki)",
 		},
 		{
-			name:        "memory has too many pages binary",
-			source:      binary.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: 70000, IsMaxEncoded: true}}),
+			name:        "memory has too many pages",
+			wasm:        binaryformat.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 2, Cap: 2, Max: 70000, IsMaxEncoded: true}}),
 			expectedErr: "section memory: max 70000 pages (4 Gi) over limit of 65536 pages (4 Gi)",
 		},
 	}
@@ -208,7 +197,7 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 			if config == nil {
 				config = NewCompileConfig()
 			}
-			_, err := r.CompileModule(testCtx, tc.source, config)
+			_, err := r.CompileModule(testCtx, tc.wasm, config)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -383,7 +372,7 @@ func TestModule_FunctionContext(t *testing.T) {
 			source := requireImportAndExportFunction(t, r, hostFn, functionName)
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModuleFromCode(tc.ctx, source)
+			module, err := r.InstantiateModuleFromBinary(tc.ctx, source)
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
@@ -410,10 +399,13 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	code, err := r.CompileModule(testCtx, []byte(`(module $runtime_test.go
-	(import "env" "start" (func $start))
-	(start $start)
-)`), NewCompileConfig())
+	binary := binaryformat.EncodeModule(&wasm.Module{
+		TypeSection:   []*wasm.FunctionType{{}},
+		ImportSection: []*wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		StartSection:  &zero,
+	})
+
+	code, err := r.CompileModule(testCtx, binary, NewCompileConfig())
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
@@ -427,21 +419,23 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	require.Equal(t, uint32(2), r.(*runtime).store.Engine.CompiledModuleCount())
 }
 
-// TestRuntime_InstantiateModuleFromCode_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't
+// TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't
 // export "_start".
-func TestRuntime_InstantiateModuleFromCode_DoesntEnforce_Start(t *testing.T) {
+func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
 	r := NewRuntime()
 	defer r.Close(testCtx)
 
-	mod, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $wasi_test.go
-	(memory 1)
-	(export "memory" (memory 0))
-)`))
+	binary := binaryformat.EncodeModule(&wasm.Module{
+		MemorySection: &wasm.Memory{Min: 1},
+		ExportSection: []*wasm.Export{{Name: "memory", Type: wasm.ExternTypeMemory, Index: 0}},
+	})
+
+	mod, err := r.InstantiateModuleFromBinary(testCtx, binary)
 	require.NoError(t, err)
 	require.NoError(t, mod.Close(testCtx))
 }
 
-func TestRuntime_InstantiateModuleFromCode_UsesContext(t *testing.T) {
+func TestRuntime_InstantiateModuleFromBinary_UsesContext(t *testing.T) {
 	r := NewRuntime()
 	defer r.Close(testCtx)
 
@@ -459,18 +453,21 @@ func TestRuntime_InstantiateModuleFromCode_UsesContext(t *testing.T) {
 	defer host.Close(testCtx)
 
 	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	_, err = r.InstantiateModuleFromCode(testCtx, []byte(`(module $start
+	startWasm, err := watzero.Wat2Wasm(`(module $start
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))
 	(export "memory" (memory 0))
-)`))
+)`)
+	require.NoError(t, err)
+
+	_, err = r.InstantiateModuleFromBinary(testCtx, startWasm)
 	require.NoError(t, err)
 
 	require.True(t, calledStart)
 }
 
-func TestRuntime_InstantiateModuleFromCode_ErrorOnStart(t *testing.T) {
+func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 	tests := []struct {
 		name, wasm string
 	}{
@@ -507,7 +504,7 @@ func TestRuntime_InstantiateModuleFromCode_ErrorOnStart(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start the module as a WASI command. We expect it to fail.
-			_, err = r.InstantiateModuleFromCode(testCtx, []byte(tc.wasm))
+			_, err = r.InstantiateModuleFromBinary(testCtx, []byte(tc.wasm))
 			require.Error(t, err)
 
 			// Close the imported module, which should remove its compiler cache.
@@ -536,7 +533,7 @@ func TestRuntime_InstantiateModule_PanicsOnWrongModuleConfigImpl(t *testing.T) {
 	r := NewRuntime()
 	defer r.Close(testCtx)
 
-	code, err := r.CompileModule(testCtx, []byte(`(module)`), NewCompileConfig())
+	code, err := r.CompileModule(testCtx, binaryformat.EncodeModule(&wasm.Module{}), NewCompileConfig())
 	require.NoError(t, err)
 
 	// It causes maintenance to define an impl of ModuleConfig in tests just to verify the error when it is wrong.
@@ -554,7 +551,7 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 	r := NewRuntime()
 	defer r.Close(testCtx)
 
-	base, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`), NewCompileConfig())
+	base, err := r.CompileModule(testCtx, binaryNamedZero, NewCompileConfig())
 	require.NoError(t, err)
 
 	require.Equal(t, "0", base.(*compiledModule).module.NameSection.ModuleName)
@@ -654,7 +651,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// Normally compiled modules are closed when instantiated but this is never instantiated.
-	_, err := r.CompileModule(testCtx, []byte(`(module $0 (memory 1))`), NewCompileConfig())
+	_, err := r.CompileModule(testCtx, binaryNamedZero, NewCompileConfig())
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), engine.CompiledModuleCount())
 
@@ -670,9 +667,11 @@ func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx con
 	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	return []byte(fmt.Sprintf(
-		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
-	))
+	return binaryformat.EncodeModule(&wasm.Module{
+		TypeSection:   []*wasm.FunctionType{{Results: []wasm.ValueType{wasm.ValueTypeI64}}},
+		ImportSection: []*wasm.Import{{Module: "host", Name: functionName, Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		ExportSection: []*wasm.Export{{Name: functionName, Type: wasm.ExternTypeFunc, Index: 0}},
+	})
 }
 
 type mockEngine struct {

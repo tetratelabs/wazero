@@ -66,7 +66,7 @@ func NewHostModule(
 		}
 	}
 
-	// Assins the ModuleID by calculating sha256 on inputs as host modules do not have `source` to hash.
+	// Assins the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
 	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v:%v:%v",
 		moduleName, nameToGoFunc, nameToMemory, nameToGlobal, enabledFeatures)))
 	return

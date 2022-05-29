@@ -8,8 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
+	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 // Runtime allows embedding of WebAssembly modules.
@@ -19,7 +18,7 @@ import (
 //	r := wazero.NewRuntime()
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
-//	module, _ := r.InstantiateModuleFromCode(ctx, source)
+//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 type Runtime interface {
 	// NewModuleBuilder lets you create modules out of functions defined in Go.
 	//
@@ -32,10 +31,10 @@ type Runtime interface {
 	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx, r)
 	NewModuleBuilder(moduleName string) ModuleBuilder
 
-	// CompileModule decodes the WebAssembly text or binary source or errs if invalid.
-	// When the context is nil, it defaults to context.Background.
+	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.
+	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig or CompileConfig.
 	//
-	// There are two main reasons to use CompileModule instead of InstantiateModuleFromCode:
+	// There are two main reasons to use CompileModule instead of InstantiateModuleFromBinary:
 	//	* Improve performance when the same module is instantiated multiple times under different names
 	//	* Reduce the amount of errors that can occur during InstantiateModule.
 	//
@@ -45,9 +44,9 @@ type Runtime interface {
 	//	* Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(ctx context.Context, source []byte, config CompileConfig) (CompiledModule, error)
+	CompileModule(ctx context.Context, binary []byte, config CompileConfig) (CompiledModule, error)
 
-	// InstantiateModuleFromCode instantiates a module from the WebAssembly text or binary source or errs if invalid.
+	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
 	// When the context is nil, it defaults to context.Background.
 	//
 	// Ex.
@@ -55,14 +54,14 @@ type Runtime interface {
 	//	r := wazero.NewRuntime()
 	//	defer r.Close(ctx) // This closes everything this Runtime created.
 	//
-	//	module, _ := r.InstantiateModuleFromCode(ctx, source)
+	//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 	//
 	// Notes
 	//
 	//	* This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	//	* To avoid using configuration defaults, use InstantiateModule instead.
-	InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error)
+	InstantiateModuleFromBinary(ctx context.Context, source []byte) (api.Module, error)
 
 	// Namespace is the default namespace of this runtime, and is embedded for convenience. Most users will only use the
 	// default namespace.
@@ -112,7 +111,7 @@ type Runtime interface {
 	//
 	//	// Everything below here can be closed, but will anyway due to above.
 	//	_, _ = wasi_snapshot_preview1.InstantiateSnapshotPreview1(ctx, r)
-	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+	//	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
 	// Closer closes all namespace and compiled code by delegating to CloseWithExitCode with an exit code of zero.
@@ -160,9 +159,9 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig CompileConfig) (CompiledModule, error) {
-	if source == nil {
-		return nil, errors.New("source == nil")
+func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig CompileConfig) (CompiledModule, error) {
+	if binary == nil {
+		return nil, errors.New("binary == nil")
 	}
 
 	config, ok := cConfig.(*compileConfig)
@@ -170,24 +169,16 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 		panic(fmt.Errorf("unsupported wazero.CompileConfig implementation: %#v", cConfig))
 	}
 
-	if len(source) < 8 { // Ex. less than magic+version in binary or '(module)' in text
-		return nil, errors.New("invalid source")
+	if len(binary) < 4 || !bytes.Equal(binary[0:4], binaryformat.Magic) {
+		return nil, errors.New("invalid binary")
 	}
 
-	// Peek to see if this is a binary or text format
-	var decoder wasm.DecodeModule
-	if bytes.Equal(source[0:4], binary.Magic) {
-		decoder = binary.DecodeModule
-	} else {
-		decoder = text.DecodeModule
-	}
-
-	internal, err := decoder(source, r.enabledFeatures, config.memorySizer)
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, config.memorySizer)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {
 		// TODO: decoders should validate before returning, as that allows
-		// them to err with the correct source position.
+		// them to err with the correct position in the wasm binary.
 		return nil, err
 	}
 
@@ -198,7 +189,7 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 		}
 	}
 
-	internal.AssignModuleID(source)
+	internal.AssignModuleID(binary)
 
 	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
 		return nil, err
@@ -209,9 +200,9 @@ func (r *runtime) CompileModule(ctx context.Context, source []byte, cConfig Comp
 	return c, nil
 }
 
-// InstantiateModuleFromCode implements Runtime.InstantiateModuleFromCode
-func (r *runtime) InstantiateModuleFromCode(ctx context.Context, source []byte) (api.Module, error) {
-	if compiled, err := r.CompileModule(ctx, source, NewCompileConfig()); err != nil {
+// InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary
+func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte) (api.Module, error) {
+	if compiled, err := r.CompileModule(ctx, binary, NewCompileConfig()); err != nil {
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true
