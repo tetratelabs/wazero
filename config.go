@@ -26,25 +26,26 @@ type RuntimeConfig interface {
 	// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	// * Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-	// * Adds `table.init`, `table.copy` and `elem.drop` instructions.
-	// * Introduces a "passive" form of element and data segments.
-	// * Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+	//	* Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
+	//	* Adds `table.init`, `table.copy` and `elem.drop` instructions.
+	//	* Introduces a "passive" form of element and data segments.
+	//	* Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
 	//
 	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
 	// Therefore, enabling this feature results in enabling WithFeatureReferenceTypes, and vice-versa.
+	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
-	// See https://github.com/WebAssembly/spec/pull/1287
+	// https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md and
+	// https://github.com/WebAssembly/spec/pull/1287
 	WithFeatureBulkMemoryOperations(bool) RuntimeConfig
 
 	// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not
 	// finished in WebAssembly 1.0 (20191205).
 	//
 	// Here are the notable effects:
-	// * Function (`func`) types allow more than one result
-	// * Block types (`block`, `loop` and `if`) can be arbitrary function types
+	//	* Function (`func`) types allow more than one result
+	//	* Block types (`block`, `loop` and `if`) can be arbitrary function types
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	WithFeatureMultiValue(bool) RuntimeConfig
@@ -60,47 +61,48 @@ type RuntimeConfig interface {
 	// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0.
 	//
 	// The only effect of enabling is allowing the following instructions, which return 0 on NaN instead of panicking.
-	// * `i32.trunc_sat_f32_s`
-	// * `i32.trunc_sat_f32_u`
-	// * `i32.trunc_sat_f64_s`
-	// * `i32.trunc_sat_f64_u`
-	// * `i64.trunc_sat_f32_s`
-	// * `i64.trunc_sat_f32_u`
-	// * `i64.trunc_sat_f64_s`
-	// * `i64.trunc_sat_f64_u`
+	//	* `i32.trunc_sat_f32_s`
+	//	* `i32.trunc_sat_f32_u`
+	//	* `i32.trunc_sat_f64_s`
+	//	* `i32.trunc_sat_f64_u`
+	//	* `i64.trunc_sat_f32_s`
+	//	* `i64.trunc_sat_f32_u`
+	//	* `i64.trunc_sat_f64_s`
+	//	* `i64.trunc_sat_f64_u`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
 
 	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
 	//
-	// * Introduction of new value types: `funcref` and `externref`.
-	// * Support for the following new instructions:
-	//   * `ref.null`
-	//   * `ref.func`
-	//   * `ref.is_null`
-	//   * `table.fill`
-	//   * `table.get`
-	//   * `table.grow`
-	//   * `table.set`
-	//   * `table.size`
-	// * Support for multiple tables per module:
-	//   * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
-	//   * Element segments can take non-zero table index.
+	//	* Introduction of new value types: `funcref` and `externref`.
+	//	* Support for the following new instructions:
+	//	 * `ref.null`
+	//	 * `ref.func`
+	//	 * `ref.is_null`
+	//	 * `table.fill`
+	//	 * `table.get`
+	//	 * `table.grow`
+	//	 * `table.set`
+	//	 * `table.size`
+	//	* Support for multiple tables per module:
+	//	 * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
+	//	 * Element segments can take non-zero table index.
 	//
 	// Note: "reference-types" is mixed with the "bulk-memory-operations" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
 	// Therefore, enabling this feature results in enabling WithFeatureBulkMemoryOperations, and vice-versa.
+	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
-	// See https://github.com/WebAssembly/spec/pull/1287
+	// https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md and
+	// https://github.com/WebAssembly/spec/pull/1287
 	WithFeatureReferenceTypes(enabled bool) RuntimeConfig
 
 	// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false
 	// as the feature was not in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	// * Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
+	//	* Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
@@ -155,7 +157,8 @@ var engineLessConfig = &runtimeConfig{
 // Note: While this is technically AOT, this does not imply any action on your
 // part. wazero automatically performs ahead-of-time compilation as needed when
 // Runtime.CompileModule is invoked.
-// Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not
+//
+// Warning: This panics at runtime if the runtime.GOOS or runtime.GOARCH does not
 // support Compiler. Use NewRuntimeConfig to safely detect and fallback to
 // NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigCompiler() RuntimeConfig {
@@ -240,10 +243,11 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 
 // CompiledModule is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
-// Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
-// Note: In WebAssembly language, this is a decoded, validated, and possibly also compiled module. wazero avoids using
+// In WebAssembly terminology, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#semantic-phases%E2%91%A0
+//
+// Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
 type CompiledModule interface {
 	// Close releases all the allocated resources for this CompiledModule.
 	//
@@ -275,15 +279,13 @@ func (c *compiledCode) Close(_ context.Context) error {
 type CompileConfig interface {
 
 	// WithImportRenamer can rename imports or break them into different modules. No default.
+	// A nil function is invalid and ignored.
 	//
-	// Note: A nil function is invalid and ignored.
 	// Note: This is currently not relevant for ModuleBuilder as it has no means to define imports.
 	WithImportRenamer(api.ImportRenamer) CompileConfig
 
 	// WithMemorySizer are the allocation parameters used for a Wasm memory.
-	// The default is to set cap=min and max=65536 if unset.
-	//
-	// Note: A nil function is invalid and ignored.
+	// The default is to set cap=min and max=65536 if unset. A nil function is invalid and ignored.
 	WithMemorySizer(api.MemorySizer) CompileConfig
 }
 
@@ -324,14 +326,14 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 // system. Using this, resources such as STDIN can be isolated, so that the same module can be safely instantiated
 // multiple times.
 //
-// Note: While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
+// While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
 //
 // Note: ModuleConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type ModuleConfig interface {
 
 	// WithArgs assigns command-line arguments visible to an imported function that reads an arg vector (argv). Defaults to
-	// none.
+	// none. Runtime.InstantiateModule errs if any arg is empty.
 	//
 	// These values are commonly read by the functions like "args_get" in "wasi_snapshot_preview1" although they could be
 	// read by functions imported from other modules.
@@ -341,12 +343,12 @@ type ModuleConfig interface {
 	// argument to the same value set via WithName.
 	//
 	// Note: This does not default to os.Args as that violates sandboxing.
-	// Note: Runtime.InstantiateModule errs if any value is empty.
-	// See https://linux.die.net/man/3/argv
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	//
+	// See https://linux.die.net/man/3/argv and https://en.wikipedia.org/wiki/Null-terminated_string
 	WithArgs(...string) ModuleConfig
 
 	// WithEnv sets an environment variable visible to a Module that imports functions. Defaults to none.
+	// Runtime.InstantiateModule errs if the key is empty or contains a NULL(0) or equals("") character.
 	//
 	// Validation is the same as os.Setenv on Linux and replaces any existing value. Unlike exec.Cmd Env, this does not
 	// default to the current process environment as that would violate sandboxing. This also does not preserve order.
@@ -358,12 +360,11 @@ type ModuleConfig interface {
 	// example, neither WebAssembly nor WebAssembly System Interfaces (WASI) define concerns processes have, such as
 	// case-sensitivity on environment keys. For portability, define entries with case-insensitively unique keys.
 	//
-	// Note: Runtime.InstantiateModule errs if the key is empty or contains a NULL(0) or equals("") character.
-	// See https://linux.die.net/man/3/environ
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	// See https://linux.die.net/man/3/environ and https://en.wikipedia.org/wiki/Null-terminated_string
 	WithEnv(key, value string) ModuleConfig
 
 	// WithFS assigns the file system to use for any paths beginning at "/". Defaults to not found.
+	// Note: This sets WithWorkDirFS to the same file-system unless already set.
 	//
 	// Ex. This sets a read-only, embedded file-system to serve files under the root ("/") and working (".") directories:
 	//
@@ -376,7 +377,6 @@ type ModuleConfig interface {
 	//	// "index.html" is accessible as both "/index.html" and "./index.html" because we didn't use WithWorkDirFS.
 	//	config := wazero.NewModuleConfig().WithFS(rooted)
 	//
-	// Note: This sets WithWorkDirFS to the same file-system unless already set.
 	WithFS(fs.FS) ModuleConfig
 
 	// WithName configures the module name. Defaults to what was decoded or overridden via CompileConfig.WithModuleName.
@@ -392,8 +392,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Note: The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	// Note: This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
+	// Notes:
+	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//	* This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
+	//
 	// See https://linux.die.net/man/3/stderr
 	WithStderr(io.Writer) ModuleConfig
 
@@ -402,8 +404,10 @@ type ModuleConfig interface {
 	// This reader is most commonly used by the functions like "fd_read" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Note: The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
-	// Note: This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
+	// Notes:
+	//	* The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
+	//	* This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
+	//
 	// See https://linux.die.net/man/3/stdin
 	WithStdin(io.Reader) ModuleConfig
 
@@ -412,8 +416,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Note: The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	// Note: This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
+	// Notes:
+	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//	* This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
+	//
 	// See https://linux.die.net/man/3/stdout
 	WithStdout(io.Writer) ModuleConfig
 

@@ -9,8 +9,6 @@ import (
 
 // ExternType classifies imports and exports with their respective types.
 //
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type ExternType = byte
 
@@ -35,7 +33,6 @@ const (
 
 // ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
 //
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
 func ExternTypeName(et ExternType) string {
 	switch et {
@@ -55,11 +52,12 @@ func ExternTypeName(et ExternType) string {
 // only definable as a value type.
 //
 // The following describes how to convert between Wasm and Golang types:
-//  * ValueTypeI32 - uint64(uint32,int32)
-//  * ValueTypeI64 - uint64(int64)
-//  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
-//  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//  * ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
+//
+//	* ValueTypeI32 - uint64(uint32,int32)
+//	* ValueTypeI64 - uint64(int64)
+//	* ValueTypeF32 - EncodeF32 DecodeF32 from float32
+//	* ValueTypeF64 - EncodeF64 DecodeF64 from float64
+//	* ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
 //
@@ -72,6 +70,7 @@ func ExternTypeName(et ExternType) string {
 //	result := api.DecodeF64(result[0])
 //
 // Note: This is a type alias as it is easier to encode and decode in the binary format.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-valtype
 type ValueType = byte
 
@@ -120,8 +119,10 @@ func ValueTypeName(t ValueType) string {
 
 // Module return functions exported in a module, post-instantiation.
 //
-// Note: Closing the wazero.Runtime closes any Module it instantiated.
-// Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+// Notes:
+//	* Closing the wazero.Runtime closes any Module it instantiated.
+//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {
 	fmt.Stringer
@@ -139,8 +140,9 @@ type Module interface {
 
 	// ExportedMemory returns a memory exported from this module or nil if it wasn't.
 	//
-	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
+	// WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
 	// as a WASI Command or Reactor will never return nil for this name.
+	//
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 	ExportedMemory(name string) Memory
 
@@ -148,7 +150,7 @@ type Module interface {
 	ExportedGlobal(name string) Global
 
 	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
-	// failure to ExportedFunction callers.
+	// failure to ExportedFunction callers. When the context is nil, it defaults to context.Background.
 	//
 	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
 	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
@@ -156,7 +158,6 @@ type Module interface {
 	//
 	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
 	// with the exitCode.
-	// Note: When the context is nil, it defaults to context.Background.
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 
 	// Closer closes this module by delegating to CloseWithExitCode with an exit code of zero.
@@ -167,31 +168,31 @@ type Module interface {
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type Closer interface {
-	// Close closes the resource.
-	// Note: When the context is nil, it defaults to context.Background.
+	// Close closes the resource. When the context is nil, it defaults to context.Background.
 	Close(context.Context) error
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
 	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
+	//
 	// See ValueType documentation for encoding rules.
 	ParamTypes() []ValueType
 
 	// ResultTypes are the possibly empty sequence of value types returned by a function with this signature.
 	//
-	// Note: In WebAssembly 1.0 (20191205), there can be at most one result.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
+	// When WebAssembly 1.0 (20191205), there can be at most one result: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
+	//
 	// See ValueType documentation for decoding rules.
 	ResultTypes() []ValueType
 
 	// Call invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
-	// including signature mismatch.
+	// including signature mismatch. When the context is nil, it defaults to context.Background.
 	//
-	// Note: When the context is nil, it defaults to context.Background.
-	// Note: If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
+	// If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
 	// function that exits.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
@@ -220,10 +221,9 @@ type Global interface {
 	// Type describes the numeric type of the global.
 	Type() ValueType
 
-	// Get returns the last known value of this global.
-	// See Type for how to encode this value from a Go type.
+	// Get returns the last known value of this global. When the context is nil, it defaults to context.Background.
 	//
-	// Note: When the context is nil, it defaults to context.Background.
+	// See Type for how to encode this value from a Go type.
 	Get(context.Context) uint64
 }
 
@@ -231,18 +231,19 @@ type Global interface {
 type MutableGlobal interface {
 	Global
 
-	// Set updates the value of this global.
-	// See Global.Type for how to decode this value to a Go type.
+	// Set updates the value of this global. When the context is nil, it defaults to context.Background.
 	//
-	// Note: When the context is nil, it defaults to context.Background.
+	// See Global.Type for how to decode this value to a Go type.
 	Set(ctx context.Context, v uint64)
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
-// Note: All functions accept a context.Context, which when nil, default to context.Background.
-// Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-// Note: This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
+// Notes:
+//	* All functions accept a context.Context, which when nil, default to context.Background.
+//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//	* This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
 
@@ -256,8 +257,8 @@ type Memory interface {
 	//
 	// Note: This is the same as the "memory.grow" instruction defined in the WebAssembly Core Specification, except
 	// returns false instead of -1 on failure
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-	// See MemorySizer
+	//
+	// See MemorySizer and https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	Grow(ctx context.Context, deltaPages uint32) (previousPages uint32, ok bool)
 
 	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
@@ -286,6 +287,7 @@ type Memory interface {
 
 	// ReadFloat64Le reads a float64 from 64 IEEE 754 little-endian encoded bits in the underlying buffer at the offset
 	// or returns false if out of range.
+	//
 	// See math.Float64bits
 	ReadFloat64Le(ctx context.Context, offset uint32) (float64, bool)
 
@@ -319,6 +321,7 @@ type Memory interface {
 
 	// WriteFloat32Le writes the value in 32 IEEE 754 little-endian encoded bits to the underlying buffer at the offset
 	// or returns false if out of range.
+	//
 	// See math.Float32bits
 	WriteFloat32Le(ctx context.Context, offset uint32, v float32) bool
 
@@ -328,6 +331,7 @@ type Memory interface {
 
 	// WriteFloat64Le writes the value in 64 IEEE 754 little-endian encoded bits to the underlying buffer at the offset
 	// or returns false if out of range.
+	//
 	// See math.Float64bits
 	WriteFloat64Le(ctx context.Context, offset uint32, v float64) bool
 
@@ -336,12 +340,14 @@ type Memory interface {
 }
 
 // EncodeExternref encodes the input as a ValueTypeExternref.
+//
 // See DecodeExternref
 func EncodeExternref(input uintptr) uint64 {
 	return uint64(input)
 }
 
 // DecodeExternref decodes the input as a ValueTypeExternref.
+//
 // See EncodeExternref
 func DecodeExternref(input uint64) uintptr {
 	return uintptr(input)
@@ -358,24 +364,28 @@ func EncodeI64(input int64) uint64 {
 }
 
 // EncodeF32 encodes the input as a ValueTypeF32.
+//
 // See DecodeF32
 func EncodeF32(input float32) uint64 {
 	return uint64(math.Float32bits(input))
 }
 
 // DecodeF32 decodes the input as a ValueTypeF32.
+//
 // See EncodeF32
 func DecodeF32(input uint64) float32 {
 	return math.Float32frombits(uint32(input))
 }
 
 // EncodeF64 encodes the input as a ValueTypeF64.
+//
 // See EncodeF32
 func EncodeF64(input float64) uint64 {
 	return math.Float64bits(input)
 }
 
 // DecodeF64 decodes the input as a ValueTypeF64.
+//
 // See EncodeF64
 func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)

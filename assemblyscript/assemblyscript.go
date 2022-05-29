@@ -1,6 +1,7 @@
 // Package assemblyscript contains Go-defined special functions imported by AssemblyScript under the module name "env".
 //
 // Note: Some code will only import "env.abort", but even that isn't imported when "import wasi" is used in the source.
+//
 // See https://www.assemblyscript.org/concepts.html#special-imports
 package assemblyscript
 
@@ -19,15 +20,15 @@ import (
 )
 
 // Instantiate instantiates a module implementing special functions defined by AssemblyScript:
-// * "env.abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
-// * "env.trace" - no output unless.
-// * "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
+//	* "env.abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
+//	* "env.trace" - no output unless.
+//	* "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
 //
-// Note: To customize behavior, use NewModuleBuilder instead.
-// Note: If the AssemblyScript program is configured to use WASI, by calling "import wasi" in any file, these
-// functions will not be used.
-// See NewModuleBuilder
-// See wasi.InstantiateSnapshotPreview1
+// Notes:
+//	* To customize behavior, use NewModuleBuilder instead.
+//	* A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
+//
+// See NewModuleBuilder and wasi.InstantiateSnapshotPreview1
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	return NewModuleBuilder(r).Instantiate(ctx)
 }
