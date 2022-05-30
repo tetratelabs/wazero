@@ -578,21 +578,21 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 
 // requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
 func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randsource io.Reader, openedFiles map[uint32]*sys.FileEntry) *wasm.SysContext {
-	sys, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, randsource, openedFiles)
+	sysCtx, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, randsource, openedFiles)
 	require.NoError(t, err)
-	return sys
+	return sysCtx
 }
 
 func TestCompiledCode_Close(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 		e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 
-		var cs []*compiledCode
+		var cs []*compiledModule
 		for i := 0; i < 10; i++ {
 			m := &wasm.Module{}
 			err := e.CompileModule(ctx, m)
 			require.NoError(t, err)
-			cs = append(cs, &compiledCode{module: m, compiledEngine: e})
+			cs = append(cs, &compiledModule{module: m, compiledEngine: e})
 		}
 
 		// Before Close.

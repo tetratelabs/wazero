@@ -223,7 +223,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
-				require.Equal(t, 0, len(tp.inlinedTypes), "expected no inlinedTypes")
+				require.Zero(t, len(tp.inlinedTypes), "expected no inlinedTypes")
 			} else {
 				exp := tp.inlinedTypes[0]
 				exp.CacheNumInUint64()

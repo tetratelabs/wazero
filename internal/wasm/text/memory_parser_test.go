@@ -68,7 +68,7 @@ func TestMemoryParser(t *testing.T) {
 			require.Equal(t, tc.expected, parsed)
 			require.Equal(t, uint32(1), tp.memoryNamespace.count)
 			if tc.expectedID == "" {
-				require.Equal(t, 0, len(tp.memoryNamespace.idToIdx), "expected no indices")
+				require.Zero(t, len(tp.memoryNamespace.idToIdx), "expected no indices")
 			} else {
 				// Since the parser was initially empty, the expected index of the parsed memory is 0
 				require.Equal(t, map[string]wasm.Index{tc.expectedID: wasm.Index(0)}, tp.memoryNamespace.idToIdx)

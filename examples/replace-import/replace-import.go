@@ -1,4 +1,4 @@
-package replace_import
+package main
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func main() {
 	host, err := r.NewModuleBuilder("assemblyscript").
 		ExportFunction("abort", func(ctx context.Context, m api.Module, messageOffset, fileNameOffset, line, col uint32) {
 			_ = m.CloseWithExitCode(ctx, 255)
-		}).Instantiate(ctx)
+		}).Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)
 	}

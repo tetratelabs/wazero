@@ -2,7 +2,9 @@ package wasm
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
@@ -58,7 +60,7 @@ func TestCallContext_WithMemory(t *testing.T) {
 }
 
 func TestCallContext_String(t *testing.T) {
-	s := newStore()
+	s, ns := newStore()
 
 	tests := []struct {
 		name, moduleName, expected string
@@ -80,18 +82,18 @@ func TestCallContext_String(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure paths that can create the host module can see the name.
-			m, err := s.Instantiate(context.Background(), &Module{}, tc.moduleName, nil, nil)
+			m, err := s.Instantiate(context.Background(), ns, &Module{}, tc.moduleName, nil, nil)
 			defer m.Close(testCtx) //nolint
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m.String())
-			require.Equal(t, tc.expected, s.Module(m.Name()).String())
+			require.Equal(t, tc.expected, ns.Module(m.Name()).String())
 		})
 	}
 }
 
 func TestCallContext_Close(t *testing.T) {
-	s := newStore()
+	s, ns := newStore()
 
 	tests := []struct {
 		name           string
@@ -116,15 +118,15 @@ func TestCallContext_Close(t *testing.T) {
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(fmt.Sprintf("%s calls store.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s calls ns.CloseWithExitCode(module.name))", tc.name), func(t *testing.T) {
 			for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 				moduleName := t.Name()
-				m, err := s.Instantiate(ctx, &Module{}, moduleName, nil, nil)
+				m, err := s.Instantiate(ctx, ns, &Module{}, moduleName, nil, nil)
 				require.NoError(t, err)
 
-				// We use side effects to see if Close called store.CloseWithExitCode (without repeating store_test.go).
-				// One side effect of store.CloseWithExitCode is that the moduleName can no longer be looked up.
-				require.Equal(t, s.Module(moduleName), m)
+				// We use side effects to see if Close called ns.CloseWithExitCode (without repeating store_test.go).
+				// One side effect of ns.CloseWithExitCode is that the moduleName can no longer be looked up.
+				require.Equal(t, ns.Module(moduleName), m)
 
 				// Closing should not err.
 				require.NoError(t, tc.closer(ctx, m))
@@ -132,7 +134,7 @@ func TestCallContext_Close(t *testing.T) {
 				require.Equal(t, tc.expectedClosed, *m.closed)
 
 				// Verify our intended side-effect
-				require.Nil(t, s.Module(moduleName))
+				require.Nil(t, ns.Module(moduleName))
 
 				// Verify no error closing again.
 				require.NoError(t, tc.closer(ctx, m))
@@ -141,30 +143,17 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls SysContext.Close()", func(t *testing.T) {
-		sys, err := NewSysContext(
-			0,   // max
-			nil, // args
-			nil, // environ
-			nil, // stdin
-			nil, // stdout
-			nil, // stderr
-			nil, // randSource
-			map[uint32]*sys.FileEntry{ // openedFiles
-				3: {Path: "."},
-			},
-		)
-		require.NoError(t, err)
+		sysCtx := DefaultSysContext()
+		sysCtx.FS().OpenFile(&sys.FileEntry{Path: "."})
 
-		fsCtx := sys.FS()
-
-		moduleName := t.Name()
-		m, err := s.Instantiate(context.Background(), &Module{}, moduleName, sys, nil)
+		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called SysContext.Close (without repeating sys_test.go).
 		// One side effect of SysContext.Close is that it clears the openedFiles map. Verify our base case.
+		fsCtx := sysCtx.FS()
 		_, ok := fsCtx.OpenedFile(3)
-		require.True(t, ok, "sys.openedFiles was empty")
+		require.True(t, ok, "sysCtx.openedFiles was empty")
 
 		// Closing should not err.
 		require.NoError(t, m.Close(testCtx))
@@ -176,4 +165,29 @@ func TestCallContext_Close(t *testing.T) {
 		// Verify no error closing again.
 		require.NoError(t, m.Close(testCtx))
 	})
+
+	t.Run("error closing", func(t *testing.T) {
+		// Right now, the only way to err closing the sys context is if a File.Close erred.
+		sysCtx := DefaultSysContext()
+		sysCtx.FS().OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
+
+		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
+		require.NoError(t, err)
+
+		require.EqualError(t, m.Close(testCtx), "error closing")
+
+		// Verify our intended side-effect
+		_, ok := sysCtx.FS().OpenedFile(3)
+		require.False(t, ok, "expected no opened files")
+	})
 }
+
+// compile-time check to ensure testFile implements fs.File
+var _ fs.File = &testFile{}
+
+type testFile struct{ closeErr error }
+
+func (f *testFile) Close() error                       { return f.closeErr }
+func (f *testFile) Stat() (fs.FileInfo, error)         { return nil, nil }
+func (f *testFile) Read(_ []byte) (int, error)         { return 0, nil }
+func (f *testFile) Seek(_ int64, _ int) (int64, error) { return 0, nil }

@@ -35,6 +35,11 @@ func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	}
 }
 
+// CompiledModuleCount implements the same method as documented on wasm.Engine.
+func (e *engine) CompiledModuleCount() uint32 {
+	return uint32(len(e.codes))
+}
+
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 	e.deleteCodes(m)

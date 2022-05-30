@@ -9,10 +9,12 @@ import (
 
 // Test_main ensures the following will work:
 //
-//	go run add.go 7 9
+//	go run counter.go
 func Test_main(t *testing.T) {
-	stdout, _ := maintester.TestMain(t, main, "add", "7", "9")
-	require.Equal(t, `wasm/math: 7 + 9 = 16
-host/math: 7 + 9 = 16
+	stdout, _ := maintester.TestMain(t, main, "counter")
+	require.Equal(t, `m1 counter=0
+m2 counter=0
+m1 counter=1
+m2 counter=1
 `, stdout)
 }

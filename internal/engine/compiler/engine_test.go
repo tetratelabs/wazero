@@ -264,7 +264,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := wasm.Features20191205
 	e := newEngine(enabledFeatures)
-	store := wasm.NewStore(enabledFeatures, e)
+	s, ns := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_and_shrink_goroutine_stack"
@@ -287,10 +287,10 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
 	require.NoError(t, err)
 
-	err = store.Engine.CompileModule(testCtx, hm)
+	err = s.Engine.CompileModule(testCtx, hm)
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(testCtx, hm, hostModuleName, nil, nil)
+	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil, nil)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -342,10 +342,10 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		ID: wasm.ModuleID{1},
 	}
 
-	err = store.Engine.CompileModule(testCtx, m)
+	err = s.Engine.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
-	mi, err := store.Instantiate(testCtx, m, t.Name(), nil, nil)
+	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil, nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {

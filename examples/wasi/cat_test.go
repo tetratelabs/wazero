@@ -1,4 +1,4 @@
-package wasi_example
+package main
 
 import (
 	"testing"

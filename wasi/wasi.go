@@ -1,5 +1,15 @@
 // Package wasi contains Go-defined functions to access system calls, such as opening a file, similar to Go's x/sys
 // package. These are accessible from WebAssembly-defined functions via importing ModuleSnapshotPreview1.
+// All WASI functions return a single Errno result, which is ErrnoSuccess on success.
+//
+// Ex. If your source (%.wasm binary) includes an import "wasi_snapshot_preview1", call InstantiateSnapshotPreview1
+// prior to instantiating it. Otherwise, it will error due to missing imports.
+//	ctx := context.Background()
+//	r := wazero.NewRuntime()
+//	defer r.Close(ctx) // This closes everything this Runtime created.
+//
+//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 //
 // See https://github.com/WebAssembly/WASI
 package wasi
@@ -24,24 +34,50 @@ import (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 const ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 
-// InstantiateSnapshotPreview1 instantiates ModuleSnapshotPreview1, so that other modules can import them.
-//
-// Ex. If your source (%.wasm binary) includes an import "wasi_snapshot_preview1", call InstantiateSnapshotPreview1
-// prior to instantiating it. Otherwise, it will error due to missing imports.
-//	ctx := context.Background()
-//	r := wazero.NewRuntime()
-//	defer r.Close(ctx) // This closes everything this Runtime created.
-//
-//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
-//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
+// InstantiateSnapshotPreview1 instantiates the ModuleSnapshotPreview1 module into the runtime default namespace.
 //
 // Notes
 //
-//	* All WASI functions return a single Errno result, ErrnoSuccess on success.
-//	* Closing the wazero.Runtime closes this instance of WASI as well.
+//	* Closing the wazero.Runtime has the same effect as closing the result.
+//	* To instantiate into another wazero.Namespace, use NewSnapshotPreview1Builder instead.
 func InstantiateSnapshotPreview1(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	_, fns := snapshotPreview1Functions(ctx)
-	return r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(fns).Instantiate(ctx)
+	return NewSnapshotPreview1Builder(r).Instantiate(ctx, r)
+}
+
+// SnapshotPreview1Builder configures the ModuleSnapshotPreview1 module for later use via Compile or Instantiate.
+type SnapshotPreview1Builder interface {
+
+	// Compile compiles the ModuleSnapshotPreview1 module that can instantiated in any namespace (wazero.Namespace).
+	//
+	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
+
+	// Instantiate instantiates the ModuleSnapshotPreview1 module into the provided namespace.
+	//
+	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
+}
+
+// NewSnapshotPreview1Builder returns a new SnapshotPreview1Builder.
+func NewSnapshotPreview1Builder(r wazero.Runtime) SnapshotPreview1Builder {
+	return &snapshotPreview1Builder{r}
+}
+
+type snapshotPreview1Builder struct{ r wazero.Runtime }
+
+// moduleBuilder returns a new wazero.ModuleBuilder for ModuleSnapshotPreview1
+func (b *snapshotPreview1Builder) moduleBuilder() wazero.ModuleBuilder {
+	return b.r.NewModuleBuilder(ModuleSnapshotPreview1).ExportFunctions(snapshotPreview1Functions())
+}
+
+// Compile implements SnapshotPreview1Builder.Compile
+func (b *snapshotPreview1Builder) Compile(ctx context.Context, config wazero.CompileConfig) (wazero.CompiledModule, error) {
+	return b.moduleBuilder().Compile(ctx, config)
+}
+
+// Instantiate implements SnapshotPreview1Builder.Instantiate
+func (b *snapshotPreview1Builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
+	return b.moduleBuilder().Instantiate(ctx, ns)
 }
 
 const (
@@ -442,13 +478,12 @@ const (
 type snapshotPreview1 struct{}
 
 // snapshotPreview1Functions returns all go functions that implement snapshotPreview1.
-// These should be exported in the module named "wasi_snapshot_preview1".
-// See wasm.NewHostModule
-func snapshotPreview1Functions(ctx context.Context) (a *snapshotPreview1, nameToGoFunc map[string]interface{}) {
-	a = &snapshotPreview1{}
+// These should be exported in the module named ModuleSnapshotPreview1.
+func snapshotPreview1Functions() map[string]interface{} {
+	a := &snapshotPreview1{}
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
-	nameToGoFunc = map[string]interface{}{
+	return map[string]interface{}{
 		functionArgsGet:              a.ArgsGet,
 		functionArgsSizesGet:         a.ArgsSizesGet,
 		functionEnvironGet:           a.EnvironGet,
@@ -495,7 +530,6 @@ func snapshotPreview1Functions(ctx context.Context) (a *snapshotPreview1, nameTo
 		functionSockSend:             a.SockSend,
 		functionSockShutdown:         a.SockShutdown,
 	}
-	return
 }
 
 // ArgsGet is the WASI function that reads command-line argument data (WithArgs).

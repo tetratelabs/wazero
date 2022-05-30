@@ -23,7 +23,7 @@ import (
 //	}
 //	env, _ := r.NewModuleBuilder("env").
 //		ExportFunction("hello", hello).
-//		Instantiate(ctx)
+//		Instantiate(ctx, r)
 //
 // If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
 //
@@ -167,19 +167,19 @@ type ModuleBuilder interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaltype
 	ExportGlobalF64(name string, v float64) ModuleBuilder
 
-	// Compile returns a module to instantiate, or an error if any of the configuration is invalid.
+	// Compile returns a CompiledModule that can instantiated in any namespace (Namespace).
 	//
-	// Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
+	// Note: Closing the Namespace has the same effect as closing the result.
 	Compile(context.Context, CompileConfig) (CompiledModule, error)
 
-	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule, using default configuration.
+	// Instantiate is a convenience that calls Compile, then Namespace.InstantiateModule.
 	//
 	// Notes
 	//
-	//	* Closing the wazero.Runtime closes any api.Module it instantiated.
+	//	* Closing the Namespace has the same effect as closing the result.
 	//	* Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
 	//	* To avoid using configuration defaults, use Compile instead.
-	Instantiate(context.Context) (api.Module, error)
+	Instantiate(context.Context, Namespace) (api.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder
@@ -294,19 +294,15 @@ func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (Com
 		return nil, err
 	}
 
-	return &compiledCode{module: module, compiledEngine: b.r.store.Engine}, nil
+	return &compiledModule{module: module, compiledEngine: b.r.store.Engine}, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
-func (b *moduleBuilder) Instantiate(ctx context.Context) (api.Module, error) {
+func (b *moduleBuilder) Instantiate(ctx context.Context, ns Namespace) (api.Module, error) {
 	if compiled, err := b.Compile(ctx, NewCompileConfig()); err != nil {
 		return nil, err
 	} else {
-		if err = b.r.store.Engine.CompileModule(ctx, compiled.(*compiledCode).module); err != nil {
-			return nil, err
-		}
-		// *wasm.ModuleInstance cannot be tracked, so we release the cache inside this function.
-		defer compiled.Close(ctx)
-		return b.r.InstantiateModule(ctx, compiled, NewModuleConfig().WithName(b.moduleName))
+		compiled.(*compiledModule).closeWithModule = true
+		return ns.InstantiateModule(ctx, compiled, NewModuleConfig())
 	}
 }

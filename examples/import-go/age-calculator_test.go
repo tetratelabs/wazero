@@ -1,4 +1,4 @@
-package age_calculator
+package main
 
 import (
 	"testing"

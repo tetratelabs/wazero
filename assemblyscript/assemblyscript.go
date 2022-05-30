@@ -1,6 +1,17 @@
 // Package assemblyscript contains Go-defined special functions imported by AssemblyScript under the module name "env".
 //
-// Note: Some code will only import "env.abort", but even that isn't imported when "import wasi" is used in the source.
+// Special Functions
+//
+// AssemblyScript code import the below special functions when not using WASI. Sometimes only "abort"
+//
+//	* "abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
+//	* "trace" - no output unless.
+//	* "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
+//
+// Relationship to WASI
+//
+// A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
+// See wasi.InstantiateSnapshotPreview1
 //
 // See https://www.assemblyscript.org/concepts.html#special-imports
 package assemblyscript
@@ -19,42 +30,44 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Instantiate instantiates a module implementing special functions defined by AssemblyScript:
-//	* "env.abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
-//	* "env.trace" - no output unless.
-//	* "env.seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
+// Instantiate instantiates the "env" module used by AssemblyScript into the runtime default namespace.
 //
 // Notes
 //
-//	* To customize behavior, use NewModuleBuilder instead.
-//	* A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
-//
-// See NewModuleBuilder and wasi.InstantiateSnapshotPreview1
+//	* Closing the wazero.Runtime has the same effect as closing the result.
+//	* To instantiate into another wazero.Namespace, use NewBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return NewModuleBuilder(r).Instantiate(ctx)
+	return NewBuilder(r).Instantiate(ctx, r)
 }
 
-// ModuleBuilder allows configuring the module that will export functions used automatically by AssemblyScript.
-type ModuleBuilder interface {
+// Builder configures the "env" module used by AssemblyScript for later use via Compile or Instantiate.
+type Builder interface {
 	// WithAbortMessageDisabled configures the AssemblyScript abort function to discard any message.
-	WithAbortMessageDisabled() ModuleBuilder
+	WithAbortMessageDisabled() Builder
 
 	// WithTraceToStdout configures the AssemblyScript trace function to output messages to Stdout, as configured by
 	// wazero.ModuleConfig WithStdout.
-	WithTraceToStdout() ModuleBuilder
+	WithTraceToStdout() Builder
 
 	// WithTraceToStderr configures the AssemblyScript trace function to output messages to Stderr, as configured by
 	// wazero.ModuleConfig WithStderr. Because of the potential volume of trace messages, it is often more appropriate
 	// to use WithTraceToStdout instead.
-	WithTraceToStderr() ModuleBuilder
+	WithTraceToStderr() Builder
 
-	// Instantiate instantiates the module so that AssemblyScript can import from it.
-	Instantiate(context.Context) (api.Closer, error)
+	// Compile compiles the "env" module that can instantiated in any namespace (wazero.Namespace).
+	//
+	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
+
+	// Instantiate instantiates the "env" module into the provided namespace.
+	//
+	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
 }
 
-// NewModuleBuilder is an alternative to Instantiate which allows customization via ModuleBuilder.
-func NewModuleBuilder(r wazero.Runtime) ModuleBuilder {
-	return &moduleBuilder{r: r, traceMode: traceDisabled}
+// NewBuilder returns a new Builder with trace disabled.
+func NewBuilder(r wazero.Runtime) Builder {
+	return &builder{r: r, traceMode: traceDisabled}
 }
 
 type traceMode int
@@ -65,41 +78,50 @@ const (
 	traceStderr   traceMode = 2
 )
 
-type moduleBuilder struct {
+type builder struct {
 	r                    wazero.Runtime
 	abortMessageDisabled bool
 	traceMode            traceMode
 }
 
-// WithAbortMessageDisabled implements ModuleBuilder.WithAbortMessageDisabled
-func (m *moduleBuilder) WithAbortMessageDisabled() ModuleBuilder {
-	ret := *m // copy
+// WithAbortMessageDisabled implements Builder.WithAbortMessageDisabled
+func (b *builder) WithAbortMessageDisabled() Builder {
+	ret := *b // copy
 	ret.abortMessageDisabled = true
 	return &ret
 }
 
-// WithTraceToStdout implements ModuleBuilder.WithTraceToStdout
-func (m *moduleBuilder) WithTraceToStdout() ModuleBuilder {
-	ret := *m // copy
+// WithTraceToStdout implements Builder.WithTraceToStdout
+func (b *builder) WithTraceToStdout() Builder {
+	ret := *b // copy
 	ret.traceMode = traceStdout
 	return &ret
 }
 
-// WithTraceToStderr implements ModuleBuilder.WithTraceToStderr
-func (m *moduleBuilder) WithTraceToStderr() ModuleBuilder {
-	ret := *m // copy
+// WithTraceToStderr implements Builder.WithTraceToStderr
+func (b *builder) WithTraceToStderr() Builder {
+	ret := *b // copy
 	ret.traceMode = traceStderr
 	return &ret
 }
 
-// Instantiate implements ModuleBuilder.Instantiate
-func (m *moduleBuilder) Instantiate(ctx context.Context) (api.Closer, error) {
-	env := &assemblyscript{abortMessageDisabled: m.abortMessageDisabled, traceMode: m.traceMode}
-	return m.r.NewModuleBuilder("env").
+// moduleBuilder returns a new wazero.ModuleBuilder
+func (b *builder) moduleBuilder() wazero.ModuleBuilder {
+	env := &assemblyscript{abortMessageDisabled: b.abortMessageDisabled, traceMode: b.traceMode}
+	return b.r.NewModuleBuilder("env").
 		ExportFunction("abort", env.abort).
 		ExportFunction("trace", env.trace).
-		ExportFunction("seed", env.seed).
-		Instantiate(ctx)
+		ExportFunction("seed", env.seed)
+}
+
+// Compile implements Builder.Compile
+func (b *builder) Compile(ctx context.Context, config wazero.CompileConfig) (wazero.CompiledModule, error) {
+	return b.moduleBuilder().Compile(ctx, config)
+}
+
+// Instantiate implements Builder.Instantiate
+func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
+	return b.moduleBuilder().Instantiate(ctx, ns)
 }
 
 // assemblyScript includes "Special imports" only used In AssemblyScript when a user didn't add `import "wasi"` to their

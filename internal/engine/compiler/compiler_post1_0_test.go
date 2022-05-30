@@ -494,7 +494,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 
 			for j := 0; j < len(insts); j++ {
 				if i == j {
-					require.Equal(t, 0, len(env.module().ElementInstances[j].References))
+					require.Zero(t, len(env.module().ElementInstances[j].References))
 				} else {
 					require.NotEqual(t, 0, len(env.module().ElementInstances[j].References))
 				}

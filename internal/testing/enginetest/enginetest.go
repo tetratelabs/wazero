@@ -375,7 +375,8 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	require.NoError(t, err)
 
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewCallContext(wasm.NewStore(features, e), module, nil)
+	_, ns := wasm.NewStore(features, e)
+	modCtx := wasm.NewCallContext(ns, module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,

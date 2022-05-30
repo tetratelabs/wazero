@@ -2,8 +2,8 @@ package sys
 
 import (
 	"context"
+	"errors"
 	"io/fs"
-	"os"
 	"path"
 	"testing"
 
@@ -14,9 +14,8 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func TestContext_Close(t *testing.T) {
-	tempDir := t.TempDir()
 	pathName := "test"
-	file, _ := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
+	file := &testFile{}
 
 	fsc := NewFSContext(map[uint32]*FileEntry{
 		3: {Path: "."},
@@ -30,20 +29,31 @@ func TestContext_Close(t *testing.T) {
 	require.NoError(t, fsc.Close(testCtx))
 
 	// Verify our intended side-effect
-	require.Equal(t, 0, len(fsc.openedFiles), "expected no opened files")
+	require.Zero(t, len(fsc.openedFiles), "expected no opened files")
 
 	// Verify no error closing again.
 	require.NoError(t, fsc.Close(testCtx))
 }
 
-// createWriteableFile uses real files when io.Writer tests are needed.
-func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (fs.File, fs.FS) {
-	require.NotNil(t, data)
-	absolutePath := path.Join(tmpDir, pathName)
-	require.NoError(t, os.WriteFile(absolutePath, data, 0o600))
+func TestContext_Close_Error(t *testing.T) {
+	file := &testFile{errors.New("error closing")}
 
-	// open the file for writing in a custom way until #390
-	f, err := os.OpenFile(absolutePath, os.O_RDWR, 0o600)
-	require.NoError(t, err)
-	return f, os.DirFS(tmpDir)
+	fsc := NewFSContext(map[uint32]*FileEntry{
+		3: {Path: ".", File: file},
+		4: {Path: "/", File: file},
+	})
+	require.EqualError(t, fsc.Close(testCtx), "error closing")
+
+	// Paths should clear even under error
+	require.Zero(t, len(fsc.openedFiles), "expected no opened files")
 }
+
+// compile-time check to ensure testFile implements fs.File
+var _ fs.File = &testFile{}
+
+type testFile struct{ closeErr error }
+
+func (f *testFile) Close() error                       { return f.closeErr }
+func (f *testFile) Stat() (fs.FileInfo, error)         { return nil, nil }
+func (f *testFile) Read(_ []byte) (int, error)         { return 0, nil }
+func (f *testFile) Seek(_ int64, _ int) (int64, error) { return 0, nil }

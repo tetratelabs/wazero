@@ -51,7 +51,7 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 		// Redefine the imported module, with a function that no longer blocks.
 		imported, err := r.NewModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
 			return x
-		}).Instantiate(testCtx)
+		}).Instantiate(testCtx, r)
 		require.NoError(t, err)
 
 		// Redefine the importing module, which should link to the redefined host module.
@@ -79,7 +79,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 
 	// Create the host module, which exports the blocking function.
 	imported, err := r.NewModuleBuilder(t.Name()+"-imported").
-		ExportFunction("return_input", blockAndReturn).Instantiate(testCtx)
+		ExportFunction("return_input", blockAndReturn).Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer imported.Close(testCtx)
 

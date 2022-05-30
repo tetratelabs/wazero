@@ -1,4 +1,4 @@
-package replace_import
+package main
 
 import (
 	"testing"

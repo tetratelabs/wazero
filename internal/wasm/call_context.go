@@ -12,9 +12,9 @@ import (
 // compile time check to ensure CallContext implements api.Module
 var _ api.Module = &CallContext{}
 
-func NewCallContext(store *Store, instance *ModuleInstance, Sys *SysContext) *CallContext {
+func NewCallContext(ns *Namespace, instance *ModuleInstance, Sys *SysContext) *CallContext {
 	zero := uint64(0)
-	return &CallContext{memory: instance.Memory, module: instance, store: store, Sys: Sys, closed: &zero}
+	return &CallContext{memory: instance.Memory, module: instance, ns: ns, Sys: Sys, closed: &zero}
 }
 
 // CallContext is a function call context bound to a module. This is important as one module's functions can call
@@ -32,7 +32,7 @@ type CallContext struct {
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory api.Memory
-	store  *Store
+	ns     *Namespace
 
 	// Note: This is a part of CallContext so that scope is correct and Close is coherent.
 	// Sys is exposed only for WASI
@@ -45,6 +45,9 @@ type CallContext struct {
 	// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
 	// See /RATIONALE.md
 	closed *uint64
+
+	// CodeCloser is non-nil when the code should be closed after this module.
+	CodeCloser api.Closer
 }
 
 // FailIfClosed returns a sys.ExitError if CloseWithExitCode was called.
@@ -79,17 +82,24 @@ func (m *CallContext) Close(ctx context.Context) (err error) {
 }
 
 // CloseWithExitCode implements the same method as documented on api.Module.
-func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) (err error) {
+func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) error {
 	closed, err := m.close(ctx, exitCode)
 	if !closed {
 		return nil
 	}
-	m.store.deleteModule(m.Name())
+	m.ns.deleteModule(m.Name())
+	if m.CodeCloser == nil {
+		return err
+	}
+	if e := m.CodeCloser.Close(ctx); e != nil && err == nil {
+		err = e
+	}
 	return err
 }
 
-// close marks this CallContext as closed and releases underlying system resources without removing
-// from the store.
+// close marks this CallContext as closed and releases underlying system resources.
+//
+// Note: The caller is responsible for removing the module from the Namespace.
 func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err error) {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
@@ -97,8 +107,8 @@ func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err e
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return false, nil
 	}
-	if sys := m.Sys; sys != nil { // ex nil if from ModuleBuilder
-		return true, sys.FS().Close(ctx)
+	if sysCtx := m.Sys; sysCtx != nil { // ex nil if from ModuleBuilder
+		return true, sysCtx.FS().Close(ctx)
 	}
 	return true, nil
 }

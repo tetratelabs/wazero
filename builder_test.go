@@ -12,8 +12,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// TestNewModuleBuilder_Build only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
-func TestNewModuleBuilder_Build(t *testing.T) {
+// TestNewModuleBuilder_Compile only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
+func TestNewModuleBuilder_Compile(t *testing.T) {
 	i32, i64 := api.ValueTypeI32, api.ValueTypeI64
 
 	uint32_uint32 := func(uint32) uint32 {
@@ -346,21 +346,25 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 			b := tc.input(NewRuntime()).(*moduleBuilder)
 			compiled, err := b.Compile(testCtx, NewCompileConfig())
 			require.NoError(t, err)
-			m := compiled.(*compiledCode)
+			m := compiled.(*compiledModule)
 
 			requireHostModuleEquals(t, tc.expected, m.module)
 
 			require.Equal(t, b.r.store.Engine, m.compiledEngine)
 
 			// Built module must be instantiable by Engine.
-			_, err = b.r.InstantiateModule(testCtx, m, NewModuleConfig())
+			mod, err := b.r.InstantiateModule(testCtx, m, NewModuleConfig())
 			require.NoError(t, err)
+
+			// Closing the module shouldn't remove the compiler cache
+			require.NoError(t, mod.Close(testCtx))
+			require.Equal(t, uint32(1), b.r.store.Engine.CompiledModuleCount())
 		})
 	}
 }
 
-// TestNewModuleBuilder_Build_Errors only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
-func TestNewModuleBuilder_Build_Errors(t *testing.T) {
+// TestNewModuleBuilder_Compile_Errors only covers a few scenarios to avoid duplicating tests in internal/wasm/host_test.go
+func TestNewModuleBuilder_Compile_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       func(Runtime) ModuleBuilder
@@ -400,21 +404,25 @@ func TestNewModuleBuilder_Build_Errors(t *testing.T) {
 // TestNewModuleBuilder_Instantiate ensures Runtime.InstantiateModule is called on success.
 func TestNewModuleBuilder_Instantiate(t *testing.T) {
 	r := NewRuntime()
-	m, err := r.NewModuleBuilder("env").Instantiate(testCtx)
+	m, err := r.NewModuleBuilder("env").Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	// If this was instantiated, it would be added to the store under the same name
-	require.Equal(t, r.(*runtime).store.Module("env"), m)
+	require.Equal(t, r.(*runtime).ns.Module("env"), m)
+
+	// Closing the module should remove the compiler cache
+	require.NoError(t, m.Close(testCtx))
+	require.Zero(t, r.(*runtime).store.Engine.CompiledModuleCount())
 }
 
 // TestNewModuleBuilder_Instantiate_Errors ensures errors propagate from Runtime.InstantiateModule
 func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
 	r := NewRuntime()
-	_, err := r.NewModuleBuilder("env").Instantiate(testCtx)
+	_, err := r.NewModuleBuilder("env").Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	_, err = r.NewModuleBuilder("env").Instantiate(testCtx)
-	require.EqualError(t, err, "module env has already been instantiated")
+	_, err = r.NewModuleBuilder("env").Instantiate(testCtx, r)
+	require.EqualError(t, err, "module[env] has already been instantiated")
 }
 
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.

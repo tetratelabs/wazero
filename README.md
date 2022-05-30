@@ -71,7 +71,7 @@ _, err := r.NewModuleBuilder("env").
 	ExportFunction("log_i32", func(v uint32) {
 		fmt.Println("log_i32 >>", v)
 	}).
-	Instantiate(ctx)
+	Instantiate(ctx, r)
 if err != nil {
     log.Panicln(err)
 }

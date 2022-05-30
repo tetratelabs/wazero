@@ -68,7 +68,7 @@ func TestAbort(t *testing.T) {
 				_, err := Instantiate(testCtx, r)
 				require.NoError(t, err)
 			} else {
-				_, err := NewModuleBuilder(r).WithAbortMessageDisabled().Instantiate(testCtx)
+				_, err := NewBuilder(r).WithAbortMessageDisabled().Instantiate(testCtx, r)
 				require.NoError(t, err)
 			}
 
@@ -176,7 +176,7 @@ func TestTrace(t *testing.T) {
 
 			out := &bytes.Buffer{}
 
-			as := NewModuleBuilder(r)
+			as := NewBuilder(r)
 			modConfig := wazero.NewModuleConfig()
 			switch tc.mode {
 			case traceStderr:
@@ -191,7 +191,7 @@ func TestTrace(t *testing.T) {
 				modConfig = modConfig.WithStdout(out)
 			}
 
-			_, err := as.Instantiate(testCtx)
+			_, err := as.Instantiate(testCtx, r)
 			require.NoError(t, err)
 
 			code, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
@@ -270,7 +270,7 @@ func TestReadAssemblyScriptString(t *testing.T) {
 
 			mod, err := r.NewModuleBuilder("mod").
 				ExportMemory("memory", 1).
-				Instantiate(testCtx)
+				Instantiate(testCtx, r)
 			require.NoError(t, err)
 
 			tc.memory(mod.Memory())
@@ -426,7 +426,7 @@ wasm stack trace:
 			r := wazero.NewRuntime()
 			defer r.Close(testCtx)
 
-			_, err := NewModuleBuilder(r).WithTraceToStdout().Instantiate(testCtx)
+			_, err := NewBuilder(r).WithTraceToStdout().Instantiate(testCtx, r)
 			require.NoError(t, err)
 
 			compiled, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())

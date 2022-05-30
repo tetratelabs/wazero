@@ -1,4 +1,4 @@
-package multiple_results
+package main
 
 import (
 	"testing"
