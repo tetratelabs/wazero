@@ -131,7 +131,7 @@ const (
 
 	// importFdFdstatGet is the WebAssembly 1.0 (20191205) Text format import of functionFdFdstatGet.
 	importFdFdstatGet = `(import "wasi_snapshot_preview1" "fd_fdstat_get"
-    (func $wasi.fd_fdstat_get (param $fd i32) (param $result.stat i32) (result (;errno;) i32)))`  //nolint
+    (func $wasi.fd_fdstat_get (param $fd i32) (param $result.stat i32) (result (;errno;) i32)))` //nolint
 
 	// functionFdFdstatSetFlags adjusts the flags associated with a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errno
@@ -663,11 +663,15 @@ func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uin
 	// Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual
 	// value. For now, we return fixed values with an assumption that realtime clocks are often lower precision than
 	// monotonic clocks. In the future, this could be improved by having OS+arch specific assembly to make syscalls.
+	//
 	// For example, this is how Go implements time.Now for linux-amd64.
 	// https://github.com/golang/go/blob/f19e4001808863d2ebfe9d1975476513d030c381/src/runtime/time_linux_amd64.s
 	// Because retrieving resolution is not generally called often, unlike getting time, it could be appropriate to only
 	// implement the fallback logic that does not use VDSO (executing syscalls in user mode). The syscall for clock_getres
 	// is 229 https://pkg.go.dev/syscall#pkg-constants.
+	// If implementing similar for Windows, mingw is often a good source to find the Windows API calls that correspond
+	// to a POSIX method.
+	// https://github.com/mirror/mingw-w64/blob/6a0e9165008f731bccadfc41a59719cf7c8efc02/mingw-w64-libraries/winpthreads/src/clock.c#L77
 
 	var resolution uint64 // ns
 	switch id {
