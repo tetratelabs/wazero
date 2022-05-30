@@ -659,7 +659,27 @@ func (a *snapshotPreview1) EnvironSizesGet(ctx context.Context, m api.Module, re
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	const resolution uint64 = 1000 // ns
+	// A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
+	// Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual
+	// value. For now, we return fixed values with an assumption that realtime clocks are often lower precision than
+	// monotonic clocks. In the future, this could be improved by having OS+arch specific assembly to make syscalls.
+	// For example, this is how Go implements time.Now for linux-amd64.
+	// https://github.com/golang/go/blob/f19e4001808863d2ebfe9d1975476513d030c381/src/runtime/time_linux_amd64.s
+	// Because retrieving resolution is not generally called often, unlike getting time, it could be appropriate to only
+	// implement the fallback logic that does not use VDSO (executing syscalls in user mode). The syscall for clock_getres
+	// is 229 https://pkg.go.dev/syscall#pkg-constants.
+
+	var resolution uint64 // ns
+	switch id {
+	case clockIDRealtime:
+		resolution = 1000 // 1us
+	case clockIDMonotonic:
+		resolution = 1 // 1ns
+	default:
+		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
+		// are slated to be removed from the next version of WASI.
+		return ErrnoNosys
+	}
 	// fixed for GrainLang per #271 and Swift per https://github.com/tetratelabs/wazero/issues/526#issuecomment-1134034760
 	if !m.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
 		return ErrnoFault
@@ -688,17 +708,29 @@ func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uin
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
 func (a *snapshotPreview1) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
-	// TODO: id and precision are currently ignored.
-	// Override Context when it is passed via context
-	clock := timeNowUnixNano
-	if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
-		clockCtx, ok := clockVal.(func() uint64)
-		if !ok {
-			panic(fmt.Errorf("unsupported clock key: %v", clockVal))
+	// TODO: precision is currently ignored.
+	var val uint64
+	switch id {
+	case clockIDRealtime:
+		clock := timeNowUnixNano
+		// Override Context when it is passed via context
+		if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
+			clockCtx, ok := clockVal.(func() uint64)
+			if !ok {
+				panic(fmt.Errorf("unsupported clock key: %v", clockVal))
+			}
+			clock = clockCtx
 		}
-		clock = clockCtx
+		val = clock()
+	case clockIDMonotonic:
+		val = uint64(time.Since(monotonicClockBase))
+	default:
+		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
+		// are slated to be removed from the next version of WASI.
+		return ErrnoNosys
 	}
-	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, clock()) {
+
+	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1367,6 +1399,16 @@ const (
 	fdStdout = 1
 	fdStderr = 2
 )
+
+const (
+	clockIDRealtime  = 0
+	clockIDMonotonic = 1
+)
+
+// time does not provide a means to directly reference the monotonic time value it computes with time.Now.
+// We retrieve a time.Now on initialization to use as a base which we compute values against which ensures
+// subsequent readings from clock_time_get return montonically increasing values with correct deltas.
+var monotonicClockBase = time.Now()
 
 func timeNowUnixNano() uint64 {
 	return uint64(time.Now().UnixNano())
