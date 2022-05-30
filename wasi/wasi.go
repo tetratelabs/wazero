@@ -131,7 +131,7 @@ const (
 
 	// importFdFdstatGet is the WebAssembly 1.0 (20191205) Text format import of functionFdFdstatGet.
 	importFdFdstatGet = `(import "wasi_snapshot_preview1" "fd_fdstat_get"
-    (func $wasi.fd_fdstat_get (param $fd i32) (param $result.stat i32) (result (;errno;) i32)))` //nolint
+    (func $wasi.fd_fdstat_get (param $fd i32) (param $result.stat i32) (result (;errno;) i32)))`  //nolint
 
 	// functionFdFdstatSetFlags adjusts the flags associated with a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errno
