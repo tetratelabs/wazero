@@ -137,6 +137,12 @@ type RuntimeConfig interface {
 	WithWasmCore2() RuntimeConfig
 }
 
+// NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
+// or the interpreter otherwise.
+func NewRuntimeConfig() RuntimeConfig {
+	return newRuntimeConfig()
+}
+
 type runtimeConfig struct {
 	enabledFeatures wasm.Features
 	newEngine       func(wasm.Features) wasm.Engine

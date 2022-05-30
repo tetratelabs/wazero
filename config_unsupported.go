@@ -2,7 +2,6 @@
 
 package wazero
 
-// NewRuntimeConfig returns NewRuntimeConfigInterpreter
-func NewRuntimeConfig() RuntimeConfig {
+func newRuntimeConfig() RuntimeConfig {
 	return NewRuntimeConfigInterpreter()
 }

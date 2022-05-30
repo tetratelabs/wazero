@@ -2,7 +2,6 @@
 
 package wazero
 
-// NewRuntimeConfig returns NewRuntimeConfigCompiler
-func NewRuntimeConfig() RuntimeConfig {
+func newRuntimeConfig() RuntimeConfig {
 	return NewRuntimeConfigCompiler()
 }
