@@ -659,7 +659,21 @@ func (a *snapshotPreview1) EnvironSizesGet(ctx context.Context, m api.Module, re
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	const resolution uint64 = 1000 // ns
+	// We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
+	// source in time.go, windows monotonic resolution can be 15ms. This chooses arbitrarily 1us for wall time and
+	// 1ns for monotonic. See RATIONALE.md for more context.
+
+	var resolution uint64 // ns
+	switch id {
+	case clockIDRealtime:
+		resolution = 1000 // 1us
+	case clockIDMonotonic:
+		resolution = 1 // 1ns
+	default:
+		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
+		// are slated to be removed from the next version of WASI.
+		return ErrnoNosys
+	}
 	// fixed for GrainLang per #271 and Swift per https://github.com/tetratelabs/wazero/issues/526#issuecomment-1134034760
 	if !m.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
 		return ErrnoFault
@@ -688,17 +702,29 @@ func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uin
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
 func (a *snapshotPreview1) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
-	// TODO: id and precision are currently ignored.
-	// Override Context when it is passed via context
-	clock := timeNowUnixNano
-	if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
-		clockCtx, ok := clockVal.(func() uint64)
-		if !ok {
-			panic(fmt.Errorf("unsupported clock key: %v", clockVal))
+	// TODO: precision is currently ignored.
+	var val uint64
+	switch id {
+	case clockIDRealtime:
+		clock := timeNowUnixNano
+		// Override Context when it is passed via context
+		if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
+			clockCtx, ok := clockVal.(func() uint64)
+			if !ok {
+				panic(fmt.Errorf("unsupported clock key: %v", clockVal))
+			}
+			clock = clockCtx
 		}
-		clock = clockCtx
+		val = clock()
+	case clockIDMonotonic:
+		val = uint64(time.Since(monotonicClockBase))
+	default:
+		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
+		// are slated to be removed from the next version of WASI.
+		return ErrnoNosys
 	}
-	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, clock()) {
+
+	if !m.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1367,6 +1393,15 @@ const (
 	fdStdout = 1
 	fdStderr = 2
 )
+
+// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clockid-enumu32
+const (
+	clockIDRealtime  = 0
+	clockIDMonotonic = 1
+)
+
+// monotonicClockBase uses time.Now to ensure a monotonic clock reading on all platforms via time.Since.
+var monotonicClockBase = time.Now()
 
 func timeNowUnixNano() uint64 {
 	return uint64(time.Now().UnixNano())

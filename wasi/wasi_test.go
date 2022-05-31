@@ -15,6 +15,7 @@ import (
 	"testing"
 	"testing/fstest"
 	"testing/iotest"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -406,36 +407,116 @@ func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 	a, mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
 	defer mod.Close(testCtx)
 
-	resultResultion := uint32(1) // arbitrary offset
-	expectedMemory := []byte{
-		'?',                                     // resultResultion is after this
+	resultResolution := uint32(1) // arbitrary offset
+
+	expectedMemoryMicro := []byte{
+		'?',                                     // resultResolution is after this
 		0xe8, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // little endian-encoded resolution (fixed to 1000).
 		'?', // stopped after encoding
 	}
-	t.Run("snapshotPreview1.ClockResGet", func(t *testing.T) {
-		maskMemory(t, testCtx, mod, len(expectedMemory))
-		require.Equal(t, ErrnoSuccess, a.ClockResGet(testCtx, mod, 0, resultResultion))
 
-		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
-		require.True(t, ok)
-		require.Equal(t, expectedMemory, actual)
-	})
+	expectedMemoryNano := []byte{
+		'?',                                    // resultResolution is after this
+		0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // little endian-encoded resolution (fixed to 1000).
+		'?', // stopped after encoding
+	}
 
-	t.Run(functionClockResGet, func(t *testing.T) {
-		maskMemory(t, testCtx, mod, len(expectedMemory))
+	tests := []struct {
+		name           string
+		clockID        uint64
+		expectedMemory []byte
+		invocation     func(clockID uint64) Errno
+	}{
+		{
+			name:           "snapshotPreview1.ClockResGet",
+			clockID:        0,
+			expectedMemory: expectedMemoryMicro,
+			invocation: func(clockID uint64) Errno {
+				return a.ClockResGet(testCtx, mod, uint32(clockID), resultResolution)
+			},
+		},
+		{
+			name:           "snapshotPreview1.ClockResGet",
+			clockID:        1,
+			expectedMemory: expectedMemoryNano,
+			invocation: func(clockID uint64) Errno {
+				return a.ClockResGet(testCtx, mod, uint32(clockID), resultResolution)
+			},
+		},
+		{
+			name:           functionClockResGet,
+			clockID:        0,
+			expectedMemory: expectedMemoryMicro,
+			invocation: func(clockID uint64) Errno {
+				results, err := fn.Call(testCtx, clockID, uint64(resultResolution))
+				require.NoError(t, err)
+				return Errno(results[0]) // results[0] is the errno
+			},
+		},
+		{
+			name:           functionClockResGet,
+			clockID:        1,
+			expectedMemory: expectedMemoryNano,
+			invocation: func(clockID uint64) Errno {
+				results, err := fn.Call(testCtx, clockID, uint64(resultResolution))
+				require.NoError(t, err)
+				return Errno(results[0]) // results[0] is the errno
+			},
+		},
+	}
 
-		results, err := fn.Call(testCtx, 0, uint64(resultResultion))
-		require.NoError(t, err)
-		errno := Errno(results[0]) // results[0] is the errno
-		require.Equal(t, ErrnoSuccess, errno, ErrnoName(errno))
+	for _, tt := range tests {
+		tc := tt
 
-		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
-		require.True(t, ok)
-		require.Equal(t, expectedMemory, actual)
-	})
+		t.Run(fmt.Sprintf("%v/clockID=%v", tc.name, tc.clockID), func(t *testing.T) {
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+
+			errno := tc.invocation(tc.clockID)
+			require.Equal(t, ErrnoSuccess, errno, ErrnoName(errno))
+
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+		})
+	}
 }
 
-func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
+func TestSnapshotPreview1_ClockResGet_Unsupported(t *testing.T) {
+	resultResolution := uint32(1) // arbitrary offset
+	_, mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
+	defer mod.Close(testCtx)
+
+	tests := []struct {
+		name    string
+		clockID uint64
+	}{
+		{
+			name:    "process cputime",
+			clockID: 2,
+		},
+		{
+			name:    "thread cputime",
+			clockID: 3,
+		},
+		{
+			name:    "undefined",
+			clockID: 100,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := fn.Call(testCtx, tc.clockID, uint64(resultResolution))
+			require.NoError(t, err)
+			errno := Errno(results[0]) // results[0] is the errno
+			require.Equal(t, ErrnoNosys, errno, ErrnoName(errno))
+		})
+	}
+}
+
+func TestSnapshotPreview1_ClockTimeGet_Realtime(t *testing.T) {
 	resultTimestamp := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
 		'?',                                          // resultTimestamp is after this
@@ -446,30 +527,125 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 	a, mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
 	defer mod.Close(testCtx)
 
-	t.Run("snapshotPreview1.ClockTimeGet", func(t *testing.T) {
-		maskMemory(t, testCtx, mod, len(expectedMemory))
+	tests := []struct {
+		name       string
+		invocation func() Errno
+	}{
+		{
+			name: "snapshotPreview1.ClockTimeGet",
+			invocation: func() Errno {
+				// invoke ClockTimeGet directly and check the memory side effects!
+				return a.ClockTimeGet(testCtx, mod, 0 /* REALTIME */, 0 /* TODO: precision */, resultTimestamp)
+			},
+		},
+		{
+			name: functionClockTimeGet,
+			invocation: func() Errno {
+				results, err := fn.Call(testCtx, 0 /* REALTIME */, 0 /* TODO: precision */, uint64(resultTimestamp))
+				require.NoError(t, err)
+				errno := Errno(results[0]) // results[0] is the errno
+				return errno
+			},
+		},
+	}
 
-		// invoke ClockTimeGet directly and check the memory side effects!
-		errno := a.ClockTimeGet(testCtx, mod, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
-		require.Zero(t, errno, ErrnoName(errno))
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			maskMemory(t, testCtx, mod, len(expectedMemory))
 
-		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
-		require.True(t, ok)
-		require.Equal(t, expectedMemory, actual)
-	})
+			errno := tc.invocation()
+			require.Zero(t, errno, ErrnoName(errno))
 
-	t.Run(functionClockTimeGet, func(t *testing.T) {
-		maskMemory(t, testCtx, mod, len(expectedMemory))
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, expectedMemory, actual)
+		})
+	}
+}
 
-		results, err := fn.Call(testCtx, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
-		require.NoError(t, err)
-		errno := Errno(results[0]) // results[0] is the errno
-		require.Zero(t, errno, ErrnoName(errno))
+func TestSnapshotPreview1_ClockTimeGet_Monotonic(t *testing.T) {
+	resultTimestamp := uint32(1) // arbitrary offset
 
-		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
-		require.True(t, ok)
-		require.Equal(t, expectedMemory, actual)
-	})
+	a, mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
+	defer mod.Close(testCtx)
+
+	tests := []struct {
+		name       string
+		invocation func() Errno
+	}{
+		{
+			name: "snapshotPreview1.ClockTimeGet",
+			invocation: func() Errno {
+				return a.ClockTimeGet(testCtx, mod, 1 /* MONOTONIC */, 0 /* TODO: precision */, resultTimestamp)
+			},
+		},
+		{
+			name: functionClockTimeGet,
+			invocation: func() Errno {
+				results, err := fn.Call(testCtx, 1 /* MONOTONIC */, 0 /* TODO: precision */, uint64(resultTimestamp))
+				require.NoError(t, err)
+				errno := Errno(results[0]) // results[0] is the errno
+				return errno
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			errno := tc.invocation()
+			require.Zero(t, errno, ErrnoName(errno))
+
+			start, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
+			require.True(t, ok)
+
+			time.Sleep(1 * time.Millisecond)
+
+			errno = tc.invocation()
+			require.Zero(t, errno, ErrnoName(errno))
+			end, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
+			require.True(t, ok)
+
+			// Time is monotonic
+			require.True(t, end > start)
+		})
+	}
+}
+
+func TestSnapshotPreview1_ClockTimeGet_Unsupported(t *testing.T) {
+	resultTimestamp := uint32(1) // arbitrary offset
+	_, mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
+	defer mod.Close(testCtx)
+
+	tests := []struct {
+		name    string
+		clockID uint64
+	}{
+		{
+			name:    "process cputime",
+			clockID: 2,
+		},
+		{
+			name:    "thread cputime",
+			clockID: 3,
+		},
+		{
+			name:    "undefined",
+			clockID: 100,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := fn.Call(testCtx, tc.clockID, 0 /* TODO: precision */, uint64(resultTimestamp))
+			require.NoError(t, err)
+			errno := Errno(results[0]) // results[0] is the errno
+			require.Equal(t, ErrnoNosys, errno, ErrnoName(errno))
+		})
+	}
 }
 
 func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
