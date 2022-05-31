@@ -15,7 +15,7 @@ import (
 
 //go:embed testdata/*.wasm
 //go:embed testdata/*.json
-var testcases embed.FS //nolint:unused
+var testcases embed.FS
 
 const enabledFeatures = wasm.Features20220419
 
