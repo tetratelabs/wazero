@@ -226,6 +226,7 @@ type AssemblerImpl struct {
 	pool constPool
 }
 
+// compile-time check to ensure AssemblerImpl implements Assembler.
 var _ Assembler = &AssemblerImpl{}
 
 func NewAssemblerImpl() *AssemblerImpl {
@@ -1143,6 +1144,7 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	MOVBLSX: {opcode: []byte{0x0f, 0xbe}, isSrc8bit: true},
 	// https://www.felixcloutier.com/x86/movzx
 	MOVBLZX: {opcode: []byte{0x0f, 0xb6}, isSrc8bit: true},
+	// https://www.felixcloutier.com/x86/movzx
 	MOVWLZX: {opcode: []byte{0x0f, 0xb7}, isSrc8bit: true},
 	// https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVBQSX: {opcode: []byte{0x0f, 0xbe}, rPrefix: RexPrefixW, isSrc8bit: true},
@@ -1209,38 +1211,55 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	MOVDQU: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x6f}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/movdqa:vmovdqa32:vmovdqa64
 	MOVDQA: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x6f}, requireSrcFloat: true, requireDstFloat: true},
-	PADDB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfc}, requireSrcFloat: true, requireDstFloat: true},
-	PADDW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfd}, requireSrcFloat: true, requireDstFloat: true},
-	PADDL:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfe}, requireSrcFloat: true, requireDstFloat: true},
-	PADDQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd4}, requireSrcFloat: true, requireDstFloat: true},
-	PSUBB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf8}, requireSrcFloat: true, requireDstFloat: true},
-	PSUBW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf9}, requireSrcFloat: true, requireDstFloat: true},
-	PSUBL:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfa}, requireSrcFloat: true, requireDstFloat: true},
-	PSUBQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfb}, requireSrcFloat: true, requireDstFloat: true},
-	ADDPS:  {opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
-	ADDPD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
-	SUBPS:  {opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
-	SUBPD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
-	PXOR:   {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xef}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
+	PADDB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfc}, requireSrcFloat: true, requireDstFloat: true},
+	PADDW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfd}, requireSrcFloat: true, requireDstFloat: true},
+	PADDL: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfe}, requireSrcFloat: true, requireDstFloat: true},
+	PADDQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd4}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	PSUBB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf8}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf9}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBL: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfa}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psubq
+	PSUBQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfb}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/addps
+	ADDPS: {opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/addpd
+	ADDPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/subps
+	SUBPS: {opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/subpd
+	SUBPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pxor
+	PXOR: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xef}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pshufb
 	PSHUFB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x0}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pshufd
 	PSHUFD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x70}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
 	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
 	PEXTRB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x14}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
-	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
-	PEXTRW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xc5}, requireSrcFloat: true, requireDstFloat: false, needArg: true},
 	// https://www.felixcloutier.com/x86/pextrw
+	PEXTRW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xc5}, requireSrcFloat: true, requireDstFloat: false, needArg: true},
+	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
 	PEXTRD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x16}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
 	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
-	PEXTRQ:   {rPrefix: RexPrefixW, mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x16}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
+	PEXTRQ: {rPrefix: RexPrefixW, mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x16}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
+	// https://www.felixcloutier.com/x86/insertps
 	INSERTPS: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x21}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
-	MOVLHPS:  {opcode: []byte{0x0f, 0x16}, requireSrcFloat: true, requireDstFloat: true},
-	PTEST:    {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x17}, requireSrcFloat: true, requireDstFloat: true},
-	PCMPEQB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x74}, requireSrcFloat: true, requireDstFloat: true},
-	PCMPEQW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x75}, requireSrcFloat: true, requireDstFloat: true},
-	PCMPEQD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x76}, requireSrcFloat: true, requireDstFloat: true},
-	PCMPEQQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x29}, requireSrcFloat: true, requireDstFloat: true},
-	PADDUSB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdc}, requireSrcFloat: true, requireDstFloat: true},
-	MOVSD:    {mandatoryPrefix: 0xf2, opcode: []byte{0x0f, 0x10}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/movlhps
+	MOVLHPS: {opcode: []byte{0x0f, 0x16}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/ptest
+	PTEST: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x17}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pcmpeqb:pcmpeqw:pcmpeqd
+	PCMPEQB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x74}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x75}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x76}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pcmpeqq
+	PCMPEQQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x29}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/paddusb:paddusw
+	PADDUSB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdc}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/movsd
+	MOVSD: {mandatoryPrefix: 0xf2, opcode: []byte{0x0f, 0x10}, requireSrcFloat: true, requireDstFloat: true},
 }
 
 var RegisterToRegisterShiftOpcode = map[asm.Instruction]struct {
@@ -1501,25 +1520,21 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 		mandatoryPrefix = 0xf3
 		opcode = []byte{0x0f, 0x7f}
-	case PEXTRB:
-		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	case PEXTRB: // https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x14}
 		needArg = true
-	case PEXTRW:
-		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	case PEXTRW: // https://www.felixcloutier.com/x86/pextrw
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x15}
 		needArg = true
-	case PEXTRD:
-		// https://www.felixcloutier.com/x86/pextrw
+	case PEXTRD: // https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x16}
 		needArg = true
-	case PEXTRQ:
-		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
-		rexPrefix |= RexPrefixW
+	case PEXTRQ: // https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
 		mandatoryPrefix = 0x66
+		rexPrefix |= RexPrefixW // REX.W
 		opcode = []byte{0x0f, 0x3a, 0x16}
 		needArg = true
 	default:
@@ -1772,46 +1787,37 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 		mandatoryPrefix = 0xf3
 		opcode = []byte{0x0f, 0x6f}
-	case PMOVSXBW:
-		// https://www.felixcloutier.com/x86/pmovsx
+	case PMOVSXBW: // https://www.felixcloutier.com/x86/pmovsx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x20}
-	case PMOVSXWD:
-		// https://www.felixcloutier.com/x86/pmovsx
+	case PMOVSXWD: // https://www.felixcloutier.com/x86/pmovsx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x23}
-	case PMOVSXDQ:
-		// https://www.felixcloutier.com/x86/pmovsx
+	case PMOVSXDQ: // https://www.felixcloutier.com/x86/pmovsx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x25}
-	case PMOVZXBW:
-		// https://www.felixcloutier.com/x86/pmovzx
+	case PMOVZXBW: // https://www.felixcloutier.com/x86/pmovzx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x30}
-	case PMOVZXWD:
+	case PMOVZXWD: // https://www.felixcloutier.com/x86/pmovzx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x33}
-		// https://www.felixcloutier.com/x86/pmovzx
-	case PMOVZXDQ:
+	case PMOVZXDQ: // https://www.felixcloutier.com/x86/pmovzx
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x38, 0x35}
-	case PINSRB:
-		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	case PINSRB: // https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x20}
 		needArg = true
-	case PINSRW:
-		// https://www.felixcloutier.com/x86/pinsrw
+	case PINSRW: // https://www.felixcloutier.com/x86/pinsrw
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0xc4}
 		needArg = true
-	case PINSRD:
-		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	case PINSRD: // https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x22}
 		needArg = true
-	case PINSRQ:
-		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	case PINSRQ: // https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 		rexPrefix |= RexPrefixW
 		mandatoryPrefix = 0x66
 		opcode = []byte{0x0f, 0x3a, 0x22}
@@ -2340,10 +2346,10 @@ type RexPrefix = byte
 const (
 	RexPrefixNone    RexPrefix = 0x0000_0000 // Indicates that the instruction doesn't need RexPrefix.
 	RexPrefixDefault RexPrefix = 0b0100_0000
-	RexPrefixW                 = 0b0000_1000 | RexPrefixDefault
-	RexPrefixR                 = 0b0000_0100 | RexPrefixDefault
-	RexPrefixX                 = 0b0000_0010 | RexPrefixDefault
-	RexPrefixB                 = 0b0000_0001 | RexPrefixDefault
+	RexPrefixW                 = 0b0000_1000 | RexPrefixDefault // REX.W
+	RexPrefixR                 = 0b0000_0100 | RexPrefixDefault // REX.R
+	RexPrefixX                 = 0b0000_0010 | RexPrefixDefault // REX.X
+	RexPrefixB                 = 0b0000_0001 | RexPrefixDefault // REX.B
 )
 
 // registerSpecifierPosition represents the position in the instruction bytes where an operand register is placed.

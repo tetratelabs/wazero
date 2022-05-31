@@ -175,11 +175,11 @@ const (
 	MOVW
 	// MOVWLSX is the MOVSX instruction for a word in 32-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWLSX
-	// MOVWLZX is the MOVZX instruction for a word in 32-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
+	// MOVWLZX is the MOVZX instruction for a word in 32-bit mode. https://www.felixcloutier.com/x86/movzx
 	MOVWLZX
 	// MOVWQSX is the MOVSX instruction for a word in 64-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWQSX
-	// MOVWQZX is the MOVZX instruction for a word in 64-bit mode. https://www.felixcloutier.com/x86/movsx:movsxd
+	// MOVWQZX is the MOVZX instruction for a word in 64-bit mode. https://www.felixcloutier.com/x86/movzx
 	MOVWQZX
 	// MULL is the MUL instruction in 32-bit mode. https://www.felixcloutier.com/x86/mul
 	MULL
@@ -303,17 +303,17 @@ const (
 	NOP
 	// UD2 is the UD2 instruction. https://www.felixcloutier.com/x86/ud
 	UD2
-	// MOVDQU is the MOVDQU instruction. https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
+	// MOVDQU is the MOVDQU instruction in 64-bit mode. https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU
-	// MOVDQA is the MOVDQA instruction.
+	// MOVDQA is the MOVDQA instruction in 64-bit mode. https://www.felixcloutier.com/x86/movdqa:vmovdqa32:vmovdqa64
 	MOVDQA
 	// PINSRB is the PINSRB instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 	PINSRB
-	// PINSRW is the mode PINSQRW instruction. https://www.felixcloutier.com/x86/pinsrw
+	// PINSRW is the PINSRW instruction. https://www.felixcloutier.com/x86/pinsrw
 	PINSRW
 	// PINSRD is the PINSRD instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 	PINSRD
-	// PINSRQ is the PINSQRQ instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	// PINSRQ is the PINSRQ instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 	PINSRQ
 	// PADDB is the PADDB instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDB
@@ -327,15 +327,15 @@ const (
 	PSUBB
 	// PSUBW is the PSUBW instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
 	PSUBW
-	// PSUBL is the PSUBL instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	// PSUBL is the PSUBD instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
 	PSUBL
-	// PSUBQ is the PSUBQ instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
+	// PSUBQ is the PSUBQ instruction. https://www.felixcloutier.com/x86/psubq
 	PSUBQ
 	// ADDPS is the ADDPS instruction. https://www.felixcloutier.com/x86/addps
 	ADDPS
 	// ADDPD is the ADDPD instruction. https://www.felixcloutier.com/x86/addpd
 	ADDPD
-	// SUBPS is the SUBPS instruction. https://www.felixcloutier.com/x86/addps
+	// SUBPS is the SUBPS instruction. https://www.felixcloutier.com/x86/subps
 	SUBPS
 	// SUBPD is the SUBPD instruction. https://www.felixcloutier.com/x86/subpd
 	SUBPD
