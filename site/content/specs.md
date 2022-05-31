@@ -76,53 +76,53 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 <details><summary>Click to see the full list of supported WASI functions</summary>
 <p>
 
-| Function                | Status |               Known Usage |
-|:------------------------|:------:|--------------------------:|
-| args_get                |   ✅    |                    TinyGo |
-| args_sizes_get          |   ✅    |                    TinyGo |
-| environ_get             |   ✅    |                    TinyGo |
-| environ_sizes_get       |   ✅    |                    TinyGo |
-| clock_res_get           |   ✅    |                 SwiftWasm |
-| clock_time_get          |   ✅    |         SwiftWasm, TinyGo |
-| fd_advise               |   ❌    |                 SwiftWasm |
-| fd_allocate             |   ❌    |                 SwiftWasm |
-| fd_close                |   ✅    |         SwiftWasm, TinyGo |
-| fd_datasync             |   ❌    |                 SwiftWasm |
-| fd_fdstat_get           |   ✅    |         SwiftWasm, TinyGo |
-| fd_fdstat_set_flags     |   ❌    |                 SwiftWasm |
-| fd_fdstat_set_rights    |   ❌    |                 SwiftWasm |
-| fd_filestat_get         |   ❌    |                 SwiftWasm |
-| fd_filestat_set_size    |   ❌    |                 SwiftWasm |
-| fd_filestat_set_times   |   ❌    |                 SwiftWasm |
-| fd_pread                |   ❌    |                 SwiftWasm |
-| fd_prestat_get          |   ✅    |         SwiftWasm, TinyGo |
-| fd_prestat_dir_name     |   ✅    |         SwiftWasm, TinyGo |
-| fd_pwrite               |   ❌    |                 SwiftWasm |
-| fd_read                 |   ✅    |         SwiftWasm, TinyGo |
-| fd_readdir              |   ❌    |                 SwiftWasm |
-| fd_renumber             |   ❌    |                 SwiftWasm |
-| fd_seek                 |   ✅    |         SwiftWasm, TinyGo |
-| fd_sync                 |   ❌    |                 SwiftWasm |
-| fd_tell                 |   ❌    |                 SwiftWasm |
-| fd_write                |   ✅    |                 SwiftWasm |
-| path_create_directory   |   ❌    |                 SwiftWasm |
-| path_filestat_get       |   ❌    |                 SwiftWasm |
-| path_filestat_set_times |   ❌    |                 SwiftWasm |
-| path_link               |   ❌    |                 SwiftWasm |
-| path_open               |   ✅    |         SwiftWasm, TinyGo |
-| path_readlink           |   ❌    |                 SwiftWasm |
-| path_remove_directory   |   ❌    |                 SwiftWasm |
-| path_rename             |   ❌    |                 SwiftWasm |
-| path_symlink            |   ❌    |                 SwiftWasm |
-| path_unlink_file        |   ❌    |                 SwiftWasm |
-| poll_oneoff             |   ✅    |         SwiftWasm, TinyGo |
-| proc_exit               |   ✅    | AssemblyScript, SwiftWasm |
-| proc_raise              |   ❌    |                 SwiftWasm |
-| sched_yield             |   ❌    |                 SwiftWasm |
-| random_get              |   ✅    |                 SwiftWasm |
-| sock_recv               |   ❌    |                 SwiftWasm |
-| sock_send               |   ❌    |                 SwiftWasm |
-| sock_shutdown           |   ❌    |                 SwiftWasm |
+| Function                | Status |    Known Usage |
+|:------------------------|:------:|---------------:|
+| args_get                |   ✅    |         TinyGo |
+| args_sizes_get          |   ✅    |         TinyGo |
+| environ_get             |   ✅    |         TinyGo |
+| environ_sizes_get       |   ✅    |         TinyGo |
+| clock_res_get           |   ✅    |                |
+| clock_time_get          |   ✅    |         TinyGo |
+| fd_advise               |   ❌    |                |
+| fd_allocate             |   ❌    |                |
+| fd_close                |   ✅    |         TinyGo |
+| fd_datasync             |   ❌    |                |
+| fd_fdstat_get           |   ✅    |         TinyGo |
+| fd_fdstat_set_flags     |   ❌    |                |
+| fd_fdstat_set_rights    |   ❌    |                |
+| fd_filestat_get         |   ❌    |                |
+| fd_filestat_set_size    |   ❌    |                |
+| fd_filestat_set_times   |   ❌    |                |
+| fd_pread                |   ❌    |                |
+| fd_prestat_get          |   ✅    |         TinyGo |
+| fd_prestat_dir_name     |   ✅    |         TinyGo |
+| fd_pwrite               |   ❌    |                |
+| fd_read                 |   ✅    |         TinyGo |
+| fd_readdir              |   ❌    |                |
+| fd_renumber             |   ❌    |                |
+| fd_seek                 |   ✅    |         TinyGo |
+| fd_sync                 |   ❌    |                |
+| fd_tell                 |   ❌    |                |
+| fd_write                |   ✅    |                |
+| path_create_directory   |   ❌    |                |
+| path_filestat_get       |   ❌    |                |
+| path_filestat_set_times |   ❌    |                |
+| path_link               |   ❌    |                |
+| path_open               |   ✅    |         TinyGo |
+| path_readlink           |   ❌    |                |
+| path_remove_directory   |   ❌    |                |
+| path_rename             |   ❌    |                |
+| path_symlink            |   ❌    |                |
+| path_unlink_file        |   ❌    |                |
+| poll_oneoff             |   ✅    |         TinyGo |
+| proc_exit               |   ✅    | AssemblyScript |
+| proc_raise              |   ❌    |                |
+| sched_yield             |   ❌    |                |
+| random_get              |   ✅    |                |
+| sock_recv               |   ❌    |                |
+| sock_send               |   ❌    |                |
+| sock_shutdown           |   ❌    |                |
 
 </p>
 </details>
