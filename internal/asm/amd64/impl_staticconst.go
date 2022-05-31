@@ -45,11 +45,11 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			// TODO: consider NOP padding for this jump, though this rarely happens as most functions should be
 			// small enough to fit all consts after the end of function.
 			if a.pool.poolSizeInBytes >= math.MaxInt8-2 {
-				// long jump
+				// long (near-relative) jump: https://www.felixcloutier.com/x86/jmp
 				a.Buf.WriteByte(0xe9)
 				a.WriteConst(int64(a.pool.poolSizeInBytes), 32)
 			} else {
-				// short jump
+				// short jump: https://www.felixcloutier.com/x86/jmp
 				a.Buf.WriteByte(0xeb)
 				a.WriteConst(int64(a.pool.poolSizeInBytes), 8)
 			}
@@ -86,7 +86,8 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 		func(offsetOfConstInBinary int) {
 			bin := a.Buf.Bytes()
 			displacement := offsetOfConstInBinary - int(n.OffsetInBinary()) - len(inst)
-			binary.LittleEndian.PutUint32(bin[n.OffsetInBinary()+uint64(len(inst)-4):], uint32(int32(displacement)))
+			displacementOffsetInInstruction := n.OffsetInBinary() + uint64(len(inst)-4)
+			binary.LittleEndian.PutUint32(bin[displacementOffsetInInstruction:], uint32(int32(displacement)))
 		})
 
 	nodeOffset := uint64(a.Buf.Len())
