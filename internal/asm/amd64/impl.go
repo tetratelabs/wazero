@@ -211,8 +211,6 @@ func (o OperandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
-const defaultMaxDisplacementForConstantPool = 1 << 30
-
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
@@ -1656,7 +1654,7 @@ func (a *AssemblerImpl) encodeReadInstructionAddress(n *NodeImpl) error {
 	opcode := byte(0x8d)
 	rexPrefix |= RexPrefixW
 
-	// https://wiki.osdev.org/X86-64_Instruction_Encoding#64-bit_addressing
+	// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 	modRM := 0b00_000_101 | // Indicate "LEAQ [RIP + 32bit displacement], DstReg" encoding.
 		(dstReg3Bits << 3) // Place the DstReg on ModRM:reg.
 

@@ -11,6 +11,7 @@ func TestConstPool_addConst(t *testing.T) {
 	p := newConstPool()
 	cons := []byte{1, 2, 3, 4}
 
+	// Loop twice to ensure that the same constant is cached and not added twice.
 	for i := 0; i < 2; i++ {
 		p.addConst(cons)
 		require.Equal(t, 1, len(p.consts))
@@ -66,7 +67,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			expectedOffsetForConsts: []int{4, 4 + 8}, // 4 = len(dummyBodyBeforeFlush)
 			firstUseOffsetInBinary:  0,
 			exp:                     []byte{'?', '?', '?', '?', 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13},
-			maxDisplacement:         1 << 31,
+			maxDisplacement:         1 << 31, // large displacement will emit the consts at the end of function.
 		},
 		{
 			name:                   "not flush",
@@ -75,7 +76,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			consts:                 []asm.StaticConst{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
 			firstUseOffsetInBinary: 0,
 			exp:                    []byte{'?', '?', '?', '?'},
-			maxDisplacement:        1 << 31,
+			maxDisplacement:        1 << 31, // large displacement will emit the consts at the end of function.
 		},
 		{
 			name:                    "not end of function but flush - short jump",
@@ -87,7 +88,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			exp: []byte{'?', '?', '?', '?',
 				0xeb, 0x0c, // short jump with offset = len(consts[0]) + len(consts[1]) = 12 = 0xc.
 				1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13},
-			maxDisplacement: 0,
+			maxDisplacement: 0, // small displacement flushes the const immediately, not at the end of function.
 		},
 		{
 			name:                    "not end of function but flush - long jump",
@@ -99,7 +100,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			exp: append([]byte{'?', '?', '?', '?',
 				0xe9, 0x0, 0x1, 0x0, 0x0, // short jump with offset = 256 = 0x0, 0x1, 0x0, 0x0 (in Little Endian).
 			}, largeData...),
-			maxDisplacement: 0,
+			maxDisplacement: 0, // small displacement flushes the const immediately, not at the end of function.
 		},
 	}
 

@@ -31,13 +31,20 @@ func (p *constPool) addConst(c asm.StaticConst) {
 	}
 }
 
+// defaultMaxDisplacementForConstantPool is the maximum displacement allowed for literal move instructions which access
+// the constant pool. This is set as 2 ^30 conservatively while the actual limit is 2^31 since we actually allow this
+// limit plus max(length(c) for c in the pool) so we must ensure that limit is less than 2^31.
+const defaultMaxDisplacementForConstantPool = 1 << 30
+
 func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 	if a.pool.firstUseOffsetInBinary == nil {
 		return
 	}
 
 	if isEndOfFunction ||
-		// Conservative strategy.
+		// If the distance between (the first use in binary) and (end of constant pool) can be larger
+		// than MaxDisplacementForConstantPool, we have to emit the constant pool now, otherwise
+		// a const might be unreachable by a literal move whose maximum offset is +- 2^31.
 		((a.pool.poolSizeInBytes+a.Buf.Len())-int(*a.pool.firstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 		if !isEndOfFunction {
 			// Adds the jump instruction to skip the constants if this is not the end of function.
@@ -93,7 +100,7 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 	nodeOffset := uint64(a.Buf.Len())
 	a.pool.firstUseOffsetInBinary = &nodeOffset
 
-	// https://wiki.osdev.org/X86-64_Instruction_Encoding#64-bit_addressing
+	// https://wiki.osdev.org/X86-64_Instruction_Encoding#32.2F64-bit_addressing
 	modRM := 0b00_000_101 | // Indicate "MOVDQU [RIP + 32bit displacement], DstReg" encoding.
 		(dstReg3Bits << 3) // Place the DstReg on ModRM:reg.
 
