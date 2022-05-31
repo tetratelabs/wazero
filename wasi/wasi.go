@@ -1404,6 +1404,7 @@ const (
 	fdStderr = 2
 )
 
+// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clockid-enumu32
 const (
 	clockIDRealtime  = 0
 	clockIDMonotonic = 1
