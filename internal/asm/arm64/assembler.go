@@ -67,22 +67,28 @@ type Assembler interface {
 	// otherwise set 0.
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register)
 
-	// CompileMemoryToVectorRegister adds an instruction where source operands is the memory address specified by `sourceBaseReg+sourceOffsetConst`
-	// and the destination is `destinationReg` vector register.
-	CompileMemoryToVectorRegister(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset asm.ConstantValue, dstReg asm.Register, arrangement VectorArrangement)
+	// CompileMemoryToVectorRegister adds an instruction where source operands is the memory address specified by
+	// `srcBaseReg+srcOffset` and the destination is `dstReg` vector register.
+	CompileMemoryToVectorRegister(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset asm.ConstantValue,
+		dstReg asm.Register, arrangement VectorArrangement)
 
-	// CompileMemoryWithRegisterOffsetToVectorRegister is the same as CompileMemoryToVectorRegister except that the offset is specified by the `srcOffsetRegister` register.
-	CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction, srcBaseReg, srcOffsetRegister asm.Register, dstReg asm.Register, arrangement VectorArrangement)
+	// CompileMemoryWithRegisterOffsetToVectorRegister is the same as CompileMemoryToVectorRegister except that the
+	// offset is specified by the `srcOffsetRegister` register.
+	CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction, srcBaseReg,
+		srcOffsetRegister asm.Register, dstReg asm.Register, arrangement VectorArrangement)
 
-	// CompileVectorRegisterToMemory adds an instruction where source operand is `sourceRegister` vector register and the destination is the
-	// memory address specified by `destinationBaseRegister+destinationOffsetConst`.
-	CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstBaseReg asm.Register, dstOffset asm.ConstantValue, arrangement VectorArrangement)
+	// CompileVectorRegisterToMemory adds an instruction where source operand is `srcReg` vector register and the
+	// destination is the memory address specified by `dstBaseReg+dstOffset`.
+	CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstBaseReg asm.Register,
+		dstOffset asm.ConstantValue, arrangement VectorArrangement)
 
-	// CompileVectorRegisterToMemoryWithRegisterOffset is the same as CompileVectorRegisterToMemory except that the offset is specified by the `dstOffsetRegister` register.
-	CompileVectorRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, srcReg, dstBaseReg, dstOffsetRegister asm.Register, arrangement VectorArrangement)
+	// CompileVectorRegisterToMemoryWithRegisterOffset is the same as CompileVectorRegisterToMemory except that the
+	// offset is specified by the `dstOffsetRegister` register.
+	CompileVectorRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, srcReg, dstBaseReg,
+		dstOffsetRegister asm.Register, arrangement VectorArrangement)
 
-	// CompileRegisterToVectorRegister adds an instruction where source operand is `sourceRegister` general purpose register
-	// and the destination is the `dstReg` vector register. The destination vector's arrangement and index of element can be
+	// CompileRegisterToVectorRegister adds an instruction where source operand is `srcReg` general purpose register and
+	// the destination is the `dstReg` vector register. The destination vector's arrangement and index of element can be
 	// given by `arrangement` and `index`, but not all the instructions will use them.
 	CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 		arrangement VectorArrangement, index VectorIndex)
@@ -93,16 +99,20 @@ type Assembler interface {
 	CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 		arrangement VectorArrangement, index VectorIndex)
 
-	// CompileVectorRegisterToVectorRegister adds an instruction where both source and destination operands are vector registers.
-	// The vector's arrangement can be specified `arrangement`, and the source and destination element's index are given by
-	// `srcIndex` and `dstIndex` respectively, but not all the instructions will use them.
-	CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, srcIndex, dstIndex VectorIndex)
+	// CompileVectorRegisterToVectorRegister adds an instruction where both source and destination operands are vector
+	// registers. The vector's arrangement can be specified `arrangement`, and the source and destination element's
+	// index are given by `srcIndex` and `dstIndex` respectively, but not all the instructions will use them.
+	CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+		arrangement VectorArrangement, srcIndex, dstIndex VectorIndex)
 
-	// CompileVectorRegisterToVectorRegisterWithConst is the same as CompileVectorRegisterToVectorRegister but the additional constant can be provided.
+	// CompileVectorRegisterToVectorRegisterWithConst is the same as CompileVectorRegisterToVectorRegister but the
+	// additional constant can be provided.
 	// For example, the const can be used to specify the shift amount for USHLL instruction.
-	CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, c asm.ConstantValue)
+	CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg, dstReg asm.Register,
+		arrangement VectorArrangement, c asm.ConstantValue)
 
-	// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
-	// and the destination is the dstReg.
-	CompileLoadStaticConstToVectorRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement)
+	// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in
+	// the memory and the destination is the dstReg.
+	CompileLoadStaticConstToVectorRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register,
+		arrangement VectorArrangement)
 }

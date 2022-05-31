@@ -228,9 +228,8 @@ type constPool struct {
 	firstUseOffsetInBinary *asm.NodeOffsetInBinary
 	consts                 []asm.StaticConst
 	constSizeInBytes       int
-	// offsetFinalizedCallbacks holds the callbacks keyed on the constants.
-	// These callbacks are called when the offsets of the constants in the binary
-	// have been determined.
+	// offsetFinalizedCallbacks are functions called when the offsets of the
+	// constants in the binary have been determined.
 	offsetFinalizedCallbacks map[string][]func(offsetOfConstInBinary int)
 }
 
@@ -345,7 +344,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 			}
 		}
 
-		// arm64 instructions are must be 4-byte (32-bit) aligned, so we must pad the zero consts here.
+		// arm64 instructions are 4-byte (32-bit) aligned, so we must pad the zero consts here.
 		if pad := a.Buf.Len() % 4; pad != 0 {
 			a.Buf.Write(make([]byte, 4-pad))
 		}
@@ -719,7 +718,7 @@ func errorEncodingUnsupported(n *NodeImpl) error {
 	return fmt.Errorf("%s is unsupported for %s type", InstructionName(n.Instruction), n.Types)
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeNoneToNone is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeNoneToNone(n *NodeImpl) (err error) {
 	if n.Instruction != NOP {
@@ -728,7 +727,7 @@ func (a *AssemblerImpl) EncodeNoneToNone(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeJumpToRegister is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 	// "Unconditional branch (register)" in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions
@@ -756,7 +755,7 @@ func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeRelativeBranch is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 	switch n.Instruction {
@@ -864,7 +863,7 @@ func checkRegisterToRegisterType(src, dst asm.Register, requireSrcInt, requireDs
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeRegisterToRegister is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
@@ -1371,7 +1370,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeLeftShiftedRegisterToRegister is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeLeftShiftedRegisterToRegister(n *NodeImpl) (err error) {
 
@@ -1408,7 +1407,7 @@ func (a *AssemblerImpl) EncodeLeftShiftedRegisterToRegister(n *NodeImpl) (err er
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeTwoRegistersToRegister is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
@@ -1527,7 +1526,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeThreeRegistersToRegister is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) {
 	switch n.Instruction {
@@ -1569,7 +1568,7 @@ func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) 
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeTwoRegistersToNone is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	switch n.Instruction {
@@ -1627,7 +1626,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
+// EncodeRegisterAndConstToNone is exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRegisterAndConstToNone(n *NodeImpl) (err error) {
 	if n.Instruction != CMP {
@@ -2593,6 +2592,7 @@ func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err er
 	}
 	return
 }
+
 func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) {
 	if err = checkArrangementIndexPair(n.VectorArrangement, n.SrcVectorIndex); err != nil {
 		return
@@ -3030,8 +3030,7 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 	case VFADDS, VFADDD, VFSUBS, VFSUBD:
 		var sz, b byte
 		switch n.Instruction {
-		case VFADDS:
-		case VFADDD:
+		case VFADDS, VFADDD:
 			sz = 0b1
 		case VFSUBS:
 			b = 0b1

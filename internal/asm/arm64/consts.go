@@ -671,9 +671,9 @@ const (
 	UCVTFWD
 	// UCVTFWS is the UCVTF instruction, for single precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/UCVTF--scalar--integer-
 	UCVTFWS
-	// UDIV is the UDIV instruction .https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
+	// UDIV is the UDIV instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIV
-	// UDIVW is the UDIV instruction, in 64-bit mode.https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
+	// UDIVW is the UDIV instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIVW
 
 	// VBIT is the BIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/BIT--vector-
@@ -681,15 +681,15 @@ const (
 	// VCNT is the CNT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/CNT--vector-
 	VCNT
 	// VMOV has different semantics depending on the types of operands:
-	//  * MOV(vector) if the operands are vectors and indexes are not specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
-	//  * MOV(vector, element) if the operands are vectors and indexes are specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector--element-
-	//  * INS(vector, element) if the src is a general purpose and the dst is a vector. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
-	//  * UMOV(vector) if the dst is a general purpose and the src is a vector. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMOV--vector-
-	//  * LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
-	//  * LDR (literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
-	//  * STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
+	//	* MOV(vector) if the operands are vectors and indexes are not specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
+	//	* MOV(vector, element) if the operands are vectors and indexes are specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector--element-
+	//	* INS(vector, element) if the src is a general purpose and the dst is a vector. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
+	//	* UMOV(vector) if the dst is a general purpose and the src is a vector. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMOV--vector-
+	//	* LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
+	//	* LDR (literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
+	//	* STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
 	VMOV
-	// VUADDLV is the UADDLV instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
+	// VUADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
 	VUADDLV
 	// VADD is the ADD(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
 	VADD
@@ -703,23 +703,23 @@ const (
 	VFSUBS
 	// VFSUBD is the FSUB(vector) instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FSUB--vector-
 	VFSUBD
-	// SSHLL is the SSHLL instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	// SSHLL is the SSHLL(vector) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
 	SSHLL
-	// USHLL is the USHLL instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	// USHLL is the USHLL(vector) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
 	USHLL
 	// LD1R is the LD1R instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--
 	LD1R
-	// SMOV is the SMOV instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
+	// SMOV is the SMOV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
 	SMOV
-	// DUP is the DUP instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+	// DUP is the DUP(element) instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
 	DUP
-	// UMAXP is the UMAXP instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/UMAXP--vector-
+	// UMAXP is the UMAXP(vector) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/UMAXP--vector-
 	UMAXP
-	// UMINV is the UMINV instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMINV--vector-
+	// UMINV is the UMINV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMINV--vector-
 	UMINV
-	// CMEQ is the CMEQ instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/CMEQ--vector--register-
+	// CMEQ is the CMEQ(vector, register) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/CMEQ--vector--register-
 	CMEQ
-	// ADDP is the ADDP instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
+	// ADDP is the ADDP(vector) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
 	ADDP
 	// TBL1 is the TBL instruction whose source is one vector. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
 	TBL1
@@ -807,7 +807,7 @@ func (v VectorArrangement) String() (ret string) {
 type VectorIndex byte
 
 // VectorIndexNone indicates no vector index specified.
-const VectorIndexNone VectorIndex = ^VectorIndex(0)
+const VectorIndexNone = ^VectorIndex(0)
 
 // InstructionName returns the name of the given instruction
 func InstructionName(i asm.Instruction) string {
