@@ -3030,7 +3030,8 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 	case VFADDS, VFADDD, VFSUBS, VFSUBD:
 		var sz, b byte
 		switch n.Instruction {
-		case VFADDS, VFADDD:
+		case VFADDS:
+		case VFADDD:
 			sz = 0b1
 		case VFSUBS:
 			b = 0b1
