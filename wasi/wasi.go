@@ -1410,11 +1410,7 @@ const (
 	clockIDMonotonic = 1
 )
 
-// time does not provide a means to directly reference the monotonic time value it computes with time.Now.
-// We retrieve a time.Now on initialization to use as a base which we compute values against which ensures
-// subsequent readings from clock_time_get return montonically increasing values with correct deltas.
-// time.Now always returns a time with a monotonic reading for dates between 1885-2157. This code should
-// probably be revisited around 2155 to check if the time is actually monotonic before returning.
+// monotonicClockBase uses time.Now to ensure a monotonic clock reading on all platforms via time.Since.
 var monotonicClockBase = time.Now()
 
 func timeNowUnixNano() uint64 {
