@@ -1395,8 +1395,6 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 						expected, err := goasm.Assemble()
 						require.NoError(t, err)
 
-						fmt.Println(hex.EncodeToString(expected))
-
 						actual, err := a.Assemble()
 						require.NoError(t, err)
 						require.Equal(t, expected, actual, hex.EncodeToString(expected))

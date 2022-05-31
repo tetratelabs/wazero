@@ -313,7 +313,6 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithArg(
 	from, to asm.Register,
 	arg byte,
 ) {
-
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG

@@ -116,9 +116,10 @@ func newRuntimeValueLocationStack() *runtimeValueLocationStack {
 // runtimeValueLocationStack represents the wazeroir virtual stack
 // where each item holds the location information about where it exists
 // on the physical machine at runtime.
+//
 // Notably this is only used in the compilation phase, not runtime,
 // and we change the state of this struct at every wazeroir operation we compile.
-// In this way, we can see where the operands of a operation (for example,
+// In this way, we can see where the operands of an operation (for example,
 // two variables for wazeroir add operation.) exist and check the necessity for
 // moving the variable to registers to perform actual CPU instruction
 // to achieve wazeroir's add operation.
@@ -190,7 +191,7 @@ func (v *runtimeValueLocationStack) pushRuntimeValueLocationOnConditionalRegiste
 	return
 }
 
-// push pushes to a given runtimeValueLocation onto the stack.
+// push a runtimeValueLocation onto the stack.
 func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
 	loc.stackPointer = v.sp
 	if v.sp >= uint64(len(v.stack)) {

@@ -15,7 +15,6 @@ func TestCompiler_compileV128Add(t *testing.T) {
 }
 
 func TestCompiler_compileV128Sub(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape

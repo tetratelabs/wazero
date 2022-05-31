@@ -45,7 +45,7 @@ func TestCompiler(t *testing.T) {
 			case "simd_store64_lane.json":
 			case "simd_store8_lane.json":
 			default:
-				return false
+				return false // others not supported, yet!
 			}
 			return true
 		}

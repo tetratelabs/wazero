@@ -1,8 +1,6 @@
 package compiler
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -92,9 +90,6 @@ func (c *arm64Compiler) compileV128Sub(o *wazeroir.OperationV128Sub) (err error)
 	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
 		return err
 	}
-
-	fmt.Println(arm64.RegisterName(x1.register))
-	fmt.Println(arm64.RegisterName(x2.register))
 
 	var arr arm64.VectorArrangement
 	var inst asm.Instruction

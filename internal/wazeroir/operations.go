@@ -1,8 +1,6 @@
 package wazeroir
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type UnsignedInt byte
 
