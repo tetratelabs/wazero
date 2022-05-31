@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -25,8 +26,8 @@ type NodeImpl struct {
 	SrcReg, SrcReg2, DstReg, DstReg2 asm.Register
 	SrcConst, DstConst               asm.ConstantValue
 
-	VectorArrangement VectorArrangement
-	VectorIndex       VectorIndex
+	VectorArrangement              VectorArrangement
+	SrcVectorIndex, DstVectorIndex VectorIndex
 
 	// readInstructionAddressBeforeTargetInstruction holds the instruction right before the target of
 	// read instruction address instruction. See asm.assemblerBase.CompileReadInstructionAddress.
@@ -34,6 +35,8 @@ type NodeImpl struct {
 
 	// JumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .JumpTarget == this.
 	JumpOrigins map[*NodeImpl]struct{}
+
+	staticConst asm.StaticConst
 }
 
 // AssignJumpTarget implements the same method as documented on asm.Node.
@@ -106,13 +109,18 @@ func (n *NodeImpl) String() (ret string) {
 	case OperandTypesTwoSIMDBytesToSIMDByteRegister:
 		ret = fmt.Sprintf("%s (%s.B8, %s.B8), %s.B8", instName, RegisterName(n.SrcReg), RegisterName(n.SrcReg2), RegisterName(n.DstReg))
 	case OperandTypesRegisterToVectorRegister:
-		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement, n.VectorIndex)
+		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement, n.DstVectorIndex)
+	case OperandTypesVectorRegisterToRegister:
+		ret = fmt.Sprintf("%s %s.%s[%d], %s.%s[%d]", instName, RegisterName(n.SrcReg), n.VectorArrangement, n.SrcVectorIndex,
+			RegisterName(n.DstReg), n.VectorArrangement, n.DstVectorIndex)
 	case OperandTypesVectorRegisterToMemory:
 		ret = fmt.Sprintf("%s %s.%s, [%s]", instName, RegisterName(n.SrcReg), n.VectorArrangement, RegisterName(n.DstReg))
 	case OperandTypesMemoryToVectorRegister:
 		ret = fmt.Sprintf("%s [%s], %s.%s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement)
 	case OperandTypesVectorRegisterToVectorRegister:
 		ret = fmt.Sprintf("%s %s.%[2]s, %s.%[2]s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement)
+	case OperandTypesStaticConstToVectorRegister:
+		ret = fmt.Sprintf("%s $%v %s.%s", instName, n.staticConst, RegisterName(n.DstReg), n.VectorArrangement)
 	}
 	return
 }
@@ -134,6 +142,7 @@ const (
 	OperandTypeSIMDByte
 	OperandTypeTwoSIMDBytes
 	OperandTypeVectorRegister
+	OperandTypeStaticConst
 )
 
 // String implements fmt.Stringer.
@@ -161,6 +170,8 @@ func (o OperandType) String() (ret string) {
 		ret = "two-simd-bytes"
 	case OperandTypeVectorRegister:
 		ret = "vector-register"
+	case OperandTypeStaticConst:
+		ret = "static-const"
 	}
 	return
 }
@@ -186,9 +197,11 @@ var (
 	OperandTypesSIMDByteToRegister             = OperandTypes{OperandTypeSIMDByte, OperandTypeRegister}
 	OperandTypesTwoSIMDBytesToSIMDByteRegister = OperandTypes{OperandTypeTwoSIMDBytes, OperandTypeSIMDByte}
 	OperandTypesRegisterToVectorRegister       = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
+	OperandTypesVectorRegisterToRegister       = OperandTypes{OperandTypeVectorRegister, OperandTypeRegister}
 	OperandTypesMemoryToVectorRegister         = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
 	OperandTypesVectorRegisterToMemory         = OperandTypes{OperandTypeVectorRegister, OperandTypeMemory}
 	OperandTypesVectorRegisterToVectorRegister = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
+	OperandTypesStaticConstToVectorRegister    = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
 )
 
 // String implements fmt.Stringer
@@ -199,30 +212,33 @@ func (o OperandTypes) String() string {
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
-	Root, Current     *NodeImpl
-	Buf               *bytes.Buffer
-	temporaryRegister asm.Register
-	nodeCount         int
-	pool              constPool
+	Root, Current                  *NodeImpl
+	Buf                            *bytes.Buffer
+	temporaryRegister              asm.Register
+	nodeCount                      int
+	pool                           constPool
+	MaxDisplacementForConstantPool int
 }
 
-// constPool holds 32-bit constants which are used by ldr(literal) instructions
+// constPool holds asm.StaticConst which are used by ldr(literal) instructions
 // emitted by memory access.
 type constPool struct {
 	// firstUseOffsetInBinary is the offset of the first ldr(literal) instruction
 	// which needs to access the const in this constPool.
 	firstUseOffsetInBinary *asm.NodeOffsetInBinary
-	consts                 []int32
+	consts                 []asm.StaticConst
+	constSizeInBytes       int
 	// offsetFinalizedCallbacks holds the callbacks keyed on the constants.
 	// These callbacks are called when the offsets of the constants in the binary
 	// have been determined.
-	offsetFinalizedCallbacks map[int32][]func(offsetOfConstInBinary int)
+	offsetFinalizedCallbacks map[string][]func(offsetOfConstInBinary int)
 }
 
 func NewAssemblerImpl(temporaryRegister asm.Register) *AssemblerImpl {
 	return &AssemblerImpl{
 		Buf: bytes.NewBuffer(nil), temporaryRegister: temporaryRegister,
-		pool: constPool{offsetFinalizedCallbacks: map[int32][]func(int){}},
+		pool:                           constPool{offsetFinalizedCallbacks: map[string][]func(int){}},
+		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstPool,
 	}
 }
 
@@ -283,6 +299,8 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	return code, nil
 }
 
+const defaultMaxDisplacementForConstPool = (1 << 20) - 1 - 4 // -4 for unconditional branch to skip the constants.
+
 // maybeFlushConstPool flushes the constant pool if endOfBinary or a boundary condition was met.
 func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	if a.pool.firstUseOffsetInBinary == nil {
@@ -295,16 +313,20 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// Also, if the offset between the first usage of the constant pool and
 		// the first constant would exceed 2^20 -1(= 2MiB-1), which is the maximum offset
 		// for load(literal) instruction, flush all the constants in the pool.
-		(a.Buf.Len()-int(*a.pool.firstUseOffsetInBinary)) >= (1<<20)-1-4 { // -4 for unconditional branch to skip the constants.
+		(a.Buf.Len()+a.pool.constSizeInBytes-int(*a.pool.firstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 
 		// Before emitting consts, we have to add br instruction to skip the const pool.
 		// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L1123-L1129
-		skipOffset := len(a.pool.consts)
+		skipOffset := a.pool.constSizeInBytes/4 + 1
+		if a.pool.constSizeInBytes%4 != 0 {
+			skipOffset++
+		}
 		if endOfBinary {
 			// If this is the end of binary, we never reach this block,
 			// so offset can be zero (which is the behavior of Go's assembler).
 			skipOffset = 0
 		}
+
 		a.Buf.Write([]byte{
 			byte(skipOffset),
 			byte(skipOffset >> 8),
@@ -315,31 +337,39 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// Then adding the consts into the binary.
 		for _, c := range a.pool.consts {
 			offsetOfConst := a.Buf.Len()
-			a.Buf.Write([]byte{byte(c), byte(c >> 8), byte(c >> 16), byte(c >> 24)})
+			a.Buf.Write(c)
 
 			// Invoke callbacks for `c` with the offset of binary where we store `c`.
-			for _, cb := range a.pool.offsetFinalizedCallbacks[c] {
+			for _, cb := range a.pool.offsetFinalizedCallbacks[asm.StaticConstKey(c)] {
 				cb(offsetOfConst)
 			}
 		}
 
+		// arm64 instructions are must be 4-byte (32-bit) aligned, so we must pad the zero consts here.
+		if pad := a.Buf.Len() % 4; pad != 0 {
+			a.Buf.Write(make([]byte, 4-pad))
+		}
+
 		// After the flush, reset the constant pool.
-		a.pool = constPool{offsetFinalizedCallbacks: map[int32][]func(int){}}
+		a.pool = constPool{offsetFinalizedCallbacks: map[string][]func(int){}}
 	}
 }
 
-func (a *AssemblerImpl) setConstPoolCallback(v int32, cb func(int)) {
-	a.pool.offsetFinalizedCallbacks[v] = append(a.pool.offsetFinalizedCallbacks[v], cb)
+func (a *AssemblerImpl) setConstPoolCallback(c asm.StaticConst, cb func(int)) {
+	key := asm.StaticConstKey(c)
+	a.pool.offsetFinalizedCallbacks[key] = append(a.pool.offsetFinalizedCallbacks[key], cb)
 }
 
-func (a *AssemblerImpl) addConstPool(v int32, useOffset asm.NodeOffsetInBinary) {
+func (a *AssemblerImpl) addConstPool(c asm.StaticConst, useOffset asm.NodeOffsetInBinary) {
 	if a.pool.firstUseOffsetInBinary == nil {
 		a.pool.firstUseOffsetInBinary = &useOffset
 	}
 
-	if _, ok := a.pool.offsetFinalizedCallbacks[v]; !ok {
-		a.pool.consts = append(a.pool.consts, v)
-		a.pool.offsetFinalizedCallbacks[v] = []func(int){}
+	key := asm.StaticConstKey(c)
+	if _, ok := a.pool.offsetFinalizedCallbacks[key]; !ok {
+		a.pool.consts = append(a.pool.consts, c)
+		a.pool.offsetFinalizedCallbacks[key] = []func(int){}
+		a.pool.constSizeInBytes += len(c)
 	}
 }
 
@@ -393,12 +423,16 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeTwoSIMDBytesToSIMDByteRegister(n)
 	case OperandTypesRegisterToVectorRegister:
 		err = a.EncodeRegisterToVectorRegister(n)
+	case OperandTypesVectorRegisterToRegister:
+		err = a.EncodeVectorRegisterToRegister(n)
 	case OperandTypesMemoryToVectorRegister:
 		err = a.EncodeMemoryToVectorRegister(n)
 	case OperandTypesVectorRegisterToMemory:
 		err = a.EncodeVectorRegisterToMemory(n)
 	case OperandTypesVectorRegisterToVectorRegister:
 		err = a.EncodeVectorRegisterToVectorRegister(n)
+	case OperandTypesStaticConstToVectorRegister:
+		err = a.EncodeStaticConstToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -590,35 +624,93 @@ func (a *AssemblerImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegist
 	n.DstReg = dstReg
 }
 
+// CompileMemoryToVectorRegister implements Assembler.CompileMemoryToVectorRegister
 func (a *AssemblerImpl) CompileMemoryToVectorRegister(
-	instruction asm.Instruction, srcOffsetReg, dstReg asm.Register, arrangement VectorArrangement) {
+	instruction asm.Instruction, srcBaseReg asm.Register, dstOffset asm.ConstantValue, dstReg asm.Register, arrangement VectorArrangement) {
 	n := a.newNode(instruction, OperandTypesMemoryToVectorRegister)
-	n.SrcReg = srcOffsetReg
+	n.SrcReg = srcBaseReg
+	n.SrcConst = dstOffset
 	n.DstReg = dstReg
 	n.VectorArrangement = arrangement
 }
 
-func (a *AssemblerImpl) CompileVectorRegisterToMemory(
-	instruction asm.Instruction, srcReg, dstOffsetReg asm.Register, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
-	n.SrcReg = srcReg
-	n.DstReg = dstOffsetReg
+// CompileMemoryWithRegisterOffsetToVectorRegister implements Assembler.CompileMemoryWithRegisterOffsetToVectorRegister
+func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction,
+	srcBaseReg, srcOffsetRegister asm.Register, dstReg asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesMemoryToVectorRegister)
+	n.SrcReg = srcBaseReg
+	n.SrcReg2 = srcOffsetRegister
+	n.DstReg = dstReg
 	n.VectorArrangement = arrangement
 }
 
+// CompileVectorRegisterToMemory implements Assembler.CompileVectorRegisterToMemory
+func (a *AssemblerImpl) CompileVectorRegisterToMemory(
+	instruction asm.Instruction, srcReg, dstBaseReg asm.Register, dstOffset asm.ConstantValue, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
+	n.SrcReg = srcReg
+	n.DstReg = dstBaseReg
+	n.DstConst = dstOffset
+	n.VectorArrangement = arrangement
+}
+
+// CompileVectorRegisterToMemoryWithRegisterOffset implements Assembler.CompileVectorRegisterToMemoryWithRegisterOffset
+func (a *AssemblerImpl) CompileVectorRegisterToMemoryWithRegisterOffset(instruction asm.Instruction,
+	srcReg, dstBaseReg, dstOffsetRegister asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
+	n.SrcReg = srcReg
+	n.DstReg = dstBaseReg
+	n.DstReg2 = dstOffsetRegister
+	n.VectorArrangement = arrangement
+}
+
+// CompileRegisterToVectorRegister implements Assembler.CompileRegisterToVectorRegister
 func (a *AssemblerImpl) CompileRegisterToVectorRegister(
 	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, index VectorIndex) {
 	n := a.newNode(instruction, OperandTypesRegisterToVectorRegister)
 	n.SrcReg = srcReg
 	n.DstReg = dstReg
 	n.VectorArrangement = arrangement
-	n.VectorIndex = index
+	n.DstVectorIndex = index
 }
 
+// CompileVectorRegisterToRegister implements Assembler.CompileVectorRegisterToRegister
+func (a *AssemblerImpl) CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement VectorArrangement, index VectorIndex) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToRegister)
+	n.SrcReg = srcReg
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+	n.SrcVectorIndex = index
+}
+
+// CompileVectorRegisterToVectorRegister implements Assembler.CompileVectorRegisterToVectorRegister
 func (a *AssemblerImpl) CompileVectorRegisterToVectorRegister(
-	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement) {
+	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, srcIndex, dstIndex VectorIndex) {
 	n := a.newNode(instruction, OperandTypesVectorRegisterToVectorRegister)
 	n.SrcReg = srcReg
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+	n.SrcVectorIndex = srcIndex
+	n.DstVectorIndex = dstIndex
+}
+
+// CompileVectorRegisterToVectorRegisterWithConst implements Assembler.CompileVectorRegisterToVectorRegisterWithConst
+func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction,
+	srcReg, dstReg asm.Register, arrangement VectorArrangement, c asm.ConstantValue) {
+	n := a.newNode(instruction, OperandTypesVectorRegisterToVectorRegister)
+	n.SrcReg = srcReg
+	n.SrcConst = c
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+}
+
+// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
+// and the destination is the dstReg.
+func (a *AssemblerImpl) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
+	c asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesStaticConstToVectorRegister)
+	n.staticConst = c
 	n.DstReg = dstReg
 	n.VectorArrangement = arrangement
 }
@@ -1643,7 +1735,9 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	// Go's assembler adds a const into the const pool at this point,
 	// regardless of its usage; e.g. if we enter the then block of the following if statement,
 	// the const is not used but it is added into the const pool.
-	a.addConstPool(offset32, uint64(a.Buf.Len()))
+	var c = make([]byte, 4)
+	binary.LittleEndian.PutUint32(c, uint32(offset))
+	a.addConstPool(c, uint64(a.Buf.Len()))
 
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3529-L3532
 	// If the offset is within 24-bits, we can load it with two ADD instructions.
@@ -1677,7 +1771,7 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		a.Buf.Write([]byte{tmpRegBits, 0x0, 0x0, 0b00_011_0_00})
 
 		// Set the callback for the constant, and we set properly the offset in the callback.
-		a.setConstPoolCallback(offset32, func(offsetOfConst int) {
+		a.setConstPoolCallback(c, func(offsetOfConst int) {
 			// ldr(literal) encodes offset divided by 4.
 			offset := (offsetOfConst - int(loadLiteralOffsetInBinary)) / 4
 			bin := a.Buf.Bytes()
@@ -2499,16 +2593,72 @@ func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err er
 	}
 	return
 }
-
-func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
-	if n.Instruction != VMOV {
-		return errorEncodingUnsupported(n)
-	}
-
-	if err = checkArrangementIndexPair(n.VectorArrangement, n.VectorIndex); err != nil {
+func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) {
+	if err = checkArrangementIndexPair(n.VectorArrangement, n.SrcVectorIndex); err != nil {
 		return
 	}
 
+	srcVecRegBits, err := vectorRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstRegBits, err := intRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	switch n.Instruction {
+	case VMOV, SMOV:
+		var imm4 byte // imm4 as in "Advanced SIMD copy" https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		isSMOV := n.Instruction == SMOV
+		if isSMOV {
+			// SMOV: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SMOV--Signed-Move-vector-element-to-general-purpose-register-
+			imm4 = 0b0101
+		} else {
+			// VMOV is translated as "UMOV": https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-
+			imm4 = 0b0111
+		}
+
+		var imm5 byte
+		var q byte
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(n.SrcVectorIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(n.SrcVectorIndex) << 2
+		case VectorArrangementS:
+			if isSMOV {
+				return fmt.Errorf("invalid arrangement for SMOV: %s", n.VectorArrangement.String())
+			}
+			imm5 |= 0b100
+			imm5 |= byte(n.SrcVectorIndex) << 3
+		case VectorArrangementD:
+			if isSMOV {
+				return fmt.Errorf("invalid arrangement for SMOV: %s", n.VectorArrangement.String())
+			}
+
+			imm5 |= 0b1000
+			imm5 |= byte(n.SrcVectorIndex) << 4
+			q = 0b1
+		default:
+			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
+		}
+		a.Buf.Write([]byte{
+			(srcVecRegBits << 5) | dstRegBits,
+			imm4<<3 | 0b100 | srcVecRegBits>>3,
+			imm5,
+			q<<6 | 0b00001110,
+		})
+	default:
+		return errorEncodingUnsupported(n)
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
 	srcRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
@@ -2520,7 +2670,32 @@ func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) 
 	}
 
 	switch n.Instruction {
+	case DUP:
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-
+		var imm5 byte
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			imm5 = 0b1
+		case VectorArrangementH:
+			imm5 = 0b10
+		case VectorArrangementS:
+			imm5 = 0b100
+		case VectorArrangementD:
+			imm5 = 0b1000
+		default:
+			return fmt.Errorf("unsupported arrangement for DUP: %s", n.VectorArrangement)
+		}
+		a.Buf.Write([]byte{
+			(srcRegBits << 5) | dstVectorRegBits,
+			0b11<<2 | srcRegBits>>3,
+			imm5,
+			0b01_001110,
+		})
 	case VMOV:
+		if err = checkArrangementIndexPair(n.VectorArrangement, n.DstVectorIndex); err != nil {
+			return
+		}
+
 		// VMOV is translated as "INS(Vector, Element)"
 		// Description: https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
 		// Encoding: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--general---Insert-vector-element-from-general-purpose-register-?lang=en
@@ -2528,16 +2703,16 @@ func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) 
 		switch n.VectorArrangement {
 		case VectorArrangementB:
 			imm5 |= 0b1
-			imm5 |= byte(n.VectorIndex) << 1
+			imm5 |= byte(n.DstVectorIndex) << 1
 		case VectorArrangementH:
 			imm5 |= 0b10
-			imm5 |= byte(n.VectorIndex) << 2
+			imm5 |= byte(n.DstVectorIndex) << 2
 		case VectorArrangementS:
 			imm5 |= 0b100
-			imm5 |= byte(n.VectorIndex) << 3
+			imm5 |= byte(n.DstVectorIndex) << 3
 		case VectorArrangementD:
 			imm5 |= 0b1000
-			imm5 |= byte(n.VectorIndex) << 4
+			imm5 |= byte(n.DstVectorIndex) << 4
 		default:
 			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
 		}
@@ -2554,7 +2729,7 @@ func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) 
 }
 
 func (a *AssemblerImpl) EncodeMemoryToVectorRegister(n *NodeImpl) (err error) {
-	srcRegBits, err := intRegisterBits(n.SrcReg)
+	srcBaseRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
 	}
@@ -2565,19 +2740,65 @@ func (a *AssemblerImpl) EncodeMemoryToVectorRegister(n *NodeImpl) (err error) {
 	}
 
 	switch n.Instruction {
-	case VLD1:
-		if !(n.VectorArrangement >= VectorArrangement8B && n.VectorArrangement <= VectorArrangement2D) {
-			return fmt.Errorf("unsupported arrangement for VLD1: %s", n.VectorArrangement)
+	case VMOV: // translated as LDR(immediate,SIMD&FP)
+		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--?lang=en
+		var size, opcode byte
+		var dataSize, dataSizeLog2 int64
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			size, opcode, dataSize, dataSizeLog2 = 0b00, 0b01, 1, 0
+		case VectorArrangementH:
+			size, opcode, dataSize, dataSizeLog2 = 0b01, 0b01, 2, 1
+		case VectorArrangementS:
+			size, opcode, dataSize, dataSizeLog2 = 0b10, 0b01, 4, 2
+		case VectorArrangementD:
+			size, opcode, dataSize, dataSizeLog2 = 0b11, 0b01, 8, 3
+		case VectorArrangementQ:
+			size, opcode, dataSize, dataSizeLog2 = 0b00, 0b11, 16, 4
+		}
+		const v = 1 // v as in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_pos
+		if n.SrcReg2 != asm.NilRegister {
+			offsetRegBits, err := intRegisterBits(n.SrcReg2)
+			if err != nil {
+				return err
+			}
+			a.encodeLoadOrStoreWithRegisterOffset(srcBaseRegBits, offsetRegBits, dstVectorRegBits, opcode, size, v)
+		} else {
+			err = a.encodeLoadOrStoreWithConstOffset(srcBaseRegBits, dstVectorRegBits,
+				n.SrcConst, opcode, size, v, dataSize, dataSizeLog2)
+		}
+	case LD1R:
+		if n.SrcReg2 != asm.NilRegister || n.SrcConst != 0 {
+			return fmt.Errorf("offset for %s is not implemented", InstructionName(LD1R))
 		}
 
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LD1--multiple-structures---Load-multiple-single-element-structures-to-one--two--three--or-four-registers-?lang=en
-		var opcode byte = 0b0111 // One register destination.
-		size, q := arrangementSizeQ(n.VectorArrangement)
+		var size, q byte
+		switch n.VectorArrangement {
+		case VectorArrangement8B:
+			size, q = 0b00, 0b0
+		case VectorArrangement16B:
+			size, q = 0b00, 0b1
+		case VectorArrangement4H:
+			size, q = 0b01, 0b0
+		case VectorArrangement8H:
+			size, q = 0b01, 0b1
+		case VectorArrangement2S:
+			size, q = 0b10, 0b0
+		case VectorArrangement4S:
+			size, q = 0b10, 0b1
+		case VectorArrangement1D:
+			size, q = 0b11, 0b0
+		case VectorArrangement2D:
+			size, q = 0b11, 0b1
+		}
+
+		// No offset encoding.
+		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--?lang=en#iclass_as_post_index
 		a.Buf.Write([]byte{
-			(srcRegBits << 5) | dstVectorRegBits,
-			opcode<<4 | (size << 2) | srcRegBits>>3,
-			0b0100_0000,
-			q<<6 | 0b00001100,
+			(srcBaseRegBits << 5) | dstVectorRegBits,
+			0b11_000000 | size<<2 | srcBaseRegBits>>3,
+			0b01_000000,
+			q<<6 | 0b1101,
 		})
 	default:
 		return errorEncodingUnsupported(n)
@@ -2613,36 +2834,96 @@ func (a *AssemblerImpl) EncodeVectorRegisterToMemory(n *NodeImpl) (err error) {
 		return err
 	}
 
-	dstRegBits, err := intRegisterBits(n.DstReg)
+	dstBaseRegBits, err := intRegisterBits(n.DstReg)
 	if err != nil {
 		return err
 	}
 
 	switch n.Instruction {
-	case VST1:
-		if !(n.VectorArrangement >= VectorArrangement8B && n.VectorArrangement <= VectorArrangement2D) {
-			return fmt.Errorf("unsupported arrangement for VST1: %s", n.VectorArrangement)
+	case VMOV: // translated as STR(immediate,SIMD&FP)
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
+		var size, opcode byte
+		var dataSize, dataSizeLog2 int64
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			size, opcode, dataSize, dataSizeLog2 = 0b00, 0b00, 1, 0
+		case VectorArrangementH:
+			size, opcode, dataSize, dataSizeLog2 = 0b01, 0b00, 2, 1
+		case VectorArrangementS:
+			size, opcode, dataSize, dataSizeLog2 = 0b10, 0b00, 4, 2
+		case VectorArrangementD:
+			size, opcode, dataSize, dataSizeLog2 = 0b11, 0b00, 8, 3
+		case VectorArrangementQ:
+			size, opcode, dataSize, dataSizeLog2 = 0b00, 0b10, 16, 4
 		}
+		const v = 1 // v as in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_pos
 
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ST1--multiple-structures---Store-multiple-single-element-structures-from-one--two--three--or-four-registers-?lang=en
-		var opcode byte = 0b0111 // One register destination.
-		size, q := arrangementSizeQ(n.VectorArrangement)
-		a.Buf.Write([]byte{
-			(dstRegBits << 5) | srcVectorRegBits,
-			opcode<<4 | (size << 2) | dstRegBits>>3,
-			0x0,
-			q<<6 | 0b00001100,
-		})
+		if n.DstReg2 != asm.NilRegister {
+			offsetRegBits, err := intRegisterBits(n.DstReg2)
+			if err != nil {
+				return err
+			}
+			a.encodeLoadOrStoreWithRegisterOffset(dstBaseRegBits, offsetRegBits, srcVectorRegBits, opcode, size, v)
+		} else {
+			err = a.encodeLoadOrStoreWithConstOffset(dstBaseRegBits, srcVectorRegBits,
+				n.DstConst, opcode, size, v, dataSize, dataSizeLog2)
+		}
 	default:
 		return errorEncodingUnsupported(n)
 	}
 	return
 }
 
-func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error {
-	srcVectorRegBits, err := vectorRegisterBits(n.SrcReg)
+func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err error) {
+	if n.Instruction != VMOV {
+		return errorEncodingUnsupported(n)
+	}
+
+	dstRegBits, err := vectorRegisterBits(n.DstReg)
 	if err != nil {
 		return err
+	}
+
+	loadLiteralOffsetInBinary := uint64(a.Buf.Len())
+	a.addConstPool(n.staticConst, loadLiteralOffsetInBinary)
+
+	// LDR (literal, SIMD&FP)
+	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--literal--SIMD-FP---Load-SIMD-FP-Register--PC-relative-literal--
+	var opc byte
+	var constLength int
+	switch n.VectorArrangement {
+	case VectorArrangementS:
+		opc, constLength = 0b00, 4
+	case VectorArrangementD:
+		opc, constLength = 0b01, 8
+	case VectorArrangementQ:
+		opc, constLength = 0b10, 16
+	}
+
+	if len(n.staticConst) != constLength {
+		return fmt.Errorf("invalid const length for %s: want %d but was %d",
+			n.VectorArrangement, constLength, len(n.staticConst))
+	}
+
+	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, opc<<6 | 0b11100})
+	a.setConstPoolCallback(n.staticConst, func(offsetOfConst int) {
+		// LDR (literal, SIMD&FP) encodes offset divided by 4.
+		offset := (offsetOfConst - int(loadLiteralOffsetInBinary)) / 4
+		bin := a.Buf.Bytes()
+		bin[loadLiteralOffsetInBinary] |= byte(offset << 5)
+		bin[loadLiteralOffsetInBinary+1] |= byte(offset >> 3)
+		bin[loadLiteralOffsetInBinary+2] |= byte(offset >> 11)
+	})
+	return
+}
+
+func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err error) {
+	var srcVectorRegBits byte
+	if n.SrcReg != RegRZR {
+		srcVectorRegBits, err = vectorRegisterBits(n.SrcReg)
+		if err != nil {
+			return err
+		}
 	}
 
 	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
@@ -2651,34 +2932,111 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error 
 	}
 
 	switch n.Instruction {
-	case VMOV:
-		if n.VectorArrangement != VectorArrangement16B {
-			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
+	case DUP:
+		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+		if n.SrcVectorIndex == VectorIndexNone {
+			return fmt.Errorf("source vector index must be given for %s", InstructionName(DUP))
 		}
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--vector---Move-vector--an-alias-of-ORR--vector--register--
+		var imm5 byte
+		switch n.VectorArrangement {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(n.SrcVectorIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(n.SrcVectorIndex) << 2
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(n.SrcVectorIndex) << 3
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(n.SrcVectorIndex) << 4
+		default:
+			return fmt.Errorf("unsupported arrangement for VMOV: %d", n.VectorArrangement)
+		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
-			0b000111<<2 | srcVectorRegBits>>3,
-			0b101<<5 | srcVectorRegBits,
+			0b1<<2 | srcVectorRegBits>>3,
+			imm5,
 			0b0100_1110,
 		})
-	case VADD:
+	case VMOV:
+		if n.SrcVectorIndex != VectorIndexNone && n.DstVectorIndex != VectorIndexNone {
+			// This case VMOV is translated as MOV(vector, element)
+			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--element---Move-vector-element-to-another-vector-element--an-alias-of-INS--element--
+			var imm5, imm4 byte
+			switch n.VectorArrangement {
+			case VectorArrangementB:
+				imm5 |= 0b1
+				imm5 |= byte(n.DstVectorIndex) << 1
+				imm4 = byte(n.SrcVectorIndex)
+			case VectorArrangementH:
+				imm5 |= 0b10
+				imm5 |= byte(n.DstVectorIndex) << 2
+				imm4 = byte(n.SrcVectorIndex) << 1
+			case VectorArrangementS:
+				imm5 |= 0b100
+				imm5 |= byte(n.DstVectorIndex) << 3
+				imm4 = byte(n.SrcVectorIndex) << 2
+			case VectorArrangementD:
+				imm5 |= 0b1000
+				imm5 |= byte(n.DstVectorIndex) << 4
+				imm4 = byte(n.SrcVectorIndex) << 3
+			default:
+				return fmt.Errorf("unsupported arrangement for VMOV: %d", n.VectorArrangement)
+			}
+			a.Buf.Write([]byte{
+				(srcVectorRegBits << 5) | dstVectorRegBits,
+				imm4<<3 | 1<<2 | srcVectorRegBits>>3,
+				imm5,
+				0b01101110,
+			})
+		} else {
+			// This case VMOV is translated as MOV(vector)
+			if n.VectorArrangement != VectorArrangement16B {
+				return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
+			}
+			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--vector---Move-vector--an-alias-of-ORR--vector--register--
+			a.Buf.Write([]byte{
+				(srcVectorRegBits << 5) | dstVectorRegBits,
+				0b000111<<2 | srcVectorRegBits>>3,
+				0b101<<5 | srcVectorRegBits,
+				0b0100_1110,
+			})
+		}
+	case VADD, VSUB:
 		if n.VectorArrangement == VectorArrangementNone || (n.VectorArrangement >= VectorArrangementB && n.VectorArrangement <= VectorArrangementD) ||
 			(n.VectorArrangement == VectorArrangement1D) {
 			return fmt.Errorf("unsupported arrangement for VADD: %s", n.VectorArrangement)
 		}
 
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ADD--vector---Add--vector--
+		var u byte
+		switch n.Instruction {
+		case VADD:
+			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ADD--vector---Add--vector--
+			u = 0b0
+		case VSUB:
+			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SUB--vector---Subtract--vector--
+			u = 0b1
+		}
+
 		size, q := arrangementSizeQ(n.VectorArrangement)
 		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			0b100001<<2 | srcVectorRegBits>>3,
-			size<<6 | 0b1<<5 | dstVectorRegBits,
-			q<<6 | 0b1110,
+			(dstVectorRegBits << 5) | dstVectorRegBits,
+			0b100001<<2 | dstVectorRegBits>>3,
+			size<<6 | 0b1<<5 | srcVectorRegBits,
+			q<<6 | u<<5 | 0b1110,
 		})
-	case VFADDS, VFADDD:
-		var sz byte
-		if n.Instruction == VFADDD {
+	case VFADDS, VFADDD, VFSUBS, VFSUBD:
+		var sz, b byte
+		switch n.Instruction {
+		case VFADDS:
+		case VFADDD:
+			sz = 0b1
+		case VFSUBS:
+			b = 0b1
+		case VFSUBD:
+			b = 0b1
 			sz = 0b1
 		}
 
@@ -2686,8 +3044,152 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) error 
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			0b110101<<2 | srcVectorRegBits>>3,
-			sz<<6 | 0b1<<5 | dstVectorRegBits,
+			b<<7 | sz<<6 | 0b1<<5 | dstVectorRegBits,
 			0b1<<6 | 0b1110,
+		})
+
+	case SSHLL, USHLL:
+		// SSHLL: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SSHLL--SSHLL2--Signed-Shift-Left-Long--immediate--
+		// USHLL: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/USHLL--USHLL2--Unsigned-Shift-Left-Long--immediate--
+		var u byte
+		switch n.Instruction {
+		case SSHLL:
+			u = 0b0
+		case USHLL:
+			u = 0b1
+		}
+
+		var immb, immh byte
+		switch n.VectorArrangement {
+		case VectorArrangement8B:
+			if n.SrcConst < 0 || n.SrcConst > 7 {
+				return fmt.Errorf("shift amount on %s must be between 0 and 7 for %s but was %d",
+					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
+			}
+			immb = byte(n.SrcConst)
+			immh = 0b0001
+		case VectorArrangement4H:
+			if n.SrcConst < 0 || n.SrcConst > 15 {
+				return fmt.Errorf("shift amount on %s must be between 0 and 15 for %s but was %d",
+					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
+			}
+			immb = byte(n.SrcConst) & 0b111
+			immh = 0b0010 | byte(n.SrcConst>>3)
+		case VectorArrangement2S:
+			if n.SrcConst < 0 || n.SrcConst > 31 {
+				return fmt.Errorf("shift amount on %s must be between 0 and 31 for %s but was %d",
+					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
+			}
+			immb = byte(n.SrcConst) & 0b111
+			immh = 0b0100 | byte(n.SrcConst>>3)
+		default:
+			return fmt.Errorf("unsupported arrangement for %s: %s",
+				InstructionName(n.Instruction), n.VectorArrangement)
+		}
+
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			0b101001<<2 | srcVectorRegBits>>3,
+			immh<<3 | immb,
+			u<<5 | 0b1111,
+		})
+	case ADDP:
+		var opcode byte
+		var size, q byte
+		var rm, op byte
+		switch n.VectorArrangement {
+		case VectorArrangementD:
+			opcode = 0b10111_0
+			size, q = 0b11, 0b1
+			// ADDP (scalar) https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
+			rm = 0b10001
+			op = 0b1
+		default:
+			// ADDP (vector) https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--vector---Add-Pairwise--vector--?lang=en
+			opcode = 0b10111_1
+			size, q = arrangementSizeQ(n.VectorArrangement)
+			rm = dstVectorRegBits
+			op = 0b0
+		}
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			opcode<<2 | srcVectorRegBits>>3,
+			size<<6 | 0b1<<5 | rm,
+			q<<6 | op<<4 | 0b01110,
+		})
+	case UMAXP:
+		// "Advanced SIMD three same" in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		var opcode, u byte
+		switch n.Instruction {
+		case UMAXP:
+			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMAXP--Unsigned-Maximum-Pairwise-
+			opcode, u = 0b10100, 0b1
+		}
+		var size, q byte = arrangementSizeQ(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			opcode<<3 | 0b1<<2 | srcVectorRegBits>>3,
+			size<<6 | 0b1<<5 | dstVectorRegBits,
+			q<<6 | u<<5 | 0b01110,
+		})
+	case UMINV:
+		// "Advanced SIMD across lanes" in  https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		var opcode, u byte = 0b11010, 0b1
+		var size, q byte = arrangementSizeQ(n.VectorArrangement)
+
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
+			size<<6 | 0b11000<<1 | opcode>>4,
+			q<<6 | u<<5 | 0b01110,
+		})
+	case CMEQ:
+		const size byte = 0b11
+		if n.SrcReg == RegRZR {
+			// CMEQ (zero, vector)
+			// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--zero---Compare-bitwise-Equal-to-zero--vector--?lang=en
+			a.Buf.Write([]byte{
+				(dstVectorRegBits << 5) | dstVectorRegBits,
+				0b100110<<2 | dstVectorRegBits>>3,
+				size<<6 | 0b1<<5,
+				0b01001110,
+			})
+		} else {
+			// CMEQ (register, vector)
+			// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--register---Compare-bitwise-Equal--vector--?lang=en
+			a.Buf.Write([]byte{
+				(srcVectorRegBits << 5) | dstVectorRegBits,
+				0b100011<<2 | srcVectorRegBits>>3,
+				size<<6 | 0b1<<5 | dstVectorRegBits,
+				0b01101110,
+			})
+		}
+
+	case TBL1, TBL2:
+		// Interpret dstVectorRegBits as the index register (`Rm` in the doc)
+		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-?lang=en
+
+		var l byte // `len` in the doc.
+		switch n.Instruction {
+		case TBL1:
+			l = 0b00
+		case TBL2:
+			l = 0b01
+		}
+
+		var q byte
+		switch n.VectorArrangement {
+		case VectorArrangement16B:
+			q = 0b1
+		case VectorArrangement8B:
+			q = 0b0
+		}
+
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			l<<5 | srcVectorRegBits>>3,
+			dstVectorRegBits,
+			q<<6 | 0b1110,
 		})
 	default:
 		return errorEncodingUnsupported(n)
@@ -2721,7 +3223,7 @@ func intRegisterBits(r asm.Register) (ret byte, err error) {
 
 func vectorRegisterBits(r asm.Register) (ret byte, err error) {
 	if !isVectorRegister(r) {
-		err = fmt.Errorf("%s is not float", RegisterName(r))
+		err = fmt.Errorf("%s is not vector", RegisterName(r))
 	} else {
 		ret = byte(r - RegV0)
 	}

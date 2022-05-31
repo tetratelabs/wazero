@@ -1,6 +1,8 @@
 package wazeroir
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type UnsignedInt byte
 
@@ -290,10 +292,34 @@ func (o OperationKind) String() (ret string) {
 		ret = "TableGrow"
 	case OperationKindTableFill:
 		ret = "TableFill"
-	case OperationKindConstV128:
+	case OperationKindV128Const:
 		ret = "ConstV128"
 	case OperationKindV128Add:
 		ret = "V128Add"
+	case OperationKindV128Sub:
+		ret = "V128Sub"
+	case OperationKindV128Load:
+		ret = "V128Load"
+	case OperationKindV128LoadLane:
+		ret = "V128LoadLane"
+	case OperationKindV128Store:
+		ret = "V128Store"
+	case OperationKindV128StoreLane:
+		ret = "V128StoreLane"
+	case OperationKindV128ExtractLane:
+		ret = "V128ExtractLane"
+	case OperationKindV128ReplaceLane:
+		ret = "V128ReplaceLane"
+	case OperationKindV128Splat:
+		ret = "V128Splat"
+	case OperationKindV128Shuffle:
+		ret = "V128Shuffle"
+	case OperationKindV128Swizzle:
+		ret = "V128Swizzle"
+	case OperationKindV128AnyTrue:
+		ret = "V128AnyTrue"
+	case OperationKindV128AllTrue:
+		ret = "V128AllTrue"
 	default:
 		panic("BUG")
 	}
@@ -388,8 +414,21 @@ const (
 	OperationKindTableSize
 	OperationKindTableGrow
 	OperationKindTableFill
-	OperationKindConstV128
+
+	OperationKindV128Const
 	OperationKindV128Add
+	OperationKindV128Sub
+	OperationKindV128Load
+	OperationKindV128LoadLane
+	OperationKindV128Store
+	OperationKindV128StoreLane
+	OperationKindV128ExtractLane
+	OperationKindV128ReplaceLane
+	OperationKindV128Splat
+	OperationKindV128Shuffle
+	OperationKindV128Swizzle
+	OperationKindV128AnyTrue
+	OperationKindV128AllTrue
 )
 
 type Label struct {
@@ -569,10 +608,10 @@ func (o *OperationGlobalSet) Kind() OperationKind {
 	return OperationKindGlobalSet
 }
 
-// MemoryImmediate is the "memarg" to all memory instructions.
+// MemoryArg is the "memarg" to all memory instructions.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instructions%E2%91%A0
-type MemoryImmediate struct {
+type MemoryArg struct {
 	// Alignment the expected alignment (expressed as the exponent of a power of 2). Default to the natural alignment.
 	//
 	// "Natural alignment" is defined here as the smallest power of two that can hold the size of the value type. Ex
@@ -586,7 +625,7 @@ type MemoryImmediate struct {
 
 type OperationLoad struct {
 	Type UnsignedType
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationLoad) Kind() OperationKind {
@@ -595,7 +634,7 @@ func (o *OperationLoad) Kind() OperationKind {
 
 type OperationLoad8 struct {
 	Type SignedInt
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationLoad8) Kind() OperationKind {
@@ -604,7 +643,7 @@ func (o *OperationLoad8) Kind() OperationKind {
 
 type OperationLoad16 struct {
 	Type SignedInt
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationLoad16) Kind() OperationKind {
@@ -613,7 +652,7 @@ func (o *OperationLoad16) Kind() OperationKind {
 
 type OperationLoad32 struct {
 	Signed bool
-	Arg    *MemoryImmediate
+	Arg    *MemoryArg
 }
 
 func (o *OperationLoad32) Kind() OperationKind {
@@ -622,7 +661,7 @@ func (o *OperationLoad32) Kind() OperationKind {
 
 type OperationStore struct {
 	Type UnsignedType
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationStore) Kind() OperationKind {
@@ -632,7 +671,7 @@ func (o *OperationStore) Kind() OperationKind {
 type OperationStore8 struct {
 	// TODO: Semantically Type doesn't affect operation so consider deleting this field.
 	Type UnsignedInt
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationStore8) Kind() OperationKind {
@@ -642,7 +681,7 @@ func (o *OperationStore8) Kind() OperationKind {
 type OperationStore16 struct {
 	// TODO: Semantically Type doesn't affect operation so consider deleting this field.
 	Type UnsignedInt
-	Arg  *MemoryImmediate
+	Arg  *MemoryArg
 }
 
 func (o *OperationStore16) Kind() OperationKind {
@@ -650,7 +689,7 @@ func (o *OperationStore16) Kind() OperationKind {
 }
 
 type OperationStore32 struct {
-	Arg *MemoryImmediate
+	Arg *MemoryArg
 }
 
 // Kind implements Operation.Kind.
@@ -1167,14 +1206,14 @@ func (o *OperationTableFill) Kind() OperationKind {
 	return OperationKindTableFill
 }
 
-// OperationConstV128 implements Operation.
-type OperationConstV128 struct {
+// OperationV128Const implements Operation.
+type OperationV128Const struct {
 	Lo, Hi uint64
 }
 
 // Kind implements Operation.Kind.
-func (o *OperationConstV128) Kind() OperationKind {
-	return OperationKindConstV128
+func (o *OperationV128Const) Kind() OperationKind {
+	return OperationKindV128Const
 }
 
 // Shape corresponds to a shape of v128 values.
@@ -1208,12 +1247,174 @@ func shapeName(s Shape) (ret string) {
 	return
 }
 
-// OperationAddV128 implements Operation.
-type OperationAddV128 struct {
+// OperationV128Add implements Operation.
+type OperationV128Add struct {
 	Shape Shape
 }
 
 // Kind implements Operation.Kind.
-func (o *OperationAddV128) Kind() OperationKind {
+func (o *OperationV128Add) Kind() OperationKind {
 	return OperationKindV128Add
+}
+
+// OperationV128Sub implements Operation.
+type OperationV128Sub struct {
+	Shape Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Sub) Kind() OperationKind {
+	return OperationKindV128Sub
+}
+
+type LoadV128Type = byte
+
+const (
+	// LoadV128Type128 corresponds to wasm.OpcodeVecV128LoadName.
+	LoadV128Type128 LoadV128Type = iota
+	// LoadV128Type8x8s corresponds to wasm.OpcodeVecV128Load8x8SName.
+	LoadV128Type8x8s
+	// LoadV128Type8x8u corresponds to wasm.OpcodeVecV128Load8x8UName.
+	LoadV128Type8x8u
+	// LoadV128Type16x4s corresponds to wasm.OpcodeVecV128Load16x4SName
+	LoadV128Type16x4s
+	// LoadV128Type16x4u corresponds to wasm.OpcodeVecV128Load16x4UName
+	LoadV128Type16x4u
+	// LoadV128Type32x2s corresponds to wasm.OpcodeVecV128Load32x2SName
+	LoadV128Type32x2s
+	// LoadV128Type32x2u corresponds to wasm.OpcodeVecV128Load32x2UName
+	LoadV128Type32x2u
+	// LoadV128Type8Splat corresponds to wasm.OpcodeVecV128Load8SplatName
+	LoadV128Type8Splat
+	// LoadV128Type16Splat corresponds to wasm.OpcodeVecV128Load16SplatName
+	LoadV128Type16Splat
+	// LoadV128Type32Splat corresponds to wasm.OpcodeVecV128Load32SplatName
+	LoadV128Type32Splat
+	// LoadV128Type64Splat corresponds to wasm.OpcodeVecV128Load64SplatName
+	LoadV128Type64Splat
+	// LoadV128Type32zero corresponds to wasm.OpcodeVecV128Load32zeroName
+	LoadV128Type32zero
+	// LoadV128Type64zero corresponds to wasm.OpcodeVecV128Load64zeroName
+	LoadV128Type64zero
+)
+
+// OperationV128Load implements Operation.
+type OperationV128Load struct {
+	Type LoadV128Type
+	Arg  *MemoryArg
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Load) Kind() OperationKind {
+	return OperationKindV128Load
+}
+
+// OperationV128LoadLane implements Operation.
+type OperationV128LoadLane struct {
+	// LaneIndex is >=0 && <(128/LaneSize).
+	LaneIndex byte
+	// LaneSize is either 8, 16, 32, or 64.
+	LaneSize byte
+	Arg      *MemoryArg
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128LoadLane) Kind() OperationKind {
+	return OperationKindV128LoadLane
+}
+
+// OperationV128Store implements Operation.
+type OperationV128Store struct {
+	Arg *MemoryArg
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Store) Kind() OperationKind {
+	return OperationKindV128Store
+}
+
+// OperationV128StoreLane implements Operation.
+type OperationV128StoreLane struct {
+	// LaneIndex is >=0 && <(128/LaneSize).
+	LaneIndex byte
+	// LaneSize is either 8, 16, 32, or 64.
+	LaneSize byte
+	Arg      *MemoryArg
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128StoreLane) Kind() OperationKind {
+	return OperationKindV128StoreLane
+}
+
+// OperationV128ExtractLane implements Operation.
+type OperationV128ExtractLane struct {
+	// LaneIndex is >=0 && <M where shape = NxM.
+	LaneIndex byte
+	// Signed is used when shape is either i8x16 or i16x2 to specify whether to sign-extend or not.
+	Signed bool
+	Shape  Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128ExtractLane) Kind() OperationKind {
+	return OperationKindV128ExtractLane
+}
+
+// OperationV128ReplaceLane implements Operation.
+type OperationV128ReplaceLane struct {
+	// LaneIndex is >=0 && <M where shape = NxM.
+	LaneIndex byte
+	Shape     Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128ReplaceLane) Kind() OperationKind {
+	return OperationKindV128ReplaceLane
+}
+
+// OperationV128Splat implements Operation.
+type OperationV128Splat struct {
+	Shape Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Splat) Kind() OperationKind {
+	return OperationKindV128Splat
+}
+
+// OperationV128Shuffle implements Operation.
+type OperationV128Shuffle struct {
+	Lanes [16]byte
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Shuffle) Kind() OperationKind {
+	return OperationKindV128Shuffle
+}
+
+// OperationV128Swizzle implements Operation.
+type OperationV128Swizzle struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Swizzle) Kind() OperationKind {
+	return OperationKindV128Swizzle
+}
+
+// OperationV128AnyTrue implements Operation.
+type OperationV128AnyTrue struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128AnyTrue) Kind() OperationKind {
+	return OperationKindV128AnyTrue
+}
+
+// OperationV128AllTrue implements Operation.
+type OperationV128AllTrue struct {
+	Shape Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128AllTrue) Kind() OperationKind {
+	return OperationKindV128AllTrue
 }

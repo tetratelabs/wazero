@@ -673,36 +673,65 @@ const (
 	UCVTFWS
 	// UDIV is the UDIV instruction .https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIV
-	// UDVIW is the UDIV instruction, in 64-bit mode.https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
+	// UDIVW is the UDIV instruction, in 64-bit mode.https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIVW
-
-	// Vector instructions.
 
 	// VBIT is the BIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/BIT--vector-
 	VBIT
 	// VCNT is the CNT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/CNT--vector-
 	VCNT
-	// VMOV is the MOV instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
+	// VMOV has different semantics depending on the types of operands:
+	//  * MOV(vector) if the operands are vectors and indexes are not specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
+	//  * MOV(vector, element) if the operands are vectors and indexes are specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector--element-
+	//  * INS(vector, element) if the src is a general purpose and the dst is a vector. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
+	//  * UMOV(vector) if the dst is a general purpose and the src is a vector. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMOV--vector-
+	//  * LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
+	//  * LDR (literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
+	//  * STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
 	VMOV
 	// VUADDLV is the UADDLV instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
 	VUADDLV
-	// VLD1 is the LD1 instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/LD1--vector--single-structure-
-	VLD1
-	// VST1 is the ST1 instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ST1--vector--single-structure-
-	VST1
-	// VADD is the ADD instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
+	// VADD is the ADD(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
 	VADD
-	// VFADDS is the FADD instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
+	// VFADDS is the FADD(vector) instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
 	VFADDS
-	// VFADDD is the FADD instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
+	// VFADDD is the FADD(vector) instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
 	VFADDD
+	// VSUB is the SUB(vector) instruction.  https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/SUB--vector-
+	VSUB
+	// VFSUBS is the FSUB(vector) instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FSUB--vector-
+	VFSUBS
+	// VFSUBD is the FSUB(vector) instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FSUB--vector-
+	VFSUBD
+	// SSHLL is the SSHLL instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	SSHLL
+	// USHLL is the USHLL instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	USHLL
+	// LD1R is the LD1R instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--
+	LD1R
+	// SMOV is the SMOV instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
+	SMOV
+	// DUP is the DUP instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+	DUP
+	// UMAXP is the UMAXP instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/UMAXP--vector-
+	UMAXP
+	// UMINV is the UMINV instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMINV--vector-
+	UMINV
+	// CMEQ is the CMEQ instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/CMEQ--vector--register-
+	CMEQ
+	// ADDP is the ADDP instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
+	ADDP
+	// TBL1 is the TBL instruction whose source is one vector. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
+	TBL1
+	// TBL2 is the TBL instruction whose source is two vectors. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
+	TBL2
 )
 
 // VectorArrangement is the arrangement of data within a vector register.
 type VectorArrangement byte
 
 const (
-	// VectorArrangmentNone is an arrangement indicating no data is stored.
+	// VectorArrangementNone is an arrangement indicating no data is stored.
 	VectorArrangementNone VectorArrangement = iota
 	// VectorArrangement8B is an arrangement of 8 bytes (64-bit vector)
 	VectorArrangement8B
@@ -728,12 +757,14 @@ const (
 
 	// VectorArrangementB is a size specifier of byte
 	VectorArrangementB
-	// VectorArrangementH is a size specifier of halfword
+	// VectorArrangementH is a size specifier of word (16-bit)
 	VectorArrangementH
-	// VectorArrangementS is a size specifier of word
+	// VectorArrangementS is a size specifier of double word (32-bit)
 	VectorArrangementS
-	// VectorArrangementD is a size specifier of doubleword
+	// VectorArrangementD is a size specifier of quad word (64-bit)
 	VectorArrangementD
+	// VectorArrangementQ is a size specifier of the entire vector (128-bit)
+	VectorArrangementQ
 )
 
 func (v VectorArrangement) String() (ret string) {
@@ -762,14 +793,21 @@ func (v VectorArrangement) String() (ret string) {
 		ret = "S"
 	case VectorArrangementD:
 		ret = "D"
+	case VectorArrangementQ:
+		ret = "Q"
+	case VectorArrangementNone:
+		ret = "none"
 	default:
-		ret = "unknown"
+		panic(v)
 	}
 	return
 }
 
 // VectorIndex is the index of an element of a vector register
 type VectorIndex byte
+
+// VectorIndexNone indicates no vector index specified.
+const VectorIndexNone VectorIndex = ^VectorIndex(0)
 
 // InstructionName returns the name of the given instruction
 func InstructionName(i asm.Instruction) string {
@@ -1014,16 +1052,36 @@ func InstructionName(i asm.Instruction) string {
 		return "VUADDLV"
 	case VMOV:
 		return "VMOV"
-	case VST1:
-		return "VST1"
-	case VLD1:
-		return "VLD1"
 	case VADD:
 		return "VADD"
 	case VFADDS:
 		return "VFADDS"
 	case VFADDD:
 		return "VFADDD"
+	case VSUB:
+		return "VSUB"
+	case VFSUBS:
+		return "VFSUBS"
+	case VFSUBD:
+		return "VFSUBD"
+	case SSHLL:
+		return "SSHLL"
+	case USHLL:
+		return "USHLL"
+	case LD1R:
+		return "LD1R"
+	case SMOV:
+		return "SMOV"
+	case DUP:
+		return "DUP"
+	case UMAXP:
+		return "UMAXP"
+	case UMINV:
+		return "UMINV"
+	case CMEQ:
+		return "CMEQ"
+	case ADDP:
+		return "ADDP"
 	}
-	return "UNKNOWN"
+	panic("unknown instruction")
 }

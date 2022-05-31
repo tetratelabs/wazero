@@ -158,6 +158,61 @@ var (
 		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeV128},
 		out: []UnsignedType{UnsignedTypeV128},
 	}
+	signature_I32_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeI32},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_I32V128_None = &signature{
+		in: []UnsignedType{UnsignedTypeI32, UnsignedTypeV128},
+	}
+	signature_I32V128_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeI32, UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_V128I32_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeI32},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_V128I64_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeI64},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_V128F32_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeF32},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_V128F64_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeF64},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_V128_I32 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeI32},
+	}
+	signature_V128_I64 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeI64},
+	}
+	signature_V128_F32 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeF32},
+	}
+	signature_V128_F64 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeF64},
+	}
+	signature_I64_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeI64},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_F32_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeF32},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
+	signature_F64_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeF64},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
 )
 
 // wasmOpcodeSignature returns the signature of given Wasm opcode.
@@ -411,10 +466,62 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 		switch vecOp := c.body[c.pc+1]; vecOp {
 		case wasm.OpcodeVecV128Const:
 			return signature_None_V128, nil
-		case wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add:
+		case wasm.OpcodeVecI8x16Add, wasm.OpcodeVecI16x8Add, wasm.OpcodeVecI32x4Add, wasm.OpcodeVecI64x2Add,
+			wasm.OpcodeVecI8x16Sub, wasm.OpcodeVecI16x8Sub, wasm.OpcodeVecI32x4Sub, wasm.OpcodeVecI64x2Sub:
 			return signature_V128V128_V128, nil
+		case wasm.OpcodeVecV128Load, wasm.OpcodeVecV128Load8x8s, wasm.OpcodeVecV128Load8x8u,
+			wasm.OpcodeVecV128Load16x4s, wasm.OpcodeVecV128Load16x4u, wasm.OpcodeVecV128Load32x2s,
+			wasm.OpcodeVecV128Load32x2u, wasm.OpcodeVecV128Load8Splat, wasm.OpcodeVecV128Load16Splat,
+			wasm.OpcodeVecV128Load32Splat, wasm.OpcodeVecV128Load64Splat, wasm.OpcodeVecV128Load32zero,
+			wasm.OpcodeVecV128Load64zero:
+			return signature_I32_V128, nil
+		case wasm.OpcodeVecV128Load8Lane, wasm.OpcodeVecV128Load16Lane,
+			wasm.OpcodeVecV128Load32Lane, wasm.OpcodeVecV128Load64Lane:
+			return signature_I32V128_V128, nil
+		case wasm.OpcodeVecV128Store,
+			wasm.OpcodeVecV128Store8Lane,
+			wasm.OpcodeVecV128Store16Lane,
+			wasm.OpcodeVecV128Store32Lane,
+			wasm.OpcodeVecV128Store64Lane:
+			return signature_I32V128_None, nil
+		case wasm.OpcodeVecI8x16ExtractLaneS,
+			wasm.OpcodeVecI8x16ExtractLaneU,
+			wasm.OpcodeVecI16x8ExtractLaneS,
+			wasm.OpcodeVecI16x8ExtractLaneU,
+			wasm.OpcodeVecI32x4ExtractLane:
+			return signature_V128_I32, nil
+		case wasm.OpcodeVecI64x2ExtractLane:
+			return signature_V128_I64, nil
+		case wasm.OpcodeVecF32x4ExtractLane:
+			return signature_V128_F32, nil
+		case wasm.OpcodeVecF64x2ExtractLane:
+			return signature_V128_F64, nil
+		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane, wasm.OpcodeVecI32x4ReplaceLane:
+			return signature_V128I32_V128, nil
+		case wasm.OpcodeVecI64x2ReplaceLane:
+			return signature_V128I64_V128, nil
+		case wasm.OpcodeVecF32x4ReplaceLane:
+			return signature_V128F32_V128, nil
+		case wasm.OpcodeVecF64x2ReplaceLane:
+			return signature_V128F64_V128, nil
+		case wasm.OpcodeVecI8x16Splat,
+			wasm.OpcodeVecI16x8Splat,
+			wasm.OpcodeVecI32x4Splat:
+			return signature_I32_V128, nil
+		case wasm.OpcodeVecI64x2Splat:
+			return signature_I64_V128, nil
+		case wasm.OpcodeVecF32x4Splat:
+			return signature_F32_V128, nil
+		case wasm.OpcodeVecF64x2Splat:
+			return signature_F64_V128, nil
+		case wasm.OpcodeVecV128i8x16Shuffle, wasm.OpcodeVecI8x16Swizzle:
+			return signature_V128V128_V128, nil
+		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue:
+			return signature_V128_I32, nil
+		case wasm.OpcodeVecV128AnyTrue:
+			return signature_V128_I32, nil
 		default:
-			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
+			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)

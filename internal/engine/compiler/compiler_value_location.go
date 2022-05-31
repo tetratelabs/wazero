@@ -212,6 +212,12 @@ func (v *runtimeValueLocationStack) pop() (loc *runtimeValueLocation) {
 	return
 }
 
+func (v *runtimeValueLocationStack) popV128() (loc *runtimeValueLocation) {
+	v.sp -= 2
+	loc = v.stack[v.sp]
+	return
+}
+
 func (v *runtimeValueLocationStack) peek() (loc *runtimeValueLocation) {
 	loc = v.stack[v.sp-1]
 	return

@@ -78,7 +78,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 	// For testing. Arbitrary number is fine.
 	loadTargetValue := uint64(0x12_34_56_78_9a_bc_ef_fe)
 	baseOffset := uint32(100)
-	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	arg := &wazeroir.MemoryArg{Offset: 361}
 	offset := baseOffset + arg.Offset
 
 	tests := []struct {
@@ -277,7 +277,7 @@ func TestCompiler_compileStore(t *testing.T) {
 	// For testing. Arbitrary number is fine.
 	storeTargetValue := uint64(math.MaxUint64)
 	baseOffset := uint32(100)
-	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	arg := &wazeroir.MemoryArg{Offset: 361}
 	offset := arg.Offset + baseOffset
 
 	tests := []struct {
@@ -444,7 +444,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
 					require.NoError(t, err)
 
-					arg := &wazeroir.MemoryImmediate{Offset: offset}
+					arg := &wazeroir.MemoryArg{Offset: offset}
 
 					switch targetSizeInByte {
 					case 1:

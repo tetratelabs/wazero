@@ -38,6 +38,8 @@ type NodeImpl struct {
 
 	// JumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .JumpTarget == this.
 	JumpOrigins map[*NodeImpl]struct{}
+
+	staticConst asm.StaticConst
 }
 
 type NodeFlag byte
@@ -45,10 +47,10 @@ type NodeFlag byte
 const (
 	// NodeFlagInitializedForEncoding is always set to indicate that node is already initialized. Notably, this is used to judge
 	// whether a jump is backward or forward before encoding.
-	NodeFlagInitializedForEncoding NodeFlag = (1 << iota)
+	NodeFlagInitializedForEncoding NodeFlag = 1 << iota
 	NodeFlagBackwardJump
 	// NodeFlagShortForwardJump is set to false by default and only used by forward branch jumps, which means .JumpTarget != nil and
-	// the target node is encoded afoter this node. False by default means that that we Encode all the jumps with JumpTarget
+	// the target node is encoded after this node. False by default means that we Encode all the jumps with JumpTarget
 	// as short jump (i.e. relative signed 8-bit integer offset jump) and try to Encode as small as possible.
 	NodeFlagShortForwardJump
 )
@@ -163,6 +165,7 @@ const (
 	OperandTypeRegister
 	OperandTypeMemory
 	OperandTypeConst
+	OperandTypeStaticConst
 	OperandTypeBranch
 )
 
@@ -178,6 +181,8 @@ func (o OperandType) String() (ret string) {
 		ret = "const"
 	case OperandTypeBranch:
 		ret = "branch"
+	case OperandTypeStaticConst:
+		ret = "static-const"
 	}
 	return
 }
@@ -186,18 +191,19 @@ func (o OperandType) String() (ret string) {
 type OperandTypes struct{ src, dst OperandType }
 
 var (
-	OperandTypesNoneToNone         = OperandTypes{OperandTypeNone, OperandTypeNone}
-	OperandTypesNoneToRegister     = OperandTypes{OperandTypeNone, OperandTypeRegister}
-	OperandTypesNoneToMemory       = OperandTypes{OperandTypeNone, OperandTypeMemory}
-	OperandTypesNoneToBranch       = OperandTypes{OperandTypeNone, OperandTypeBranch}
-	OperandTypesRegisterToNone     = OperandTypes{OperandTypeRegister, OperandTypeNone}
-	OperandTypesRegisterToRegister = OperandTypes{OperandTypeRegister, OperandTypeRegister}
-	OperandTypesRegisterToMemory   = OperandTypes{OperandTypeRegister, OperandTypeMemory}
-	OperandTypesRegisterToConst    = OperandTypes{OperandTypeRegister, OperandTypeConst}
-	OperandTypesMemoryToRegister   = OperandTypes{OperandTypeMemory, OperandTypeRegister}
-	OperandTypesMemoryToConst      = OperandTypes{OperandTypeMemory, OperandTypeConst}
-	OperandTypesConstToRegister    = OperandTypes{OperandTypeConst, OperandTypeRegister}
-	OperandTypesConstToMemory      = OperandTypes{OperandTypeConst, OperandTypeMemory}
+	OperandTypesNoneToNone            = OperandTypes{OperandTypeNone, OperandTypeNone}
+	OperandTypesNoneToRegister        = OperandTypes{OperandTypeNone, OperandTypeRegister}
+	OperandTypesNoneToMemory          = OperandTypes{OperandTypeNone, OperandTypeMemory}
+	OperandTypesNoneToBranch          = OperandTypes{OperandTypeNone, OperandTypeBranch}
+	OperandTypesRegisterToNone        = OperandTypes{OperandTypeRegister, OperandTypeNone}
+	OperandTypesRegisterToRegister    = OperandTypes{OperandTypeRegister, OperandTypeRegister}
+	OperandTypesRegisterToMemory      = OperandTypes{OperandTypeRegister, OperandTypeMemory}
+	OperandTypesRegisterToConst       = OperandTypes{OperandTypeRegister, OperandTypeConst}
+	OperandTypesMemoryToRegister      = OperandTypes{OperandTypeMemory, OperandTypeRegister}
+	OperandTypesMemoryToConst         = OperandTypes{OperandTypeMemory, OperandTypeConst}
+	OperandTypesConstToRegister       = OperandTypes{OperandTypeConst, OperandTypeRegister}
+	OperandTypesConstToMemory         = OperandTypes{OperandTypeConst, OperandTypeMemory}
+	OperandTypesStaticConstToRegister = OperandTypes{OperandTypeStaticConst, OperandTypeRegister}
 )
 
 // String implements fmt.Stringer
@@ -205,17 +211,26 @@ func (o OperandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
+const defaultMaxDisplacementForConstantPool = 1 << 30
+
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
-	EnablePadding   bool
-	Root, Current   *NodeImpl
-	Buf             *bytes.Buffer
-	ForceReAssemble bool
+	EnablePadding                  bool
+	Root, Current                  *NodeImpl
+	nodeCount                      int
+	Buf                            *bytes.Buffer
+	ForceReAssemble                bool
+	MaxDisplacementForConstantPool int
+
+	pool constPool
 }
 
+var _ Assembler = &AssemblerImpl{}
+
 func NewAssemblerImpl() *AssemblerImpl {
-	return &AssemblerImpl{Buf: bytes.NewBuffer(nil), EnablePadding: true}
+	return &AssemblerImpl{Buf: bytes.NewBuffer(nil), EnablePadding: true, pool: newConstPool(),
+		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool}
 }
 
 // newNode creates a new Node and appends it into the linked list.
@@ -226,8 +241,8 @@ func (a *AssemblerImpl) newNode(instruction asm.Instruction, types OperandTypes)
 		Types:       types,
 		JumpOrigins: map[*NodeImpl]struct{}{},
 	}
-
 	a.addNode(n)
+	a.nodeCount++
 	return n
 }
 
@@ -277,6 +292,8 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeConstToMemory(n)
 	case OperandTypesMemoryToConst:
 		err = a.EncodeMemoryToConst(n)
+	case OperandTypesStaticConstToRegister:
+		err = a.encodeStaticConstToRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -288,7 +305,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 	a.InitializeNodesForEncoding()
 
 	// Continue encoding until we are not forced to re-assemble which happens when
-	// an short relative jump ends up the offset larger than 8-bit length.
+	// a short relative jump ends up the offset larger than 8-bit length.
 	for {
 		err := a.Encode()
 		if err != nil {
@@ -318,9 +335,7 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 // InitializeNodesForEncoding initializes NodeImpl.Flag and determine all the jumps
 // are forward or backward jump.
 func (a *AssemblerImpl) InitializeNodesForEncoding() {
-	var count int
 	for n := a.Root; n != nil; n = n.Next {
-		count++
 		n.Flag |= NodeFlagInitializedForEncoding
 		if target := n.JumpTarget; target != nil {
 			if target.isInitializedForEncoding() {
@@ -336,7 +351,7 @@ func (a *AssemblerImpl) InitializeNodesForEncoding() {
 	}
 
 	// Roughly allocate the buffer by assuming an instruction has 5-bytes length on average.
-	a.Buf.Grow(count * 5)
+	a.Buf.Grow(a.nodeCount * 5)
 }
 
 func (a *AssemblerImpl) Encode() (err error) {
@@ -361,6 +376,8 @@ func (a *AssemblerImpl) Encode() (err error) {
 			err = fmt.Errorf("invalid relative forward jumps: %w", err)
 			break
 		}
+
+		a.maybeFlushConstants(n.Next == nil)
 	}
 	return
 }
@@ -600,7 +617,7 @@ func (a *AssemblerImpl) CompileReadInstructionAddress(
 	n.readInstructionAddressBeforeTargetInstruction = beforeAcquisitionTargetInstruction
 }
 
-// CompileRegisterToRegisterWithArg implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToRegisterWithArg implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileRegisterToRegisterWithArg(
 	instruction asm.Instruction,
 	from, to asm.Register,
@@ -612,7 +629,7 @@ func (a *AssemblerImpl) CompileRegisterToRegisterWithArg(
 	n.Arg = arg
 }
 
-// CompileMemoryWithIndexToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryWithIndexToRegister implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileMemoryWithIndexToRegister(
 	instruction asm.Instruction,
 	srcBaseReg asm.Register,
@@ -629,7 +646,26 @@ func (a *AssemblerImpl) CompileMemoryWithIndexToRegister(
 	n.DstReg = dstReg
 }
 
-// CompileRegisterToMemoryWithIndex implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryWithIndexAndArgToRegister implements the same method as documented on amd64.Assembler.
+func (a *AssemblerImpl) CompileMemoryWithIndexAndArgToRegister(
+	instruction asm.Instruction,
+	srcBaseReg asm.Register,
+	srcOffsetConst asm.ConstantValue,
+	srcIndex asm.Register,
+	srcScale int16,
+	dstReg asm.Register,
+	arg byte,
+) {
+	n := a.newNode(instruction, OperandTypesMemoryToRegister)
+	n.SrcReg = srcBaseReg
+	n.SrcConst = srcOffsetConst
+	n.SrcMemIndex = srcIndex
+	n.SrcMemScale = byte(srcScale)
+	n.DstReg = dstReg
+	n.Arg = arg
+}
+
+// CompileRegisterToMemoryWithIndex implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileRegisterToMemoryWithIndex(
 	instruction asm.Instruction,
 	srcReg, dstBaseReg asm.Register,
@@ -645,7 +681,25 @@ func (a *AssemblerImpl) CompileRegisterToMemoryWithIndex(
 	n.DstMemScale = byte(dstScale)
 }
 
-// CompileRegisterToConst implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToMemoryWithIndexAndArg implements the same method as documented on amd64.Assembler.
+func (a *AssemblerImpl) CompileRegisterToMemoryWithIndexAndArg(
+	instruction asm.Instruction,
+	srcReg, dstBaseReg asm.Register,
+	dstOffsetConst asm.ConstantValue,
+	dstIndex asm.Register,
+	dstScale int16,
+	arg byte,
+) {
+	n := a.newNode(instruction, OperandTypesRegisterToMemory)
+	n.SrcReg = srcReg
+	n.DstReg = dstBaseReg
+	n.DstConst = dstOffsetConst
+	n.DstMemIndex = dstIndex
+	n.DstMemScale = byte(dstScale)
+	n.Arg = arg
+}
+
+// CompileRegisterToConst implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileRegisterToConst(
 	instruction asm.Instruction,
 	srcRegister asm.Register,
@@ -657,19 +711,19 @@ func (a *AssemblerImpl) CompileRegisterToConst(
 	return n
 }
 
-// CompileRegisterToNone implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToNone implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileRegisterToNone(instruction asm.Instruction, register asm.Register) {
 	n := a.newNode(instruction, OperandTypesRegisterToNone)
 	n.SrcReg = register
 }
 
-// CompileNoneToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileNoneToRegister implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileNoneToRegister(instruction asm.Instruction, register asm.Register) {
 	n := a.newNode(instruction, OperandTypesNoneToRegister)
 	n.DstReg = register
 }
 
-// CompileNoneToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileNoneToMemory implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileNoneToMemory(
 	instruction asm.Instruction,
 	baseReg asm.Register,
@@ -680,7 +734,7 @@ func (a *AssemblerImpl) CompileNoneToMemory(
 	n.DstConst = offset
 }
 
-// CompileConstToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileConstToMemory implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileConstToMemory(
 	instruction asm.Instruction,
 	value asm.ConstantValue,
@@ -694,7 +748,7 @@ func (a *AssemblerImpl) CompileConstToMemory(
 	return n
 }
 
-// CompileMemoryToConst implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryToConst implements the same method as documented on amd64.Assembler.
 func (a *AssemblerImpl) CompileMemoryToConst(
 	instruction asm.Instruction,
 	srcBaseReg asm.Register,
@@ -907,7 +961,7 @@ func (a *AssemblerImpl) ResolveForwardRelativeJumps(target *NodeImpl) (err error
 		offset := offsetInBinary - (int64(origin.OffsetInBinary()) + instructionLen)
 		if shortJump {
 			if offset > math.MaxInt8 {
-				// This forces reassemble in the outer loop inside of AssemblerImpl.Assemble().
+				// This forces reassemble in the outer loop inside AssemblerImpl.Assemble().
 				a.ForceReAssemble = true
 				// From the next reAssemble phases, this forward jump will be encoded long jump and
 				// allocate 32-bit offset bytes by default. This means that this `origin` node
@@ -1023,7 +1077,7 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	mandatoryPrefix                  byte
 	srcOnModRMReg                    bool
 	isSrc8bit                        bool
-	needMode                         bool
+	needArg                          bool
 	requireSrcFloat, requireDstFloat bool
 }{
 	// https://www.felixcloutier.com/x86/add
@@ -1089,6 +1143,7 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	MOVBLSX: {opcode: []byte{0x0f, 0xbe}, isSrc8bit: true},
 	// https://www.felixcloutier.com/x86/movzx
 	MOVBLZX: {opcode: []byte{0x0f, 0xb6}, isSrc8bit: true},
+	MOVWLZX: {opcode: []byte{0x0f, 0xb7}, isSrc8bit: true},
 	// https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVBQSX: {opcode: []byte{0x0f, 0xbe}, rPrefix: RexPrefixW, isSrc8bit: true},
 	// https://www.felixcloutier.com/x86/movsx:movsxd
@@ -1112,9 +1167,9 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	POPCNTL: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0xb8}},
 	POPCNTQ: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0xb8}, rPrefix: RexPrefixW},
 	// https://www.felixcloutier.com/x86/roundss
-	ROUNDSS: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x0a}, needMode: true, requireSrcFloat: true, requireDstFloat: true},
+	ROUNDSS: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x0a}, needArg: true, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/roundsd
-	ROUNDSD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x0b}, needMode: true, requireSrcFloat: true, requireDstFloat: true},
+	ROUNDSD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x0b}, needArg: true, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/sqrtss
 	SQRTSS: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x51}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/sqrtsd
@@ -1143,15 +1198,49 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	XORPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x57}, requireSrcFloat: true, requireDstFloat: true},
 	XORPS: {opcode: []byte{0x0f, 0x57}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
-	PINSRQ: {mandatoryPrefix: 0x66, rPrefix: RexPrefixW, opcode: []byte{0x0f, 0x3a, 0x22}, requireSrcFloat: false, requireDstFloat: true, needMode: true},
+	PINSRB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x20}, requireSrcFloat: false, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/pinsrw
+	PINSRW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xc4}, requireSrcFloat: false, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	PINSRD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x22}, requireSrcFloat: false, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	PINSRQ: {mandatoryPrefix: 0x66, rPrefix: RexPrefixW, opcode: []byte{0x0f, 0x3a, 0x22}, requireSrcFloat: false, requireDstFloat: true, needArg: true},
 	// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x6f}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/movdqa:vmovdqa32:vmovdqa64
+	MOVDQA: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x6f}, requireSrcFloat: true, requireDstFloat: true},
 	PADDB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfc}, requireSrcFloat: true, requireDstFloat: true},
 	PADDW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfd}, requireSrcFloat: true, requireDstFloat: true},
 	PADDL:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfe}, requireSrcFloat: true, requireDstFloat: true},
 	PADDQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd4}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf8}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf9}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBL:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfa}, requireSrcFloat: true, requireDstFloat: true},
+	PSUBQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xfb}, requireSrcFloat: true, requireDstFloat: true},
 	ADDPS:  {opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
 	ADDPD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x58}, requireSrcFloat: true, requireDstFloat: true},
+	SUBPS:  {opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
+	SUBPD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
+	PXOR:   {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xef}, requireSrcFloat: true, requireDstFloat: true},
+	PSHUFB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x0}, requireSrcFloat: true, requireDstFloat: true},
+	PSHUFD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x70}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x14}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
+	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xc5}, requireSrcFloat: true, requireDstFloat: false, needArg: true},
+	// https://www.felixcloutier.com/x86/pextrw
+	PEXTRD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x16}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
+	// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRQ:   {rPrefix: RexPrefixW, mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x16}, requireSrcFloat: true, requireDstFloat: false, needArg: true, srcOnModRMReg: true},
+	INSERTPS: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x21}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
+	MOVLHPS:  {opcode: []byte{0x0f, 0x16}, requireSrcFloat: true, requireDstFloat: true},
+	PTEST:    {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x17}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x74}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQW:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x75}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x76}, requireSrcFloat: true, requireDstFloat: true},
+	PCMPEQQ:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x29}, requireSrcFloat: true, requireDstFloat: true},
+	PADDUSB:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdc}, requireSrcFloat: true, requireDstFloat: true},
+	MOVSD:    {mandatoryPrefix: 0xf2, opcode: []byte{0x0f, 0x10}, requireSrcFloat: true, requireDstFloat: true},
 }
 
 var RegisterToRegisterShiftOpcode = map[asm.Instruction]struct {
@@ -1273,7 +1362,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 
 		a.Buf.WriteByte(modRM)
 
-		if op.needMode {
+		if op.needArg {
 			a.WriteConst(int64(n.Arg), 8)
 		}
 		return nil
@@ -1314,6 +1403,7 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 	var opcode []byte
 	var mandatoryPrefix byte
 	var isShiftInstruction bool
+	var needArg bool
 	switch n.Instruction {
 	case CMPL:
 		// https://www.felixcloutier.com/x86/cmp
@@ -1411,6 +1501,27 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 		mandatoryPrefix = 0xf3
 		opcode = []byte{0x0f, 0x7f}
+	case PEXTRB:
+		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x14}
+		needArg = true
+	case PEXTRW:
+		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x15}
+		needArg = true
+	case PEXTRD:
+		// https://www.felixcloutier.com/x86/pextrw
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x16}
+		needArg = true
+	case PEXTRQ:
+		// https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+		rexPrefix |= RexPrefixW
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x16}
+		needArg = true
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1448,6 +1559,10 @@ func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
 
 	if displacementWidth != 0 {
 		a.WriteConst(n.DstConst, displacementWidth)
+	}
+
+	if needArg {
+		a.WriteConst(int64(n.Arg), 8)
 	}
 	return
 }
@@ -1555,6 +1670,7 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 
 	var mandatoryPrefix byte
 	var opcode []byte
+	var needArg bool
 	switch n.Instruction {
 	case ADDL:
 		// https://www.felixcloutier.com/x86/add
@@ -1656,6 +1772,50 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 		mandatoryPrefix = 0xf3
 		opcode = []byte{0x0f, 0x6f}
+	case PMOVSXBW:
+		// https://www.felixcloutier.com/x86/pmovsx
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x20}
+	case PMOVSXWD:
+		// https://www.felixcloutier.com/x86/pmovsx
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x23}
+	case PMOVSXDQ:
+		// https://www.felixcloutier.com/x86/pmovsx
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x25}
+	case PMOVZXBW:
+		// https://www.felixcloutier.com/x86/pmovzx
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x30}
+	case PMOVZXWD:
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x33}
+		// https://www.felixcloutier.com/x86/pmovzx
+	case PMOVZXDQ:
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x38, 0x35}
+	case PINSRB:
+		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x20}
+		needArg = true
+	case PINSRW:
+		// https://www.felixcloutier.com/x86/pinsrw
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0xc4}
+		needArg = true
+	case PINSRD:
+		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x22}
+		needArg = true
+	case PINSRQ:
+		// https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+		rexPrefix |= RexPrefixW
+		mandatoryPrefix = 0x66
+		opcode = []byte{0x0f, 0x3a, 0x22}
+		needArg = true
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -1681,6 +1841,9 @@ func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
 		a.WriteConst(n.SrcConst, displacementWidth)
 	}
 
+	if needArg {
+		a.WriteConst(int64(n.Arg), 8)
+	}
 	return
 }
 

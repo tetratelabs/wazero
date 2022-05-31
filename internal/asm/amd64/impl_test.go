@@ -509,6 +509,33 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 			exp: []byte{0xf3, 0x45, 0xf, 0x6f, 0xfa},
 		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQA,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX3,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x6f, 0xd3},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQA,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegX3,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x6f, 0xda},
+		},
+		{
+			n: &NodeImpl{
+				Instruction: MOVDQA,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegX15,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0x6f, 0xfa},
+		},
 	}
 
 	for _, tt := range tests {

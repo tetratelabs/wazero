@@ -305,7 +305,15 @@ const (
 	UD2
 	// MOVDQU is the MOVDQU instruction. https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
 	MOVDQU
-	// PINSRQ is the PINSQR instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	// MOVDQA is the MOVDQA instruction.
+	MOVDQA
+	// PINSRB is the PINSRB instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	PINSRB
+	// PINSRW is the mode PINSQRW instruction. https://www.felixcloutier.com/x86/pinsrw
+	PINSRW
+	// PINSRD is the PINSRD instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
+	PINSRD
+	// PINSRQ is the PINSQRQ instruction. https://www.felixcloutier.com/x86/pinsrb:pinsrd:pinsrq
 	PINSRQ
 	// PADDB is the PADDB instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDB
@@ -315,10 +323,66 @@ const (
 	PADDL
 	// PADDQ is the PADDQ instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDQ
+	// PSUBB is the PSUBB instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	PSUBB
+	// PSUBW is the PSUBW instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	PSUBW
+	// PSUBL is the PSUBL instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	PSUBL
+	// PSUBQ is the PSUBQ instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
+	PSUBQ
 	// ADDPS is the ADDPS instruction. https://www.felixcloutier.com/x86/addps
 	ADDPS
 	// ADDPD is the ADDPD instruction. https://www.felixcloutier.com/x86/addpd
 	ADDPD
+	// SUBPS is the SUBPS instruction. https://www.felixcloutier.com/x86/addps
+	SUBPS
+	// SUBPD is the SUBPD instruction. https://www.felixcloutier.com/x86/subpd
+	SUBPD
+	// PMOVSXBW is the PMOVSXBW instruction https://www.felixcloutier.com/x86/pmovsx
+	PMOVSXBW
+	// PMOVSXWD is the PMOVSXWD instruction https://www.felixcloutier.com/x86/pmovsx
+	PMOVSXWD
+	// PMOVSXDQ is the PMOVSXDQ instruction https://www.felixcloutier.com/x86/pmovsx
+	PMOVSXDQ
+	// PMOVZXBW is the PMOVZXBW instruction https://www.felixcloutier.com/x86/pmovzx
+	PMOVZXBW
+	// PMOVZXWD is the PMOVZXWD instruction https://www.felixcloutier.com/x86/pmovzx
+	PMOVZXWD
+	// PMOVZXDQ is the PMOVZXDQ instruction https://www.felixcloutier.com/x86/pmovzx
+	PMOVZXDQ
+	// PSHUFB is the PSHUFB instruction https://www.felixcloutier.com/x86/pshufb
+	PSHUFB
+	// PSHUFD is the PSHUFD instruction https://www.felixcloutier.com/x86/pshufd
+	PSHUFD
+	// PXOR is the PXOR instruction https://www.felixcloutier.com/x86/pxor
+	PXOR
+	// PEXTRB is the PEXTRB instruction https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRB
+	// PEXTRW is the PEXTRW instruction https://www.felixcloutier.com/x86/pextrw
+	PEXTRW
+	// PEXTRD is the PEXTRD instruction https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRD
+	// PEXTRQ is the PEXTRQ instruction https://www.felixcloutier.com/x86/pextrb:pextrd:pextrq
+	PEXTRQ
+	// MOVLHPS is the MOVLHPS instruction https://www.felixcloutier.com/x86/movlhps
+	MOVLHPS
+	// INSERTPS is the INSERTPS instruction https://www.felixcloutier.com/x86/insertps
+	INSERTPS
+	// PTEST is the PTEST instruction https://www.felixcloutier.com/x86/ptest
+	PTEST
+	// PCMPEQB is the PCMPEQB instruction https://www.felixcloutier.com/x86/pcmpeqb:pcmpeqw:pcmpeqd
+	PCMPEQB
+	// PCMPEQW is the PCMPEQW instruction https://www.felixcloutier.com/x86/pcmpeqb:pcmpeqw:pcmpeqd
+	PCMPEQW
+	// PCMPEQD is the PCMPEQD instruction https://www.felixcloutier.com/x86/pcmpeqb:pcmpeqw:pcmpeqd
+	PCMPEQD
+	// PCMPEQQ is the PCMPEQQ instruction https://www.felixcloutier.com/x86/pcmpeqq
+	PCMPEQQ
+	// PADDUSB is the PADDUSB instruction https://www.felixcloutier.com/x86/paddusb:paddusw
+	PADDUSB
+	// MOVSD is the MOVSD instruction https://www.felixcloutier.com/x86/movsd
+	MOVSD
 )
 
 // InstructionName returns the name for an instruction
@@ -586,6 +650,12 @@ func InstructionName(instruction asm.Instruction) string {
 		return "UD2"
 	case MOVDQU:
 		return "MOVDQU"
+	case PINSRB:
+		return "PINSRB"
+	case PINSRW:
+		return "PINSRW"
+	case PINSRD:
+		return "PINSRD"
 	case PINSRQ:
 		return "PINSRQ"
 	case PADDB:
@@ -600,6 +670,64 @@ func InstructionName(instruction asm.Instruction) string {
 		return "ADDPS"
 	case ADDPD:
 		return "ADDPD"
+	case PSUBB:
+		return "PSUBB"
+	case PSUBW:
+		return "PSUBW"
+	case PSUBL:
+		return "PSUBL"
+	case PSUBQ:
+		return "PSUBQ"
+	case SUBPS:
+		return "SUBPS"
+	case SUBPD:
+		return "SUBPD"
+	case PMOVSXBW:
+		return "PMOVSXBW"
+	case PMOVSXWD:
+		return "PMOVSXWD"
+	case PMOVSXDQ:
+		return "PMOVSXDQ"
+	case PMOVZXBW:
+		return "PMOVZXBW"
+	case PMOVZXWD:
+		return "PMOVZXWD"
+	case PMOVZXDQ:
+		return "PMOVZXDQ"
+	case PSHUFB:
+		return "PSHUFB"
+	case PSHUFD:
+		return "PSHUFD"
+	case PXOR:
+		return "PXOR"
+	case PEXTRB:
+		return "PEXTRB"
+	case PEXTRW:
+		return "PEXTRW"
+	case PEXTRD:
+		return "PEXTRD"
+	case PEXTRQ:
+		return "PEXTRQ"
+	case INSERTPS:
+		return "INSERTPS"
+	case MOVLHPS:
+		return "MOVLHPS"
+	case PTEST:
+		return "PTEST"
+	case PCMPEQB:
+		return "PCMPEQB"
+	case PCMPEQW:
+		return "PCMPEQW"
+	case PCMPEQD:
+		return "PCMPEQD"
+	case PCMPEQQ:
+		return "PCMPEQQ"
+	case PADDUSB:
+		return "PADDUSB"
+	case MOVDQA:
+		return "MOVDQA"
+	case MOVSD:
+		return "MOVSD"
 	}
 	return "Unknown"
 }

@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -577,14 +578,55 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationTableFill:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.TableIndex)
-		case *wazeroir.OperationConstV128:
+		case *wazeroir.OperationV128Const:
 			op.us = make([]uint64, 2)
 			op.us[0] = o.Lo
 			op.us[1] = o.Hi
-		case *wazeroir.OperationAddV128:
-			op.b1 = byte(o.Shape)
+		case *wazeroir.OperationV128Add:
+			op.b1 = o.Shape
+		case *wazeroir.OperationV128Sub:
+			op.b1 = o.Shape
+		case *wazeroir.OperationV128Load:
+			op.b1 = o.Type
+			op.us = make([]uint64, 2)
+			op.us[0] = uint64(o.Arg.Alignment)
+			op.us[1] = uint64(o.Arg.Offset)
+		case *wazeroir.OperationV128LoadLane:
+			op.b1 = o.LaneSize
+			op.b2 = o.LaneIndex
+			op.us = make([]uint64, 2)
+			op.us[0] = uint64(o.Arg.Alignment)
+			op.us[1] = uint64(o.Arg.Offset)
+		case *wazeroir.OperationV128Store:
+			op.us = make([]uint64, 2)
+			op.us[0] = uint64(o.Arg.Alignment)
+			op.us[1] = uint64(o.Arg.Offset)
+		case *wazeroir.OperationV128StoreLane:
+			op.b1 = o.LaneSize
+			op.b2 = o.LaneIndex
+			op.us = make([]uint64, 2)
+			op.us[0] = uint64(o.Arg.Alignment)
+			op.us[1] = uint64(o.Arg.Offset)
+		case *wazeroir.OperationV128ExtractLane:
+			op.b1 = o.Shape
+			op.b2 = o.LaneIndex
+			op.b3 = o.Signed
+		case *wazeroir.OperationV128ReplaceLane:
+			op.b1 = o.Shape
+			op.b2 = o.LaneIndex
+		case *wazeroir.OperationV128Splat:
+			op.b1 = o.Shape
+		case *wazeroir.OperationV128Shuffle:
+			op.us = make([]uint64, 16)
+			for i, l := range o.Lanes {
+				op.us[i] = uint64(l)
+			}
+		case *wazeroir.OperationV128Swizzle:
+		case *wazeroir.OperationV128AnyTrue:
+		case *wazeroir.OperationV128AllTrue:
+			op.b1 = o.Shape
 		default:
-			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
+			panic(fmt.Errorf("BUG: unimplemented operation %s", op.kind.String()))
 		}
 		ret.body = append(ret.body, op)
 	}
@@ -812,14 +854,14 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalGet:
-			g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
+			g := globals[op.us[0]]
 			ce.pushValue(g.Val)
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				ce.pushValue(g.ValHi)
 			}
 			frame.pc++
 		case wazeroir.OperationKindGlobalSet:
-			g := globals[op.us[0]] // TODO: Not yet traceable as it doesn't use the types in global.go
+			g := globals[op.us[0]]
 			if g.Type.ValType == wasm.ValueTypeV128 {
 				g.ValHi = ce.popValue()
 			}
@@ -1815,23 +1857,482 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 			}
 			frame.pc++
-		case wazeroir.OperationKindConstV128:
+		case wazeroir.OperationKindV128Const:
 			lo, hi := op.us[0], op.us[1]
 			ce.pushValue(lo)
 			ce.pushValue(hi)
 			frame.pc++
 		case wazeroir.OperationKindV128Add:
+			xHigh, xLow := ce.popValue(), ce.popValue()
+			yHigh, yLow := ce.popValue(), ce.popValue()
 			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				ce.pushValue(
+					uint64(uint8(xLow>>8)+uint8(yLow>>8))<<8 | uint64(uint8(xLow)+uint8(yLow)) |
+						uint64(uint8(xLow>>24)+uint8(yLow>>24))<<24 | uint64(uint8(xLow>>16)+uint8(yLow>>16))<<16 |
+						uint64(uint8(xLow>>40)+uint8(yLow>>40))<<40 | uint64(uint8(xLow>>32)+uint8(yLow>>32))<<32 |
+						uint64(uint8(xLow>>56)+uint8(yLow>>56))<<56 | uint64(uint8(xLow>>48)+uint8(yLow>>48))<<48,
+				)
+				ce.pushValue(
+					uint64(uint8(xHigh>>8)+uint8(yHigh>>8))<<8 | uint64(uint8(xHigh)+uint8(yHigh)) |
+						uint64(uint8(xHigh>>24)+uint8(yHigh>>24))<<24 | uint64(uint8(xHigh>>16)+uint8(yHigh>>16))<<16 |
+						uint64(uint8(xHigh>>40)+uint8(yHigh>>40))<<40 | uint64(uint8(xHigh>>32)+uint8(yHigh>>32))<<32 |
+						uint64(uint8(xHigh>>56)+uint8(yHigh>>56))<<56 | uint64(uint8(xHigh>>48)+uint8(yHigh>>48))<<48,
+				)
+			case wazeroir.ShapeI16x8:
+				ce.pushValue(
+					uint64(uint16(xLow>>16+yLow>>16))<<16 | uint64(uint16(xLow)+uint16(yLow)) |
+						uint64(uint16(xLow>>48+yLow>>48))<<48 | uint64(uint16(xLow>>32+yLow>>32))<<32,
+				)
+				ce.pushValue(
+					uint64(uint16(xHigh>>16)+uint16(yHigh>>16))<<16 | uint64(uint16(xHigh)+uint16(yHigh)) |
+						uint64(uint16(xHigh>>48)+uint16(yHigh>>48))<<48 | uint64(uint16(xHigh>>32)+uint16(yHigh>>32))<<32,
+				)
 			case wazeroir.ShapeI32x4:
-				xHigh, xLow := ce.popValue(), ce.popValue()
-				yHigh, yLow := ce.popValue(), ce.popValue()
-				ce.pushValue(uint64(uint32(xLow>>32+yLow>>32))<<32 + uint64(uint32(xLow)+uint32(yLow)))
-				ce.pushValue(uint64(uint32(xHigh>>32+yHigh>>32))<<32 + uint64(uint32(xHigh)+uint32(yHigh)))
+				ce.pushValue(uint64(uint32(xLow>>32)+uint32(yLow>>32))<<32 | uint64(uint32(xLow)+uint32(yLow)))
+				ce.pushValue(uint64(uint32(xHigh>>32)+uint32(yHigh>>32))<<32 | uint64(uint32(xHigh)+uint32(yHigh)))
 			case wazeroir.ShapeI64x2:
-				xHigh, xLow := ce.popValue(), ce.popValue()
-				yHigh, yLow := ce.popValue(), ce.popValue()
 				ce.pushValue(xLow + yLow)
 				ce.pushValue(xHigh + yHigh)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128Sub:
+			yHigh, yLow := ce.popValue(), ce.popValue()
+			xHigh, xLow := ce.popValue(), ce.popValue()
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				ce.pushValue(
+					uint64(uint8(xLow>>8)-uint8(yLow>>8))<<8 | uint64(uint8(xLow)-uint8(yLow)) |
+						uint64(uint8(xLow>>24)-uint8(yLow>>24))<<24 | uint64(uint8(xLow>>16)-uint8(yLow>>16))<<16 |
+						uint64(uint8(xLow>>40)-uint8(yLow>>40))<<40 | uint64(uint8(xLow>>32)-uint8(yLow>>32))<<32 |
+						uint64(uint8(xLow>>56)-uint8(yLow>>56))<<56 | uint64(uint8(xLow>>48)-uint8(yLow>>48))<<48,
+				)
+				ce.pushValue(
+					uint64(uint8(xHigh>>8)-uint8(yHigh>>8))<<8 | uint64(uint8(xHigh)-uint8(yHigh)) |
+						uint64(uint8(xHigh>>24)-uint8(yHigh>>24))<<24 | uint64(uint8(xHigh>>16)-uint8(yHigh>>16))<<16 |
+						uint64(uint8(xHigh>>40)-uint8(yHigh>>40))<<40 | uint64(uint8(xHigh>>32)-uint8(yHigh>>32))<<32 |
+						uint64(uint8(xHigh>>56)-uint8(yHigh>>56))<<56 | uint64(uint8(xHigh>>48)-uint8(yHigh>>48))<<48,
+				)
+			case wazeroir.ShapeI16x8:
+				ce.pushValue(
+					uint64(uint16(xLow>>16)-uint16(yLow>>16))<<16 | uint64(uint16(xLow)-uint16(yLow)) |
+						uint64(uint16(xLow>>48)-uint16(yLow>>48))<<48 | uint64(uint16(xLow>>32)-uint16(yLow>>32))<<32,
+				)
+				ce.pushValue(
+					uint64(uint16(xHigh>>16)-uint16(yHigh>>16))<<16 | uint64(uint16(xHigh)-uint16(yHigh)) |
+						uint64(uint16(xHigh>>48)-uint16(yHigh>>48))<<48 | uint64(uint16(xHigh>>32)-uint16(yHigh>>32))<<32,
+				)
+			case wazeroir.ShapeI32x4:
+				ce.pushValue(uint64(uint32(xLow>>32-yLow>>32))<<32 | uint64(uint32(xLow)-uint32(yLow)))
+				ce.pushValue(uint64(uint32(xHigh>>32-yHigh>>32))<<32 | uint64(uint32(xHigh)-uint32(yHigh)))
+			case wazeroir.ShapeI64x2:
+				ce.pushValue(xLow - yLow)
+				ce.pushValue(xHigh - yHigh)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128Load:
+			offset := ce.popMemoryOffset(op)
+			switch op.b1 {
+			case wazeroir.LoadV128Type128:
+				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(lo)
+				hi, ok := memoryInst.ReadUint64Le(ctx, offset+8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(hi)
+			case wazeroir.LoadV128Type8x8s:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(
+					uint64(uint16(int8(data[3])))<<48 | uint64(uint16(int8(data[2])))<<32 | uint64(uint16(int8(data[1])))<<16 | uint64(uint16(int8(data[0]))),
+				)
+				ce.pushValue(
+					uint64(uint16(int8(data[7])))<<48 | uint64(uint16(int8(data[6])))<<32 | uint64(uint16(int8(data[5])))<<16 | uint64(uint16(int8(data[4]))),
+				)
+			case wazeroir.LoadV128Type8x8u:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(
+					uint64(data[3])<<48 | uint64(data[2])<<32 | uint64(data[1])<<16 | uint64(data[0]),
+				)
+				ce.pushValue(
+					uint64(data[7])<<48 | uint64(data[6])<<32 | uint64(data[5])<<16 | uint64(data[4]),
+				)
+			case wazeroir.LoadV128Type16x4s:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(
+					uint64(int16(binary.LittleEndian.Uint16(data[2:])))<<32 |
+						uint64(uint32(int16(binary.LittleEndian.Uint16(data)))),
+				)
+				ce.pushValue(
+					uint64(uint32(int16(binary.LittleEndian.Uint16(data[6:]))))<<32 |
+						uint64(uint32(int16(binary.LittleEndian.Uint16(data[4:])))),
+				)
+			case wazeroir.LoadV128Type16x4u:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(
+					uint64(binary.LittleEndian.Uint16(data[2:]))<<32 | uint64(binary.LittleEndian.Uint16(data)),
+				)
+				ce.pushValue(
+					uint64(binary.LittleEndian.Uint16(data[6:]))<<32 | uint64(binary.LittleEndian.Uint16(data[4:])),
+				)
+			case wazeroir.LoadV128Type32x2s:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(uint64(int32(binary.LittleEndian.Uint32(data))))
+				ce.pushValue(uint64(int32(binary.LittleEndian.Uint32(data[4:]))))
+			case wazeroir.LoadV128Type32x2u:
+				data, ok := memoryInst.Read(ctx, offset, 8)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(uint64(binary.LittleEndian.Uint32(data)))
+				ce.pushValue(uint64(binary.LittleEndian.Uint32(data[4:])))
+			case wazeroir.LoadV128Type8Splat:
+				v, ok := memoryInst.ReadByte(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				v8 := uint64(v)<<56 | uint64(v)<<48 | uint64(v)<<40 | uint64(v)<<32 |
+					uint64(v)<<24 | uint64(v)<<16 | uint64(v)<<8 | uint64(v)
+				ce.pushValue(v8)
+				ce.pushValue(v8)
+			case wazeroir.LoadV128Type16Splat:
+				v, ok := memoryInst.ReadUint16Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				v4 := uint64(v)<<48 | uint64(v)<<32 | uint64(v)<<16 | uint64(v)
+				ce.pushValue(v4)
+				ce.pushValue(v4)
+			case wazeroir.LoadV128Type32Splat:
+				v, ok := memoryInst.ReadUint32Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				vv := uint64(v)<<32 | uint64(v)
+				ce.pushValue(vv)
+				ce.pushValue(vv)
+			case wazeroir.LoadV128Type64Splat:
+				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(lo)
+				ce.pushValue(lo)
+			case wazeroir.LoadV128Type32zero:
+				lo, ok := memoryInst.ReadUint32Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(uint64(lo))
+				ce.pushValue(0)
+			case wazeroir.LoadV128Type64zero:
+				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				ce.pushValue(lo)
+				ce.pushValue(0)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128LoadLane:
+			hi, lo := ce.popValue(), ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			switch op.b1 {
+			case 8:
+				b, ok := memoryInst.ReadByte(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if op.b2 < 8 {
+					s := op.b2 << 3
+					lo = (lo & ^(0xff << s)) | uint64(b)<<s
+				} else {
+					s := (op.b2 - 8) << 3
+					hi = (hi & ^(0xff << s)) | uint64(b)<<s
+				}
+			case 16:
+				b, ok := memoryInst.ReadUint16Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if op.b2 < 4 {
+					s := op.b2 << 4
+					lo = (lo & ^(0xff_ff << s)) | uint64(b)<<s
+				} else {
+					s := (op.b2 - 4) << 4
+					hi = (hi & ^(0xff_ff << s)) | uint64(b)<<s
+				}
+			case 32:
+				b, ok := memoryInst.ReadUint32Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if op.b2 < 2 {
+					s := op.b2 << 5
+					lo = (lo & ^(0xff_ff_ff_ff << s)) | uint64(b)<<s
+				} else {
+					s := (op.b2 - 2) << 5
+					hi = (hi & ^(0xff_ff_ff_ff << s)) | uint64(b)<<s
+				}
+			case 64:
+				b, ok := memoryInst.ReadUint64Le(ctx, offset)
+				if !ok {
+					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
+				if op.b2 == 0 {
+					lo = b
+				} else {
+					hi = b
+				}
+			}
+			ce.pushValue(lo)
+			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Store:
+			hi, lo := ce.popValue(), ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			if ok := memoryInst.WriteUint64Le(ctx, offset, lo); !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			if ok := memoryInst.WriteUint64Le(ctx, offset+8, hi); !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128StoreLane:
+			hi, lo := ce.popValue(), ce.popValue()
+			offset := ce.popMemoryOffset(op)
+			var ok bool
+			switch op.b1 {
+			case 8:
+				if op.b2 < 8 {
+					ok = memoryInst.WriteByte(ctx, offset, byte(lo>>(op.b2*8)))
+				} else {
+					ok = memoryInst.WriteByte(ctx, offset, byte(hi>>((op.b2-8)*8)))
+				}
+			case 16:
+				if op.b2 < 4 {
+					ok = memoryInst.WriteUint16Le(ctx, offset, uint16(lo>>(op.b2*16)))
+				} else {
+					ok = memoryInst.WriteUint16Le(ctx, offset, uint16(hi>>((op.b2-4)*16)))
+				}
+			case 32:
+				if op.b2 < 2 {
+					ok = memoryInst.WriteUint32Le(ctx, offset, uint32(lo>>(op.b2*32)))
+				} else {
+					ok = memoryInst.WriteUint32Le(ctx, offset, uint32(hi>>((op.b2-2)*32)))
+				}
+			case 64:
+				if op.b2 == 0 {
+					ok = memoryInst.WriteUint64Le(ctx, offset, lo)
+				} else {
+					ok = memoryInst.WriteUint64Le(ctx, offset, hi)
+				}
+			}
+			if !ok {
+				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128ReplaceLane:
+			v := ce.popValue()
+			hi, lo := ce.popValue(), ce.popValue()
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				if op.b2 < 8 {
+					s := op.b2 << 3
+					lo = (lo & ^(0xff << s)) | uint64(byte(v))<<s
+				} else {
+					s := (op.b2 - 8) << 3
+					hi = (hi & ^(0xff << s)) | uint64(byte(v))<<s
+				}
+			case wazeroir.ShapeI16x8:
+				if op.b2 < 4 {
+					s := op.b2 << 4
+					lo = (lo & ^(0xff_ff << s)) | uint64(uint16(v))<<s
+				} else {
+					s := (op.b2 - 4) << 4
+					hi = (hi & ^(0xff_ff << s)) | uint64(uint16(v))<<s
+				}
+			case wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
+				if op.b2 < 2 {
+					s := op.b2 << 5
+					lo = (lo & ^(0xff_ff_ff_ff << s)) | uint64(uint32(v))<<s
+				} else {
+					s := (op.b2 - 2) << 5
+					hi = (hi & ^(0xff_ff_ff_ff << s)) | uint64(uint32(v))<<s
+				}
+			case wazeroir.ShapeI64x2, wazeroir.ShapeF64x2:
+				if op.b2 == 0 {
+					lo = v
+				} else {
+					hi = v
+				}
+			}
+			ce.pushValue(lo)
+			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindV128ExtractLane:
+			hi, lo := ce.popValue(), ce.popValue()
+			var v uint64
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				var u8 byte
+				if op.b2 < 8 {
+					u8 = byte(lo >> (op.b2 * 8))
+				} else {
+					u8 = byte(hi >> ((op.b2 - 8) * 8))
+				}
+				if op.b3 {
+					// sign-extend.
+					v = uint64(int8(u8))
+				} else {
+					v = uint64(u8)
+				}
+			case wazeroir.ShapeI16x8:
+				var u16 uint16
+				if op.b2 < 4 {
+					u16 = uint16(lo >> (op.b2 * 16))
+				} else {
+					u16 = uint16(hi >> ((op.b2 - 4) * 16))
+				}
+				if op.b3 {
+					// sign-extend.
+					v = uint64(int16(u16))
+				} else {
+					v = uint64(u16)
+				}
+			case wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
+				if op.b2 < 2 {
+					v = uint64(uint32(lo >> (op.b2 * 32)))
+				} else {
+					v = uint64(uint32(hi >> ((op.b2 - 2) * 32)))
+				}
+			case wazeroir.ShapeI64x2, wazeroir.ShapeF64x2:
+				if op.b2 == 0 {
+					v = lo
+				} else {
+					v = hi
+				}
+			}
+			ce.pushValue(v)
+			frame.pc++
+		case wazeroir.OperationKindV128Splat:
+			v := ce.popValue()
+			var hi, lo uint64
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				v8 := uint64(byte(v))<<56 | uint64(byte(v))<<48 | uint64(byte(v))<<40 | uint64(byte(v))<<32 |
+					uint64(byte(v))<<24 | uint64(byte(v))<<16 | uint64(byte(v))<<8 | uint64(byte(v))
+				hi, lo = v8, v8
+			case wazeroir.ShapeI16x8:
+				v4 := uint64(uint16(v))<<48 | uint64(uint16(v))<<32 | uint64(uint16(v))<<16 | uint64(uint16(v))
+				hi, lo = v4, v4
+			case wazeroir.ShapeI32x4, wazeroir.ShapeF32x4:
+				v2 := uint64(uint32(v))<<32 | uint64(uint32(v))
+				lo, hi = v2, v2
+			case wazeroir.ShapeI64x2, wazeroir.ShapeF64x2:
+				lo, hi = v, v
+			}
+			ce.pushValue(lo)
+			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Swizzle:
+			idxHi, idxLo := ce.popValue(), ce.popValue()
+			baseHi, baseLo := ce.popValue(), ce.popValue()
+			var newVal [16]byte
+			for i := 0; i < 16; i++ {
+				var id byte
+				if i < 8 {
+					id = byte(idxLo >> (i * 8))
+				} else {
+					id = byte(idxHi >> ((i - 8) * 8))
+				}
+				if id < 8 {
+					newVal[i] = byte(baseLo >> (id * 8))
+				} else if id < 16 {
+					newVal[i] = byte(baseHi >> ((id - 8) * 8))
+				}
+			}
+			ce.pushValue(binary.LittleEndian.Uint64(newVal[:8]))
+			ce.pushValue(binary.LittleEndian.Uint64(newVal[8:]))
+			frame.pc++
+		case wazeroir.OperationKindV128Shuffle:
+			xHi, xLo, yHi, yLo := ce.popValue(), ce.popValue(), ce.popValue(), ce.popValue()
+			var newVal [16]byte
+			for i, l := range op.us {
+				if l < 8 {
+					newVal[i] = byte(yLo >> (l * 8))
+				} else if l < 16 {
+					newVal[i] = byte(yHi >> ((l - 8) * 8))
+				} else if l < 24 {
+					newVal[i] = byte(xLo >> ((l - 16) * 8))
+				} else if l < 32 {
+					newVal[i] = byte(xHi >> ((l - 24) * 8))
+				}
+			}
+			ce.pushValue(binary.LittleEndian.Uint64(newVal[:8]))
+			ce.pushValue(binary.LittleEndian.Uint64(newVal[8:]))
+			frame.pc++
+		case wazeroir.OperationKindV128AnyTrue:
+			hi, lo := ce.popValue(), ce.popValue()
+			if hi != 0 || lo != 0 {
+				ce.pushValue(1)
+			} else {
+				ce.pushValue(0)
+			}
+			frame.pc++
+		case wazeroir.OperationKindV128AllTrue:
+			hi, lo := ce.popValue(), ce.popValue()
+			var ret = true
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				for i := 0; i < 16; i++ {
+					if i < 8 {
+						ret = ret && (byte(lo>>(i*8)) != 0)
+					} else {
+						ret = ret && (byte(hi>>((i-8)*8)) != 0)
+					}
+				}
+			case wazeroir.ShapeI16x8:
+				for i := 0; i < 8; i++ {
+					if i < 4 {
+						ret = ret && (uint16(lo>>(i*8)) != 0)
+					} else {
+						ret = ret && (uint16(hi>>((i-4)*8)) != 0)
+					}
+				}
+			case wazeroir.ShapeI32x4:
+				for i := 0; i < 4; i++ {
+					if i < 2 {
+						ret = ret && (uint32(lo>>(i*8)) != 0)
+					} else {
+						ret = ret && (uint32(hi>>((i-2)*8)) != 0)
+					}
+				}
+			case wazeroir.ShapeI64x2:
+				ret = ret && (lo != 0) && (hi != 0)
+			}
+			if ret {
+				ce.pushValue(1)
+			} else {
+				ce.pushValue(0)
 			}
 			frame.pc++
 		}

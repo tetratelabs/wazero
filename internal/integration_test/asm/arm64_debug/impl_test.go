@@ -244,7 +244,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToNone(t *testing.T) {
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.FCMPS,
 					SrcReg: arm64.RegR0, SrcReg2: arm64.RegV0},
-				expErr: "R0 is not float",
+				expErr: "R0 is not vector",
 			},
 		}
 
@@ -349,7 +349,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
 	intRegsWithoutZero := intRegs[1:]
-	conditionalRegs := []asm.Register{arm64.RegCondEQ, arm64.RegCondNE, arm64.RegCondHS, arm64.RegCondLO, arm64.RegCondMI, arm64.RegCondPL, arm64.RegCondVS, arm64.RegCondVC, arm64.RegCondHI, arm64.RegCondLS, arm64.RegCondGE, arm64.RegCondLT, arm64.RegCondGT, arm64.RegCondLE, arm64.RegCondAL, arm64.RegCondNV}
+	conditionalRegs := []asm.Register{arm64.RegCondEQ, arm64.RegCondNE,
+		arm64.RegCondHS, arm64.RegCondLO, arm64.RegCondMI, arm64.RegCondPL, arm64.RegCondVS, arm64.RegCondVC,
+		arm64.RegCondHI, arm64.RegCondLS, arm64.RegCondGE, arm64.RegCondLT, arm64.RegCondGT, arm64.RegCondLE,
+		arm64.RegCondAL, arm64.RegCondNV}
 	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV15, arm64.RegV31}
 
 	tests := []struct {
@@ -877,6 +880,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		-1, 0, 1, 2, -2, 4, -4, 0xf, -0xf, 1 << 4, 1<<4 - 1, 1<<4 + 1, -128, -256, 8 * 10, -128,
 		255, 4096, 4096 << 1, 32760, 32760 * 2, 32760*2 - 8,
 		32760*2 - 16, 1 << 27, 1 << 30, 1<<30 + 8, 1<<30 - 8, 1<<30 + 16, 1<<30 - 16, 1<<31 - 8,
+		(1 << 28) + 4,
 	}
 	intRegs := []asm.Register{
 		arm64.RegR0, arm64.RegR16,
@@ -975,6 +979,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		-1, 0, 1, 2, -2, 0xf, -0xf, 1 << 4, 1<<4 - 1, 1<<4 + 1, -128, -256, 8 * 10, -128,
 		255, 4096, 4096 << 1, 32760, 32760 * 2, 32760*2 - 8,
 		32760*2 - 16, 1 << 27, 1 << 30, 1<<30 + 8, 1<<30 - 8, 1<<30 + 16, 1<<30 - 16, 1<<31 - 8,
+		(1 << 28) + 4,
 		1<<12<<8 + 8,
 		1<<12<<8 - 8,
 	}
@@ -1279,27 +1284,33 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		}{
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.B,
-					SrcReg: arm64.RegV21,
-					DstReg: arm64.RegV21,
-					Types:  arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcReg:         arm64.RegV21,
+					DstReg:         arm64.RegV21,
+					Types:          arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcVectorIndex: arm64.VectorIndexNone,
+					DstVectorIndex: arm64.VectorIndexNone,
 				},
 				expErr: "B is unsupported for from:vector-register,to:vector-register type",
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.VMOV,
-					SrcReg: arm64.RegV21,
-					DstReg: arm64.RegV21,
-					Types:  arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcReg:         arm64.RegV21,
+					DstReg:         arm64.RegV21,
+					Types:          arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcVectorIndex: arm64.VectorIndexNone,
+					DstVectorIndex: arm64.VectorIndexNone,
 				},
-				expErr: "unsupported arrangement for VMOV: unknown",
+				expErr: "unsupported arrangement for VMOV: none",
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.VADD,
-					SrcReg: arm64.RegV21,
-					DstReg: arm64.RegV21,
-					Types:  arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcReg:         arm64.RegV21,
+					DstReg:         arm64.RegV21,
+					Types:          arm64.OperandTypesVectorRegisterToVectorRegister,
+					SrcVectorIndex: arm64.VectorIndexNone,
+					DstVectorIndex: arm64.VectorIndexNone,
 				},
-				expErr: "unsupported arrangement for VADD: unknown",
+				expErr: "unsupported arrangement for VADD: none",
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.VADD,
@@ -1307,6 +1318,8 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 					DstReg:            arm64.RegV21,
 					Types:             arm64.OperandTypesVectorRegisterToVectorRegister,
 					VectorArrangement: arm64.VectorArrangement1D,
+					SrcVectorIndex:    arm64.VectorIndexNone,
+					DstVectorIndex:    arm64.VectorIndexNone,
 				},
 				expErr: "unsupported arrangement for VADD: 1D",
 			},
@@ -1314,27 +1327,55 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeVectorRegisterToVectorRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
+			t.Run(tc.expErr, func(t *testing.T) {
+				a := arm64.NewAssemblerImpl(asm.NilRegister)
+				err := a.EncodeVectorRegisterToVectorRegister(tc.n)
+				require.EqualError(t, err, tc.expErr)
+			})
 		}
 	})
 
 	vectorRegs := []asm.Register{arm64.RegV10, arm64.RegV2, arm64.RegV30}
 	tests := []struct {
-		inst asm.Instruction
-		arr  arm64.VectorArrangement
+		name               string
+		inst               asm.Instruction
+		arr                arm64.VectorArrangement
+		needConst          bool
+		c                  asm.ConstantValue
+		srcIndex, dstIndex arm64.VectorIndex
 	}{
-		{inst: arm64.VMOV, arr: arm64.VectorArrangement16B},
-		{inst: arm64.VADD, arr: arm64.VectorArrangement2D},
-		{inst: arm64.VADD, arr: arm64.VectorArrangement4S},
-		{inst: arm64.VADD, arr: arm64.VectorArrangement8H},
-		{inst: arm64.VADD, arr: arm64.VectorArrangement16B},
+		{inst: arm64.VMOV, arr: arm64.VectorArrangement16B, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.VADD, arr: arm64.VectorArrangement2D, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.VADD, arr: arm64.VectorArrangement4S, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.VADD, arr: arm64.VectorArrangement8H, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.VADD, arr: arm64.VectorArrangement16B, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{
+			name: "VSUB 2d",
+			inst: arm64.VSUB, arr: arm64.VectorArrangement2D, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone,
+		},
+		{
+			name: "VSUB 4s",
+			inst: arm64.VSUB, arr: arm64.VectorArrangement4S, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone,
+		},
+		{
+			name: "VSUB 8h",
+			inst: arm64.VSUB, arr: arm64.VectorArrangement8H, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone,
+		},
+		{
+			name: "VSUB 16b",
+			inst: arm64.VSUB, arr: arm64.VectorArrangement16B, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone,
+		},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement8B, needConst: true, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement4H, needConst: true, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement2S, needConst: true, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement8B, needConst: true, c: 7, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement4H, needConst: true, c: 15, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
+		{inst: arm64.USHLL, arr: arm64.VectorArrangement2S, needConst: true, c: 31, srcIndex: arm64.VectorIndexNone, dstIndex: arm64.VectorIndexNone},
 	}
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(fmt.Sprintf("%s.%s", arm64.InstructionName(tc.inst), tc.arr), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			for _, src := range vectorRegs {
 				for _, dst := range vectorRegs {
 					src, dst := src, dst
@@ -1344,11 +1385,17 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 						a := arm64.NewAssemblerImpl(asm.NilRegister)
 
 						for _, assembler := range []arm64.Assembler{goasm, a} {
-							assembler.CompileVectorRegisterToVectorRegister(tc.inst, src, dst, tc.arr)
+							if tc.needConst {
+								assembler.CompileVectorRegisterToVectorRegisterWithConst(tc.inst, src, dst, tc.arr, tc.c)
+							} else {
+								assembler.CompileVectorRegisterToVectorRegister(tc.inst, src, dst, tc.arr, tc.srcIndex, tc.dstIndex)
+							}
 						}
 
 						expected, err := goasm.Assemble()
 						require.NoError(t, err)
+
+						fmt.Println(hex.EncodeToString(expected))
 
 						actual, err := a.Assemble()
 						require.NoError(t, err)
@@ -1360,190 +1407,47 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	}
 }
 
-func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.B,
-					SrcReg: arm64.RegR1,
-					DstReg: arm64.RegV21,
-					Types:  arm64.OperandTypesMemoryToVectorRegister,
-				},
-				expErr: "B is unsupported for from:memory,to:vector-register type",
-			},
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.VLD1,
-					SrcReg: arm64.RegR1,
-					DstReg: arm64.RegV21,
-					Types:  arm64.OperandTypesMemoryToVectorRegister,
-				},
-				expErr: "unsupported arrangement for VLD1: unknown",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeMemoryToVectorRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	regs := []asm.Register{arm64.RegR0, arm64.RegR5, arm64.RegR30}
-	vectorRegs := []asm.Register{arm64.RegV10, arm64.RegV2}
-	arrangements := []arm64.VectorArrangement{
-		arm64.VectorArrangement8B,
-		arm64.VectorArrangement16B,
-		arm64.VectorArrangement4H,
-		arm64.VectorArrangement8H,
-		arm64.VectorArrangement2S,
-		arm64.VectorArrangement4S,
-		arm64.VectorArrangement1D,
-		arm64.VectorArrangement2D,
-	}
-
-	for _, inst := range []asm.Instruction{arm64.VLD1} {
-		inst := inst
-		t.Run(arm64.InstructionName(inst), func(t *testing.T) {
-			for _, arr := range arrangements {
-				for _, offsetReg := range regs {
-					for _, vr := range vectorRegs {
-						arr, offsetReg, vr := arr, offsetReg, vr
-						t.Run(fmt.Sprintf("src=%s,dst=%s.%s",
-							arm64.RegisterName(offsetReg), arm64.RegisterName(vr), arr), func(t *testing.T) {
-							goasm := newGoasmAssembler(t, asm.NilRegister)
-							a := arm64.NewAssemblerImpl(asm.NilRegister)
-
-							for _, assembler := range []arm64.Assembler{goasm, a} {
-								assembler.CompileMemoryToVectorRegister(inst, offsetReg, vr, arr)
-							}
-
-							expected, err := goasm.Assemble()
-							require.NoError(t, err)
-
-							actual, err := a.Assemble()
-							require.NoError(t, err)
-							require.Equal(t, expected, actual, hex.EncodeToString(expected))
-						})
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.B,
-					SrcReg: arm64.RegV21,
-					DstReg: arm64.RegR1,
-					Types:  arm64.OperandTypesVectorRegisterToMemory,
-				},
-				expErr: "B is unsupported for from:vector-register,to:memory type",
-			},
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.VST1,
-					SrcReg: arm64.RegV21,
-					DstReg: arm64.RegR1,
-					Types:  arm64.OperandTypesVectorRegisterToMemory,
-				},
-				expErr: "unsupported arrangement for VST1: unknown",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeVectorRegisterToMemory(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	regs := []asm.Register{arm64.RegR0, arm64.RegR5, arm64.RegR30}
-	vectorRegs := []asm.Register{arm64.RegV10, arm64.RegV2}
-	arrangements := []arm64.VectorArrangement{
-		arm64.VectorArrangement8B,
-		arm64.VectorArrangement16B,
-		arm64.VectorArrangement4H,
-		arm64.VectorArrangement8H,
-		arm64.VectorArrangement2S,
-		arm64.VectorArrangement4S,
-		arm64.VectorArrangement1D,
-		arm64.VectorArrangement2D,
-	}
-
-	for _, inst := range []asm.Instruction{arm64.VST1} {
-		inst := inst
-		t.Run(arm64.InstructionName(inst), func(t *testing.T) {
-			for _, arr := range arrangements {
-				for _, offsetReg := range regs {
-					for _, vr := range vectorRegs {
-						arr, offsetReg, vr := arr, offsetReg, vr
-						t.Run(fmt.Sprintf("src=%s,dst=%s.%s",
-							arm64.RegisterName(offsetReg), arm64.RegisterName(vr), arr), func(t *testing.T) {
-							goasm := newGoasmAssembler(t, asm.NilRegister)
-							a := arm64.NewAssemblerImpl(asm.NilRegister)
-
-							for _, assembler := range []arm64.Assembler{goasm, a} {
-								assembler.CompileVectorRegisterToMemory(inst, vr, offsetReg, arr)
-							}
-
-							expected, err := goasm.Assemble()
-							require.NoError(t, err)
-
-							actual, err := a.Assemble()
-							require.NoError(t, err)
-							require.Equal(t, expected, actual, hex.EncodeToString(expected))
-							fmt.Println(hex.EncodeToString(expected))
-						})
-					}
-				}
-			}
-		})
-	}
-}
-
 func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
+			n   *arm64.NodeImpl
+			exp string
 		}{
 			{
-				n:      &arm64.NodeImpl{Instruction: arm64.B, Types: arm64.OperandTypesRegisterToVectorRegister},
-				expErr: "B is unsupported for from:register,to:vector-register type",
+				n: &arm64.NodeImpl{
+					Instruction: arm64.B, Types: arm64.OperandTypesRegisterToVectorRegister,
+					SrcReg: arm64.RegR0,
+					DstReg: arm64.RegV3,
+				},
+				exp: "B is unsupported for from:register,to:vector-register type",
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.VMOV,
-					Types:       arm64.OperandTypesRegisterToVectorRegister,
-					VectorIndex: 100, VectorArrangement: arm64.VectorArrangement1D,
+					SrcReg:         arm64.RegR0,
+					DstReg:         arm64.RegV3,
+					Types:          arm64.OperandTypesRegisterToVectorRegister,
+					DstVectorIndex: 100, VectorArrangement: arm64.VectorArrangement1D,
 				},
-				expErr: "invalid arrangement and index pair: 1D[100]",
+				exp: "invalid arrangement and index pair: 1D[100]",
 			},
 			{
 				n: &arm64.NodeImpl{Instruction: arm64.VMOV,
-					Types:       arm64.OperandTypesRegisterToVectorRegister,
-					SrcReg:      arm64.RegR0,
-					DstReg:      arm64.RegV3,
-					VectorIndex: 0, VectorArrangement: arm64.VectorArrangement1D,
+					Types:          arm64.OperandTypesRegisterToVectorRegister,
+					SrcReg:         arm64.RegR0,
+					DstReg:         arm64.RegV3,
+					DstVectorIndex: 0, VectorArrangement: arm64.VectorArrangement1D,
 				},
-				expErr: "unsupported arrangement for VMOV: 1D",
+				exp: "unsupported arrangement for VMOV: 1D",
 			},
 		}
 
 		for _, tt := range tests {
 			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeRegisterToVectorRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
+			t.Run(tc.exp, func(t *testing.T) {
+				a := arm64.NewAssemblerImpl(asm.NilRegister)
+				err := a.EncodeRegisterToVectorRegister(tc.n)
+				require.EqualError(t, err, tc.exp)
+			})
 		}
 	})
 
@@ -1605,6 +1509,133 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 						expected, err := goasm.Assemble()
 						require.NoError(t, err)
 
+						actual, err := a.Assemble()
+						require.NoError(t, err)
+						require.Equal(t, expected, actual)
+					})
+				}
+			}
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		tests := []struct {
+			n      *arm64.NodeImpl
+			expErr string
+		}{
+			{
+				n: &arm64.NodeImpl{Instruction: arm64.B, Types: arm64.OperandTypesVectorRegisterToRegister,
+					SrcReg: arm64.RegV0,
+					DstReg: arm64.RegR3,
+				},
+				expErr: "B is unsupported for from:vector-register,to:register type",
+			},
+			{
+				n: &arm64.NodeImpl{Instruction: arm64.VMOV,
+					Types:          arm64.OperandTypesVectorRegisterToRegister,
+					SrcReg:         arm64.RegV0,
+					DstReg:         arm64.RegR3,
+					SrcVectorIndex: 100, VectorArrangement: arm64.VectorArrangement1D,
+				},
+				expErr: "invalid arrangement and index pair: 1D[100]",
+			},
+			{
+				n: &arm64.NodeImpl{Instruction: arm64.VMOV,
+					Types:          arm64.OperandTypesVectorRegisterToRegister,
+					SrcReg:         arm64.RegV0,
+					DstReg:         arm64.RegR3,
+					SrcVectorIndex: 0, VectorArrangement: arm64.VectorArrangement1D,
+				},
+				expErr: "unsupported arrangement for VMOV: 1D",
+			},
+		}
+
+		for _, tt := range tests {
+			tc := tt
+			a := arm64.NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeVectorRegisterToRegister(tc.n)
+			require.EqualError(t, err, tc.expErr)
+		}
+	})
+
+	regs := []asm.Register{arm64.RegR0, arm64.RegR10, arm64.RegR30}
+	vectorRegs := []asm.Register{arm64.RegV0, arm64.RegV10, arm64.RegV30}
+
+	tests := []struct {
+		name        string
+		inst        asm.Instruction
+		arrangement arm64.VectorArrangement
+		index       arm64.VectorIndex
+	}{
+		{
+			name:        "VMOV D[0]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementD,
+			index:       0,
+		},
+		{
+			name:        "VMOV D[1]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementD,
+			index:       1,
+		},
+		{
+			name:        "VMOV B[0]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementB,
+			index:       0,
+		},
+		{
+			name:        "VMOV B[15]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementB,
+			index:       15,
+		},
+		{
+			name:        "VMOV H[1]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementH,
+			index:       1,
+		},
+		{
+			name:        "VMOV H[4]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementH,
+			index:       7,
+		},
+		{
+			name:        "VMOV S[2]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementS,
+			index:       2,
+		},
+		{
+			name:        "VMOV S[3]",
+			inst:        arm64.VMOV,
+			arrangement: arm64.VectorArrangementS,
+			index:       3,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			for _, r := range regs {
+				for _, vr := range vectorRegs {
+					r, vr := r, vr
+					t.Run(fmt.Sprintf("dst=%s,src=%s.%s[%d]",
+						arm64.RegisterName(r), arm64.RegisterName(vr), tc.arrangement, tc.index), func(t *testing.T) {
+						goasm := newGoasmAssembler(t, asm.NilRegister)
+						a := arm64.NewAssemblerImpl(asm.NilRegister)
+
+						for _, assembler := range []arm64.Assembler{goasm, a} {
+							assembler.CompileVectorRegisterToRegister(tc.inst, vr, r, tc.arrangement, tc.index)
+						}
+
+						expected, err := goasm.Assemble()
+						require.NoError(t, err)
 						actual, err := a.Assemble()
 						require.NoError(t, err)
 						require.Equal(t, expected, actual)

@@ -159,6 +159,12 @@ func (c *arm64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt 
 	return
 }
 
+func (c *arm64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) {
+	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
+	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
+	c.markRegisterUsed(reg)
+}
+
 func (c *arm64Compiler) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
 		if !isZeroRegister(reg) && reg != asm.NilRegister {
@@ -477,6 +483,7 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	if err := c.compileEnsureOnGeneralPurposeRegister(x); err != nil {
 		return err
 	}
+
 	if err := c.compileEnsureOnGeneralPurposeRegister(y); err != nil {
 		return err
 	}
@@ -507,10 +514,10 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 			return err
 		}
 		c.assembler.CompileConstToRegister(arm64.ADD, globalInstanceValueOffset, intReg)
-		c.assembler.CompileMemoryToVectorRegister(arm64.VLD1, intReg, resultReg, arm64.VectorArrangement2D)
+		c.assembler.CompileMemoryToVectorRegister(arm64.VMOV, intReg, 0,
+			resultReg, arm64.VectorArrangementQ)
 
-		c.pushRuntimeValueLocationOnRegister(resultReg, runtimeValueTypeV128Lo)
-		c.pushRuntimeValueLocationOnRegister(resultReg, runtimeValueTypeV128Hi)
+		c.pushVectorRuntimeValueLocationOnRegister(resultReg)
 	} else {
 
 		var intMov, floatMov = arm64.NOP, arm64.NOP
@@ -560,9 +567,10 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	wasmValueType := c.ir.Globals[o.Index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
 
-	val := c.locationStack.pop()
+	var val *runtimeValueLocation
 	if isV128 {
-		// The previous val is higher 64-bits, and have to use lower 64-bit's runtimeValueLocation for allocation, etc.
+		val = c.locationStack.popV128()
+	} else {
 		val = c.locationStack.pop()
 	}
 	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
@@ -575,9 +583,9 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	if isV128 {
-		c.assembler.CompileConstToRegister(arm64.ADD, globalInstanceValueOffset, globalInstanceAddressRegister)
-		c.assembler.CompileVectorRegisterToMemory(arm64.VST1, val.register, globalInstanceAddressRegister,
-			arm64.VectorArrangement2D)
+		c.assembler.CompileVectorRegisterToMemory(arm64.VMOV,
+			val.register, globalInstanceAddressRegister, globalInstanceValueOffset,
+			arm64.VectorArrangementQ)
 	} else {
 		var mov asm.Instruction
 		switch c.ir.Globals[o.Index].ValType {
@@ -1395,7 +1403,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 			c.assembler.CompileRegisterToRegister(arm64.FMOVD, pickTarget.register, pickedRegister)
 		case runtimeValueTypeV128Lo:
 			c.assembler.CompileVectorRegisterToVectorRegister(arm64.VMOV,
-				pickTarget.register, pickedRegister, arm64.VectorArrangement16B)
+				pickTarget.register, pickedRegister, arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
 		case runtimeValueTypeV128Hi:
 			panic("BUG") // since pick target must point to the lower 64-bits of vectors.
 		}
@@ -4012,10 +4020,9 @@ func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 		c.assembler.CompileMemoryToRegister(arm64.FMOVD, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeV128Lo:
-		// Stores arm64ReservedRegisterForStackBasePointerAddress+ int64(loc.stackPointer)*8 into tem register.
-		c.assembler.CompileConstToRegister(arm64.MOVD, int64(loc.stackPointer)*8, arm64ReservedRegisterForTemporary)
-		c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForStackBasePointerAddress, arm64ReservedRegisterForTemporary)
-		c.assembler.CompileMemoryToVectorRegister(arm64.VLD1, arm64ReservedRegisterForTemporary, loc.register, arm64.VectorArrangement2D)
+		c.assembler.CompileMemoryToVectorRegister(arm64.VMOV,
+			arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, loc.register,
+			arm64.VectorArrangementQ)
 		// Higher 64-bits are loaded as well ^^.
 		hi := c.locationStack.stack[loc.stackPointer+1]
 		hi.setRegister(loc.register)
@@ -4071,20 +4078,19 @@ func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
 func (c *arm64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
 	switch loc.valueType {
 	case runtimeValueTypeI32:
-		// Use 64-bit mov as all the values are represented as uint64 in Go so we have to clear out the higher bits.
+		// Use 64-bit mov as all the values are represented as uint64 in Go, so we have to clear out the higher bits.
 		c.assembler.CompileRegisterToMemory(arm64.MOVD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeI64:
 		c.assembler.CompileRegisterToMemory(arm64.MOVD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF32:
-		// Use 64-bit mov as all the values are represented as uint64 in Go so we have to clear out the higher bits.
+		// Use 64-bit mov as all the values are represented as uint64 in Go, so we have to clear out the higher bits.
 		c.assembler.CompileRegisterToMemory(arm64.FMOVD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF64:
 		c.assembler.CompileRegisterToMemory(arm64.FMOVD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeV128Lo:
-		// Stores arm64ReservedRegisterForStackBasePointerAddress + int64(loc.stackPointer)*8 into tem register.
-		c.assembler.CompileConstToRegister(arm64.MOVD, int64(loc.stackPointer)*8, arm64ReservedRegisterForTemporary)
-		c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForStackBasePointerAddress, arm64ReservedRegisterForTemporary)
-		c.assembler.CompileVectorRegisterToMemory(arm64.VST1, loc.register, arm64ReservedRegisterForTemporary, arm64.VectorArrangement2D)
+		c.assembler.CompileVectorRegisterToMemory(arm64.VMOV,
+			loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8,
+			arm64.VectorArrangementQ)
 		// Higher 64-bits are released as well ^^.
 		hi := c.locationStack.stack[loc.stackPointer+1]
 		c.locationStack.releaseRegister(hi)

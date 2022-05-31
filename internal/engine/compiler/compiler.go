@@ -404,9 +404,45 @@ type compiler interface {
 	//
 	// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-fill-x
 	compileTableFill(*wazeroir.OperationTableFill) error
-	// compileConstV128 adds instructions to push a constant V128 value onto the stack.
+	// compileV128Const adds instructions to push a constant V128 value onto the stack.
 	// See wasm.OpcodeVecV128Const
-	compileConstV128(*wazeroir.OperationConstV128) error
-	// compileAddV128 adds instruction to add two vector values whose shape is specified as `o.Shape`.
-	compileAddV128(o *wazeroir.OperationAddV128) error
+	compileV128Const(*wazeroir.OperationV128Const) error
+	// compileV128Add adds instruction to add two vector values whose shape is specified as `o.Shape`.
+	// See wasm.OpcodeVecI8x16Add wasm.OpcodeVecI16x8Add wasm.OpcodeVecI32x4Add wasm.OpcodeVecI64x2Add wasm.OpcodeVecF32x4Add wasm.OpcodeVecF64x2Add
+	compileV128Add(o *wazeroir.OperationV128Add) error
+	// compileV128Sub adds instruction to subtract two vector values whose shape is specified as `o.Shape`.
+	// See wasm.OpcodeVecI8x16Sub wasm.OpcodeVecI16x8Sub wasm.OpcodeVecI32x4Sub wasm.OpcodeVecI64x2Sub wasm.OpcodeVecF32x4Sub wasm.OpcodeVecF64x2Sub
+	compileV128Sub(o *wazeroir.OperationV128Sub) error
+	// compileV128Load adds instruction to perform vector load kind instructions.
+	// See wasm.OpcodeVecV128Load* instructions.
+	compileV128Load(o *wazeroir.OperationV128Load) error
+	// compileV128LoadLane adds instructions which are equivalent to wasm.OpcodeVecV128LoadXXLane instructions.
+	// See wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName
+	compileV128LoadLane(o *wazeroir.OperationV128LoadLane) error
+	// compileV128Store adds instructions which are equivalent to wasm.OpcodeVecV128StoreName.
+	compileV128Store(o *wazeroir.OperationV128Store) error
+	// compileV128StoreLane adds instructions which are equivalent to wasm.OpcodeVecV128StoreXXLane instructions.
+	// See wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
+	compileV128StoreLane(o *wazeroir.OperationV128StoreLane) error
+	// compileV128ExtractLane adds instructions which are equivalent to wasm.OpcodeVecXXXXExtractLane instructions.
+	// See wasm.OpcodeVecI8x16ExtractLaneSName wasm.OpcodeVecI8x16ExtractLaneUName wasm.OpcodeVecI16x8ExtractLaneSName wasm.OpcodeVecI16x8ExtractLaneUName
+	// wasm.OpcodeVecI32x4ExtractLaneName wasm.OpcodeVecI64x2ExtractLaneName wasm.OpcodeVecF32x4ExtractLaneName wasm.OpcodeVecF64x2ExtractLaneName.
+	compileV128ExtractLane(o *wazeroir.OperationV128ExtractLane) error
+	// compileV128ReplaceLane adds instructions which are equivalent to wasm.OpcodeVecXXXXReplaceLane instructions.
+	// See wasm.OpcodeVecI8x16ReplaceLaneName wasm.OpcodeVecI16x8ReplaceLaneName wasm.OpcodeVecI32x4ReplaceLaneName wasm.OpcodeVecI64x2ReplaceLaneName
+	// wasm.OpcodeVecF32x4ReplaceLaneName wasm.OpcodeVecF64x2ReplaceLaneName.
+	compileV128ReplaceLane(o *wazeroir.OperationV128ReplaceLane) error
+	// compileV128Splat adds instructions which are equivalent to wasm.OpcodeVecXXXSplat instructions.
+	// See wasm.OpcodeVecI8x16SplatName wasm.OpcodeVecI16x8SplatName wasm.OpcodeVecI32x4SplatName wasm.OpcodeVecI64x2SplatName
+	// wasm.OpcodeVecF32x4SplatName wasm.OpcodeVecF64x2SplatName.
+	compileV128Splat(o *wazeroir.OperationV128Splat) error
+	// compileV128Shuffle adds instructions which are equivalent to wasm.OpcodeVecV128i8x16ShuffleName instruction.
+	compileV128Shuffle(o *wazeroir.OperationV128Shuffle) error
+	// compileV128Swizzle adds instructions which are equivalent to wasm.OpcodeVecI8x16SwizzleName instruction.
+	compileV128Swizzle(o *wazeroir.OperationV128Swizzle) error
+	// compileV128Swizzle adds instructions which are equivalent to wasm.OpcodeVecV128AnyTrueName instruction.
+	compileV128AnyTrue(o *wazeroir.OperationV128AnyTrue) error
+	// compileV128AllTrue adds instructions which are equivalent to wasm.OpcodeVecXXXAllTrue instructions.
+	// See wasm.OpcodeVecI8x16AllTrueName wasm.OpcodeVecI16x8AllTrueName wasm.OpcodeVecI32x4AllTrueName wasm.OpcodeVecI64x2AllTrueName.
+	compileV128AllTrue(o *wazeroir.OperationV128AllTrue) error
 }

@@ -332,63 +332,30 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-func createOffsetForVectorRegList(arr asm_arm64.VectorArrangement, reg asm.Register) (offset int64) {
-	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/arch/arm64.go#L372
-	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/arch/arm64.go#L332
-	// https://github.com/golang/go/blob/19309779ac5e2f5a2fd3cbb34421dafb2855ac21/src/cmd/asm/internal/asm/parse.go#L1143-L1148
-	var curQ, curSize int64
-	switch arr {
-	case asm_arm64.VectorArrangement8B:
-		curSize = 0
-		curQ = 0
-	case asm_arm64.VectorArrangement16B:
-		curSize = 0
-		curQ = 1
-	case asm_arm64.VectorArrangement4H:
-		curSize = 1
-		curQ = 0
-	case asm_arm64.VectorArrangement8H:
-		curSize = 1
-		curQ = 1
-	case asm_arm64.VectorArrangement2S:
-		curSize = 2
-		curQ = 0
-	case asm_arm64.VectorArrangement4S:
-		curSize = 2
-		curQ = 1
-	case asm_arm64.VectorArrangement1D:
-		curSize = 3
-		curQ = 0
-	case asm_arm64.VectorArrangement2D:
-		curSize = 3
-		curQ = 1
-	}
-	return (int64(curQ) & 1 << 30) | ((curSize & 3) << 10) | (0x7 << 12) | 1<<60 | int64(castAsGolangAsVectorRegister[reg]&31)
-}
-
+// CompileMemoryToVectorRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryToVectorRegister(
-	instruction asm.Instruction, srcOffsetReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement,
+	_ asm.Instruction, _ asm.Register, _ asm.ConstantValue, _ asm.Register, _ asm_arm64.VectorArrangement,
 ) {
-	inst := a.NewProg()
-	inst.As = castAsGolangAsmInstruction[instruction]
-	inst.To.Type = obj.TYPE_REGLIST
-	inst.To.Offset = createOffsetForVectorRegList(arrangement, dstReg)
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = castAsGolangAsmRegister[srcOffsetReg]
-	a.AddInstruction(inst)
+	panic("CompileMemoryToVectorRegister is unsupported with golang-asm")
 }
 
-func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstOffsetReg asm.Register,
-	arrangement asm_arm64.VectorArrangement) {
-	inst := a.NewProg()
-	inst.As = castAsGolangAsmInstruction[instruction]
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = castAsGolangAsmRegister[dstOffsetReg]
-	inst.From.Type = obj.TYPE_REGLIST
-	inst.From.Offset = createOffsetForVectorRegList(arrangement, srcReg)
-	a.AddInstruction(inst)
+// CompileVectorRegisterToMemory implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemory(_ asm.Instruction, _, _ asm.Register, _ asm.ConstantValue,
+	_ asm_arm64.VectorArrangement) {
+	panic("CompileVectorRegisterToMemory is unsupported with golang-asm")
 }
 
+// CompileMemoryWithRegisterOffsetToVectorRegister  implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToVectorRegister(_ asm.Instruction, _, _ asm.Register, _ asm.Register, _ asm_arm64.VectorArrangement) {
+	panic("CompileMemoryWithRegisterOffsetToVectorRegister is unsupported with golang-asm")
+}
+
+// CompileVectorRegisterToMemoryWithRegisterOffset  implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemoryWithRegisterOffset(_ asm.Instruction, _, _, _ asm.Register, _ asm_arm64.VectorArrangement) {
+	panic("CompileVectorRegisterToMemoryWithRegisterOffset is unsupported with golang-asm")
+}
+
+// CompileRegisterToVectorRegister implements the same method as documented on asm_arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 	arrangement asm_arm64.VectorArrangement, index asm_arm64.VectorIndex) {
 	inst := a.NewProg()
@@ -401,7 +368,9 @@ func (a *assemblerGoAsmImpl) CompileRegisterToVectorRegister(instruction asm.Ins
 	inst.From.Reg = castAsGolangAsmRegister[srcReg]
 	a.AddInstruction(inst)
 }
-func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement) {
+
+// CompileVectorRegisterToVectorRegister implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement, srcIndex, dstIndex asm_arm64.VectorIndex) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 
@@ -414,18 +383,63 @@ func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction a
 		inst.From.Type = obj.TYPE_REG
 		inst.From.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
 		a.AddInstruction(inst)
-	case asm_arm64.VADD:
+	case asm_arm64.VADD, asm_arm64.VSUB:
 		inst.To.Type = obj.TYPE_REG
 		inst.To.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
-		inst.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
 		inst.From.Type = obj.TYPE_REG
-		inst.From.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.From.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
 		a.AddInstruction(inst)
-	case asm_arm64.VFADDD:
-		panic("Unsupported in golang-asm")
-	case asm_arm64.VFADDS:
+	default:
 		panic("Unsupported in golang-asm")
 	}
+}
+
+// CompileVectorRegisterToVectorRegisterWithConst implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg,
+	dstReg asm.Register, arrangement asm_arm64.VectorArrangement, c asm.ConstantValue) {
+	switch instruction {
+	case asm_arm64.USHLL:
+		var dstArrangement asm_arm64.VectorArrangement
+		if arrangement == asm_arm64.VectorArrangement8B {
+			dstArrangement = asm_arm64.VectorArrangement8H
+		} else if arrangement == asm_arm64.VectorArrangement4H {
+			dstArrangement = asm_arm64.VectorArrangement4S
+		} else if arrangement == asm_arm64.VectorArrangement2S {
+			dstArrangement = asm_arm64.VectorArrangement2D
+		}
+		inst := a.NewProg()
+		inst.As = castAsGolangAsmInstruction[instruction]
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = castAsGolangAsVectorRegister[dstReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[dstArrangement]&15)<<5
+		inst.Reg = castAsGolangAsVectorRegister[srcReg]&31 + arm64.REG_ARNG + (castAsGolangAsmArrangement[arrangement]&15)<<5
+		inst.From.Type = obj.TYPE_CONST
+		inst.From.Offset = c
+		a.AddInstruction(inst)
+	default:
+		panic("unsupported in golang-asm")
+	}
+}
+
+// CompileVectorRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement asm_arm64.VectorArrangement, index asm_arm64.VectorIndex) {
+	inst := a.NewProg()
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = castAsGolangAsmRegister[dstReg]
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = (castAsGolangAsVectorRegister[srcReg] & 31) + arm64.REG_ELEM +
+		(castAsGolangAsmArrangement[arrangement]&15)<<5
+	inst.From.Index = int16(index)
+	a.AddInstruction(inst)
+}
+
+// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
+// and the destination is the dstReg.
+func (a *assemblerGoAsmImpl) CompileLoadStaticConstToVectorRegister(asm.Instruction,
+	asm.StaticConst, asm.Register, asm_arm64.VectorArrangement) {
+	panic("unsupported in golang-asm")
 }
 
 var castAsGolangAsmArrangement = [...]int16{
@@ -689,7 +703,7 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_arm64.VCNT:     arm64.AVCNT,
 	asm_arm64.VUADDLV:  arm64.AVUADDLV,
 	asm_arm64.VMOV:     arm64.AVMOV,
-	asm_arm64.VLD1:     arm64.AVLD1,
-	asm_arm64.VST1:     arm64.AVST1,
 	asm_arm64.VADD:     arm64.AVADD,
+	asm_arm64.VSUB:     arm64.AVSUB,
+	asm_arm64.USHLL:    arm64.AVUSHLL,
 }

@@ -255,16 +255,18 @@ func (ta *testAssembler) CompileConditionalRegisterSet(cond asm.ConditionalRegis
 	ta.a.CompileConditionalRegisterSet(cond, dstReg)
 }
 
-func (ta *testAssembler) CompileMemoryToVectorRegister(instruction asm.Instruction, srcOffsetReg, dstReg asm.Register,
+func (ta *testAssembler) CompileMemoryToVectorRegister(instruction asm.Instruction, srcOffsetReg asm.Register,
+	c asm.ConstantValue, dstReg asm.Register,
 	arrangement arm64.VectorArrangement) {
-	ta.goasm.CompileMemoryToVectorRegister(instruction, srcOffsetReg, dstReg, arrangement)
-	ta.a.CompileMemoryToVectorRegister(instruction, srcOffsetReg, dstReg, arrangement)
+	ta.goasm.CompileMemoryToVectorRegister(instruction, srcOffsetReg, c, dstReg, arrangement)
+	ta.a.CompileMemoryToVectorRegister(instruction, srcOffsetReg, c, dstReg, arrangement)
 }
 
 func (ta *testAssembler) CompileVectorRegisterToMemory(instruction asm.Instruction, srcReg, dstOffsetReg asm.Register,
+	c asm.ConstantValue,
 	arrangement arm64.VectorArrangement) {
-	ta.goasm.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, arrangement)
-	ta.a.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, arrangement)
+	ta.goasm.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, c, arrangement)
+	ta.a.CompileVectorRegisterToMemory(instruction, srcReg, dstOffsetReg, c, arrangement)
 }
 
 func (ta *testAssembler) CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
@@ -274,7 +276,36 @@ func (ta *testAssembler) CompileRegisterToVectorRegister(instruction asm.Instruc
 }
 
 func (ta *testAssembler) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
-	arrangement arm64.VectorArrangement) {
-	ta.goasm.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement)
-	ta.a.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement)
+	arrangement arm64.VectorArrangement, srcIndex, dstIndex arm64.VectorIndex) {
+	ta.goasm.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement, srcIndex, dstIndex)
+	ta.a.CompileVectorRegisterToVectorRegister(instruction, srcReg, dstReg, arrangement, srcIndex, dstIndex)
+}
+
+func (ta *testAssembler) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg, dstReg asm.Register,
+	arrangement arm64.VectorArrangement, c asm.ConstantValue) {
+	ta.goasm.CompileVectorRegisterToVectorRegisterWithConst(instruction, srcReg, dstReg, arrangement, c)
+	ta.a.CompileVectorRegisterToVectorRegisterWithConst(instruction, srcReg, dstReg, arrangement, c)
+}
+
+func (ta *testAssembler) CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction, srcBaseReg, srcOffsetRegister asm.Register, dstReg asm.Register, arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileMemoryWithRegisterOffsetToVectorRegister(instruction, srcBaseReg, srcOffsetRegister, dstReg, arrangement)
+	ta.a.CompileMemoryWithRegisterOffsetToVectorRegister(instruction, srcBaseReg, srcOffsetRegister, dstReg, arrangement)
+}
+
+func (ta *testAssembler) CompileVectorRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, srcReg, dstBaseReg, dstOffsetRegister asm.Register, arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileVectorRegisterToMemoryWithRegisterOffset(instruction, srcReg, dstBaseReg, dstOffsetRegister, arrangement)
+	ta.a.CompileVectorRegisterToMemoryWithRegisterOffset(instruction, srcReg, dstBaseReg, dstOffsetRegister, arrangement)
+}
+
+func (ta *testAssembler) CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement arm64.VectorArrangement, index arm64.VectorIndex) {
+	ta.goasm.CompileVectorRegisterToRegister(instruction, srcReg, dstReg, arrangement, index)
+	ta.a.CompileVectorRegisterToRegister(instruction, srcReg, dstReg, arrangement, index)
+}
+
+// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
+// and the destination is the dstReg.
+func (ta *testAssembler) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
+	c asm.StaticConst, dstReg asm.Register, arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
+	ta.a.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
 }
