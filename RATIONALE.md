@@ -351,6 +351,26 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 
 Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
 
+### ClockResGet
+
+A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
+Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual
+value. For now, we return fixed values of 1us for realtime and 1ns for monotonic, assuming that realtime clocks are
+often lower precision than monotonic clocks. In the future, this could be improved by having OS+arch specific assembly
+to make syscalls.
+
+For example, Go implements time.Now for linux-amd64 with this [assembly](https://github.com/golang/go/blob/f19e4001808863d2ebfe9d1975476513d030c381/src/runtime/time_linux_amd64.s).
+Because retrieving resolution is not generally called often, unlike getting time, it could be appropriate to only
+implement the fallback logic that does not use VDSO (executing syscalls in user mode). The syscall for clock_getres
+is 229 and should be usable. https://pkg.go.dev/syscall#pkg-constants.
+
+If implementing similar for Windows, [mingw](https://github.com/mirror/mingw-w64/blob/6a0e9165008f731bccadfc41a59719cf7c8efc02/mingw-w64-libraries/winpthreads/src/clock.c#L77
+) is often a good source to find the Windows API calls that correspond
+to a POSIX method.
+
+Writing assembly would allow making syscalls without CGO, but comes with the cost that it will require implementations
+across many combinations of OS and architecture.
+
 ## Signed encoding of integer global constant initializers
 wazero treats integer global constant initializers signed as their interpretation is not known at declaration time. For
 example, there is no signed integer [value type](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#value-types%E2%91%A0).

@@ -659,10 +659,9 @@ func (a *snapshotPreview1) EnvironSizesGet(ctx context.Context, m api.Module, re
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *snapshotPreview1) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	// A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
-	// Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual
-	// value. For now, we return fixed values with an assumption that realtime clocks are often lower precision than
-	// monotonic clocks. In the future, this could be improved by having OS+arch specific assembly to make syscalls.
+	// We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
+	// source in time.go, windows monotonic resolution can be 15ms. This chooses arbitrarily 1us for wall time and
+	// 1ns for monotonic. See RATIONALE.md for more context.
 
 	var resolution uint64 // ns
 	switch id {
