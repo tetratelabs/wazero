@@ -1413,6 +1413,7 @@ const (
 // time does not provide a means to directly reference the monotonic time value it computes with time.Now.
 // We retrieve a time.Now on initialization to use as a base which we compute values against which ensures
 // subsequent readings from clock_time_get return montonically increasing values with correct deltas.
+// time.Now always returns a Time with a monotonic reading.
 var monotonicClockBase = time.Now()
 
 func timeNowUnixNano() uint64 {
