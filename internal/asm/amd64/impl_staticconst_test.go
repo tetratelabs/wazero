@@ -22,7 +22,7 @@ func TestConstPool_addConst(t *testing.T) {
 
 func TestAssemblerImpl_CompileLoadStaticConstToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
-	t.Run("odd bytes", func(t *testing.T) {
+	t.Run("odd count of bytes", func(t *testing.T) {
 		err := a.CompileLoadStaticConstToRegister(MOVDQU, []byte{1}, RegAX)
 		require.Error(t, err)
 	})
@@ -41,7 +41,7 @@ func TestAssemblerImpl_CompileLoadStaticConstToRegister(t *testing.T) {
 func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 	t.Run("no consts", func(t *testing.T) {
 		a := NewAssemblerImpl()
-		// Invoking maybeFlushConstants before encoding consts usage should be fine.
+		// Invoking maybeFlushConstants before encoding consts usage should not panic.
 		a.maybeFlushConstants(false)
 		a.maybeFlushConstants(true)
 	})

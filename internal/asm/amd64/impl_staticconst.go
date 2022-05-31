@@ -13,9 +13,8 @@ type constPool struct {
 	consts                 []asm.StaticConst
 	poolSizeInBytes        int
 
-	// offsetFinalizedCallbacks holds the callbacks keyed on the constants.
-	// These callbacks are called when the offsets of the constants in the binary
-	// have been determined.
+	// offsetFinalizedCallbacks are functions called when the offsets of the
+	// constants in the binary have been determined.
 	offsetFinalizedCallbacks map[string][]func(offsetOfConstInBinary int)
 }
 
@@ -64,7 +63,7 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			}
 		}
 
-		a.pool = newConstPool()
+		a.pool = newConstPool() // reset
 	}
 }
 
