@@ -111,7 +111,7 @@ type Runtime interface {
 	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.
 	//
 	//	// Everything below here can be closed, but will anyway due to above.
-	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, r)
+	//	_, _ = wasi_snapshot_preview1.InstantiateSnapshotPreview1(ctx, r)
 	//	mod, _ := r.InstantiateModuleFromCode(ctx, source)
 	CloseWithExitCode(ctx context.Context, exitCode uint32) error
 

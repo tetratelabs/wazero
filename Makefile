@@ -5,9 +5,9 @@ space :=
 space +=
 
 goimports := golang.org/x/tools/cmd/goimports@v0.1.10
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.0
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.99.0
+hugo          := github.com/gohugoio/hugo@v0.100.0
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)

@@ -11,7 +11,7 @@
 // Relationship to WASI
 //
 // A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
-// See wasi.InstantiateSnapshotPreview1
+// See wasi_snapshot_preview1.InstantiateSnapshotPreview1
 //
 // See https://www.assemblyscript.org/concepts.html#special-imports
 package assemblyscript

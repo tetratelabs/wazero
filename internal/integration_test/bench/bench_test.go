@@ -10,7 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -190,7 +190,7 @@ func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = wasi.InstantiateSnapshotPreview1(testCtx, r)
+	_, err = wasi_snapshot_preview1.Instantiate(testCtx, r)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -175,7 +176,7 @@ func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+	if !platform.IsSupported() {
 		t.Skip()
 	}
 }

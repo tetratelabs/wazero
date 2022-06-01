@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 func TestExampleUpToDate(t *testing.T) {
@@ -29,7 +29,7 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithWasmCore2())
 
 		// Add WASI to satisfy import tests
-		wm, err := wasi.InstantiateSnapshotPreview1(testCtx, r)
+		wm, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 		require.NoError(t, err)
 		defer wm.Close(testCtx)
 

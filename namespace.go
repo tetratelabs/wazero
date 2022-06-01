@@ -35,7 +35,7 @@ type Namespace interface {
 	//	defer n.CloseWithExitCode(ctx, 2) // This closes all modules in this Namespace.
 	//
 	//	Everything below here can be closed, but will anyway due to above.
-	//	_, _ = wasi.InstantiateSnapshotPreview1(ctx, n)
+	//	_, _ = wasi_snapshot_preview1.InstantiateSnapshotPreview1(ctx, n)
 	//	mod, _ := n.InstantiateModuleFromCode(ctx, source)
 	//
 	// See Closer

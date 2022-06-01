@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 // greetWasm was compiled using `tinygo build -o greet.wasm -scheduler=none --no-debug -target=wasi greet.go`
@@ -39,7 +39,7 @@ func main() {
 
 	// Note: testdata/greet.go doesn't use WASI, but TinyGo needs it to
 	// implement functions such as panic.
-	if _, err = wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		log.Panicln(err)
 	}
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 // loggerFactory implements experimental.FunctionListenerFactory to log all function calls to the console.
@@ -62,7 +62,7 @@ func Example_listener() {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
-	if _, err := wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		log.Panicln(err)
 	}
 

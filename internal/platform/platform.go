@@ -9,6 +9,23 @@ import (
 	"runtime"
 )
 
+// IsSupported is exported for tests and includes constraints here and also the assembler.
+func IsSupported() bool {
+	switch runtime.GOOS {
+	case "darwin", "windows", "linux":
+	default:
+		return false
+	}
+
+	switch runtime.GOARCH {
+	case "amd64", "arm64":
+	default:
+		return false
+	}
+
+	return true
+}
+
 // MmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
 //
 // See https://man7.org/linux/man-pages/man2/mmap.2.html for mmap API and flags.

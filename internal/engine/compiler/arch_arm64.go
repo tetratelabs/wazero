@@ -6,8 +6,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-const isSupported = true
-
 // init initializes variables for the arm64 architecture
 func init() {
 	newArchContext = newArchContextImpl
@@ -17,7 +15,7 @@ func init() {
 type archContext struct {
 	// compilerCallReturnAddress holds the absolute return address for nativecall.
 	// The value is set whenever nativecall is executed and done in compiler_arm64.s
-	// Native code can return back to the ce.execWasmFunction's main loop back by
+	// Native code can return to the ce.execWasmFunction's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	// Note: this is only used by Compiler code so mark this as nolint.
 	compilerCallReturnAddress uint64 //nolint
