@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -396,7 +397,7 @@ func releaseCode(compiledFn *code) {
 
 	// Setting this to nil allows tests to know the correct finalizer function was called.
 	compiledFn.codeSegment = nil
-	if err := munmapCodeSegment(codeSegment); err != nil {
+	if err := platform.MunmapCodeSegment(codeSegment); err != nil {
 		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
 		// functions can return errors, they are ignored. To make these visible for troubleshooting, we panic
 		// with additional context. module+funcidx should be enough, but if not, we can add more later.

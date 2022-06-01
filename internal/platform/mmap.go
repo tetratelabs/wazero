@@ -1,31 +1,12 @@
 //go:build !windows
 
-package compiler
+package platform
 
 import (
-	"errors"
-	"runtime"
 	"syscall"
 )
 
-// mmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
-// See https://man7.org/linux/man-pages/man2/mmap.2.html for mmap API and flags.
-func mmapCodeSegment(code []byte) ([]byte, error) {
-	if len(code) == 0 {
-		panic(errors.New("BUG: mmapCodeSegment with zero length"))
-	}
-	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(code)
-	} else {
-		return mmapCodeSegmentARM64(code)
-	}
-}
-
-// munmapCodeSegment unmaps the given memory region.
 func munmapCodeSegment(code []byte) error {
-	if len(code) == 0 {
-		panic(errors.New("BUG: munmapCodeSegment with zero length"))
-	}
 	return syscall.Munmap(code)
 }
 

@@ -1,10 +1,8 @@
-package compiler
+package platform
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -24,21 +22,7 @@ const (
 	windows_PAGE_EXECUTE_READWRITE uintptr = 0x00000040
 )
 
-func mmapCodeSegment(code []byte) ([]byte, error) {
-	if len(code) == 0 {
-		panic(errors.New("BUG: mmapCodeSegment with zero length"))
-	}
-	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(code)
-	} else {
-		return mmapCodeSegmentARM64(code)
-	}
-}
-
 func munmapCodeSegment(code []byte) error {
-	if len(code) == 0 {
-		panic(errors.New("BUG: munmapCodeSegment with zero length"))
-	}
 	return freeMemory(code)
 }
 

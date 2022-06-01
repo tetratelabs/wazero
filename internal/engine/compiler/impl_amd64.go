@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -231,7 +232,7 @@ func (c *amd64Compiler) compile() (code []byte, staticData codeStaticData, stack
 		return
 	}
 
-	code, err = mmapCodeSegment(code)
+	code, err = platform.MmapCodeSegment(code)
 	if err != nil {
 		return
 	}
