@@ -1196,7 +1196,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				lane := body[pc]
 				if lane >= attr.laneCeil {
-					return fmt.Errorf("invalid lane index %d >= %d", lane, attr.laneCeil)
+					return fmt.Errorf("invalid lane index %d >= %d for %s", lane, attr.laneCeil, vectorInstructionName[vecOpcode])
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
@@ -1260,7 +1260,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128i8x16Shuffle:
 				pc++
-				if pc+16 >= uint64(len(body)) {
+				if pc+15 >= uint64(len(body)) {
 					return fmt.Errorf("16 lane indexes for %s not found", vectorInstructionName[vecOpcode])
 				}
 				lanes := body[pc : pc+16]

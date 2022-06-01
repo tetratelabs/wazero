@@ -2877,18 +2877,18 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 		{name: OpcodeVecV128Load64LaneName, body: loadLane(OpcodeVecV128Load64Lane, 0, 3, 1)},
 		{
 			name: OpcodeVecV128StoreName, body: []byte{
-				OpcodeI32Const,
-				1, 1, 1, 1,
-				OpcodeVecPrefix,
-				OpcodeVecV128Const,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				OpcodeVecPrefix,
-				OpcodeVecV128Store,
-				4,  // alignment
-				10, // offset
-				OpcodeEnd,
-			},
+			OpcodeI32Const,
+			1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Store,
+			4,  // alignment
+			10, // offset
+			OpcodeEnd,
+		},
 		},
 		{name: OpcodeVecV128Store8LaneName, body: storeLane(OpcodeVecV128Store8Lane, 0, 0, 0)},
 		{name: OpcodeVecV128Store8LaneName + "/lane=15", body: storeLane(OpcodeVecV128Store8Lane, 100, 0, 15)},
@@ -2935,18 +2935,20 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 		{name: OpcodeVecI8x16SwizzleName, body: vv2v(OpcodeVecI8x16Swizzle)},
 		{
 			name: OpcodeVecV128i8x16ShuffleName, body: []byte{
-				OpcodeI32Const,
-				1, 1, 1, 1,
-				OpcodeVecPrefix,
-				OpcodeVecV128Const,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				OpcodeVecPrefix,
-				OpcodeVecV128Store,
-				4,  // alignment
-				10, // offset
-				OpcodeEnd,
-			},
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128i8x16Shuffle,
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+			OpcodeDrop,
+			OpcodeEnd,
+		},
 		},
 	}
 
@@ -2965,12 +2967,14 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 }
 
 func TestModule_funcValidation_SIMD_error(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		name        string
 		body        []byte
 		flag        Features
 		expectedErr string
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name: "simd disabled",
 			body: []byte{
@@ -3022,6 +3026,26 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			expectedErr: "cannot pop the operand for i64x2.add: v128 missing",
 		},
 		{
+			name: "shuffle lane index not found",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128i8x16Shuffle,
+			},
+			expectedErr: "16 lane indexes for v128.shuffle not found",
+		},
+		{
+			name: "shuffle lane index not found",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128i8x16Shuffle,
+				0xff, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			expectedErr: "invalid lane index[0] 255 >= 32 for v128.shuffle",
+		},
+		{
 			// TODO delete this case after SIMD impl completion.
 			name: "unimplemented",
 			body: []byte{
@@ -3033,6 +3057,58 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 		},
 	}
 
+	addExtractOrReplaceLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
+		n := VectorInstructionName(op)
+		c := testCase{
+			name: VectorInstructionName(op) + "/lane index out of range",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix, op, lane,
+			},
+			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
+		}
+		tests = append(tests, c)
+	}
+
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ExtractLaneS, 16, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ExtractLaneU, 20, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ExtractLaneS, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ExtractLaneU, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI32x4ExtractLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF32x4ExtractLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI64x2ExtractLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF64x2ExtractLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ReplaceLane, 16, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ReplaceLane, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI32x4ReplaceLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI64x2ReplaceLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF32x4ReplaceLane, 10, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF64x2ReplaceLane, 3, 2)
+
+	addStoreOrLoadLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
+		n := VectorInstructionName(op)
+		c := testCase{
+			name: VectorInstructionName(op) + "/lane index out of range",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix, op,
+				0, 0, // align and offset.
+				lane,
+			},
+			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
+		}
+		tests = append(tests, c)
+	}
+
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load8Lane, 16, 16)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load16Lane, 8, 8)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load32Lane, 4, 4)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load64Lane, 2, 2)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store8Lane, 16, 16)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store16Lane, 8, 8)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store32Lane, 4, 4)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store64Lane, 2, 2)
+
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
@@ -3041,7 +3117,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
