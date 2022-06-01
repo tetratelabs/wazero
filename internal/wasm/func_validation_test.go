@@ -3059,15 +3059,14 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 
 	addExtractOrReplaceLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
 		n := VectorInstructionName(op)
-		c := testCase{
-			name: VectorInstructionName(op) + "/lane index out of range",
+		tests = append(tests, testCase{
+			name: n + "/lane index out of range",
 			flag: FeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix, op, lane,
 			},
 			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
-		}
-		tests = append(tests, c)
+		})
 	}
 
 	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ExtractLaneS, 16, 16)
@@ -3087,8 +3086,8 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 
 	addStoreOrLoadLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
 		n := VectorInstructionName(op)
-		c := testCase{
-			name: VectorInstructionName(op) + "/lane index out of range",
+		tests = append(tests, testCase{
+			name: n + "/lane index out of range",
 			flag: FeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix, op,
@@ -3096,8 +3095,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				lane,
 			},
 			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
-		}
-		tests = append(tests, c)
+		})
 	}
 
 	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load8Lane, 16, 16)
