@@ -620,8 +620,6 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			if tc.x1OnRegister {
 				err = compiler.compileV128Const(&wazeroir.OperationV128Const{Lo: x1Lo, Hi: x1Hi})
 				require.NoError(t, err)
-				env.stack()[0] = 0xff
-				env.stack()[1] = 0xff
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
 				lo.valueType = runtimeValueTypeV128Lo
