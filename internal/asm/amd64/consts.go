@@ -383,6 +383,20 @@ const (
 	PADDUSB
 	// MOVSD is the MOVSD instruction https://www.felixcloutier.com/x86/movsd
 	MOVSD
+	// PACKSSWB is the PACKSSWB instruction https://www.felixcloutier.com/x86/packsswb:packssdw
+	PACKSSWB
+	// PMOVMSKB is the PMOVMSKB instruction https://www.felixcloutier.com/x86/pmovmskb
+	PMOVMSKB
+	// MOVMSKPS is the MOVMSKPS instruction https://www.felixcloutier.com/x86/movmskps
+	MOVMSKPS
+	// MOVMSKPD is the MOVMSKPD instruction https://www.felixcloutier.com/x86/movmskpd
+	MOVMSKPD
+	// PAND is the PAND instruction https://www.felixcloutier.com/x86/pand
+	PAND
+	// POR is the POR instruction https://www.felixcloutier.com/x86/por
+	POR
+	// PANDN is the PANDN instruction https://www.felixcloutier.com/x86/pandn
+	PANDN
 )
 
 // InstructionName returns the name for an instruction
@@ -728,6 +742,20 @@ func InstructionName(instruction asm.Instruction) string {
 		return "MOVDQA"
 	case MOVSD:
 		return "MOVSD"
+	case PACKSSWB:
+		return "PACKSSWB"
+	case PMOVMSKB:
+		return "PMOVMSKB"
+	case MOVMSKPS:
+		return "MOVMSKPS"
+	case MOVMSKPD:
+		return "MOVMSKPD"
+	case PAND:
+		return "PAND"
+	case POR:
+		return "POR"
+	case PANDN:
+		return "PANDN"
 	}
 	return "Unknown"
 }

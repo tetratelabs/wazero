@@ -479,10 +479,12 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
-		n   *NodeImpl
-		exp []byte
+		name string
+		n    *NodeImpl
+		exp  []byte
 	}{
 		{
+			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
@@ -492,6 +494,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			exp: []byte{0xf3, 0x44, 0xf, 0x6f, 0xd3},
 		},
 		{
+			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
@@ -501,6 +504,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			exp: []byte{0xf3, 0x41, 0xf, 0x6f, 0xda},
 		},
 		{
+			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
 				Types:       OperandTypesRegisterToRegister,
@@ -510,6 +514,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			exp: []byte{0xf3, 0x45, 0xf, 0x6f, 0xfa},
 		},
 		{
+			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
 				Types:       OperandTypesRegisterToRegister,
@@ -519,6 +524,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			exp: []byte{0x66, 0x44, 0xf, 0x6f, 0xd3},
 		},
 		{
+			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
 				Types:       OperandTypesRegisterToRegister,
@@ -528,6 +534,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			exp: []byte{0x66, 0x41, 0xf, 0x6f, 0xda},
 		},
 		{
+			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
 				Types:       OperandTypesRegisterToRegister,
@@ -536,11 +543,101 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 			exp: []byte{0x66, 0x45, 0xf, 0x6f, 0xfa},
 		},
+		{
+			name: "PACKSSWB",
+			n: &NodeImpl{
+				Instruction: PACKSSWB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegX15,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0x63, 0xfa},
+		},
+		{
+			name: "pmovmskb r15d, xmm10",
+			n: &NodeImpl{
+				Instruction: PMOVMSKB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegR15,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xd7, 0xfa},
+		},
+		{
+			name: "movmskps eax, xmm10",
+			n: &NodeImpl{
+				Instruction: MOVMSKPS,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegAX,
+			},
+			exp: []byte{0x41, 0xf, 0x50, 0xc2},
+		},
+		{
+			name: "movmskps r13d, xmm1",
+			n: &NodeImpl{
+				Instruction: MOVMSKPS,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegR13,
+			},
+			exp: []byte{0x44, 0xf, 0x50, 0xe9},
+		},
+		{
+			name: "movmskpd eax, xmm10",
+			n: &NodeImpl{
+				Instruction: MOVMSKPD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX10,
+				DstReg:      RegAX,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x50, 0xc2},
+		},
+		{
+			name: "movmskpd r15d, xmm1",
+			n: &NodeImpl{
+				Instruction: MOVMSKPD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegR15,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x50, 0xf9},
+		},
+		{
+			name: "pand xmm15, xmm1",
+			n: &NodeImpl{
+				Instruction: PAND,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegX15,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xdb, 0xf9},
+		},
+		{
+			name: "por xmm1, xmm15",
+			n: &NodeImpl{
+				Instruction: POR,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0xeb, 0xcf},
+		},
+		{
+			name: "pandn xmm13, xmm15",
+			n: &NodeImpl{
+				Instruction: PANDN,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xdf, 0xef},
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
-		t.Run(tc.n.String(), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.EncodeRegisterToRegister(tc.n)
 			require.NoError(t, err)

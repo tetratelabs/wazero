@@ -318,6 +318,20 @@ func (o OperationKind) String() (ret string) {
 		ret = "V128AnyTrue"
 	case OperationKindV128AllTrue:
 		ret = "V128AllTrue"
+	case OperationKindV128And:
+		return "V128And"
+	case OperationKindV128Not:
+		return "V128Not"
+	case OperationKindV128Or:
+		return "V128Or"
+	case OperationKindV128Xor:
+		return "V128Xor"
+	case OperationKindV128Bitselect:
+		return "V128Bitselect"
+	case OperationKindV128AndNot:
+		return "V128AndNot"
+	case OperationKindV128BitMask:
+		return "V128BitMask"
 	default:
 		panic("BUG")
 	}
@@ -429,6 +443,13 @@ const (
 	OperationKindV128Swizzle
 	OperationKindV128AnyTrue
 	OperationKindV128AllTrue
+	OperationKindV128BitMask
+	OperationKindV128And
+	OperationKindV128Not
+	OperationKindV128Or
+	OperationKindV128Xor
+	OperationKindV128Bitselect
+	OperationKindV128AndNot
 )
 
 type Label struct {
@@ -1417,4 +1438,62 @@ type OperationV128AllTrue struct {
 // Kind implements Operation.Kind.
 func (o *OperationV128AllTrue) Kind() OperationKind {
 	return OperationKindV128AllTrue
+}
+
+// OperationV128BitMask implements Operation.
+type OperationV128BitMask struct {
+	Shape Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128BitMask) Kind() OperationKind {
+	return OperationKindV128BitMask
+}
+
+// OperationV128And implements Operation.
+type OperationV128And struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128And) Kind() OperationKind {
+	return OperationKindV128And
+}
+
+// OperationV128Not implements Operation.
+type OperationV128Not struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Not) Kind() OperationKind {
+	return OperationKindV128Not
+}
+
+// OperationV128Or implements Operation.
+type OperationV128Or struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Or) Kind() OperationKind {
+	return OperationKindV128Or
+}
+
+// OperationV128Xor implements Operation.
+type OperationV128Xor struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Xor) Kind() OperationKind {
+	return OperationKindV128Xor
+}
+
+// OperationV128Bitselect implements Operation.
+type OperationV128Bitselect struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Bitselect) Kind() OperationKind {
+	return OperationKindV128Bitselect
+}
+
+// OperationV128AndNot implements Operation.
+type OperationV128AndNot struct{}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128AndNot) Kind() OperationKind {
+	return OperationKindV128AndNot
 }

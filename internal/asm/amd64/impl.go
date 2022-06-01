@@ -1232,6 +1232,12 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	SUBPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x5c}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pxor
 	PXOR: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xef}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pand
+	PAND: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdb}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/por
+	POR: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xeb}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pandn
+	PANDN: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdf}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pshufb
 	PSHUFB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x0}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pshufd
@@ -1260,6 +1266,14 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	PADDUSB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xdc}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/movsd
 	MOVSD: {mandatoryPrefix: 0xf2, opcode: []byte{0x0f, 0x10}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/packsswb:packssdw
+	PACKSSWB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x63}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmovmskb
+	PMOVMSKB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd7}, requireSrcFloat: true, requireDstFloat: false},
+	// https://www.felixcloutier.com/x86/movmskps
+	MOVMSKPS: {opcode: []byte{0x0f, 0x50}, requireSrcFloat: true, requireDstFloat: false},
+	// https://www.felixcloutier.com/x86/movmskpd
+	MOVMSKPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x50}, requireSrcFloat: true, requireDstFloat: false},
 }
 
 var RegisterToRegisterShiftOpcode = map[asm.Instruction]struct {

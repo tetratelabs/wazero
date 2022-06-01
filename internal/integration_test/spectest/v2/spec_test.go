@@ -44,6 +44,8 @@ func TestCompiler(t *testing.T) {
 			case "simd_store32_lane.json":
 			case "simd_store64_lane.json":
 			case "simd_store8_lane.json":
+			case "simd_bitwise.json":
+			case "simd_boolean.json":
 			default:
 				return false // others not supported, yet!
 			}
@@ -74,8 +76,10 @@ func TestInterpreter(t *testing.T) {
 			case "simd_store32_lane.json":
 			case "simd_store64_lane.json":
 			case "simd_store8_lane.json":
+			case "simd_bitwise.json":
+			case "simd_boolean.json":
 			default:
-				return false
+				return false // others not supported, yet!
 			}
 			return true
 		}

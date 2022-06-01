@@ -2668,34 +2668,42 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 }
 
 func TestModule_funcValidation_SIMD(t *testing.T) {
-	vv2v := func(vec OpcodeVec) []byte {
-		return []byte{
-			OpcodeVecPrefix,
+	addV128Const := func(in []byte) []byte {
+		return append(in, OpcodeVecPrefix,
 			OpcodeVecV128Const,
 			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1)
+	}
+	vv2v := func(vec OpcodeVec) (ret []byte) {
+		ret = addV128Const(ret)
+		ret = addV128Const(ret)
+		return append(ret,
 			OpcodeVecPrefix,
 			vec,
 			OpcodeDrop,
 			OpcodeEnd,
-		}
+		)
+	}
+	vvv2v := func(vec OpcodeVec) (ret []byte) {
+		ret = addV128Const(ret)
+		ret = addV128Const(ret)
+		ret = addV128Const(ret)
+		return append(ret,
+			OpcodeVecPrefix,
+			vec,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
 	}
 
-	v2v := func(vec OpcodeVec) []byte {
-		return []byte{
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
+	v2v := func(vec OpcodeVec) (ret []byte) {
+		ret = addV128Const(ret)
+		return append(ret,
 			OpcodeVecPrefix,
 			vec,
 			OpcodeDrop,
 			OpcodeEnd,
-		}
+		)
 	}
 
 	load := func(vec OpcodeVec, offset, align uint32) (ret []byte) {
@@ -2716,16 +2724,11 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	}
 
 	loadLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
-		ret = []byte{
-			OpcodeI32Const,
-			1, 1, 1, 1,
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
+		ret = addV128Const([]byte{OpcodeI32Const, 1, 1, 1, 1})
+		ret = append(ret,
 			OpcodeVecPrefix,
 			vec,
-		}
+		)
 
 		ret = append(ret, leb128.EncodeUint32(align)...)
 		ret = append(ret, leb128.EncodeUint32(offset)...)
@@ -2738,16 +2741,11 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	}
 
 	storeLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
-		ret = []byte{
-			OpcodeI32Const,
-			1, 1, 1, 1,
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
+		ret = addV128Const([]byte{OpcodeI32Const, 1, 1, 1, 1})
+		ret = append(ret,
 			OpcodeVecPrefix,
 			vec,
-		}
+		)
 		ret = append(ret, leb128.EncodeUint32(align)...)
 		ret = append(ret, leb128.EncodeUint32(offset)...)
 		ret = append(ret,
@@ -2758,27 +2756,19 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	}
 
 	extractLane := func(vec OpcodeVec, lane byte) (ret []byte) {
-		ret = []byte{
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
+		ret = addV128Const(ret)
+		ret = append(ret,
 			OpcodeVecPrefix,
 			vec,
 			lane,
 			OpcodeDrop,
 			OpcodeEnd,
-		}
+		)
 		return
 	}
 
 	replaceLane := func(vec OpcodeVec, lane byte) (ret []byte) {
-		ret = []byte{
-			OpcodeVecPrefix,
-			OpcodeVecV128Const,
-			1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1,
-		}
+		ret = addV128Const(ret)
 
 		switch vec {
 		case OpcodeVecI8x16ReplaceLane, OpcodeVecI16x8ReplaceLane, OpcodeVecI32x4ReplaceLane:
@@ -2847,10 +2837,14 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 		{name: OpcodeVecI32x4SubName, body: vv2v(OpcodeVecI32x4Sub)},
 		{name: OpcodeVecI64x2SubName, body: vv2v(OpcodeVecI64x2Sub)},
 		{name: OpcodeVecV128AnyTrueName, body: v2v(OpcodeVecV128AnyTrue)},
-		{name: OpcodeVecV128AnyTrueName, body: v2v(OpcodeVecI8x16AllTrue)},
-		{name: OpcodeVecI8x16AllTrueName, body: v2v(OpcodeVecI16x8AllTrue)},
-		{name: OpcodeVecI16x8AllTrueName, body: v2v(OpcodeVecI32x4AllTrue)},
-		{name: OpcodeVecI32x4AllTrueName, body: v2v(OpcodeVecI64x2AllTrue)},
+		{name: OpcodeVecI8x16AllTrueName, body: v2v(OpcodeVecI8x16AllTrue)},
+		{name: OpcodeVecI16x8AllTrueName, body: v2v(OpcodeVecI16x8AllTrue)},
+		{name: OpcodeVecI32x4AllTrueName, body: v2v(OpcodeVecI32x4AllTrue)},
+		{name: OpcodeVecI64x2AllTrueName, body: v2v(OpcodeVecI64x2AllTrue)},
+		{name: OpcodeVecI8x16BitMaskName, body: v2v(OpcodeVecI8x16BitMask)},
+		{name: OpcodeVecI16x8BitMaskName, body: v2v(OpcodeVecI16x8BitMask)},
+		{name: OpcodeVecI32x4BitMaskName, body: v2v(OpcodeVecI32x4BitMask)},
+		{name: OpcodeVecI64x2BitMaskName, body: v2v(OpcodeVecI64x2BitMask)},
 		{name: OpcodeVecV128LoadName, body: load(OpcodeVecV128Load, 0, 0)},
 		{name: OpcodeVecV128LoadName + "/align=4", body: load(OpcodeVecV128Load, 0, 4)},
 		{name: OpcodeVecV128Load8x8SName, body: load(OpcodeVecV128Load8x8s, 1, 0)},
@@ -2950,6 +2944,12 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				OpcodeEnd,
 			},
 		},
+		{name: OpcodeVecV128NotName, body: v2v(OpcodeVecV128Not)},
+		{name: OpcodeVecV128AndName, body: vv2v(OpcodeVecV128And)},
+		{name: OpcodeVecV128AndNotName, body: vv2v(OpcodeVecV128AndNot)},
+		{name: OpcodeVecV128OrName, body: vv2v(OpcodeVecV128Or)},
+		{name: OpcodeVecV128XorName, body: vv2v(OpcodeVecV128Xor)},
+		{name: OpcodeVecV128BitselectName, body: vvv2v(OpcodeVecV128Bitselect)},
 	}
 
 	for _, tt := range tests {

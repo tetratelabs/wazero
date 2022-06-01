@@ -158,6 +158,10 @@ var (
 		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeV128},
 		out: []UnsignedType{UnsignedTypeV128},
 	}
+	signature_V128V128V128_V32 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128, UnsignedTypeV128, UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeV128},
+	}
 	signature_I32_V128 = &signature{
 		in:  []UnsignedType{UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeV128},
@@ -200,6 +204,10 @@ var (
 	signature_V128_F64 = &signature{
 		in:  []UnsignedType{UnsignedTypeV128},
 		out: []UnsignedType{UnsignedTypeF64},
+	}
+	signature_V128_V128 = &signature{
+		in:  []UnsignedType{UnsignedTypeV128},
+		out: []UnsignedType{UnsignedTypeV128},
 	}
 	signature_I64_V128 = &signature{
 		in:  []UnsignedType{UnsignedTypeI64},
@@ -514,12 +522,16 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 			return signature_F32_V128, nil
 		case wasm.OpcodeVecF64x2Splat:
 			return signature_F64_V128, nil
-		case wasm.OpcodeVecV128i8x16Shuffle, wasm.OpcodeVecI8x16Swizzle:
+		case wasm.OpcodeVecV128i8x16Shuffle, wasm.OpcodeVecI8x16Swizzle, wasm.OpcodeVecV128And, wasm.OpcodeVecV128Or, wasm.OpcodeVecV128Xor, wasm.OpcodeVecV128AndNot:
 			return signature_V128V128_V128, nil
-		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue:
+		case wasm.OpcodeVecI8x16AllTrue, wasm.OpcodeVecI16x8AllTrue, wasm.OpcodeVecI32x4AllTrue, wasm.OpcodeVecI64x2AllTrue,
+			wasm.OpcodeVecV128AnyTrue,
+			wasm.OpcodeVecI8x16BitMask, wasm.OpcodeVecI16x8BitMask, wasm.OpcodeVecI32x4BitMask, wasm.OpcodeVecI64x2BitMask:
 			return signature_V128_I32, nil
-		case wasm.OpcodeVecV128AnyTrue:
-			return signature_V128_I32, nil
+		case wasm.OpcodeVecV128Not:
+			return signature_V128_V128, nil
+		case wasm.OpcodeVecV128Bitselect:
+			return signature_V128V128V128_V32, nil
 		default:
 			return nil, fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}

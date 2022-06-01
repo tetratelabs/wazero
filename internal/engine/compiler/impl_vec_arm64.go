@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -632,4 +633,39 @@ func (c *arm64Compiler) compileV128AllTrue(o *wazeroir.OperationV128AllTrue) (er
 	}
 	c.markRegisterUnused(v)
 	return
+}
+
+// compileV128BitMask implements compiler.compileV128BitMask for arm64.
+func (c *arm64Compiler) compileV128BitMask(o *wazeroir.OperationV128BitMask) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128And implements compiler.compileV128And for arm64.
+func (c *arm64Compiler) compileV128And(o *wazeroir.OperationV128And) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Not implements compiler.compileV128Not for arm64.
+func (c *arm64Compiler) compileV128Not(o *wazeroir.OperationV128Not) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Or implements compiler.compileV128Or for arm64.
+func (c *arm64Compiler) compileV128Or(o *wazeroir.OperationV128Or) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Xor implements compiler.compileV128Xor for arm64.
+func (c *arm64Compiler) compileV128Xor(o *wazeroir.OperationV128Xor) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Bitselect implements compiler.compileV128Bitselect for arm64.
+func (c *arm64Compiler) compileV128Bitselect(o *wazeroir.OperationV128Bitselect) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128AndNot implements compiler.compileV128AndNot for arm64.
+func (c *arm64Compiler) compileV128AndNot(o *wazeroir.OperationV128AndNot) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 }

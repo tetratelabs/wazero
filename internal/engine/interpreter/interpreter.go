@@ -630,6 +630,14 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationV128AnyTrue:
 		case *wazeroir.OperationV128AllTrue:
 			op.b1 = o.Shape
+		case *wazeroir.OperationV128BitMask:
+			op.b1 = o.Shape
+		case *wazeroir.OperationV128And:
+		case *wazeroir.OperationV128Not:
+		case *wazeroir.OperationV128Or:
+		case *wazeroir.OperationV128Xor:
+		case *wazeroir.OperationV128Bitselect:
+		case *wazeroir.OperationV128AndNot:
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.kind.String()))
 		}
@@ -2305,40 +2313,115 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			frame.pc++
 		case wazeroir.OperationKindV128AllTrue:
 			hi, lo := ce.popValue(), ce.popValue()
-			var ret = true
+			var ret bool
 			switch op.b1 {
 			case wazeroir.ShapeI8x16:
-				for i := 0; i < 16; i++ {
-					if i < 8 {
-						ret = ret && (byte(lo>>(i*8)) != 0)
-					} else {
-						ret = ret && (byte(hi>>((i-8)*8)) != 0)
-					}
-				}
+				ret = (uint8(lo) != 0) && (uint8(lo>>8) != 0) && (uint8(lo>>16) != 0) && (uint8(lo>>24) != 0) &&
+					(uint8(lo>>32) != 0) && (uint8(lo>>40) != 0) && (uint8(lo>>48) != 0) && (uint8(lo>>56) != 0) &&
+					(uint8(hi) != 0) && (uint8(hi>>8) != 0) && (uint8(hi>>16) != 0) && (uint8(hi>>24) != 0) &&
+					(uint8(hi>>32) != 0) && (uint8(hi>>40) != 0) && (uint8(hi>>48) != 0) && (uint8(hi>>56) != 0)
 			case wazeroir.ShapeI16x8:
-				for i := 0; i < 8; i++ {
-					if i < 4 {
-						ret = ret && (uint16(lo>>(i*8)) != 0)
-					} else {
-						ret = ret && (uint16(hi>>((i-4)*8)) != 0)
-					}
-				}
+				ret = (uint16(lo) != 0) && (uint16(lo>>16) != 0) && (uint16(lo>>32) != 0) && (uint16(lo>>48) != 0) &&
+					(uint16(hi) != 0) && (uint16(hi>>16) != 0) && (uint16(hi>>32) != 0) && (uint16(hi>>48) != 0)
 			case wazeroir.ShapeI32x4:
-				for i := 0; i < 4; i++ {
-					if i < 2 {
-						ret = ret && (uint32(lo>>(i*8)) != 0)
-					} else {
-						ret = ret && (uint32(hi>>((i-2)*8)) != 0)
-					}
-				}
+				ret = (uint32(lo) != 0) && (uint32(lo>>32) != 0) &&
+					(uint32(hi) != 0) && (uint32(hi>>32) != 0)
 			case wazeroir.ShapeI64x2:
-				ret = ret && (lo != 0) && (hi != 0)
+				ret = (lo != 0) &&
+					(hi != 0)
 			}
 			if ret {
 				ce.pushValue(1)
 			} else {
 				ce.pushValue(0)
 			}
+			frame.pc++
+		case wazeroir.OperationKindV128BitMask:
+			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitmask-extraction
+			hi, lo := ce.popValue(), ce.popValue()
+			var res uint64
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				for i := 0; i < 8; i++ {
+					if int8(lo>>(i*8)) < 0 {
+						res |= 1 << i
+					}
+				}
+				for i := 0; i < 8; i++ {
+					if int8(hi>>(i*8)) < 0 {
+						res |= 1 << (i + 8)
+					}
+				}
+				fmt.Println(wazeroir.ShapeI8x16)
+			case wazeroir.ShapeI16x8:
+				for i := 0; i < 4; i++ {
+					if int8(lo>>(i*16)) < 0 {
+						res |= 1 << i
+					}
+				}
+				for i := 0; i < 4; i++ {
+					if int8(hi>>(i*16)) < 0 {
+						res |= 1 << (i + 4)
+					}
+				}
+			case wazeroir.ShapeI32x4:
+				for i := 0; i < 2; i++ {
+					if int8(lo>>(i*32)) < 0 {
+						res |= 1 << i
+					}
+				}
+				for i := 0; i < 2; i++ {
+					if int8(hi>>(i*32)) < 0 {
+						res |= 1 << (i + 2)
+					}
+				}
+			case wazeroir.ShapeI64x2:
+				if int64(lo) < 0 {
+					res |= 0b01
+				}
+				if int(hi) < 0 {
+					res |= 0b10
+				}
+			}
+			ce.pushValue(res)
+			frame.pc++
+		case wazeroir.OperationKindV128And:
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			ce.pushValue(x1Lo & x2Lo)
+			ce.pushValue(x1Hi & x2Hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Not:
+			hi, lo := ce.popValue(), ce.popValue()
+			ce.pushValue(^lo)
+			ce.pushValue(^hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Or:
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			ce.pushValue(x1Lo | x2Lo)
+			ce.pushValue(x1Hi | x2Hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Xor:
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			ce.pushValue(x1Lo ^ x2Lo)
+			ce.pushValue(x1Hi ^ x2Hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Bitselect:
+			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitwise-select
+			cHi, cLo := ce.popValue(), ce.popValue()
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			// v128.or(v128.and(v1, c), v128.and(v2, v128.not(c)))
+			ce.pushValue((x1Lo & cLo) | (x2Lo & (^cLo)))
+			ce.pushValue((x1Hi & cHi) | (x2Hi & (^cHi)))
+			frame.pc++
+		case wazeroir.OperationKindV128AndNot:
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			ce.pushValue(x1Lo & (^x2Lo))
+			ce.pushValue(x1Hi & (^x2Hi))
 			frame.pc++
 		}
 	}

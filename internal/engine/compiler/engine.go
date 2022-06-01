@@ -1074,6 +1074,20 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 			err = compiler.compileV128AnyTrue(o)
 		case *wazeroir.OperationV128AllTrue:
 			err = compiler.compileV128AllTrue(o)
+		case *wazeroir.OperationV128BitMask:
+			err = compiler.compileV128BitMask(o)
+		case *wazeroir.OperationV128And:
+			err = compiler.compileV128And(o)
+		case *wazeroir.OperationV128Not:
+			err = compiler.compileV128Not(o)
+		case *wazeroir.OperationV128Or:
+			err = compiler.compileV128Or(o)
+		case *wazeroir.OperationV128Xor:
+			err = compiler.compileV128Xor(o)
+		case *wazeroir.OperationV128Bitselect:
+			err = compiler.compileV128Bitselect(o)
+		case *wazeroir.OperationV128AndNot:
+			err = compiler.compileV128AndNot(o)
 		default:
 			err = errors.New("unsupported")
 		}

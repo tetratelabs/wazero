@@ -590,3 +590,178 @@ func (c *amd64Compiler) compileV128AllTrue(o *wazeroir.OperationV128AllTrue) err
 	c.locationStack.pushRuntimeValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateE)
 	return nil
 }
+
+// compileV128BitMask implements compiler.compileV128BitMask for amd64.
+func (c *amd64Compiler) compileV128BitMask(o *wazeroir.OperationV128BitMask) error {
+	v := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	result, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		return err
+	}
+
+	switch o.Shape {
+	case wazeroir.ShapeI8x16:
+		c.assembler.CompileRegisterToRegister(amd64.PMOVMSKB, v.register, result)
+	case wazeroir.ShapeI16x8:
+		// When we have:
+		// 	R1 = [R1(w1), R1(w2), R1(w3), R1(w4), R1(w5), R1(w6), R1(w7), R1(v8)]
+		// 	R2 = [R2(w1), R2(w2), R2(w3), R2(v4), R2(w5), R2(w6), R2(w7), R2(v8)]
+		//	where RX(wn) is n-th signed word (16-bit) of RX register,
+		//
+		// "PACKSSWB R1, R2" produces
+		//  R1 = [
+		// 		byte_sat(R1(w1)), byte_sat(R1(w2)), byte_sat(R1(w3)), byte_sat(R1(w4)),
+		// 		byte_sat(R1(w5)), byte_sat(R1(w6)), byte_sat(R1(w7)), byte_sat(R1(w8)),
+		// 		byte_sat(R2(w1)), byte_sat(R2(w2)), byte_sat(R2(w3)), byte_sat(R2(w4)),
+		// 		byte_sat(R2(w5)), byte_sat(R2(w6)), byte_sat(R2(w7)), byte_sat(R2(w8)),
+		//  ]
+		//  where R1 is the destination register, and
+		// 	byte_sat(w) = w if w fits as signed 8-bit,
+		//                0x80 if w is less than 0x80
+		//                0x7F if w is greater than 0x7f
+		//
+		// See https://www.felixcloutier.com/x86/packsswb:packssdw for detail.
+		//
+		// Therefore, v.register ends up having i-th and (i+8)-th bit set if i-th lane is negative (for i in 0..8).
+		c.assembler.CompileRegisterToRegister(amd64.PACKSSWB, v.register, v.register)
+		c.assembler.CompileRegisterToRegister(amd64.PMOVMSKB, v.register, result)
+		// Clear the higher bits than 8.
+		c.assembler.CompileConstToRegister(amd64.SHRQ, 8, result)
+	case wazeroir.ShapeI32x4:
+		c.assembler.CompileRegisterToRegister(amd64.MOVMSKPS, v.register, result)
+	case wazeroir.ShapeI64x2:
+		c.assembler.CompileRegisterToRegister(amd64.MOVMSKPD, v.register, result)
+	}
+
+	c.locationStack.markRegisterUnused(v.register)
+	c.pushRuntimeValueLocationOnRegister(result, runtimeValueTypeI32)
+	return nil
+}
+
+// compileV128And implements compiler.compileV128And for amd64.
+func (c *amd64Compiler) compileV128And(*wazeroir.OperationV128And) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	c.assembler.CompileRegisterToRegister(amd64.PAND, x2.register, x1.register)
+
+	c.locationStack.markRegisterUnused(x2.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128Not implements compiler.compileV128Not for amd64.
+func (c *amd64Compiler) compileV128Not(*wazeroir.OperationV128Not) error {
+	v := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	// Set all bits on tmp register.
+	c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, tmp, tmp)
+	// Then XOR with tmp to reverse all bits on v.register.
+	c.assembler.CompileRegisterToRegister(amd64.PXOR, tmp, v.register)
+	c.pushVectorRuntimeValueLocationOnRegister(v.register)
+	return nil
+}
+
+// compileV128Or implements compiler.compileV128Or for amd64.
+func (c *amd64Compiler) compileV128Or(*wazeroir.OperationV128Or) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	c.assembler.CompileRegisterToRegister(amd64.POR, x2.register, x1.register)
+
+	c.locationStack.markRegisterUnused(x2.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128Xor implements compiler.compileV128Xor for amd64.
+func (c *amd64Compiler) compileV128Xor(*wazeroir.OperationV128Xor) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	c.assembler.CompileRegisterToRegister(amd64.PXOR, x2.register, x1.register)
+
+	c.locationStack.markRegisterUnused(x2.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128Bitselect implements compiler.compileV128Bitselect for amd64.
+func (c *amd64Compiler) compileV128Bitselect(*wazeroir.OperationV128Bitselect) error {
+	selector := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(selector); err != nil {
+		return err
+	}
+
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// The following logic is equivalent to v128.or(v128.and(v1, selector), v128.and(v2, v128.not(selector)))
+	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitwise-select
+	c.assembler.CompileRegisterToRegister(amd64.PAND, selector.register, x1.register)
+	c.assembler.CompileRegisterToRegister(amd64.PANDN, x2.register, selector.register)
+	c.assembler.CompileRegisterToRegister(amd64.POR, selector.register, x1.register)
+
+	c.locationStack.markRegisterUnused(x2.register, selector.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128AndNot implements compiler.compileV128AndNot for amd64.
+func (c *amd64Compiler) compileV128AndNot(*wazeroir.OperationV128AndNot) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	c.assembler.CompileRegisterToRegister(amd64.PANDN, x1.register, x2.register)
+
+	c.locationStack.markRegisterUnused(x1.register)
+	c.pushVectorRuntimeValueLocationOnRegister(x2.register)
+	return nil
+}

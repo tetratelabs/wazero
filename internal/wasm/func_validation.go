@@ -1079,12 +1079,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 				}
 				valueTypeStack.push(ValueTypeV128)
-			case OpcodeVecV128AnyTrue:
-				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
-					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
-				}
-				valueTypeStack.push(ValueTypeI32)
-			case OpcodeVecI8x16AllTrue, OpcodeVecI16x8AllTrue, OpcodeVecI32x4AllTrue, OpcodeVecI64x2AllTrue:
+			case OpcodeVecV128AnyTrue, OpcodeVecI8x16AllTrue, OpcodeVecI16x8AllTrue, OpcodeVecI32x4AllTrue, OpcodeVecI64x2AllTrue,
+				OpcodeVecI8x16BitMask, OpcodeVecI16x8BitMask, OpcodeVecI32x4BitMask, OpcodeVecI64x2BitMask:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}
@@ -1250,10 +1246,26 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}
 				valueTypeStack.push(ValueTypeV128)
-			case OpcodeVecI8x16Swizzle:
+			case OpcodeVecI8x16Swizzle, OpcodeVecV128And, OpcodeVecV128Or, OpcodeVecV128Xor, OpcodeVecV128AndNot:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecV128Bitselect:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecV128Not:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}
