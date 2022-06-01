@@ -3,6 +3,7 @@ package compiler
 import (
 	"encoding/binary"
 	"math"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -1756,6 +1757,11 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 }
 
 func TestCompiler_compileV128Bitmask(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// only implemented on amd64.
+		t.Skip()
+	}
+
 	u16x8 := func(u1, u2, u3, u4, u5, u6, u7, u8 uint16) (ret [16]byte) {
 		binary.LittleEndian.PutUint16(ret[0:], u1)
 		binary.LittleEndian.PutUint16(ret[2:], u2)
@@ -1888,6 +1894,11 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 }
 
 func TestCompiler_compileV128_Not(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// only implemented on amd64.
+		t.Skip()
+	}
+
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler,
 		&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
@@ -1923,6 +1934,10 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 }
 
 func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// only implemented on amd64.
+		t.Skip()
+	}
 	tests := []struct {
 		name        string
 		op          wazeroir.OperationKind
@@ -2154,6 +2169,11 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 }
 
 func TestCompiler_compileV128Bitselect(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// only implemented on amd64.
+		t.Skip()
+	}
+
 	tests := []struct {
 		name                  string
 		selector, x1, x2, exp [16]byte
@@ -2245,5 +2265,4 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 			require.Equal(t, tc.exp, actual)
 		})
 	}
-
 }
