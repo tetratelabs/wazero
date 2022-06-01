@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
