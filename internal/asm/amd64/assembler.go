@@ -28,6 +28,18 @@ type Assembler interface {
 		dstReg asm.Register,
 	)
 
+	// CompileMemoryWithIndexAndArgToRegister is the same as CompileMemoryWithIndexToRegister except that this
+	// also accepts one argument.
+	CompileMemoryWithIndexAndArgToRegister(
+		instruction asm.Instruction,
+		srcBaseReg asm.Register,
+		srcOffsetConst int64,
+		srcIndex asm.Register,
+		srcScale int16,
+		dstReg asm.Register,
+		arg byte,
+	)
+
 	// CompileRegisterToMemoryWithIndex adds an instruction where source operand is the register `SrcReg`,
 	// and the destination is the memory address specified as `dstBaseReg + dstOffsetConst + dstIndex*dstScale`
 	// Note: dstScale must be one of 1, 2, 4, 8.
@@ -38,6 +50,18 @@ type Assembler interface {
 		dstOffsetConst int64,
 		dstIndex asm.Register,
 		dstScale int16,
+	)
+
+	// CompileRegisterToMemoryWithIndexAndArg is the same as CompileRegisterToMemoryWithIndex except that this
+	// also accepts one argument.
+	CompileRegisterToMemoryWithIndexAndArg(
+		instruction asm.Instruction,
+		srcReg asm.Register,
+		dstBaseReg asm.Register,
+		dstOffsetConst int64,
+		dstIndex asm.Register,
+		dstScale int16,
+		arg byte,
 	)
 
 	// CompileRegisterToConst adds an instruction where source operand is the register `srcRegister`,
@@ -57,15 +81,14 @@ type Assembler interface {
 	CompileNoneToMemory(instruction asm.Instruction, baseReg asm.Register, offset int64)
 
 	// CompileConstToMemory adds an instruction where source operand is the constant `value` and
-	// the destination is the memory address specified as `dstbaseReg+dstOffset`.
-	CompileConstToMemory(instruction asm.Instruction, value int64, dstbaseReg asm.Register, dstOffset int64) asm.Node
+	// the destination is the memory address specified as `dstBaseReg+dstOffset`.
+	CompileConstToMemory(instruction asm.Instruction, value int64, dstBaseReg asm.Register, dstOffset int64) asm.Node
 
 	// CompileMemoryToConst adds an instruction where source operand is the memory address, and
 	// the destination is the constant `value`.
 	CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node
-}
 
-// Mode represents a Mode for specific instruction.
-// For example, ROUND** instructions' behavior can be modified "Mode" constant.
-// See https://www.felixcloutier.com/x86/roundss for ROUNDSS as an example.
-type Mode = byte
+	// CompileLoadStaticConstToRegister adds an instruction where the source operand is asm.StaticConst located in the
+	// memory and the destination is the dstReg.
+	CompileLoadStaticConstToRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register) error
+}

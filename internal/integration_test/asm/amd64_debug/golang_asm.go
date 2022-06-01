@@ -62,6 +62,34 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegister(
 	a.AddInstruction(p)
 }
 
+// CompileMemoryWithIndexAndArgToRegister implements the same method as documented on amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileMemoryWithIndexAndArgToRegister(
+	inst asm.Instruction,
+	sourceBaseReg asm.Register,
+	sourceOffsetConst asm.ConstantValue,
+	sourceIndexReg asm.Register,
+	sourceScale int16,
+	destinationReg asm.Register,
+	arg byte,
+) {
+	p := a.NewProg()
+	p.As = castAsGolangAsmInstruction[inst]
+	p.To.Type = obj.TYPE_REG
+	p.To.Reg = castAsGolangAsmRegister[destinationReg]
+	p.RestArgs = append(p.RestArgs,
+		obj.Addr{
+			Reg:    castAsGolangAsmRegister[sourceBaseReg],
+			Offset: sourceOffsetConst,
+			Index:  castAsGolangAsmRegister[sourceIndexReg],
+			Scale:  sourceScale,
+			Type:   obj.TYPE_MEM,
+		})
+
+	p.From.Type = obj.TYPE_CONST
+	p.From.Offset = int64(arg)
+	a.AddInstruction(p)
+}
+
 // CompileRegisterToMemoryWithIndex implements the same method as documented on amd64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(
 	inst asm.Instruction,
@@ -74,6 +102,30 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[srcReg]
+	p.To.Type = obj.TYPE_MEM
+	p.To.Reg = castAsGolangAsmRegister[dstBaseReg]
+	p.To.Offset = dstOffsetConst
+	p.To.Index = castAsGolangAsmRegister[dstIndexReg]
+	p.To.Scale = dstScale
+	a.AddInstruction(p)
+}
+
+// CompileRegisterToMemoryWithIndexAndArg implements the same method as documented on amd64.Assembler.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndexAndArg(
+	inst asm.Instruction,
+	srcReg, dstBaseReg asm.Register,
+	dstOffsetConst asm.ConstantValue,
+	dstIndexReg asm.Register,
+	dstScale int16,
+	arg byte,
+) {
+	p := a.NewProg()
+	p.As = castAsGolangAsmInstruction[inst]
+	p.From.Type = obj.TYPE_CONST
+	p.From.Offset = int64(arg)
+	p.RestArgs = append(p.RestArgs,
+		obj.Addr{Reg: castAsGolangAsmRegister[srcReg], Type: obj.TYPE_REG})
+
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[dstBaseReg]
 	p.To.Offset = dstOffsetConst
@@ -263,10 +315,10 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithArg(
 ) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
-	p.From.Type = obj.TYPE_CONST
-	p.From.Offset = int64(arg)
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[to]
+	p.From.Type = obj.TYPE_CONST
+	p.From.Offset = int64(arg)
 	p.RestArgs = append(p.RestArgs,
 		obj.Addr{Reg: castAsGolangAsmRegister[from], Type: obj.TYPE_REG})
 	a.AddInstruction(p)
@@ -326,6 +378,11 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(
 		code[readInstructionAddress.Pc+2] &= 0b01111111
 		return nil
 	})
+}
+
+// CompileLoadStaticConstToRegister implements Assembler.CompileLoadStaticConstToRegister.
+func (a *assemblerGoAsmImpl) CompileLoadStaticConstToRegister(instruction asm.Instruction, c []byte, dstReg asm.Register) (err error) {
+	panic("CompileLoadStaticConstToRegister cannot be supported by golangasm")
 }
 
 // castAsGolangAsmRegister maps the registers to golang-asm specific register values.
@@ -497,6 +554,9 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	amd64.XORPD:     x86.AXORPD,
 	amd64.XORPS:     x86.AXORPS,
 	amd64.XORQ:      x86.AXORQ,
+	amd64.PINSRB:    x86.APINSRB,
+	amd64.PINSRW:    x86.APINSRW,
+	amd64.PINSRD:    x86.APINSRD,
 	amd64.PINSRQ:    x86.APINSRQ,
 	amd64.PADDB:     x86.APADDB,
 	amd64.PADDW:     x86.APADDW,
@@ -504,4 +564,32 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	amd64.PADDQ:     x86.APADDQ,
 	amd64.ADDPS:     x86.AADDPS,
 	amd64.ADDPD:     x86.AADDPD,
+	amd64.PSUBB:     x86.APSUBB,
+	amd64.PSUBW:     x86.APSUBW,
+	amd64.PSUBL:     x86.APSUBL,
+	amd64.PSUBQ:     x86.APSUBQ,
+	amd64.SUBPS:     x86.ASUBPS,
+	amd64.SUBPD:     x86.ASUBPD,
+	amd64.PMOVSXBW:  x86.APMOVSXBW,
+	amd64.PMOVSXWD:  x86.APMOVSXWD,
+	amd64.PMOVSXDQ:  x86.APMOVSXDQ,
+	amd64.PMOVZXBW:  x86.APMOVZXBW,
+	amd64.PMOVZXWD:  x86.APMOVZXWD,
+	amd64.PMOVZXDQ:  x86.APMOVZXDQ,
+	amd64.PSHUFB:    x86.APSHUFB,
+	amd64.PSHUFD:    x86.APSHUFD,
+	amd64.PXOR:      x86.APXOR,
+	amd64.PEXTRB:    x86.APEXTRB,
+	amd64.PEXTRW:    x86.APEXTRW,
+	amd64.PEXTRD:    x86.APEXTRD,
+	amd64.PEXTRQ:    x86.APEXTRQ,
+	amd64.MOVLHPS:   x86.AMOVLHPS,
+	amd64.INSERTPS:  x86.AINSERTPS,
+	amd64.PTEST:     x86.APTEST,
+	amd64.PCMPEQB:   x86.APCMPEQB,
+	amd64.PCMPEQW:   x86.APCMPEQW,
+	amd64.PCMPEQD:   x86.APCMPEQL,
+	amd64.PCMPEQQ:   x86.APCMPEQQ,
+	amd64.PADDUSB:   x86.APADDUSB,
+	amd64.MOVSD:     x86.AMOVSD,
 }

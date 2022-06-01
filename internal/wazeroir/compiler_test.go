@@ -931,7 +931,7 @@ func TestCompile_Locals(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstV128{Lo: 0, Hi: 0},
+				&OperationV128Const{Lo: 0, Hi: 0},
 				&OperationPick{Depth: 1, IsTargetVector: true}, // [p[0].low, p[0].high] -> [p[0].low, p[0].high, p[0].low, p[0].high]
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
@@ -952,7 +952,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
 				&OperationSwap{Depth: 3, IsTargetVector: true},
 				// [0x01, 0x02, p[0].lo, p[1].hi] -> [0x02, 0x01]
@@ -997,9 +997,9 @@ func TestCompile_Locals(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstV128{Lo: 0, Hi: 0},
+				&OperationV128Const{Lo: 0, Hi: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
 				&OperationSwap{Depth: 3, IsTargetVector: true},
 				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [0x02, 0x01]
@@ -1023,7 +1023,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
 				&OperationPick{Depth: 1, IsTargetVector: true},
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]
@@ -1071,9 +1071,9 @@ func TestCompile_Locals(t *testing.T) {
 				}},
 			},
 			expected: []Operation{
-				&OperationConstV128{Lo: 0, Hi: 0},
+				&OperationV128Const{Lo: 0, Hi: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
-				&OperationConstV128{Lo: 0x01, Hi: 0x02},
+				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
 				&OperationPick{Depth: 1, IsTargetVector: true},
 				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]

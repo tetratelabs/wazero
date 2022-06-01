@@ -180,7 +180,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 			// Set up the stack before picking.
 			if tc.isPickTargetOnRegister {
-				err = compiler.compileConstV128(&wazeroir.OperationConstV128{
+				err = compiler.compileV128Const(&wazeroir.OperationV128Const{
 					Lo: pickTargetLo, Hi: pickTargetHi,
 				})
 				require.NoError(t, err)
@@ -618,7 +618,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.x1OnRegister {
-				err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: x1Lo, Hi: x1Hi})
+				err = compiler.compileV128Const(&wazeroir.OperationV128Const{Lo: x1Lo, Hi: x1Hi})
 				require.NoError(t, err)
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo
@@ -632,7 +632,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // Dummy value!
 
 			if tc.x2OnRegister {
-				err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: x2Lo, Hi: x2Hi})
+				err = compiler.compileV128Const(&wazeroir.OperationV128Const{Lo: x2Lo, Hi: x2Hi})
 				require.NoError(t, err)
 			} else {
 				lo := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack() // lo

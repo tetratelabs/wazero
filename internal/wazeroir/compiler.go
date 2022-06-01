@@ -798,7 +798,7 @@ operatorSwitch:
 			&OperationGlobalSet{Index: *index},
 		)
 	case wasm.OpcodeI32Load:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32LoadName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32LoadName)
 		if err != nil {
 			return err
 		}
@@ -806,7 +806,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64LoadName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64LoadName)
 		if err != nil {
 			return err
 		}
@@ -814,7 +814,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Load:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeF32LoadName)
+		imm, err := c.readMemoryArg(wasm.OpcodeF32LoadName)
 		if err != nil {
 			return err
 		}
@@ -822,7 +822,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Load:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeF64LoadName)
+		imm, err := c.readMemoryArg(wasm.OpcodeF64LoadName)
 		if err != nil {
 			return err
 		}
@@ -830,7 +830,7 @@ operatorSwitch:
 			&OperationLoad{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8S:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8SName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8SName)
 		if err != nil {
 			return err
 		}
@@ -838,7 +838,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load8U:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load8UName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Load8UName)
 		if err != nil {
 			return err
 		}
@@ -846,7 +846,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16S:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16SName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16SName)
 		if err != nil {
 			return err
 		}
@@ -854,7 +854,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Load16U:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Load16UName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Load16UName)
 		if err != nil {
 			return err
 		}
@@ -862,7 +862,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint32, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8S:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8SName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8SName)
 		if err != nil {
 			return err
 		}
@@ -870,7 +870,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load8U:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load8UName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load8UName)
 		if err != nil {
 			return err
 		}
@@ -878,7 +878,7 @@ operatorSwitch:
 			&OperationLoad8{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16S:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16SName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16SName)
 		if err != nil {
 			return err
 		}
@@ -886,7 +886,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load16U:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load16UName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load16UName)
 		if err != nil {
 			return err
 		}
@@ -894,7 +894,7 @@ operatorSwitch:
 			&OperationLoad16{Type: SignedUint64, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32S:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32SName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32SName)
 		if err != nil {
 			return err
 		}
@@ -902,7 +902,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: true, Arg: imm},
 		)
 	case wasm.OpcodeI64Load32U:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Load32UName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Load32UName)
 		if err != nil {
 			return err
 		}
@@ -910,7 +910,7 @@ operatorSwitch:
 			&OperationLoad32{Signed: false, Arg: imm},
 		)
 	case wasm.OpcodeI32Store:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32StoreName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32StoreName)
 		if err != nil {
 			return err
 		}
@@ -918,7 +918,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64StoreName)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64StoreName)
 		if err != nil {
 			return err
 		}
@@ -926,7 +926,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeI64, Arg: imm},
 		)
 	case wasm.OpcodeF32Store:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeF32StoreName)
+		imm, err := c.readMemoryArg(wasm.OpcodeF32StoreName)
 		if err != nil {
 			return err
 		}
@@ -934,7 +934,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF32, Arg: imm},
 		)
 	case wasm.OpcodeF64Store:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeF64StoreName)
+		imm, err := c.readMemoryArg(wasm.OpcodeF64StoreName)
 		if err != nil {
 			return err
 		}
@@ -942,7 +942,7 @@ operatorSwitch:
 			&OperationStore{Type: UnsignedTypeF64, Arg: imm},
 		)
 	case wasm.OpcodeI32Store8:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store8Name)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Store8Name)
 		if err != nil {
 			return err
 		}
@@ -950,7 +950,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI32Store16:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI32Store16Name)
+		imm, err := c.readMemoryArg(wasm.OpcodeI32Store16Name)
 		if err != nil {
 			return err
 		}
@@ -958,7 +958,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt32, Arg: imm},
 		)
 	case wasm.OpcodeI64Store8:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store8Name)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Store8Name)
 		if err != nil {
 			return err
 		}
@@ -966,7 +966,7 @@ operatorSwitch:
 			&OperationStore8{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store16:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store16Name)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Store16Name)
 		if err != nil {
 			return err
 		}
@@ -974,7 +974,7 @@ operatorSwitch:
 			&OperationStore16{Type: UnsignedInt64, Arg: imm},
 		)
 	case wasm.OpcodeI64Store32:
-		imm, err := c.readMemoryImmediate(wasm.OpcodeI64Store32Name)
+		imm, err := c.readMemoryArg(wasm.OpcodeI64Store32Name)
 		if err != nil {
 			return err
 		}
@@ -1720,26 +1720,380 @@ operatorSwitch:
 		}
 	case wasm.OpcodeVecPrefix:
 		c.pc++
-		switch miscOp := c.body[c.pc]; miscOp {
+		switch vecOp := c.body[c.pc]; vecOp {
 		case wasm.OpcodeVecV128Const:
 			c.pc++
 			lo := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
 			c.pc += 8
 			hi := binary.LittleEndian.Uint64(c.body[c.pc : c.pc+8])
 			c.emit(
-				&OperationConstV128{Lo: lo, Hi: hi},
+				&OperationV128Const{Lo: lo, Hi: hi},
 			)
 			c.pc += 7
+		case wasm.OpcodeVecI8x16Add:
+			c.emit(
+				&OperationV128Add{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8Add:
+			c.emit(
+				&OperationV128Add{Shape: ShapeI16x8},
+			)
 		case wasm.OpcodeVecI32x4Add:
 			c.emit(
-				&OperationAddV128{Shape: ShapeI32x4},
+				&OperationV128Add{Shape: ShapeI32x4},
 			)
 		case wasm.OpcodeVecI64x2Add:
 			c.emit(
-				&OperationAddV128{Shape: ShapeI64x2},
+				&OperationV128Add{Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecI8x16Sub:
+			c.emit(
+				&OperationV128Sub{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8Sub:
+			c.emit(
+				&OperationV128Sub{Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI32x4Sub:
+			c.emit(
+				&OperationV128Sub{Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2Sub:
+			c.emit(
+				&OperationV128Sub{Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecV128Load:
+			arg, err := c.readMemoryArg(wasm.OpcodeI32LoadName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type128, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load8x8s:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8x8SName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type8x8s, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load8x8u:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8x8UName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type8x8u, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load16x4s:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16x4SName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type16x4s, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load16x4u:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16x4UName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type16x4u, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load32x2s:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32x2SName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type32x2s, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load32x2u:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32x2UName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type32x2u, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load8Splat:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8SplatName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type8Splat, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load16Splat:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16SplatName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type16Splat, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load32Splat:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32SplatName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type32Splat, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load64Splat:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64SplatName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type64Splat, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load32zero:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32zeroName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type32zero, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load64zero:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64zeroName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Load{Type: LoadV128Type64zero, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load8Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load8LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 8, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load16Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load16LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 16, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load32Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load32LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 32, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Load64Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Load64LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128LoadLane{LaneIndex: laneIndex, LaneSize: 64, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Store:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128StoreName)
+			if err != nil {
+				return err
+			}
+			c.emit(
+				&OperationV128Store{Arg: arg},
+			)
+		case wasm.OpcodeVecV128Store8Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store8LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 8, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Store16Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store16LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 16, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Store32Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store32LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 32, Arg: arg},
+			)
+		case wasm.OpcodeVecV128Store64Lane:
+			arg, err := c.readMemoryArg(wasm.OpcodeVecV128Store64LaneName)
+			if err != nil {
+				return err
+			}
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128StoreLane{LaneIndex: laneIndex, LaneSize: 64, Arg: arg},
+			)
+		case wasm.OpcodeVecI8x16ExtractLaneS:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: true},
+			)
+		case wasm.OpcodeVecI8x16ExtractLaneU:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI8x16, Signed: false},
+			)
+		case wasm.OpcodeVecI16x8ExtractLaneS:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: true},
+			)
+		case wasm.OpcodeVecI16x8ExtractLaneU:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI16x8, Signed: false},
+			)
+		case wasm.OpcodeVecI32x4ExtractLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2ExtractLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecF32x4ExtractLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+			)
+		case wasm.OpcodeVecF64x2ExtractLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ExtractLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+			)
+		case wasm.OpcodeVecI8x16ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI32x4ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecF32x4ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF32x4},
+			)
+		case wasm.OpcodeVecF64x2ReplaceLane:
+			c.pc++
+			laneIndex := c.body[c.pc]
+			c.emit(
+				&OperationV128ReplaceLane{LaneIndex: laneIndex, Shape: ShapeF64x2},
+			)
+		case wasm.OpcodeVecI8x16Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI32x4Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecF32x4Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeF32x4},
+			)
+		case wasm.OpcodeVecF64x2Splat:
+			c.emit(
+				&OperationV128Splat{Shape: ShapeF64x2},
+			)
+		case wasm.OpcodeVecI8x16Swizzle:
+			c.emit(
+				&OperationV128Swizzle{},
+			)
+		case wasm.OpcodeVecV128i8x16Shuffle:
+			c.pc++
+			op := &OperationV128Shuffle{}
+			copy(op.Lanes[:], c.body[c.pc:c.pc+16])
+			c.emit(op)
+			c.pc += 15
+		case wasm.OpcodeVecV128AnyTrue:
+			c.emit(
+				&OperationV128AnyTrue{},
+			)
+		case wasm.OpcodeVecI8x16AllTrue:
+			c.emit(
+				&OperationV128AllTrue{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8AllTrue:
+			c.emit(
+				&OperationV128AllTrue{Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI32x4AllTrue:
+			c.emit(
+				&OperationV128AllTrue{Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2AllTrue:
+			c.emit(
+				&OperationV128AllTrue{Shape: ShapeI64x2},
 			)
 		default:
-			return fmt.Errorf("unsupported vector instruction in wazeroir: 0x%x", op)
+			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
@@ -1882,7 +2236,7 @@ func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 		c.emit(&OperationConstF64{Value: 0})
 	case wasm.ValueTypeV128:
 		c.stackPush(UnsignedTypeV128)
-		c.emit(&OperationConstV128{Hi: 0, Lo: 0})
+		c.emit(&OperationV128Const{Hi: 0, Lo: 0})
 	}
 }
 
@@ -1945,7 +2299,7 @@ func (c *compiler) stackLenInUint64(ceil int) (ret int) {
 	return
 }
 
-func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {
+func (c *compiler) readMemoryArg(tag string) (*MemoryArg, error) {
 	r := bytes.NewReader(c.body[c.pc+1:])
 	alignment, num, err := leb128.DecodeUint32(r)
 	if err != nil {
@@ -1957,5 +2311,5 @@ func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {
 		return nil, fmt.Errorf("reading offset for %s: %w", tag, err)
 	}
 	c.pc += num
-	return &MemoryImmediate{Offset: offset, Alignment: alignment}, nil
+	return &MemoryArg{Offset: offset, Alignment: alignment}, nil
 }

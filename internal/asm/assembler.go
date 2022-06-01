@@ -51,6 +51,15 @@ type NodeOffsetInBinary = uint64
 // ConstantValue represents a constant value used in an instruction.
 type ConstantValue = int64
 
+// StaticConst represents an arbitrary constant bytes which are pooled and emitted by assembler into the binary.
+// These constants can be referenced by instructions.
+type StaticConst = []byte
+
+// StaticConstKey returns a string whose underlying bytes equal the original const.
+func StaticConstKey(c StaticConst) string {
+	return string(c)
+}
+
 // AssemblerBase is the common interface for assemblers among multiple architectures.
 //
 // Note: some of them can be implemented in an arch-independent way, but not all can be

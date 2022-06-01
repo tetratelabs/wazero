@@ -816,8 +816,20 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.PADDQ, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.ADDPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.ADDPD, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSUBB, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSUBW, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSUBL, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSUBQ, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.SUBPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.SUBPD, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.PINSRQ, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 1},
 		{instruction: amd64.PINSRQ, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 0},
+		{instruction: amd64.PINSRD, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PINSRD, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 0},
+		{instruction: amd64.PINSRW, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PINSRW, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 0},
+		{instruction: amd64.PINSRB, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PINSRB, srcRegs: intRegisters, DstRegs: floatRegisters, arg: 0},
 		{instruction: amd64.ADDL, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.ADDQ, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.ADDSD, srcRegs: floatRegisters, DstRegs: floatRegisters},
@@ -852,6 +864,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.MAXSS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.MINSS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.MOVBLSX, srcRegs: intRegisters, DstRegs: intRegisters},
+		{instruction: amd64.MOVWLZX, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.MOVBLZX, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.MOVBQSX, srcRegs: intRegisters, DstRegs: intRegisters},
 		{instruction: amd64.MOVLQSX, srcRegs: intRegisters, DstRegs: intRegisters},
@@ -905,6 +918,24 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{instruction: amd64.XORPD, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.XORPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
 		{instruction: amd64.XORQ, srcRegs: intRegisters, DstRegs: intRegisters},
+		{instruction: amd64.PXOR, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSHUFB, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PSHUFD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0},
+		{instruction: amd64.PSHUFD, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PEXTRB, srcRegs: floatRegisters, DstRegs: intRegisters, arg: 0},
+		{instruction: amd64.PEXTRW, srcRegs: floatRegisters, DstRegs: intRegisters, arg: 1},
+		{instruction: amd64.PEXTRD, srcRegs: floatRegisters, DstRegs: intRegisters, arg: 1},
+		{instruction: amd64.PEXTRQ, srcRegs: floatRegisters, DstRegs: intRegisters, arg: 1},
+		{instruction: amd64.MOVLHPS, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.INSERTPS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 0},
+		{instruction: amd64.INSERTPS, srcRegs: floatRegisters, DstRegs: floatRegisters, arg: 1},
+		{instruction: amd64.PTEST, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PCMPEQB, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PCMPEQW, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PCMPEQD, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PCMPEQQ, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.PADDUSB, srcRegs: floatRegisters, DstRegs: floatRegisters},
+		{instruction: amd64.MOVSD, srcRegs: floatRegisters, DstRegs: floatRegisters},
 	}
 
 	for _, tt := range tests {
@@ -961,11 +992,16 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 							// TODO: remove golang-asm dependency in tests.
 							goasm, err := newGolangAsmAssembler()
 							require.NoError(t, err)
-							if tc.instruction == amd64.ROUNDSD || tc.instruction == amd64.ROUNDSS || tc.instruction == amd64.PINSRQ {
+
+							switch tc.instruction {
+							case amd64.ROUNDSD, amd64.ROUNDSS, amd64.PINSRQ, amd64.PINSRD, amd64.PINSRW,
+								amd64.PINSRB, amd64.PSHUFD, amd64.PEXTRB, amd64.PEXTRW, amd64.PEXTRD, amd64.PEXTRQ,
+								amd64.INSERTPS:
 								goasm.CompileRegisterToRegisterWithArg(tc.instruction, srcReg, DstReg, tc.arg)
-							} else {
+							default:
 								goasm.CompileRegisterToRegister(tc.instruction, srcReg, DstReg)
 							}
+
 							bs, err := goasm.Assemble()
 							require.NoError(t, err)
 
@@ -975,12 +1011,119 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 								Arg: tc.arg,
 							})
 							require.NoError(t, err)
-							// fmt.Printf("modRM: want: 0b%b, got: 0b%b\n", bs[1], a.Buf.Bytes()[1])
 							require.Equal(t, bs, a.Buf.Bytes())
 						})
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestAssemblerImpl_CompileMemoryWithIndexAndArgToRegister(t *testing.T) {
+	tests := []struct {
+		name        string
+		instruction asm.Instruction
+	}{
+		{name: "PINSRB", instruction: amd64.PINSRB},
+		{name: "PINSRW", instruction: amd64.PINSRW},
+		{name: "PINSRD", instruction: amd64.PINSRD},
+		{name: "PINSRQ", instruction: amd64.PINSRQ},
+	}
+
+	dstRegs := []asm.Register{amd64.RegX0, amd64.RegX13}
+	indexRegs := []asm.Register{amd64.RegR12, amd64.RegAX, amd64.RegBP, amd64.RegSI}
+	offsets := []int64{0, 1, math.MaxInt32}
+	args := []byte{0, 1}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+
+			for _, dstReg := range dstRegs {
+				for _, indexReg := range indexRegs {
+					for _, offset := range offsets {
+						for _, arg := range args {
+							dstReg, indexReg, offset, arg := dstReg, indexReg, offset, arg
+							t.Run(fmt.Sprintf("dst=%s,index=%s,offset=%d,arg=%d",
+								amd64.RegisterName(dstReg), amd64.RegisterName(indexReg), offset, arg), func(t *testing.T) {
+
+								goasm, err := newGolangAsmAssembler()
+								require.NoError(t, err)
+
+								a := amd64.NewAssemblerImpl()
+								for _, assembler := range []amd64.Assembler{goasm, a} {
+									assembler.CompileMemoryWithIndexAndArgToRegister(tc.instruction,
+										amd64.RegAX, offset, amd64.RegCX, 1, dstReg, arg)
+								}
+
+								actual, err := a.Assemble()
+								require.NoError(t, err)
+								expected, err := goasm.Assemble()
+								require.NoError(t, err)
+
+								require.Equal(t, expected, actual)
+							})
+						}
+
+					}
+				}
+			}
+
+		})
+	}
+}
+
+func TestAssemblerImpl_CompileRegisterToMemoryWithIndexAndArg(t *testing.T) {
+	tests := []struct {
+		name        string
+		instruction asm.Instruction
+	}{
+		{name: "PEXTRB", instruction: amd64.PEXTRB},
+		{name: "PEXTRW", instruction: amd64.PEXTRW},
+		{name: "PEXTRD", instruction: amd64.PEXTRD},
+		{name: "PEXTRQ", instruction: amd64.PEXTRQ},
+	}
+
+	srcRegs := []asm.Register{amd64.RegX0, amd64.RegX13}
+	indexRegs := []asm.Register{amd64.RegR12, amd64.RegAX, amd64.RegBP, amd64.RegSI}
+	offsets := []int64{0, 1, math.MaxInt32}
+	args := []byte{0, 1}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+
+			for _, srcReg := range srcRegs {
+				for _, indexReg := range indexRegs {
+					for _, offset := range offsets {
+						for _, arg := range args {
+							srcReg, indexReg, offset, arg := srcReg, indexReg, offset, arg
+							t.Run(fmt.Sprintf("src=%s,index=%s,offset=%d,arg=%d",
+								amd64.RegisterName(srcReg), amd64.RegisterName(indexReg), offset, arg), func(t *testing.T) {
+
+								goasm, err := newGolangAsmAssembler()
+								require.NoError(t, err)
+
+								a := amd64.NewAssemblerImpl()
+								for _, assembler := range []amd64.Assembler{goasm, a} {
+									assembler.CompileRegisterToMemoryWithIndexAndArg(tc.instruction, srcReg,
+										amd64.RegCX, offset, indexReg, 1, arg)
+								}
+
+								actual, err := a.Assemble()
+								require.NoError(t, err)
+								expected, err := goasm.Assemble()
+								require.NoError(t, err)
+
+								require.Equal(t, expected, actual)
+							})
+						}
+
+					}
+				}
+			}
+
 		})
 	}
 }
@@ -1256,7 +1399,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		a := amd64.NewAssemblerImpl()
 		require.EqualError(t, a.EncodeMemoryToRegister(n), "JMP is unsupported for from:memory,to:register type")
 	})
-	intRegs := []asm.Register{amd64.RegAX, amd64.RegBP, amd64.RegSI, amd64.RegDI, amd64.RegR10}
+	intRegs := []asm.Register{amd64.RegAX, amd64.RegBP, amd64.RegDI, amd64.RegR10}
 	floatRegs := []asm.Register{amd64.RegX0, amd64.RegX8}
 	scales := []byte{1, 4}
 	tests := []struct {
@@ -1285,6 +1428,12 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 		{instruction: amd64.SUBSS, isFloatInst: true},
 		{instruction: amd64.UCOMISD, isFloatInst: true},
 		{instruction: amd64.UCOMISS, isFloatInst: true},
+		{instruction: amd64.PMOVSXBW, isFloatInst: true},
+		{instruction: amd64.PMOVSXWD, isFloatInst: true},
+		{instruction: amd64.PMOVSXDQ, isFloatInst: true},
+		{instruction: amd64.PMOVZXBW, isFloatInst: true},
+		{instruction: amd64.PMOVZXWD, isFloatInst: true},
+		{instruction: amd64.PMOVZXDQ, isFloatInst: true},
 	}
 
 	for _, tt := range tests {

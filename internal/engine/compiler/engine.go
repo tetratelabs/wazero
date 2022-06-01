@@ -1040,10 +1040,34 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 			err = compiler.compileTableSize(o)
 		case *wazeroir.OperationTableFill:
 			err = compiler.compileTableFill(o)
-		case *wazeroir.OperationConstV128:
-			err = compiler.compileConstV128(o)
-		case *wazeroir.OperationAddV128:
-			err = compiler.compileAddV128(o)
+		case *wazeroir.OperationV128Const:
+			err = compiler.compileV128Const(o)
+		case *wazeroir.OperationV128Add:
+			err = compiler.compileV128Add(o)
+		case *wazeroir.OperationV128Sub:
+			err = compiler.compileV128Sub(o)
+		case *wazeroir.OperationV128Load:
+			err = compiler.compileV128Load(o)
+		case *wazeroir.OperationV128LoadLane:
+			err = compiler.compileV128LoadLane(o)
+		case *wazeroir.OperationV128Store:
+			err = compiler.compileV128Store(o)
+		case *wazeroir.OperationV128StoreLane:
+			err = compiler.compileV128StoreLane(o)
+		case *wazeroir.OperationV128ExtractLane:
+			err = compiler.compileV128ExtractLane(o)
+		case *wazeroir.OperationV128ReplaceLane:
+			err = compiler.compileV128ReplaceLane(o)
+		case *wazeroir.OperationV128Splat:
+			err = compiler.compileV128Splat(o)
+		case *wazeroir.OperationV128Shuffle:
+			err = compiler.compileV128Shuffle(o)
+		case *wazeroir.OperationV128Swizzle:
+			err = compiler.compileV128Swizzle(o)
+		case *wazeroir.OperationV128AnyTrue:
+			err = compiler.compileV128AnyTrue(o)
+		case *wazeroir.OperationV128AllTrue:
+			err = compiler.compileV128AllTrue(o)
 		default:
 			err = errors.New("unsupported")
 		}

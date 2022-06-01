@@ -191,10 +191,10 @@ func (ta *testAssembler) CompileReadInstructionAddress(
 func (ta *testAssembler) CompileRegisterToRegisterWithArg(
 	instruction asm.Instruction,
 	from, to asm.Register,
-	mode asm_amd64.Mode,
+	arg byte,
 ) {
-	ta.goasm.CompileRegisterToRegisterWithArg(instruction, from, to, mode)
-	ta.a.CompileRegisterToRegisterWithArg(instruction, from, to, mode)
+	ta.goasm.CompileRegisterToRegisterWithArg(instruction, from, to, arg)
+	ta.a.CompileRegisterToRegisterWithArg(instruction, from, to, arg)
 }
 
 // CompileMemoryWithIndexToRegister implements the same method as documented on asm_amd64.Assembler.
@@ -210,6 +210,20 @@ func (ta *testAssembler) CompileMemoryWithIndexToRegister(
 	ta.a.CompileMemoryWithIndexToRegister(instruction, srcBaseReg, srcOffsetConst, srcIndex, srcScale, dstReg)
 }
 
+// CompileMemoryWithIndexAndArgToRegister implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileMemoryWithIndexAndArgToRegister(
+	instruction asm.Instruction,
+	srcBaseReg asm.Register,
+	srcOffsetConst int64,
+	srcIndex asm.Register,
+	srcScale int16,
+	dstReg asm.Register,
+	arg byte,
+) {
+	ta.goasm.CompileMemoryWithIndexAndArgToRegister(instruction, srcBaseReg, srcOffsetConst, srcIndex, srcScale, dstReg, arg)
+	ta.a.CompileMemoryWithIndexAndArgToRegister(instruction, srcBaseReg, srcOffsetConst, srcIndex, srcScale, dstReg, arg)
+}
+
 // CompileRegisterToMemoryWithIndex implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) CompileRegisterToMemoryWithIndex(
 	instruction asm.Instruction,
@@ -220,6 +234,19 @@ func (ta *testAssembler) CompileRegisterToMemoryWithIndex(
 ) {
 	ta.goasm.CompileRegisterToMemoryWithIndex(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale)
 	ta.a.CompileRegisterToMemoryWithIndex(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale)
+}
+
+// CompileRegisterToMemoryWithIndexAndArg implements the same method as documented on asm_amd64.Assembler.
+func (ta *testAssembler) CompileRegisterToMemoryWithIndexAndArg(
+	instruction asm.Instruction,
+	srcReg, dstBaseReg asm.Register,
+	dstOffsetConst int64,
+	dstIndex asm.Register,
+	dstScale int16,
+	arg byte,
+) {
+	ta.goasm.CompileRegisterToMemoryWithIndexAndArg(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale, arg)
+	ta.a.CompileRegisterToMemoryWithIndexAndArg(instruction, srcReg, dstBaseReg, dstOffsetConst, dstIndex, dstScale, arg)
 }
 
 // CompileRegisterToConst implements the same method as documented on asm_amd64.Assembler.
@@ -272,4 +299,9 @@ func (ta *testAssembler) CompileMemoryToConst(
 	ret := ta.goasm.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
 	ret2 := ta.a.CompileMemoryToConst(instruction, srcBaseReg, srcOffset, value)
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
+}
+
+// CompileLoadStaticConstToRegister implements Assembler.CompileLoadStaticConstToRegister.
+func (ta *testAssembler) CompileLoadStaticConstToRegister(asm.Instruction, []byte, asm.Register) (err error) {
+	panic("CompileLoadStaticConstToRegister cannot be supported by golang-asm")
 }

@@ -31,6 +31,24 @@ func (m *Module) validateFunction(enabledFeatures Features, idx Index, functions
 	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
 
+func readMemArg(pc uint64, body []byte) (align, offset uint32, read uint64, err error) {
+	align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+	if err != nil {
+		err = fmt.Errorf("read memory align: %v", err)
+		return
+	}
+	read += num
+
+	offset, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc+num:]))
+	if err != nil {
+		err = fmt.Errorf("read memory offset: %v", err)
+		return
+	}
+
+	read += num
+	return align, offset, read, nil
+}
+
 // validateFunctionWithMaxStackValues is like validateFunction, but allows overriding maxStackValues for testing.
 //
 // * maxStackValues is the maximum height of values stack which the target is allowed to reach.
@@ -63,10 +81,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
-			align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			align, _, read, err := readMemArg(pc, body)
 			if err != nil {
-				return fmt.Errorf("read memory align: %v", err)
+				return err
 			}
+			pc += read - 1
 			switch op {
 			case OpcodeI32Load:
 				if 1<<align > 32/8 {
@@ -239,13 +258,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return err
 				}
 			}
-			pc += num
-			// offset
-			_, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc:]))
-			if err != nil {
-				return fmt.Errorf("read memory offset: %v", err)
-			}
-			pc += num - 1
 		} else if OpcodeMemorySize <= op && op <= OpcodeMemoryGrow {
 			if memory == nil {
 				return fmt.Errorf("unknown memory access")
@@ -1059,20 +1071,199 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				pc += 16
 				valueTypeStack.push(ValueTypeV128)
-			case OpcodeVecI32x4Add:
+			case OpcodeVecI8x16Add, OpcodeVecI16x8Add, OpcodeVecI32x4Add, OpcodeVecI64x2Add,
+				OpcodeVecI8x16Sub, OpcodeVecI16x8Sub, OpcodeVecI32x4Sub, OpcodeVecI64x2Sub:
 				for i := 0; i < 2; i++ {
 					if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
-						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI32x4AddName, err)
+						return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 					}
 				}
 				valueTypeStack.push(ValueTypeV128)
-			case OpcodeVecI64x2Add:
-				for i := 0; i < 2; i++ {
-					if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
-						return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecI64x2AddName, err)
-					}
+			case OpcodeVecV128AnyTrue:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeI32)
+			case OpcodeVecI8x16AllTrue, OpcodeVecI16x8AllTrue, OpcodeVecI32x4AllTrue, OpcodeVecI64x2AllTrue:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeI32)
+			case OpcodeVecV128Load, OpcodeVecV128Load8x8s, OpcodeVecV128Load8x8u, OpcodeVecV128Load16x4s, OpcodeVecV128Load16x4u,
+				OpcodeVecV128Load32x2s, OpcodeVecV128Load32x2u, OpcodeVecV128Load8Splat, OpcodeVecV128Load16Splat,
+				OpcodeVecV128Load32Splat, OpcodeVecV128Load64Splat,
+				OpcodeVecV128Load32zero, OpcodeVecV128Load64zero:
+				pc++
+				align, _, read, err := readMemArg(pc, body)
+				if err != nil {
+					return err
+				}
+				pc += read - 1
+				var maxAlign uint32
+				switch vecOpcode {
+				case OpcodeVecV128Load:
+					maxAlign = 128 / 8
+				case OpcodeVecV128Load8x8s, OpcodeVecV128Load8x8u, OpcodeVecV128Load16x4s, OpcodeVecV128Load16x4u,
+					OpcodeVecV128Load32x2s, OpcodeVecV128Load32x2u:
+					maxAlign = 64 / 8
+				case OpcodeVecV128Load8Splat:
+					maxAlign = 1
+				case OpcodeVecV128Load16Splat:
+					maxAlign = 16 / 8
+				case OpcodeVecV128Load32Splat:
+					maxAlign = 32 / 8
+				case OpcodeVecV128Load64Splat:
+					maxAlign = 64 / 8
+				case OpcodeVecV128Load32zero:
+					maxAlign = 32 / 8
+				case OpcodeVecV128Load64zero:
+					maxAlign = 64 / 8
+				}
+				if 1<<align > maxAlign {
+					return fmt.Errorf("invalid memory alignment %d for %s", align, OpcodeVecV128StoreName)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128LoadName, err)
 				}
 				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecV128Store:
+				pc++
+				align, _, read, err := readMemArg(pc, body)
+				if err != nil {
+					return err
+				}
+				pc += read - 1
+				if 1<<align > 128/8 {
+					return fmt.Errorf("invalid memory alignment %d for %s", align, OpcodeVecV128StoreName)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128StoreName, err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128StoreName, err)
+				}
+			case OpcodeVecV128Load8Lane, OpcodeVecV128Load16Lane, OpcodeVecV128Load32Lane, OpcodeVecV128Load64Lane:
+				attr := vecLoadLanes[vecOpcode]
+				pc++
+				align, _, read, err := readMemArg(pc, body)
+				if err != nil {
+					return err
+				}
+				if 1<<align > attr.alignMax {
+					return fmt.Errorf("invalid memory alignment %d for %s", align, OpcodeVecV128Load64LaneName)
+				}
+				pc += read
+				if pc >= uint64(len(body)) {
+					return fmt.Errorf("lane for %s not found", OpcodeVecV128Load64LaneName)
+				}
+				lane := body[pc]
+				if lane >= attr.laneCeil {
+					return fmt.Errorf("invalid lane index %d >= %d for %s", lane, attr.laneCeil, vectorInstructionName[vecOpcode])
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecV128Store8Lane, OpcodeVecV128Store16Lane, OpcodeVecV128Store32Lane, OpcodeVecV128Store64Lane:
+				attr := vecStoreLanes[vecOpcode]
+				pc++
+				align, _, read, err := readMemArg(pc, body)
+				if err != nil {
+					return err
+				}
+				if 1<<align > attr.alignMax {
+					return fmt.Errorf("invalid memory alignment %d for %s", align, vectorInstructionName[vecOpcode])
+				}
+				pc += read
+				if pc >= uint64(len(body)) {
+					return fmt.Errorf("lane for %s not found", vectorInstructionName[vecOpcode])
+				}
+				lane := body[pc]
+				if lane >= attr.laneCeil {
+					return fmt.Errorf("invalid lane index %d >= %d", lane, attr.laneCeil)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+			case OpcodeVecI8x16ExtractLaneS,
+				OpcodeVecI8x16ExtractLaneU,
+				OpcodeVecI16x8ExtractLaneS,
+				OpcodeVecI16x8ExtractLaneU,
+				OpcodeVecI32x4ExtractLane,
+				OpcodeVecI64x2ExtractLane,
+				OpcodeVecF32x4ExtractLane,
+				OpcodeVecF64x2ExtractLane:
+				pc++
+				if pc >= uint64(len(body)) {
+					return fmt.Errorf("lane for %s not found", vectorInstructionName[vecOpcode])
+				}
+				attr := vecExtractLanes[vecOpcode]
+				lane := body[pc]
+				if lane >= attr.laneCeil {
+					return fmt.Errorf("invalid lane index %d >= %d for %s", lane, attr.laneCeil, vectorInstructionName[vecOpcode])
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(attr.resultType)
+			case OpcodeVecI8x16ReplaceLane, OpcodeVecI16x8ReplaceLane, OpcodeVecI32x4ReplaceLane,
+				OpcodeVecI64x2ReplaceLane, OpcodeVecF32x4ReplaceLane, OpcodeVecF64x2ReplaceLane:
+				pc++
+				if pc >= uint64(len(body)) {
+					return fmt.Errorf("lane for %s not found", vectorInstructionName[vecOpcode])
+				}
+				attr := vecReplaceLanes[vecOpcode]
+				lane := body[pc]
+				if lane >= attr.laneCeil {
+					return fmt.Errorf("invalid lane index %d >= %d for %s", lane, attr.laneCeil, vectorInstructionName[vecOpcode])
+				}
+				if err := valueTypeStack.popAndVerifyType(attr.paramType); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecI8x16Splat, OpcodeVecI16x8Splat, OpcodeVecI32x4Splat,
+				OpcodeVecI64x2Splat, OpcodeVecF32x4Splat, OpcodeVecF64x2Splat:
+				tp := vecSplatValueTypes[vecOpcode]
+				if err := valueTypeStack.popAndVerifyType(tp); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecI8x16Swizzle:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecV128i8x16Shuffle:
+				pc++
+				if pc+16 >= uint64(len(body)) {
+					return fmt.Errorf("16 lane indexes for %s not found", vectorInstructionName[vecOpcode])
+				}
+				lanes := body[pc : pc+16]
+				for i, l := range lanes {
+					if l >= 32 {
+						return fmt.Errorf("invalid lane index[%d] %d >= %d for %s", i, l, 32, vectorInstructionName[vecOpcode])
+					}
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+				pc += 15
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}
@@ -1258,6 +1449,61 @@ func (m *Module) validateFunctionWithMaxStackValues(
 		return fmt.Errorf("function may have %d stack values, which exceeds limit %d", valueTypeStack.maximumStackPointer, maxStackValues)
 	}
 	return nil
+}
+
+var vecExtractLanes = [...]struct {
+	laneCeil   byte
+	resultType ValueType
+}{
+	OpcodeVecI8x16ExtractLaneS: {laneCeil: 16, resultType: ValueTypeI32},
+	OpcodeVecI8x16ExtractLaneU: {laneCeil: 16, resultType: ValueTypeI32},
+	OpcodeVecI16x8ExtractLaneS: {laneCeil: 8, resultType: ValueTypeI32},
+	OpcodeVecI16x8ExtractLaneU: {laneCeil: 8, resultType: ValueTypeI32},
+	OpcodeVecI32x4ExtractLane:  {laneCeil: 4, resultType: ValueTypeI32},
+	OpcodeVecI64x2ExtractLane:  {laneCeil: 2, resultType: ValueTypeI64},
+	OpcodeVecF32x4ExtractLane:  {laneCeil: 4, resultType: ValueTypeF32},
+	OpcodeVecF64x2ExtractLane:  {laneCeil: 2, resultType: ValueTypeF64},
+}
+
+var vecReplaceLanes = [...]struct {
+	laneCeil  byte
+	paramType ValueType
+}{
+	OpcodeVecI8x16ReplaceLane: {laneCeil: 16, paramType: ValueTypeI32},
+	OpcodeVecI16x8ReplaceLane: {laneCeil: 8, paramType: ValueTypeI32},
+	OpcodeVecI32x4ReplaceLane: {laneCeil: 4, paramType: ValueTypeI32},
+	OpcodeVecI64x2ReplaceLane: {laneCeil: 2, paramType: ValueTypeI64},
+	OpcodeVecF32x4ReplaceLane: {laneCeil: 4, paramType: ValueTypeF32},
+	OpcodeVecF64x2ReplaceLane: {laneCeil: 2, paramType: ValueTypeF64},
+}
+
+var vecStoreLanes = [...]struct {
+	alignMax uint32
+	laneCeil byte
+}{
+	OpcodeVecV128Store64Lane: {alignMax: 64 / 8, laneCeil: 128 / 64},
+	OpcodeVecV128Store32Lane: {alignMax: 32 / 8, laneCeil: 128 / 32},
+	OpcodeVecV128Store16Lane: {alignMax: 16 / 8, laneCeil: 128 / 16},
+	OpcodeVecV128Store8Lane:  {alignMax: 1, laneCeil: 128 / 8},
+}
+
+var vecLoadLanes = [...]struct {
+	alignMax uint32
+	laneCeil byte
+}{
+	OpcodeVecV128Load64Lane: {alignMax: 64 / 8, laneCeil: 128 / 64},
+	OpcodeVecV128Load32Lane: {alignMax: 32 / 8, laneCeil: 128 / 32},
+	OpcodeVecV128Load16Lane: {alignMax: 16 / 8, laneCeil: 128 / 16},
+	OpcodeVecV128Load8Lane:  {alignMax: 1, laneCeil: 128 / 8},
+}
+
+var vecSplatValueTypes = [...]ValueType{
+	OpcodeVecI8x16Splat: ValueTypeI32,
+	OpcodeVecI16x8Splat: ValueTypeI32,
+	OpcodeVecI32x4Splat: ValueTypeI32,
+	OpcodeVecI64x2Splat: ValueTypeI64,
+	OpcodeVecF32x4Splat: ValueTypeF32,
+	OpcodeVecF64x2Splat: ValueTypeF64,
 }
 
 type valueTypeStack struct {
@@ -1449,12 +1695,12 @@ func writeValueTypes(vts []ValueType, ret *strings.Builder) {
 	switch len(vts) {
 	case 0:
 	case 1:
-		ret.WriteString(api.ValueTypeName(vts[0]))
+		ret.WriteString(ValueTypeName(vts[0]))
 	default:
-		ret.WriteString(api.ValueTypeName(vts[0]))
+		ret.WriteString(ValueTypeName(vts[0]))
 		for _, vt := range vts[1:] {
 			ret.WriteString(", ")
-			ret.WriteString(api.ValueTypeName(vt))
+			ret.WriteString(ValueTypeName(vt))
 		}
 	}
 }

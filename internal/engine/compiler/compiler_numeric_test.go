@@ -17,7 +17,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 		wazeroir.OperationKindConstI64,
 		wazeroir.OperationKindConstF32,
 		wazeroir.OperationKindConstF64,
-		wazeroir.OperationKindConstV128,
+		wazeroir.OperationKindV128Const,
 	} {
 		op := op
 		t.Run(op.String(), func(t *testing.T) {
@@ -51,8 +51,8 @@ func TestCompiler_compileConsts(t *testing.T) {
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(val))})
 					case wazeroir.OperationKindConstF64:
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
-					case wazeroir.OperationKindConstV128:
-						err = compiler.compileConstV128(&wazeroir.OperationConstV128{Lo: val, Hi: ^val})
+					case wazeroir.OperationKindV128Const:
+						err = compiler.compileV128Const(&wazeroir.OperationV128Const{Lo: val, Hi: ^val})
 					}
 					require.NoError(t, err)
 
@@ -60,7 +60,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 					loc := compiler.runtimeValueLocationStack().peek()
 					require.True(t, loc.onRegister())
 
-					if op == wazeroir.OperationKindConstV128 {
+					if op == wazeroir.OperationKindV128Const {
 						require.Equal(t, runtimeValueTypeV128Hi, loc.valueType)
 					}
 
@@ -76,7 +76,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 
 					// Compiler status must be returned.
 					require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-					if op == wazeroir.OperationKindConstV128 {
+					if op == wazeroir.OperationKindV128Const {
 						require.Equal(t, uint64(2), env.stackPointer()) // a vector value consists of two uint64.
 					} else {
 						require.Equal(t, uint64(1), env.stackPointer())
@@ -87,7 +87,7 @@ func TestCompiler_compileConsts(t *testing.T) {
 						require.Equal(t, uint32(val), env.stackTopAsUint32())
 					case wazeroir.OperationKindConstI64, wazeroir.OperationKindConstF64:
 						require.Equal(t, val, env.stackTopAsUint64())
-					case wazeroir.OperationKindConstV128:
+					case wazeroir.OperationKindV128Const:
 						lo, hi := env.stackTopAsV128()
 						require.Equal(t, val, lo)
 						require.Equal(t, ^val, hi)
