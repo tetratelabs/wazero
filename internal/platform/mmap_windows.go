@@ -1,10 +1,8 @@
 package platform
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -24,21 +22,7 @@ const (
 	windows_PAGE_EXECUTE_READWRITE uintptr = 0x00000040
 )
 
-func MmapCodeSegment(code []byte) ([]byte, error) {
-	if len(code) == 0 {
-		panic(errors.New("BUG: MmapCodeSegment with zero length"))
-	}
-	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(code)
-	} else {
-		return mmapCodeSegmentARM64(code)
-	}
-}
-
-func MunmapCodeSegment(code []byte) error {
-	if len(code) == 0 {
-		panic(errors.New("BUG: MunmapCodeSegment with zero length"))
-	}
+func munmapCodeSegment(code []byte) error {
 	return freeMemory(code)
 }
 
@@ -74,7 +58,7 @@ func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error
 	return nil
 }
 
-func MmapCodeSegmentAMD64(code []byte) ([]byte, error) {
+func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	p, err := allocateMemory(code, windows_PAGE_EXECUTE_READWRITE)
 	if err != nil {
 		return nil, err
@@ -89,7 +73,7 @@ func MmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	return mem, nil
 }
 
-func MmapCodeSegmentARM64(code []byte) ([]byte, error) {
+func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	p, err := allocateMemory(code, windows_PAGE_READWRITE)
 	if err != nil {
 		return nil, err

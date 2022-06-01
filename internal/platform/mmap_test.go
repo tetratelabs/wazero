@@ -11,7 +11,7 @@ import (
 
 var testCode, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
-func Test_mmapCodeSegment(t *testing.T) {
+func Test_MmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
 
 	newCode, err := MmapCodeSegment(testCode)
@@ -28,7 +28,7 @@ func Test_mmapCodeSegment(t *testing.T) {
 	})
 }
 
-func Test_munmapCodeSegment(t *testing.T) {
+func Test_MunmapCodeSegment(t *testing.T) {
 	requireSupportedOSArch(t)
 
 	// Errors if never mapped
