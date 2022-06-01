@@ -1,10 +1,9 @@
-//go:build !windows
+// This uses syscall.Mprotect. Go's SDK only supports this on darwin and linux.
+//go:build darwin || linux
 
 package platform
 
-import (
-	"syscall"
-)
+import "syscall"
 
 func munmapCodeSegment(code []byte) error {
 	return syscall.Munmap(code)

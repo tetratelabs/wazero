@@ -11,7 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -47,7 +47,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 }
 
 func TestEngineCompiler(t *testing.T) {
-	if !compiler.IsSupported {
+	if !platform.IsSupported() {
 		t.Skip()
 	}
 	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
