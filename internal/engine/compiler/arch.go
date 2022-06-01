@@ -1,13 +1,8 @@
 package compiler
 
-var (
-	// newArchContext returns a new archContext which is architecture-specific type to be embedded in callEngine.
-	// This must be initialized in init() function in architecture-specific arch_*.go file which is guarded by build tag.
-	newArchContext func() archContext
-)
-
-// IsSupported returns whether the compiler is supported on this architecture.
-const IsSupported = isSupported
+// newArchContext returns a new archContext which is architecture-specific type to be embedded in callEngine.
+// This must be initialized in init() function in architecture-specific arch_*.go file which is guarded by build tag.
+var newArchContext func() archContext
 
 // nativecall is used by callEngine.execWasmFunction and the entrypoint to enter the compiled native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.

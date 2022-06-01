@@ -6,7 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -19,7 +19,7 @@ var hammers = map[string]func(t *testing.T, r wazero.Runtime){
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {
-	if !compiler.IsSupported {
+	if !platform.IsSupported() {
 		t.Skip()
 	}
 	runAllTests(t, hammers, wazero.NewRuntimeConfigCompiler())

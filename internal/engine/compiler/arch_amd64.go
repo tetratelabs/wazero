@@ -4,8 +4,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-const isSupported = true
-
 // init initializes variables for the amd64 architecture
 func init() {
 	newArchContext = newArchContextImpl

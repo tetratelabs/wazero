@@ -3,7 +3,6 @@ package platform
 import (
 	"crypto/rand"
 	"io"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -12,7 +11,9 @@ import (
 var testCode, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
 func Test_MmapCodeSegment(t *testing.T) {
-	requireSupportedOSArch(t)
+	if !IsSupported() {
+		t.Skip()
+	}
 
 	newCode, err := MmapCodeSegment(testCode)
 	require.NoError(t, err)
@@ -29,7 +30,9 @@ func Test_MmapCodeSegment(t *testing.T) {
 }
 
 func Test_MunmapCodeSegment(t *testing.T) {
-	requireSupportedOSArch(t)
+	if !IsSupported() {
+		t.Skip()
+	}
 
 	// Errors if never mapped
 	require.Error(t, MunmapCodeSegment(testCode))
@@ -47,11 +50,4 @@ func Test_MunmapCodeSegment(t *testing.T) {
 		})
 		require.EqualError(t, captured, "BUG: MunmapCodeSegment with zero length")
 	})
-}
-
-// requireSupportedOSArch is duplicated also in the compiler package to ensure no cyclic dependency.
-func requireSupportedOSArch(t *testing.T) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
 }
