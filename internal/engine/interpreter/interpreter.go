@@ -2352,7 +2352,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						res |= 1 << (i + 8)
 					}
 				}
-				fmt.Println(wazeroir.ShapeI8x16)
 			case wazeroir.ShapeI16x8:
 				for i := 0; i < 4; i++ {
 					if int8(lo>>(i*16)) < 0 {
