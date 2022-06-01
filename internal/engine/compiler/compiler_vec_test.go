@@ -1758,7 +1758,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 
 func TestCompiler_compileV128Bitmask(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
-		// only implemented on amd64.
+		// TODO: implement on amd64.
 		t.Skip()
 	}
 
@@ -1895,7 +1895,7 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 
 func TestCompiler_compileV128_Not(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
-		// only implemented on amd64.
+		// TODO: implement on amd64.
 		t.Skip()
 	}
 
@@ -1935,9 +1935,10 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 
 func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
-		// only implemented on amd64.
+		// TODO: implement on amd64.
 		t.Skip()
 	}
+
 	tests := []struct {
 		name        string
 		op          wazeroir.OperationKind
@@ -2138,13 +2139,13 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 
 			switch tc.op {
 			case wazeroir.OperationKindV128And:
-				err = compiler.compileV128And(nil)
+				err = compiler.compileV128And(nil) // And doesn't use the param.
 			case wazeroir.OperationKindV128Or:
-				err = compiler.compileV128Or(nil)
+				err = compiler.compileV128Or(nil) // Or doesn't use the param.
 			case wazeroir.OperationKindV128Xor:
-				err = compiler.compileV128Xor(nil)
+				err = compiler.compileV128Xor(nil) // Xor doesn't use the param.
 			case wazeroir.OperationKindV128AndNot:
-				err = compiler.compileV128AndNot(nil)
+				err = compiler.compileV128AndNot(nil) // AndNot doesn't use the param.
 			}
 			require.NoError(t, err)
 
@@ -2170,7 +2171,7 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 
 func TestCompiler_compileV128Bitselect(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
-		// only implemented on amd64.
+		// TODO: implement on amd64.
 		t.Skip()
 	}
 

@@ -3,18 +3,17 @@ package compiler
 import (
 	"math"
 	"os"
-	"runtime"
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func TestMain(m *testing.M) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		// Compiler is currently implemented only for amd64 or arm64.
+	if !platform.IsSupported() {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
