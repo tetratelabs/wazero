@@ -17,6 +17,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -125,7 +126,7 @@ func (c *arm64Compiler) compile() (code []byte, staticData codeStaticData, stack
 		return
 	}
 
-	code, err = mmap.mmapCodeSegment(original)
+	code, err = platform.MmapCodeSegment(original)
 	if err != nil {
 		return
 	}
