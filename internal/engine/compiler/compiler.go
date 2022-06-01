@@ -445,4 +445,25 @@ type compiler interface {
 	// compileV128AllTrue adds instructions which are equivalent to wasm.OpcodeVecXXXAllTrue instructions.
 	// See wasm.OpcodeVecI8x16AllTrueName wasm.OpcodeVecI16x8AllTrueName wasm.OpcodeVecI32x4AllTrueName wasm.OpcodeVecI64x2AllTrueName.
 	compileV128AllTrue(o *wazeroir.OperationV128AllTrue) error
+	// compileV128BitMask adds instructions which are equivalent to wasm.OpcodeVecV128XXXBitMask instruction.
+	// See wasm.OpcodeVecI8x16BitMaskName wasm.OpcodeVecI16x8BitMaskName wasm.OpcodeVecI32x4BitMaskName wasm.OpcodeVecI64x2BitMaskName.
+	compileV128BitMask(*wazeroir.OperationV128BitMask) error
+	// compileV128And adds instructions which are equivalent to wasm.OpcodeVecV128AndName instruction.
+	// See wasm.OpcodeVecV128AndName.
+	compileV128And(*wazeroir.OperationV128And) error
+	// compileV128Not adds instructions which are equivalent to wasm.OpcodeVecV128NotName instruction.
+	// See wasm.OpcodeVecV128NotName.
+	compileV128Not(*wazeroir.OperationV128Not) error
+	// compileV128Or adds instructions which are equivalent to wasm.OpcodeVecV128OrName instruction.
+	// See wasm.OpcodeVecV128OrName.
+	compileV128Or(*wazeroir.OperationV128Or) error
+	// compileV128Xor adds instructions which are equivalent to wasm.OpcodeVecV128XorName instruction.
+	// See wasm.OpcodeVecV128XorName.
+	compileV128Xor(*wazeroir.OperationV128Xor) error
+	// compileV128Bitselect adds instructions which are equivalent to wasm.OpcodeVecV128BitselectName instruction.
+	// See wasm.OpcodeVecV128BitselectName.
+	compileV128Bitselect(*wazeroir.OperationV128Bitselect) error
+	// compileV128AndNot adds instructions which are equivalent to wasm.OpcodeVecV128AndNotName instruction.
+	// See wasm.OpcodeVecV128AndNotName.
+	compileV128AndNot(*wazeroir.OperationV128AndNot) error
 }

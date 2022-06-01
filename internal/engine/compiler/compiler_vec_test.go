@@ -3,6 +3,7 @@ package compiler
 import (
 	"encoding/binary"
 	"math"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -1709,8 +1710,6 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			},
 		},
 	}
-	/*
-	 */
 
 	for _, tc := range tests {
 		tc := tc
@@ -1735,6 +1734,518 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			require.NoError(t, err)
 
 			err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: tc.lanes})
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			lo, hi := env.stackTopAsV128()
+			var actual [16]byte
+			binary.LittleEndian.PutUint64(actual[:8], lo)
+			binary.LittleEndian.PutUint64(actual[8:], hi)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
+
+func TestCompiler_compileV128Bitmask(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: implement on amd64.
+		t.Skip()
+	}
+
+	u16x8 := func(u1, u2, u3, u4, u5, u6, u7, u8 uint16) (ret [16]byte) {
+		binary.LittleEndian.PutUint16(ret[0:], u1)
+		binary.LittleEndian.PutUint16(ret[2:], u2)
+		binary.LittleEndian.PutUint16(ret[4:], u3)
+		binary.LittleEndian.PutUint16(ret[6:], u4)
+		binary.LittleEndian.PutUint16(ret[8:], u5)
+		binary.LittleEndian.PutUint16(ret[10:], u6)
+		binary.LittleEndian.PutUint16(ret[12:], u7)
+		binary.LittleEndian.PutUint16(ret[14:], u8)
+		return
+	}
+	u32x4 := func(u1, u2, u3, u4 uint32) (ret [16]byte) {
+		binary.LittleEndian.PutUint32(ret[0:], u1)
+		binary.LittleEndian.PutUint32(ret[4:], u2)
+		binary.LittleEndian.PutUint32(ret[8:], u3)
+		binary.LittleEndian.PutUint32(ret[12:], u4)
+		return
+	}
+	u64x2 := func(u1, u2 uint64) (ret [16]byte) {
+		binary.LittleEndian.PutUint64(ret[0:], u1)
+		binary.LittleEndian.PutUint64(ret[8:], u2)
+		return
+	}
+
+	tests := []struct {
+		name  string
+		shape wazeroir.Shape
+		v     [16]byte
+		exp   uint32
+	}{
+		{
+			name: wasm.OpcodeVecI8x16BitMaskName,
+			v: [16]byte{
+				i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1,
+				i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1,
+			},
+			shape: wazeroir.ShapeI8x16,
+			exp:   0b0101_0101_0101_0101,
+		},
+		{
+			name: wasm.OpcodeVecI8x16BitMaskName,
+			v: [16]byte{
+				i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			shape: wazeroir.ShapeI8x16,
+			exp:   0b0000_0000_0101_0101,
+		},
+		{
+			name: wasm.OpcodeVecI8x16BitMaskName,
+			v: [16]byte{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1, i8ToU8(-1), 1,
+			},
+			shape: wazeroir.ShapeI8x16,
+			exp:   0b0101_0101_0000_0000,
+		},
+		{
+			name:  wasm.OpcodeVecI16x8BitMaskName,
+			v:     u16x8(0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff),
+			shape: wazeroir.ShapeI16x8,
+			exp:   0b1111_1111,
+		},
+		{
+			name:  wasm.OpcodeVecI16x8BitMaskName,
+			v:     u16x8(0, 0xffff, 0, 0xffff, 0, 0xffff, 0, 0xffff),
+			shape: wazeroir.ShapeI16x8,
+			exp:   0b1010_1010,
+		},
+		{
+			name:  wasm.OpcodeVecI32x4BitMaskName,
+			v:     u32x4(0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff),
+			shape: wazeroir.ShapeI32x4,
+			exp:   0b1111,
+		},
+		{
+			name:  wasm.OpcodeVecI32x4BitMaskName,
+			v:     u32x4(0, 0xffffffff, 0xffffffff, 0),
+			shape: wazeroir.ShapeI32x4,
+			exp:   0b0110,
+		},
+		{
+			name:  wasm.OpcodeVecI64x2BitMaskName,
+			v:     u64x2(0, 0xffffffffffffffff),
+			shape: wazeroir.ShapeI64x2,
+			exp:   0b10,
+		},
+		{
+			name:  wasm.OpcodeVecI64x2BitMaskName,
+			v:     u64x2(0xffffffffffffffff, 0xffffffffffffffff),
+			shape: wazeroir.ShapeI64x2,
+			exp:   0b11,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128BitMask(&wazeroir.OperationV128BitMask{Shape: tc.shape})
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			actual := env.stackTopAsUint32()
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
+
+func TestCompiler_compileV128_Not(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: implement on amd64.
+		t.Skip()
+	}
+
+	env := newCompilerEnvironment()
+	compiler := env.requireNewCompiler(t, newCompiler,
+		&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	var originalLo, originalHi uint64 = 0xffff_0000_ffff_0000, 0x0000_ffff_0000_ffff
+
+	err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+		Lo: originalLo,
+		Hi: originalHi,
+	})
+	require.NoError(t, err)
+
+	err = compiler.compileV128Not(&wazeroir.OperationV128Not{})
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate and run the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+
+	lo, hi := env.stackTopAsV128()
+	require.Equal(t, ^originalLo, lo)
+	require.Equal(t, ^originalHi, hi)
+}
+
+func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: implement on amd64.
+		t.Skip()
+	}
+
+	tests := []struct {
+		name        string
+		op          wazeroir.OperationKind
+		x1, x2, exp [16]byte
+	}{
+		{
+			name: "AND",
+			op:   wazeroir.OperationKindV128And,
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x2:  [16]byte{},
+			exp: [16]byte{},
+		},
+		{
+			name: "AND",
+			op:   wazeroir.OperationKindV128And,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1:  [16]byte{},
+			exp: [16]byte{},
+		},
+		{
+			name: "AND",
+			op:   wazeroir.OperationKindV128And,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1:  [16]byte{0: 0x1, 5: 0x1, 15: 0x1},
+			exp: [16]byte{0: 0x1, 5: 0x1, 15: 0x1},
+		},
+		{
+			name: "OR",
+			op:   wazeroir.OperationKindV128Or,
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x2: [16]byte{},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+		{
+			name: "OR",
+			op:   wazeroir.OperationKindV128Or,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1: [16]byte{},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+		{
+			name: "OR",
+			op:   wazeroir.OperationKindV128Or,
+			x2:   [16]byte{},
+			x1:   [16]byte{0: 0x1, 5: 0x1, 15: 0x1},
+			exp:  [16]byte{0: 0x1, 5: 0x1, 15: 0x1},
+		},
+		{
+			name: "OR",
+			op:   wazeroir.OperationKindV128Or,
+			x2:   [16]byte{8: 0x1, 10: 0x1},
+			x1:   [16]byte{0: 0x1},
+			exp:  [16]byte{0: 0x1, 8: 0x1, 10: 0x1},
+		},
+		{
+			name: "XOR",
+			op:   wazeroir.OperationKindV128Xor,
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x2: [16]byte{},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+		{
+			name: "XOR",
+			op:   wazeroir.OperationKindV128Xor,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1: [16]byte{},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+		{
+			name: "XOR",
+			op:   wazeroir.OperationKindV128Xor,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			exp: [16]byte{},
+		},
+		{
+			name: "XOR",
+			op:   wazeroir.OperationKindV128Xor,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1: [16]byte{0: 0x1, 15: 0x2},
+			exp: [16]byte{
+				0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfd,
+			},
+		},
+
+		{
+			name: "AndNot",
+			op:   wazeroir.OperationKindV128AndNot,
+			x2:   [16]byte{},
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+		{
+			name: "AndNot",
+			op:   wazeroir.OperationKindV128AndNot,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1:  [16]byte{},
+			exp: [16]byte{},
+		},
+		{
+			name: "AndNot",
+			op:   wazeroir.OperationKindV128AndNot,
+			x2: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			exp: [16]byte{},
+		},
+		{
+			name: "AndNot",
+			op:   wazeroir.OperationKindV128AndNot,
+			x2: [16]byte{
+				0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfd,
+			},
+			x1:  [16]byte{0: 0x1, 15: 0x2},
+			exp: [16]byte{0: 0x1, 15: 0x2},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
+			})
+			require.NoError(t, err)
+
+			switch tc.op {
+			case wazeroir.OperationKindV128And:
+				err = compiler.compileV128And(nil) // And doesn't use the param.
+			case wazeroir.OperationKindV128Or:
+				err = compiler.compileV128Or(nil) // Or doesn't use the param.
+			case wazeroir.OperationKindV128Xor:
+				err = compiler.compileV128Xor(nil) // Xor doesn't use the param.
+			case wazeroir.OperationKindV128AndNot:
+				err = compiler.compileV128AndNot(nil) // AndNot doesn't use the param.
+			}
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			lo, hi := env.stackTopAsV128()
+			var actual [16]byte
+			binary.LittleEndian.PutUint64(actual[:8], lo)
+			binary.LittleEndian.PutUint64(actual[8:], hi)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
+
+func TestCompiler_compileV128Bitselect(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: implement on amd64.
+		t.Skip()
+	}
+
+	tests := []struct {
+		name                  string
+		selector, x1, x2, exp [16]byte
+	}{
+		{
+			name: "all x1",
+			selector: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			x1:  [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			x2:  [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+			exp: [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		},
+		{
+			name:     "all x2",
+			selector: [16]byte{},
+			x1:       [16]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			x2:       [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+			exp:      [16]byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+		},
+		{
+			name: "mix",
+			selector: [16]byte{
+				0b1111_0000, 0b1111_0000, 0b1111_0000, 0b1111_0000, 0b1111_0000, 0b1111_0000, 0b1111_0000, 0b1111_0000,
+				0b0000_0000, 0b0000_0000, 0b0000_0000, 0b0000_0000, 0b1111_1111, 0b1111_1111, 0b1111_1111, 0b1111_1111,
+			},
+			x1: [16]byte{
+				0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010,
+				0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010,
+			},
+			x2: [16]byte{
+				0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101,
+				0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101,
+			},
+			exp: [16]byte{
+				0b1010_0101, 0b1010_0101, 0b1010_0101, 0b1010_0101, 0b1010_0101, 0b1010_0101, 0b1010_0101, 0b1010_0101,
+				0b0101_0101, 0b0101_0101, 0b0101_0101, 0b0101_0101, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.selector[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.selector[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Bitselect(nil)
 			require.NoError(t, err)
 
 			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)

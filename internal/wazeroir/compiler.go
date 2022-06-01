@@ -2092,6 +2092,46 @@ operatorSwitch:
 			c.emit(
 				&OperationV128AllTrue{Shape: ShapeI64x2},
 			)
+		case wasm.OpcodeVecI8x16BitMask:
+			c.emit(
+				&OperationV128BitMask{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI16x8BitMask:
+			c.emit(
+				&OperationV128BitMask{Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI32x4BitMask:
+			c.emit(
+				&OperationV128BitMask{Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI64x2BitMask:
+			c.emit(
+				&OperationV128BitMask{Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecV128And:
+			c.emit(
+				&OperationV128And{},
+			)
+		case wasm.OpcodeVecV128Not:
+			c.emit(
+				&OperationV128Not{},
+			)
+		case wasm.OpcodeVecV128Or:
+			c.emit(
+				&OperationV128Or{},
+			)
+		case wasm.OpcodeVecV128Xor:
+			c.emit(
+				&OperationV128Xor{},
+			)
+		case wasm.OpcodeVecV128Bitselect:
+			c.emit(
+				&OperationV128Bitselect{},
+			)
+		case wasm.OpcodeVecV128AndNot:
+			c.emit(
+				&OperationV128AndNot{},
+			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}
