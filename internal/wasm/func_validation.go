@@ -1093,6 +1093,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				OpcodeVecV128Load32x2s, OpcodeVecV128Load32x2u, OpcodeVecV128Load8Splat, OpcodeVecV128Load16Splat,
 				OpcodeVecV128Load32Splat, OpcodeVecV128Load64Splat,
 				OpcodeVecV128Load32zero, OpcodeVecV128Load64zero:
+				if memory == nil {
+					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
+				}
 				pc++
 				align, _, read, err := readMemArg(pc, body)
 				if err != nil {
@@ -1119,14 +1122,18 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				case OpcodeVecV128Load64zero:
 					maxAlign = 64 / 8
 				}
+
 				if 1<<align > maxAlign {
-					return fmt.Errorf("invalid memory alignment %d for %s", align, OpcodeVecV128StoreName)
+					return fmt.Errorf("invalid memory alignment %d for %s", align, VectorInstructionName(vecOpcode))
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128LoadName, err)
+					return fmt.Errorf("cannot pop the operand for %s: %v", VectorInstructionName(vecOpcode), err)
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store:
+				if memory == nil {
+					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
+				}
 				pc++
 				align, _, read, err := readMemArg(pc, body)
 				if err != nil {
@@ -1143,6 +1150,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128StoreName, err)
 				}
 			case OpcodeVecV128Load8Lane, OpcodeVecV128Load16Lane, OpcodeVecV128Load32Lane, OpcodeVecV128Load64Lane:
+				if memory == nil {
+					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
+				}
 				attr := vecLoadLanes[vecOpcode]
 				pc++
 				align, _, read, err := readMemArg(pc, body)
@@ -1150,7 +1160,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return err
 				}
 				if 1<<align > attr.alignMax {
-					return fmt.Errorf("invalid memory alignment %d for %s", align, OpcodeVecV128Load64LaneName)
+					return fmt.Errorf("invalid memory alignment %d for %s", align, vectorInstructionName[vecOpcode])
 				}
 				pc += read
 				if pc >= uint64(len(body)) {
@@ -1168,6 +1178,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store8Lane, OpcodeVecV128Store16Lane, OpcodeVecV128Store32Lane, OpcodeVecV128Store64Lane:
+				if memory == nil {
+					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
+				}
 				attr := vecStoreLanes[vecOpcode]
 				pc++
 				align, _, read, err := readMemArg(pc, body)

@@ -6,6 +6,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// compileV128Const implements compiler.compileV128Const for arm64.
 func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
@@ -37,6 +38,7 @@ func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
 	return nil
 }
 
+// compileV128Add implements compiler.compileV128Add for arm64.
 func (c *arm64Compiler) compileV128Add(o *wazeroir.OperationV128Add) error {
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
