@@ -413,6 +413,8 @@ const (
 	OperationKindTableGrow
 	OperationKindTableFill
 
+	// Vector value related instructions are prefixed by V128.
+
 	OperationKindV128Const
 	OperationKindV128Add
 	OperationKindV128Sub
