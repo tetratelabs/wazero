@@ -34,12 +34,6 @@ type (
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		Engine Engine
 
-		// moduleNames ensures no race conditions instantiating two modules of the same name
-		moduleNames []string // guarded by mux
-
-		// modules holds the instantiated Wasm modules by module name from Instantiate.
-		modules map[string]*ModuleInstance // guarded by mux
-
 		// typeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
 		typeIDs map[string]FunctionTypeID
@@ -47,6 +41,9 @@ type (
 		// functionMaxTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		functionMaxTypes uint32
+
+		// namespaces are all Namespace instances for this store including the default one.
+		namespaces []*Namespace // guarded by mux
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.RWMutex
@@ -312,15 +309,26 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(enabledFeatures Features, engine Engine) *Store {
+func NewStore(enabledFeatures Features, engine Engine) (*Store, *Namespace) {
+	ns := newNamespace()
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
-		moduleNames:      nil,
-		modules:          map[string]*ModuleInstance{},
+		namespaces:       []*Namespace{ns},
 		typeIDs:          map[string]FunctionTypeID{},
 		functionMaxTypes: maximumFunctionTypes,
-	}
+	}, ns
+}
+
+// NewNamespace implements the same method as documented on wazero.Runtime.
+func (s *Store) NewNamespace(_ context.Context) *Namespace {
+	// TODO: The above context isn't yet used. If it is, ensure it defaults to context.Background.
+
+	ns := newNamespace()
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	s.namespaces = append(s.namespaces, ns)
+	return ns
 }
 
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
@@ -333,6 +341,7 @@ func NewStore(enabledFeatures Features, engine Engine) *Store {
 // Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(
 	ctx context.Context,
+	ns *Namespace,
 	module *Module,
 	name string,
 	sys *SysContext,
@@ -342,19 +351,51 @@ func (s *Store) Instantiate(
 		ctx = context.Background()
 	}
 
-	if err := s.requireModuleName(name); err != nil {
+	// Collect any imported modules to avoid locking the namespace too long.
+	importedModuleNames := map[string]struct{}{}
+	for _, i := range module.ImportSection {
+		importedModuleNames[i.Module] = struct{}{}
+	}
+
+	// Read-Lock the namespace and ensure imports needed are present.
+	importedModules, err := ns.requireModules(importedModuleNames)
+	if err != nil {
 		return nil, err
 	}
 
+	// Write-Lock the namespace and claim the name of the current module.
+	if err = ns.requireModuleName(name); err != nil {
+		return nil, err
+	}
+
+	// Instantiate the module and add it to the namespace so that other modules can import it.
+	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, functionListenerFactory, importedModules); err != nil {
+		ns.deleteModule(name)
+		return nil, err
+	} else {
+		// Now that the instantiation is complete without error, add it.
+		// This makes the module visible for import, and ensures it is closed when the namespace is.
+		ns.addModule(callCtx.module)
+		return callCtx, nil
+	}
+}
+
+func (s *Store) instantiate(
+	ctx context.Context,
+	ns *Namespace,
+	module *Module,
+	name string,
+	sys *SysContext,
+	functionListenerFactory experimentalapi.FunctionListenerFactory,
+	modules map[string]*ModuleInstance,
+) (*CallContext, error) {
 	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
 	if err != nil {
-		s.deleteModule(name)
 		return nil, err
 	}
 
-	importedFunctions, importedGlobals, importedTables, importedMemory, err := s.resolveImports(module)
+	importedFunctions, importedGlobals, importedTables, importedMemory, err := resolveImports(module, modules)
 	if err != nil {
-		s.deleteModule(name)
 		return nil, err
 	}
 
@@ -362,7 +403,6 @@ func (s *Store) Instantiate(
 		// As of reference-types proposal, boundary check must be done after instantiation.
 		s.EnabledFeatures.Get(FeatureReferenceTypes))
 	if err != nil {
-		s.deleteModule(name)
 		return nil, err
 	}
 	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
@@ -387,7 +427,6 @@ func (s *Store) Instantiate(
 	// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L395-L405
 	if !s.EnabledFeatures.Get(FeatureReferenceTypes) {
 		if err = m.validateData(module.DataSection); err != nil {
-			s.deleteModule(name)
 			return nil, err
 		}
 	}
@@ -406,88 +445,34 @@ func (s *Store) Instantiate(
 	m.Engine.InitializeFuncrefGlobals(globals)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
-	if err := m.applyData(module.DataSection); err != nil {
+	if err = m.applyData(module.DataSection); err != nil {
 		return nil, err
 	}
 
 	// Compile the default context for calls to this module.
-	m.CallCtx = NewCallContext(s, m, sys)
+	m.CallCtx = NewCallContext(ns, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
 		if _, err = f.Module.Engine.Call(ctx, m.CallCtx, f); err != nil {
-			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
 	}
 
-	// Now that the instantiation is complete without error, add it. This makes it visible for import.
-	s.addModule(m)
 	return m.CallCtx, nil
 }
 
-// deleteModule makes the moduleName available for instantiation again.
-func (s *Store) deleteModule(moduleName string) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	delete(s.modules, moduleName)
-	// remove this module name
-	for i, n := range s.moduleNames {
-		if n == moduleName {
-			s.moduleNames = append(s.moduleNames[:i], s.moduleNames[i+1:]...)
-			break
-		}
-	}
-}
-
-// requireModuleName is a pre-flight check to reserve a module.
-// This must be reverted on error with deleteModule if initialization fails.
-func (s *Store) requireModuleName(moduleName string) error {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	for _, n := range s.moduleNames {
-		if n == moduleName {
-			return fmt.Errorf("module %s has already been instantiated", moduleName)
-		}
-	}
-	s.moduleNames = append(s.moduleNames, moduleName)
-	return nil
-}
-
-// addModule makes the module visible for import
-func (s *Store) addModule(m *ModuleInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	s.modules[m.Name] = m
-}
-
-// Module implements wazero.Runtime Module
-func (s *Store) Module(moduleName string) api.Module {
-	if m := s.module(moduleName); m != nil {
-		return m.CallCtx
-	} else {
-		return nil
-	}
-}
-
-func (s *Store) module(moduleName string) *ModuleInstance {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-	return s.modules[moduleName]
-}
-
-func (s *Store) resolveImports(module *Module) (
-	importedFunctions []*FunctionInstance, importedGlobals []*GlobalInstance,
-	importedTables []*TableInstance, importedMemory *MemoryInstance,
+func resolveImports(module *Module, modules map[string]*ModuleInstance) (
+	importedFunctions []*FunctionInstance,
+	importedGlobals []*GlobalInstance,
+	importedTables []*TableInstance,
+	importedMemory *MemoryInstance,
 	err error,
 ) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
 	for idx, i := range module.ImportSection {
-		m, ok := s.modules[i.Module]
+		m, ok := modules[i.Module]
 		if !ok {
 			err = fmt.Errorf("module[%s] not instantiated", i.Module)
 			return
@@ -678,20 +663,13 @@ func (s *Store) CloseWithExitCode(ctx context.Context, exitCode uint32) (err err
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	// Close modules in reverse initialization order.
-	for i := len(s.moduleNames) - 1; i >= 0; i-- {
-		// If closing this module errs, proceed anyway to close the others.
-		if _, e := s.modules[s.moduleNames[i]].CallCtx.close(ctx, exitCode); e != nil && err == nil {
+	for i := len(s.namespaces) - 1; i >= 0; i-- {
+		// If closing this namespace errs, proceed anyway to close the others.
+		if e := s.namespaces[i].CloseWithExitCode(ctx, exitCode); e != nil && err == nil {
 			err = e // first error
 		}
 	}
-	s.moduleNames = nil
-	s.modules = map[string]*ModuleInstance{}
-	return err
-}
-
-// AliasModule aliases the instantiated module named `src` as `dst`.
-//
-// Note: This is only used for spectests.
-func (s *Store) AliasModule(src, dst string) {
-	s.modules[dst] = s.modules[src]
+	s.namespaces = nil
+	s.typeIDs = nil
+	return
 }

@@ -72,10 +72,8 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
+// FS returns the file system context.
 func (c *SysContext) FS() *sys.FSContext {
-	if c.fs == nil {
-		return &sys.FSContext{}
-	}
 	return c.fs
 }
 
@@ -99,10 +97,10 @@ func (eofReader) Read([]byte) (int, error) {
 // Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
 // TODO: Make it an error to open or close files when no FS was assigned.
 func DefaultSysContext() *SysContext {
-	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if sysCtx, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
 	} else {
-		return sys
+		return sysCtx
 	}
 }
 

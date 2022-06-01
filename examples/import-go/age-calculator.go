@@ -1,4 +1,4 @@
-package age_calculator
+package main
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func main() {
 			}
 			return uint32(time.Now().Year())
 		}).
-		Instantiate(ctx)
+		Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)
 	}

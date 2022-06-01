@@ -1,4 +1,4 @@
-package add
+package main
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func main() {
 	host, err := r.NewModuleBuilder("host/math").
 		ExportFunction("add", func(v1, v2 uint32) uint32 {
 			return v1 + v2
-		}).Instantiate(ctx)
+		}).Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)
 	}

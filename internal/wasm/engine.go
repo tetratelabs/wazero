@@ -11,6 +11,14 @@ type Engine interface {
 	// CompileModule implements the same method as documented on wasm.Engine.
 	CompileModule(ctx context.Context, module *Module) error
 
+	// CompiledModuleCount is exported for testing, to track the size of the compilation cache.
+	CompiledModuleCount() uint32
+
+	// DeleteCompiledModule releases compilation caches for the given module (source).
+	// Note: it is safe to call this function for a module from which module instances are instantiated even when these
+	// module instances have outstanding calls.
+	DeleteCompiledModule(module *Module)
+
 	// NewModuleEngine compiles down the function instances in a module, and returns ModuleEngine for the module.
 	//
 	// * name is the name the module was instantiated with used for error handling.
@@ -29,11 +37,6 @@ type Engine interface {
 		tables []*TableInstance,
 		tableInits []TableInitEntry,
 	) (ModuleEngine, error)
-
-	// DeleteCompiledModule releases compilation caches for the given module (source).
-	// Note: it is safe to call this function for a module from which module instances are instantiated even when these
-	// module instances have outstanding calls.
-	DeleteCompiledModule(module *Module)
 }
 
 // ModuleEngine implements function calls for a given module.

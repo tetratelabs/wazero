@@ -32,7 +32,7 @@ func main() {
 	// log to the console.
 	_, err := r.NewModuleBuilder("env").
 		ExportFunction("log", logString).
-		Instantiate(ctx)
+		Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)
 	}

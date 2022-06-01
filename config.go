@@ -261,14 +261,17 @@ type CompiledModule interface {
 	Close(context.Context) error
 }
 
-type compiledCode struct {
+type compiledModule struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
+
+	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
+	closeWithModule bool
 }
 
 // Close implements CompiledModule.Close
-func (c *compiledCode) Close(_ context.Context) error {
+func (c *compiledModule) Close(_ context.Context) error {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	c.compiledEngine.DeleteCompiledModule(c.module)
@@ -331,6 +334,13 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
 // system. Using this, resources such as STDIN can be isolated, so that the same module can be safely instantiated
 // multiple times.
+//
+// Ex.
+//	// Initialize base configuration:
+//	config := wazero.NewModuleConfig().WithStdout(buf)
+//
+//	// Assign different configuration on each instantiation
+//	module, _ := r.InstantiateModule(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
 //
 // While wazero supports Windows as a platform, host functions using ModuleConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).

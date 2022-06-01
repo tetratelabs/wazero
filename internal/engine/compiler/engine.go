@@ -406,6 +406,11 @@ func releaseCode(compiledFn *code) {
 	}
 }
 
+// CompiledModuleCount implements the same method as documented on wasm.Engine.
+func (e *engine) CompiledModuleCount() uint32 {
+	return uint32(len(e.codes))
+}
+
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 	e.deleteCodes(module)

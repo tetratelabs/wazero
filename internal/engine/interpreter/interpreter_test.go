@@ -23,7 +23,7 @@ func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 	f2 := &callFrame{}
 
 	ce := callEngine{}
-	require.Equal(t, 0, len(ce.frames), "expected no frames")
+	require.Zero(t, len(ce.frames), "expected no frames")
 
 	ce.pushFrame(f1)
 	require.Equal(t, []*callFrame{f1}, ce.frames)

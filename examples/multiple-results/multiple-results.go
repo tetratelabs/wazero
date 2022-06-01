@@ -1,4 +1,4 @@
-package multiple_results
+package main
 
 import (
 	"context"
@@ -131,7 +131,7 @@ func resultOffsetHostFunctions(ctx context.Context, r wazero.Runtime) (api.Modul
 			_, _ = m.ExportedFunction("get_age").Call(ctx, uint64(resultOffsetAge))
 			age, _ = m.Memory().ReadUint64Le(ctx, resultOffsetAge)
 			return
-		}).Instantiate(ctx)
+		}).Instantiate(ctx, r)
 }
 
 // multiValueWasmFunctions defines Wasm functions that illustrate multiple results using the "multiple-results" feature.
@@ -168,5 +168,5 @@ func multiValueHostFunctions(ctx context.Context, r wazero.Runtime) (api.Module,
 		ExportFunction("call_get_age", func(ctx context.Context, m api.Module) (age uint64) {
 			results, _ := m.ExportedFunction("get_age").Call(ctx)
 			return results[0]
-		}).Instantiate(ctx)
+		}).Instantiate(ctx, r)
 }
