@@ -2,7 +2,6 @@ package spectest
 
 import (
 	"embed"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"path"
 	"runtime"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
