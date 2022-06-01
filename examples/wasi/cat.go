@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 // catFS is an embedded filesystem limited to test.txt
@@ -42,7 +42,7 @@ func main() {
 	config := wazero.NewModuleConfig().WithStdout(os.Stdout).WithFS(rooted)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	if _, err = wasi.InstantiateSnapshotPreview1(ctx, r); err != nil {
+	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		log.Panicln(err)
 	}
 

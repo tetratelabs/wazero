@@ -1,4 +1,4 @@
-package wasi
+package wasi_snapshot_preview1
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ func TestInstantiateModule(t *testing.T) {
 
 	// Configure WASI to write stdout to a buffer, so that we can verify it later.
 	sys := wazero.NewModuleConfig().WithStdout(stdout)
-	wm, err := InstantiateSnapshotPreview1(testCtx, r)
+	wm, err := Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer wm.Close(testCtx)
 

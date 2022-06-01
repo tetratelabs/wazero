@@ -1,4 +1,4 @@
-package wasi
+package wasi_snapshot_preview1
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func Example() {
 	r := wazero.NewRuntime()
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wm, err := InstantiateSnapshotPreview1(ctx, r)
+	wm, err := Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)
 	}
