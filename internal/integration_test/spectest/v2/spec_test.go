@@ -44,8 +44,11 @@ func TestCompiler(t *testing.T) {
 			case "simd_store32_lane.json":
 			case "simd_store64_lane.json":
 			case "simd_store8_lane.json":
-			case "simd_bitwise.json":
-			case "simd_boolean.json":
+			case "simd_bitwise.json", "simd_boolean.json":
+				// These are only implemented on amd64 yet.
+				if runtime.GOARCH != "amd64" {
+					return false
+				}
 			default:
 				return false // others not supported, yet!
 			}
