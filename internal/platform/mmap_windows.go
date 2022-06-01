@@ -24,7 +24,7 @@ const (
 	windows_PAGE_EXECUTE_READWRITE uintptr = 0x00000040
 )
 
-func mmapCodeSegment(code []byte) ([]byte, error) {
+func MmapCodeSegment(code []byte) ([]byte, error) {
 	if len(code) == 0 {
 		panic(errors.New("BUG: MmapCodeSegment with zero length"))
 	}
@@ -35,7 +35,7 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 	}
 }
 
-func munmapCodeSegment(code []byte) error {
+func MunmapCodeSegment(code []byte) error {
 	if len(code) == 0 {
 		panic(errors.New("BUG: MunmapCodeSegment with zero length"))
 	}
@@ -74,7 +74,7 @@ func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error
 	return nil
 }
 
-func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
+func MmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	p, err := allocateMemory(code, windows_PAGE_EXECUTE_READWRITE)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	return mem, nil
 }
 
-func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
+func MmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	p, err := allocateMemory(code, windows_PAGE_READWRITE)
 	if err != nil {
 		return nil, err
