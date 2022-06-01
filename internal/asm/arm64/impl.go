@@ -212,11 +212,13 @@ func (o OperandTypes) String() string {
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
-	Root, Current                  *NodeImpl
-	Buf                            *bytes.Buffer
-	temporaryRegister              asm.Register
-	nodeCount                      int
-	pool                           constPool
+	Root, Current     *NodeImpl
+	Buf               *bytes.Buffer
+	temporaryRegister asm.Register
+	nodeCount         int
+	pool              constPool
+	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstPool
+	// but have it as a field here for testability.
 	MaxDisplacementForConstantPool int
 }
 

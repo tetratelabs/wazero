@@ -214,11 +214,13 @@ func (o OperandTypes) String() string {
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
-	EnablePadding                  bool
-	Root, Current                  *NodeImpl
-	nodeCount                      int
-	Buf                            *bytes.Buffer
-	ForceReAssemble                bool
+	EnablePadding   bool
+	Root, Current   *NodeImpl
+	nodeCount       int
+	Buf             *bytes.Buffer
+	ForceReAssemble bool
+	// MaxDisplacementForConstantPool is fixed to defaultMaxDisplacementForConstantPool
+	// but have it as a field here for testability.
 	MaxDisplacementForConstantPool int
 
 	pool constPool

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -2667,6 +2668,160 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 }
 
 func TestModule_funcValidation_SIMD(t *testing.T) {
+	vv2v := func(vec OpcodeVec) []byte {
+		return []byte{
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+			OpcodeDrop,
+			OpcodeEnd,
+		}
+	}
+
+	v2v := func(vec OpcodeVec) []byte {
+		return []byte{
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+			OpcodeDrop,
+			OpcodeEnd,
+		}
+	}
+
+	load := func(vec OpcodeVec, offset, align uint32) (ret []byte) {
+		ret = []byte{
+			OpcodeI32Const,
+			1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+		}
+
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
+		return
+	}
+
+	loadLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
+		ret = []byte{
+			OpcodeI32Const,
+			1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+		}
+
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret,
+			lane,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
+		return
+	}
+
+	storeLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
+		ret = []byte{
+			OpcodeI32Const,
+			1, 1, 1, 1,
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+		}
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret,
+			lane,
+			OpcodeEnd,
+		)
+		return
+	}
+
+	extractLane := func(vec OpcodeVec, lane byte) (ret []byte) {
+		ret = []byte{
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+			lane,
+			OpcodeDrop,
+			OpcodeEnd,
+		}
+		return
+	}
+
+	replaceLane := func(vec OpcodeVec, lane byte) (ret []byte) {
+		ret = []byte{
+			OpcodeVecPrefix,
+			OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1,
+		}
+
+		switch vec {
+		case OpcodeVecI8x16ReplaceLane, OpcodeVecI16x8ReplaceLane, OpcodeVecI32x4ReplaceLane:
+			ret = append(ret, OpcodeI32Const, 0, 0, 0, 0)
+		case OpcodeVecI64x2ReplaceLane:
+			ret = append(ret, OpcodeI64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		case OpcodeVecF32x4ReplaceLane:
+			ret = append(ret, OpcodeF32Const, 0, 0, 0, 0)
+		case OpcodeVecF64x2ReplaceLane:
+			ret = append(ret, OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		}
+
+		ret = append(ret,
+			OpcodeVecPrefix,
+			vec,
+			lane,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
+		return
+	}
+
+	splat := func(vec OpcodeVec) (ret []byte) {
+		switch vec {
+		case OpcodeVecI8x16Splat, OpcodeVecI16x8Splat, OpcodeVecI32x4Splat:
+			ret = append(ret, OpcodeI32Const, 0, 0, 0, 0)
+		case OpcodeVecI64x2Splat:
+			ret = append(ret, OpcodeI64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		case OpcodeVecF32x4Splat:
+			ret = append(ret, OpcodeF32Const, 0, 0, 0, 0)
+		case OpcodeVecF64x2Splat:
+			ret = append(ret, OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		}
+
+		ret = append(ret,
+			OpcodeVecPrefix,
+			vec,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
+		return
+	}
+
 	tests := []struct {
 		name        string
 		body        []byte
@@ -2683,26 +2838,103 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				OpcodeEnd,
 			},
 		},
+		{name: OpcodeVecI8x16AddName, body: vv2v(OpcodeVecI8x16Add)},
+		{name: OpcodeVecI16x8AddName, body: vv2v(OpcodeVecI16x8Add)},
+		{name: OpcodeVecI32x4AddName, body: vv2v(OpcodeVecI32x4Add)},
+		{name: OpcodeVecI64x2AddName, body: vv2v(OpcodeVecI64x2Add)},
+		{name: OpcodeVecI8x16SubName, body: vv2v(OpcodeVecI8x16Sub)},
+		{name: OpcodeVecI16x8SubName, body: vv2v(OpcodeVecI16x8Sub)},
+		{name: OpcodeVecI32x4SubName, body: vv2v(OpcodeVecI32x4Sub)},
+		{name: OpcodeVecI64x2SubName, body: vv2v(OpcodeVecI64x2Sub)},
+		{name: OpcodeVecV128AnyTrueName, body: v2v(OpcodeVecV128AnyTrue)},
+		{name: OpcodeVecV128AnyTrueName, body: v2v(OpcodeVecI8x16AllTrue)},
+		{name: OpcodeVecI8x16AllTrueName, body: v2v(OpcodeVecI16x8AllTrue)},
+		{name: OpcodeVecI16x8AllTrueName, body: v2v(OpcodeVecI32x4AllTrue)},
+		{name: OpcodeVecI32x4AllTrueName, body: v2v(OpcodeVecI64x2AllTrue)},
+		{name: OpcodeVecV128LoadName, body: load(OpcodeVecV128Load, 0, 0)},
+		{name: OpcodeVecV128LoadName + "/align=4", body: load(OpcodeVecV128Load, 0, 4)},
+		{name: OpcodeVecV128Load8x8SName, body: load(OpcodeVecV128Load8x8s, 1, 0)},
+		{name: OpcodeVecV128Load8x8SName + "/align=1", body: load(OpcodeVecV128Load8x8s, 0, 1)},
+		{name: OpcodeVecV128Load8x8UName, body: load(OpcodeVecV128Load8x8u, 0, 0)},
+		{name: OpcodeVecV128Load8x8UName + "/align=1", body: load(OpcodeVecV128Load8x8u, 0, 1)},
+		{name: OpcodeVecV128Load16x4SName, body: load(OpcodeVecV128Load16x4s, 1, 0)},
+		{name: OpcodeVecV128Load16x4SName + "/align=2", body: load(OpcodeVecV128Load16x4s, 0, 2)},
+		{name: OpcodeVecV128Load16x4UName, body: load(OpcodeVecV128Load16x4u, 0, 0)},
+		{name: OpcodeVecV128Load16x4UName + "/align=2", body: load(OpcodeVecV128Load16x4u, 0, 2)},
+		{name: OpcodeVecV128Load32x2SName, body: load(OpcodeVecV128Load32x2s, 1, 0)},
+		{name: OpcodeVecV128Load32x2SName + "/align=3", body: load(OpcodeVecV128Load32x2s, 0, 3)},
+		{name: OpcodeVecV128Load32x2UName, body: load(OpcodeVecV128Load32x2u, 0, 0)},
+		{name: OpcodeVecV128Load32x2UName + "/align=3", body: load(OpcodeVecV128Load32x2u, 0, 3)},
+		{name: OpcodeVecV128Load8SplatName, body: load(OpcodeVecV128Load8Splat, 2, 0)},
+		{name: OpcodeVecV128Load16SplatName, body: load(OpcodeVecV128Load16Splat, 0, 1)},
+		{name: OpcodeVecV128Load32SplatName, body: load(OpcodeVecV128Load32Splat, 3, 2)},
+		{name: OpcodeVecV128Load64SplatName, body: load(OpcodeVecV128Load64Splat, 0, 3)},
+		{name: OpcodeVecV128Load32zeroName, body: load(OpcodeVecV128Load32zero, 0, 2)},
+		{name: OpcodeVecV128Load64zeroName, body: load(OpcodeVecV128Load64zero, 5, 3)},
+		{name: OpcodeVecV128Load8LaneName, body: loadLane(OpcodeVecV128Load8Lane, 5, 0, 10)},
+		{name: OpcodeVecV128Load16LaneName, body: loadLane(OpcodeVecV128Load16Lane, 100, 1, 7)},
+		{name: OpcodeVecV128Load32LaneName, body: loadLane(OpcodeVecV128Load32Lane, 0, 2, 3)},
+		{name: OpcodeVecV128Load64LaneName, body: loadLane(OpcodeVecV128Load64Lane, 0, 3, 1)},
 		{
-			name: "i32x4.add",
-			body: []byte{
+			name: OpcodeVecV128StoreName, body: []byte{
+				OpcodeI32Const,
+				1, 1, 1, 1,
 				OpcodeVecPrefix,
 				OpcodeVecV128Const,
 				1, 1, 1, 1, 1, 1, 1, 1,
 				1, 1, 1, 1, 1, 1, 1, 1,
 				OpcodeVecPrefix,
-				OpcodeVecV128Const,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				1, 1, 1, 1, 1, 1, 1, 1,
-				OpcodeVecPrefix,
-				OpcodeVecI32x4Add,
-				OpcodeDrop,
+				OpcodeVecV128Store,
+				4,  // alignment
+				10, // offset
 				OpcodeEnd,
 			},
 		},
+		{name: OpcodeVecV128Store8LaneName, body: storeLane(OpcodeVecV128Store8Lane, 0, 0, 0)},
+		{name: OpcodeVecV128Store8LaneName + "/lane=15", body: storeLane(OpcodeVecV128Store8Lane, 100, 0, 15)},
+		{name: OpcodeVecV128Store16LaneName, body: storeLane(OpcodeVecV128Store16Lane, 0, 0, 0)},
+		{name: OpcodeVecV128Store16LaneName + "/lane=7/align=1", body: storeLane(OpcodeVecV128Store16Lane, 100, 1, 7)},
+		{name: OpcodeVecV128Store32LaneName, body: storeLane(OpcodeVecV128Store32Lane, 0, 0, 0)},
+		{name: OpcodeVecV128Store32LaneName + "/lane=3/align=2", body: storeLane(OpcodeVecV128Store32Lane, 100, 2, 3)},
+		{name: OpcodeVecV128Store64LaneName, body: storeLane(OpcodeVecV128Store64Lane, 0, 0, 0)},
+		{name: OpcodeVecV128Store64LaneName + "/lane=1/align=3", body: storeLane(OpcodeVecV128Store64Lane, 50, 3, 1)},
+		{name: OpcodeVecI8x16ExtractLaneSName, body: extractLane(OpcodeVecI8x16ExtractLaneS, 0)},
+		{name: OpcodeVecI8x16ExtractLaneSName + "/lane=15", body: extractLane(OpcodeVecI8x16ExtractLaneS, 15)},
+		{name: OpcodeVecI8x16ExtractLaneUName, body: extractLane(OpcodeVecI8x16ExtractLaneU, 0)},
+		{name: OpcodeVecI8x16ExtractLaneUName + "/lane=15", body: extractLane(OpcodeVecI8x16ExtractLaneU, 15)},
+		{name: OpcodeVecI16x8ExtractLaneSName, body: extractLane(OpcodeVecI16x8ExtractLaneS, 0)},
+		{name: OpcodeVecI16x8ExtractLaneSName + "/lane=7", body: extractLane(OpcodeVecI16x8ExtractLaneS, 7)},
+		{name: OpcodeVecI16x8ExtractLaneUName, body: extractLane(OpcodeVecI16x8ExtractLaneU, 0)},
+		{name: OpcodeVecI16x8ExtractLaneUName + "/lane=8", body: extractLane(OpcodeVecI16x8ExtractLaneU, 7)},
+		{name: OpcodeVecI32x4ExtractLaneName, body: extractLane(OpcodeVecI32x4ExtractLane, 0)},
+		{name: OpcodeVecI32x4ExtractLaneName + "/lane=3", body: extractLane(OpcodeVecI32x4ExtractLane, 3)},
+		{name: OpcodeVecI64x2ExtractLaneName, body: extractLane(OpcodeVecI64x2ExtractLane, 0)},
+		{name: OpcodeVecI64x2ExtractLaneName + "/lane=1", body: extractLane(OpcodeVecI64x2ExtractLane, 1)},
+		{name: OpcodeVecF32x4ExtractLaneName, body: extractLane(OpcodeVecF32x4ExtractLane, 0)},
+		{name: OpcodeVecF32x4ExtractLaneName + "/lane=3", body: extractLane(OpcodeVecF32x4ExtractLane, 3)},
+		{name: OpcodeVecF64x2ExtractLaneName, body: extractLane(OpcodeVecF64x2ExtractLane, 0)},
+		{name: OpcodeVecF64x2ExtractLaneName + "/lane=1", body: extractLane(OpcodeVecF64x2ExtractLane, 1)},
+		{name: OpcodeVecI8x16ReplaceLaneName, body: replaceLane(OpcodeVecI8x16ReplaceLane, 0)},
+		{name: OpcodeVecI8x16ReplaceLaneName + "/lane=15", body: replaceLane(OpcodeVecI8x16ReplaceLane, 15)},
+		{name: OpcodeVecI16x8ReplaceLaneName, body: replaceLane(OpcodeVecI16x8ReplaceLane, 0)},
+		{name: OpcodeVecI16x8ReplaceLaneName + "/lane=7", body: replaceLane(OpcodeVecI16x8ReplaceLane, 7)},
+		{name: OpcodeVecI32x4ReplaceLaneName, body: replaceLane(OpcodeVecI32x4ReplaceLane, 0)},
+		{name: OpcodeVecI32x4ReplaceLaneName + "/lane=3", body: replaceLane(OpcodeVecI32x4ReplaceLane, 3)},
+		{name: OpcodeVecI64x2ReplaceLaneName, body: replaceLane(OpcodeVecI64x2ReplaceLane, 0)},
+		{name: OpcodeVecI64x2ReplaceLaneName + "/lane=1", body: replaceLane(OpcodeVecI64x2ReplaceLane, 1)},
+		{name: OpcodeVecF32x4ReplaceLaneName, body: replaceLane(OpcodeVecF32x4ReplaceLane, 0)},
+		{name: OpcodeVecF32x4ReplaceLaneName + "/lane=3", body: replaceLane(OpcodeVecF32x4ReplaceLane, 3)},
+		{name: OpcodeVecF64x2ReplaceLaneName, body: replaceLane(OpcodeVecF64x2ReplaceLane, 0)},
+		{name: OpcodeVecF64x2ReplaceLaneName + "/lane=1", body: replaceLane(OpcodeVecF64x2ReplaceLane, 1)},
+		{name: OpcodeVecI8x16SplatName, body: splat(OpcodeVecI8x16Splat)},
+		{name: OpcodeVecI16x8SplatName, body: splat(OpcodeVecI16x8Splat)},
+		{name: OpcodeVecI32x4SplatName, body: splat(OpcodeVecI32x4Splat)},
+		{name: OpcodeVecI64x2SplatName, body: splat(OpcodeVecI64x2Splat)},
+		{name: OpcodeVecF32x4SplatName, body: splat(OpcodeVecF32x4Splat)},
+		{name: OpcodeVecF64x2SplatName, body: splat(OpcodeVecF64x2Splat)},
+		{name: OpcodeVecI8x16SwizzleName, body: vv2v(OpcodeVecI8x16Swizzle)},
 		{
-			name: "i64x2.add",
-			body: []byte{
+			name: OpcodeVecV128i8x16ShuffleName, body: []byte{
 				OpcodeVecPrefix,
 				OpcodeVecV128Const,
 				1, 1, 1, 1, 1, 1, 1, 1,
@@ -2712,7 +2944,8 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				1, 1, 1, 1, 1, 1, 1, 1,
 				1, 1, 1, 1, 1, 1, 1, 1,
 				OpcodeVecPrefix,
-				OpcodeVecI64x2Add,
+				OpcodeVecV128i8x16Shuffle,
+				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 				OpcodeDrop,
 				OpcodeEnd,
 			},
@@ -2727,19 +2960,21 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(FeatureSIMD, 0, []Index{0}, nil, nil, nil, nil)
+			err := m.validateFunction(FeatureSIMD, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.NoError(t, err)
 		})
 	}
 }
 
 func TestModule_funcValidation_SIMD_error(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		name        string
 		body        []byte
 		flag        Features
 		expectedErr string
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name: "simd disabled",
 			body: []byte{
@@ -2791,6 +3026,26 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			expectedErr: "cannot pop the operand for i64x2.add: v128 missing",
 		},
 		{
+			name: "shuffle lane index not found",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128i8x16Shuffle,
+			},
+			expectedErr: "16 lane indexes for v128.shuffle not found",
+		},
+		{
+			name: "shuffle lane index not found",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix,
+				OpcodeVecV128i8x16Shuffle,
+				0xff, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			expectedErr: "invalid lane index[0] 255 >= 32 for v128.shuffle",
+		},
+		{
 			// TODO delete this case after SIMD impl completion.
 			name: "unimplemented",
 			body: []byte{
@@ -2802,6 +3057,56 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 		},
 	}
 
+	addExtractOrReplaceLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
+		n := VectorInstructionName(op)
+		tests = append(tests, testCase{
+			name: n + "/lane index out of range",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix, op, lane,
+			},
+			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
+		})
+	}
+
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ExtractLaneS, 16, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ExtractLaneU, 20, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ExtractLaneS, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ExtractLaneU, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI32x4ExtractLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF32x4ExtractLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI64x2ExtractLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF64x2ExtractLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI8x16ReplaceLane, 16, 16)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI16x8ReplaceLane, 8, 8)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI32x4ReplaceLane, 4, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecI64x2ReplaceLane, 2, 2)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF32x4ReplaceLane, 10, 4)
+	addExtractOrReplaceLaneOutOfIndexCase(OpcodeVecF64x2ReplaceLane, 3, 2)
+
+	addStoreOrLoadLaneOutOfIndexCase := func(op OpcodeVec, lane, laneCeil byte) {
+		n := VectorInstructionName(op)
+		tests = append(tests, testCase{
+			name: n + "/lane index out of range",
+			flag: FeatureSIMD,
+			body: []byte{
+				OpcodeVecPrefix, op,
+				0, 0, // align and offset.
+				lane,
+			},
+			expectedErr: fmt.Sprintf("invalid lane index %d >= %d for %s", lane, laneCeil, n),
+		})
+	}
+
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load8Lane, 16, 16)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load16Lane, 8, 8)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load32Lane, 4, 4)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Load64Lane, 2, 2)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store8Lane, 16, 16)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store16Lane, 8, 8)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store32Lane, 4, 4)
+	addStoreOrLoadLaneOutOfIndexCase(OpcodeVecV128Store64Lane, 2, 2)
+
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
@@ -2810,7 +3115,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, nil, nil, nil)
+			err := m.validateFunction(tc.flag, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
