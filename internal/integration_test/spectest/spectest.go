@@ -17,9 +17,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
+	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
+	"github.com/tetratelabs/wazero/internal/watzero"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
@@ -265,7 +265,7 @@ func (c command) expectedError() (err error) {
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
 func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
-	mod, err := text.DecodeModule([]byte(`(module $spectest
+	w, err := watzero.Wat2Wasm(`(module $spectest
 (; TODO
   (global (export "global_i32") i32)
   (global (export "global_i64") i64)
@@ -301,7 +301,10 @@ func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
 
   (func (param f64 f64) local.get 0 drop local.get 1 drop)
      (export "print_f64_f64" (func 6))
-)`), wasm.Features20191205, wasm.MemorySizer)
+)`)
+	require.NoError(t, err)
+
+	mod, err := binaryformat.DecodeModule(w, wasm.Features20220419, wasm.MemorySizer)
 	require.NoError(t, err)
 
 	// (global (export "global_i32") i32 (i32.const 666))
@@ -397,7 +400,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 					case "module":
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
+						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
 						mod.AssignModuleID(buf)
@@ -530,7 +533,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							//
 							// In practice, such a module instance can be used for invoking functions without any issue. In addition, we have to
 							// retain functions after the expected "instantiation" failure, so in wazero we choose to not raise error in that case.
-							mod, err := binary.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
+							mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
 							require.NoError(t, err, msg)
 
 							err = mod.Validate(s.EnabledFeatures)
@@ -558,7 +561,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 }
 
 func requireInstantiationError(t *testing.T, s *wasm.Store, ns *wasm.Namespace, buf []byte, msg string) {
-	mod, err := binary.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
+	mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
 	if err != nil {
 		return
 	}
@@ -704,10 +707,10 @@ func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures wasm.F
 
 						buf = requireStripCustomSections(t, buf)
 
-						mod, err := binary.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
+						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
 						require.NoError(t, err)
 
-						encodedBuf := binary.EncodeModule(mod)
+						encodedBuf := binaryformat.EncodeModule(mod)
 						require.Equal(t, buf, encodedBuf)
 					})
 				}

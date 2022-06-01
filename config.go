@@ -53,7 +53,7 @@ type RuntimeConfig interface {
 	// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
 	// WebAssembly 1.0 (20191205).
 	//
-	// When false, an api.Global can never be cast to an api.MutableGlobal, and any source that includes global vars
+	// When false, an api.Global can never be cast to an api.MutableGlobal, and any wasm that includes global vars
 	// will fail to parse.
 	WithFeatureMutableGlobal(bool) RuntimeConfig
 
@@ -279,7 +279,7 @@ func (c *compiledModule) Close(_ context.Context) error {
 	return nil
 }
 
-// CompileConfig allows you to override what was decoded from source, prior to compilation (ModuleBuilder.Compile or
+// CompileConfig allows you to override what was decoded from wasm, prior to compilation (ModuleBuilder.Compile or
 // Runtime.CompileModule).
 //
 // For example, WithImportRenamer allows you to override hard-coded names that don't match your requirements.

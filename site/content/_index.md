@@ -22,7 +22,7 @@ func main() {
 
 	// Read a WebAssembly binary containing an exported "fac" function.
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
-	source, err := os.ReadFile("./path/to/fac.wasm")
+	wasm, err := os.ReadFile("./path/to/fac.wasm")
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -32,7 +32,7 @@ func main() {
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate the module and return its exported functions
-	module, err := r.InstantiateModuleFromCode(ctx, source)
+	module, err := r.InstantiateModuleFromBinary(ctx, wasm)
 	if err != nil {
 		log.Panicln(err)
 	}

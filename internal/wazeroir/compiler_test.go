@@ -9,7 +9,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
+	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/watzero"
 )
 
 // ctx is an arbitrary, non-default context.
@@ -603,8 +604,10 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	require.Equal(t, expected, res[0])
 }
 
-func requireModuleText(t *testing.T, source string) *wasm.Module {
-	m, err := text.DecodeModule([]byte(source), wasm.Features20220419, wasm.MemorySizer)
+func requireModuleText(t *testing.T, wat string) *wasm.Module {
+	binary, err := watzero.Wat2Wasm(wat)
+	require.NoError(t, err)
+	m, err := binaryformat.DecodeModule(binary, wasm.Features20220419, wasm.MemorySizer)
 	require.NoError(t, err)
 	return m
 }

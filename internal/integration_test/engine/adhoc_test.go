@@ -14,6 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/watzero"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -96,7 +97,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
-	module, err := r.InstantiateModuleFromCode(testCtx, reftypeImportsWasm)
+	module, err := r.InstantiateModuleFromBinary(testCtx, reftypeImportsWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -108,7 +109,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 }
 
 func testHugeStack(t *testing.T, r wazero.Runtime) {
-	module, err := r.InstantiateModuleFromCode(testCtx, hugestackWasm)
+	module, err := r.InstantiateModuleFromBinary(testCtx, hugestackWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -127,7 +128,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromCode(testCtx, unreachableWasm)
+	module, err := r.InstantiateModuleFromBinary(testCtx, unreachableWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -150,7 +151,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
-	module, err := r.InstantiateModuleFromCode(testCtx, recursiveWasm)
+	module, err := r.InstantiateModuleFromBinary(testCtx, recursiveWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -180,7 +181,7 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
-	module, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $test
+	module, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(`(module $test
 		(import "" "store_int"
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
@@ -228,7 +229,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 	defer imported.Close(testCtx)
 
 	// Instantiate a module that uses Wasm code to call the host function.
-	importing, err = r.InstantiateModuleFromCode(testCtx, []byte(fmt.Sprintf(`(module $%[1]s
+	importing, err = r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "outer" (func $outer (param i32) (result i32)))
 	(import "%[2]s" "inner" (func $inner (param i32) (result i32)))
 	(func $call_outer (param i32) (result i32) local.get 0 call $outer)
@@ -272,7 +273,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err = r.InstantiateModuleFromCode(testCtx, []byte(fmt.Sprintf(`(module $%[1]s
+			importing, err = r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
 	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -338,7 +339,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err := r.InstantiateModuleFromCode(testCtx, []byte(fmt.Sprintf(`(module $%[1]s
+			importing, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
 	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
 	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
 	(export "call->%[3]s" (func $call_%[3]s))
@@ -353,8 +354,8 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	}
 }
 
-func callReturnImportSource(importedModule, importingModule string) []byte {
-	return []byte(fmt.Sprintf(`(module $%[1]s
+func callReturnImportWasm(importedModule, importingModule string) []byte {
+	return wat2wasm(fmt.Sprintf(`(module $%[1]s
 	;; test an imported function by re-exporting it
 	(import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
 	(export "return_input" (func $return_input))
@@ -363,6 +364,11 @@ func callReturnImportSource(importedModule, importingModule string) []byte {
 	(func $call_return_import (param i32) (result i32) local.get 0 call $return_input)
 	(export "call_return_import" (func $call_return_import))
 )`, importingModule, importedModule))
+}
+
+func wat2wasm(wat string) []byte {
+	wasm, _ := watzero.Wat2Wasm(wat)
+	return wasm
 }
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
@@ -438,8 +444,8 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			defer imported.Close(testCtx)
 
 			// Import that module.
-			source := callReturnImportSource(imported.Name(), t.Name()+"-importing")
-			importingCode, err = r.CompileModule(testCtx, source, compileConfig)
+			binary := callReturnImportWasm(imported.Name(), t.Name()+"-importing")
+			importingCode, err = r.CompileModule(testCtx, binary, compileConfig)
 			require.NoError(t, err)
 
 			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig)
@@ -467,7 +473,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Instantiate a module that manages its memory
-	memory, err := r.InstantiateModuleFromCode(testCtx, []byte(`(module $memory
+	memory, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(`(module $memory
   (func $grow (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
   (func $size (result (;size;) i32) memory.size)
 
@@ -531,7 +537,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
-	compiled, err := r.CompileModule(testCtx, []byte(`(module $test
+	compiled, err := r.CompileModule(testCtx, wat2wasm(`(module $test
 		(memory 1)
 		(func $store
           i32.const 1    ;; memory offset
