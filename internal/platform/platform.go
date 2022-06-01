@@ -11,18 +11,15 @@ import (
 
 // IsSupported is exported for tests and includes constraints here and also the assembler.
 func IsSupported() bool {
-	if _, ok := map[string]struct{}{
-		"darwin":  {},
-		"windows": {},
-		"linux":   {},
-	}[runtime.GOOS]; !ok {
+	switch runtime.GOOS {
+	case "darwin", "windows", "linux":
+	default:
 		return false
 	}
 
-	if _, ok := map[string]struct{}{
-		"amd64": {},
-		"arm64": {},
-	}[runtime.GOARCH]; !ok {
+	switch runtime.GOARCH {
+	case "amd64", "arm64":
+	default:
 		return false
 	}
 
