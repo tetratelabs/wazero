@@ -97,7 +97,7 @@ type ModuleBuilder interface {
 	//
 	// Parameters
 	//
-	//	* name - the name to export. Ex "memory" for wasi.ModuleSnapshotPreview1
+	//	* name - the name to export. Ex "memory" for wasi_snapshot_preview1.ModuleSnapshotPreview1
 	//	* minPages - the possibly zero initial size in pages (65536 bytes per page).
 	//
 	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:

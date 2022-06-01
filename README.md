@@ -87,7 +87,7 @@ bundles an implementation. That way, you don't have to write these functions.
 For example, here's how you can allow WebAssembly modules to read
 "/work/home/a.txt" as "/a.txt" or "./a.txt":
 ```go
-_, err := wasi.InstantiateSnapshotPreview1(ctx, r)
+_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 if err != nil {
     log.Panicln(err)
 }

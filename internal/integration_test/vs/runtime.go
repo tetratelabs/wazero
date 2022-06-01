@@ -6,7 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 type RuntimeConfig struct {
@@ -96,7 +96,7 @@ func (r *wazeroRuntime) Instantiate(ctx context.Context, cfg *RuntimeConfig) (mo
 
 	// Instantiate WASI, if configured.
 	if cfg.NeedsWASI {
-		if m.wasi, err = wasi.InstantiateSnapshotPreview1(ctx, r.runtime); err != nil {
+		if m.wasi, err = wasi_snapshot_preview1.Instantiate(ctx, r.runtime); err != nil {
 			return
 		}
 	}

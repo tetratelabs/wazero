@@ -13,7 +13,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 var testCtx = context.Background()
@@ -21,7 +21,7 @@ var testCtx = context.Background()
 //go:embed testdata/animals.txt
 var animals []byte
 
-// wasiFs is an implementation of fs.Fs calling into wasi. Not thread-safe because we use
+// wasiFs is an implementation of fs.Fs calling into wasiWASI. Not thread-safe because we use
 // fixed Memory offsets for transferring data with wasm.
 type wasiFs struct {
 	t *testing.T
@@ -57,7 +57,7 @@ func (fs *wasiFs) Open(name string) (fs.File, error) {
 		uint64(fd), uint64(dirflags), uint64(pathPtr), uint64(pathLen), uint64(oflags),
 		fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.NoError(fs.t, err)
-	require.Equal(fs.t, uint64(wasi.ErrnoSuccess), res[0])
+	require.Equal(fs.t, uint64(wasi_snapshot_preview1.ErrnoSuccess), res[0])
 
 	resFd, ok := fs.memory.ReadUint32Le(testCtx, resultOpenedFd)
 	require.True(fs.t, ok)
@@ -65,8 +65,8 @@ func (fs *wasiFs) Open(name string) (fs.File, error) {
 	return &wasiFile{fd: resFd, fs: fs}, nil
 }
 
-// wasiFile implements io.Reader and io.Seeker using wasi functions. It does not
-// implement io.ReaderAt because there is no wasi function for directly reading
+// wasiFile implements io.Reader and io.Seeker using wasiWASI functions. It does not
+// implement io.ReaderAt because there is no wasiWASI function for directly reading
 // from an offset.
 type wasiFile struct {
 	fd uint32
@@ -98,7 +98,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 	res, err := f.fs.fdRead.Call(testCtx, uint64(f.fd), uint64(iovsOff), uint64(iovsCount), uint64(resultSizeOff))
 	require.NoError(f.fs.t, err)
 
-	require.NotEqual(f.fs.t, uint64(wasi.ErrnoFault), res[0])
+	require.NotEqual(f.fs.t, uint64(wasi_snapshot_preview1.ErrnoFault), res[0])
 
 	numRead, ok := f.fs.memory.ReadUint32Le(testCtx, resultSizeOff)
 	require.True(f.fs.t, ok)
@@ -107,7 +107,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 		if len(bytes) == 0 {
 			return 0, nil
 		}
-		if wasi.Errno(res[0]) == wasi.ErrnoSuccess {
+		if wasi_snapshot_preview1.Errno(res[0]) == wasi_snapshot_preview1.ErrnoSuccess {
 			return 0, io.EOF
 		} else {
 			return 0, fmt.Errorf("could not read from file")
@@ -123,7 +123,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 func (f *wasiFile) Close() error {
 	res, err := f.fs.fdClose.Call(testCtx, uint64(f.fd))
 	require.NoError(f.fs.t, err)
-	require.NotEqual(f.fs.t, uint64(wasi.ErrnoFault), res[0])
+	require.NotEqual(f.fs.t, uint64(wasi_snapshot_preview1.ErrnoFault), res[0])
 	return nil
 }
 
@@ -133,7 +133,7 @@ func (f *wasiFile) Seek(offset int64, whence int) (int64, error) {
 
 	res, err := f.fs.fdSeek.Call(testCtx, uint64(f.fd), uint64(offset), uint64(whence), uint64(resultNewoffsetOff))
 	require.NoError(f.fs.t, err)
-	require.NotEqual(f.fs.t, uint64(wasi.ErrnoFault), res[0])
+	require.NotEqual(f.fs.t, uint64(wasi_snapshot_preview1.ErrnoFault), res[0])
 
 	newOffset, ok := f.fs.memory.ReadUint32Le(testCtx, resultNewoffsetOff)
 	require.True(f.fs.t, ok)
@@ -145,7 +145,7 @@ func TestReader(t *testing.T) {
 	r := wazero.NewRuntime()
 	defer r.Close(testCtx)
 
-	_, err := wasi.InstantiateSnapshotPreview1(testCtx, r)
+	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	realFs := fstest.MapFS{"animals.txt": &fstest.MapFile{Data: animals}}

@@ -14,8 +14,6 @@ import (
 type FSKey struct{}
 
 // FileEntry maps a path to an open file in a file system.
-//
-// Note: This does not introduce cycles because the types here are in the package "wasi" not "internalwasi".
 type FileEntry struct {
 	Path string
 	FS   fs.FS
