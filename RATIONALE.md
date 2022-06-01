@@ -1,5 +1,50 @@
 # Notable rationale of wazero
 
+## Zero dependencies
+
+Wazero has zero dependencies to differentiate itself from other runtimes which
+have heavy impact usually due to CGO. By avoiding CGO, wazero avoids
+prerequisites such as shared libraries or libc, and lets users keep features
+like cross compilation.
+
+Avoiding go.mod dependencies reduces interference on Go version support, and
+size of a statically compiled binary. However, doing so brings some
+responsibility into the project.
+
+Go's native platform support is good: We don't need platform-specific code to
+get monotonic time, nor do we need much work to implement certain features
+needed by our compiler such as `mmap`. That said, Go does not support all
+common operating systems to the same degree. For example, Go 1.18 includes
+`Mprotect` on Linux and Darwin, but not FreeBSD.
+
+The general tradeoff the project takes from a zero dependency policy is more
+explicit support of platforms (in the compiler runtime), as well a larger and
+more technically difficult codebase.
+
+At some point, we may allow extensions to supply their own platform-specific
+hooks. Until then, one end user impact/tradeoff is some glitches trying
+untested platforms (with the Compiler runtime).
+
+### Why not x/sys
+
+Going beyond Go's SDK limitations can be accomplished with their [x/sys library](https://pkg.go.dev/golang.org/x/sys/unix).
+For example, this includes `zsyscall_freebsd_amd64.go` missing from the Go SDK.
+
+However, like all dependencies, x/sys is a source of conflict. For example,
+x/sys had to be in order to upgrade to Go 1.18.
+
+If we depended on x/sys, we could get more precise functionality needed for
+features such as clocks or more platform support for the compiler runtime.
+
+That said, formally supporting an operating system may still require testing as
+even use of x/sys can require platform-specifics. For example, [mmap-go](https://github.com/edsrzf/mmap-go)
+uses x/sys, but also mentions limitations, some not surmountable with x/sys
+alone.
+
+Regardless, we may at some point introduce a separate go.mod for users to use
+x/sys as a platform plugin without forcing all users to maintain that
+dependency.
+
 ## Project structure
 wazero uses internal packages extensively to balance API compatability desires for end users with the need to safely
 share internals between compilers.

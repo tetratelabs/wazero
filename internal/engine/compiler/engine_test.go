@@ -173,6 +173,7 @@ func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 	enginetest.RunTestModuleEngine_Memory(t, et)
 }
 
+// requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()

@@ -1,4 +1,4 @@
-package compiler
+package platform
 
 import (
 	"errors"
@@ -26,7 +26,7 @@ const (
 
 func mmapCodeSegment(code []byte) ([]byte, error) {
 	if len(code) == 0 {
-		panic(errors.New("BUG: mmapCodeSegment with zero length"))
+		panic(errors.New("BUG: MmapCodeSegment with zero length"))
 	}
 	if runtime.GOARCH == "amd64" {
 		return mmapCodeSegmentAMD64(code)
@@ -37,7 +37,7 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 
 func munmapCodeSegment(code []byte) error {
 	if len(code) == 0 {
-		panic(errors.New("BUG: munmapCodeSegment with zero length"))
+		panic(errors.New("BUG: MunmapCodeSegment with zero length"))
 	}
 	return freeMemory(code)
 }

@@ -125,7 +125,7 @@ func (c *arm64Compiler) compile() (code []byte, staticData codeStaticData, stack
 		return
 	}
 
-	code, err = mmapCodeSegment(original)
+	code, err = mmap.mmapCodeSegment(original)
 	if err != nil {
 		return
 	}

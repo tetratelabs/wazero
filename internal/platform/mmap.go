@@ -1,6 +1,6 @@
 //go:build !windows
 
-package compiler
+package platform
 
 import (
 	"errors"
@@ -8,30 +8,30 @@ import (
 	"syscall"
 )
 
-// mmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
+// MmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
 // See https://man7.org/linux/man-pages/man2/mmap.2.html for mmap API and flags.
-func mmapCodeSegment(code []byte) ([]byte, error) {
+func MmapCodeSegment(code []byte) ([]byte, error) {
 	if len(code) == 0 {
-		panic(errors.New("BUG: mmapCodeSegment with zero length"))
+		panic(errors.New("BUG: MmapCodeSegment with zero length"))
 	}
 	if runtime.GOARCH == "amd64" {
-		return mmapCodeSegmentAMD64(code)
+		return MmapCodeSegmentAMD64(code)
 	} else {
 		return mmapCodeSegmentARM64(code)
 	}
 }
 
-// munmapCodeSegment unmaps the given memory region.
-func munmapCodeSegment(code []byte) error {
+// MunmapCodeSegment unmaps the given memory region.
+func MunmapCodeSegment(code []byte) error {
 	if len(code) == 0 {
-		panic(errors.New("BUG: munmapCodeSegment with zero length"))
+		panic(errors.New("BUG: MunmapCodeSegment with zero length"))
 	}
 	return syscall.Munmap(code)
 }
 
-// mmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region
+// MmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region
 // to enter the function. Otherwise, segmentation fault exception is raised.
-func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
+func MmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	mmapFunc, err := syscall.Mmap(
 		-1,
 		0,
