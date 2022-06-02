@@ -690,7 +690,6 @@ func (c *arm64Compiler) compileV128AndNot(o *wazeroir.OperationV128AndNot) error
 
 // compileV128Shr implements compiler.compileV128Shr for arm64.
 func (c *arm64Compiler) compileV128Shr(o *wazeroir.OperationV128Shr) error {
-	// https://stackoverflow.com/questions/35002937/sse-simd-shift-with-one-byte-element-size-granularity
 	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 }
 
