@@ -396,7 +396,48 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 
 Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
 
-### ClockResGet
+## sys.Clock
+
+`sys.Clock` is a base interface for two implementations: `WallClock` and
+`MonotonicClock`. These include `WallTime()` and `NanoTime()` respectively, to
+match naming conventions used internally in Go. Using different methods for
+wall and clock time allow a single implementation to implement both Clock APIs
+at the same time.
+
+This design allows implementations to supply a `Resolution`, which is usually
+incorrect as detained in a sub-heading below. This is exposed despite the
+trouble supplying it, as it is needed for WASI:
+
+See https://github.com/WebAssembly/wasi-clocks
+
+## Why not `time.Clock`?
+
+wazero can't use `time.Clock` as a plugin for clock implementation as it is
+only substitutable with build flags and conflates wall and monotonic time in
+the same call.
+
+Go's `time.Clock` was added monotonic time after the fact. For portability with
+prior APIs, a decision was made to combine readings into the same API call.
+
+```go
+func time_now() (sec int64, nsec int32, mono int64) {
+	sec, nsec = walltime()
+	return sec, nsec, nanotime()
+}
+```
+
+See https://go.googlesource.com/proposal/+/master/design/12914-monotonic.md
+
+WebAssembly time imports do not have the same concern. In fact even Go's
+imports for clocks split walltime from nanotime readings.
+
+See https://github.com/golang/go/blob/252324e879e32f948d885f787decf8af06f82be9/misc/wasm/wasm_exec.js#L243-L255
+
+Finally, Go's clock is not an interface. WebAssembly users who want determinism
+or security need to be able to substitute an alternative clock implementation
+from the host process one.
+
+### `Clock.Resolution`
 
 A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
 Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual
