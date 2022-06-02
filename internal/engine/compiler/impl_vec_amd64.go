@@ -960,7 +960,7 @@ func (c *amd64Compiler) compileV128ShrI8x16Impl(signed bool) error {
 		}
 
 		// We have to get the mask according to the shift amount, so we first have to do
-		// gpShiftAmount << 4 = gpShiftAmount*4 to get the initial offset of the mask (4 is the size of each mask in bytes).
+		// gpShiftAmount << 4 = gpShiftAmount*16 to get the initial offset of the mask (16 is the size of each mask in bytes).
 		c.assembler.CompileConstToRegister(amd64.SHLQ, 4, gpShiftAmount)
 
 		// Now ready to read the content of the mask into the vecTmp.
@@ -1045,7 +1045,7 @@ func (c *amd64Compiler) compileV128Shl(o *wazeroir.OperationV128Shl) error {
 		}
 
 		// We have to get the mask according to the shift amount, so we first have to do
-		// gpShiftAmount << 4 = gpShiftAmount*4 to get the initial offset of the mask (4 is the size of each mask in bytes).
+		// gpShiftAmount << 4 = gpShiftAmount*16 to get the initial offset of the mask (16 is the size of each mask in bytes).
 		c.assembler.CompileConstToRegister(amd64.SHLQ, 4, gpShiftAmount)
 
 		// Now ready to read the content of the mask into the vecTmp.
