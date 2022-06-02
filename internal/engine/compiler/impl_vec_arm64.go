@@ -517,7 +517,6 @@ func (c *arm64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		prevValue := c.locationStack.stack[i]
 		if prevValue.register == reg {
-			fmt.Printf("releaseing %s to sp=%d \n", arm64.RegisterName(prevValue.register), prevValue.stackPointer)
 			c.compileReleaseRegisterToStack(prevValue)
 			break
 		}
