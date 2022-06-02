@@ -778,6 +778,7 @@ func (c *amd64Compiler) compileV128Shr(o *wazeroir.OperationV128Shr) error {
 	}
 }
 
+// compileV128ShrImpl implements shift right instructions except for i8x16 (logical/arithmetic) and i64x2 (arithmetic).
 func (c *amd64Compiler) compileV128ShrImpl(o *wazeroir.OperationV128Shr) error {
 	s := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(s); err != nil {
