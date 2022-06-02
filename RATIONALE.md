@@ -400,24 +400,7 @@ Their semantics match when `pathLen` == the length of `path`, so in practice thi
 
 `sys.Clock` is a base interface for two implementations: `WallClock` and
 `MonotonicClock`. These include `WallTime()` and `NanoTime()` respectively, to
-match naming conventions used internally in Go. Using different methods for
-wall and clock time allow a single implementation to implement both Clock APIs
-at the same time.
-
-This design allows implementations to supply a `Resolution`, which is usually
-incorrect as detained in a sub-heading below. This is exposed despite the
-trouble supplying it, as it is needed for WASI:
-
-See https://github.com/WebAssembly/wasi-clocks
-
-## Why not `time.Clock`?
-
-wazero can't use `time.Clock` as a plugin for clock implementation as it is
-only substitutable with build flags and conflates wall and monotonic time in
-the same call.
-
-Go's `time.Clock` was added monotonic time after the fact. For portability with
-prior APIs, a decision was made to combine readings into the same API call.
+match naming conventions used internally in Go.
 
 ```go
 func time_now() (sec int64, nsec int32, mono int64) {
@@ -425,6 +408,24 @@ func time_now() (sec int64, nsec int32, mono int64) {
 	return sec, nsec, nanotime()
 }
 ```
+
+Using different methods for wall and clock time allow implementations to choose
+whether to implement the clock once (as in Go), or split them out.
+
+This design allows implementations to supply a `Resolution`, which is usually
+incorrect as detailed in a sub-heading below. This is exposed despite the
+trouble supplying it, as it is needed for WASI:
+
+See https://github.com/WebAssembly/wasi-clocks
+
+## Why not `time.Clock`?
+
+wazero can't use `time.Clock` as a plugin for clock implementation as it is
+only substitutable with build flags (`faketime`) and conflates wall and
+monotonic time in the same call.
+
+Go's `time.Clock` was added monotonic time after the fact. For portability with
+prior APIs, a decision was made to combine readings into the same API call.
 
 See https://go.googlesource.com/proposal/+/master/design/12914-monotonic.md
 
