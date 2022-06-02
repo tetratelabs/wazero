@@ -1289,6 +1289,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 				pc += 15
+			case OpcodeVecI8x16Shl, OpcodeVecI8x16ShrS, OpcodeVecI8x16ShrU,
+				OpcodeVecI16x8Shl, OpcodeVecI16x8ShrS, OpcodeVecI16x8ShrU,
+				OpcodeVecI32x4Shl, OpcodeVecI32x4ShrS, OpcodeVecI32x4ShrU,
+				OpcodeVecI64x2Shl, OpcodeVecI64x2ShrS, OpcodeVecI64x2ShrU:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}

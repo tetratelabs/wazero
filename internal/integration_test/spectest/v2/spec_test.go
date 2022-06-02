@@ -34,7 +34,7 @@ func TestCompiler(t *testing.T) {
 				"simd_load_splat.json", "simd_load_zero.json", "simd_store.json", "simd_store16_lane.json",
 				"simd_store32_lane.json", "simd_store64_lane.json", "simd_store8_lane.json":
 				return true
-			case "simd_bitwise.json", "simd_boolean.json":
+			case "simd_bitwise.json", "simd_boolean.json", "simd_bit_shift.json":
 				// TODO: implement on arm64.
 				return runtime.GOARCH == "amd64"
 			default:
@@ -54,7 +54,7 @@ func TestInterpreter(t *testing.T) {
 				"simd_load32_lane.json", "simd_load64_lane.json", "simd_load8_lane.json", "simd_lane.json",
 				"simd_load_extend.json", "simd_load_splat.json", "simd_load_zero.json", "simd_store.json",
 				"simd_store16_lane.json", "simd_store32_lane.json", "simd_store64_lane.json", "simd_store8_lane.json",
-				"simd_bitwise.json", "simd_boolean.json":
+				"simd_bitwise.json", "simd_boolean.json", "simd_bit_shift.json":
 				return true
 			default:
 				return false // others not supported, yet!

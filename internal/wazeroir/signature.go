@@ -504,7 +504,11 @@ func (c *compiler) wasmOpcodeSignature(op wasm.Opcode, index uint32) (*signature
 			return signature_V128_F32, nil
 		case wasm.OpcodeVecF64x2ExtractLane:
 			return signature_V128_F64, nil
-		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane, wasm.OpcodeVecI32x4ReplaceLane:
+		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane, wasm.OpcodeVecI32x4ReplaceLane,
+			wasm.OpcodeVecI8x16Shl, wasm.OpcodeVecI8x16ShrS, wasm.OpcodeVecI8x16ShrU,
+			wasm.OpcodeVecI16x8Shl, wasm.OpcodeVecI16x8ShrS, wasm.OpcodeVecI16x8ShrU,
+			wasm.OpcodeVecI32x4Shl, wasm.OpcodeVecI32x4ShrS, wasm.OpcodeVecI32x4ShrU,
+			wasm.OpcodeVecI64x2Shl, wasm.OpcodeVecI64x2ShrS, wasm.OpcodeVecI64x2ShrU:
 			return signature_V128I32_V128, nil
 		case wasm.OpcodeVecI64x2ReplaceLane:
 			return signature_V128I64_V128, nil

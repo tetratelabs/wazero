@@ -1757,8 +1757,8 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 
 	// First shift left by one to clear the sign bit, and then shift right by one.
 	if o.Type == wazeroir.Float32 {
-		c.assembler.CompileConstToRegister(amd64.PSLLL, 1, target.register)
-		c.assembler.CompileConstToRegister(amd64.PSRLL, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSLLD, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSRLD, 1, target.register)
 	} else {
 		c.assembler.CompileConstToRegister(amd64.PSLLQ, 1, target.register)
 		c.assembler.CompileConstToRegister(amd64.PSRLQ, 1, target.register)

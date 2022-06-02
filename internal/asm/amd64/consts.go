@@ -203,12 +203,12 @@ const (
 	POPCNTL
 	// POPCNTQ is the POPCNT instruction in 64-bit mode. https://www.felixcloutier.com/x86/popcnt
 	POPCNTQ
-	// PSLLL is the PSLLW instruction. https://www.felixcloutier.com/x86/psllw:pslld:psllq
-	PSLLL
+	// PSLLD is the PSLLD instruction. https://www.felixcloutier.com/x86/psllw:pslld:psllq
+	PSLLD
 	// PSLLQ is the PSLLQ instruction. https://www.felixcloutier.com/x86/psllw:pslld:psllq
 	PSLLQ
-	// PSRLL is the PSRLW instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
-	PSRLL
+	// PSRLD is the PSRLD instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+	PSRLD
 	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
@@ -397,6 +397,18 @@ const (
 	POR
 	// PANDN is the PANDN instruction https://www.felixcloutier.com/x86/pandn
 	PANDN
+	// PSRAD is the PSRAD instruction https://www.felixcloutier.com/x86/psraw:psrad:psraq
+	PSRAD
+	// PSRAW is the PSRAW instruction https://www.felixcloutier.com/x86/psraw:psrad:psraq
+	PSRAW
+	// PSRLW is the PSRLW instruction https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+	PSRLW
+	// PSLLW is the PSLLW instruction https://www.felixcloutier.com/x86/psllw:pslld:psllq
+	PSLLW
+	// PUNPCKLBW is the PUNPCKLBW instruction https://www.felixcloutier.com/x86/punpcklbw:punpcklwd:punpckldq:punpcklqdq
+	PUNPCKLBW
+	// PUNPCKHBW is the PUNPCKHBW instruction https://www.felixcloutier.com/x86/punpckhbw:punpckhwd:punpckhdq:punpckhqdq
+	PUNPCKHBW
 )
 
 // InstructionName returns the name for an instruction
@@ -562,12 +574,12 @@ func InstructionName(instruction asm.Instruction) string {
 		return "POPCNTL"
 	case POPCNTQ:
 		return "POPCNTQ"
-	case PSLLL:
-		return "PSLLL"
+	case PSLLD:
+		return "PSLLD"
 	case PSLLQ:
 		return "PSLLQ"
-	case PSRLL:
-		return "PSRLL"
+	case PSRLD:
+		return "PSRLD"
 	case PSRLQ:
 		return "PSRLQ"
 	case ROLL:
@@ -756,8 +768,24 @@ func InstructionName(instruction asm.Instruction) string {
 		return "POR"
 	case PANDN:
 		return "PANDN"
+	case PSRAD:
+		return "PSRAD"
+	case PSRAW:
+		return "PSRAW"
+	case PSRLW:
+		return "PSRLW"
+	case PSLLW:
+		return "PSLLW"
+	case PUNPCKLBW:
+		return "PUNPCKLBW"
+	case PUNPCKHBW:
+		return "PUNPCKHBW"
+	case NEGQ:
+		return "NEGQ"
+	case NONE:
+		return "NONE"
 	}
-	return "Unknown"
+	panic(instruction)
 }
 
 // Amd64-specific registers.

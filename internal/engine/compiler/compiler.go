@@ -466,4 +466,12 @@ type compiler interface {
 	// compileV128AndNot adds instructions which are equivalent to wasm.OpcodeVecV128AndNotName instruction.
 	// See wasm.OpcodeVecV128AndNotName.
 	compileV128AndNot(*wazeroir.OperationV128AndNot) error
+	// compileV128Shr adds instructions which are equivalent to wasm.OpcodeVecXXXShrYYYY instructions.
+	// See wasm.OpcodeVecI8x16ShrSName wasm.OpcodeVecI8x16ShrUName wasm.OpcodeVecI16x8ShrSName
+	// wasm.OpcodeVecI16x8ShrUName wasm.OpcodeVecI32x4ShrSName wasm.OpcodeVecI32x4ShrUName.
+	// wasm.OpcodeVecI64x2ShrSName wasm.OpcodeVecI64x2ShrUName.
+	compileV128Shr(shr *wazeroir.OperationV128Shr) error
+	// compileV128Shl adds instructions which are equivalent to wasm.OpcodeVecXXXShl instructions.
+	// See wasm.OpcodeVecI8x16ShlName wasm.OpcodeVecI16x8ShlName wasm.OpcodeVecI32x4ShlName wasm.OpcodeVecI64x2ShlName
+	compileV128Shl(shr *wazeroir.OperationV128Shl) error
 }

@@ -62,3 +62,157 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	binary.LittleEndian.PutUint64(actual[8:], hi)
 	require.Equal(t, exp, actual)
 }
+
+func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
+	x := [16]byte{
+		0, 0, 0, 0x80, 0, 0, 0, 0x80,
+		0, 0, 0, 0x80, 0, 0, 0, 0x80,
+	}
+	exp := [16]byte{
+		0, 0, 0, 0x40, 0, 0, 0, 0x80 | 0x80>>1,
+		0, 0, 0, 0x40, 0, 0, 0, 0x80 | 0x80>>1,
+	}
+	shiftAmount := uint32(1)
+
+	tests := []struct {
+		name               string
+		shiftAmountSetupFn func(t *testing.T, c *amd64Compiler)
+		verifyFn           func(t *testing.T, env *compilerEnv)
+	}{
+		{
+			name: "RegR10/CX not in use",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Move the shift amount to R10.
+				loc := c.locationStack.peek()
+				oldReg, newReg := loc.register, amd64.RegR10
+				c.assembler.CompileRegisterToRegister(amd64.MOVQ, oldReg, newReg)
+				loc.setRegister(newReg)
+				c.locationStack.markRegisterUnused(oldReg)
+				c.locationStack.markRegisterUsed(newReg)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {},
+		},
+		{
+			name: "RegR10/CX in use",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Pop the shift amount and vector values temporarily.
+				shiftAmountLocation := c.locationStack.pop()
+				vec := c.locationStack.popV128()
+
+				// Move the shift amount to R10.
+				oldReg, newReg := shiftAmountLocation.register, amd64.RegR10
+				c.assembler.CompileRegisterToRegister(amd64.MOVQ, oldReg, newReg)
+				c.locationStack.markRegisterUnused(oldReg)
+				c.locationStack.markRegisterUsed(newReg)
+
+				// Create the previous usage of CX register.
+				c.pushRuntimeValueLocationOnRegister(amd64.RegCX, runtimeValueTypeI32)
+				c.assembler.CompileConstToRegister(amd64.MOVQ, 100, amd64.RegCX)
+
+				// push the operands back to the location registers.
+				c.pushVectorRuntimeValueLocationOnRegister(vec.register)
+				c.pushRuntimeValueLocationOnRegister(newReg, runtimeValueTypeI32)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {
+				// at the bottom of stack, the previous value on the CX register must be saved.
+				actual := env.stack()[0]
+				require.Equal(t, uint64(100), actual)
+			},
+		},
+		{
+			name: "Stack/CX not in use",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Release the shift amount value to the stack.
+				loc := c.locationStack.peek()
+				c.compileReleaseRegisterToStack(loc)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {},
+		},
+		{
+			name: "Stack/CX in use",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Pop the shift amount and vector values temporarily.
+				shiftAmountReg := c.locationStack.pop().register
+				require.NotEqual(t, amd64.RegCX, shiftAmountReg)
+				vec := c.locationStack.popV128()
+
+				// Create the previous usage of CX register.
+				c.pushRuntimeValueLocationOnRegister(amd64.RegCX, runtimeValueTypeI32)
+				c.assembler.CompileConstToRegister(amd64.MOVQ, 100, amd64.RegCX)
+
+				// push the operands back to the location registers.
+				c.pushVectorRuntimeValueLocationOnRegister(vec.register)
+				// Release the shift amount value to the stack.
+				loc := c.pushRuntimeValueLocationOnRegister(shiftAmountReg, runtimeValueTypeI32)
+				c.compileReleaseRegisterToStack(loc)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {
+				// at the bottom of stack, the previous value on the CX register must be saved.
+				actual := env.stack()[0]
+				require.Equal(t, uint64(100), actual)
+			},
+		},
+		{
+			name: "CondReg/CX not in use",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Ignore the pushed const.
+				loc := c.locationStack.pop()
+				c.locationStack.markRegisterUnused(loc.register)
+
+				// Instead, push the conditional flag value which is supposed be interpreted as 1 (=shiftAmount).
+				err := c.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+				require.NoError(t, err)
+				err = c.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+				require.NoError(t, err)
+				err = c.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(x[:8]),
+				Hi: binary.LittleEndian.Uint64(x[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: shiftAmount})
+			require.NoError(t, err)
+
+			amdCompiler := compiler.(*amd64Compiler)
+			tc.shiftAmountSetupFn(t, amdCompiler)
+
+			err = amdCompiler.compileV128ShrI64x2SignedImpl()
+			require.NoError(t, err)
+
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			lo, hi := env.stackTopAsV128()
+			var actual [16]byte
+			binary.LittleEndian.PutUint64(actual[:8], lo)
+			binary.LittleEndian.PutUint64(actual[8:], hi)
+			require.Equal(t, exp, actual)
+
+			tc.verifyFn(t, env)
+		})
+	}
+}

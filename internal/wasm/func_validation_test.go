@@ -2706,6 +2706,18 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 		)
 	}
 
+	vi2v := func(vec OpcodeVec) (ret []byte) {
+		ret = addV128Const(ret)
+		return append(ret,
+			OpcodeI32Const,
+			1, 1, 1, 1,
+			OpcodeVecPrefix,
+			vec,
+			OpcodeDrop,
+			OpcodeEnd,
+		)
+	}
+
 	load := func(vec OpcodeVec, offset, align uint32) (ret []byte) {
 		ret = []byte{
 			OpcodeI32Const,
@@ -2950,6 +2962,18 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 		{name: OpcodeVecV128OrName, body: vv2v(OpcodeVecV128Or)},
 		{name: OpcodeVecV128XorName, body: vv2v(OpcodeVecV128Xor)},
 		{name: OpcodeVecV128BitselectName, body: vvv2v(OpcodeVecV128Bitselect)},
+		{name: OpcodeVecI8x16ShlName, body: vi2v(OpcodeVecI8x16Shl)},
+		{name: OpcodeVecI8x16ShrSName, body: vi2v(OpcodeVecI8x16ShrS)},
+		{name: OpcodeVecI8x16ShrUName, body: vi2v(OpcodeVecI8x16ShrU)},
+		{name: OpcodeVecI16x8ShlName, body: vi2v(OpcodeVecI16x8Shl)},
+		{name: OpcodeVecI16x8ShrSName, body: vi2v(OpcodeVecI16x8ShrS)},
+		{name: OpcodeVecI16x8ShrUName, body: vi2v(OpcodeVecI16x8ShrU)},
+		{name: OpcodeVecI32x4ShlName, body: vi2v(OpcodeVecI32x4Shl)},
+		{name: OpcodeVecI32x4ShrSName, body: vi2v(OpcodeVecI32x4ShrS)},
+		{name: OpcodeVecI32x4ShrUName, body: vi2v(OpcodeVecI32x4ShrU)},
+		{name: OpcodeVecI64x2ShlName, body: vi2v(OpcodeVecI64x2Shl)},
+		{name: OpcodeVecI64x2ShrSName, body: vi2v(OpcodeVecI64x2ShrS)},
+		{name: OpcodeVecI64x2ShrUName, body: vi2v(OpcodeVecI64x2ShrU)},
 	}
 
 	for _, tt := range tests {

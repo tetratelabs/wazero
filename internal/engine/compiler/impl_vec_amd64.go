@@ -620,7 +620,7 @@ func (c *amd64Compiler) compileV128BitMask(o *wazeroir.OperationV128BitMask) err
 		// 		byte_sat(R2(w5)), byte_sat(R2(w6)), byte_sat(R2(w7)), byte_sat(R2(w8)),
 		//  ]
 		//  where R1 is the destination register, and
-		// 	byte_sat(w) = w if w fits as signed 8-bit,
+		// 	byte_sat(w) = int8(w) if w fits as signed 8-bit,
 		//                0x80 if w is less than 0x80
 		//                0x7F if w is greater than 0x7f
 		//
@@ -763,5 +763,303 @@ func (c *amd64Compiler) compileV128AndNot(*wazeroir.OperationV128AndNot) error {
 
 	c.locationStack.markRegisterUnused(x1.register)
 	c.pushVectorRuntimeValueLocationOnRegister(x2.register)
+	return nil
+}
+
+// compileV128Shr implements compiler.compileV128Shr for amd64.
+func (c *amd64Compiler) compileV128Shr(o *wazeroir.OperationV128Shr) error {
+	// https://stackoverflow.com/questions/35002937/sse-simd-shift-with-one-byte-element-size-granularity
+	if o.Shape == wazeroir.ShapeI8x16 {
+		return c.compileV128ShrI8x16Impl(o.Signed)
+	} else if o.Shape == wazeroir.ShapeI64x2 && o.Signed {
+		return c.compileV128ShrI64x2SignedImpl()
+	} else {
+		return c.compileV128ShrImpl(o)
+	}
+}
+
+// compileV128ShrImpl implements shift right instructions except for i8x16 (logical/arithmetic) and i64x2 (arithmetic).
+func (c *amd64Compiler) compileV128ShrImpl(o *wazeroir.OperationV128Shr) error {
+	s := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(s); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	vecTmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	var moduleConst int64
+	var shift asm.Instruction
+	switch o.Shape {
+	case wazeroir.ShapeI16x8:
+		moduleConst = 0xf // modulo 16.
+		if o.Signed {
+			shift = amd64.PSRAW
+		} else {
+			shift = amd64.PSRLW
+		}
+	case wazeroir.ShapeI32x4:
+		moduleConst = 0x1f // modulo 32.
+		if o.Signed {
+			shift = amd64.PSRAD
+		} else {
+			shift = amd64.PSRLD
+		}
+	case wazeroir.ShapeI64x2:
+		moduleConst = 0x3f // modulo 64.
+		shift = amd64.PSRLQ
+	}
+
+	gpShiftAmount := s.register
+	c.assembler.CompileConstToRegister(amd64.ANDQ, moduleConst, gpShiftAmount)
+	c.assembler.CompileRegisterToRegister(amd64.MOVL, gpShiftAmount, vecTmp)
+	c.assembler.CompileRegisterToRegister(shift, vecTmp, x1.register)
+
+	c.locationStack.markRegisterUnused(gpShiftAmount)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128ShrI64x2SignedImpl implements compiler.compileV128Shr for i64x4 signed (arithmetic) shift.
+// PSRAQ instruction requires AVX, so we emulate it without AVX instructions. https://www.felixcloutier.com/x86/psraw:psrad:psraq
+func (c *amd64Compiler) compileV128ShrI64x2SignedImpl() error {
+	const shiftCountRegister = amd64.RegCX
+	// If another value lives on the CX register, we release it to the stack.
+	c.onValueReleaseRegisterToStack(shiftCountRegister)
+
+	s := c.locationStack.pop()
+	if s.onStack() {
+		s.setRegister(shiftCountRegister)
+		c.compileLoadValueOnStackToRegister(s)
+	} else if s.onConditionalRegister() {
+		c.compileMoveConditionalToGeneralPurposeRegister(s, shiftCountRegister)
+	} else { // already on register.
+		old := s.register
+		c.assembler.CompileRegisterToRegister(amd64.MOVL, old, shiftCountRegister)
+		s.setRegister(shiftCountRegister)
+		c.locationStack.markRegisterUnused(old)
+	}
+	c.locationStack.markRegisterUnused(shiftCountRegister)
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// Extract each lane into tmp, execute SHR on tmp, and write it back to the lane.
+	c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, x1.register, tmp, 0)
+	c.assembler.CompileRegisterToRegister(amd64.SARQ, shiftCountRegister, tmp)
+	c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRQ, tmp, x1.register, 0)
+	c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRQ, x1.register, tmp, 1)
+	c.assembler.CompileRegisterToRegister(amd64.SARQ, shiftCountRegister, tmp)
+	c.assembler.CompileRegisterToRegisterWithArg(amd64.PINSRQ, tmp, x1.register, 1)
+
+	c.locationStack.markRegisterUnused(shiftCountRegister)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// i8x16LogicalSHRMaskTable is necessary for emulating non-existent packed bytes logical right shifts on amd64.
+// The mask is applied after performing packed word shifts on the value to clear out the unnecessary bits.
+var i8x16LogicalSHRMaskTable = [8 * 16]byte{ // (the number of possible shift amount 0, 1, ..., 7.) * 16 bytes.
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // for 0 shift
+	0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, // for 1 shift
+	0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, 0x3f, // for 2 shift
+	0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, 0x1f, // for 3 shift
+	0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, // for 4 shift
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, // for 5 shift
+	0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, // for 6 shift
+	0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, // for 7 shift
+}
+
+// compileV128ShrI64x2SignedImpl implements compiler.compileV128Shr for i8x16 signed logical/arithmetic shifts.
+// amd64 doesn't have packed byte shifts, so we need this special casing.
+// See https://stackoverflow.com/questions/35002937/sse-simd-shift-with-one-byte-element-size-granularity
+func (c *amd64Compiler) compileV128ShrI8x16Impl(signed bool) error {
+	s := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(s); err != nil {
+		return err
+	}
+
+	v := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	vecTmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	gpShiftAmount := s.register
+	c.assembler.CompileConstToRegister(amd64.ANDQ, 0x7, gpShiftAmount) // mod 8.
+
+	if signed {
+		c.locationStack.markRegisterUsed(vecTmp)
+		vecTmp2, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+
+		vreg := v.register
+
+		// Copy the value from v.register to vecTmp.
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, vreg, vecTmp)
+
+		// Assuming that we have
+		//  vreg   = [b1, ..., b16]
+		//  vecTmp = [b1, ..., b16]
+		// at this point, then we use PUNPCKLBW and PUNPCKHBW to produce:
+		//  vreg   = [b1, b1, b2, b2, ..., b8, b8]
+		//  vecTmp = [b9, b9, b10, b10, ..., b16, b16]
+		c.assembler.CompileRegisterToRegister(amd64.PUNPCKLBW, vreg, vreg)
+		c.assembler.CompileRegisterToRegister(amd64.PUNPCKHBW, vecTmp, vecTmp)
+
+		// Adding 8 to the shift amount, and then move the amount to vecTmp2.
+		c.assembler.CompileConstToRegister(amd64.ADDQ, 0x8, gpShiftAmount)
+		c.assembler.CompileRegisterToRegister(amd64.MOVL, gpShiftAmount, vecTmp2)
+
+		// Perform the word packed arithmetic right shifts on vreg and vecTmp.
+		// This changes these two registers as:
+		//  vreg   = [xxx, b1 >> s, xxx, b2 >> s, ..., xxx, b8 >> s]
+		//  vecTmp = [xxx, b9 >> s, xxx, b10 >> s, ..., xxx, b16 >> s]
+		// where xxx is 1 or 0 depending on each byte's sign, and ">>" is the arithmetic shift on a byte.
+		c.assembler.CompileRegisterToRegister(amd64.PSRAW, vecTmp2, vreg)
+		c.assembler.CompileRegisterToRegister(amd64.PSRAW, vecTmp2, vecTmp)
+
+		// Finally, we can get the result by packing these two word vectors.
+		c.assembler.CompileRegisterToRegister(amd64.PACKSSWB, vecTmp, vreg)
+
+		c.locationStack.markRegisterUnused(gpShiftAmount, vecTmp)
+		c.pushVectorRuntimeValueLocationOnRegister(vreg)
+	} else {
+		c.assembler.CompileRegisterToRegister(amd64.MOVL, gpShiftAmount, vecTmp)
+		// amd64 doesn't have packed byte shifts, so we packed word shift here, and then mark-out
+		// the unnecessary bits below.
+		c.assembler.CompileRegisterToRegister(amd64.PSRLW, vecTmp, v.register)
+
+		gpTmp, err := c.allocateRegister(registerTypeGeneralPurpose)
+		if err != nil {
+			return err
+		}
+
+		// Read the initial address of the mask table into gpTmp register.
+		err = c.assembler.CompileLoadStaticConstToRegister(amd64.LEAQ, i8x16LogicalSHRMaskTable[:], gpTmp)
+		if err != nil {
+			return err
+		}
+
+		// We have to get the mask according to the shift amount, so we first have to do
+		// gpShiftAmount << 4 = gpShiftAmount*16 to get the initial offset of the mask (16 is the size of each mask in bytes).
+		c.assembler.CompileConstToRegister(amd64.SHLQ, 4, gpShiftAmount)
+
+		// Now ready to read the content of the mask into the vecTmp.
+		c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVDQU,
+			gpTmp, 0, gpShiftAmount, 1,
+			vecTmp,
+		)
+
+		// Finally, clear out the unnecessary
+		c.assembler.CompileRegisterToRegister(amd64.PAND, vecTmp, v.register)
+
+		c.locationStack.markRegisterUnused(gpShiftAmount)
+		c.pushVectorRuntimeValueLocationOnRegister(v.register)
+	}
+	return nil
+}
+
+// i8x16SHLMaskTable is necessary for emulating non-existent packed bytes left shifts on amd64.
+// The mask is applied after performing packed word shifts on the value to clear out the unnecessary bits.
+var i8x16SHLMaskTable = [8 * 16]byte{ // (the number of possible shift amount 0, 1, ..., 7.) * 16 bytes.
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // for 0 shift
+	0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, // for 1 shift
+	0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc, // for 2 shift
+	0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, 0xf8, // for 3 shift
+	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // for 4 shift
+	0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, 0xe0, // for 5 shift
+	0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, // for 6 shift
+	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, // for 7 shift
+}
+
+// compileV128Shl implements compiler.compileV128Shl for amd64.
+func (c *amd64Compiler) compileV128Shl(o *wazeroir.OperationV128Shl) error {
+	s := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(s); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	vecTmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	var modulo int64
+	var shift asm.Instruction
+	switch o.Shape {
+	case wazeroir.ShapeI8x16:
+		modulo = 0x7 // modulo 8.
+		// x86 doesn't have packed bytes shift, so we use PSLLW and mask-out the redundant bits.
+		// See https://stackoverflow.com/questions/35002937/sse-simd-shift-with-one-byte-element-size-granularity
+		shift = amd64.PSLLW
+	case wazeroir.ShapeI16x8:
+		modulo = 0xf // modulo 16.
+		shift = amd64.PSLLW
+	case wazeroir.ShapeI32x4:
+		modulo = 0x1f // modulo 32.
+		shift = amd64.PSLLD
+	case wazeroir.ShapeI64x2:
+		modulo = 0x3f // modulo 64.
+		shift = amd64.PSLLQ
+	}
+
+	gpShiftAmount := s.register
+	c.assembler.CompileConstToRegister(amd64.ANDQ, modulo, gpShiftAmount)
+	c.assembler.CompileRegisterToRegister(amd64.MOVL, gpShiftAmount, vecTmp)
+	c.assembler.CompileRegisterToRegister(shift, vecTmp, x1.register)
+
+	if o.Shape == wazeroir.ShapeI8x16 {
+		gpTmp, err := c.allocateRegister(registerTypeGeneralPurpose)
+		if err != nil {
+			return err
+		}
+
+		// Read the initial address of the mask table into gpTmp register.
+		err = c.assembler.CompileLoadStaticConstToRegister(amd64.LEAQ, i8x16SHLMaskTable[:], gpTmp)
+		if err != nil {
+			return err
+		}
+
+		// We have to get the mask according to the shift amount, so we first have to do
+		// gpShiftAmount << 4 = gpShiftAmount*16 to get the initial offset of the mask (16 is the size of each mask in bytes).
+		c.assembler.CompileConstToRegister(amd64.SHLQ, 4, gpShiftAmount)
+
+		// Now ready to read the content of the mask into the vecTmp.
+		c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVDQU,
+			gpTmp, 0, gpShiftAmount, 1,
+			vecTmp,
+		)
+
+		// Finally, clear out the unnecessary
+		c.assembler.CompileRegisterToRegister(amd64.PAND, vecTmp, x1.register)
+	}
+
+	c.locationStack.markRegisterUnused(gpShiftAmount)
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
 	return nil
 }
