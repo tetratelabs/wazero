@@ -638,6 +638,11 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 		case *wazeroir.OperationV128Xor:
 		case *wazeroir.OperationV128Bitselect:
 		case *wazeroir.OperationV128AndNot:
+		case *wazeroir.OperationV128Shr:
+			op.b1 = o.Shape
+			op.b3 = o.Signed
+		case *wazeroir.OperationV128Shl:
+			op.b1 = o.Shape
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.kind.String()))
 		}
@@ -2421,6 +2426,134 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
 			ce.pushValue(x1Lo & (^x2Lo))
 			ce.pushValue(x1Hi & (^x2Hi))
+			frame.pc++
+		case wazeroir.OperationKindV128Shl:
+			s := ce.popValue()
+			hi, lo := ce.popValue(), ce.popValue()
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				s = s % 8
+				lo = uint64(uint8(lo<<s)) |
+					uint64(uint8((lo>>8)<<s))<<8 |
+					uint64(uint8((lo>>16)<<s))<<16 |
+					uint64(uint8((lo>>24)<<s))<<24 |
+					uint64(uint8((lo>>32)<<s))<<32 |
+					uint64(uint8((lo>>40)<<s))<<40 |
+					uint64(uint8((lo>>48)<<s))<<48 |
+					uint64(uint8((lo>>56)<<s))<<56
+				hi = uint64(uint8(hi<<s)) |
+					uint64(uint8((hi>>8)<<s))<<8 |
+					uint64(uint8((hi>>16)<<s))<<16 |
+					uint64(uint8((hi>>24)<<s))<<24 |
+					uint64(uint8((hi>>32)<<s))<<32 |
+					uint64(uint8((hi>>40)<<s))<<40 |
+					uint64(uint8((hi>>48)<<s))<<48 |
+					uint64(uint8((hi>>56)<<s))<<56
+			case wazeroir.ShapeI16x8:
+				s = s % 16
+				lo = uint64(uint16(lo<<s)) |
+					uint64(uint16((lo>>16)<<s))<<16 |
+					uint64(uint16((lo>>32)<<s))<<32 |
+					uint64(uint16((lo>>48)<<s))<<48
+				hi = uint64(uint16(hi<<s)) |
+					uint64(uint16((hi>>16)<<s))<<16 |
+					uint64(uint16((hi>>32)<<s))<<32 |
+					uint64(uint16((hi>>48)<<s))<<48
+			case wazeroir.ShapeI32x4:
+				s = s % 32
+				lo = uint64(uint32(lo<<s)) | uint64(uint32((lo>>32)<<s))<<32
+				hi = uint64(uint32(hi<<s)) | uint64(uint32((hi>>32)<<s))<<32
+			case wazeroir.ShapeI64x2:
+				s = s % 64
+				lo = lo << s
+				hi = hi << s
+			}
+			ce.pushValue(lo)
+			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Shr:
+			s := ce.popValue()
+			hi, lo := ce.popValue(), ce.popValue()
+			switch op.b1 {
+			case wazeroir.ShapeI8x16:
+				s = s % 8
+				if op.b3 { // signed
+					lo = uint64(uint8(int8(lo)>>s)) |
+						uint64(uint8(int8(lo>>8)>>s))<<8 |
+						uint64(uint8(int8(lo>>16)>>s))<<16 |
+						uint64(uint8(int8(lo>>24)>>s))<<24 |
+						uint64(uint8(int8(lo>>32)>>s))<<32 |
+						uint64(uint8(int8(lo>>40)>>s))<<40 |
+						uint64(uint8(int8(lo>>48)>>s))<<48 |
+						uint64(uint8(int8(lo>>56)>>s))<<56
+					hi = uint64(uint8(int8(hi)>>s)) |
+						uint64(uint8(int8(hi>>8)>>s))<<8 |
+						uint64(uint8(int8(hi>>16)>>s))<<16 |
+						uint64(uint8(int8(hi>>24)>>s))<<24 |
+						uint64(uint8(int8(hi>>32)>>s))<<32 |
+						uint64(uint8(int8(hi>>40)>>s))<<40 |
+						uint64(uint8(int8(hi>>48)>>s))<<48 |
+						uint64(uint8(int8(hi>>56)>>s))<<56
+				} else {
+					lo = uint64(uint8(lo)>>s) |
+						uint64(uint8(lo>>8)>>s)<<8 |
+						uint64(uint8(lo>>16)>>s)<<16 |
+						uint64(uint8(lo>>24)>>s)<<24 |
+						uint64(uint8(lo>>32)>>s)<<32 |
+						uint64(uint8(lo>>40)>>s)<<40 |
+						uint64(uint8(lo>>48)>>s)<<48 |
+						uint64(uint8(lo>>56)>>s)<<56
+					hi = uint64(uint8(hi)>>s) |
+						uint64(uint8(hi>>8)>>s)<<8 |
+						uint64(uint8(hi>>16)>>s)<<16 |
+						uint64(uint8(hi>>24)>>s)<<24 |
+						uint64(uint8(hi>>32)>>s)<<32 |
+						uint64(uint8(hi>>40)>>s)<<40 |
+						uint64(uint8(hi>>48)>>s)<<48 |
+						uint64(uint8(hi>>56)>>s)<<56
+				}
+			case wazeroir.ShapeI16x8:
+				s = s % 16
+				if op.b3 { // signed
+					lo = uint64(uint16(int16(lo)>>s)) |
+						uint64(uint16(int16(lo>>16)>>s))<<16 |
+						uint64(uint16(int16(lo>>32)>>s))<<32 |
+						uint64(uint16(int16(lo>>48)>>s))<<48
+					hi = uint64(uint16(int16(hi)>>s)) |
+						uint64(uint16(int16(hi>>16)>>s))<<16 |
+						uint64(uint16(int16(hi>>32)>>s))<<32 |
+						uint64(uint16(int16(hi>>48)>>s))<<48
+				} else {
+					lo = uint64(uint16(lo)>>s) |
+						uint64(uint16(lo>>16)>>s)<<16 |
+						uint64(uint16(lo>>32)>>s)<<32 |
+						uint64(uint16(lo>>48)>>s)<<48
+					hi = uint64(uint16(hi)>>s) |
+						uint64(uint16(hi>>16)>>s)<<16 |
+						uint64(uint16(hi>>32)>>s)<<32 |
+						uint64(uint16(hi>>48)>>s)<<48
+				}
+			case wazeroir.ShapeI32x4:
+				s = s % 32
+				if op.b3 {
+					lo = uint64(uint32(int32(lo)>>s)) | uint64(uint32(int32(lo>>32)>>s))<<32
+					hi = uint64(uint32(int32(hi)>>s)) | uint64(uint32(int32(hi>>32)>>s))<<32
+				} else {
+					lo = uint64(uint32(lo)>>s) | uint64(uint32(lo>>32)>>s)<<32
+					hi = uint64(uint32(hi)>>s) | uint64(uint32(hi>>32)>>s)<<32
+				}
+			case wazeroir.ShapeI64x2:
+				s = s % 64
+				if op.b3 { // signed
+					lo = uint64(int64(lo) >> s)
+					hi = uint64(int64(hi) >> s)
+				} else {
+					lo = lo >> s
+					hi = hi >> s
+				}
+			}
+			ce.pushValue(lo)
+			ce.pushValue(hi)
 			frame.pc++
 		}
 	}

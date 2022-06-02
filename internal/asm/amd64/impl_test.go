@@ -633,6 +633,106 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 			exp: []byte{0x66, 0x45, 0xf, 0xdf, 0xef},
 		},
+		{
+			name: "psrad xmm13, xmm15",
+			n: &NodeImpl{
+				Instruction: PSRAD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xe2, 0xef},
+		},
+		{
+			name: "psraw xmm1, xmm1",
+			n: &NodeImpl{
+				Instruction: PSRAW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0xe1, 0xc9},
+		},
+		{
+			name: "psrlq xmm14, xmm14",
+			n: &NodeImpl{
+				Instruction: PSRLQ,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX14,
+				DstReg:      RegX14,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xd3, 0xf6},
+		},
+		{
+			name: "psrld xmm3, xmm3",
+			n: &NodeImpl{
+				Instruction: PSRLD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX3,
+				DstReg:      RegX3,
+			},
+			exp: []byte{0x66, 0xf, 0xd2, 0xdb},
+		},
+		{
+			name: "psrlw xmm15, xmm1",
+			n: &NodeImpl{
+				Instruction: PSRLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegX15,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xd1, 0xf9},
+		},
+		{
+			name: "psllw xmm1, xmm15",
+			n: &NodeImpl{
+				Instruction: PSLLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0xf1, 0xcf},
+		},
+		{
+			name: "punpcklbw xmm1, xmm15",
+			n: &NodeImpl{
+				Instruction: PUNPCKLBW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x60, 0xcf},
+		},
+		{
+			name: "punpckhbw xmm11, xmm1",
+			n: &NodeImpl{
+				Instruction: PUNPCKHBW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegX11,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x68, 0xd9},
+		},
+		{
+			name: "pslld xmm11, xmm1",
+			n: &NodeImpl{
+				Instruction: PSLLD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX1,
+				DstReg:      RegX11,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xf2, 0xd9},
+		},
+		{
+			name: "psllq xmm11, xmm15",
+			n: &NodeImpl{
+				Instruction: PSLLQ,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX11,
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xf3, 0xdf},
+		},
 	}
 
 	for _, tt := range tests {
@@ -640,6 +740,90 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl()
 			err := a.EncodeRegisterToRegister(tc.n)
+			require.NoError(t, err)
+
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
+	// These are not supported by golang-asm, so we test here instead of integration tests.
+	tests := []struct {
+		name string
+		n    *NodeImpl
+		exp  []byte
+	}{
+		{
+			name: "psraw xmm10, 1",
+			n: &NodeImpl{
+				Instruction: PSRAW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    1,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xe2, 0x1},
+		},
+		{
+			name: "psraw xmm10, 8",
+			n: &NodeImpl{
+				Instruction: PSRAW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    8,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xe2, 0x8},
+		},
+
+		{
+			name: "psrlw xmm10, 1",
+			n: &NodeImpl{
+				Instruction: PSRLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    1,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xd2, 0x1},
+		},
+		{
+			name: "psrlw xmm10, 8",
+			n: &NodeImpl{
+				Instruction: PSRLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    8,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xd2, 0x8},
+		},
+		{
+			name: "psllw xmm10, 1",
+			n: &NodeImpl{
+				Instruction: PSLLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    1,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xf2, 0x1},
+		},
+		{
+			name: "psllw xmm10, 8",
+			n: &NodeImpl{
+				Instruction: PSLLW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    8,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xf2, 0x8},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl()
+			err := a.EncodeConstToRegister(tc.n)
 			require.NoError(t, err)
 
 			actual, err := a.Assemble()

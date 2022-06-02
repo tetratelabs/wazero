@@ -1274,6 +1274,26 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	MOVMSKPS: {opcode: []byte{0x0f, 0x50}, requireSrcFloat: true, requireDstFloat: false},
 	// https://www.felixcloutier.com/x86/movmskpd
 	MOVMSKPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x50}, requireSrcFloat: true, requireDstFloat: false},
+	// https://www.felixcloutier.com/x86/psraw:psrad:psraq
+	PSRAD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xe2}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psraw:psrad:psraq
+	PSRAW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xe1}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+	PSRLQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd3}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+	PSRLD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd2}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+	PSRLW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xd1}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psllw:pslld:psllq
+	PSLLW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf1}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psllw:pslld:psllq
+	PSLLD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf2}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/psllw:pslld:psllq
+	PSLLQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xf3}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/punpcklbw:punpcklwd:punpckldq:punpcklqdq
+	PUNPCKLBW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x60}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/punpckhbw:punpckhwd:punpckhdq:punpckhqdq
+	PUNPCKHBW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x68}, requireSrcFloat: true, requireDstFloat: true},
 }
 
 var RegisterToRegisterShiftOpcode = map[asm.Instruction]struct {
@@ -1875,7 +1895,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 
 	isFloatReg := IsVectorRegister(n.DstReg)
 	switch n.Instruction {
-	case PSLLL, PSLLQ, PSRLL, PSRLQ:
+	case PSLLD, PSLLQ, PSRLD, PSRLQ, PSRAW, PSRLW, PSLLW:
 		if !isFloatReg {
 			return fmt.Errorf("%s needs float register but got %s", InstructionName(n.Instruction), RegisterName(n.DstReg))
 		}
@@ -1889,9 +1909,9 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		return fmt.Errorf("constant must fit in 32-bit integer for %s, but got %d", InstructionName(n.Instruction), n.SrcConst)
 	} else if (n.Instruction == SHLQ || n.Instruction == SHRQ) && (n.SrcConst < 0 || n.SrcConst > math.MaxUint8) {
 		return fmt.Errorf("constant must fit in positive 8-bit integer for %s, but got %d", InstructionName(n.Instruction), n.SrcConst)
-	} else if (n.Instruction == PSLLL ||
+	} else if (n.Instruction == PSLLD ||
 		n.Instruction == PSLLQ ||
-		n.Instruction == PSRLL ||
+		n.Instruction == PSRLD ||
 		n.Instruction == PSRLQ) && (n.SrcConst < math.MinInt8 || n.SrcConst > math.MaxInt8) {
 		return fmt.Errorf("constant must fit in signed 8-bit integer for %s, but got %d", InstructionName(n.Instruction), n.SrcConst)
 	}
@@ -1988,7 +2008,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			a.Buf.Write([]byte{rexPrefix, 0xc1, modRM})
 			a.WriteConst(n.SrcConst, 8)
 		}
-	case PSLLL:
+	case PSLLD:
 		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
 		modRM := 0b11_000_000 | // Specifying that opeand is register.
 			0b00_110_000 | // PSLL with immediate needs "/6" extension.
@@ -2012,10 +2032,10 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			a.Buf.Write([]byte{0x66, 0x0f, 0x73, modRM})
 			a.WriteConst(n.SrcConst, 8)
 		}
-	case PSRLL:
+	case PSRLD:
 		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
-		modRM := 0b11_000_000 | // Specifying that opeand is register.
+		modRM := 0b11_000_000 | // Specifying that operand is register.
 			0b00_010_000 | // PSRL with immediate needs "/2" extension.
 			regBits
 		if rexPrefix != RexPrefixNone {
@@ -2027,7 +2047,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		}
 	case PSRLQ:
 		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
-		modRM := 0b11_000_000 | // Specifying that opeand is register.
+		modRM := 0b11_000_000 | // Specifying that operand is register.
 			0b00_010_000 | // PSRL with immediate needs "/2" extension.
 			regBits
 		if rexPrefix != RexPrefixNone {
@@ -2037,6 +2057,39 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 			a.Buf.Write([]byte{0x66, 0x0f, 0x73, modRM})
 			a.WriteConst(n.SrcConst, 8)
 		}
+	case PSRAW:
+		// https://www.felixcloutier.com/x86/psraw:psrad:psraq
+		modRM := 0b11_000_000 | // Specifying that operand is register.
+			0b00_100_000 | // PSRAW with immediate needs "/4" extension.
+			regBits
+		a.Buf.WriteByte(0x66)
+		if rexPrefix != RexPrefixNone {
+			a.Buf.WriteByte(rexPrefix)
+		}
+		a.Buf.Write([]byte{0x0f, 0x71, modRM})
+		a.WriteConst(n.SrcConst, 8)
+	case PSRLW:
+		// https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
+		modRM := 0b11_000_000 | // Specifying that operand is register.
+			0b00_010_000 | // PSRLW with immediate needs "/2" extension.
+			regBits
+		a.Buf.WriteByte(0x66)
+		if rexPrefix != RexPrefixNone {
+			a.Buf.WriteByte(rexPrefix)
+		}
+		a.Buf.Write([]byte{0x0f, 0x71, modRM})
+		a.WriteConst(n.SrcConst, 8)
+	case PSLLW:
+		// https://www.felixcloutier.com/x86/psllw:pslld:psllq
+		modRM := 0b11_000_000 | // Specifying that operand is register.
+			0b00_110_000 | // PSLLW with immediate needs "/6" extension.
+			regBits
+		a.Buf.WriteByte(0x66)
+		if rexPrefix != RexPrefixNone {
+			a.Buf.WriteByte(rexPrefix)
+		}
+		a.Buf.Write([]byte{0x0f, 0x71, modRM})
+		a.WriteConst(n.SrcConst, 8)
 	case XORL, XORQ:
 		// https://www.felixcloutier.com/x86/xor
 		if inst == XORQ {

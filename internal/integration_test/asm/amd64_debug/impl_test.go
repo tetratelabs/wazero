@@ -1507,20 +1507,20 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 				expErr: "RET is unsupported for from:const,to:register type",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister},
+				n:      &amd64.NodeImpl{Instruction: amd64.PSLLD, Types: amd64.OperandTypesConstToRegister},
 				expErr: "invalid register [nil]",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegAX},
-				expErr: "PSLLL needs float register but got AX",
+				n:      &amd64.NodeImpl{Instruction: amd64.PSLLD, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegAX},
+				expErr: "PSLLD needs float register but got AX",
 			},
 			{
 				n:      &amd64.NodeImpl{Instruction: amd64.ADDQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0},
 				expErr: "ADDQ needs int register but got X0",
 			},
 			{
-				n:      &amd64.NodeImpl{Instruction: amd64.PSLLL, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0, SrcConst: 2199023255552},
-				expErr: "constant must fit in 32-bit integer for PSLLL, but got 2199023255552",
+				n:      &amd64.NodeImpl{Instruction: amd64.PSLLD, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegX0, SrcConst: 2199023255552},
+				expErr: "constant must fit in 32-bit integer for PSLLD, but got 2199023255552",
 			},
 			{
 				n:      &amd64.NodeImpl{Instruction: amd64.SHLQ, Types: amd64.OperandTypesConstToRegister, DstReg: amd64.RegR10, SrcConst: 32768},
@@ -1580,7 +1580,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 		}
 	})
 	t.Run("float instructions", func(t *testing.T) {
-		for _, inst := range []asm.Instruction{amd64.PSLLL, amd64.PSLLQ, amd64.PSRLL, amd64.PSRLQ} {
+		for _, inst := range []asm.Instruction{amd64.PSLLD, amd64.PSLLQ, amd64.PSLLD, amd64.PSRLQ} {
 			inst := inst
 			t.Run(amd64.InstructionName(inst), func(t *testing.T) {
 				for _, reg := range floatRegisters {

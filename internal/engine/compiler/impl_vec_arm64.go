@@ -513,50 +513,68 @@ func (c *arm64Compiler) compileV128Splat(o *wazeroir.OperationV128Splat) (err er
 	return
 }
 
+func (c *arm64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
+	for i := uint64(0); i < c.locationStack.sp; i++ {
+		prevValue := c.locationStack.stack[i]
+		if prevValue.register == reg {
+			fmt.Printf("releaseing %s to sp=%d \n", arm64.RegisterName(prevValue.register), prevValue.stackPointer)
+			c.compileReleaseRegisterToStack(prevValue)
+			break
+		}
+	}
+}
+
 // compileV128Shuffle implements compiler.compileV128Shuffle for arm64.
 func (c *arm64Compiler) compileV128Shuffle(o *wazeroir.OperationV128Shuffle) (err error) {
+	// Shuffle needs two operands (v, w) must be next to each other.
+	// For simplicity, we use V29 for v and V30 for w values respectively.
+	const vReg, wReg = arm64.RegV29, arm64.RegV30
+
+	// Ensures that w value is placed on wReg.
 	w := c.locationStack.popV128()
+	if w.register != wReg {
+		// If wReg is already in use, save the value onto the stack.
+		c.onValueReleaseRegisterToStack(wReg)
+
+		if w.onRegister() {
+			c.assembler.CompileVectorRegisterToVectorRegister(arm64.VMOV, w.register, wReg,
+				arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+			// We no longer use the old register.
+			c.markRegisterUnused(w.register)
+		} else { // on stack
+			w.setRegister(wReg)
+			c.compileLoadValueOnStackToRegister(w)
+		}
+	}
+
+	// Ensures that v value is placed on wReg.
 	v := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
-		return err
+	if v.register != vReg {
+		// If vReg is already in use, save the value onto the stack.
+		c.onValueReleaseRegisterToStack(vReg)
+
+		if v.onRegister() {
+			c.assembler.CompileVectorRegisterToVectorRegister(arm64.VMOV, v.register, vReg,
+				arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+			// We no longer use the old register.
+			c.markRegisterUnused(v.register)
+		} else { // on stack
+			v.setRegister(vReg)
+			c.compileLoadValueOnStackToRegister(v)
+		}
 	}
 
-	r1 := v.register
-	var r2 asm.Register
-	if r1 < arm64.RegV30 {
-		r2 = v.register + 1
-	} else {
-		r2 = v.register - 1
-	}
-
-	if w.onRegister() {
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.VMOV, w.register, r2,
-			arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
-		c.markRegisterUnused(w.register)
-	} else { // on stack
-		w.setRegister(r2)
-		c.compileLoadValueOnStackToRegister(w)
-	}
-
-	c.locationStack.markRegisterUsed(r1, r2)
-
+	c.locationStack.markRegisterUsed(vReg, wReg)
 	result, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
 
 	c.assembler.CompileLoadStaticConstToVectorRegister(arm64.VMOV, o.Lanes[:], result, arm64.VectorArrangementQ)
-
-	var origin asm.Register
-	if r1 < r2 {
-		origin = r1
-	} else {
-		origin = r2
-	}
-	c.assembler.CompileVectorRegisterToVectorRegister(arm64.TBL2, origin, result, arm64.VectorArrangement16B,
+	c.assembler.CompileVectorRegisterToVectorRegister(arm64.TBL2, vReg, result, arm64.VectorArrangement16B,
 		arm64.VectorIndexNone, arm64.VectorIndexNone)
 
-	c.locationStack.markRegisterUnused(r1, r2)
+	c.locationStack.markRegisterUnused(vReg, wReg)
 	c.pushVectorRuntimeValueLocationOnRegister(result)
 	return
 }
@@ -668,5 +686,16 @@ func (c *arm64Compiler) compileV128Bitselect(o *wazeroir.OperationV128Bitselect)
 
 // compileV128AndNot implements compiler.compileV128AndNot for arm64.
 func (c *arm64Compiler) compileV128AndNot(o *wazeroir.OperationV128AndNot) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Shr implements compiler.compileV128Shr for arm64.
+func (c *arm64Compiler) compileV128Shr(o *wazeroir.OperationV128Shr) error {
+	// https://stackoverflow.com/questions/35002937/sse-simd-shift-with-one-byte-element-size-granularity
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}
+
+// compileV128Shl implements compiler.compileV128Shl for arm64.
+func (c *arm64Compiler) compileV128Shl(o *wazeroir.OperationV128Shl) error {
 	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 }

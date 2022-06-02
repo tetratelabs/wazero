@@ -2132,6 +2132,54 @@ operatorSwitch:
 			c.emit(
 				&OperationV128AndNot{},
 			)
+		case wasm.OpcodeVecI8x16Shl:
+			c.emit(
+				&OperationV128Shl{Shape: ShapeI8x16},
+			)
+		case wasm.OpcodeVecI8x16ShrS:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI8x16, Signed: true},
+			)
+		case wasm.OpcodeVecI8x16ShrU:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI8x16, Signed: false},
+			)
+		case wasm.OpcodeVecI16x8Shl:
+			c.emit(
+				&OperationV128Shl{Shape: ShapeI16x8},
+			)
+		case wasm.OpcodeVecI16x8ShrS:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI16x8, Signed: true},
+			)
+		case wasm.OpcodeVecI16x8ShrU:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI16x8, Signed: false},
+			)
+		case wasm.OpcodeVecI32x4Shl:
+			c.emit(
+				&OperationV128Shl{Shape: ShapeI32x4},
+			)
+		case wasm.OpcodeVecI32x4ShrS:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI32x4, Signed: true},
+			)
+		case wasm.OpcodeVecI32x4ShrU:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI32x4, Signed: false},
+			)
+		case wasm.OpcodeVecI64x2Shl:
+			c.emit(
+				&OperationV128Shl{Shape: ShapeI64x2},
+			)
+		case wasm.OpcodeVecI64x2ShrS:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI64x2, Signed: true},
+			)
+		case wasm.OpcodeVecI64x2ShrU:
+			c.emit(
+				&OperationV128Shr{Shape: ShapeI64x2, Signed: false},
+			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}

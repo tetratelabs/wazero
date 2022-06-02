@@ -75,11 +75,6 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 }
 
 func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
-	if n.Instruction != MOVDQU {
-		err = errorEncodingUnsupported(n)
-		return
-	}
-
 	a.pool.addConst(n.staticConst)
 
 	dstReg3Bits, rexPrefix, err := register3bits(n.DstReg, registerSpecifierPositionModRMFieldReg)
@@ -104,12 +99,31 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 	modRM := 0b00_000_101 | // Indicate "MOVDQU [RIP + 32bit displacement], DstReg" encoding.
 		(dstReg3Bits << 3) // Place the DstReg on ModRM:reg.
 
-	// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
-	inst = append(inst, 0xf3) // mandatory prefix
+	var mandatoryPrefix byte
+	var opcodes []byte
+	switch n.Instruction {
+	case MOVDQU:
+		// https://www.felixcloutier.com/x86/movdqu:vmovdqu8:vmovdqu16:vmovdqu32:vmovdqu64
+		mandatoryPrefix = 0xf3
+		opcodes = []byte{0x0f, 0x6f}
+	case LEAQ:
+		// https://www.felixcloutier.com/x86/lea
+		rexPrefix |= RexPrefixW
+		opcodes = []byte{0x8d}
+	default:
+		err = errorEncodingUnsupported(n)
+		return
+	}
+
+	if mandatoryPrefix != 0 {
+		inst = append(inst, mandatoryPrefix)
+	}
 	if rexPrefix != RexPrefixNone {
 		inst = append(inst, rexPrefix)
 	}
-	inst = append(inst, 0x0f, 0x6f, modRM,
+
+	inst = append(inst, opcodes...)
+	inst = append(inst, modRM,
 		0x0, 0x0, 0x0, 0x0, // Preserve 4 bytes for displacement.
 	)
 

@@ -332,6 +332,10 @@ func (o OperationKind) String() (ret string) {
 		return "V128AndNot"
 	case OperationKindV128BitMask:
 		return "V128BitMask"
+	case OperationKindV128Shl:
+		return "V128Shl"
+	case OperationKindV128Shr:
+		return "V128Shr"
 	default:
 		panic("BUG")
 	}
@@ -450,6 +454,8 @@ const (
 	OperationKindV128Xor
 	OperationKindV128Bitselect
 	OperationKindV128AndNot
+	OperationKindV128Shl
+	OperationKindV128Shr
 )
 
 type Label struct {
@@ -1496,4 +1502,25 @@ type OperationV128AndNot struct{}
 // Kind implements Operation.Kind.
 func (o *OperationV128AndNot) Kind() OperationKind {
 	return OperationKindV128AndNot
+}
+
+// OperationV128Shl implements Operation.
+type OperationV128Shl struct {
+	Shape Shape
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Shl) Kind() OperationKind {
+	return OperationKindV128Shl
+}
+
+// OperationV128Shr implements Operation.
+type OperationV128Shr struct {
+	Shape  Shape
+	Signed bool
+}
+
+// Kind implements Operation.Kind.
+func (o *OperationV128Shr) Kind() OperationKind {
+	return OperationKindV128Shr
 }
