@@ -1318,7 +1318,6 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	PMINSW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xea}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pminsb:pminsw
 	PMINSB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x38}, requireSrcFloat: true, requireDstFloat: true},
-
 	// https://www.felixcloutier.com/x86/pminud:pminuq
 	PMINUD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3b}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/pminub:pminuw

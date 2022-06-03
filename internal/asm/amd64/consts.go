@@ -860,7 +860,7 @@ func InstructionName(instruction asm.Instruction) string {
 	case PMAXSB:
 		return "PMAXSB"
 	}
-	panic(instruction)
+	panic(fmt.Errorf("unknown instruction %d", instruction))
 }
 
 // Amd64-specific registers.

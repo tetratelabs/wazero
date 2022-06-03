@@ -349,7 +349,7 @@ func (o OperationKind) String() (ret string) {
 	case OperationKindSignExtend64From32:
 		ret = "SignExtend64From32"
 	default:
-		panic(int(o))
+		panic(fmt.Errorf("unknown operation %d", o))
 	}
 	return
 }

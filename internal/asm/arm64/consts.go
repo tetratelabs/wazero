@@ -1090,5 +1090,5 @@ func InstructionName(i asm.Instruction) string {
 	case TBL2:
 		return "TBL2"
 	}
-	panic(i)
+	panic(fmt.Errorf("unknown instruction %d", i))
 }

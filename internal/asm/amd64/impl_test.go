@@ -740,7 +740,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX11,
-				Arg:         0, // CMPPS with arg=0 == CMPEQPS.
+				Arg:         0, // CMPPS with arg=0 == Pseudo-Op CMPEQPS.
 			},
 			exp: []byte{0x45, 0xf, 0xc2, 0xdf, 0x0},
 		},
@@ -751,7 +751,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX5,
 				DstReg:      RegX1,
-				Arg:         7, // CMPPS with arg=7 == CMPORDPS.
+				Arg:         7, // CMPPS with arg=7 == Pseudo-Op CMPORDPS.
 			},
 			exp: []byte{0xf, 0xc2, 0xcd, 0x7},
 		},
@@ -762,7 +762,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX11,
-				Arg:         2, // CMPPD with arg=2 == CMPLEPD.
+				Arg:         2, // CMPPD with arg=2 == Pseudo-Op CMPLEPD.
 			},
 			exp: []byte{0x66, 0x45, 0xf, 0xc2, 0xdf, 0x2},
 		},
@@ -773,7 +773,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX5,
 				DstReg:      RegX1,
-				Arg:         4, // CMPPD with arg=4 == CMPNEQPD.
+				Arg:         4, // CMPPD with arg=4 == Pseudo-Op CMPNEQPD.
 			},
 			exp: []byte{0x66, 0xf, 0xc2, 0xcd, 0x4},
 		},
