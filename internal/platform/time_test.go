@@ -27,5 +27,5 @@ func Test_Nanotime(t *testing.T) {
 
 	// It takes more than a nanosecond to make the two clock readings required
 	// to implement time.Now. Hence, delta will always be less than nanos.
-	require.True(t, delta < nanos)
+	require.True(t, delta <= nanos)
 }
