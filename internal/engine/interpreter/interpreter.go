@@ -643,6 +643,8 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.b3 = o.Signed
 		case *wazeroir.OperationV128Shl:
 			op.b1 = o.Shape
+		case *wazeroir.OperationV128Cmp:
+			op.b1 = o.Type
 		default:
 			panic(fmt.Errorf("BUG: unimplemented operation %s", op.kind.String()))
 		}
@@ -2551,9 +2553,375 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					lo = lo >> s
 					hi = hi >> s
 				}
+
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
+			frame.pc++
+		case wazeroir.OperationKindV128Cmp:
+			x2Hi, x2Lo := ce.popValue(), ce.popValue()
+			x1Hi, x1Lo := ce.popValue(), ce.popValue()
+			var result []bool
+			switch op.b1 {
+			case wazeroir.V128CmpTypeI8x16Eq:
+				result = []bool{
+					byte(x1Lo>>0) == byte(x2Lo>>0), byte(x1Lo>>8) == byte(x2Lo>>8),
+					byte(x1Lo>>16) == byte(x2Lo>>16), byte(x1Lo>>24) == byte(x2Lo>>24),
+					byte(x1Lo>>32) == byte(x2Lo>>32), byte(x1Lo>>40) == byte(x2Lo>>40),
+					byte(x1Lo>>48) == byte(x2Lo>>48), byte(x1Lo>>56) == byte(x2Lo>>56),
+					byte(x1Hi>>0) == byte(x2Hi>>0), byte(x1Hi>>8) == byte(x2Hi>>8),
+					byte(x1Hi>>16) == byte(x2Hi>>16), byte(x1Hi>>24) == byte(x2Hi>>24),
+					byte(x1Hi>>32) == byte(x2Hi>>32), byte(x1Hi>>40) == byte(x2Hi>>40),
+					byte(x1Hi>>48) == byte(x2Hi>>48), byte(x1Hi>>56) == byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16Ne:
+				result = []bool{
+					byte(x1Lo>>0) != byte(x2Lo>>0), byte(x1Lo>>8) != byte(x2Lo>>8),
+					byte(x1Lo>>16) != byte(x2Lo>>16), byte(x1Lo>>24) != byte(x2Lo>>24),
+					byte(x1Lo>>32) != byte(x2Lo>>32), byte(x1Lo>>40) != byte(x2Lo>>40),
+					byte(x1Lo>>48) != byte(x2Lo>>48), byte(x1Lo>>56) != byte(x2Lo>>56),
+					byte(x1Hi>>0) != byte(x2Hi>>0), byte(x1Hi>>8) != byte(x2Hi>>8),
+					byte(x1Hi>>16) != byte(x2Hi>>16), byte(x1Hi>>24) != byte(x2Hi>>24),
+					byte(x1Hi>>32) != byte(x2Hi>>32), byte(x1Hi>>40) != byte(x2Hi>>40),
+					byte(x1Hi>>48) != byte(x2Hi>>48), byte(x1Hi>>56) != byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16LtS:
+				result = []bool{
+					int8(x1Lo>>0) < int8(x2Lo>>0), int8(x1Lo>>8) < int8(x2Lo>>8),
+					int8(x1Lo>>16) < int8(x2Lo>>16), int8(x1Lo>>24) < int8(x2Lo>>24),
+					int8(x1Lo>>32) < int8(x2Lo>>32), int8(x1Lo>>40) < int8(x2Lo>>40),
+					int8(x1Lo>>48) < int8(x2Lo>>48), int8(x1Lo>>56) < int8(x2Lo>>56),
+					int8(x1Hi>>0) < int8(x2Hi>>0), int8(x1Hi>>8) < int8(x2Hi>>8),
+					int8(x1Hi>>16) < int8(x2Hi>>16), int8(x1Hi>>24) < int8(x2Hi>>24),
+					int8(x1Hi>>32) < int8(x2Hi>>32), int8(x1Hi>>40) < int8(x2Hi>>40),
+					int8(x1Hi>>48) < int8(x2Hi>>48), int8(x1Hi>>56) < int8(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16LtU:
+				result = []bool{
+					byte(x1Lo>>0) < byte(x2Lo>>0), byte(x1Lo>>8) < byte(x2Lo>>8),
+					byte(x1Lo>>16) < byte(x2Lo>>16), byte(x1Lo>>24) < byte(x2Lo>>24),
+					byte(x1Lo>>32) < byte(x2Lo>>32), byte(x1Lo>>40) < byte(x2Lo>>40),
+					byte(x1Lo>>48) < byte(x2Lo>>48), byte(x1Lo>>56) < byte(x2Lo>>56),
+					byte(x1Hi>>0) < byte(x2Hi>>0), byte(x1Hi>>8) < byte(x2Hi>>8),
+					byte(x1Hi>>16) < byte(x2Hi>>16), byte(x1Hi>>24) < byte(x2Hi>>24),
+					byte(x1Hi>>32) < byte(x2Hi>>32), byte(x1Hi>>40) < byte(x2Hi>>40),
+					byte(x1Hi>>48) < byte(x2Hi>>48), byte(x1Hi>>56) < byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16GtS:
+				result = []bool{
+					int8(x1Lo>>0) > int8(x2Lo>>0), int8(x1Lo>>8) > int8(x2Lo>>8),
+					int8(x1Lo>>16) > int8(x2Lo>>16), int8(x1Lo>>24) > int8(x2Lo>>24),
+					int8(x1Lo>>32) > int8(x2Lo>>32), int8(x1Lo>>40) > int8(x2Lo>>40),
+					int8(x1Lo>>48) > int8(x2Lo>>48), int8(x1Lo>>56) > int8(x2Lo>>56),
+					int8(x1Hi>>0) > int8(x2Hi>>0), int8(x1Hi>>8) > int8(x2Hi>>8),
+					int8(x1Hi>>16) > int8(x2Hi>>16), int8(x1Hi>>24) > int8(x2Hi>>24),
+					int8(x1Hi>>32) > int8(x2Hi>>32), int8(x1Hi>>40) > int8(x2Hi>>40),
+					int8(x1Hi>>48) > int8(x2Hi>>48), int8(x1Hi>>56) > int8(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16GtU:
+				result = []bool{
+					byte(x1Lo>>0) > byte(x2Lo>>0), byte(x1Lo>>8) > byte(x2Lo>>8),
+					byte(x1Lo>>16) > byte(x2Lo>>16), byte(x1Lo>>24) > byte(x2Lo>>24),
+					byte(x1Lo>>32) > byte(x2Lo>>32), byte(x1Lo>>40) > byte(x2Lo>>40),
+					byte(x1Lo>>48) > byte(x2Lo>>48), byte(x1Lo>>56) > byte(x2Lo>>56),
+					byte(x1Hi>>0) > byte(x2Hi>>0), byte(x1Hi>>8) > byte(x2Hi>>8),
+					byte(x1Hi>>16) > byte(x2Hi>>16), byte(x1Hi>>24) > byte(x2Hi>>24),
+					byte(x1Hi>>32) > byte(x2Hi>>32), byte(x1Hi>>40) > byte(x2Hi>>40),
+					byte(x1Hi>>48) > byte(x2Hi>>48), byte(x1Hi>>56) > byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16LeS:
+				result = []bool{
+					int8(x1Lo>>0) <= int8(x2Lo>>0), int8(x1Lo>>8) <= int8(x2Lo>>8),
+					int8(x1Lo>>16) <= int8(x2Lo>>16), int8(x1Lo>>24) <= int8(x2Lo>>24),
+					int8(x1Lo>>32) <= int8(x2Lo>>32), int8(x1Lo>>40) <= int8(x2Lo>>40),
+					int8(x1Lo>>48) <= int8(x2Lo>>48), int8(x1Lo>>56) <= int8(x2Lo>>56),
+					int8(x1Hi>>0) <= int8(x2Hi>>0), int8(x1Hi>>8) <= int8(x2Hi>>8),
+					int8(x1Hi>>16) <= int8(x2Hi>>16), int8(x1Hi>>24) <= int8(x2Hi>>24),
+					int8(x1Hi>>32) <= int8(x2Hi>>32), int8(x1Hi>>40) <= int8(x2Hi>>40),
+					int8(x1Hi>>48) <= int8(x2Hi>>48), int8(x1Hi>>56) <= int8(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16LeU:
+				result = []bool{
+					byte(x1Lo>>0) <= byte(x2Lo>>0), byte(x1Lo>>8) <= byte(x2Lo>>8),
+					byte(x1Lo>>16) <= byte(x2Lo>>16), byte(x1Lo>>24) <= byte(x2Lo>>24),
+					byte(x1Lo>>32) <= byte(x2Lo>>32), byte(x1Lo>>40) <= byte(x2Lo>>40),
+					byte(x1Lo>>48) <= byte(x2Lo>>48), byte(x1Lo>>56) <= byte(x2Lo>>56),
+					byte(x1Hi>>0) <= byte(x2Hi>>0), byte(x1Hi>>8) <= byte(x2Hi>>8),
+					byte(x1Hi>>16) <= byte(x2Hi>>16), byte(x1Hi>>24) <= byte(x2Hi>>24),
+					byte(x1Hi>>32) <= byte(x2Hi>>32), byte(x1Hi>>40) <= byte(x2Hi>>40),
+					byte(x1Hi>>48) <= byte(x2Hi>>48), byte(x1Hi>>56) <= byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16GeS:
+				result = []bool{
+					int8(x1Lo>>0) >= int8(x2Lo>>0), int8(x1Lo>>8) >= int8(x2Lo>>8),
+					int8(x1Lo>>16) >= int8(x2Lo>>16), int8(x1Lo>>24) >= int8(x2Lo>>24),
+					int8(x1Lo>>32) >= int8(x2Lo>>32), int8(x1Lo>>40) >= int8(x2Lo>>40),
+					int8(x1Lo>>48) >= int8(x2Lo>>48), int8(x1Lo>>56) >= int8(x2Lo>>56),
+					int8(x1Hi>>0) >= int8(x2Hi>>0), int8(x1Hi>>8) >= int8(x2Hi>>8),
+					int8(x1Hi>>16) >= int8(x2Hi>>16), int8(x1Hi>>24) >= int8(x2Hi>>24),
+					int8(x1Hi>>32) >= int8(x2Hi>>32), int8(x1Hi>>40) >= int8(x2Hi>>40),
+					int8(x1Hi>>48) >= int8(x2Hi>>48), int8(x1Hi>>56) >= int8(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI8x16GeU:
+				result = []bool{
+					byte(x1Lo>>0) >= byte(x2Lo>>0), byte(x1Lo>>8) >= byte(x2Lo>>8),
+					byte(x1Lo>>16) >= byte(x2Lo>>16), byte(x1Lo>>24) >= byte(x2Lo>>24),
+					byte(x1Lo>>32) >= byte(x2Lo>>32), byte(x1Lo>>40) >= byte(x2Lo>>40),
+					byte(x1Lo>>48) >= byte(x2Lo>>48), byte(x1Lo>>56) >= byte(x2Lo>>56),
+					byte(x1Hi>>0) >= byte(x2Hi>>0), byte(x1Hi>>8) >= byte(x2Hi>>8),
+					byte(x1Hi>>16) >= byte(x2Hi>>16), byte(x1Hi>>24) >= byte(x2Hi>>24),
+					byte(x1Hi>>32) >= byte(x2Hi>>32), byte(x1Hi>>40) >= byte(x2Hi>>40),
+					byte(x1Hi>>48) >= byte(x2Hi>>48), byte(x1Hi>>56) >= byte(x2Hi>>56),
+				}
+			case wazeroir.V128CmpTypeI16x8Eq:
+				result = []bool{
+					uint16(x1Lo>>0) == uint16(x2Lo>>0), uint16(x1Lo>>16) == uint16(x2Lo>>16),
+					uint16(x1Lo>>32) == uint16(x2Lo>>32), uint16(x1Lo>>48) == uint16(x2Lo>>48),
+					uint16(x1Hi>>0) == uint16(x2Hi>>0), uint16(x1Hi>>16) == uint16(x2Hi>>16),
+					uint16(x1Hi>>32) == uint16(x2Hi>>32), uint16(x1Hi>>48) == uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8Ne:
+				result = []bool{
+					uint16(x1Lo>>0) != uint16(x2Lo>>0), uint16(x1Lo>>16) != uint16(x2Lo>>16),
+					uint16(x1Lo>>32) != uint16(x2Lo>>32), uint16(x1Lo>>48) != uint16(x2Lo>>48),
+					uint16(x1Hi>>0) != uint16(x2Hi>>0), uint16(x1Hi>>16) != uint16(x2Hi>>16),
+					uint16(x1Hi>>32) != uint16(x2Hi>>32), uint16(x1Hi>>48) != uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8LtS:
+				result = []bool{
+					int16(x1Lo>>0) < int16(x2Lo>>0), int16(x1Lo>>16) < int16(x2Lo>>16),
+					int16(x1Lo>>32) < int16(x2Lo>>32), int16(x1Lo>>48) < int16(x2Lo>>48),
+					int16(x1Hi>>0) < int16(x2Hi>>0), int16(x1Hi>>16) < int16(x2Hi>>16),
+					int16(x1Hi>>32) < int16(x2Hi>>32), int16(x1Hi>>48) < int16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8LtU:
+				result = []bool{
+					uint16(x1Lo>>0) < uint16(x2Lo>>0), uint16(x1Lo>>16) < uint16(x2Lo>>16),
+					uint16(x1Lo>>32) < uint16(x2Lo>>32), uint16(x1Lo>>48) < uint16(x2Lo>>48),
+					uint16(x1Hi>>0) < uint16(x2Hi>>0), uint16(x1Hi>>16) < uint16(x2Hi>>16),
+					uint16(x1Hi>>32) < uint16(x2Hi>>32), uint16(x1Hi>>48) < uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8GtS:
+				result = []bool{
+					int16(x1Lo>>0) > int16(x2Lo>>0), int16(x1Lo>>16) > int16(x2Lo>>16),
+					int16(x1Lo>>32) > int16(x2Lo>>32), int16(x1Lo>>48) > int16(x2Lo>>48),
+					int16(x1Hi>>0) > int16(x2Hi>>0), int16(x1Hi>>16) > int16(x2Hi>>16),
+					int16(x1Hi>>32) > int16(x2Hi>>32), int16(x1Hi>>48) > int16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8GtU:
+				result = []bool{
+					uint16(x1Lo>>0) > uint16(x2Lo>>0), uint16(x1Lo>>16) > uint16(x2Lo>>16),
+					uint16(x1Lo>>32) > uint16(x2Lo>>32), uint16(x1Lo>>48) > uint16(x2Lo>>48),
+					uint16(x1Hi>>0) > uint16(x2Hi>>0), uint16(x1Hi>>16) > uint16(x2Hi>>16),
+					uint16(x1Hi>>32) > uint16(x2Hi>>32), uint16(x1Hi>>48) > uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8LeS:
+				result = []bool{
+					int16(x1Lo>>0) <= int16(x2Lo>>0), int16(x1Lo>>16) <= int16(x2Lo>>16),
+					int16(x1Lo>>32) <= int16(x2Lo>>32), int16(x1Lo>>48) <= int16(x2Lo>>48),
+					int16(x1Hi>>0) <= int16(x2Hi>>0), int16(x1Hi>>16) <= int16(x2Hi>>16),
+					int16(x1Hi>>32) <= int16(x2Hi>>32), int16(x1Hi>>48) <= int16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8LeU:
+				result = []bool{
+					uint16(x1Lo>>0) <= uint16(x2Lo>>0), uint16(x1Lo>>16) <= uint16(x2Lo>>16),
+					uint16(x1Lo>>32) <= uint16(x2Lo>>32), uint16(x1Lo>>48) <= uint16(x2Lo>>48),
+					uint16(x1Hi>>0) <= uint16(x2Hi>>0), uint16(x1Hi>>16) <= uint16(x2Hi>>16),
+					uint16(x1Hi>>32) <= uint16(x2Hi>>32), uint16(x1Hi>>48) <= uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8GeS:
+				result = []bool{
+					int16(x1Lo>>0) >= int16(x2Lo>>0), int16(x1Lo>>16) >= int16(x2Lo>>16),
+					int16(x1Lo>>32) >= int16(x2Lo>>32), int16(x1Lo>>48) >= int16(x2Lo>>48),
+					int16(x1Hi>>0) >= int16(x2Hi>>0), int16(x1Hi>>16) >= int16(x2Hi>>16),
+					int16(x1Hi>>32) >= int16(x2Hi>>32), int16(x1Hi>>48) >= int16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI16x8GeU:
+				result = []bool{
+					uint16(x1Lo>>0) >= uint16(x2Lo>>0), uint16(x1Lo>>16) >= uint16(x2Lo>>16),
+					uint16(x1Lo>>32) >= uint16(x2Lo>>32), uint16(x1Lo>>48) >= uint16(x2Lo>>48),
+					uint16(x1Hi>>0) >= uint16(x2Hi>>0), uint16(x1Hi>>16) >= uint16(x2Hi>>16),
+					uint16(x1Hi>>32) >= uint16(x2Hi>>32), uint16(x1Hi>>48) >= uint16(x2Hi>>48),
+				}
+			case wazeroir.V128CmpTypeI32x4Eq:
+				result = []bool{
+					uint32(x1Lo>>0) == uint32(x2Lo>>0), uint32(x1Lo>>32) == uint32(x2Lo>>32),
+					uint32(x1Hi>>0) == uint32(x2Hi>>0), uint32(x1Hi>>32) == uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4Ne:
+				result = []bool{
+					uint32(x1Lo>>0) != uint32(x2Lo>>0), uint32(x1Lo>>32) != uint32(x2Lo>>32),
+					uint32(x1Hi>>0) != uint32(x2Hi>>0), uint32(x1Hi>>32) != uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4LtS:
+				result = []bool{
+					int32(x1Lo>>0) < int32(x2Lo>>0), int32(x1Lo>>32) < int32(x2Lo>>32),
+					int32(x1Hi>>0) < int32(x2Hi>>0), int32(x1Hi>>32) < int32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4LtU:
+				result = []bool{
+					uint32(x1Lo>>0) < uint32(x2Lo>>0), uint32(x1Lo>>32) < uint32(x2Lo>>32),
+					uint32(x1Hi>>0) < uint32(x2Hi>>0), uint32(x1Hi>>32) < uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4GtS:
+				result = []bool{
+					int32(x1Lo>>0) > int32(x2Lo>>0), int32(x1Lo>>32) > int32(x2Lo>>32),
+					int32(x1Hi>>0) > int32(x2Hi>>0), int32(x1Hi>>32) > int32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4GtU:
+				result = []bool{
+					uint32(x1Lo>>0) > uint32(x2Lo>>0), uint32(x1Lo>>32) > uint32(x2Lo>>32),
+					uint32(x1Hi>>0) > uint32(x2Hi>>0), uint32(x1Hi>>32) > uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4LeS:
+				result = []bool{
+					int32(x1Lo>>0) <= int32(x2Lo>>0), int32(x1Lo>>32) <= int32(x2Lo>>32),
+					int32(x1Hi>>0) <= int32(x2Hi>>0), int32(x1Hi>>32) <= int32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4LeU:
+				result = []bool{
+					uint32(x1Lo>>0) <= uint32(x2Lo>>0), uint32(x1Lo>>32) <= uint32(x2Lo>>32),
+					uint32(x1Hi>>0) <= uint32(x2Hi>>0), uint32(x1Hi>>32) <= uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4GeS:
+				result = []bool{
+					int32(x1Lo>>0) >= int32(x2Lo>>0), int32(x1Lo>>32) >= int32(x2Lo>>32),
+					int32(x1Hi>>0) >= int32(x2Hi>>0), int32(x1Hi>>32) >= int32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI32x4GeU:
+				result = []bool{
+					uint32(x1Lo>>0) >= uint32(x2Lo>>0), uint32(x1Lo>>32) >= uint32(x2Lo>>32),
+					uint32(x1Hi>>0) >= uint32(x2Hi>>0), uint32(x1Hi>>32) >= uint32(x2Hi>>32),
+				}
+			case wazeroir.V128CmpTypeI64x2Eq:
+				result = []bool{x1Lo == x2Lo, x1Hi == x2Hi}
+			case wazeroir.V128CmpTypeI64x2Ne:
+				result = []bool{x1Lo != x2Lo, x1Hi != x2Hi}
+			case wazeroir.V128CmpTypeI64x2LtS:
+				result = []bool{int64(x1Lo) < int64(x2Lo), int64(x1Hi) < int64(x2Hi)}
+			case wazeroir.V128CmpTypeI64x2GtS:
+				result = []bool{int64(x1Lo) > int64(x2Lo), int64(x1Hi) > int64(x2Hi)}
+			case wazeroir.V128CmpTypeI64x2LeS:
+				result = []bool{int64(x1Lo) <= int64(x2Lo), int64(x1Hi) <= int64(x2Hi)}
+			case wazeroir.V128CmpTypeI64x2GeS:
+				result = []bool{int64(x1Lo) >= int64(x2Lo), int64(x1Hi) >= int64(x2Hi)}
+			case wazeroir.V128CmpTypeF32x4Eq:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) == math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) == math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) == math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) == math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF32x4Ne:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) != math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) != math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) != math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) != math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF32x4Lt:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) < math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) < math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) < math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) < math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF32x4Gt:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) > math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) > math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) > math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) > math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF32x4Le:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) <= math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) <= math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) <= math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) <= math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF32x4Ge:
+				result = []bool{
+					math.Float32frombits(uint32(x1Lo>>0)) >= math.Float32frombits(uint32(x2Lo>>0)),
+					math.Float32frombits(uint32(x1Lo>>32)) >= math.Float32frombits(uint32(x2Lo>>32)),
+					math.Float32frombits(uint32(x1Hi>>0)) >= math.Float32frombits(uint32(x2Hi>>0)),
+					math.Float32frombits(uint32(x1Hi>>32)) >= math.Float32frombits(uint32(x2Hi>>32)),
+				}
+			case wazeroir.V128CmpTypeF64x2Eq:
+				result = []bool{
+					math.Float64frombits(x1Lo) == math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) == math.Float64frombits(x2Hi),
+				}
+			case wazeroir.V128CmpTypeF64x2Ne:
+				result = []bool{
+					math.Float64frombits(x1Lo) != math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) != math.Float64frombits(x2Hi),
+				}
+			case wazeroir.V128CmpTypeF64x2Lt:
+				result = []bool{
+					math.Float64frombits(x1Lo) < math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) < math.Float64frombits(x2Hi),
+				}
+			case wazeroir.V128CmpTypeF64x2Gt:
+				result = []bool{
+					math.Float64frombits(x1Lo) > math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) > math.Float64frombits(x2Hi),
+				}
+			case wazeroir.V128CmpTypeF64x2Le:
+				result = []bool{
+					math.Float64frombits(x1Lo) <= math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) <= math.Float64frombits(x2Hi),
+				}
+			case wazeroir.V128CmpTypeF64x2Ge:
+				result = []bool{
+					math.Float64frombits(x1Lo) >= math.Float64frombits(x2Lo),
+					math.Float64frombits(x1Hi) >= math.Float64frombits(x2Hi),
+				}
+			}
+
+			var retLo, retHi uint64
+			switch len(result) {
+			case 16:
+				for i, b := range result {
+					if b {
+						if i < 8 {
+							retLo |= 0xff << (i * 8)
+						} else {
+							retHi |= 0xff << ((i - 8) * 8)
+						}
+					}
+				}
+			case 8:
+				for i, b := range result {
+					if b {
+						if i < 4 {
+							retLo |= 0xffff << (i * 16)
+						} else {
+							retHi |= 0xffff << ((i - 4) * 16)
+						}
+					}
+				}
+			case 4:
+				for i, b := range result {
+					if b {
+						if i < 2 {
+							retLo |= 0xffff_ffff << (i * 32)
+						} else {
+							retHi |= 0xffff_ffff << ((i - 2) * 32)
+						}
+					}
+				}
+			case 2:
+				if result[0] {
+					retLo = ^uint64(0)
+				}
+				if result[1] {
+					retHi = ^uint64(0)
+				}
+			}
+
+			ce.pushValue(retLo)
+			ce.pushValue(retHi)
 			frame.pc++
 		}
 	}

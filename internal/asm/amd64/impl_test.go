@@ -733,6 +733,210 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			},
 			exp: []byte{0x66, 0x45, 0xf, 0xf3, 0xdf},
 		},
+		{
+			name: "cmpeqps xmm11, xmm15",
+			n: &NodeImpl{
+				Instruction: CMPPS,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX11,
+				Arg:         0, // CMPPS with arg=0 == CMPEQPS.
+			},
+			exp: []byte{0x45, 0xf, 0xc2, 0xdf, 0x0},
+		},
+		{
+			name: "cmpordps xmm1, xmm5",
+			n: &NodeImpl{
+				Instruction: CMPPS,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX5,
+				DstReg:      RegX1,
+				Arg:         7, // CMPPS with arg=7 == CMPORDPS.
+			},
+			exp: []byte{0xf, 0xc2, 0xcd, 0x7},
+		},
+		{
+			name: "cmplepd xmm11, xmm15",
+			n: &NodeImpl{
+				Instruction: CMPPD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX15,
+				DstReg:      RegX11,
+				Arg:         2, // CMPPD with arg=2 == CMPLEPD.
+			},
+			exp: []byte{0x66, 0x45, 0xf, 0xc2, 0xdf, 0x2},
+		},
+		{
+			name: "cmpneqpd xmm1, xmm5",
+			n: &NodeImpl{
+				Instruction: CMPPD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX5,
+				DstReg:      RegX1,
+				Arg:         4, // CMPPD with arg=4 == CMPNEQPD.
+			},
+			exp: []byte{0x66, 0xf, 0xc2, 0xcd, 0x4},
+		},
+		{
+			name: "pcmpgtq xmm10, xmm3",
+			n: &NodeImpl{
+				Instruction: PCMPGTQ,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX3,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x37, 0xd3},
+		},
+		{
+			name: "pcmpgtd xmm10, xmm3",
+			n: &NodeImpl{
+				Instruction: PCMPGTD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX3,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x66, 0xd3},
+		},
+		{
+			name: "pminsd xmm10, xmm3",
+			n: &NodeImpl{
+				Instruction: PMINSD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX3,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x39, 0xd3},
+		},
+		{
+			name: "pmaxsd xmm1, xmm12",
+			n: &NodeImpl{
+				Instruction: PMAXSD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX12,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x38, 0x3d, 0xcc},
+		},
+		{
+			name: "pmaxsw xmm1, xmm12",
+			n: &NodeImpl{
+				Instruction: PMAXSW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX12,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x38, 0x3d, 0xcc},
+		},
+		{
+			name: "pminsw xmm1, xmm12",
+			n: &NodeImpl{
+				Instruction: PMINSW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX12,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0xea, 0xcc},
+		},
+		{
+			name: "pcmpgtb xmm1, xmm12",
+			n: &NodeImpl{
+				Instruction: PCMPGTB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX12,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x64, 0xcc},
+		},
+		{
+			name: "pminsb xmm1, xmm12",
+			n: &NodeImpl{
+				Instruction: PMINSB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX12,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x38, 0x38, 0xcc},
+		},
+		{
+			name: "pmaxsb xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMAXSB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x38, 0x3c, 0xca},
+		},
+		{
+			name: "pminud xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMINUD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x38, 0x3b, 0xca},
+		},
+		{
+			name: "pminuw xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMINUW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x38, 0x3a, 0xca},
+		},
+		{
+			name: "pminub xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMINUB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0xda, 0xca},
+		},
+		{
+			name: "pmaxud xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMAXUD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x38, 0x3f, 0xca},
+		},
+		{
+			name: "pmaxuw xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMAXUW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x38, 0x3e, 0xca},
+		},
+		{
+			name: "pmaxub xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PMAXUB,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0xde, 0xca},
+		},
+		{
+			name: "pcmpgtw xmm1, xmm2",
+			n: &NodeImpl{
+				Instruction: PCMPGTW,
+				Types:       OperandTypesRegisterToRegister,
+				SrcReg:      RegX2,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0xf, 0x65, 0xca},
+		},
 	}
 
 	for _, tt := range tests {

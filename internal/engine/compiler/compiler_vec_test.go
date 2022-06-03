@@ -2838,3 +2838,439 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 		})
 	}
 }
+
+func i16x8(i1, i2, i3, i4, i5, i6, i7, i8 uint16) (ret [16]byte) {
+	binary.LittleEndian.PutUint16(ret[0:], i1)
+	binary.LittleEndian.PutUint16(ret[2:], i2)
+	binary.LittleEndian.PutUint16(ret[4:], i3)
+	binary.LittleEndian.PutUint16(ret[6:], i4)
+	binary.LittleEndian.PutUint16(ret[8:], i5)
+	binary.LittleEndian.PutUint16(ret[10:], i6)
+	binary.LittleEndian.PutUint16(ret[12:], i7)
+	binary.LittleEndian.PutUint16(ret[14:], i8)
+	return
+}
+
+func i32x4(i1, i2, i3, i4 uint32) (ret [16]byte) {
+	binary.LittleEndian.PutUint32(ret[0:], i1)
+	binary.LittleEndian.PutUint32(ret[4:], i2)
+	binary.LittleEndian.PutUint32(ret[8:], i3)
+	binary.LittleEndian.PutUint32(ret[12:], i4)
+	return
+}
+
+func f32x4(f1, f2, f3, f4 float32) (ret [16]byte) {
+	binary.LittleEndian.PutUint32(ret[0:], math.Float32bits(f1))
+	binary.LittleEndian.PutUint32(ret[4:], math.Float32bits(f2))
+	binary.LittleEndian.PutUint32(ret[8:], math.Float32bits(f3))
+	binary.LittleEndian.PutUint32(ret[12:], math.Float32bits(f4))
+	return
+}
+
+func i64x2(i1, i2 uint64) (ret [16]byte) {
+	binary.LittleEndian.PutUint64(ret[0:], i1)
+	binary.LittleEndian.PutUint64(ret[8:], i2)
+	return
+}
+
+func f64x2(f1, f2 float64) (ret [16]byte) {
+	binary.LittleEndian.PutUint64(ret[0:], math.Float64bits(f1))
+	binary.LittleEndian.PutUint64(ret[8:], math.Float64bits(f2))
+	return
+}
+
+func TestCompiler_compileV128Cmp(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: implement on amd64.
+		t.Skip()
+	}
+
+	tests := []struct {
+		name        string
+		cmpType     wazeroir.V128CmpType
+		x1, x2, exp [16]byte
+	}{
+		{
+			name:    "f32x4 eq",
+			cmpType: wazeroir.V128CmpTypeF32x4Eq,
+			x1:      f32x4(1.0, -123.123, 0, 3214231),
+			x2:      f32x4(0, 0, 0, 0),
+			exp:     [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0},
+		},
+		{
+			name:    "f32x4 ne",
+			cmpType: wazeroir.V128CmpTypeF32x4Ne,
+			x1:      f32x4(1.0, -123.123, 123, 3214231),
+			x2:      f32x4(2.0, 213123123.1231, 123, 0),
+			exp:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f32x4 lt",
+			cmpType: wazeroir.V128CmpTypeF32x4Lt,
+			x1:      f32x4(2.0, -123.123, 1234, 3214231),
+			x2:      f32x4(2.0, 213123123.1231, 123, 0),
+			exp:     [16]byte{0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0},
+		},
+		{
+			name:    "f32x4 le",
+			cmpType: wazeroir.V128CmpTypeF32x4Le,
+			x1:      f32x4(2.0, -123.123, 1234, 3214231),
+			x2:      f32x4(2.0, 213123123.1231, 123, 0),
+			exp:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0},
+		},
+		{
+			name:    "f32x4 gt",
+			cmpType: wazeroir.V128CmpTypeF32x4Gt,
+			x1:      f32x4(2.0, -123.123, 1234, 3214231),
+			x2:      f32x4(2.0, 213123123.1231, 123, 0),
+			exp:     [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f32x4 ge",
+			cmpType: wazeroir.V128CmpTypeF32x4Ge,
+			x1:      f32x4(2.0, -123.123, 1234, 3214231),
+			x2:      f32x4(2.0, 213123123.1231, 123, 0),
+			exp:     [16]byte{0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f64x2 eq",
+			cmpType: wazeroir.V128CmpTypeF64x2Eq,
+			x1:      f64x2(1.0, -123.12412),
+			x2:      f64x2(1.0, 123.123124),
+			exp:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0},
+		},
+		{
+			name:    "f64x2 ne",
+			cmpType: wazeroir.V128CmpTypeF64x2Ne,
+			x1:      f64x2(1.0, -123.12412),
+			x2:      f64x2(1.0, 123.123124),
+			exp:     [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f64x2 lt",
+			cmpType: wazeroir.V128CmpTypeF64x2Lt,
+			x1:      f64x2(-123, math.Inf(-1)),
+			x2:      f64x2(-123, -1234515),
+			exp:     [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f64x2 le",
+			cmpType: wazeroir.V128CmpTypeF64x2Le,
+			x1:      f64x2(-123, 123),
+			x2:      f64x2(-123, math.MaxFloat64),
+			exp:     [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "f64x2 gt",
+			cmpType: wazeroir.V128CmpTypeF64x2Gt,
+			x1:      f64x2(math.MaxFloat64, -123.0),
+			x2:      f64x2(123, -123.0),
+			exp: [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0, 0, 0, 0, 0, 0, 0, 0},
+		},
+		{
+			name:    "f64x2 ge",
+			cmpType: wazeroir.V128CmpTypeF64x2Ge,
+			x1:      f64x2(math.MaxFloat64, -123.0),
+			x2:      f64x2(123, -123.0),
+			exp: [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "i8x16 eq",
+			cmpType: wazeroir.V128CmpTypeI8x16Eq,
+			x1:      [16]byte{0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1},
+			x2:      [16]byte{1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0},
+			exp:     [16]byte{0, 0xff, 0, 0xff, 0xff, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0xff, 0xff, 0},
+		},
+		{
+			name:    "i8x16 ne",
+			cmpType: wazeroir.V128CmpTypeI8x16Ne,
+			x1:      [16]byte{0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1},
+			x2:      [16]byte{1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0},
+			exp:     [16]byte{0xff, 0, 0xff, 0, 0, 0xff, 0, 0, 0, 0, 0, 0, 0xff, 0, 0, 0xff},
+		},
+		{
+			name:    "i8x16 lt_s",
+			cmpType: wazeroir.V128CmpTypeI8x16LtS,
+			x1:      [16]byte{0: i8ToU8(-1), 15: 0},
+			x2:      [16]byte{0: 0x7f, 15: i8ToU8(-1)},
+			exp:     [16]byte{0: 0xff},
+		},
+		{
+			name:    "i8x16 lt_u",
+			cmpType: wazeroir.V128CmpTypeI8x16LtU,
+			x1:      [16]byte{0: 0xff, 15: 0},
+			x2:      [16]byte{0: 0x7f, 15: 0xff},
+			exp:     [16]byte{15: 0xff},
+		},
+		{
+			name:    "i8x16 gt_s",
+			cmpType: wazeroir.V128CmpTypeI8x16GtS,
+			x1:      [16]byte{0: i8ToU8(-1), 15: 0},
+			x2:      [16]byte{0: 0x7f, 15: i8ToU8(-1)},
+			exp:     [16]byte{15: 0xff},
+		},
+		{
+			name:    "i8x16 gt_u",
+			cmpType: wazeroir.V128CmpTypeI8x16GtU,
+			x1:      [16]byte{0: 0xff, 15: 0},
+			x2:      [16]byte{0: 0x7f, 15: 0xff},
+			exp:     [16]byte{0: 0xff},
+		},
+		{
+			name:    "i8x16 le_s",
+			cmpType: wazeroir.V128CmpTypeI8x16LeS,
+			x1:      [16]byte{i8ToU8(-1), 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, i8ToU8(-1)},
+			x2:      [16]byte{0: 0x7f, 15: i8ToU8(-1)},
+			exp:     [16]byte{0: 0xff, 15: 0xff},
+		},
+		{
+			name:    "i8x16 le_u",
+			cmpType: wazeroir.V128CmpTypeI8x16LeU,
+			x1:      [16]byte{0x80, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0xff},
+			x2:      [16]byte{0: 0x7f, 5: 0x1, 15: 0xff},
+			exp:     [16]byte{5: 0xff, 15: 0xff},
+		},
+		{
+			name:    "i8x16 ge_s",
+			cmpType: wazeroir.V128CmpTypeI8x16GeS,
+			x1:      [16]byte{0: 0x7f, 15: i8ToU8(-1)},
+			x2:      [16]byte{i8ToU8(-1), 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, i8ToU8(-1)},
+			exp:     [16]byte{0: 0xff, 15: 0xff},
+		},
+		{
+			name:    "i8x16 ge_u",
+			cmpType: wazeroir.V128CmpTypeI8x16GeU,
+			x1:      [16]byte{0: 0x7f, 3: 0xe, 15: 0xff},
+			x2:      [16]byte{0xff, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0xff},
+			exp:     [16]byte{3: 0xff, 15: 0xff},
+		},
+		{
+			name:    "i16x8 eq",
+			cmpType: wazeroir.V128CmpTypeI16x8Eq,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0xffff, 0, 0xffff, 0xffff, 0, 0xffff, 0xffff, 0),
+		},
+		{
+			name:    "i8x16 ne",
+			cmpType: wazeroir.V128CmpTypeI16x8Ne,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0, 0xffff, 0, 0, 0xffff, 0, 0, 0xffff),
+		},
+		{
+			name:    "i8x16 lt_s",
+			cmpType: wazeroir.V128CmpTypeI16x8LtS,
+			x1:      i16x8(0xffff, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0xffff, 0, 0, 0, 0xffff, 0, 0, 0),
+		},
+		{
+			name:    "i8x16 lt_u",
+			cmpType: wazeroir.V128CmpTypeI16x8LtU,
+			x1:      i16x8(0xffff, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0, 0, 0, 0, 0xffff, 0, 0, 0),
+		},
+		{
+			name:    "i8x16 gt_s",
+			cmpType: wazeroir.V128CmpTypeI16x8GtS,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0xffff, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0xffff, 0xffff, 0, 0, 0, 0, 0, 0xffff),
+		},
+		{
+			name:    "i8x16 gt_u",
+			cmpType: wazeroir.V128CmpTypeI16x8GtU,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0xffff, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0, 0xffff, 0, 0, 0, 0, 0, 0xffff),
+		},
+		{
+			name:    "i8x16 le_s",
+			cmpType: wazeroir.V128CmpTypeI16x8LeS,
+			x1:      i16x8(0xffff, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0xffff, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0),
+		},
+		{
+			name:    "i8x16 le_u",
+			cmpType: wazeroir.V128CmpTypeI16x8LeU,
+			x1:      i16x8(0xffff, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0),
+		},
+		{
+			name:    "i8x16 ge_s",
+			cmpType: wazeroir.V128CmpTypeI16x8GeS,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0xffff, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0xffff, 0xffff, 0xffff, 0xffff, 0, 0xffff, 0xffff, 0xffff),
+		},
+		{
+			name:    "i8x16 ge_u",
+			cmpType: wazeroir.V128CmpTypeI16x8GeU,
+			x1:      i16x8(0, 1, 0, 1, 0, 1, 0, 1),
+			x2:      i16x8(0xffff, 0, 0, 1, 1, 1, 0, 0),
+			exp:     i16x8(0, 0xffff, 0xffff, 0xffff, 0, 0xffff, 0xffff, 0xffff),
+		},
+		{
+			name:    "i32x4 eq",
+			cmpType: wazeroir.V128CmpTypeI32x4Eq,
+			x1:      i32x4(0, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0xffffffff, 0xffffffff, 0, 0),
+		},
+		{
+			name:    "i32x4 ne",
+			cmpType: wazeroir.V128CmpTypeI32x4Ne,
+			x1:      i32x4(0, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0, 0, 0xffffffff, 0xffffffff),
+		},
+		{
+			name:    "i32x4 lt_s",
+			cmpType: wazeroir.V128CmpTypeI32x4LtS,
+			x1:      i32x4(0xffffffff, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0xffffffff, 0, 0, 0xffffffff),
+		},
+		{
+			name:    "i32x4 lt_u",
+			cmpType: wazeroir.V128CmpTypeI32x4LtU,
+			x1:      i32x4(0xffffffff, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0, 0, 0, 0xffffffff),
+		},
+		{
+			name:    "i32x4 gt_s",
+			cmpType: wazeroir.V128CmpTypeI32x4GtS,
+			x1:      i32x4(0, 1, 1, 1),
+			x2:      i32x4(0xffffffff, 1, 0, 0),
+			exp:     i32x4(0xffffffff, 0, 0xffffffff, 0xffffffff),
+		},
+		{
+			name:    "i32x4 gt_u",
+			cmpType: wazeroir.V128CmpTypeI32x4GtU,
+			x1:      i32x4(0, 1, 1, 1),
+			x2:      i32x4(0xffffffff, 1, 0, 0),
+			exp:     i32x4(0, 0, 0xffffffff, 0xffffffff),
+		},
+		{
+			name:    "i32x4 le_s",
+			cmpType: wazeroir.V128CmpTypeI32x4LeS,
+			x1:      i32x4(0xffffffff, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0xffffffff, 0xffffffff, 0, 0xffffffff),
+		},
+		{
+			name:    "i32x4 le_u",
+			cmpType: wazeroir.V128CmpTypeI32x4LeU,
+			x1:      i32x4(0xffffffff, 1, 1, 0),
+			x2:      i32x4(0, 1, 0, 1),
+			exp:     i32x4(0, 0xffffffff, 0, 0xffffffff),
+		},
+		{
+			name:    "i32x4 ge_s",
+			cmpType: wazeroir.V128CmpTypeI32x4GeS,
+			x1:      i32x4(0, 1, 1, 0),
+			x2:      i32x4(0xffffffff, 1, 0, 1),
+			exp:     i32x4(0xffffffff, 0xffffffff, 0xffffffff, 0),
+		},
+		{
+			name:    "i32x4 ge_u",
+			cmpType: wazeroir.V128CmpTypeI32x4GeU,
+			x1:      i32x4(0, 1, 1, 0),
+			x2:      i32x4(0xffffffff, 1, 0, 1),
+			exp:     i32x4(0, 0xffffffff, 0xffffffff, 0),
+		},
+		{
+			name:    "i64x2 eq",
+			cmpType: wazeroir.V128CmpTypeI64x2Eq,
+			x1:      i64x2(1, 0),
+			x2:      i64x2(0, 0),
+			exp:     i64x2(0, 0xffffffffffffffff),
+		},
+		{
+			name:    "i64x2 ne",
+			cmpType: wazeroir.V128CmpTypeI64x2Ne,
+			x1:      i64x2(1, 0),
+			x2:      i64x2(0, 0),
+			exp:     i64x2(0xffffffffffffffff, 0),
+		},
+		{
+			name:    "i64x2 lt_s",
+			cmpType: wazeroir.V128CmpTypeI64x2LtS,
+			x1:      i64x2(0xffffffffffffffff, 0),
+			x2:      i64x2(0, 0),
+			exp:     i64x2(0xffffffffffffffff, 0),
+		},
+		{
+			name:    "i64x2 gt_s",
+			cmpType: wazeroir.V128CmpTypeI64x2GtS,
+			x1:      i64x2(123, 0),
+			x2:      i64x2(123, 0xffffffffffffffff),
+			exp:     i64x2(0, 0xffffffffffffffff),
+		},
+		{
+			name:    "i64x2 le_s",
+			cmpType: wazeroir.V128CmpTypeI64x2LeS,
+			x1:      i64x2(123, 0xffffffffffffffff),
+			x2:      i64x2(123, 0),
+			exp:     i64x2(0xffffffffffffffff, 0xffffffffffffffff),
+		},
+		{
+			name:    "i64x2 ge_s",
+			cmpType: wazeroir.V128CmpTypeI64x2GeS,
+			x1:      i64x2(123, 0),
+			x2:      i64x2(123, 0xffffffffffffffff),
+			exp:     i64x2(0xffffffffffffffff, 0xffffffffffffffff),
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x1[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x1[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.x2[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.x2[8:]),
+			})
+			require.NoError(t, err)
+
+			err = compiler.compileV128Cmp(&wazeroir.OperationV128Cmp{Type: tc.cmpType})
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			lo, hi := env.stackTopAsV128()
+			var actual [16]byte
+			binary.LittleEndian.PutUint64(actual[:8], lo)
+			binary.LittleEndian.PutUint64(actual[8:], hi)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}

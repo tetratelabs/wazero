@@ -697,3 +697,8 @@ func (c *arm64Compiler) compileV128Shr(o *wazeroir.OperationV128Shr) error {
 func (c *arm64Compiler) compileV128Shl(o *wazeroir.OperationV128Shl) error {
 	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 }
+
+// compileV128Cmp implements compiler.compileV128Cmp for arm64.
+func (c *arm64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
+	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+}

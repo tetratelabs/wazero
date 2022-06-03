@@ -81,9 +81,9 @@ const (
 	CVTSL2SD
 	// CVTSL2SS is the CVTSI2SS instruction in 32-bit mode. https://www.felixcloutier.com/x86/cvtsi2ss
 	CVTSL2SS
-	// CVTSL2SD is the CVTSI2SD instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2sd
+	// CVTSQ2SD is the CVTSI2SD instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2sd
 	CVTSQ2SD
-	// CVTSL2SS is the CVTSI2SS instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2ss
+	// CVTSQ2SS is the CVTSI2SS instruction in 64-bit mode. https://www.felixcloutier.com/x86/cvtsi2ss
 	CVTSQ2SS
 	// CVTSS2SD is the CVTSS2SD instruction. https://www.felixcloutier.com/x86/cvtss2sd
 	CVTSS2SD
@@ -409,6 +409,45 @@ const (
 	PUNPCKLBW
 	// PUNPCKHBW is the PUNPCKHBW instruction https://www.felixcloutier.com/x86/punpckhbw:punpckhwd:punpckhdq:punpckhqdq
 	PUNPCKHBW
+	// CMPPS is the CMPPS instruction https://www.felixcloutier.com/x86/cmpps
+	CMPPS
+	// CMPPD is the https://www.felixcloutier.com/x86/cmppd
+	CMPPD
+	// PCMPGTQ is the PCMPGTQ instruction https://www.felixcloutier.com/x86/pcmpgtq
+	PCMPGTQ
+	// PCMPGTD is the PCMPGTD instruction https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTD
+	// PCMPGTW is the PCMPGTW instruction https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTW
+	// PCMPGTB is the PCMPGTB instruction https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTB
+	// PMINSD is the PMINSD instruction https://www.felixcloutier.com/x86/pminsd:pminsq
+	PMINSD
+	// PMINSW is the PMINSW instruction https://www.felixcloutier.com/x86/pminsb:pminsw
+	PMINSW
+	// PMINSB is the PMINSB instruction https://www.felixcloutier.com/x86/pminsb:pminsw
+	PMINSB
+	// PMAXSD is the PMAXSD instruction https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSD
+	// PMAXSW is the PMAXSW instruction https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSW
+	// PMAXSB is the PMAXSB instruction https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSB
+	// PMINUD is the PMINUD instruction https://www.felixcloutier.com/x86/pminud:pminuq
+	PMINUD
+	// PMINUW is the PMINUW instruction https://www.felixcloutier.com/x86/pminub:pminuw
+	PMINUW
+	// PMINUB is the PMINUB instruction https://www.felixcloutier.com/x86/pminub:pminuw
+	PMINUB
+	// PMAXUD is the PMAXUD instruction https://www.felixcloutier.com/x86/pmaxud:pmaxuq
+	PMAXUD
+	// PMAXUW is the PMAXUW instruction https://www.felixcloutier.com/x86/pmaxub:pmaxuw
+	PMAXUW
+	// PMAXUB is the PMAXUB instruction https://www.felixcloutier.com/x86/pmaxub:pmaxuw
+	PMAXUB
+
+	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
+	instructionEnd
 )
 
 // InstructionName returns the name for an instruction
@@ -784,6 +823,40 @@ func InstructionName(instruction asm.Instruction) string {
 		return "NEGQ"
 	case NONE:
 		return "NONE"
+	case CMPPS:
+		return "CMPPS"
+	case CMPPD:
+		return "CMPPD"
+	case PCMPGTQ:
+		return "PCMPGTQ"
+	case PCMPGTD:
+		return "PCMPGTD"
+	case PMINSD:
+		return "PMINSD"
+	case PMAXSD:
+		return "PMAXSD"
+	case PMINSW:
+		return "PMINSW"
+	case PCMPGTB:
+		return "PCMPGTB"
+	case PMINSB:
+		return "PMINSB"
+	case PMINUD:
+		return "PMINUD"
+	case PMINUW:
+		return "PMINUW"
+	case PMINUB:
+		return "PMINUB"
+	case PMAXUD:
+		return "PMAXUD"
+	case PMAXUW:
+		return "PMAXUW"
+	case PMAXUB:
+		return "PMAXUB"
+	case PCMPGTW:
+		return "PCMPGTW"
+	case PMAXSW:
+		return "PMAXSW"
 	}
 	panic(instruction)
 }

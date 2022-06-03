@@ -319,25 +319,37 @@ func (o OperationKind) String() (ret string) {
 	case OperationKindV128AllTrue:
 		ret = "V128AllTrue"
 	case OperationKindV128And:
-		return "V128And"
+		ret = "V128And"
 	case OperationKindV128Not:
-		return "V128Not"
+		ret = "V128Not"
 	case OperationKindV128Or:
-		return "V128Or"
+		ret = "V128Or"
 	case OperationKindV128Xor:
-		return "V128Xor"
+		ret = "V128Xor"
 	case OperationKindV128Bitselect:
-		return "V128Bitselect"
+		ret = "V128Bitselect"
 	case OperationKindV128AndNot:
-		return "V128AndNot"
+		ret = "V128AndNot"
 	case OperationKindV128BitMask:
-		return "V128BitMask"
+		ret = "V128BitMask"
 	case OperationKindV128Shl:
-		return "V128Shl"
+		ret = "V128Shl"
 	case OperationKindV128Shr:
-		return "V128Shr"
+		ret = "V128Shr"
+	case OperationKindV128Cmp:
+		ret = "V128Cmp"
+	case OperationKindSignExtend32From8:
+		ret = "SignExtend32From8"
+	case OperationKindSignExtend32From16:
+		ret = "SignExtend32From16"
+	case OperationKindSignExtend64From8:
+		ret = "SignExtend64From8"
+	case OperationKindSignExtend64From16:
+		ret = "SignExtend64From16"
+	case OperationKindSignExtend64From32:
+		ret = "SignExtend64From32"
 	default:
-		panic("BUG")
+		panic(int(o))
 	}
 	return
 }
@@ -456,6 +468,10 @@ const (
 	OperationKindV128AndNot
 	OperationKindV128Shl
 	OperationKindV128Shr
+	OperationKindV128Cmp
+
+	// operationKindEnd is always placed at the bottom of this iota definition to be used in the test.
+	operationKindEnd
 )
 
 type Label struct {
@@ -1523,4 +1539,115 @@ type OperationV128Shr struct {
 // Kind implements Operation.Kind.
 func (o *OperationV128Shr) Kind() OperationKind {
 	return OperationKindV128Shr
+}
+
+// OperationV128Cmp implements Operation.
+type OperationV128Cmp struct {
+	Type V128CmpType
+}
+
+type V128CmpType = byte
+
+const (
+	// V128CmpTypeI8x16Eq corresponds to wasm.OpcodeVecI8x16EqName.
+	V128CmpTypeI8x16Eq V128CmpType = iota
+	// V128CmpTypeI8x16Ne corresponds to wasm.OpcodeVecI8x16NeName.
+	V128CmpTypeI8x16Ne
+	// V128CmpTypeI8x16LtS corresponds to wasm.OpcodeVecI8x16LtSName.
+	V128CmpTypeI8x16LtS
+	// V128CmpTypeI8x16LtU corresponds to wasm.OpcodeVecI8x16LtUName.
+	V128CmpTypeI8x16LtU
+	// V128CmpTypeI8x16GtS corresponds to wasm.OpcodeVecI8x16GtSName.
+	V128CmpTypeI8x16GtS
+	// V128CmpTypeI8x16GtU corresponds to wasm.OpcodeVecI8x16GtUName.
+	V128CmpTypeI8x16GtU
+	// V128CmpTypeI8x16LeS corresponds to wasm.OpcodeVecI8x16LeSName.
+	V128CmpTypeI8x16LeS
+	// V128CmpTypeI8x16LeU corresponds to wasm.OpcodeVecI8x16LeUName.
+	V128CmpTypeI8x16LeU
+	// V128CmpTypeI8x16GeS corresponds to wasm.OpcodeVecI8x16GeSName.
+	V128CmpTypeI8x16GeS
+	// V128CmpTypeI8x16GeU corresponds to wasm.OpcodeVecI8x16GeUName.
+	V128CmpTypeI8x16GeU
+	// V128CmpTypeI16x8Eq corresponds to wasm.OpcodeVecI16x8EqName.
+	V128CmpTypeI16x8Eq
+	// V128CmpTypeI16x8Ne corresponds to wasm.OpcodeVecI16x8NeName.
+	V128CmpTypeI16x8Ne
+	// V128CmpTypeI16x8LtS corresponds to wasm.OpcodeVecI16x8LtSName.
+	V128CmpTypeI16x8LtS
+	// V128CmpTypeI16x8LtU corresponds to wasm.OpcodeVecI16x8LtUName.
+	V128CmpTypeI16x8LtU
+	// V128CmpTypeI16x8GtS corresponds to wasm.OpcodeVecI16x8GtSName.
+	V128CmpTypeI16x8GtS
+	// V128CmpTypeI16x8GtU corresponds to wasm.OpcodeVecI16x8GtUName.
+	V128CmpTypeI16x8GtU
+	// V128CmpTypeI16x8LeS corresponds to wasm.OpcodeVecI16x8LeSName.
+	V128CmpTypeI16x8LeS
+	// V128CmpTypeI16x8LeU corresponds to wasm.OpcodeVecI16x8LeUName.
+	V128CmpTypeI16x8LeU
+	// V128CmpTypeI16x8GeS corresponds to wasm.OpcodeVecI16x8GeSName.
+	V128CmpTypeI16x8GeS
+	// V128CmpTypeI16x8GeU corresponds to wasm.OpcodeVecI16x8GeUName.
+	V128CmpTypeI16x8GeU
+	// V128CmpTypeI32x4Eq corresponds to wasm.OpcodeVecI32x4EqName.
+	V128CmpTypeI32x4Eq
+	// V128CmpTypeI32x4Ne corresponds to wasm.OpcodeVecI32x4NeName.
+	V128CmpTypeI32x4Ne
+	// V128CmpTypeI32x4LtS corresponds to wasm.OpcodeVecI32x4LtSName.
+	V128CmpTypeI32x4LtS
+	// V128CmpTypeI32x4LtU corresponds to wasm.OpcodeVecI32x4LtUName.
+	V128CmpTypeI32x4LtU
+	// V128CmpTypeI32x4GtS corresponds to wasm.OpcodeVecI32x4GtSName.
+	V128CmpTypeI32x4GtS
+	// V128CmpTypeI32x4GtU corresponds to wasm.OpcodeVecI32x4GtUName.
+	V128CmpTypeI32x4GtU
+	// V128CmpTypeI32x4LeS corresponds to wasm.OpcodeVecI32x4LeSName.
+	V128CmpTypeI32x4LeS
+	// V128CmpTypeI32x4LeU corresponds to wasm.OpcodeVecI32x4LeUName.
+	V128CmpTypeI32x4LeU
+	// V128CmpTypeI32x4GeS corresponds to wasm.OpcodeVecI32x4GeSName.
+	V128CmpTypeI32x4GeS
+	// V128CmpTypeI32x4GeU corresponds to wasm.OpcodeVecI32x4GeUName.
+	V128CmpTypeI32x4GeU
+	// V128CmpTypeI64x2Eq corresponds to wasm.OpcodeVecI64x2EqName.
+	V128CmpTypeI64x2Eq
+	// V128CmpTypeI64x2Ne corresponds to wasm.OpcodeVecI64x2NeName.
+	V128CmpTypeI64x2Ne
+	// V128CmpTypeI64x2LtS corresponds to wasm.OpcodeVecI64x2LtSName.
+	V128CmpTypeI64x2LtS
+	// V128CmpTypeI64x2GtS corresponds to wasm.OpcodeVecI64x2GtSName.
+	V128CmpTypeI64x2GtS
+	// V128CmpTypeI64x2LeS corresponds to wasm.OpcodeVecI64x2LeSName.
+	V128CmpTypeI64x2LeS
+	// V128CmpTypeI64x2GeS corresponds to wasm.OpcodeVecI64x2GeSName.
+	V128CmpTypeI64x2GeS
+	// V128CmpTypeF32x4Eq corresponds to wasm.OpcodeVecF32x4EqName.
+	V128CmpTypeF32x4Eq
+	// V128CmpTypeF32x4Ne corresponds to wasm.OpcodeVecF32x4NeName.
+	V128CmpTypeF32x4Ne
+	// V128CmpTypeF32x4Lt corresponds to wasm.OpcodeVecF32x4LtName.
+	V128CmpTypeF32x4Lt
+	// V128CmpTypeF32x4Gt corresponds to wasm.OpcodeVecF32x4GtName.
+	V128CmpTypeF32x4Gt
+	// V128CmpTypeF32x4Le corresponds to wasm.OpcodeVecF32x4LeName.
+	V128CmpTypeF32x4Le
+	// V128CmpTypeF32x4Ge corresponds to wasm.OpcodeVecF32x4GeName.
+	V128CmpTypeF32x4Ge
+	// V128CmpTypeF64x2Eq corresponds to wasm.OpcodeVecF64x2EqName.
+	V128CmpTypeF64x2Eq
+	// V128CmpTypeF64x2Ne corresponds to wasm.OpcodeVecF64x2NeName.
+	V128CmpTypeF64x2Ne
+	// V128CmpTypeF64x2Lt corresponds to wasm.OpcodeVecF64x2LtName.
+	V128CmpTypeF64x2Lt
+	// V128CmpTypeF64x2Gt corresponds to wasm.OpcodeVecF64x2GtName.
+	V128CmpTypeF64x2Gt
+	// V128CmpTypeF64x2Le corresponds to wasm.OpcodeVecF64x2LeName.
+	V128CmpTypeF64x2Le
+	// V128CmpTypeF64x2Ge corresponds to wasm.OpcodeVecF64x2GeName.
+	V128CmpTypeF64x2Ge
+)
+
+//Kind implements Operation.Kind.
+func (o *OperationV128Cmp) Kind() OperationKind {
+	return OperationKindV128Cmp
 }

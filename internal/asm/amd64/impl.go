@@ -1294,6 +1294,43 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	PUNPCKLBW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x60}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/punpckhbw:punpckhwd:punpckhdq:punpckhqdq
 	PUNPCKHBW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x68}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/cmpps
+	CMPPS: {opcode: []byte{0x0f, 0xc2}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/cmppd
+	CMPPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xc2}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/pcmpgtq
+	PCMPGTQ: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x37}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x66}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x65}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pcmpgtb:pcmpgtw:pcmpgtd
+	PCMPGTB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x64}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pminsd:pminsq
+	PMINSD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x39}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3d}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xee}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxsb:pmaxsw:pmaxsd:pmaxsq
+	PMAXSB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3c}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pminsb:pminsw
+	PMINSW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xea}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pminsb:pminsw
+	PMINSB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x38}, requireSrcFloat: true, requireDstFloat: true},
+
+	// https://www.felixcloutier.com/x86/pminud:pminuq
+	PMINUD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3b}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pminub:pminuw
+	PMINUW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3a}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pminub:pminuw
+	PMINUB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xda}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxud:pmaxuq
+	PMAXUD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3f}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxub:pmaxuw
+	PMAXUW: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x38, 0x3e}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/pmaxub:pmaxuw
+	PMAXUB: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0xde}, requireSrcFloat: true, requireDstFloat: true},
 }
 
 var RegisterToRegisterShiftOpcode = map[asm.Instruction]struct {
