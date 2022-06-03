@@ -857,6 +857,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PCMPGTW"
 	case PMAXSW:
 		return "PMAXSW"
+	case PMAXSB:
+		return "PMAXSB"
 	}
 	panic(instruction)
 }

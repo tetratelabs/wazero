@@ -825,7 +825,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
-			exp: []byte{0x66, 0x41, 0xf, 0x38, 0x3d, 0xcc},
+			exp: []byte{0x66, 0x41, 0xf, 0xee, 0xcc},
 		},
 		{
 			name: "pminsw xmm1, xmm12",
