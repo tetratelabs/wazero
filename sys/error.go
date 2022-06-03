@@ -2,40 +2,8 @@
 package sys
 
 import (
-	"context"
 	"fmt"
 )
-
-// WallClock returns a reading similar to time.Time.
-type WallClock interface {
-	Clock
-
-	// WallTime returns the current time in epoch seconds with a nanosecond fraction.
-	WallTime(context.Context) (sec int64, nsec int32)
-}
-
-// MonotonicClock returns a relative reading used to measuring elapsed time.
-type MonotonicClock interface {
-	Clock
-
-	// NanoTime returns nanoseconds since an arbitrary start point.
-	//
-	// Note: There are no constraints on the value return except that it
-	// increments. For example, -1 is a valid if the next value is >= 0.
-	NanoTime(context.Context) int64
-}
-
-// Clock is similar to time.Time in Go, except it splits wall-clock and
-// monotonic-clock readings into separate interfaces.
-type Clock interface {
-	// Resolution returns a positive granularity of clock precision in
-	// nanoseconds. For example, if the resolution is 1us, this returns 1000.
-	//
-	// Note: Some implementations return arbitrary resolution because there's
-	// no perfect alternative. For example, according to the source in time.go,
-	// windows monotonic resolution can be 15ms. See /RATIONALE.md.
-	Resolution(context.Context) uint64
-}
 
 // ExitError is returned to a caller of api.Function still running when api.Module CloseWithExitCode was invoked.
 // ExitCode zero value means success, while any other value is an error.

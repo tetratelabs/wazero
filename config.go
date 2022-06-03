@@ -6,12 +6,15 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
-	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/platform"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
@@ -442,6 +445,31 @@ type ModuleConfig interface {
 	// See https://linux.die.net/man/3/stdout
 	WithStdout(io.Writer) ModuleConfig
 
+	// WithWalltime configures the wall clock, sometimes referred to as the
+	// real time clock. Defaults to a constant fake result.
+	//
+	// Note: This does not default to time.Now as that violates sandboxing. Use
+	// WithSysWalltime for a usable implementation.
+	WithWalltime(sys.Walltime, sys.ClockResolution) ModuleConfig
+
+	// WithSysWalltime uses time.Now for sys.Walltime with a resolution of 1us
+	// (1000ns).
+	//
+	// See WithWalltime
+	WithSysWalltime() ModuleConfig
+
+	// WithNanotime configures the monotonic clock, used to measure elapsed
+	// time in nanoseconds. Defaults to a constant fake result.
+	//
+	// Note: This does not default to time.Since as that violates sandboxing.
+	// Use WithSysNanotime for a usable implementation.
+	WithNanotime(sys.Nanotime, sys.ClockResolution) ModuleConfig
+
+	// WithSysNanotime uses time.Now for sys.Nanotime with a resolution of 1us.
+	//
+	// See WithNanotime
+	WithSysNanotime() ModuleConfig
+
 	// WithRandSource configures a source of random bytes. Defaults to crypto/rand.Reader.
 	//
 	// This reader is most commonly used by the functions like "random_get" in "wasi_snapshot_preview1" or "seed" in
@@ -466,19 +494,22 @@ type ModuleConfig interface {
 }
 
 type moduleConfig struct {
-	name           string
-	startFunctions []string
-	stdin          io.Reader
-	stdout         io.Writer
-	stderr         io.Writer
-	randSource     io.Reader
-	args           []string
+	name               string
+	startFunctions     []string
+	stdin              io.Reader
+	stdout             io.Writer
+	stderr             io.Writer
+	randSource         io.Reader
+	walltimeTime       *sys.Walltime
+	walltimeResolution sys.ClockResolution
+	nanotimeTime       *sys.Nanotime
+	nanotimeResolution sys.ClockResolution
+	args               []string
 	// environ is pair-indexed to retain order similar to os.Environ.
 	environ []string
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
-
-	fs *sys.FSConfig
+	fs          *internalsys.FSConfig
 }
 
 // NewModuleConfig returns a ModuleConfig that can be used for configuring module instantiation.
@@ -487,7 +518,7 @@ func NewModuleConfig() ModuleConfig {
 		startFunctions: []string{"_start"},
 		environKeys:    map[string]int{},
 
-		fs: sys.NewFSConfig(),
+		fs: internalsys.NewFSConfig(),
 	}
 }
 
@@ -553,6 +584,36 @@ func (c *moduleConfig) WithStdout(stdout io.Writer) ModuleConfig {
 	return &ret
 }
 
+// WithWalltime implements ModuleConfig.WithWalltime
+func (c *moduleConfig) WithWalltime(walltime sys.Walltime, resolution sys.ClockResolution) ModuleConfig {
+	ret := *c // copy
+	ret.walltimeTime = &walltime
+	ret.walltimeResolution = resolution
+	return &ret
+}
+
+// We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
+// source in time.go, windows monotonic resolution can be 15ms. This chooses arbitrarily 1us for wall time and
+// 1ns for monotonic. See RATIONALE.md for more context.
+
+// WithSysWalltime implements ModuleConfig.WithSysWalltime
+func (c *moduleConfig) WithSysWalltime() ModuleConfig {
+	return c.WithWalltime(platform.Walltime, sys.ClockResolution(time.Microsecond.Nanoseconds()))
+}
+
+// WithNanotime implements ModuleConfig.WithNanotime
+func (c *moduleConfig) WithNanotime(nanotime sys.Nanotime, resolution sys.ClockResolution) ModuleConfig {
+	ret := *c // copy
+	ret.nanotimeTime = &nanotime
+	ret.nanotimeResolution = resolution
+	return &ret
+}
+
+// WithSysNanotime implements ModuleConfig.WithSysNanotime
+func (c *moduleConfig) WithSysNanotime() ModuleConfig {
+	return c.WithNanotime(platform.Nanotime, sys.ClockResolution(1))
+}
+
 // WithRandSource implements ModuleConfig.WithRandSource
 func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 	ret := *c // copy
@@ -591,5 +652,16 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 		return nil, err
 	}
 
-	return wasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, c.randSource, preopens)
+	return wasm.NewSysContext(
+		math.MaxUint32,
+		c.args,
+		environ,
+		c.stdin,
+		c.stdout,
+		c.stderr,
+		c.randSource,
+		c.walltimeTime, c.walltimeResolution,
+		c.nanotimeTime, c.nanotimeResolution,
+		preopens,
+	)
 }

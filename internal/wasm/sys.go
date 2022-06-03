@@ -1,23 +1,35 @@
 package wasm
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
-	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/platform"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/sys"
 )
 
-// SysContext holds module-scoped system resources currently only used by internalwasi.
+// SysContext holds module-scoped system resources currently only supported by
+// built-in host functions.
 type SysContext struct {
 	args, environ         []string
 	argsSize, environSize uint32
 	stdin                 io.Reader
 	stdout, stderr        io.Writer
-	randSource            io.Reader
 
-	fs *sys.FSContext
+	// Note: Using function pointers here keeps them stable for tests.
+
+	walltime           *sys.Walltime
+	walltimeResolution sys.ClockResolution
+	nanotime           *sys.Nanotime
+	nanotimeResolution sys.ClockResolution
+	randSource         io.Reader
+
+	fs *internalsys.FSContext
 }
 
 // Args is like os.Args and defaults to nil.
@@ -72,8 +84,28 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
+// Walltime implements sys.Walltime.
+func (c *SysContext) Walltime(ctx context.Context) (sec int64, nsec int32) {
+	return (*(c.walltime))(ctx)
+}
+
+// WalltimeResolution returns resolution of Walltime.
+func (c *SysContext) WalltimeResolution() sys.ClockResolution {
+	return c.walltimeResolution
+}
+
+// Nanotime implements sys.Nanotime.
+func (c *SysContext) Nanotime(ctx context.Context) int64 {
+	return (*(c.nanotime))(ctx)
+}
+
+// NanotimeResolution returns resolution of Nanotime.
+func (c *SysContext) NanotimeResolution() sys.ClockResolution {
+	return c.nanotimeResolution
+}
+
 // FS returns the file system context.
-func (c *SysContext) FS() *sys.FSContext {
+func (c *SysContext) FS() *internalsys.FSContext {
 	return c.fs
 }
 
@@ -97,7 +129,7 @@ func (eofReader) Read([]byte) (int, error) {
 // Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
 // TODO: Make it an error to open or close files when no FS was assigned.
 func DefaultSysContext() *SysContext {
-	if sysCtx, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if sysCtx, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil); err != nil {
 		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
 	} else {
 		return sysCtx
@@ -105,10 +137,21 @@ func DefaultSysContext() *SysContext {
 }
 
 var _ = DefaultSysContext() // Force panic on bug.
+var wt sys.Walltime = platform.FakeWalltime
+var nt sys.Nanotime = platform.FakeNanotime
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*sys.FileEntry) (sysCtx *SysContext, err error) {
+func NewSysContext(
+	max uint32,
+	args, environ []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	randSource io.Reader,
+	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
+	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
+	openedFiles map[uint32]*internalsys.FileEntry,
+) (sysCtx *SysContext, err error) {
 	sysCtx = &SysContext{args: args, environ: environ}
 
 	if sysCtx.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
@@ -143,9 +186,36 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sysCtx.randSource = randSource
 	}
 
-	sysCtx.fs = sys.NewFSContext(openedFiles)
+	if walltime != nil {
+		if clockResolutionInvalid(walltimeResolution) {
+			return nil, fmt.Errorf("invalid Walltime resolution %d", walltimeResolution)
+		}
+		sysCtx.walltime = walltime
+		sysCtx.walltimeResolution = walltimeResolution
+	} else {
+		sysCtx.walltime = &wt
+		sysCtx.walltimeResolution = sys.ClockResolution(time.Microsecond.Nanoseconds())
+	}
+
+	if nanotime != nil {
+		if clockResolutionInvalid(nanotimeResolution) {
+			return nil, fmt.Errorf("invalid Nanotime resolution %d", nanotimeResolution)
+		}
+		sysCtx.nanotime = nanotime
+		sysCtx.nanotimeResolution = nanotimeResolution
+	} else {
+		sysCtx.nanotime = &nt
+		sysCtx.nanotimeResolution = sys.ClockResolution(time.Nanosecond)
+	}
+
+	sysCtx.fs = internalsys.NewFSContext(openedFiles)
 
 	return
+}
+
+// clockResolutionInvalid returns true if the value stored isn't reasonable.
+func clockResolutionInvalid(resolution sys.ClockResolution) bool {
+	return resolution < 1 || resolution > sys.ClockResolution(time.Hour.Nanoseconds())
 }
 
 // nullTerminatedByteCount ensures the count or Nul-terminated length of the elements doesn't exceed max, and that no

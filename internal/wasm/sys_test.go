@@ -6,29 +6,36 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestDefaultSysContext(t *testing.T) {
-	sys, err := NewSysContext(
-		0,   // max
-		nil, // args
-		nil, // environ
-		nil, // stdin
-		nil, // stdout
-		nil, // stderr
-		nil, // randSource
+	sysCtx, err := NewSysContext(
+		0,      // max
+		nil,    // args
+		nil,    // environ
+		nil,    // stdin
+		nil,    // stdout
+		nil,    // stderr
+		nil,    // randSource
+		nil, 0, // walltime, walltimeResolution
+		nil, 0, // nanotime, nanotimeResolution
 		nil, // openedFiles
 	)
 	require.NoError(t, err)
 
-	require.Nil(t, sys.Args())
-	require.Zero(t, sys.ArgsSize())
-	require.Nil(t, sys.Environ())
-	require.Zero(t, sys.EnvironSize())
-	require.Equal(t, eofReader{}, sys.Stdin())
-	require.Equal(t, io.Discard, sys.Stdout())
-	require.Equal(t, io.Discard, sys.Stderr())
-	require.Equal(t, sys, DefaultSysContext())
+	require.Nil(t, sysCtx.Args())
+	require.Zero(t, sysCtx.ArgsSize())
+	require.Nil(t, sysCtx.Environ())
+	require.Zero(t, sysCtx.EnvironSize())
+	require.Equal(t, eofReader{}, sysCtx.Stdin())
+	require.Equal(t, io.Discard, sysCtx.Stdout())
+	require.Equal(t, io.Discard, sysCtx.Stderr())
+	require.Equal(t, &wt, sysCtx.walltime)
+	require.Equal(t, sys.ClockResolution(1_000), sysCtx.walltimeResolution)
+	require.Equal(t, &nt, sysCtx.nanotime)
+	require.Equal(t, sys.ClockResolution(1), sysCtx.nanotimeResolution)
+	require.Equal(t, sysCtx, DefaultSysContext())
 }
 
 func TestNewSysContext_Args(t *testing.T) {
@@ -69,7 +76,7 @@ func TestNewSysContext_Args(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sys, err := NewSysContext(
+			sysCtx, err := NewSysContext(
 				tc.maxSize, // max
 				tc.args,
 				nil,                              // environ
@@ -77,12 +84,14 @@ func TestNewSysContext_Args(t *testing.T) {
 				nil,                              // stdout
 				nil,                              // stderr
 				nil,                              // randSource
-				nil,                              // openedFiles
+				nil, 0,                           // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
-				require.Equal(t, tc.args, sys.Args())
-				require.Equal(t, tc.expectedSize, sys.ArgsSize())
+				require.Equal(t, tc.args, sysCtx.Args())
+				require.Equal(t, tc.expectedSize, sysCtx.ArgsSize())
 			} else {
 				require.EqualError(t, err, tc.expectedErr)
 			}
@@ -128,7 +137,7 @@ func TestNewSysContext_Environ(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sys, err := NewSysContext(
+			sysCtx, err := NewSysContext(
 				tc.maxSize, // max
 				nil,        // args
 				tc.environ,
@@ -136,12 +145,14 @@ func TestNewSysContext_Environ(t *testing.T) {
 				nil,                              // stdout
 				nil,                              // stderr
 				nil,                              // randSource
-				nil,                              // openedFiles
+				nil, 0,                           // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
-				require.Equal(t, tc.environ, sys.Environ())
-				require.Equal(t, tc.expectedSize, sys.EnvironSize())
+				require.Equal(t, tc.environ, sysCtx.Environ())
+				require.Equal(t, tc.expectedSize, sysCtx.EnvironSize())
 			} else {
 				require.EqualError(t, err, tc.expectedErr)
 			}

@@ -48,7 +48,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 }
 
 func TestEngineCompiler(t *testing.T) {
-	if !platform.IsSupported() {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())

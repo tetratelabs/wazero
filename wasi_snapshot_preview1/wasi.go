@@ -661,13 +661,13 @@ func (a *wasi) EnvironGet(ctx context.Context, m api.Module, environ uint32, env
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (a *wasi) EnvironSizesGet(ctx context.Context, m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
-	sys := sysCtx(m)
+	sysCtx := sysCtx(m)
 	mem := m.Memory()
 
-	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sys.Environ()))) {
+	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
 		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sys.EnvironSize()) {
+	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sysCtx.EnvironSize()) {
 		return ErrnoFault
 	}
 
@@ -693,22 +693,19 @@ func (a *wasi) EnvironSizesGet(ctx context.Context, m api.Module, resultEnvironc
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *wasi) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	// We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
-	// source in time.go, windows monotonic resolution can be 15ms. This chooses arbitrarily 1us for wall time and
-	// 1ns for monotonic. See RATIONALE.md for more context.
+	sysCtx := sysCtx(m)
 
 	var resolution uint64 // ns
 	switch id {
 	case clockIDRealtime:
-		resolution = 1000 // 1us
+		resolution = uint64(sysCtx.WalltimeResolution())
 	case clockIDMonotonic:
-		resolution = 1 // 1ns
+		resolution = uint64(sysCtx.NanotimeResolution())
 	default:
 		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
 		// are slated to be removed from the next version of WASI.
 		return ErrnoNosys
 	}
-	// fixed for GrainLang per #271 and Swift per https://github.com/tetratelabs/wazero/issues/526#issuecomment-1134034760
 	if !m.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
 		return ErrnoFault
 	}
@@ -737,21 +734,15 @@ func (a *wasi) ClockResGet(ctx context.Context, m api.Module, id uint32, resultR
 // See https://linux.die.net/man/3/clock_gettime
 func (a *wasi) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: precision is currently ignored.
+	sysCtx := sysCtx(m)
+
 	var val uint64
 	switch id {
 	case clockIDRealtime:
-		clock := timeNowUnixNano
-		// Override Context when it is passed via context
-		if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
-			clockCtx, ok := clockVal.(func() uint64)
-			if !ok {
-				panic(fmt.Errorf("unsupported clock key: %v", clockVal))
-			}
-			clock = clockCtx
-		}
-		val = clock()
+		sec, nsec := sysCtx.Walltime(ctx)
+		val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
 	case clockIDMonotonic:
-		val = uint64(time.Since(monotonicClockBase))
+		val = uint64(sysCtx.Nanotime(ctx))
 	default:
 		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
 		// are slated to be removed from the next version of WASI.
@@ -1433,13 +1424,6 @@ const (
 	clockIDRealtime  = 0
 	clockIDMonotonic = 1
 )
-
-// monotonicClockBase uses time.Now to ensure a monotonic clock reading on all platforms via time.Since.
-var monotonicClockBase = time.Now()
-
-func timeNowUnixNano() uint64 {
-	return uint64(time.Now().UnixNano())
-}
 
 func sysCtx(m api.Module) *wasm.SysContext {
 	if internal, ok := m.(*wasm.CallContext); !ok {

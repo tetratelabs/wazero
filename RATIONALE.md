@@ -399,7 +399,7 @@ Their semantics match when `pathLen` == the length of `path`, so in practice thi
 ## sys.Clock
 
 `sys.Clock` is a base interface for two implementations: `WallClock` and
-`MonotonicClock`. These include `WallTime()` and `NanoTime()` respectively, to
+`Nanotime`. These include `Walltime()` and `Nanotime()` respectively, to
 match naming conventions used internally in Go.
 
 ```go

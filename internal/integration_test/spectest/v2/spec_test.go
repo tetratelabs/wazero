@@ -21,7 +21,7 @@ var testcases embed.FS
 const enabledFeatures = wasm.Features20220419
 
 func TestCompiler(t *testing.T) {
-	if !platform.IsSupported() {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 

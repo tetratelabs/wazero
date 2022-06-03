@@ -11,7 +11,7 @@ import (
 var testCode, _ = io.ReadAll(io.LimitReader(rand.Reader, 8*1024))
 
 func Test_MmapCodeSegment(t *testing.T) {
-	if !IsSupported() {
+	if !CompilerSupported() {
 		t.Skip()
 	}
 
@@ -30,7 +30,7 @@ func Test_MmapCodeSegment(t *testing.T) {
 }
 
 func Test_MunmapCodeSegment(t *testing.T) {
-	if !IsSupported() {
+	if !CompilerSupported() {
 		t.Skip()
 	}
 
