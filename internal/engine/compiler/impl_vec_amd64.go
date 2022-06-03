@@ -1076,47 +1076,55 @@ func (c *amd64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
 		return err
 	}
 
+	const (
+		// See https://www.felixcloutier.com/x86/cmppd and https://www.felixcloutier.com/x86/cmpps
+		floatEqualArg           = 0
+		floatLessThanArg        = 1
+		floatLessThanOrEqualArg = 2
+		floatNotEqualARg        = 4
+	)
+
 	x1Reg, x2Reg, result := x1.register, x2.register, asm.NilRegister
 	switch o.Type {
 	case wazeroir.V128CmpTypeF32x4Eq:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, 0)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatEqualArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF32x4Ne:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, 4)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatNotEqualARg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF32x4Lt:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, 1)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatLessThanArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF32x4Gt:
 		// Without AVX, there's no float Gt instruction, so we swap the register and use Lt instead.
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, 1)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, floatLessThanArg)
 		result = x2Reg
 	case wazeroir.V128CmpTypeF32x4Le:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, 2)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatLessThanOrEqualArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF32x4Ge:
 		// Without AVX, there's no float Ge instruction, so we swap the register and use Le instead.
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, 2)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, floatLessThanOrEqualArg)
 		result = x2Reg
 	case wazeroir.V128CmpTypeF64x2Eq:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, 0)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatEqualArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF64x2Ne:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, 4)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatNotEqualARg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF64x2Lt:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, 1)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatLessThanArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF64x2Gt:
 		// Without AVX, there's no float Gt instruction, so we swap the register and use Lt instead.
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, 1)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, floatLessThanArg)
 		result = x2Reg
 	case wazeroir.V128CmpTypeF64x2Le:
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, 2)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatLessThanOrEqualArg)
 		result = x1Reg
 	case wazeroir.V128CmpTypeF64x2Ge:
 		// Without AVX, there's no float Ge instruction, so we swap the register and use Le instead.
-		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, 2)
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, floatLessThanOrEqualArg)
 		result = x2Reg
 	case wazeroir.V128CmpTypeI8x16Eq:
 		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, x2Reg, x1Reg)
