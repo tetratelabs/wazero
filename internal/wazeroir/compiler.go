@@ -2180,6 +2180,198 @@ operatorSwitch:
 			c.emit(
 				&OperationV128Shr{Shape: ShapeI64x2, Signed: false},
 			)
+		case wasm.OpcodeVecI8x16Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16Eq},
+			)
+		case wasm.OpcodeVecI8x16Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16Ne},
+			)
+		case wasm.OpcodeVecI8x16LtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16LtS},
+			)
+		case wasm.OpcodeVecI8x16LtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16LtU},
+			)
+		case wasm.OpcodeVecI8x16GtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16GtS},
+			)
+		case wasm.OpcodeVecI8x16GtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16GtU},
+			)
+		case wasm.OpcodeVecI8x16LeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16LeS},
+			)
+		case wasm.OpcodeVecI8x16LeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16LeU},
+			)
+		case wasm.OpcodeVecI8x16GeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16GeS},
+			)
+		case wasm.OpcodeVecI8x16GeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI8x16GeU},
+			)
+		case wasm.OpcodeVecI16x8Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8Eq},
+			)
+		case wasm.OpcodeVecI16x8Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8Ne},
+			)
+		case wasm.OpcodeVecI16x8LtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8LtS},
+			)
+		case wasm.OpcodeVecI16x8LtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8LtU},
+			)
+		case wasm.OpcodeVecI16x8GtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8GtS},
+			)
+		case wasm.OpcodeVecI16x8GtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8GtU},
+			)
+		case wasm.OpcodeVecI16x8LeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8LeS},
+			)
+		case wasm.OpcodeVecI16x8LeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8LeU},
+			)
+		case wasm.OpcodeVecI16x8GeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8GeS},
+			)
+		case wasm.OpcodeVecI16x8GeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI16x8GeU},
+			)
+		case wasm.OpcodeVecI32x4Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4Eq},
+			)
+		case wasm.OpcodeVecI32x4Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4Ne},
+			)
+		case wasm.OpcodeVecI32x4LtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4LtS},
+			)
+		case wasm.OpcodeVecI32x4LtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4LtU},
+			)
+		case wasm.OpcodeVecI32x4GtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4GtS},
+			)
+		case wasm.OpcodeVecI32x4GtU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4GtU},
+			)
+		case wasm.OpcodeVecI32x4LeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4LeS},
+			)
+		case wasm.OpcodeVecI32x4LeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4LeU},
+			)
+		case wasm.OpcodeVecI32x4GeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4GeS},
+			)
+		case wasm.OpcodeVecI32x4GeU:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI32x4GeU},
+			)
+		case wasm.OpcodeVecI64x2Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2Eq},
+			)
+		case wasm.OpcodeVecI64x2Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2Ne},
+			)
+		case wasm.OpcodeVecI64x2LtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2LtS},
+			)
+		case wasm.OpcodeVecI64x2GtS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2GtS},
+			)
+		case wasm.OpcodeVecI64x2LeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2LeS},
+			)
+		case wasm.OpcodeVecI64x2GeS:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeI64x2GeS},
+			)
+		case wasm.OpcodeVecF32x4Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Eq},
+			)
+		case wasm.OpcodeVecF32x4Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Ne},
+			)
+		case wasm.OpcodeVecF32x4Lt:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Lt},
+			)
+		case wasm.OpcodeVecF32x4Gt:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Gt},
+			)
+		case wasm.OpcodeVecF32x4Le:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Le},
+			)
+		case wasm.OpcodeVecF32x4Ge:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF32x4Ge},
+			)
+		case wasm.OpcodeVecF64x2Eq:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Eq},
+			)
+		case wasm.OpcodeVecF64x2Ne:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Ne},
+			)
+		case wasm.OpcodeVecF64x2Lt:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Lt},
+			)
+		case wasm.OpcodeVecF64x2Gt:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Gt},
+			)
+		case wasm.OpcodeVecF64x2Le:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Le},
+			)
+		case wasm.OpcodeVecF64x2Ge:
+			c.emit(
+				&OperationV128Cmp{Type: V128CmpTypeF64x2Ge},
+			)
 		default:
 			return fmt.Errorf("unsupported vector instruction in wazeroir: %s", wasm.VectorInstructionName(vecOp))
 		}

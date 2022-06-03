@@ -1,6 +1,8 @@
 package arm64
 
 import (
+	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 )
 
@@ -725,6 +727,9 @@ const (
 	TBL1
 	// TBL2 is the TBL instruction whose source is two vectors. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
 	TBL2
+
+	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
+	instructionEnd
 )
 
 // VectorArrangement is the arrangement of data within a vector register.
@@ -1082,6 +1087,10 @@ func InstructionName(i asm.Instruction) string {
 		return "CMEQ"
 	case ADDP:
 		return "ADDP"
+	case TBL1:
+		return "TBL1"
+	case TBL2:
+		return "TBL2"
 	}
-	panic("unknown instruction")
+	panic(fmt.Errorf("unknown instruction %d", i))
 }

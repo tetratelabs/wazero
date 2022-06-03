@@ -1063,3 +1063,270 @@ func (c *amd64Compiler) compileV128Shl(o *wazeroir.OperationV128Shl) error {
 	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
 	return nil
 }
+
+// compileV128Cmp implements compiler.compileV128Cmp for amd64.
+func (c *amd64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	const (
+		// See https://www.felixcloutier.com/x86/cmppd and https://www.felixcloutier.com/x86/cmpps
+		floatEqualArg           = 0
+		floatLessThanArg        = 1
+		floatLessThanOrEqualArg = 2
+		floatNotEqualARg        = 4
+	)
+
+	x1Reg, x2Reg, result := x1.register, x2.register, asm.NilRegister
+	switch o.Type {
+	case wazeroir.V128CmpTypeF32x4Eq:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatEqualArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF32x4Ne:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatNotEqualARg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF32x4Lt:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatLessThanArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF32x4Gt:
+		// Without AVX, there's no float Gt instruction, so we swap the register and use Lt instead.
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, floatLessThanArg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeF32x4Le:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x2Reg, x1Reg, floatLessThanOrEqualArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF32x4Ge:
+		// Without AVX, there's no float Ge instruction, so we swap the register and use Le instead.
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPS, x1Reg, x2Reg, floatLessThanOrEqualArg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeF64x2Eq:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatEqualArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF64x2Ne:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatNotEqualARg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF64x2Lt:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatLessThanArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF64x2Gt:
+		// Without AVX, there's no float Gt instruction, so we swap the register and use Lt instead.
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, floatLessThanArg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeF64x2Le:
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x2Reg, x1Reg, floatLessThanOrEqualArg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeF64x2Ge:
+		// Without AVX, there's no float Ge instruction, so we swap the register and use Le instead.
+		c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, x1Reg, x2Reg, floatLessThanOrEqualArg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeI8x16Eq:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI8x16Ne:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI8x16LtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTB, x1Reg, x2Reg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeI8x16LtU, wazeroir.V128CmpTypeI8x16GtU:
+		// Take the unsigned min/max values on each byte on x1 and x2 onto x1Reg.
+		if o.Type == wazeroir.V128CmpTypeI8x16LtU {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUB, x2Reg, x1Reg)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUB, x2Reg, x1Reg)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI8x16GtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTB, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI8x16LeS, wazeroir.V128CmpTypeI8x16LeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		// Copy the value on the src to tmp.
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI8x16LeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMINSB, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUB, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI8x16GeS, wazeroir.V128CmpTypeI8x16GeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI8x16GeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXSB, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUB, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQB, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8Eq:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQW, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8Ne:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQW, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8LtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTW, x1Reg, x2Reg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeI16x8LtU, wazeroir.V128CmpTypeI16x8GtU:
+		// Take the unsigned min/max values on each byte on x1 and x2 onto x1Reg.
+		if o.Type == wazeroir.V128CmpTypeI16x8LtU {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUW, x2Reg, x1Reg)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUW, x2Reg, x1Reg)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQW, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8GtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTW, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8LeS, wazeroir.V128CmpTypeI16x8LeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		// Copy the value on the src to tmp.
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI16x8LeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMINSW, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUW, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQW, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI16x8GeS, wazeroir.V128CmpTypeI16x8GeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI16x8GeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXSW, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUW, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQW, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4Eq:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4Ne:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4LtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTD, x1Reg, x2Reg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeI32x4LtU, wazeroir.V128CmpTypeI32x4GtU:
+		// Take the unsigned min/max values on each byte on x1 and x2 onto x1Reg.
+		if o.Type == wazeroir.V128CmpTypeI32x4LtU {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUD, x2Reg, x1Reg)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUD, x2Reg, x1Reg)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4GtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTD, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4LeS, wazeroir.V128CmpTypeI32x4LeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		// Copy the value on the src to tmp.
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI32x4LeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMINSD, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMINUD, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI32x4GeS, wazeroir.V128CmpTypeI32x4GeU:
+		tmp, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1Reg, tmp)
+		if o.Type == wazeroir.V128CmpTypeI32x4GeS {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXSD, x2Reg, tmp)
+		} else {
+			c.assembler.CompileRegisterToRegister(amd64.PMAXUD, x2Reg, tmp)
+		}
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, tmp, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI64x2Eq:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQQ, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI64x2Ne:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQQ, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI64x2LtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTQ, x1Reg, x2Reg)
+		result = x2Reg
+	case wazeroir.V128CmpTypeI64x2GtS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTQ, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI64x2LeS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTQ, x2Reg, x1Reg)
+		// Set all bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x2Reg, x2Reg)
+		// Swap the bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x2Reg, x1Reg)
+		result = x1Reg
+	case wazeroir.V128CmpTypeI64x2GeS:
+		c.assembler.CompileRegisterToRegister(amd64.PCMPGTQ, x1Reg, x2Reg)
+		// Set all bits on x1Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PCMPEQD, x1Reg, x1Reg)
+		// Swap the bits on x2Reg register.
+		c.assembler.CompileRegisterToRegister(amd64.PXOR, x1Reg, x2Reg)
+		result = x2Reg
+	}
+
+	c.locationStack.markRegisterUnused(x1Reg, x2Reg)
+	c.pushVectorRuntimeValueLocationOnRegister(result)
+	return nil
+}

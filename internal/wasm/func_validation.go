@@ -1300,6 +1300,23 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}
 				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecI8x16Eq, OpcodeVecI8x16Ne, OpcodeVecI8x16LtS, OpcodeVecI8x16LtU, OpcodeVecI8x16GtS,
+				OpcodeVecI8x16GtU, OpcodeVecI8x16LeS, OpcodeVecI8x16LeU, OpcodeVecI8x16GeS, OpcodeVecI8x16GeU,
+				OpcodeVecI16x8Eq, OpcodeVecI16x8Ne, OpcodeVecI16x8LtS, OpcodeVecI16x8LtU, OpcodeVecI16x8GtS,
+				OpcodeVecI16x8GtU, OpcodeVecI16x8LeS, OpcodeVecI16x8LeU, OpcodeVecI16x8GeS, OpcodeVecI16x8GeU,
+				OpcodeVecI32x4Eq, OpcodeVecI32x4Ne, OpcodeVecI32x4LtS, OpcodeVecI32x4LtU, OpcodeVecI32x4GtS,
+				OpcodeVecI32x4GtU, OpcodeVecI32x4LeS, OpcodeVecI32x4LeU, OpcodeVecI32x4GeS, OpcodeVecI32x4GeU,
+				OpcodeVecI64x2Eq, OpcodeVecI64x2Ne, OpcodeVecI64x2LtS, OpcodeVecI64x2GtS, OpcodeVecI64x2LeS,
+				OpcodeVecI64x2GeS, OpcodeVecF32x4Eq, OpcodeVecF32x4Ne, OpcodeVecF32x4Lt, OpcodeVecF32x4Gt,
+				OpcodeVecF32x4Le, OpcodeVecF32x4Ge, OpcodeVecF64x2Eq, OpcodeVecF64x2Ne, OpcodeVecF64x2Lt,
+				OpcodeVecF64x2Gt, OpcodeVecF64x2Le, OpcodeVecF64x2Ge:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
 			default:
 				return fmt.Errorf("TODO: SIMD instruction %s will be implemented in #506", vectorInstructionName[vecOpcode])
 			}
