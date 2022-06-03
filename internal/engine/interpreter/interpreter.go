@@ -2880,7 +2880,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 
 			var retLo, retHi uint64
-			switch len(result) {
+			laneNum := len(result)
+			switch laneNum {
 			case 16:
 				for i, b := range result {
 					if b {
