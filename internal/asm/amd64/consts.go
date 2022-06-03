@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"fmt"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 )
 
