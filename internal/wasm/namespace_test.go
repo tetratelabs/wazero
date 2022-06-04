@@ -162,7 +162,7 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 	}
 
 	t.Run("error closing", func(t *testing.T) {
-		sysCtx := DefaultSysContext()
+		sysCtx := sys.DefaultContext()
 		sysCtx.FS().OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
 
 		ns, m1, m2 := newTestNamespace()

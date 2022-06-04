@@ -27,6 +27,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -155,7 +156,7 @@ func (a *assemblyscript) abort(
 	columnNumber uint32,
 ) {
 	if !a.abortMessageDisabled {
-		sys := sysCtx(mod)
+		sysCtx := sysCtx(mod)
 		msg, err := readAssemblyScriptString(ctx, mod, message)
 		if err != nil {
 			return
@@ -164,7 +165,7 @@ func (a *assemblyscript) abort(
 		if err != nil {
 			return
 		}
-		_, _ = fmt.Fprintf(sys.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+		_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 	}
 	_ = mod.CloseWithExitCode(ctx, 255)
 }
@@ -269,7 +270,7 @@ func decodeUTF16(b []byte) string {
 	return string(utf16.Decode(u16s))
 }
 
-func sysCtx(m api.Module) *wasm.SysContext {
+func sysCtx(m api.Module) *internalsys.Context {
 	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {

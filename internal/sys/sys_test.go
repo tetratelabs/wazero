@@ -1,4 +1,4 @@
-package wasm
+package sys
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestDefaultSysContext(t *testing.T) {
-	sysCtx, err := NewSysContext(
+	sysCtx, err := NewContext(
 		0,      // max
 		nil,    // args
 		nil,    // environ
@@ -35,7 +35,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1_000), sysCtx.walltimeResolution)
 	require.Equal(t, &nt, sysCtx.nanotime)
 	require.Equal(t, sys.ClockResolution(1), sysCtx.nanotimeResolution)
-	require.Equal(t, sysCtx, DefaultSysContext())
+	require.Equal(t, sysCtx, DefaultContext())
 }
 
 func TestNewSysContext_Args(t *testing.T) {
@@ -76,7 +76,7 @@ func TestNewSysContext_Args(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewSysContext(
+			sysCtx, err := NewContext(
 				tc.maxSize, // max
 				tc.args,
 				nil,                              // environ
@@ -137,7 +137,7 @@ func TestNewSysContext_Environ(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := NewSysContext(
+			sysCtx, err := NewContext(
 				tc.maxSize, // max
 				nil,        // args
 				tc.environ,

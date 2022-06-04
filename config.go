@@ -628,8 +628,8 @@ func (c *moduleConfig) WithWorkDirFS(fs fs.FS) ModuleConfig {
 	return &ret
 }
 
-// toSysContext creates a baseline wasm.SysContext configured by ModuleConfig.
-func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
+// toSysContext creates a baseline wasm.Context configured by ModuleConfig.
+func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
 	for i := 0; i < len(c.environ); i += 2 {
@@ -639,7 +639,7 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 			return
 		}
 		for j := 0; j < len(key); j++ {
-			if key[j] == '=' { // NUL enforced in NewSysContext
+			if key[j] == '=' { // NUL enforced in NewContext
 				err = errors.New("environ invalid: key contains '=' character")
 				return
 			}
@@ -652,7 +652,7 @@ func (c *moduleConfig) toSysContext() (sys *wasm.SysContext, err error) {
 		return nil, err
 	}
 
-	return wasm.NewSysContext(
+	return internalsys.NewContext(
 		math.MaxUint32,
 		c.args,
 		environ,

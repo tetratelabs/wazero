@@ -300,7 +300,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    ModuleConfig
-		expected *wasm.SysContext
+		expected *internalsys.Context
 	}{
 		{
 			name:  "empty",
@@ -606,7 +606,7 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	}
 }
 
-// requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
+// requireSysContext ensures wasm.NewContext doesn't return an error, which makes it usable in test matrices.
 func requireSysContext(
 	t *testing.T,
 	max uint32,
@@ -617,8 +617,8 @@ func requireSysContext(
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
 	openedFiles map[uint32]*internalsys.FileEntry,
-) *wasm.SysContext {
-	sysCtx, err := wasm.NewSysContext(
+) *internalsys.Context {
+	sysCtx, err := internalsys.NewContext(
 		max,
 		args,
 		environ,

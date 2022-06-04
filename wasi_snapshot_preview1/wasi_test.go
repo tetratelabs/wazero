@@ -2182,7 +2182,7 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			sysCtx, err := wasm.NewSysContext(
+			sysCtx, err := internalsys.NewContext(
 				math.MaxUint32,
 				nil,
 				nil,
@@ -2268,7 +2268,7 @@ func maskMemory(t *testing.T, ctx context.Context, mod api.Module, size int) {
 	}
 }
 
-func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (api.Module, api.Function) {
+func instantiateModule(ctx context.Context, t *testing.T, wasiFunction, wasiImport string, sysCtx *internalsys.Context) (api.Module, api.Function) {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
 	_, err := Instantiate(testCtx, r)
@@ -2279,7 +2279,7 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasifunction, wasiimport))
+)`, wasiFunction, wasiImport))
 	require.NoError(t, err)
 
 	compiled, err := r.CompileModule(ctx, binary, wazero.NewCompileConfig())
@@ -2295,14 +2295,14 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
 		mod.(*wasm.CallContext).Sys = sysCtx
 	}
 
-	fn := mod.ExportedFunction(wasifunction)
+	fn := mod.ExportedFunction(wasiFunction)
 	require.NotNil(t, fn)
 
 	return mod, fn
 }
 
-func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *wasm.SysContext, err error) {
-	return wasm.NewSysContext(
+func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *internalsys.Context, err error) {
+	return internalsys.NewContext(
 		math.MaxUint32,
 		args,
 		environ,

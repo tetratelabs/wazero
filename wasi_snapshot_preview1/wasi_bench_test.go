@@ -3,6 +3,7 @@ package wasi_snapshot_preview1
 import (
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -57,7 +58,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 	})
 }
 
-func newModule(buf []byte, sys *wasm.SysContext) *wasm.CallContext {
+func newModule(buf []byte, sys *sys.Context) *wasm.CallContext {
 	return wasm.NewCallContext(nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
 	}, sys)
