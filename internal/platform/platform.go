@@ -9,8 +9,8 @@ import (
 	"runtime"
 )
 
-// IsSupported is exported for tests and includes constraints here and also the assembler.
-func IsSupported() bool {
+// CompilerSupported is exported for tests and includes constraints here and also the assembler.
+func CompilerSupported() bool {
 	switch runtime.GOOS {
 	case "darwin", "windows", "linux":
 	default:

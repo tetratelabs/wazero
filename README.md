@@ -85,14 +85,17 @@ The [wasi_snapshot_preview1][13] tag of WASI is widely implemented, so wazero
 bundles an implementation. That way, you don't have to write these functions.
 
 For example, here's how you can allow WebAssembly modules to read
-"/work/home/a.txt" as "/a.txt" or "./a.txt":
+"/work/home/a.txt" as "/a.txt" or "./a.txt" as well the system clock:
 ```go
 _, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 if err != nil {
     log.Panicln(err)
 }
 
-config := wazero.NewModuleConfig().WithFS(os.DirFS("/work/home"))
+config := wazero.NewModuleConfig().
+	WithFS(os.DirFS("/work/home")). // instead of no file system
+    WithSysWalltime().WithSysNanotime() // instead of fake time
+
 module, err := r.InstantiateModule(ctx, compiled, config)
 ...
 ```

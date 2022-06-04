@@ -559,8 +559,8 @@ func wasiFunctions() map[string]interface{} {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (a *wasi) ArgsGet(ctx context.Context, m api.Module, argv, argvBuf uint32) Errno {
-	sys := sysCtx(m)
-	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), sys.Args(), argv, argvBuf)
+	sysCtx := getSysCtx(m)
+	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), sysCtx.Args(), argv, argvBuf)
 }
 
 // ArgsSizesGet is the WASI function named functionArgsSizesGet that reads command-line argument data (WithArgs)
@@ -590,13 +590,13 @@ func (a *wasi) ArgsGet(ctx context.Context, m api.Module, argv, argvBuf uint32) 
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (a *wasi) ArgsSizesGet(ctx context.Context, m api.Module, resultArgc, resultArgvBufSize uint32) Errno {
-	sys := sysCtx(m)
+	sysCtx := getSysCtx(m)
 	mem := m.Memory()
 
-	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sys.Args()))) {
+	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
 		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(ctx, resultArgvBufSize, sys.ArgsSize()) {
+	if !mem.WriteUint32Le(ctx, resultArgvBufSize, sysCtx.ArgsSize()) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -629,8 +629,8 @@ func (a *wasi) ArgsSizesGet(ctx context.Context, m api.Module, resultArgc, resul
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (a *wasi) EnvironGet(ctx context.Context, m api.Module, environ uint32, environBuf uint32) Errno {
-	sys := sysCtx(m)
-	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), sys.Environ(), environ, environBuf)
+	env := getSysCtx(m).Environ()
+	return writeOffsetsAndNullTerminatedValues(ctx, m.Memory(), env, environ, environBuf)
 }
 
 // EnvironSizesGet is the WASI function named functionEnvironSizesGet that reads environment variable
@@ -661,13 +661,13 @@ func (a *wasi) EnvironGet(ctx context.Context, m api.Module, environ uint32, env
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (a *wasi) EnvironSizesGet(ctx context.Context, m api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
-	sys := sysCtx(m)
+	sysCtx := getSysCtx(m)
 	mem := m.Memory()
 
-	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sys.Environ()))) {
+	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
 		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sys.EnvironSize()) {
+	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sysCtx.EnvironSize()) {
 		return ErrnoFault
 	}
 
@@ -693,22 +693,19 @@ func (a *wasi) EnvironSizesGet(ctx context.Context, m api.Module, resultEnvironc
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *wasi) ClockResGet(ctx context.Context, m api.Module, id uint32, resultResolution uint32) Errno {
-	// We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
-	// source in time.go, windows monotonic resolution can be 15ms. This chooses arbitrarily 1us for wall time and
-	// 1ns for monotonic. See RATIONALE.md for more context.
+	sysCtx := getSysCtx(m)
 
 	var resolution uint64 // ns
 	switch id {
 	case clockIDRealtime:
-		resolution = 1000 // 1us
+		resolution = uint64(sysCtx.WalltimeResolution())
 	case clockIDMonotonic:
-		resolution = 1 // 1ns
+		resolution = uint64(sysCtx.NanotimeResolution())
 	default:
 		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
 		// are slated to be removed from the next version of WASI.
 		return ErrnoNosys
 	}
-	// fixed for GrainLang per #271 and Swift per https://github.com/tetratelabs/wazero/issues/526#issuecomment-1134034760
 	if !m.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
 		return ErrnoFault
 	}
@@ -737,21 +734,15 @@ func (a *wasi) ClockResGet(ctx context.Context, m api.Module, id uint32, resultR
 // See https://linux.die.net/man/3/clock_gettime
 func (a *wasi) ClockTimeGet(ctx context.Context, m api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: precision is currently ignored.
+	sysCtx := getSysCtx(m)
+
 	var val uint64
 	switch id {
 	case clockIDRealtime:
-		clock := timeNowUnixNano
-		// Override Context when it is passed via context
-		if clockVal := ctx.Value(sys.TimeNowUnixNanoKey{}); clockVal != nil {
-			clockCtx, ok := clockVal.(func() uint64)
-			if !ok {
-				panic(fmt.Errorf("unsupported clock key: %v", clockVal))
-			}
-			clock = clockCtx
-		}
-		val = clock()
+		sec, nsec := sysCtx.Walltime(ctx)
+		val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
 	case clockIDMonotonic:
-		val = uint64(time.Since(monotonicClockBase))
+		val = uint64(sysCtx.Nanotime(ctx))
 	default:
 		// Similar to many other runtimes, we only support realtime and monotonic clocks. Other types
 		// are slated to be removed from the next version of WASI.
@@ -1011,13 +1002,13 @@ func (a *wasi) FdPwrite(ctx context.Context, m api.Module, fd, iovs, iovsCount u
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
 // See https://linux.die.net/man/3/readv
 func (a *wasi) FdRead(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sys, fsc := sysFSCtx(ctx, m)
+	sysCtx, fsCtx := sysFSCtx(ctx, m)
 
 	var reader io.Reader
 
 	if fd == fdStdin {
-		reader = sys.Stdin()
-	} else if f, ok := fsc.OpenedFile(fd); !ok || f.File == nil {
+		reader = sysCtx.Stdin()
+	} else if f, ok := fsCtx.OpenedFile(fd); !ok || f.File == nil {
 		return ErrnoBadf
 	} else {
 		reader = f.File
@@ -1180,18 +1171,18 @@ func (a *wasi) FdTell(ctx context.Context, m api.Module, fd, resultOffset uint32
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 // See https://linux.die.net/man/3/writev
 func (a *wasi) FdWrite(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sys, fsc := sysFSCtx(ctx, m)
+	sysCtx, fsCtx := sysFSCtx(ctx, m)
 
 	var writer io.Writer
 
 	switch fd {
 	case fdStdout:
-		writer = sys.Stdout()
+		writer = sysCtx.Stdout()
 	case fdStderr:
-		writer = sys.Stderr()
+		writer = sysCtx.Stderr()
 	default:
 		// Check to see if the file descriptor is available
-		if f, ok := fsc.OpenedFile(fd); !ok || f.File == nil {
+		if f, ok := fsCtx.OpenedFile(fd); !ok || f.File == nil {
 			return ErrnoBadf
 			// fs.FS doesn't declare io.Writer, but implementations such as os.File implement it.
 		} else if writer, ok = f.File.(io.Writer); !ok {
@@ -1393,8 +1384,8 @@ func (a *wasi) SchedYield(m api.Module) Errno {
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 func (a *wasi) RandomGet(ctx context.Context, m api.Module, buf uint32, bufLen uint32) (errno Errno) {
 	randomBytes := make([]byte, bufLen)
-	sys := sysCtx(m)
-	n, err := sys.RandSource().Read(randomBytes)
+	sysCtx := getSysCtx(m)
+	n, err := sysCtx.RandSource().Read(randomBytes)
 	if n != int(bufLen) || err != nil {
 		// TODO: handle different errors that syscal to entropy source can return
 		return ErrnoIo
@@ -1434,14 +1425,7 @@ const (
 	clockIDMonotonic = 1
 )
 
-// monotonicClockBase uses time.Now to ensure a monotonic clock reading on all platforms via time.Since.
-var monotonicClockBase = time.Now()
-
-func timeNowUnixNano() uint64 {
-	return uint64(time.Now().UnixNano())
-}
-
-func sysCtx(m api.Module) *wasm.SysContext {
+func getSysCtx(m api.Module) *sys.Context {
 	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {
@@ -1449,7 +1433,7 @@ func sysCtx(m api.Module) *wasm.SysContext {
 	}
 }
 
-func sysFSCtx(ctx context.Context, m api.Module) (*wasm.SysContext, *sys.FSContext) {
+func sysFSCtx(ctx context.Context, m api.Module) (*sys.Context, *sys.FSContext) {
 	if internal, ok := m.(*wasm.CallContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
 	} else {

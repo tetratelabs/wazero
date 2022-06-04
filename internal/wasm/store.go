@@ -13,6 +13,7 @@ import (
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/sys"
 )
 
 type (
@@ -344,7 +345,7 @@ func (s *Store) Instantiate(
 	ns *Namespace,
 	module *Module,
 	name string,
-	sys *SysContext,
+	sys *sys.Context,
 	functionListenerFactory experimentalapi.FunctionListenerFactory,
 ) (*CallContext, error) {
 	if ctx == nil {
@@ -385,7 +386,7 @@ func (s *Store) instantiate(
 	ns *Namespace,
 	module *Module,
 	name string,
-	sys *SysContext,
+	sys *sys.Context,
 	functionListenerFactory experimentalapi.FunctionListenerFactory,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {

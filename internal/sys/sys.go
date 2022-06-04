@@ -1,30 +1,41 @@
-package wasm
+package sys
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
-	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/sys"
 )
 
-// SysContext holds module-scoped system resources currently only used by internalwasi.
-type SysContext struct {
+// Context holds module-scoped system resources currently only supported by
+// built-in host functions.
+type Context struct {
 	args, environ         []string
 	argsSize, environSize uint32
 	stdin                 io.Reader
 	stdout, stderr        io.Writer
-	randSource            io.Reader
 
-	fs *sys.FSContext
+	// Note: Using function pointers here keeps them stable for tests.
+
+	walltime           *sys.Walltime
+	walltimeResolution sys.ClockResolution
+	nanotime           *sys.Nanotime
+	nanotimeResolution sys.ClockResolution
+	randSource         io.Reader
+
+	fs *FSContext
 }
 
 // Args is like os.Args and defaults to nil.
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithArgs
-func (c *SysContext) Args() []string {
+func (c *Context) Args() []string {
 	return c.args
 }
 
@@ -33,7 +44,7 @@ func (c *SysContext) Args() []string {
 // Note: To get the size without null-terminators, subtract the length of Args from this value.
 // See wazero.ModuleConfig WithArgs
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (c *SysContext) ArgsSize() uint32 {
+func (c *Context) ArgsSize() uint32 {
 	return c.argsSize
 }
 
@@ -41,7 +52,7 @@ func (c *SysContext) ArgsSize() uint32 {
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithEnv
-func (c *SysContext) Environ() []string {
+func (c *Context) Environ() []string {
 	return c.environ
 }
 
@@ -50,36 +61,56 @@ func (c *SysContext) Environ() []string {
 // Note: To get the size without null-terminators, subtract the length of Environ from this value.
 // See wazero.ModuleConfig WithEnv
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func (c *SysContext) EnvironSize() uint32 {
+func (c *Context) EnvironSize() uint32 {
 	return c.environSize
 }
 
 // Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
 // See wazero.ModuleConfig WithStdin
-func (c *SysContext) Stdin() io.Reader {
+func (c *Context) Stdin() io.Reader {
 	return c.stdin
 }
 
 // Stdout is like exec.Cmd Stdout and defaults to io.Discard.
 // See wazero.ModuleConfig WithStdout
-func (c *SysContext) Stdout() io.Writer {
+func (c *Context) Stdout() io.Writer {
 	return c.stdout
 }
 
 // Stderr is like exec.Cmd Stderr and defaults to io.Discard.
 // See wazero.ModuleConfig WithStderr
-func (c *SysContext) Stderr() io.Writer {
+func (c *Context) Stderr() io.Writer {
 	return c.stderr
 }
 
+// Walltime implements sys.Walltime.
+func (c *Context) Walltime(ctx context.Context) (sec int64, nsec int32) {
+	return (*(c.walltime))(ctx)
+}
+
+// WalltimeResolution returns resolution of Walltime.
+func (c *Context) WalltimeResolution() sys.ClockResolution {
+	return c.walltimeResolution
+}
+
+// Nanotime implements sys.Nanotime.
+func (c *Context) Nanotime(ctx context.Context) int64 {
+	return (*(c.nanotime))(ctx)
+}
+
+// NanotimeResolution returns resolution of Nanotime.
+func (c *Context) NanotimeResolution() sys.ClockResolution {
+	return c.nanotimeResolution
+}
+
 // FS returns the file system context.
-func (c *SysContext) FS() *sys.FSContext {
+func (c *Context) FS() *FSContext {
 	return c.fs
 }
 
 // RandSource is a source of random bytes and defaults to crypto/rand.Reader.
 // see wazero.ModuleConfig WithRandSource
-func (c *SysContext) RandSource() io.Reader {
+func (c *Context) RandSource() io.Reader {
 	return c.randSource
 }
 
@@ -92,24 +123,35 @@ func (eofReader) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
 
-// DefaultSysContext returns SysContext with no values set.
+// DefaultContext returns Context with no values set.
 //
-// Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
+// Note: This isn't a constant because Context.openedFiles is currently mutable even when empty.
 // TODO: Make it an error to open or close files when no FS was assigned.
-func DefaultSysContext() *SysContext {
-	if sysCtx, err := NewSysContext(0, nil, nil, nil, nil, nil, nil, nil); err != nil {
-		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
+func DefaultContext() *Context {
+	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil); err != nil {
+		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
 		return sysCtx
 	}
 }
 
-var _ = DefaultSysContext() // Force panic on bug.
+var _ = DefaultContext() // Force panic on bug.
+var wt sys.Walltime = platform.FakeWalltime
+var nt sys.Nanotime = platform.FakeNanotime
 
-// NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
+// NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randSource io.Reader, openedFiles map[uint32]*sys.FileEntry) (sysCtx *SysContext, err error) {
-	sysCtx = &SysContext{args: args, environ: environ}
+func NewContext(
+	max uint32,
+	args, environ []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	randSource io.Reader,
+	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
+	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
+	openedFiles map[uint32]*FileEntry,
+) (sysCtx *Context, err error) {
+	sysCtx = &Context{args: args, environ: environ}
 
 	if sysCtx.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
 		return nil, fmt.Errorf("args invalid: %w", err)
@@ -143,9 +185,36 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 		sysCtx.randSource = randSource
 	}
 
-	sysCtx.fs = sys.NewFSContext(openedFiles)
+	if walltime != nil {
+		if clockResolutionInvalid(walltimeResolution) {
+			return nil, fmt.Errorf("invalid Walltime resolution: %d", walltimeResolution)
+		}
+		sysCtx.walltime = walltime
+		sysCtx.walltimeResolution = walltimeResolution
+	} else {
+		sysCtx.walltime = &wt
+		sysCtx.walltimeResolution = sys.ClockResolution(time.Microsecond.Nanoseconds())
+	}
+
+	if nanotime != nil {
+		if clockResolutionInvalid(nanotimeResolution) {
+			return nil, fmt.Errorf("invalid Nanotime resolution: %d", nanotimeResolution)
+		}
+		sysCtx.nanotime = nanotime
+		sysCtx.nanotimeResolution = nanotimeResolution
+	} else {
+		sysCtx.nanotime = &nt
+		sysCtx.nanotimeResolution = sys.ClockResolution(time.Nanosecond)
+	}
+
+	sysCtx.fs = NewFSContext(openedFiles)
 
 	return
+}
+
+// clockResolutionInvalid returns true if the value stored isn't reasonable.
+func clockResolutionInvalid(resolution sys.ClockResolution) bool {
+	return resolution < 1 || resolution > sys.ClockResolution(time.Hour.Nanoseconds())
 }
 
 // nullTerminatedByteCount ensures the count or Nul-terminated length of the elements doesn't exceed max, and that no

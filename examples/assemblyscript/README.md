@@ -1,9 +1,13 @@
 ## AssemblyScript example
 
-This example runs a WebAssembly program compiled using AssemblyScript, built with `npm install && npm run build`.
-The program exports two functions, `hello_world` which executes simple integer math, and `goodbye_world`, which
-throws an error that is logged using the AssemblyScript `abort` built-in function. Wazero is configured to export
-functions used by WebAssembly for reporting errors and trace messages.
+This example runs a WebAssembly program compiled using AssemblyScript, built
+with `npm install && npm run build`.
+
+AssemblyScript program exports two functions, `hello_world` which executes
+simple math, and `goodbye_world`, which throws an error that is logged using
+AssemblyScript `abort` built-in function.
+
+This demo configures AssemblyScript imports for errors and trace messages.
 
 Ex.
 ```bash

@@ -176,7 +176,7 @@ func TestCompiler_ModuleEngine_Memory(t *testing.T) {
 
 // requireSupportedOSArch is duplicated also in the platform package to ensure no cyclic dependency.
 func requireSupportedOSArch(t *testing.T) {
-	if !platform.IsSupported() {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 }

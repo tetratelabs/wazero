@@ -13,7 +13,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if !platform.IsSupported() {
+	if !platform.CompilerSupported() {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())

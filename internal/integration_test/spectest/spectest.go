@@ -14,6 +14,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -344,7 +345,7 @@ func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
 	err = s.Engine.CompileModule(testCtx, mod)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, mod, mod.NameSection.ModuleName, wasm.DefaultSysContext(), nil)
+	_, err = s.Instantiate(testCtx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(), nil)
 	require.NoError(t, err)
 }
 

@@ -15,11 +15,11 @@ import (
 	"testing"
 	"testing/fstest"
 	"testing/iotest"
-	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -27,13 +27,14 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-const (
-	epochNanos = uint64(1640995200000000000) // midnight UTC 2022-01-01
-	seed       = int64(42)                   // fixed seed value
-)
+const seed = int64(42) // fixed seed value
 
-// testCtx ensures the fake clock is used for WASI functions.
-var testCtx = experimental.WithTimeNowUnixNano(context.Background(), func() uint64 { return epochNanos })
+var deterministicRandomSource = func() io.Reader {
+	return rand.New(rand.NewSource(seed))
+}
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 var a = &wasi{}
 
@@ -600,18 +601,9 @@ func TestSnapshotPreview1_ClockTimeGet_Monotonic(t *testing.T) {
 			errno := tc.invocation()
 			require.Zero(t, errno, ErrnoName(errno))
 
-			start, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
+			tick, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
 			require.True(t, ok)
-
-			time.Sleep(1 * time.Millisecond)
-
-			errno = tc.invocation()
-			require.Zero(t, errno, ErrnoName(errno))
-			end, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
-			require.True(t, ok)
-
-			// Time is monotonic
-			require.True(t, end > start)
+			require.Equal(t, uint64(platform.FakeEpochNanos), tick)
 		})
 	}
 }
@@ -2105,11 +2097,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	offset := uint32(1) // offset,
 
 	t.Run("wasi.RandomGet", func(t *testing.T) {
-		source := rand.New(rand.NewSource(seed))
-		sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, source, nil)
-		require.NoError(t, err)
-
-		mod, _ := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, sysCtx)
+		mod, _ := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, nil)
 		defer mod.Close(testCtx)
 
 		maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -2124,11 +2112,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	})
 
 	t.Run(functionRandomGet, func(t *testing.T) {
-		source := rand.New(rand.NewSource(seed))
-		sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, source, nil)
-		require.NoError(t, err)
-
-		mod, fn := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, sysCtx)
+		mod, fn := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, nil)
 		defer mod.Close(testCtx)
 
 		maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -2198,17 +2182,24 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			var errCtx = experimental.WithTimeNowUnixNano(context.Background(), func() uint64 {
-				panic(errors.New("TimeNowUnixNano error"))
-			})
-
-			sysCtx, err := wasm.NewSysContext(math.MaxUint32, nil, nil, new(bytes.Buffer), nil, nil, tc.randSource, nil)
+			sysCtx, err := internalsys.NewContext(
+				math.MaxUint32,
+				nil,
+				nil,
+				new(bytes.Buffer),
+				nil,
+				nil,
+				tc.randSource,
+				nil, 0,
+				nil, 0,
+				nil,
+			)
 			require.NoError(t, err)
 
-			mod, _ := instantiateModule(errCtx, t, functionRandomGet, importRandomGet, sysCtx)
-			defer mod.Close(errCtx)
+			mod, _ := instantiateModule(testCtx, t, functionRandomGet, importRandomGet, sysCtx)
+			defer mod.Close(testCtx)
 
-			errno := a.RandomGet(errCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
+			errno := a.RandomGet(testCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
 			require.Equal(t, ErrnoIo, errno, ErrnoName(errno))
 		})
 	}
@@ -2277,7 +2268,7 @@ func maskMemory(t *testing.T, ctx context.Context, mod api.Module, size int) {
 	}
 }
 
-func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimport string, sysCtx *wasm.SysContext) (api.Module, api.Function) {
+func instantiateModule(ctx context.Context, t *testing.T, wasiFunction, wasiImport string, sysCtx *internalsys.Context) (api.Module, api.Function) {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
 	_, err := Instantiate(testCtx, r)
@@ -2288,28 +2279,41 @@ func instantiateModule(ctx context.Context, t *testing.T, wasifunction, wasiimpo
   (memory 1 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasifunction, wasiimport))
+)`, wasiFunction, wasiImport))
 	require.NoError(t, err)
 
 	compiled, err := r.CompileModule(ctx, binary, wazero.NewCompileConfig())
 	require.NoError(t, err)
 	defer compiled.Close(ctx)
 
-	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(t.Name()))
+	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().
+		WithName(t.Name()).
+		WithRandSource(deterministicRandomSource()))
 	require.NoError(t, err)
 
 	if sysCtx != nil {
 		mod.(*wasm.CallContext).Sys = sysCtx
 	}
 
-	fn := mod.ExportedFunction(wasifunction)
+	fn := mod.ExportedFunction(wasiFunction)
 	require.NotNil(t, fn)
 
 	return mod, fn
 }
 
-func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *wasm.SysContext, err error) {
-	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, nil, openedFiles)
+func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *internalsys.Context, err error) {
+	return internalsys.NewContext(
+		math.MaxUint32,
+		args,
+		environ,
+		new(bytes.Buffer),
+		nil,
+		nil,
+		deterministicRandomSource(),
+		nil, 0,
+		nil, 0,
+		openedFiles,
+	)
 }
 
 func createFile(t *testing.T, pathName string, data []byte) (fs.File, fs.FS) {

@@ -38,7 +38,7 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Combine the above into our baseline config, overriding defaults (which discard stdout and have no file system).
+	// Combine the above into our baseline config, overriding defaults (which discards stdout and has no file system).
 	config := wazero.NewModuleConfig().WithStdout(os.Stdout).WithFS(rooted)
 
 	// Instantiate WASI, which implements system I/O such as console output.

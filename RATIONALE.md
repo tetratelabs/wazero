@@ -396,7 +396,56 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 
 Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
 
-### ClockResGet
+## sys.Walltime and Nanotime
+
+The `sys` package has two function types, `Walltime` and `Nanotime` for real
+and monotonic clock exports. The naming matches conventions used in Go.
+
+```go
+func time_now() (sec int64, nsec int32, mono int64) {
+	sec, nsec = walltime()
+	return sec, nsec, nanotime()
+}
+```
+
+Splitting functions for wall and clock time allow implementations to choose
+whether to implement the clock once (as in Go), or split them out.
+
+Each can be configured with a `ClockResolution`, although is it usually
+incorrect as detailed in a sub-heading below. The only reason for exposing this
+is to satisfy WASI:
+
+See https://github.com/WebAssembly/wasi-clocks
+
+## Why default to fake time?
+
+WebAssembly has an implicit design pattern of capabilities based security. By
+defaulting to a fake time, we reduce the chance of timing attacks, at the cost
+of requiring configuration to opt-into real clocks.
+
+See https://gruss.cc/files/fantastictimers.pdf for an example attacks.
+
+## Why not `time.Clock`?
+
+wazero can't use `time.Clock` as a plugin for clock implementation as it is
+only substitutable with build flags (`faketime`) and conflates wall and
+monotonic time in the same call.
+
+Go's `time.Clock` was added monotonic time after the fact. For portability with
+prior APIs, a decision was made to combine readings into the same API call.
+
+See https://go.googlesource.com/proposal/+/master/design/12914-monotonic.md
+
+WebAssembly time imports do not have the same concern. In fact even Go's
+imports for clocks split walltime from nanotime readings.
+
+See https://github.com/golang/go/blob/252324e879e32f948d885f787decf8af06f82be9/misc/wasm/wasm_exec.js#L243-L255
+
+Finally, Go's clock is not an interface. WebAssembly users who want determinism
+or security need to be able to substitute an alternative clock implementation
+from the host process one.
+
+### `ClockResolution`
 
 A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
 Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual

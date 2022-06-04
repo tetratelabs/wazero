@@ -9,9 +9,10 @@ import (
 	"testing/fstest"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/sys"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func TestRuntimeConfig(t *testing.T) {
@@ -299,7 +300,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    ModuleConfig
-		expected *wasm.SysContext
+		expected *internalsys.Context
 	}{
 		{
 			name:  "empty",
@@ -312,7 +313,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				nil,            // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -326,7 +329,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // stdout
 				nil,                 // stderr
 				nil,                 // randSource
-				nil,                 // openedFiles
+				nil, 0,              // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -340,7 +345,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                // stdout
 				nil,                // stderr
 				nil,                // randSource
-				nil,                // openedFiles
+				nil, 0,             // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -354,7 +361,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // stdout
 				nil,                 // stderr
 				nil,                 // randSource
-				nil,                 // openedFiles
+				nil, 0,              // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -368,7 +377,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,             // stdout
 				nil,             // stderr
 				nil,             // randSource
-				nil,             // openedFiles
+				nil, 0,          // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -382,7 +393,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				nil,            // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -396,7 +409,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // stdout
 				nil,                     // stderr
 				nil,                     // randSource
-				nil,                     // openedFiles
+				nil, 0,                  // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -410,10 +425,11 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                      // stdout
 				nil,                      // stderr
 				nil,                      // randSource
-				nil,                      // openedFiles
+				nil, 0,                   // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
-
 		{
 			name:  "WithEnv twice",
 			input: NewModuleConfig().WithEnv("a", "b").WithEnv("c", "de"),
@@ -425,7 +441,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // stdout
 				nil,                     // stderr
 				nil,                     // randSource
-				nil,                     // openedFiles
+				nil, 0,                  // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
 			),
 		},
 		{
@@ -439,7 +457,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*sys.FileEntry{ // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS},
 				},
@@ -456,7 +476,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*sys.FileEntry{ // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS2},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -473,7 +495,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*sys.FileEntry{ // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 				},
 			),
@@ -489,7 +513,9 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*sys.FileEntry{ // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS2},
 				},
@@ -506,22 +532,169 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				nil,            // randSource
-				map[uint32]*sys.FileEntry{ // openedFiles
+				nil, 0,         // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 					4: {Path: "/", FS: testFS2},
 				},
 			),
 		},
 	}
+
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			sys, err := tc.input.(*moduleConfig).toSysContext()
+			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, sys)
+			require.Equal(t, tc.expected, sysCtx)
 		})
 	}
+}
+
+// TestModuleConfig_toSysContext_WithWalltime has to test differently because we can't
+// compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
+	tests := []struct {
+		name               string
+		input              ModuleConfig
+		expectedSec        int64
+		expectedNsec       int32
+		expectedResolution sys.ClockResolution
+		expectedErr        string
+	}{
+		{
+			name: "ok",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 3),
+			expectedSec:        1,
+			expectedNsec:       2,
+			expectedResolution: 3,
+		},
+		{
+			name: "overwrites",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 3, 4
+				}, 5).
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 3),
+			expectedSec:        1,
+			expectedNsec:       2,
+			expectedResolution: 3,
+		},
+		{
+			name: "invalid resolution",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 0),
+			expectedErr: "invalid Walltime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				sec, nsec := sysCtx.Walltime(testCtx)
+				require.Equal(t, tc.expectedSec, sec)
+				require.Equal(t, tc.expectedNsec, nsec)
+				require.Equal(t, tc.expectedResolution, sysCtx.WalltimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+
+	t.Run("context", func(t *testing.T) {
+		sysCtx, err := NewModuleConfig().
+			WithWalltime(func(ctx context.Context) (sec int64, nsec int32) {
+				require.Equal(t, testCtx, ctx)
+				return 1, 2
+			}, 3).(*moduleConfig).toSysContext()
+		require.NoError(t, err)
+		sec, nsec := sysCtx.Walltime(testCtx)
+		// If below pass, the context was correct!
+		require.Equal(t, int64(1), sec)
+		require.Equal(t, int32(2), nsec)
+	})
+}
+
+// TestModuleConfig_toSysContext_WithNanotime has to test differently because we can't
+// compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
+	tests := []struct {
+		name               string
+		input              ModuleConfig
+		expectedNanos      int64
+		expectedResolution sys.ClockResolution
+		expectedErr        string
+	}{
+		{
+			name: "ok",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 2),
+			expectedNanos:      1,
+			expectedResolution: 2,
+		},
+		{
+			name: "overwrites",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 3
+				}, 4).
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 2),
+			expectedNanos:      1,
+			expectedResolution: 2,
+		},
+		{
+			name: "invalid resolution",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 0),
+			expectedErr: "invalid Nanotime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				nanos := sysCtx.Nanotime(testCtx)
+				require.Equal(t, tc.expectedNanos, nanos)
+				require.Equal(t, tc.expectedResolution, sysCtx.NanotimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+
+	t.Run("context", func(t *testing.T) {
+		sysCtx, err := NewModuleConfig().
+			WithNanotime(func(ctx context.Context) int64 {
+				require.Equal(t, testCtx, ctx)
+				return 1
+			}, 2).(*moduleConfig).toSysContext()
+		require.NoError(t, err)
+		// If below pass, the context was correct!
+		require.Equal(t, int64(1), sysCtx.Nanotime(testCtx))
+	})
 }
 
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {
@@ -576,9 +749,30 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	}
 }
 
-// requireSysContext ensures wasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
-func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, randsource io.Reader, openedFiles map[uint32]*sys.FileEntry) *wasm.SysContext {
-	sysCtx, err := wasm.NewSysContext(max, args, environ, stdin, stdout, stderr, randsource, openedFiles)
+// requireSysContext ensures wasm.NewContext doesn't return an error, which makes it usable in test matrices.
+func requireSysContext(
+	t *testing.T,
+	max uint32,
+	args, environ []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	randSource io.Reader,
+	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
+	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
+	openedFiles map[uint32]*internalsys.FileEntry,
+) *internalsys.Context {
+	sysCtx, err := internalsys.NewContext(
+		max,
+		args,
+		environ,
+		stdin,
+		stdout,
+		stderr,
+		randSource,
+		walltime, walltimeResolution,
+		nanotime, nanotimeResolution,
+		openedFiles,
+	)
 	require.NoError(t, err)
 	return sysCtx
 }

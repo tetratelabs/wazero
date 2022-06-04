@@ -19,7 +19,7 @@ var hammers = map[string]func(t *testing.T, r wazero.Runtime){
 }
 
 func TestEngineCompiler_hammer(t *testing.T) {
-	if !platform.IsSupported() {
+	if !platform.CompilerSupported() {
 		t.Skip()
 	}
 	runAllTests(t, hammers, wazero.NewRuntimeConfigCompiler())

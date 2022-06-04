@@ -6,13 +6,14 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 // compile time check to ensure CallContext implements api.Module
 var _ api.Module = &CallContext{}
 
-func NewCallContext(ns *Namespace, instance *ModuleInstance, Sys *SysContext) *CallContext {
+func NewCallContext(ns *Namespace, instance *ModuleInstance, Sys *internalsys.Context) *CallContext {
 	zero := uint64(0)
 	return &CallContext{memory: instance.Memory, module: instance, ns: ns, Sys: Sys, closed: &zero}
 }
@@ -34,9 +35,16 @@ type CallContext struct {
 	memory api.Memory
 	ns     *Namespace
 
-	// Note: This is a part of CallContext so that scope is correct and Close is coherent.
-	// Sys is exposed only for WASI
-	Sys *SysContext
+	// Sys is exposed for use in special imports such as WASI, assemblyscript
+	// and wasm_exec.
+	//
+	// Notes
+	//
+	//	* This is a part of CallContext so that scope and Close is coherent.
+	//	* This is not exposed outside this repository (as a host function
+	//	  parameter) because we haven't thought through capabilities based
+	//	  security implications.
+	Sys *internalsys.Context
 
 	// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
 	//

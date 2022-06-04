@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -76,7 +77,7 @@ func (ns *namespace) InstantiateModule(
 		panic(fmt.Errorf("unsupported wazero.ModuleConfig implementation: %#v", mConfig))
 	}
 
-	var sysCtx *wasm.SysContext
+	var sysCtx *internalsys.Context
 	if sysCtx, err = config.toSysContext(); err != nil {
 		return
 	}

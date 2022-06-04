@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -99,8 +100,8 @@ func TestStore_Instantiate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sys := DefaultSysContext()
-	mod, err := s.Instantiate(testCtx, ns, m, "", sys, nil)
+	sysCtx := sys.DefaultContext()
+	mod, err := s.Instantiate(testCtx, ns, m, "", sysCtx, nil)
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
 
@@ -108,7 +109,7 @@ func TestStore_Instantiate(t *testing.T) {
 		require.Equal(t, ns.modules[""], mod.module)
 		require.Equal(t, ns.modules[""].Memory, mod.memory)
 		require.Equal(t, ns, mod.ns)
-		require.Equal(t, sys, mod.Sys)
+		require.Equal(t, sysCtx, mod.Sys)
 	})
 }
 
@@ -210,7 +211,7 @@ func TestStore_hammer(t *testing.T) {
 		N = 100
 	}
 	hammer.NewHammer(t, P, N).Run(func(name string) {
-		mod, instantiateErr := s.Instantiate(testCtx, ns, importingModule, name, DefaultSysContext(), nil)
+		mod, instantiateErr := s.Instantiate(testCtx, ns, importingModule, name, sys.DefaultContext(), nil)
 		require.NoError(t, instantiateErr)
 		require.NoError(t, mod.Close(testCtx))
 	}, nil)
