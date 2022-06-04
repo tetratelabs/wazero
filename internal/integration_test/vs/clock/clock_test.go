@@ -1,4 +1,4 @@
-package bench
+package clock
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ import (
 //go:linkname nanotime runtime.nanotime
 func nanotime() int64
 
-func BenchmarkTime(b *testing.B) {
+func BenchmarkClock(b *testing.B) {
 	b.Run("time.Now", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = time.Now()

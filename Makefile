@@ -24,14 +24,14 @@ main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
 bench:
-	@(cd ./internal/integration_test/bench; go test -run=NONE -benchmem -bench=. .)
+	@go test -run=NONE -benchmem -bench=. ./internal/integration_test/bench/...
 	@go test -benchmem -bench=. ./internal/integration_test/vs/... $(ensureCompilerFastest)
 
 .PHONY: bench.check
 bench.check:
-	@(cd ./internal/integration_test/bench; go build .)
+	@go build ./internal/integration_test/bench/...
 	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
-	@for d in vs/wasmedge vs/wasmer vs/wasmtime ; do \
+	@for d in vs/clock vs/wasmedge vs/wasmer vs/wasmtime ; do \
 		cd ./internal/integration_test/$$d ; \
 		go test -bench=. . -tags='wasmedge' $(ensureCompilerFastest) ; \
 		cd - ;\
