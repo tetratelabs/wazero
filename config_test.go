@@ -430,7 +430,6 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil, // openedFiles
 			),
 		},
-
 		{
 			name:  "WithEnv twice",
 			input: NewModuleConfig().WithEnv("a", "b").WithEnv("c", "de"),
@@ -552,6 +551,150 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 			require.Equal(t, tc.expected, sysCtx)
 		})
 	}
+}
+
+// TestModuleConfig_toSysContext_WithWalltime has to test differently because we can't
+// compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithWalltime(t *testing.T) {
+	tests := []struct {
+		name               string
+		input              ModuleConfig
+		expectedSec        int64
+		expectedNsec       int32
+		expectedResolution sys.ClockResolution
+		expectedErr        string
+	}{
+		{
+			name: "ok",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 3),
+			expectedSec:        1,
+			expectedNsec:       2,
+			expectedResolution: 3,
+		},
+		{
+			name: "overwrites",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 3, 4
+				}, 5).
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 3),
+			expectedSec:        1,
+			expectedNsec:       2,
+			expectedResolution: 3,
+		},
+		{
+			name: "invalid resolution",
+			input: NewModuleConfig().
+				WithWalltime(func(context.Context) (sec int64, nsec int32) {
+					return 1, 2
+				}, 0),
+			expectedErr: "invalid Walltime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				sec, nsec := sysCtx.Walltime(testCtx)
+				require.Equal(t, tc.expectedSec, sec)
+				require.Equal(t, tc.expectedNsec, nsec)
+				require.Equal(t, tc.expectedResolution, sysCtx.WalltimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+
+	t.Run("context", func(t *testing.T) {
+		sysCtx, err := NewModuleConfig().
+			WithWalltime(func(ctx context.Context) (sec int64, nsec int32) {
+				require.Equal(t, testCtx, ctx)
+				return 1, 2
+			}, 3).(*moduleConfig).toSysContext()
+		require.NoError(t, err)
+		sec, nsec := sysCtx.Walltime(testCtx)
+		// If below pass, the context was correct!
+		require.Equal(t, int64(1), sec)
+		require.Equal(t, int32(2), nsec)
+	})
+}
+
+// TestModuleConfig_toSysContext_WithNanotime has to test differently because we can't
+// compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
+	tests := []struct {
+		name               string
+		input              ModuleConfig
+		expectedNanos      int64
+		expectedResolution sys.ClockResolution
+		expectedErr        string
+	}{
+		{
+			name: "ok",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 2),
+			expectedNanos:      1,
+			expectedResolution: 2,
+		},
+		{
+			name: "overwrites",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 3
+				}, 4).
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 2),
+			expectedNanos:      1,
+			expectedResolution: 2,
+		},
+		{
+			name: "invalid resolution",
+			input: NewModuleConfig().
+				WithNanotime(func(context.Context) int64 {
+					return 1
+				}, 0),
+			expectedErr: "invalid Nanotime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := tc.input.(*moduleConfig).toSysContext()
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				nanos := sysCtx.Nanotime(testCtx)
+				require.Equal(t, tc.expectedNanos, nanos)
+				require.Equal(t, tc.expectedResolution, sysCtx.NanotimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+
+	t.Run("context", func(t *testing.T) {
+		sysCtx, err := NewModuleConfig().
+			WithNanotime(func(ctx context.Context) int64 {
+				require.Equal(t, testCtx, ctx)
+				return 1
+			}, 2).(*moduleConfig).toSysContext()
+		require.NoError(t, err)
+		// If below pass, the context was correct!
+		require.Equal(t, int64(1), sysCtx.Nanotime(testCtx))
+	})
 }
 
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {

@@ -25,8 +25,8 @@ func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	// Create a new WebAssembly Runtime. AssemblyScript enables certain wasm 2.0 features by default, so
-	// we go ahead and configure the runtime for wasm 2.0 compatibility.
+	// Create a new WebAssembly Runtime.
+	// Use WebAssembly 2.0 because AssemblyScript uses some >1.0 features.
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().
 		WithWasmCore2())
 	defer r.Close(ctx) // This closes everything this Runtime created.
@@ -44,10 +44,12 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Instantiate a WebAssembly module that imports the "abort" and "trace" functions defined by
-	// assemblyscript.Instantiate and exports functions we'll use in this example. We override the
-	// default module config that discards stdout and stderr.
-	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout).WithStderr(os.Stderr))
+	// Instantiate a WebAssembly module that imports the "abort" and "trace"
+	// functions defined by assemblyscript.Instantiate and exports functions
+	// we'll use in this example.
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().
+		// Override the default module config that discards stdout and stderr.
+		WithStdout(os.Stdout).WithStderr(os.Stderr))
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -63,16 +65,16 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Call hello_world, which returns the input value incremented by 3. It includes a call to trace()
-	// for detailed logging but the above assemblyscript.Instantiate does not enable it by default.
+	// Call hello_world, which returns the input value incremented by 3.
+	// While this calls trace(), our configuration didn't enable it.
 	results, err := helloWorld.Call(ctx, uint64(num))
 	if err != nil {
 		log.Panicln(err)
 	}
 	fmt.Printf("hello_world returned: %v", results[0])
 
-	// Call goodbye_world, which aborts with an error. assemblyscript.Instantiate configures abort
-	// to print to stderr.
+	// Call goodbye_world, which aborts with an error.
+	// assemblyscript.Instantiate was configured above to abort to stderr.
 	results, err = goodbyeWorld.Call(ctx)
 	if err == nil {
 		log.Panicln("goodbye_world did not fail")

@@ -187,7 +187,7 @@ func NewContext(
 
 	if walltime != nil {
 		if clockResolutionInvalid(walltimeResolution) {
-			return nil, fmt.Errorf("invalid Walltime resolution %d", walltimeResolution)
+			return nil, fmt.Errorf("invalid Walltime resolution: %d", walltimeResolution)
 		}
 		sysCtx.walltime = walltime
 		sysCtx.walltimeResolution = walltimeResolution
@@ -198,7 +198,7 @@ func NewContext(
 
 	if nanotime != nil {
 		if clockResolutionInvalid(nanotimeResolution) {
-			return nil, fmt.Errorf("invalid Nanotime resolution %d", nanotimeResolution)
+			return nil, fmt.Errorf("invalid Nanotime resolution: %d", nanotimeResolution)
 		}
 		sysCtx.nanotime = nanotime
 		sysCtx.nanotimeResolution = nanotimeResolution

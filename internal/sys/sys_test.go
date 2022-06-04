@@ -2,8 +2,10 @@ package sys
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
@@ -31,14 +33,15 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, eofReader{}, sysCtx.Stdin())
 	require.Equal(t, io.Discard, sysCtx.Stdout())
 	require.Equal(t, io.Discard, sysCtx.Stderr())
-	require.Equal(t, &wt, sysCtx.walltime)
-	require.Equal(t, sys.ClockResolution(1_000), sysCtx.walltimeResolution)
-	require.Equal(t, &nt, sysCtx.nanotime)
-	require.Equal(t, sys.ClockResolution(1), sysCtx.nanotimeResolution)
-	require.Equal(t, sysCtx, DefaultContext())
+	require.Equal(t, &wt, sysCtx.walltime) // To compare functions, we can only compare pointers.
+	require.Equal(t, sys.ClockResolution(1_000), sysCtx.WalltimeResolution())
+	require.Equal(t, &nt, sysCtx.nanotime) // To compare functions, we can only compare pointers.
+	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
+	require.Equal(t, rand.Reader, sysCtx.RandSource())
+	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS())
 }
 
-func TestNewSysContext_Args(t *testing.T) {
+func TestNewContext_Args(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         []string
@@ -99,7 +102,7 @@ func TestNewSysContext_Args(t *testing.T) {
 	}
 }
 
-func TestNewSysContext_Environ(t *testing.T) {
+func TestNewContext_Environ(t *testing.T) {
 	tests := []struct {
 		name         string
 		environ      []string
@@ -156,6 +159,131 @@ func TestNewSysContext_Environ(t *testing.T) {
 			} else {
 				require.EqualError(t, err, tc.expectedErr)
 			}
+		})
+	}
+}
+
+func TestNewContext_Walltime(t *testing.T) {
+	tests := []struct {
+		name        string
+		time        *sys.Walltime
+		resolution  sys.ClockResolution
+		expectedErr string
+	}{
+		{
+			name:       "ok",
+			time:       &wt,
+			resolution: 3,
+		},
+		{
+			name:        "invalid resolution",
+			time:        &wt,
+			resolution:  0,
+			expectedErr: "invalid Walltime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := NewContext(
+				0,   // max
+				nil, // args
+				nil,
+				nil,                    // stdin
+				nil,                    // stdout
+				nil,                    // stderr
+				nil,                    // randSource
+				tc.time, tc.resolution, // walltime, walltimeResolution
+				nil, 0, // nanotime, nanotimeResolution
+				nil, // openedFiles
+			)
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				require.Equal(t, tc.time, sysCtx.walltime)
+				require.Equal(t, tc.resolution, sysCtx.WalltimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func TestNewContext_Nanotime(t *testing.T) {
+	tests := []struct {
+		name        string
+		time        *sys.Nanotime
+		resolution  sys.ClockResolution
+		expectedErr string
+	}{
+		{
+			name:       "ok",
+			time:       &nt,
+			resolution: 3,
+		},
+		{
+			name:        "invalid resolution",
+			time:        &nt,
+			resolution:  0,
+			expectedErr: "invalid Nanotime resolution: 0",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sysCtx, err := NewContext(
+				0,   // max
+				nil, // args
+				nil,
+				nil,    // stdin
+				nil,    // stdout
+				nil,    // stderr
+				nil,    // randSource
+				nil, 0, // nanotime, nanotimeResolution
+				tc.time, tc.resolution, // nanotime, nanotimeResolution
+				nil, // openedFiles
+			)
+			if tc.expectedErr == "" {
+				require.Nil(t, err)
+				require.Equal(t, tc.time, sysCtx.nanotime)
+				require.Equal(t, tc.resolution, sysCtx.NanotimeResolution())
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
+func Test_clockResolutionInvalid(t *testing.T) {
+	tests := []struct {
+		name       string
+		resolution sys.ClockResolution
+		expected   bool
+	}{
+		{
+			name:       "ok",
+			resolution: 1,
+		},
+		{
+			name:       "zero",
+			resolution: 0,
+			expected:   true,
+		},
+		{
+			name:       "too big",
+			resolution: sys.ClockResolution(time.Hour.Nanoseconds() * 2),
+			expected:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, clockResolutionInvalid(tc.resolution))
 		})
 	}
 }

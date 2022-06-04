@@ -340,7 +340,7 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 //
 // Ex.
 //	// Initialize base configuration:
-//	config := wazero.NewModuleConfig().WithStdout(buf)
+//	config := wazero.NewModuleConfig().WithStdout(buf).WithSysNanotime()
 //
 //	// Assign different configuration on each instantiation
 //	module, _ := r.InstantiateModule(ctx, compiled, config.WithName("rotate").WithArgs("rotate", "angle=90", "dir=cw"))
@@ -448,6 +448,12 @@ type ModuleConfig interface {
 	// WithWalltime configures the wall clock, sometimes referred to as the
 	// real time clock. Defaults to a constant fake result.
 	//
+	// Ex. To override with your own clock:
+	//	moduleConfig = moduleConfig.
+	//		WithWalltime(func(context.Context) (sec int64, nsec int32) {
+	//			return clock.walltime()
+	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
+	//
 	// Note: This does not default to time.Now as that violates sandboxing. Use
 	// WithSysWalltime for a usable implementation.
 	WithWalltime(sys.Walltime, sys.ClockResolution) ModuleConfig
@@ -460,6 +466,12 @@ type ModuleConfig interface {
 
 	// WithNanotime configures the monotonic clock, used to measure elapsed
 	// time in nanoseconds. Defaults to a constant fake result.
+	//
+	// Ex. To override with your own clock:
+	//	moduleConfig = moduleConfig.
+	//		WithNanotime(func(context.Context) int64 {
+	//			return clock.nanotime()
+	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
 	//
 	// Note: This does not default to time.Since as that violates sandboxing.
 	// Use WithSysNanotime for a usable implementation.

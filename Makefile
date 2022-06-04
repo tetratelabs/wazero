@@ -31,7 +31,7 @@ bench:
 bench.check:
 	@go build ./internal/integration_test/bench/...
 	@# Don't use -test.benchmem as it isn't accurate when comparing against CGO libs
-	@for d in vs/clock vs/wasmedge vs/wasmer vs/wasmtime ; do \
+	@for d in vs/time vs/wasmedge vs/wasmer vs/wasmtime ; do \
 		cd ./internal/integration_test/$$d ; \
 		go test -bench=. . -tags='wasmedge' $(ensureCompilerFastest) ; \
 		cd - ;\

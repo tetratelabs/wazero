@@ -1,4 +1,13 @@
-package clock
+// Package time benchmarks shows ways to implementing the platform clock more
+// efficiently. As long as CGO is available, all platforms can use
+// `runtime.nanotime` to more efficiently implement sys.Nanotime vs using
+// time.Since or x/sys.
+//
+// While results would be more impressive, this doesn't show how to use
+// `runtime.walltime` to avoid the double-performance vs using time.Now. The
+// corresponding function only exists in darwin, so prevents this benchmark
+// from running on other platforms.
+package time
 
 import (
 	"testing"
@@ -7,16 +16,6 @@ import (
 
 	"golang.org/x/sys/unix"
 )
-
-// This benchmark shows one possibility of implementing the platform clock
-// more efficiently. As long as CGO is available, all platforms can use
-// `runtime.nanotime` to more efficiently implement sys.Nanotime vs using
-// time.Since or x/sys.
-//
-// While results would be more impressive, this doesn't show how to use
-// `runtime.walltime` to avoid the double-performance vs using time.Now. The
-// corresponding function only exists in darwin, so prevents this benchmark
-// from running on other platforms.
 
 //go:noescape
 //go:linkname nanotime runtime.nanotime

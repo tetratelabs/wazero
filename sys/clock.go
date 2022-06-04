@@ -8,7 +8,7 @@ import "context"
 // Note: Some implementations return arbitrary resolution because there's
 // no perfect alternative. For example, according to the source in time.go,
 // windows monotonic resolution can be 15ms. See /RATIONALE.md.
-type ClockResolution uint64
+type ClockResolution uint32
 
 // Walltime returns the current time in epoch seconds with a nanosecond fraction.
 type Walltime func(context.Context) (sec int64, nsec int32)
