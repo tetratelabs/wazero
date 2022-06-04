@@ -33,10 +33,16 @@ func Walltime(context.Context) (sec int64, nsec int32) {
 // via time.Since.
 var nanoBase = time.Now()
 
-// Nanotime implements sys.Nanotime with time.Since.
+// nanotimePortable implements sys.Nanotime with time.Since.
 //
-// Note: This is only slightly less efficient than it could be is reading
-// runtime.nanotime(). The extra logic implied here is only doing math.
-func Nanotime(context.Context) int64 {
+// Note: This is less efficient than it could be is reading runtime.nanotime(),
+// Just to do that requires CGO.
+func nanotimePortable() int64 {
 	return time.Since(nanoBase).Nanoseconds()
+}
+
+// Nanotime implements sys.Nanotime with runtime.nanotime() if CGO is available
+// and time.Since if not.
+func Nanotime(context.Context) int64 {
+	return nanotime()
 }

@@ -396,11 +396,10 @@ See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6a
 
 Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
 
-## sys.Clock
+## sys.Walltime and Nanotime
 
-`sys.Clock` is a base interface for two implementations: `WallClock` and
-`Nanotime`. These include `Walltime()` and `Nanotime()` respectively, to
-match naming conventions used internally in Go.
+The `sys` package has two function types, `Walltime` and `Nanotime` for real
+and monotonic clock exports. The naming matches conventions used in Go.
 
 ```go
 func time_now() (sec int64, nsec int32, mono int64) {
@@ -409,14 +408,22 @@ func time_now() (sec int64, nsec int32, mono int64) {
 }
 ```
 
-Using different methods for wall and clock time allow implementations to choose
+Splitting functions for wall and clock time allow implementations to choose
 whether to implement the clock once (as in Go), or split them out.
 
-This design allows implementations to supply a `Resolution`, which is usually
-incorrect as detailed in a sub-heading below. This is exposed despite the
-trouble supplying it, as it is needed for WASI:
+Each can be configured with a `ClockResolution`, although is it usually
+incorrect as detailed in a sub-heading below. The only reason for exposing this
+is to satisfy WASI:
 
 See https://github.com/WebAssembly/wasi-clocks
+
+## Why default to fake time?
+
+WebAssembly has an implicit design pattern of capabilities based security. By
+defaulting to a fake time, we reduce the chance of timing attacks, at the cost
+of requiring configuration to opt-into real clocks.
+
+See https://gruss.cc/files/fantastictimers.pdf for an example attacks.
 
 ## Why not `time.Clock`?
 
@@ -438,7 +445,7 @@ Finally, Go's clock is not an interface. WebAssembly users who want determinism
 or security need to be able to substitute an alternative clock implementation
 from the host process one.
 
-### `Clock.Resolution`
+### `ClockResolution`
 
 A clock's resolution is hardware and OS dependent so requires a system call to retrieve an accurate value.
 Go does not provide a function for getting resolution, so without CGO we don't have an easy way to get an actual

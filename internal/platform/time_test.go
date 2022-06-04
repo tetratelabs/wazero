@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func Test_Walltime(t *testing.T) {
@@ -22,10 +23,25 @@ func Test_Walltime(t *testing.T) {
 }
 
 func Test_Nanotime(t *testing.T) {
-	delta := time.Since(nanoBase).Nanoseconds()
-	nanos := Nanotime(context.Background())
+	tests := []struct {
+		name     string
+		nanotime sys.Nanotime
+	}{
+		{"Nanotime", Nanotime},
+		{"nanotimePortable", func(ctx context.Context) int64 {
+			return nanotimePortable()
+		}},
+	}
 
-	// It takes more than a nanosecond to make the two clock readings required
-	// to implement time.Now. Hence, delta will always be less than nanos.
-	require.True(t, delta <= nanos)
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			delta := time.Since(nanoBase).Nanoseconds()
+			nanos := Nanotime(context.Background())
+
+			// It takes more than a nanosecond to make the two clock readings required
+			// to implement time.Now. Hence, delta will always be less than nanos.
+			require.True(t, delta <= nanos)
+		})
+	}
 }
