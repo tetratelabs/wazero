@@ -156,7 +156,7 @@ func (a *assemblyscript) abort(
 	columnNumber uint32,
 ) {
 	if !a.abortMessageDisabled {
-		sysCtx := sysCtx(mod)
+		sysCtx := getSysCtx(mod)
 		msg, err := readAssemblyScriptString(ctx, mod, message)
 		if err != nil {
 			return
@@ -184,9 +184,9 @@ func (a *assemblyscript) trace(
 	case traceDisabled:
 		return
 	case traceStdout:
-		writer = sysCtx(mod).Stdout()
+		writer = getSysCtx(mod).Stdout()
 	case traceStderr:
-		writer = sysCtx(mod).Stderr()
+		writer = getSysCtx(mod).Stderr()
 	}
 
 	msg, err := readAssemblyScriptString(ctx, mod, message)
@@ -234,8 +234,8 @@ func formatFloat(f float64) string {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
 func (a *assemblyscript) seed(mod api.Module) float64 {
-	source := sysCtx(mod).RandSource()
-	v, err := ieee754.DecodeFloat64(source)
+	randSource := getSysCtx(mod).RandSource()
+	v, err := ieee754.DecodeFloat64(randSource)
 	if err != nil {
 		panic(fmt.Errorf("error reading Module.RandSource: %w", err))
 	}
@@ -243,16 +243,16 @@ func (a *assemblyscript) seed(mod api.Module) float64 {
 }
 
 // readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
-func readAssemblyScriptString(ctx context.Context, m api.Module, offset uint32) (string, error) {
+func readAssemblyScriptString(ctx context.Context, mod api.Module, offset uint32) (string, error) {
 	// Length is four bytes before pointer.
-	byteCount, ok := m.Memory().ReadUint32Le(ctx, offset-4)
+	byteCount, ok := mod.Memory().ReadUint32Le(ctx, offset-4)
 	if !ok {
 		return "", fmt.Errorf("Memory.ReadUint32Le(%d) out of range", offset-4)
 	}
 	if byteCount%2 != 0 {
 		return "", fmt.Errorf("read an odd number of bytes for utf-16 string: %d", byteCount)
 	}
-	buf, ok := m.Memory().Read(ctx, offset, byteCount)
+	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
 	if !ok {
 		return "", fmt.Errorf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}
@@ -270,9 +270,9 @@ func decodeUTF16(b []byte) string {
 	return string(utf16.Decode(u16s))
 }
 
-func sysCtx(m api.Module) *internalsys.Context {
-	if internal, ok := m.(*wasm.CallContext); !ok {
-		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", m))
+func getSysCtx(mod api.Module) *internalsys.Context {
+	if internal, ok := mod.(*wasm.CallContext); !ok {
+		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", mod))
 	} else {
 		return internal.Sys
 	}

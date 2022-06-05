@@ -254,18 +254,18 @@ type Memory interface {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size(context.Context) uint32
 
-	// Grow increases memory by the delta in pages (65536 bytes per page). The return val is the previous memory size in
-	// pages, or false if the delta was ignored as it exceeds max memory.
+	// Grow increases memory by the delta in pages (65536 bytes per page).
+	// The return val is the previous memory size in pages, or false if the
+	// delta was ignored as it exceeds max memory.
 	//
-	// Note: This is the same as the "memory.grow" instruction defined in the WebAssembly Core Specification, except
-	// returns false instead of -1 on failure
+	// Notes
 	//
-	// See MemorySizer and https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	//	* This is the same as the "memory.grow" instruction defined in the
+	//	  WebAssembly Core Specification, except returns false instead of -1.
+	//	* When this returns true, any shared views via Read must be refreshed.
+	//
+	// See MemorySizer Read and https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	Grow(ctx context.Context, deltaPages uint32) (previousPages uint32, ok bool)
-
-	// IndexByte returns the index of the first instance of c in the underlying buffer at the offset or returns false if
-	// not found or out of range.
-	IndexByte(ctx context.Context, offset uint32, c byte) (uint32, bool)
 
 	// ReadByte reads a single byte from the underlying buffer at the offset or returns false if out of range.
 	ReadByte(ctx context.Context, offset uint32) (byte, bool)
@@ -293,21 +293,37 @@ type Memory interface {
 	// See math.Float64bits
 	ReadFloat64Le(ctx context.Context, offset uint32) (float64, bool)
 
-	// Read reads byteCount bytes from the underlying buffer at the offset or returns false if out of range.
+	// Read reads byteCount bytes from the underlying buffer at the offset or
+	// returns false if out of range.
 	//
-	// This returns a view of the underlying memory, not a copy. This means any writes to the slice returned are visible
-	// to Wasm, and any updates from Wasm are visible reading the returned slice.
+	// For example, to search for a NUL-terminated string:
+	//	buf, _ = memory.Read(ctx, offset, byteCount)
+	//	n := bytes.IndexByte(buf, 0)
+	//	if n < 0 {
+	//		// Not found!
+	//	}
+	//
+	// Write-through
+	//
+	// This returns a view of the underlying memory, not a copy. This means any
+	// writes to the slice returned are visible to Wasm, and any updates from
+	// Wasm are visible reading the returned slice.
 	//
 	// For example:
 	//	buf, _ = memory.Read(ctx, offset, byteCount)
-	//	buf[1] = 'a' // writes through to memory, meaning Wasm code see 'a' at that position.
+	//	buf[1] = 'a' // writes through to memory, meaning Wasm code see 'a'.
 	//
-	// If you don't desire this behavior, make a copy of the returned slice before affecting it.
+	// If you don't intend-write through, make a copy of the returned slice.
 	//
-	// Note: The returned slice is no longer shared on a capacity change. For example, `buf = append(buf, 'a')` might result
-	// in a slice that is no longer shared. The same exists Wasm side. For example, if Wasm changes its memory capacity,
-	// ex via "memory.grow"), the host slice is no longer shared. Those who need a stable view must set Wasm memory
-	// min=max, or use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always allocated.
+	// When to refresh Read
+	//
+	// The returned slice disconnects on any capacity change. For example,
+	// `buf = append(buf, 'a')` might result in a slice that is no longer
+	// shared. The same exists Wasm side. For example, if Wasm changes its
+	// memory capacity, ex via "memory.grow"), the host slice is no longer
+	// shared. Those who need a stable view must set Wasm memory min=max, or
+	// use wazero.RuntimeConfig WithMemoryCapacityPages to ensure max is always
+	// allocated.
 	Read(ctx context.Context, offset, byteCount uint32) ([]byte, bool)
 
 	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.
