@@ -1140,7 +1140,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 	)
 
 	// TestSnapshotPreview1_FdRead uses a matrix because setting up test files is complicated and has to be clean each time.
-	type fdReadFn func(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
+	type fdReadFn func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
 	tests := []struct {
 		name   string
 		fdRead func(api.Module, api.Function) fdReadFn
@@ -1149,7 +1149,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 			return a.FdRead
 		}},
 		{functionFdRead, func(mod api.Module, fn api.Function) fdReadFn {
-			return func(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+			return func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 				results, err := fn.Call(testCtx, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
 				return Errno(results[0])
@@ -1329,7 +1329,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	defer mod.Close(testCtx)
 
 	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
-	type fdSeekFn func(ctx context.Context, m api.Module, fd uint32, offset uint64, whence, resultNewOffset uint32) Errno
+	type fdSeekFn func(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence, resultNewOffset uint32) Errno
 	seekFns := []struct {
 		name   string
 		fdSeek func() fdSeekFn
@@ -1338,7 +1338,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 			return a.FdSeek
 		}},
 		{functionFdSeek, func() fdSeekFn {
-			return func(ctx context.Context, m api.Module, fd uint32, offset uint64, whence, resultNewoffset uint32) Errno {
+			return func(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence, resultNewoffset uint32) Errno {
 				results, err := fn.Call(ctx, uint64(fd), offset, uint64(whence), uint64(resultNewoffset))
 				require.NoError(t, err)
 				return Errno(results[0])
@@ -1532,7 +1532,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 	)
 
 	// TestSnapshotPreview1_FdWrite uses a matrix because setting up test files is complicated and has to be clean each time.
-	type fdWriteFn func(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
+	type fdWriteFn func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno
 	tests := []struct {
 		name    string
 		fdWrite func(api.Module, api.Function) fdWriteFn
@@ -1541,7 +1541,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			return a.FdWrite
 		}},
 		{functionFdWrite, func(mod api.Module, fn api.Function) fdWriteFn {
-			return func(ctx context.Context, m api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+			return func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 				results, err := fn.Call(ctx, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
 				return Errno(results[0])

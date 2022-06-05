@@ -29,13 +29,13 @@ func TestMemoryPages(t *testing.T) {
 	})
 }
 
-func Test_MemoryPagesToBytesNum(t *testing.T) {
+func TestMemoryPagesToBytesNum(t *testing.T) {
 	for _, numPage := range []uint32{0, 1, 5, 10} {
 		require.Equal(t, uint64(numPage*MemoryPageSize), MemoryPagesToBytesNum(numPage))
 	}
 }
 
-func Test_MemoryBytesNumToPages(t *testing.T) {
+func TestMemoryBytesNumToPages(t *testing.T) {
 	for _, numbytes := range []uint32{0, MemoryPageSize * 1, MemoryPageSize * 10} {
 		require.Equal(t, numbytes/MemoryPageSize, memoryBytesNumToPages(uint64(numbytes)))
 	}
@@ -106,22 +106,7 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 	}
 }
 
-func TestIndexByte(t *testing.T) {
-	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
-		v, ok := mem.IndexByte(ctx, 4, 16)
-		require.True(t, ok)
-		require.Equal(t, uint32(4), v)
-
-		_, ok = mem.IndexByte(ctx, 5, 16)
-		require.False(t, ok)
-
-		_, ok = mem.IndexByte(ctx, 9, 16)
-		require.False(t, ok)
-	}
-}
-
-func TestReadByte(t *testing.T) {
+func TestMemoryInstance_ReadByte(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
 		v, ok := mem.ReadByte(ctx, 7)
@@ -133,31 +118,6 @@ func TestReadByte(t *testing.T) {
 
 		_, ok = mem.ReadByte(ctx, 9)
 		require.False(t, ok)
-	}
-}
-
-func TestReadUint32Le(t *testing.T) {
-	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
-		v, ok := mem.ReadUint32Le(ctx, 4)
-		require.True(t, ok)
-		require.Equal(t, uint32(16), v)
-
-		_, ok = mem.ReadUint32Le(ctx, 5)
-		require.False(t, ok)
-
-		_, ok = mem.ReadUint32Le(ctx, 9)
-		require.False(t, ok)
-	}
-}
-
-func TestWriteUint32Le(t *testing.T) {
-	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: make([]byte, 8), Min: 1}
-		require.True(t, mem.WriteUint32Le(ctx, 4, 16))
-		require.Equal(t, []byte{0, 0, 0, 0, 16, 0, 0, 0}, mem.Buffer)
-		require.False(t, mem.WriteUint32Le(ctx, 5, 16))
-		require.False(t, mem.WriteUint32Le(ctx, 9, 16))
 	}
 }
 
@@ -514,6 +474,27 @@ func TestMemoryInstance_ReadFloat64Le(t *testing.T) {
 	}
 }
 
+func TestMemoryInstance_Read(t *testing.T) {
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+
+		buf, ok := mem.Read(ctx, 4, 4)
+		require.True(t, ok)
+		require.Equal(t, []byte{16, 0, 0, 0}, buf)
+
+		// Test write-through
+		buf[3] = 4
+		require.Equal(t, []byte{16, 0, 0, 4}, buf)
+		require.Equal(t, []byte{0, 0, 0, 0, 16, 0, 0, 4}, mem.Buffer)
+
+		_, ok = mem.Read(ctx, 5, 4)
+		require.False(t, ok)
+
+		_, ok = mem.Read(ctx, 9, 4)
+		require.False(t, ok)
+	}
+}
+
 func TestMemoryInstance_WriteUint16Le(t *testing.T) {
 	memory := &MemoryInstance{Buffer: make([]byte, 100)}
 
@@ -774,5 +755,26 @@ func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMemoryInstance_Write(t *testing.T) {
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+
+		buf := []byte{16, 0, 0, 4}
+		require.True(t, mem.Write(ctx, 4, buf))
+		require.Equal(t, []byte{0, 0, 0, 0, 16, 0, 0, 4}, mem.Buffer)
+
+		// Test it isn't write-through
+		buf[3] = 0
+		require.Equal(t, []byte{16, 0, 0, 0}, buf)
+		require.Equal(t, []byte{0, 0, 0, 0, 16, 0, 0, 4}, mem.Buffer)
+
+		ok := mem.Write(ctx, 5, buf)
+		require.False(t, ok)
+
+		ok = mem.Write(ctx, 9, buf)
+		require.False(t, ok)
 	}
 }

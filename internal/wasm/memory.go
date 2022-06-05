@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -66,21 +65,6 @@ func (m *MemoryInstance) Size(_ context.Context) uint32 {
 	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	return m.size()
-}
-
-// IndexByte implements the same method as documented on api.Memory.
-func (m *MemoryInstance) IndexByte(_ context.Context, offset uint32, c byte) (uint32, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
-	if offset >= uint32(len(m.Buffer)) {
-		return 0, false
-	}
-	b := m.Buffer[offset:]
-	if result := bytes.IndexByte(b, c); result == -1 {
-		return 0, false
-	} else {
-		return uint32(result) + offset, true
-	}
 }
 
 // ReadByte implements the same method as documented on api.Memory.
@@ -280,9 +264,11 @@ func (m *MemoryInstance) size() uint32 {
 	return uint32(len(m.Buffer)) // We don't lock here because size can't become smaller.
 }
 
-// hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
-func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
-	return uint64(offset)+uint64(sizeInBytes) <= uint64(len(m.Buffer)) // uint64 prevents overflow on add
+// hasSize returns true if Len is sufficient for byteCount at the given offset.
+//
+// Note: This is always fine, because memory can grow, but never shrink.
+func (m *MemoryInstance) hasSize(offset uint32, byteCount uint32) bool {
+	return uint64(offset)+uint64(byteCount) <= uint64(len(m.Buffer)) // uint64 prevents overflow on add
 }
 
 // readUint32Le implements ReadUint32Le without using a context. This is extracted as both ints and floats are stored in
