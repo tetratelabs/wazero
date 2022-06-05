@@ -298,7 +298,7 @@ type Memory interface {
 	//
 	// For example, to search for a NUL-terminated string:
 	//	buf, _ = memory.Read(ctx, offset, byteCount)
-	//	n := bytes.IndexByte(data, 0)
+	//	n := bytes.IndexByte(buf, 0)
 	//	if n < 0 {
 	//		// Not found!
 	//	}
