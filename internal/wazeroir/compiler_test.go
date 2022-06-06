@@ -3,11 +3,11 @@ package wazeroir
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/leb128"
 	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
