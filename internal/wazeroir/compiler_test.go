@@ -3,6 +3,7 @@ package wazeroir
 import (
 	"context"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	"math"
 	"testing"
 
@@ -1096,6 +1097,513 @@ func TestCompile_Locals(t *testing.T) {
 			require.NoError(t, err)
 			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
 			require.Equal(t, tc.expected, res[0].Operations, msg)
+		})
+	}
+}
+
+func TestCompile_Vec(t *testing.T) {
+	addV128Const := func(in []byte) []byte {
+		return append(in, wasm.OpcodeVecPrefix,
+			wasm.OpcodeVecV128Const,
+			1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1)
+	}
+	vv2v := func(vec wasm.OpcodeVec) (ret []byte) {
+		ret = addV128Const(ret)
+		ret = addV128Const(ret)
+		return append(ret, wasm.OpcodeVecPrefix, vec, wasm.OpcodeDrop, wasm.OpcodeEnd)
+	}
+
+	load := func(vec wasm.OpcodeVec, offset, align uint32) (ret []byte) {
+		ret = []byte{wasm.OpcodeI32Const, 1, 1, 1, 1, wasm.OpcodeVecPrefix, vec}
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret, wasm.OpcodeDrop, wasm.OpcodeEnd)
+		return
+	}
+
+	loadLane := func(vec wasm.OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
+		ret = addV128Const([]byte{wasm.OpcodeI32Const, 1, 1, 1, 1})
+		ret = append(ret, wasm.OpcodeVecPrefix, vec)
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret, lane, wasm.OpcodeDrop, wasm.OpcodeEnd)
+		return
+	}
+
+	storeLane := func(vec wasm.OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
+		ret = addV128Const([]byte{wasm.OpcodeI32Const, 0})
+		ret = append(ret, wasm.OpcodeVecPrefix, vec)
+		ret = append(ret, leb128.EncodeUint32(align)...)
+		ret = append(ret, leb128.EncodeUint32(offset)...)
+		ret = append(ret, lane, wasm.OpcodeEnd)
+		return
+	}
+
+	extractLane := func(vec wasm.OpcodeVec, lane byte) (ret []byte) {
+		ret = addV128Const(ret)
+		ret = append(ret, wasm.OpcodeVecPrefix, vec, lane, wasm.OpcodeDrop, wasm.OpcodeEnd)
+		return
+	}
+	replaceLane := func(vec wasm.OpcodeVec, lane byte) (ret []byte) {
+		ret = addV128Const(ret)
+
+		switch vec {
+		case wasm.OpcodeVecI8x16ReplaceLane, wasm.OpcodeVecI16x8ReplaceLane, wasm.OpcodeVecI32x4ReplaceLane:
+			ret = append(ret, wasm.OpcodeI32Const, 0)
+		case wasm.OpcodeVecI64x2ReplaceLane:
+			ret = append(ret, wasm.OpcodeI64Const, 0)
+		case wasm.OpcodeVecF32x4ReplaceLane:
+			ret = append(ret, wasm.OpcodeF32Const, 0, 0, 0, 0)
+		case wasm.OpcodeVecF64x2ReplaceLane:
+			ret = append(ret, wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		}
+
+		ret = append(ret, wasm.OpcodeVecPrefix, vec, lane, wasm.OpcodeDrop, wasm.OpcodeEnd)
+		return
+	}
+
+	splat := func(vec wasm.OpcodeVec) (ret []byte) {
+		switch vec {
+		case wasm.OpcodeVecI8x16Splat, wasm.OpcodeVecI16x8Splat, wasm.OpcodeVecI32x4Splat:
+			ret = append(ret, wasm.OpcodeI32Const, 0)
+		case wasm.OpcodeVecI64x2Splat:
+			ret = append(ret, wasm.OpcodeI64Const, 0)
+		case wasm.OpcodeVecF32x4Splat:
+			ret = append(ret, wasm.OpcodeF32Const, 0, 0, 0, 0)
+		case wasm.OpcodeVecF64x2Splat:
+			ret = append(ret, wasm.OpcodeF64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+		}
+		ret = append(ret, wasm.OpcodeVecPrefix, vec, wasm.OpcodeDrop, wasm.OpcodeEnd)
+		return
+	}
+
+	tests := []struct {
+		name                 string
+		body                 []byte
+		expected             Operation
+		needDropBeforeReturn bool
+	}{
+		{
+			name:                 "i8x16 add",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI8x16Add),
+			expected:             &OperationV128Add{Shape: ShapeI8x16},
+		},
+		{
+			name:                 "i8x16 add",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI16x8Add),
+			expected:             &OperationV128Add{Shape: ShapeI16x8},
+		},
+		{
+			name:                 "i32x2 add",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI64x2Add),
+			expected:             &OperationV128Add{Shape: ShapeI64x2},
+		},
+		{
+			name:                 "i64x2 add",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI64x2Add),
+			expected:             &OperationV128Add{Shape: ShapeI64x2},
+		},
+		{
+			name:                 "i8x16 sub",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI8x16Sub),
+			expected:             &OperationV128Sub{Shape: ShapeI8x16},
+		},
+		{
+			name:                 "i16x8 sub",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI16x8Sub),
+			expected:             &OperationV128Sub{Shape: ShapeI16x8},
+		},
+		{
+			name:                 "i32x2 sub",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI64x2Sub),
+			expected:             &OperationV128Sub{Shape: ShapeI64x2},
+		},
+		{
+			name:                 "i64x2 sub",
+			needDropBeforeReturn: true,
+			body:                 vv2v(wasm.OpcodeVecI64x2Sub),
+			expected:             &OperationV128Sub{Shape: ShapeI64x2},
+		},
+		{
+			name: wasm.OpcodeVecV128LoadName, body: load(wasm.OpcodeVecV128Load, 0, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type128, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128LoadName + "/align=4", body: load(wasm.OpcodeVecV128Load, 0, 4),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type128, Arg: &MemoryArg{Alignment: 4, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load8x8SName, body: load(wasm.OpcodeVecV128Load8x8s, 1, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type8x8s, Arg: &MemoryArg{Alignment: 0, Offset: 1}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load8x8SName + "/align=1", body: load(wasm.OpcodeVecV128Load8x8s, 0, 1),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type8x8s, Arg: &MemoryArg{Alignment: 1, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load8x8UName, body: load(wasm.OpcodeVecV128Load8x8u, 0, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type8x8u, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load8x8UName + "/align=1", body: load(wasm.OpcodeVecV128Load8x8u, 0, 1),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type8x8u, Arg: &MemoryArg{Alignment: 1, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load16x4SName, body: load(wasm.OpcodeVecV128Load16x4s, 1, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type16x4s, Arg: &MemoryArg{Alignment: 0, Offset: 1}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load16x4SName + "/align=2", body: load(wasm.OpcodeVecV128Load16x4s, 0, 2),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type16x4s, Arg: &MemoryArg{Alignment: 2, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load16x4UName, body: load(wasm.OpcodeVecV128Load16x4u, 0, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type16x4u, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load16x4UName + "/align=2", body: load(wasm.OpcodeVecV128Load16x4u, 0, 2),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type16x4u, Arg: &MemoryArg{Alignment: 2, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32x2SName, body: load(wasm.OpcodeVecV128Load32x2s, 1, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32x2s, Arg: &MemoryArg{Alignment: 0, Offset: 1}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32x2SName + "/align=3", body: load(wasm.OpcodeVecV128Load32x2s, 0, 3),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32x2s, Arg: &MemoryArg{Alignment: 3, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32x2UName, body: load(wasm.OpcodeVecV128Load32x2u, 0, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32x2u, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32x2UName + "/align=3", body: load(wasm.OpcodeVecV128Load32x2u, 0, 3),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32x2u, Arg: &MemoryArg{Alignment: 3, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load8SplatName, body: load(wasm.OpcodeVecV128Load8Splat, 2, 0),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type8Splat, Arg: &MemoryArg{Alignment: 0, Offset: 2}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load16SplatName, body: load(wasm.OpcodeVecV128Load16Splat, 0, 1),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type16Splat, Arg: &MemoryArg{Alignment: 1, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32SplatName, body: load(wasm.OpcodeVecV128Load32Splat, 3, 2),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32Splat, Arg: &MemoryArg{Alignment: 2, Offset: 3}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load64SplatName, body: load(wasm.OpcodeVecV128Load64Splat, 0, 3),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type64Splat, Arg: &MemoryArg{Alignment: 3, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load32zeroName, body: load(wasm.OpcodeVecV128Load32zero, 0, 2),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type32zero, Arg: &MemoryArg{Alignment: 2, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128Load64zeroName, body: load(wasm.OpcodeVecV128Load64zero, 5, 3),
+			needDropBeforeReturn: true,
+			expected:             &OperationV128Load{Type: LoadV128Type64zero, Arg: &MemoryArg{Alignment: 3, Offset: 5}},
+		},
+		{name: wasm.OpcodeVecV128Load8LaneName, needDropBeforeReturn: true,
+			body:     loadLane(wasm.OpcodeVecV128Load8Lane, 5, 0, 10),
+			expected: &OperationV128LoadLane{LaneIndex: 10, LaneSize: 8, Arg: &MemoryArg{Alignment: 0, Offset: 5}},
+		},
+		{name: wasm.OpcodeVecV128Load16LaneName, needDropBeforeReturn: true,
+			body:     loadLane(wasm.OpcodeVecV128Load16Lane, 100, 1, 7),
+			expected: &OperationV128LoadLane{LaneIndex: 7, LaneSize: 16, Arg: &MemoryArg{Alignment: 1, Offset: 100}},
+		},
+		{name: wasm.OpcodeVecV128Load32LaneName, needDropBeforeReturn: true,
+			body:     loadLane(wasm.OpcodeVecV128Load32Lane, 0, 2, 3),
+			expected: &OperationV128LoadLane{LaneIndex: 3, LaneSize: 32, Arg: &MemoryArg{Alignment: 2, Offset: 0}},
+		},
+		{name: wasm.OpcodeVecV128Load64LaneName, needDropBeforeReturn: true,
+			body:     loadLane(wasm.OpcodeVecV128Load64Lane, 0, 3, 1),
+			expected: &OperationV128LoadLane{LaneIndex: 1, LaneSize: 64, Arg: &MemoryArg{Alignment: 3, Offset: 0}},
+		},
+		{
+			name: wasm.OpcodeVecV128StoreName, body: []byte{
+				wasm.OpcodeI32Const,
+				1, 1, 1, 1,
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Store,
+				4,  // alignment
+				10, // offset
+				wasm.OpcodeEnd,
+			},
+			expected: &OperationV128Store{Arg: &MemoryArg{Alignment: 4, Offset: 10}},
+		},
+		{name: wasm.OpcodeVecV128Store8LaneName,
+			body:     storeLane(wasm.OpcodeVecV128Store8Lane, 0, 0, 0),
+			expected: &OperationV128StoreLane{LaneIndex: 0, LaneSize: 8, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{name: wasm.OpcodeVecV128Store8LaneName + "/lane=15",
+			body:     storeLane(wasm.OpcodeVecV128Store8Lane, 100, 0, 15),
+			expected: &OperationV128StoreLane{LaneIndex: 15, LaneSize: 8, Arg: &MemoryArg{Alignment: 0, Offset: 100}},
+		},
+		{name: wasm.OpcodeVecV128Store16LaneName,
+			body:     storeLane(wasm.OpcodeVecV128Store16Lane, 0, 0, 0),
+			expected: &OperationV128StoreLane{LaneIndex: 0, LaneSize: 16, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{name: wasm.OpcodeVecV128Store16LaneName + "/lane=7/align=1",
+			body:     storeLane(wasm.OpcodeVecV128Store16Lane, 100, 1, 7),
+			expected: &OperationV128StoreLane{LaneIndex: 7, LaneSize: 16, Arg: &MemoryArg{Alignment: 1, Offset: 100}},
+		},
+		{name: wasm.OpcodeVecV128Store32LaneName,
+			body:     storeLane(wasm.OpcodeVecV128Store32Lane, 0, 0, 0),
+			expected: &OperationV128StoreLane{LaneIndex: 0, LaneSize: 32, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{name: wasm.OpcodeVecV128Store32LaneName + "/lane=3/align=2",
+			body:     storeLane(wasm.OpcodeVecV128Store32Lane, 100, 2, 3),
+			expected: &OperationV128StoreLane{LaneIndex: 3, LaneSize: 32, Arg: &MemoryArg{Alignment: 2, Offset: 100}},
+		},
+		{name: wasm.OpcodeVecV128Store64LaneName,
+			body:     storeLane(wasm.OpcodeVecV128Store64Lane, 0, 0, 0),
+			expected: &OperationV128StoreLane{LaneIndex: 0, LaneSize: 64, Arg: &MemoryArg{Alignment: 0, Offset: 0}},
+		},
+		{name: wasm.OpcodeVecV128Store64LaneName + "/lane=1/align=3",
+			body:     storeLane(wasm.OpcodeVecV128Store64Lane, 50, 3, 1),
+			expected: &OperationV128StoreLane{LaneIndex: 1, LaneSize: 64, Arg: &MemoryArg{Alignment: 3, Offset: 50}},
+		},
+		{name: wasm.OpcodeVecI8x16ExtractLaneSName,
+			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneS, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Signed: true, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16ExtractLaneSName + "/lane=15",
+			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneS, 15),
+			expected:             &OperationV128ExtractLane{LaneIndex: 15, Signed: true, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16ExtractLaneUName,
+			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneU, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Signed: false, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16ExtractLaneUName + "/lane=15",
+			body:                 extractLane(wasm.OpcodeVecI8x16ExtractLaneU, 15),
+			expected:             &OperationV128ExtractLane{LaneIndex: 15, Signed: false, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ExtractLaneSName,
+			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneS, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Signed: true, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ExtractLaneSName + "/lane=7",
+			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneS, 7),
+			expected:             &OperationV128ExtractLane{LaneIndex: 7, Signed: true, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ExtractLaneUName,
+			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneU, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Signed: false, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ExtractLaneUName + "/lane=7",
+			body:                 extractLane(wasm.OpcodeVecI16x8ExtractLaneU, 7),
+			expected:             &OperationV128ExtractLane{LaneIndex: 7, Signed: false, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI32x4ExtractLaneName,
+			body:                 extractLane(wasm.OpcodeVecI32x4ExtractLane, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeI32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI32x4ExtractLaneName + "/lane=3",
+			body:                 extractLane(wasm.OpcodeVecI32x4ExtractLane, 3),
+			expected:             &OperationV128ExtractLane{LaneIndex: 3, Shape: ShapeI32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI64x2ExtractLaneName,
+			body:                 extractLane(wasm.OpcodeVecI64x2ExtractLane, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeI64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI64x2ExtractLaneName + "/lane=1",
+			body:                 extractLane(wasm.OpcodeVecI64x2ExtractLane, 1),
+			expected:             &OperationV128ExtractLane{LaneIndex: 1, Shape: ShapeI64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF32x4ExtractLaneName,
+			body:                 extractLane(wasm.OpcodeVecF32x4ExtractLane, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeF32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF32x4ExtractLaneName + "/lane=3",
+			body:                 extractLane(wasm.OpcodeVecF32x4ExtractLane, 3),
+			expected:             &OperationV128ExtractLane{LaneIndex: 3, Shape: ShapeF32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF64x2ExtractLaneName,
+			body:                 extractLane(wasm.OpcodeVecF64x2ExtractLane, 0),
+			expected:             &OperationV128ExtractLane{LaneIndex: 0, Shape: ShapeF64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF64x2ExtractLaneName + "/lane=1",
+			body:                 extractLane(wasm.OpcodeVecF64x2ExtractLane, 1),
+			expected:             &OperationV128ExtractLane{LaneIndex: 1, Shape: ShapeF64x2},
+			needDropBeforeReturn: true,
+		},
+
+		{name: wasm.OpcodeVecI8x16ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecI8x16ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16ReplaceLaneName + "/lane=15",
+			body:                 replaceLane(wasm.OpcodeVecI8x16ReplaceLane, 15),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 15, Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecI16x8ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8ReplaceLaneName + "/lane=7",
+			body:                 replaceLane(wasm.OpcodeVecI16x8ReplaceLane, 7),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 7, Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI32x4ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecI32x4ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI32x4ReplaceLaneName + "/lane=3",
+			body:                 replaceLane(wasm.OpcodeVecI32x4ReplaceLane, 3),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 3, Shape: ShapeI32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI64x2ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecI64x2ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeI64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI64x2ReplaceLaneName + "/lane=1",
+			body:                 replaceLane(wasm.OpcodeVecI64x2ReplaceLane, 1),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 1, Shape: ShapeI64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF32x4ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecF32x4ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeF32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF32x4ReplaceLaneName + "/lane=3",
+			body:                 replaceLane(wasm.OpcodeVecF32x4ReplaceLane, 3),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 3, Shape: ShapeF32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF64x2ReplaceLaneName,
+			body:                 replaceLane(wasm.OpcodeVecF64x2ReplaceLane, 0),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 0, Shape: ShapeF64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF64x2ReplaceLaneName + "/lane=1",
+			body:                 replaceLane(wasm.OpcodeVecF64x2ReplaceLane, 1),
+			expected:             &OperationV128ReplaceLane{LaneIndex: 1, Shape: ShapeF64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16SplatName, body: splat(wasm.OpcodeVecI8x16Splat),
+			expected:             &OperationV128Splat{Shape: ShapeI8x16},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI16x8SplatName, body: splat(wasm.OpcodeVecI16x8Splat),
+			expected:             &OperationV128Splat{Shape: ShapeI16x8},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI32x4SplatName, body: splat(wasm.OpcodeVecI32x4Splat),
+			expected:             &OperationV128Splat{Shape: ShapeI32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI64x2SplatName, body: splat(wasm.OpcodeVecI64x2Splat),
+			expected:             &OperationV128Splat{Shape: ShapeI64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF32x4SplatName, body: splat(wasm.OpcodeVecF32x4Splat),
+			expected:             &OperationV128Splat{Shape: ShapeF32x4},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecF64x2SplatName, body: splat(wasm.OpcodeVecF64x2Splat),
+			expected:             &OperationV128Splat{Shape: ShapeF64x2},
+			needDropBeforeReturn: true,
+		},
+		{name: wasm.OpcodeVecI8x16SwizzleName, body: vv2v(wasm.OpcodeVecI8x16Swizzle),
+			expected:             &OperationV128Swizzle{},
+			needDropBeforeReturn: true,
+		},
+		{
+			name: wasm.OpcodeVecV128i8x16ShuffleName, body: []byte{
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128Const, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+				wasm.OpcodeVecPrefix,
+				wasm.OpcodeVecV128i8x16Shuffle,
+				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+				wasm.OpcodeDrop,
+				wasm.OpcodeEnd,
+			},
+			expected: &OperationV128Shuffle{Lanes: [16]byte{
+				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+			}},
+			needDropBeforeReturn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			module := &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				MemorySection:   &wasm.Memory{},
+				CodeSection:     []*wasm.Code{{Body: tc.body}},
+			}
+			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			require.NoError(t, err)
+
+			var actual Operation
+			if tc.needDropBeforeReturn {
+				actual = res[0].Operations[len(res[0].Operations)-3]
+			} else {
+				actual = res[0].Operations[len(res[0].Operations)-2]
+			}
+
+			require.Equal(t, tc.expected, actual)
 		})
 	}
 }

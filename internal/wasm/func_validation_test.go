@@ -2709,8 +2709,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	vi2v := func(vec OpcodeVec) (ret []byte) {
 		ret = addV128Const(ret)
 		return append(ret,
-			OpcodeI32Const,
-			1, 1, 1, 1,
+			OpcodeI32Const, 1,
 			OpcodeVecPrefix,
 			vec,
 			OpcodeDrop,
@@ -2720,8 +2719,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 
 	load := func(vec OpcodeVec, offset, align uint32) (ret []byte) {
 		ret = []byte{
-			OpcodeI32Const,
-			1, 1, 1, 1,
+			OpcodeI32Const, 1,
 			OpcodeVecPrefix,
 			vec,
 		}
@@ -2736,7 +2734,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	}
 
 	loadLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
-		ret = addV128Const([]byte{OpcodeI32Const, 1, 1, 1, 1})
+		ret = addV128Const([]byte{OpcodeI32Const, 1})
 		ret = append(ret,
 			OpcodeVecPrefix,
 			vec,
@@ -2753,7 +2751,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 	}
 
 	storeLane := func(vec OpcodeVec, offset, align uint32, lane byte) (ret []byte) {
-		ret = addV128Const([]byte{OpcodeI32Const, 1, 1, 1, 1})
+		ret = addV128Const([]byte{OpcodeI32Const, 1})
 		ret = append(ret,
 			OpcodeVecPrefix,
 			vec,
@@ -2784,9 +2782,9 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 
 		switch vec {
 		case OpcodeVecI8x16ReplaceLane, OpcodeVecI16x8ReplaceLane, OpcodeVecI32x4ReplaceLane:
-			ret = append(ret, OpcodeI32Const, 0, 0, 0, 0)
+			ret = append(ret, OpcodeI32Const, 0)
 		case OpcodeVecI64x2ReplaceLane:
-			ret = append(ret, OpcodeI64Const, 0, 0, 0, 0, 0, 0, 0, 0)
+			ret = append(ret, OpcodeI64Const, 0)
 		case OpcodeVecF32x4ReplaceLane:
 			ret = append(ret, OpcodeF32Const, 0, 0, 0, 0)
 		case OpcodeVecF64x2ReplaceLane:
