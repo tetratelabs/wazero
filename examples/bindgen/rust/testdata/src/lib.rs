@@ -9,8 +9,20 @@ pub fn greet(name: String) -> String {
 
 /// Tries to greet but fails every time
 #[wazero_bindgen]
-pub fn greet_err(name: String) -> Result<(), String> {
+pub fn greet_err(_: String) -> Result<(), String> {
 	Err(String::from("oops, there was an error"))
+}
+
+/// Returns the greeting as a tuple
+#[wazero_bindgen]
+pub fn greet_tuple(name: String) -> (String, String) {
+	("Hello".to_string(), name)
+}
+
+/// Returns the greeting as a vector of bytes
+#[wazero_bindgen]
+pub fn greet_vec(name: String) -> Vec<u8> {
+	format!("Hello {}", name).as_bytes().to_vec()
 }
 
 #[no_mangle]

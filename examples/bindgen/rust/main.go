@@ -33,14 +33,24 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Bind the bindgen instance to the module
 	bg.Bind(module)
 
-	results, err := bg.Execute(ctx, "greet", "Wazero")
-	if err != nil {
-		panic(err)
-	}
+	// Run the normal greet function
+	results, _ := bg.Execute(ctx, "greet", "Wazero")
 	fmt.Println(results[0].(string)) // Prints "Hello Wazero"
 
+	// Run the failing greet function
 	_, err = bg.Execute(ctx, "greet_err", "Wazero")
 	fmt.Println(err) // Prints "oops, there was an error"
+
+	// Run the tuple greet function
+	results, _ = bg.Execute(ctx, "greet_tuple", "Wazero")
+	fmt.Printf("%s %s\n", results[0], results[1]) // Prints "Hello Wazero"
+
+	// Run the greet function that returns a vector of bytes
+	results, _ = bg.Execute(ctx, "greet_vec", "Wazero")
+	fmt.Println(string(results[0].([]byte))) // Prints "Hello Wazero"
+
 }
