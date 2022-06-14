@@ -72,9 +72,9 @@ func formatOperation(w io.StringWriter, b Operation) {
 	case *OperationStore:
 		str = fmt.Sprintf("%s.store (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore8:
-		str = fmt.Sprintf("%s.store8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
+		str = fmt.Sprintf("store8 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore16:
-		str = fmt.Sprintf("%s.store16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
+		str = fmt.Sprintf("store16 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore32:
 		str = fmt.Sprintf("i64.store32 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
 	case *OperationMemorySize:

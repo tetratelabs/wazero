@@ -66,25 +66,51 @@ type (
 	}
 
 	commandActionVal struct {
-		ValType  string      `json:"type"`
-		LaneType string      `json:"lane_type"`
+		ValType string `json:"type"`
+		// LaneType is not empty if ValueType == "v128"
+		LaneType laneType    `json:"lane_type"`
 		Value    interface{} `json:"value"`
 	}
 )
 
+// laneType is a type of each lane of vector value.
+//
+// See https://github.com/WebAssembly/wabt/blob/main/docs/wast2json.md#const
+type laneType = string
+
+const (
+	laneTypeI8  laneType = "i8"
+	laneTypeI16 laneType = "i16"
+	laneTypeI32 laneType = "i32"
+	laneTypeI64 laneType = "i64"
+	laneTypeF32 laneType = "f32"
+	laneTypeF64 laneType = "f64"
+)
+
 func (c commandActionVal) String() string {
 	var v string
+	valTypeStr := c.ValType
 	switch c.ValType {
 	case "i32":
 		v = c.Value.(string)
 	case "f32":
-		ret, _ := strconv.ParseUint(c.Value.(string), 10, 32)
-		v = fmt.Sprintf("%f", math.Float32frombits(uint32(ret)))
+		str := c.Value.(string)
+		if strings.Contains(str, "nan") {
+			v = "nan"
+		} else {
+			ret, _ := strconv.ParseUint(str, 10, 32)
+			v = fmt.Sprintf("%f", math.Float32frombits(uint32(ret)))
+		}
 	case "i64":
 		v = c.Value.(string)
 	case "f64":
-		ret, _ := strconv.ParseUint(c.Value.(string), 10, 64)
-		v = fmt.Sprintf("%f", math.Float64frombits(ret))
+		str := c.Value.(string)
+		if strings.Contains(str, "nan") {
+			v = "nan"
+		} else {
+			ret, _ := strconv.ParseUint(str, 10, 64)
+			v = fmt.Sprintf("%f", math.Float64frombits(ret))
+		}
 	case "externref":
 		if c.Value == "null" {
 			v = "null"
@@ -107,8 +133,9 @@ func (c commandActionVal) String() string {
 			strs = append(strs, v.(string))
 		}
 		v = strings.Join(strs, ",")
+		valTypeStr = fmt.Sprintf("v128[lane=%s]", c.LaneType)
 	}
-	return fmt.Sprintf("{type: %s, value: %v}", c.ValType, v)
+	return fmt.Sprintf("{type: %s, value: %v}", valTypeStr, v)
 }
 
 func (c command) String() string {
@@ -153,15 +180,14 @@ func (c command) getAssertReturnArgs() []uint64 {
 	return args
 }
 
-func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
-	var args, exps []uint64
+func (c command) getAssertReturnArgsExps() (args []uint64, exps []uint64) {
 	for _, arg := range c.Action.Args {
 		args = append(args, arg.toUint64s()...)
 	}
 	for _, exp := range c.Exps {
 		exps = append(exps, exp.toUint64s()...)
 	}
-	return args, exps
+	return
 }
 
 func (c commandActionVal) toUint64s() (ret []uint64) {
@@ -170,7 +196,6 @@ func (c commandActionVal) toUint64s() (ret []uint64) {
 		if !ok {
 			panic("BUG")
 		}
-		var low, high uint64
 		var width, valNum int
 		switch c.LaneType {
 		case "i8":
@@ -188,24 +213,39 @@ func (c commandActionVal) toUint64s() (ret []uint64) {
 		default:
 			panic("BUG")
 		}
-		for i := 0; i < valNum/2; i++ {
-			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
-			if err != nil {
-				panic(err)
-			}
-			low |= (v << (i * width))
-		}
-		for i := valNum / 2; i < valNum; i++ {
-			v, err := strconv.ParseUint(strValues[i].(string), 10, width)
-			if err != nil {
-				panic(err)
-			}
-			high |= (v << ((i - valNum/2) * width))
-		}
-		return []uint64{low, high}
+		lo, hi := buildLaneUint64(strValues, width, valNum)
+		return []uint64{lo, hi}
 	} else {
 		return []uint64{c.toUint64()}
 	}
+}
+
+func buildLaneUint64(raw []interface{}, width, valNum int) (lo, hi uint64) {
+	for i := 0; i < valNum; i++ {
+		str := raw[i].(string)
+
+		var v uint64
+		var err error
+		if strings.Contains(str, "nan") {
+			if width == 64 {
+				v = math.Float64bits(math.NaN())
+			} else {
+				v = uint64(math.Float32bits(float32(math.NaN())))
+			}
+		} else {
+			v, err = strconv.ParseUint(str, 10, width)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		if half := valNum / 2; i < half {
+			lo |= v << (i * width)
+		} else {
+			hi |= v << ((i - half) * width)
+		}
+	}
+	return
 }
 
 func (c commandActionVal) toUint64() (ret uint64) {
@@ -441,7 +481,14 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							vals, types, err := callFunction(ns, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
-							requireValuesEq(t, vals, exps, types, msg)
+							laneTypes := map[int]string{}
+							for i, expV := range c.Exps {
+								if expV.ValType == "v128" {
+									laneTypes[i] = expV.LaneType
+								}
+							}
+							matched, valuesMsg := valuesEq(vals, exps, types, laneTypes)
+							require.True(t, matched, msg+"\n"+valuesMsg)
 						case "get":
 							_, exps := c.getAssertReturnArgsExps()
 							require.Equal(t, 1, len(exps))
@@ -597,52 +644,160 @@ func testdataPath(filename string) string {
 	return fmt.Sprintf("testdata/%s", filename)
 }
 
-func requireValuesEq(t *testing.T, actual, exps []uint64, valTypes []wasm.ValueType, msg string) {
-	var expectedTypesVectorFlattend []wasm.ValueType
-	for _, tp := range valTypes {
-		if tp != wasm.ValueTypeV128 {
-			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, tp)
-		} else {
-			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)
-			expectedTypesVectorFlattend = append(expectedTypesVectorFlattend, wasm.ValueTypeI64)
+// valuesEq returns true if all the actual result matches exps which are all expressed as uint64.
+// 	* actual,exps: comparison target values which are all represented as uint64, meaning that if valTypes = [V128,I32], then
+//		we have actual/exp = [(lower-64bit of the first V128), (higher-64bit of the first V128), I32].
+// 	* valTypes holds the wasm.ValueType(s) of the original values in Wasm.
+// 	* laneTypes maps the index of valueTypes to laneType if valueTypes[i] == wasm.ValueTypeV128.
+//
+// Also, if matched == false this returns non-empty valuesMsg which can be used to augment the test failure message.
+func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[int]laneType) (matched bool, valuesMsg string) {
+	if len(exps) == 0 {
+		matched = len(actual) == 0
+		return
+	}
+
+	var msgExpValuesStrs, msgActualValuesStrs []string
+	var uint64RepPos int // the index to actual and exps slice.
+	for i, tp := range valTypes {
+		switch tp {
+		case wasm.ValueTypeI32:
+			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%d", uint32(exps[uint64RepPos])))
+			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%d", uint32(actual[uint64RepPos])))
+			matched = uint32(exps[uint64RepPos]) == uint32(actual[uint64RepPos])
+			uint64RepPos++
+		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%d", exps[uint64RepPos]))
+			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%d", actual[uint64RepPos]))
+			matched = exps[uint64RepPos] == actual[uint64RepPos]
+			uint64RepPos++
+		case wasm.ValueTypeF32:
+			a := math.Float32frombits(uint32(actual[uint64RepPos]))
+			e := math.Float32frombits(uint32(exps[uint64RepPos]))
+			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%f", e))
+			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%f", a))
+			matched = f32Equal(e, a)
+			uint64RepPos++
+		case wasm.ValueTypeF64:
+			e := math.Float64frombits(exps[uint64RepPos])
+			a := math.Float64frombits(actual[uint64RepPos])
+			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%f", e))
+			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%f", a))
+			matched = f64Equal(e, a)
+			uint64RepPos++
+		case wasm.ValueTypeV128:
+			actualLo, actualHi := actual[uint64RepPos], actual[uint64RepPos+1]
+			expLo, expHi := exps[uint64RepPos], exps[uint64RepPos+1]
+			switch laneTypes[i] {
+			case laneTypeI8:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("i8x16(%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x)",
+						byte(expLo), byte(expLo>>8), byte(expLo>>16), byte(expLo>>24),
+						byte(expLo>>32), byte(expLo>>40), byte(expLo>>48), byte(expLo>>56),
+						byte(expHi), byte(expHi>>8), byte(expHi>>16), byte(expHi>>24),
+						byte(expHi>>32), byte(expHi>>40), byte(expHi>>48), byte(expHi>>56),
+					),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("i8x16(%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x)",
+						byte(actualLo), byte(actualLo>>8), byte(actualLo>>16), byte(actualLo>>24),
+						byte(actualLo>>32), byte(actualLo>>40), byte(actualLo>>48), byte(actualLo>>56),
+						byte(actualHi), byte(actualHi>>8), byte(actualHi>>16), byte(actualHi>>24),
+						byte(actualHi>>32), byte(actualHi>>40), byte(actualHi>>48), byte(actualHi>>56),
+					),
+				)
+				matched = (expLo == actualLo) && (expHi == actualHi)
+			case laneTypeI16:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("i16x8(%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x)",
+						uint16(expLo), uint16(expLo>>16), uint16(expLo>>32), uint16(expLo>>48),
+						uint16(expHi), uint16(expHi>>16), uint16(expHi>>32), uint16(expHi>>48),
+					),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("i16x8(%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x)",
+						uint16(actualLo), uint16(actualLo>>16), uint16(actualLo>>32), uint16(actualLo>>48),
+						uint16(actualHi), uint16(actualHi>>16), uint16(actualHi>>32), uint16(actualHi>>48),
+					),
+				)
+				matched = (expLo == actualLo) && (expHi == actualHi)
+			case laneTypeI32:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("i32x4(%#x, %#x, %#x, %#x)", uint32(expLo), uint32(expLo>>32), uint32(expHi), uint32(expHi>>32)),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("i32x4(%#x, %#x, %#x, %#x)", uint32(actualLo), uint32(actualLo>>32), uint32(actualHi), uint32(actualHi>>32)),
+				)
+				matched = (expLo == actualLo) && (expHi == actualHi)
+			case laneTypeI64:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("i64x2(%#x, %#x)", expLo, expHi),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("i64x2(%#x, %#x)", actualLo, actualHi),
+				)
+				matched = (expLo == actualLo) && (expHi == actualHi)
+			case laneTypeF32:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("f32x4(%f, %f, %f, %f)",
+						math.Float32frombits(uint32(expLo)), math.Float32frombits(uint32(expLo>>32)),
+						math.Float32frombits(uint32(expHi)), math.Float32frombits(uint32(expHi>>32)),
+					),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("f32x4(%f, %f, %f, %f)",
+						math.Float32frombits(uint32(actualLo)), math.Float32frombits(uint32(actualLo>>32)),
+						math.Float32frombits(uint32(actualHi)), math.Float32frombits(uint32(actualHi>>32)),
+					),
+				)
+				matched =
+					f32Equal(math.Float32frombits(uint32(expLo)), math.Float32frombits(uint32(actualLo))) &&
+						f32Equal(math.Float32frombits(uint32(expLo>>32)), math.Float32frombits(uint32(actualLo>>32))) &&
+						f32Equal(math.Float32frombits(uint32(expHi)), math.Float32frombits(uint32(actualHi))) &&
+						f32Equal(math.Float32frombits(uint32(expHi>>32)), math.Float32frombits(uint32(actualHi>>32)))
+			case laneTypeF64:
+				msgExpValuesStrs = append(msgExpValuesStrs,
+					fmt.Sprintf("f64x2(%f, %f)", math.Float64frombits(expLo), math.Float64frombits(expHi)),
+				)
+				msgActualValuesStrs = append(msgActualValuesStrs,
+					fmt.Sprintf("f64x2(%f, %f)", math.Float64frombits(actualLo), math.Float64frombits(actualHi)),
+				)
+				matched =
+					f64Equal(math.Float64frombits(expLo), math.Float64frombits(actualLo)) &&
+						f64Equal(math.Float64frombits(expHi), math.Float64frombits(actualHi))
+			default:
+				panic("BUG")
+			}
+			uint64RepPos += 2
+		default:
+			panic("BUG")
 		}
 	}
 
-	result := fmt.Sprintf("\thave (%v)\n\twant (%v)", actual, exps)
-	for i := range exps {
-		requireValueEq(t, actual[i], exps[i], expectedTypesVectorFlattend[i], msg+"\n"+result)
+	if !matched {
+		valuesMsg = fmt.Sprintf("\thave [%s]\n\twant [%s]",
+			strings.Join(msgActualValuesStrs, ", "),
+			strings.Join(msgExpValuesStrs, ", "))
 	}
+	return
 }
 
-func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueType, msg string) {
-	switch valType {
-	case wasm.ValueTypeI32:
-		require.Equal(t, uint32(expected), uint32(actual), msg)
-	case wasm.ValueTypeI64:
-		require.Equal(t, expected, actual, msg)
-	case wasm.ValueTypeF32:
-		expF := math.Float32frombits(uint32(expected))
-		actualF := math.Float32frombits(uint32(actual))
-		if math.IsNaN(float64(expF)) { // NaN cannot be compared with themselves, so we have to use IsNaN
-			require.True(t, math.IsNaN(float64(actualF)), msg)
-		} else {
-			require.Equal(t, expF, actualF, msg)
-		}
-	case wasm.ValueTypeF64:
-		expF := math.Float64frombits(expected)
-		actualF := math.Float64frombits(actual)
-		if math.IsNaN(expF) { // NaN cannot be compared with themselves, so we have to use IsNaN
-			require.True(t, math.IsNaN(actualF), msg)
-		} else {
-			require.Equal(t, expF, actualF, msg)
-		}
-	case wasm.ValueTypeExternref:
-		require.Equal(t, expected, actual, msg)
-	case wasm.ValueTypeFuncref:
-		require.Equal(t, expected, actual, msg)
-	default:
-		t.Fatal(msg)
+func f32Equal(expected, actual float32) (matched bool) {
+	if math.IsNaN(float64(expected)) { // NaN cannot be compared with themselves, so we have to use IsNaN
+		matched = math.IsNaN(float64(actual))
+	} else {
+		matched = expected == actual
 	}
+	return
+}
+
+func f64Equal(actual, expected float64) (matched bool) {
+	if math.IsNaN(expected) { // NaN cannot be compared with themselves, so we have to use IsNaN
+		matched = math.IsNaN(actual)
+	} else {
+		matched = expected == actual
+	}
+	return
 }
 
 // callFunction is inlined here as the spectest needs to validate the signature was correct

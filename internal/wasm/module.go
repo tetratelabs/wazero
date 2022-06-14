@@ -1006,7 +1006,7 @@ const (
 	ValueTypeF32 = api.ValueTypeF32
 	ValueTypeF64 = api.ValueTypeF64
 	// TODO: ValueTypeV128 is not exposed in the api pkg yet.
-	ValueTypeV128 = 0x7b
+	ValueTypeV128 ValueType = 0x7b
 	// TODO: ValueTypeFuncref is not exposed in the api pkg yet.
 	ValueTypeFuncref   ValueType = 0x70
 	ValueTypeExternref           = api.ValueTypeExternref

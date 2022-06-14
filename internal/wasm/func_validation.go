@@ -714,7 +714,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the f64 operand for %s: %v", InstructionName(op), err)
 				}
 				valueTypeStack.push(ValueTypeI64)
-			case OpcodeF32ConvertI32s, OpcodeF32ConvertI32U:
+			case OpcodeF32ConvertI32S, OpcodeF32ConvertI32U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the i32 operand for %s: %v", InstructionName(op), err)
 				}
@@ -1071,14 +1071,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				pc += 16
 				valueTypeStack.push(ValueTypeV128)
-			case OpcodeVecI8x16Add, OpcodeVecI16x8Add, OpcodeVecI32x4Add, OpcodeVecI64x2Add,
-				OpcodeVecI8x16Sub, OpcodeVecI16x8Sub, OpcodeVecI32x4Sub, OpcodeVecI64x2Sub:
-				for i := 0; i < 2; i++ {
-					if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
-						return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
-					}
-				}
-				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128AnyTrue, OpcodeVecI8x16AllTrue, OpcodeVecI16x8AllTrue, OpcodeVecI32x4AllTrue, OpcodeVecI64x2AllTrue,
 				OpcodeVecI8x16BitMask, OpcodeVecI16x8BitMask, OpcodeVecI32x4BitMask, OpcodeVecI64x2BitMask:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
@@ -1309,7 +1301,53 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				OpcodeVecI64x2Eq, OpcodeVecI64x2Ne, OpcodeVecI64x2LtS, OpcodeVecI64x2GtS, OpcodeVecI64x2LeS,
 				OpcodeVecI64x2GeS, OpcodeVecF32x4Eq, OpcodeVecF32x4Ne, OpcodeVecF32x4Lt, OpcodeVecF32x4Gt,
 				OpcodeVecF32x4Le, OpcodeVecF32x4Ge, OpcodeVecF64x2Eq, OpcodeVecF64x2Ne, OpcodeVecF64x2Lt,
-				OpcodeVecF64x2Gt, OpcodeVecF64x2Le, OpcodeVecF64x2Ge:
+				OpcodeVecF64x2Gt, OpcodeVecF64x2Le, OpcodeVecF64x2Ge,
+				OpcodeVecI32x4DotI16x8S,
+				OpcodeVecI8x16NarrowI16x8S, OpcodeVecI8x16NarrowI16x8U, OpcodeVecI16x8NarrowI32x4S, OpcodeVecI16x8NarrowI32x4U:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+			case OpcodeVecI8x16Neg, OpcodeVecI16x8Neg, OpcodeVecI32x4Neg, OpcodeVecI64x2Neg, OpcodeVecF32x4Neg, OpcodeVecF64x2Neg,
+				OpcodeVecF32x4Sqrt, OpcodeVecF64x2Sqrt,
+				OpcodeVecI8x16Abs, OpcodeVecI8x16Popcnt, OpcodeVecI16x8Abs, OpcodeVecI32x4Abs, OpcodeVecI64x2Abs,
+				OpcodeVecF32x4Abs, OpcodeVecF64x2Abs,
+				OpcodeVecF32x4Ceil, OpcodeVecF32x4Floor, OpcodeVecF32x4Trunc, OpcodeVecF32x4Nearest,
+				OpcodeVecF64x2Ceil, OpcodeVecF64x2Floor, OpcodeVecF64x2Trunc, OpcodeVecF64x2Nearest,
+				OpcodeVecI16x8ExtendLowI8x16S, OpcodeVecI16x8ExtendHighI8x16S, OpcodeVecI16x8ExtendLowI8x16U, OpcodeVecI16x8ExtendHighI8x16U,
+				OpcodeVecI32x4ExtendLowI16x8S, OpcodeVecI32x4ExtendHighI16x8S, OpcodeVecI32x4ExtendLowI16x8U, OpcodeVecI32x4ExtendHighI16x8U,
+				OpcodeVecI64x2ExtendLowI32x4S, OpcodeVecI64x2ExtendHighI32x4S, OpcodeVecI64x2ExtendLowI32x4U, OpcodeVecI64x2ExtendHighI32x4U,
+				OpcodeVecI16x8ExtaddPairwiseI8x16S, OpcodeVecI16x8ExtaddPairwiseI8x16U,
+				OpcodeVecI32x4ExtaddPairwiseI16x8S, OpcodeVecI32x4ExtaddPairwiseI16x8U,
+				OpcodeVecF64x2PromoteLowF32x4Zero, OpcodeVecF32x4DemoteF64x2Zero,
+				OpcodeVecF32x4ConvertI32x4S, OpcodeVecF32x4ConvertI32x4U,
+				OpcodeVecF64x2ConvertLowI32x4S, OpcodeVecF64x2ConvertLowI32x4U,
+				OpcodeVecI32x4TruncSatF32x4S, OpcodeVecI32x4TruncSatF32x4U, OpcodeVecI32x4TruncSatF64x2SZero, OpcodeVecI32x4TruncSatF64x2UZero:
+				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
+				}
+				valueTypeStack.push(ValueTypeV128)
+
+			case OpcodeVecI8x16Add, OpcodeVecI8x16AddSatS, OpcodeVecI8x16AddSatU, OpcodeVecI8x16Sub, OpcodeVecI8x16SubSatS, OpcodeVecI8x16SubSatU,
+				OpcodeVecI16x8Add, OpcodeVecI16x8AddSatS, OpcodeVecI16x8AddSatU, OpcodeVecI16x8Sub, OpcodeVecI16x8SubSatS, OpcodeVecI16x8SubSatU, OpcodeVecI16x8Mul,
+				OpcodeVecI32x4Add, OpcodeVecI32x4Sub, OpcodeVecI32x4Mul,
+				OpcodeVecI64x2Add, OpcodeVecI64x2Sub, OpcodeVecI64x2Mul,
+				OpcodeVecF32x4Add, OpcodeVecF32x4Sub, OpcodeVecF32x4Mul, OpcodeVecF32x4Div,
+				OpcodeVecF64x2Add, OpcodeVecF64x2Sub, OpcodeVecF64x2Mul, OpcodeVecF64x2Div,
+				OpcodeVecI8x16MinS, OpcodeVecI8x16MinU, OpcodeVecI8x16MaxS, OpcodeVecI8x16MaxU,
+				OpcodeVecI8x16AvgrU,
+				OpcodeVecI16x8MinS, OpcodeVecI16x8MinU, OpcodeVecI16x8MaxS, OpcodeVecI16x8MaxU,
+				OpcodeVecI16x8AvgrU,
+				OpcodeVecI32x4MinS, OpcodeVecI32x4MinU, OpcodeVecI32x4MaxS, OpcodeVecI32x4MaxU,
+				OpcodeVecF32x4Min, OpcodeVecF32x4Max, OpcodeVecF64x2Min, OpcodeVecF64x2Max,
+				OpcodeVecF32x4Pmin, OpcodeVecF32x4Pmax, OpcodeVecF64x2Pmin, OpcodeVecF64x2Pmax,
+				OpcodeVecI16x8Q15mulrSatS,
+				OpcodeVecI16x8ExtMulLowI8x16S, OpcodeVecI16x8ExtMulHighI8x16S, OpcodeVecI16x8ExtMulLowI8x16U, OpcodeVecI16x8ExtMulHighI8x16U,
+				OpcodeVecI32x4ExtMulLowI16x8S, OpcodeVecI32x4ExtMulHighI16x8S, OpcodeVecI32x4ExtMulLowI16x8U, OpcodeVecI32x4ExtMulHighI16x8U,
+				OpcodeVecI64x2ExtMulLowI32x4S, OpcodeVecI64x2ExtMulHighI32x4S, OpcodeVecI64x2ExtMulLowI32x4U, OpcodeVecI64x2ExtMulHighI32x4U:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeV128); err != nil {
 					return fmt.Errorf("cannot pop the operand for %s: %v", vectorInstructionName[vecOpcode], err)
 				}

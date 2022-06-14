@@ -323,16 +323,16 @@ const (
 	PADDB
 	// PADDW is the PADDW instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDW
-	// PADDL is the PADDD instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
-	PADDL
+	// PADDD is the PADDD instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
+	PADDD
 	// PADDQ is the PADDQ instruction. https://www.felixcloutier.com/x86/paddb:paddw:paddd:paddq
 	PADDQ
 	// PSUBB is the PSUBB instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
 	PSUBB
 	// PSUBW is the PSUBW instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
 	PSUBW
-	// PSUBL is the PSUBD instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
-	PSUBL
+	// PSUBD is the PSUBD instruction. https://www.felixcloutier.com/x86/psubb:psubw:psubd
+	PSUBD
 	// PSUBQ is the PSUBQ instruction. https://www.felixcloutier.com/x86/psubq
 	PSUBQ
 	// ADDPS is the ADDPS instruction. https://www.felixcloutier.com/x86/addps
@@ -449,6 +449,112 @@ const (
 	PMAXUW
 	// PMAXUB is the PMAXUB instruction https://www.felixcloutier.com/x86/pmaxub:pmaxuw
 	PMAXUB
+	// PMULLW is the PMULLW instruction https://www.felixcloutier.com/x86/pmullw
+	PMULLW
+	// PMULLD is the PMULLD instruction https://www.felixcloutier.com/x86/pmulld:pmullq
+	PMULLD
+	// PMULUDQ is the PMULUDQ instruction https://www.felixcloutier.com/x86/pmuludq
+	PMULUDQ
+	// PSUBSB is the PSUBSB instruction https://www.felixcloutier.com/x86/psubsb:psubsw
+	PSUBSB
+	// PSUBSW is the PSUBSW instruction https://www.felixcloutier.com/x86/psubsb:psubsw
+	PSUBSW
+	// PSUBUSB is the PSUBUSB instruction https://www.felixcloutier.com/x86/psubusb:psubusw
+	PSUBUSB
+	// PSUBUSW is the PSUBUSW instruction https://www.felixcloutier.com/x86/psubusb:psubusw
+	PSUBUSW
+	// PADDSW is the PADDSW instruction https://www.felixcloutier.com/x86/paddsb:paddsw
+	PADDSW
+	// PADDSB is the PADDSB instruction https://www.felixcloutier.com/x86/paddsb:paddsw
+	PADDSB
+	// PADDUSW is the PADDUSW instruction https://www.felixcloutier.com/x86/paddusb:paddusw
+	PADDUSW
+	// PAVGB is the PAVGB instruction https://www.felixcloutier.com/x86/pavgb:pavgw
+	PAVGB
+	// PAVGW is the PAVGW instruction https://www.felixcloutier.com/x86/pavgb:pavgw
+	PAVGW
+	// PABSB is the PABSB instruction https://www.felixcloutier.com/x86/pabsb:pabsw:pabsd:pabsq
+	PABSB
+	// PABSW is the PABSW instruction https://www.felixcloutier.com/x86/pabsb:pabsw:pabsd:pabsq
+	PABSW
+	// PABSD is the PABSD instruction https://www.felixcloutier.com/x86/pabsb:pabsw:pabsd:pabsq
+	PABSD
+	// BLENDVPD is the BLENDVPD instruction https://www.felixcloutier.com/x86/blendvpd
+	BLENDVPD
+	// MAXPD is the MAXPD instruction https://www.felixcloutier.com/x86/maxpd
+	MAXPD
+	// MAXPS is the MAXPS instruction https://www.felixcloutier.com/x86/maxps
+	MAXPS
+	// MINPD is the MINPD instruction https://www.felixcloutier.com/x86/minpd
+	MINPD
+	// MINPS is the MINPS instruction https://www.felixcloutier.com/x86/minps
+	MINPS
+	// ANDNPD is the ANDNPD instruction https://www.felixcloutier.com/x86/andnpd
+	ANDNPD
+	// ANDNPS is the ANDNPS instruction https://www.felixcloutier.com/x86/andnps
+	ANDNPS
+	// MULPS is the MULPS instruction https://www.felixcloutier.com/x86/mulps
+	MULPS
+	// MULPD is the MULPD instruction https://www.felixcloutier.com/x86/mulpd
+	MULPD
+	// DIVPS is the DIVPS instruction https://www.felixcloutier.com/x86/divps
+	DIVPS
+	// DIVPD is the DIVPD instruction https://www.felixcloutier.com/x86/divpd
+	DIVPD
+	// SQRTPS is the SQRTPS instruction https://www.felixcloutier.com/x86/sqrtps
+	SQRTPS
+	// SQRTPD is the SQRTPD instruction https://www.felixcloutier.com/x86/sqrtpd
+	SQRTPD
+	// ROUNDPS is the ROUNDPS instruction https://www.felixcloutier.com/x86/roundps
+	ROUNDPS
+	// ROUNDPD is the ROUNDPD instruction https://www.felixcloutier.com/x86/roundpd
+	ROUNDPD
+	// PALIGNR is the PALIGNR instruction https://www.felixcloutier.com/x86/palignr
+	PALIGNR
+	// PUNPCKLWD is the PUNPCKLWD instruction https://www.felixcloutier.com/x86/punpcklbw:punpcklwd:punpckldq:punpcklqdq
+	PUNPCKLWD
+	// PUNPCKHWD is the PUNPCKHWD instruction https://www.felixcloutier.com/x86/punpckhbw:punpckhwd:punpckhdq:punpckhqdq
+	PUNPCKHWD
+	// PMULHUW is the PMULHUW instruction https://www.felixcloutier.com/x86/pmulhuw
+	PMULHUW
+	// PMULDQ is the PMULDQ instruction https://www.felixcloutier.com/x86/pmuldq
+	PMULDQ
+	// PMULHRSW is the PMULHRSW instruction https://www.felixcloutier.com/x86/pmulhrsw
+	PMULHRSW
+	// PMULHW is the PMULHW instruction https://www.felixcloutier.com/x86/pmulhw
+	PMULHW
+	// CMPEQPS is the CMPEQPS instruction https://www.felixcloutier.com/x86/cmpps
+	CMPEQPS
+	// CMPEQPD is the CMPEQPD instruction https://www.felixcloutier.com/x86/cmppd
+	CMPEQPD
+	// CVTTPS2DQ is the CVTTPS2DQ instruction https://www.felixcloutier.com/x86/cvttps2dq
+	CVTTPS2DQ
+	// CVTDQ2PS is the CVTDQ2PS instruction https://www.felixcloutier.com/x86/cvtdq2ps
+	CVTDQ2PS
+	// MOVUPD is the MOVUPD instruction https://www.felixcloutier.com/x86/movupd
+	MOVUPD
+	// SHUFPS is the SHUFPS instruction https://www.felixcloutier.com/x86/shufps
+	SHUFPS
+	// PMADDWD is the PMADDWD instruction https://www.felixcloutier.com/x86/pmaddwd
+	PMADDWD
+	// CVTDQ2PD is the CVTDQ2PD instruction https://www.felixcloutier.com/x86/cvtdq2pd
+	CVTDQ2PD
+	// UNPCKLPS is the UNPCKLPS instruction https://www.felixcloutier.com/x86/unpcklps
+	UNPCKLPS
+	// PACKUSWB is the PACKUSWB instruction https://www.felixcloutier.com/x86/packuswb
+	PACKUSWB
+	// PACKSSDW is the PACKSSDW instruction https://www.felixcloutier.com/x86/packsswb:packssdw
+	PACKSSDW
+	// PACKUSDW is the PACKUSDW instruction https://www.felixcloutier.com/x86/packusdw
+	PACKUSDW
+	// CVTPS2PD is the CVTPS2PD instruction https://www.felixcloutier.com/x86/cvtps2pd
+	CVTPS2PD
+	// CVTPD2PS is the CVTPD2PS instruction https://www.felixcloutier.com/x86/cvtpd2ps
+	CVTPD2PS
+	// PMADDUBSW is the PMADDUBSW instruction https://www.felixcloutier.com/x86/pmaddubsw
+	PMADDUBSW
+	// CVTTPD2DQ is the CVTTPD2DQ instruction https://www.felixcloutier.com/x86/cvttpd2dq
+	CVTTPD2DQ
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -731,8 +837,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PADDB"
 	case PADDW:
 		return "PADDW"
-	case PADDL:
-		return "PADDL"
+	case PADDD:
+		return "PADDD"
 	case PADDQ:
 		return "PADDQ"
 	case ADDPS:
@@ -743,7 +849,7 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PSUBB"
 	case PSUBW:
 		return "PSUBW"
-	case PSUBL:
+	case PSUBD:
 		return "PSUBL"
 	case PSUBQ:
 		return "PSUBQ"
@@ -863,6 +969,112 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PMAXSW"
 	case PMAXSB:
 		return "PMAXSB"
+	case PMULLW:
+		return "PMULLW"
+	case PMULLD:
+		return "PMULLD"
+	case PMULUDQ:
+		return "PMULUDQ"
+	case PSUBSB:
+		return "PSUBSB"
+	case PSUBUSB:
+		return "PSUBUSB"
+	case PADDSW:
+		return "PADDSW"
+	case PADDSB:
+		return "PADDSB"
+	case PADDUSW:
+		return "PADDUSW"
+	case PSUBSW:
+		return "PSUBSW"
+	case PSUBUSW:
+		return "PSUBUSW"
+	case PAVGB:
+		return "PAVGB"
+	case PAVGW:
+		return "PAVGW"
+	case PABSB:
+		return "PABSB"
+	case PABSW:
+		return "PABSW"
+	case PABSD:
+		return "PABSD"
+	case BLENDVPD:
+		return "BLENDVPD"
+	case MAXPD:
+		return "MAXPD"
+	case MAXPS:
+		return "MAXPS"
+	case MINPD:
+		return "MINPD"
+	case MINPS:
+		return "MINPS"
+	case ANDNPD:
+		return "ANDNPD"
+	case ANDNPS:
+		return "ANDNPS"
+	case MULPS:
+		return "MULPS"
+	case MULPD:
+		return "MULPD"
+	case DIVPS:
+		return "DIVPS"
+	case DIVPD:
+		return "DIVPD"
+	case SQRTPS:
+		return "SQRTPS"
+	case SQRTPD:
+		return "SQRTPD"
+	case ROUNDPS:
+		return "ROUNDPS"
+	case ROUNDPD:
+		return "ROUNDPD"
+	case PALIGNR:
+		return "PALIGNR"
+	case PUNPCKLWD:
+		return "PUNPCKLWD"
+	case PUNPCKHWD:
+		return "PUNPCKHWD"
+	case PMULHUW:
+		return "PMULHUW"
+	case PMULDQ:
+		return "PMULDQ"
+	case PMULHRSW:
+		return "PMULHRSW"
+	case PMULHW:
+		return "PMULHW"
+	case CMPEQPS:
+		return "CMPEQPS"
+	case CMPEQPD:
+		return "CMPEQPD"
+	case CVTTPS2DQ:
+		return "CVTTPS2DQ"
+	case CVTDQ2PS:
+		return "CVTDQ2PS"
+	case MOVUPD:
+		return "MOVUPD"
+	case SHUFPS:
+		return "SHUFPS"
+	case PMADDWD:
+		return "PMADDWD"
+	case CVTDQ2PD:
+		return "CVTDQ2PD"
+	case UNPCKLPS:
+		return "UNPCKLPS"
+	case PACKUSWB:
+		return "PACKUSWB"
+	case PACKSSDW:
+		return "PACKSSDW"
+	case PACKUSDW:
+		return "PACKUSDW"
+	case CVTPS2PD:
+		return "CVTPS2PD"
+	case CVTPD2PS:
+		return "CVTPD2PS"
+	case PMADDUBSW:
+		return "PMADDUBSW"
+	case CVTTPD2DQ:
+		return "CVTTPD2DQ"
 	}
 	panic(fmt.Errorf("unknown instruction %d", instruction))
 }

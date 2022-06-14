@@ -1,6 +1,7 @@
 package amd64
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm"
@@ -138,7 +139,7 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 	a.CompileStandAlone(UD2) // insert any dummy instruction before MOVDQUs.
 	err := a.CompileLoadStaticConstToRegister(MOVDQU, consts[0], RegX12)
 	require.NoError(t, err)
-	err = a.CompileLoadStaticConstToRegister(MOVDQU, consts[1], RegX0)
+	err = a.CompileLoadStaticConstToRegister(MOVUPD, consts[1], RegX0)
 	require.NoError(t, err)
 	err = a.CompileLoadStaticConstToRegister(LEAQ, consts[0], RegX0)
 	require.NoError(t, err)
@@ -153,9 +154,9 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 		// 0x2: movdqu xmm12, xmmword ptr [rip + 0x18]
 		// where rip = 0x0b, therefore [rip + 0x18] = [0x23] = consts[0].
 		0xf3, 0x44, 0x0f, 0x6f, 0x25, 0x18, 0x00, 0x00, 0x00,
-		// 0x0b: movdqu xmm0, xmmword ptr [rip + 0x18]
+		// 0x0b: movupd xmm0, xmmword ptr [rip + 0x18]
 		// where rip = 0x13, therefore [rip + 0x18] = [0x2b] = consts[1].
-		0xf3, 0x0f, 0x6f, 0x05, 0x18, 0x00, 0x00, 0x00,
+		0x66, 0x0f, 0x10, 0x05, 0x18, 0x00, 0x00, 0x00,
 		// 0x13: lea rax, [rip + 9]
 		// where rip = 0x1a, therefore [rip + 0x9] = [0x23] = consts[0].
 		0x48, 0x8d, 0x05, 0x09, 0x00, 0x00, 0x00,
@@ -168,6 +169,5 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 		0x22, 0x22, 0x22, 0x22,
 		// 0x2f: consts[2]
 		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
-	}, actual)
-
+	}, actual, hex.EncodeToString(actual))
 }
