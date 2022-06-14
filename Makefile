@@ -113,6 +113,7 @@ coverage: ## Generate test coverage
 
 .PHONY: spectest
 spectest:
+	@go test ./internal/integration_test/spectest
 	@$(MAKE) spectest.v1
 	@$(MAKE) spectest.v2
 

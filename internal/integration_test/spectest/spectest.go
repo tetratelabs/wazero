@@ -652,10 +652,7 @@ func testdataPath(filename string) string {
 //
 // Also, if matched == false this returns non-empty valuesMsg which can be used to augment the test failure message.
 func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[int]laneType) (matched bool, valuesMsg string) {
-	if len(exps) == 0 {
-		matched = len(actual) == 0
-		return
-	}
+	matched = true
 
 	var msgExpValuesStrs, msgActualValuesStrs []string
 	var uint64RepPos int // the index to actual and exps slice.
@@ -664,26 +661,26 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 		case wasm.ValueTypeI32:
 			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%d", uint32(exps[uint64RepPos])))
 			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%d", uint32(actual[uint64RepPos])))
-			matched = uint32(exps[uint64RepPos]) == uint32(actual[uint64RepPos])
+			matched = matched && uint32(exps[uint64RepPos]) == uint32(actual[uint64RepPos])
 			uint64RepPos++
 		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%d", exps[uint64RepPos]))
 			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%d", actual[uint64RepPos]))
-			matched = exps[uint64RepPos] == actual[uint64RepPos]
+			matched = matched && exps[uint64RepPos] == actual[uint64RepPos]
 			uint64RepPos++
 		case wasm.ValueTypeF32:
 			a := math.Float32frombits(uint32(actual[uint64RepPos]))
 			e := math.Float32frombits(uint32(exps[uint64RepPos]))
 			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%f", e))
 			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%f", a))
-			matched = f32Equal(e, a)
+			matched = matched && f32Equal(e, a)
 			uint64RepPos++
 		case wasm.ValueTypeF64:
 			e := math.Float64frombits(exps[uint64RepPos])
 			a := math.Float64frombits(actual[uint64RepPos])
 			msgExpValuesStrs = append(msgExpValuesStrs, fmt.Sprintf("%f", e))
 			msgActualValuesStrs = append(msgActualValuesStrs, fmt.Sprintf("%f", a))
-			matched = f64Equal(e, a)
+			matched = matched && f64Equal(e, a)
 			uint64RepPos++
 		case wasm.ValueTypeV128:
 			actualLo, actualHi := actual[uint64RepPos], actual[uint64RepPos+1]
@@ -706,7 +703,7 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 						byte(actualHi>>32), byte(actualHi>>40), byte(actualHi>>48), byte(actualHi>>56),
 					),
 				)
-				matched = (expLo == actualLo) && (expHi == actualHi)
+				matched = matched && (expLo == actualLo) && (expHi == actualHi)
 			case laneTypeI16:
 				msgExpValuesStrs = append(msgExpValuesStrs,
 					fmt.Sprintf("i16x8(%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x)",
@@ -720,7 +717,7 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 						uint16(actualHi), uint16(actualHi>>16), uint16(actualHi>>32), uint16(actualHi>>48),
 					),
 				)
-				matched = (expLo == actualLo) && (expHi == actualHi)
+				matched = matched && (expLo == actualLo) && (expHi == actualHi)
 			case laneTypeI32:
 				msgExpValuesStrs = append(msgExpValuesStrs,
 					fmt.Sprintf("i32x4(%#x, %#x, %#x, %#x)", uint32(expLo), uint32(expLo>>32), uint32(expHi), uint32(expHi>>32)),
@@ -728,7 +725,7 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 				msgActualValuesStrs = append(msgActualValuesStrs,
 					fmt.Sprintf("i32x4(%#x, %#x, %#x, %#x)", uint32(actualLo), uint32(actualLo>>32), uint32(actualHi), uint32(actualHi>>32)),
 				)
-				matched = (expLo == actualLo) && (expHi == actualHi)
+				matched = matched && (expLo == actualLo) && (expHi == actualHi)
 			case laneTypeI64:
 				msgExpValuesStrs = append(msgExpValuesStrs,
 					fmt.Sprintf("i64x2(%#x, %#x)", expLo, expHi),
@@ -736,7 +733,7 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 				msgActualValuesStrs = append(msgActualValuesStrs,
 					fmt.Sprintf("i64x2(%#x, %#x)", actualLo, actualHi),
 				)
-				matched = (expLo == actualLo) && (expHi == actualHi)
+				matched = matched && (expLo == actualLo) && (expHi == actualHi)
 			case laneTypeF32:
 				msgExpValuesStrs = append(msgExpValuesStrs,
 					fmt.Sprintf("f32x4(%f, %f, %f, %f)",
@@ -750,11 +747,11 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 						math.Float32frombits(uint32(actualHi)), math.Float32frombits(uint32(actualHi>>32)),
 					),
 				)
-				matched =
+				matched = matched &&
 					f32Equal(math.Float32frombits(uint32(expLo)), math.Float32frombits(uint32(actualLo))) &&
-						f32Equal(math.Float32frombits(uint32(expLo>>32)), math.Float32frombits(uint32(actualLo>>32))) &&
-						f32Equal(math.Float32frombits(uint32(expHi)), math.Float32frombits(uint32(actualHi))) &&
-						f32Equal(math.Float32frombits(uint32(expHi>>32)), math.Float32frombits(uint32(actualHi>>32)))
+					f32Equal(math.Float32frombits(uint32(expLo>>32)), math.Float32frombits(uint32(actualLo>>32))) &&
+					f32Equal(math.Float32frombits(uint32(expHi)), math.Float32frombits(uint32(actualHi))) &&
+					f32Equal(math.Float32frombits(uint32(expHi>>32)), math.Float32frombits(uint32(actualHi>>32)))
 			case laneTypeF64:
 				msgExpValuesStrs = append(msgExpValuesStrs,
 					fmt.Sprintf("f64x2(%f, %f)", math.Float64frombits(expLo), math.Float64frombits(expHi)),
@@ -762,9 +759,9 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 				msgActualValuesStrs = append(msgActualValuesStrs,
 					fmt.Sprintf("f64x2(%f, %f)", math.Float64frombits(actualLo), math.Float64frombits(actualHi)),
 				)
-				matched =
+				matched = matched &&
 					f64Equal(math.Float64frombits(expLo), math.Float64frombits(actualLo)) &&
-						f64Equal(math.Float64frombits(expHi), math.Float64frombits(actualHi))
+					f64Equal(math.Float64frombits(expHi), math.Float64frombits(actualHi))
 			default:
 				panic("BUG")
 			}
