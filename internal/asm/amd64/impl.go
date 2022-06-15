@@ -1386,7 +1386,9 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	SQRTPS: {opcode: []byte{0x0f, 0x51}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/sqrtpd
 	SQRTPD:  {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x51}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/roundps
 	ROUNDPS: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x08}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
+	// https://www.felixcloutier.com/x86/roundpd
 	ROUNDPD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x09}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
 	// https://www.felixcloutier.com/x86/palignr
 	PALIGNR: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x3a, 0x0f}, requireSrcFloat: true, requireDstFloat: true, needArg: true},
@@ -2222,7 +2224,7 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		var op byte
 		if inst == PSRAD {
 			op = 0x72
-		} else {
+		} else { // PSRAW
 			op = 0x71
 		}
 
