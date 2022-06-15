@@ -3003,6 +3003,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			x1hi, x1Lo := ce.popValue(), ce.popValue()
 
 			var retLo, retHi uint64
+
+			// Lane-wise addition while saturating the overflowing values.
+			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#saturating-integer-addition
 			switch op.b1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
@@ -3032,7 +3035,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						}
 					}
 
-					if i < 8 {
+					if i < 8 { // first 8 lanes are on lower 64bits.
 						retLo |= uv << (i * 8)
 					} else {
 						retHi |= uv << ((i - 8) * 8)
@@ -3066,7 +3069,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						}
 					}
 
-					if i < 4 {
+					if i < 4 { // first 4 lanes are on lower 64bits.
 						retLo |= uv << (i * 16)
 					} else {
 						retHi |= uv << ((i - 4) * 16)
@@ -3082,6 +3085,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			x1hi, x1Lo := ce.popValue(), ce.popValue()
 
 			var retLo, retHi uint64
+
+			// Lane-wise subtraction while saturating the overflowing values.
+			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#saturating-integer-subtraction
 			switch op.b1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
