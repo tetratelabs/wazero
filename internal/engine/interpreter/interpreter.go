@@ -1198,8 +1198,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			case wazeroir.UnsignedTypeI64:
 				ce.pushValue(v1 + v2)
 			case wazeroir.UnsignedTypeF32:
-				v := math.Float32frombits(uint32(v1)) + math.Float32frombits(uint32(v2))
-				ce.pushValue(uint64(math.Float32bits(v)))
+				ce.pushValue(addFloat32bits(uint32(v1), uint32(v2)))
 			case wazeroir.UnsignedTypeF64:
 				v := math.Float64frombits(v1) + math.Float64frombits(v2)
 				ce.pushValue(math.Float64bits(v))
@@ -1214,8 +1213,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			case wazeroir.UnsignedTypeI64:
 				ce.pushValue(v1 - v2)
 			case wazeroir.UnsignedTypeF32:
-				v := math.Float32frombits(uint32(v1)) - math.Float32frombits(uint32(v2))
-				ce.pushValue(uint64(math.Float32bits(v)))
+				ce.pushValue(subFloat32bits(uint32(v1), uint32(v2)))
 			case wazeroir.UnsignedTypeF64:
 				v := math.Float64frombits(v1) - math.Float64frombits(v2)
 				ce.pushValue(math.Float64bits(v))
@@ -1230,8 +1228,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			case wazeroir.UnsignedTypeI64:
 				ce.pushValue(v1 * v2)
 			case wazeroir.UnsignedTypeF32:
-				v := math.Float32frombits(uint32(v2)) * math.Float32frombits(uint32(v1))
-				ce.pushValue(uint64(math.Float32bits(v)))
+				ce.pushValue(mulFloat32bits(uint32(v1), uint32(v2)))
 			case wazeroir.UnsignedTypeF64:
 				v := math.Float64frombits(v2) * math.Float64frombits(v1)
 				ce.pushValue(math.Float64bits(v))
@@ -1303,15 +1300,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				n := v1
 				ce.pushValue(n / d)
 			case wazeroir.SignedTypeFloat32:
-				d := v2
-				n := v1
-				v := math.Float32frombits(uint32(n)) / math.Float32frombits(uint32(d))
-				ce.pushValue(uint64(math.Float32bits(v)))
+				ce.pushValue(divFloat32bits(uint32(v1), uint32(v2)))
 			case wazeroir.SignedTypeFloat64:
-				d := v2
-				n := v1
-				v := math.Float64frombits(n) / math.Float64frombits(d)
-				ce.pushValue(math.Float64bits(v))
+				ce.pushValue(math.Float64bits(math.Float64frombits(v1) / math.Float64frombits(v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindRem:
@@ -1979,12 +1970,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(xHigh + yHigh)
 			case wazeroir.ShapeF32x4:
 				ce.pushValue(
-					uint64(math.Float32bits(math.Float32frombits(uint32(xLow))+math.Float32frombits(uint32(yLow)))) |
-						(uint64(math.Float32bits(math.Float32frombits(uint32(xLow>>32))+math.Float32frombits(uint32(yLow>>32)))) << 32),
+					addFloat32bits(uint32(xLow), uint32(yLow)) | addFloat32bits(uint32(xLow>>32), uint32(yLow>>32))<<32,
 				)
 				ce.pushValue(
-					uint64(math.Float32bits(math.Float32frombits(uint32(xHigh))+math.Float32frombits(uint32(yHigh)))) |
-						(uint64(math.Float32bits(math.Float32frombits(uint32(xHigh>>32))+math.Float32frombits(uint32(yHigh>>32)))) << 32),
+					addFloat32bits(uint32(xHigh), uint32(yHigh)) | addFloat32bits(uint32(xHigh>>32), uint32(yHigh>>32))<<32,
 				)
 			case wazeroir.ShapeF64x2:
 				ce.pushValue(math.Float64bits(math.Float64frombits(xLow) + math.Float64frombits(yLow)))
@@ -2025,12 +2014,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(xHigh - yHigh)
 			case wazeroir.ShapeF32x4:
 				ce.pushValue(
-					uint64(math.Float32bits(math.Float32frombits(uint32(xLow))-math.Float32frombits(uint32(yLow)))) |
-						(uint64(math.Float32bits(math.Float32frombits(uint32(xLow>>32))-math.Float32frombits(uint32(yLow>>32)))) << 32),
+					subFloat32bits(uint32(xLow), uint32(yLow)) | subFloat32bits(uint32(xLow>>32), uint32(yLow>>32))<<32,
 				)
 				ce.pushValue(
-					uint64(math.Float32bits(math.Float32frombits(uint32(xHigh))-math.Float32frombits(uint32(yHigh)))) |
-						(uint64(math.Float32bits(math.Float32frombits(uint32(xHigh>>32))-math.Float32frombits(uint32(yHigh>>32)))) << 32),
+					subFloat32bits(uint32(xHigh), uint32(yHigh)) | subFloat32bits(uint32(xHigh>>32), uint32(yHigh>>32))<<32,
 				)
 			case wazeroir.ShapeF64x2:
 				ce.pushValue(math.Float64bits(math.Float64frombits(xLow) - math.Float64frombits(yLow)))
@@ -3186,10 +3173,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				retHi = x1hi * x2hi
 				retLo = x1lo * x2lo
 			case wazeroir.ShapeF32x4:
-				retHi = uint64(math.Float32bits(math.Float32frombits(uint32(x1hi))*math.Float32frombits(uint32(x2hi)))) |
-					(uint64(math.Float32bits(math.Float32frombits(uint32(x1hi>>32))*math.Float32frombits(uint32(x2hi>>32)))) << 32)
-				retLo = uint64(math.Float32bits(math.Float32frombits(uint32(x1lo))*math.Float32frombits(uint32(x2lo)))) |
-					(uint64(math.Float32bits(math.Float32frombits(uint32(x1lo>>32))*math.Float32frombits(uint32(x2lo>>32)))) << 32)
+				retHi = mulFloat32bits(uint32(x1hi), uint32(x2hi)) | mulFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
+				retLo = mulFloat32bits(uint32(x1lo), uint32(x2lo)) | mulFloat32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
 			case wazeroir.ShapeF64x2:
 				retHi = math.Float64bits(math.Float64frombits(x1hi) * math.Float64frombits(x2hi))
 				retLo = math.Float64bits(math.Float64frombits(x1lo) * math.Float64frombits(x2lo))
@@ -3205,10 +3190,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				retHi = math.Float64bits(math.Float64frombits(x1hi) / math.Float64frombits(x2hi))
 				retLo = math.Float64bits(math.Float64frombits(x1lo) / math.Float64frombits(x2lo))
 			} else {
-				retHi = uint64(math.Float32bits(math.Float32frombits(uint32(x1hi))/math.Float32frombits(uint32(x2hi)))) |
-					(uint64(math.Float32bits(math.Float32frombits(uint32(x1hi>>32))/math.Float32frombits(uint32(x2hi>>32)))) << 32)
-				retLo = uint64(math.Float32bits(math.Float32frombits(uint32(x1lo))/math.Float32frombits(uint32(x2lo)))) |
-					(uint64(math.Float32bits(math.Float32frombits(uint32(x1lo>>32))/math.Float32frombits(uint32(x2lo>>32)))) << 32)
+				retHi = divFloat32bits(uint32(x1hi), uint32(x2hi)) | divFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
+				retLo = divFloat32bits(uint32(x1lo), uint32(x2lo)) | divFloat32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
 			}
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
@@ -4129,6 +4112,22 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+}
+
+func addFloat32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(math.Float32frombits(v1) + math.Float32frombits(v2)))
+}
+
+func subFloat32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(math.Float32frombits(v1) - math.Float32frombits(v2)))
+}
+
+func mulFloat32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(math.Float32frombits(v1) * math.Float32frombits(v2)))
+}
+
+func divFloat32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(math.Float32frombits(v1) / math.Float32frombits(v2)))
 }
 
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#xref-exec-numerics-op-flt-mathrm-flt-n-z-1-z-2
