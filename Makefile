@@ -102,7 +102,7 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 
 .PHONY: test
 test:
-	@go test $$(go list ./... | grep -v spectest) -timeout 120s
+	@go test $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)') -timeout 120s
 	@cd internal/integration_test/asm && go test ./... -timeout 120s
 
 .PHONY: coverage

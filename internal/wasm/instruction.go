@@ -218,7 +218,7 @@ const (
 	OpcodeI64TruncF64S  Opcode = 0xb0
 	OpcodeI64TruncF64U  Opcode = 0xb1
 
-	OpcodeF32ConvertI32s Opcode = 0xb2
+	OpcodeF32ConvertI32S Opcode = 0xb2
 	OpcodeF32ConvertI32U Opcode = 0xb3
 	OpcodeF32ConvertI64S Opcode = 0xb4
 	OpcodeF32ConvertI64U Opcode = 0xb5
@@ -487,7 +487,7 @@ const (
 	OpcodeVecI8x16MinU    OpcodeVec = 0x77
 	OpcodeVecI8x16MaxS    OpcodeVec = 0x78
 	OpcodeVecI8x16MaxU    OpcodeVec = 0x79
-	OpcodeVecI8x16ArgrU   OpcodeVec = 0x7b
+	OpcodeVecI8x16AvgrU   OpcodeVec = 0x7b
 
 	// i16 misc.
 
@@ -495,7 +495,7 @@ const (
 	OpcodeVecI16x8ExtaddPairwiseI8x16U OpcodeVec = 0x7d
 	OpcodeVecI16x8Abs                  OpcodeVec = 0x80
 	OpcodeVecI16x8Neg                  OpcodeVec = 0x81
-	OpcodeVecI16x8Q16mulrSatS          OpcodeVec = 0x82
+	OpcodeVecI16x8Q15mulrSatS          OpcodeVec = 0x82
 	OpcodeVecI16x8AllTrue              OpcodeVec = 0x83
 	OpcodeVecI16x8BitMask              OpcodeVec = 0x84
 	OpcodeVecI16x8NarrowI32x4S         OpcodeVec = 0x85
@@ -518,7 +518,7 @@ const (
 	OpcodeVecI16x8MinU                 OpcodeVec = 0x97
 	OpcodeVecI16x8MaxS                 OpcodeVec = 0x98
 	OpcodeVecI16x8MaxU                 OpcodeVec = 0x99
-	OpcodeVecI16x8ArgrU                OpcodeVec = 0x9b
+	OpcodeVecI16x8AvgrU                OpcodeVec = 0x9b
 	OpcodeVecI16x8ExtMulLowI8x16S      OpcodeVec = 0x9c
 	OpcodeVecI16x8ExtMulHighI8x16S     OpcodeVec = 0x9d
 	OpcodeVecI16x8ExtMulLowI8x16U      OpcodeVec = 0x9e
@@ -617,8 +617,8 @@ const (
 	OpcodeVecF32x4ConvertI32x4U       OpcodeVec = 0xfb
 	OpcodeVecI32x4TruncSatF64x2SZero  OpcodeVec = 0xfc
 	OpcodeVecI32x4TruncSatF64x2UZero  OpcodeVec = 0xfd
-	OpcodeVecF64x2ConvertI32x4S       OpcodeVec = 0xfe
-	OpcodeVecF64x2ConvertI32x4U       OpcodeVec = 0xff
+	OpcodeVecF64x2ConvertLowI32x4S    OpcodeVec = 0xfe
+	OpcodeVecF64x2ConvertLowI32x4U    OpcodeVec = 0xff
 	OpcodeVecF32x4DemoteF64x2Zero     OpcodeVec = 0x5e
 	OpcodeVecF64x2PromoteLowF32x4Zero OpcodeVec = 0x5f
 )
@@ -783,7 +783,7 @@ const (
 	OpcodeI64TruncF32UName      = "i64.trunc_f32_u"
 	OpcodeI64TruncF64SName      = "i64.trunc_f64_s"
 	OpcodeI64TruncF64UName      = "i64.trunc_f64_u"
-	OpcodeF32ConvertI32sName    = "f32.convert_i32_s"
+	OpcodeF32ConvertI32SName    = "f32.convert_i32_s"
 	OpcodeF32ConvertI32UName    = "f32.convert_i32_u"
 	OpcodeF32ConvertI64SName    = "f32.convert_i64_s"
 	OpcodeF32ConvertI64UName    = "f32.convert_i64u"
@@ -977,7 +977,7 @@ var instructionNames = [256]string{
 	OpcodeI64TruncF32U:      OpcodeI64TruncF32UName,
 	OpcodeI64TruncF64S:      OpcodeI64TruncF64SName,
 	OpcodeI64TruncF64U:      OpcodeI64TruncF64UName,
-	OpcodeF32ConvertI32s:    OpcodeF32ConvertI32sName,
+	OpcodeF32ConvertI32S:    OpcodeF32ConvertI32SName,
 	OpcodeF32ConvertI32U:    OpcodeF32ConvertI32UName,
 	OpcodeF32ConvertI64S:    OpcodeF32ConvertI64SName,
 	OpcodeF32ConvertI64U:    OpcodeF32ConvertI64UName,
@@ -1187,12 +1187,12 @@ const (
 	OpcodeVecI8x16MinUName                 = "i8x16.min_u"
 	OpcodeVecI8x16MaxSName                 = "i8x16.max_s"
 	OpcodeVecI8x16MaxUName                 = "i8x16.max_u"
-	OpcodeVecI8x16ArgrUName                = "i8x16.argr_u"
+	OpcodeVecI8x16AvgrUName                = "i8x16.avgr_u"
 	OpcodeVecI16x8ExtaddPairwiseI8x16SName = "i16x8.extadd_pairwise_i8x16_s"
 	OpcodeVecI16x8ExtaddPairwiseI8x16UName = "i16x8.extadd_pairwise_i8x16_u"
 	OpcodeVecI16x8AbsName                  = "i16x8.abs"
 	OpcodeVecI16x8NegName                  = "i16x8.neg"
-	OpcodeVecI16x8Q16mulrSatSName          = "i16x8.q15mulr_sat_s"
+	OpcodeVecI16x8Q15mulrSatSName          = "i16x8.q15mulr_sat_s"
 	OpcodeVecI16x8AllTrueName              = "i16x8.all_true"
 	OpcodeVecI16x8BitMaskName              = "i16x8.bitmask"
 	OpcodeVecI16x8NarrowI32x4SName         = "i16x8.narrow_i32x4_s"
@@ -1215,7 +1215,7 @@ const (
 	OpcodeVecI16x8MinUName                 = "i16x8.min_u"
 	OpcodeVecI16x8MaxSName                 = "i16x8.max_s"
 	OpcodeVecI16x8MaxUName                 = "i16x8.max_u"
-	OpcodeVecI16x8ArgrUName                = "i16x8.argr_u"
+	OpcodeVecI16x8AvgrUName                = "i16x8.avgr_u"
 	OpcodeVecI16x8ExtMulLowI8x16SName      = "i16x8.extmul_low_i8x16_s"
 	OpcodeVecI16x8ExtMulHighI8x16SName     = "i16x8.extmul_high_i8x16_s"
 	OpcodeVecI16x8ExtMulLowI8x16UName      = "i16x8.extmul_low_i8x16_u"
@@ -1299,8 +1299,8 @@ const (
 	OpcodeVecF32x4ConvertI32x4UName        = "f32x4.convert_i32x4_u"
 	OpcodeVecI32x4TruncSatF64x2SZeroName   = "i32x4.trunc_sat_f64x2_s_zero"
 	OpcodeVecI32x4TruncSatF64x2UZeroName   = "i32x4.trunc_sat_f64x2_u_zero"
-	OpcodeVecF64x2ConvertI32x4SName        = "f64x2.convert_low_i32x4_s"
-	OpcodeVecF64x2ConvertI32x4UName        = "f64x2.convert_low_i32x4_u"
+	OpcodeVecF64x2ConvertLowI32x4SName     = "f64x2.convert_low_i32x4_s"
+	OpcodeVecF64x2ConvertLowI32x4UName     = "f64x2.convert_low_i32x4_u"
 	OpcodeVecF32x4DemoteF64x2ZeroName      = "f32x4.demote_f64x2_zero"
 	OpcodeVecF64x2PromoteLowF32x4ZeroName  = "f64x2.promote_low_f32x4"
 )
@@ -1426,12 +1426,12 @@ var vectorInstructionName = map[OpcodeVec]string{
 	OpcodeVecI8x16MinU:                 OpcodeVecI8x16MinUName,
 	OpcodeVecI8x16MaxS:                 OpcodeVecI8x16MaxSName,
 	OpcodeVecI8x16MaxU:                 OpcodeVecI8x16MaxUName,
-	OpcodeVecI8x16ArgrU:                OpcodeVecI8x16ArgrUName,
+	OpcodeVecI8x16AvgrU:                OpcodeVecI8x16AvgrUName,
 	OpcodeVecI16x8ExtaddPairwiseI8x16S: OpcodeVecI16x8ExtaddPairwiseI8x16SName,
 	OpcodeVecI16x8ExtaddPairwiseI8x16U: OpcodeVecI16x8ExtaddPairwiseI8x16UName,
 	OpcodeVecI16x8Abs:                  OpcodeVecI16x8AbsName,
 	OpcodeVecI16x8Neg:                  OpcodeVecI16x8NegName,
-	OpcodeVecI16x8Q16mulrSatS:          OpcodeVecI16x8Q16mulrSatSName,
+	OpcodeVecI16x8Q15mulrSatS:          OpcodeVecI16x8Q15mulrSatSName,
 	OpcodeVecI16x8AllTrue:              OpcodeVecI16x8AllTrueName,
 	OpcodeVecI16x8BitMask:              OpcodeVecI16x8BitMaskName,
 	OpcodeVecI16x8NarrowI32x4S:         OpcodeVecI16x8NarrowI32x4SName,
@@ -1454,7 +1454,7 @@ var vectorInstructionName = map[OpcodeVec]string{
 	OpcodeVecI16x8MinU:                 OpcodeVecI16x8MinUName,
 	OpcodeVecI16x8MaxS:                 OpcodeVecI16x8MaxSName,
 	OpcodeVecI16x8MaxU:                 OpcodeVecI16x8MaxUName,
-	OpcodeVecI16x8ArgrU:                OpcodeVecI16x8ArgrUName,
+	OpcodeVecI16x8AvgrU:                OpcodeVecI16x8AvgrUName,
 	OpcodeVecI16x8ExtMulLowI8x16S:      OpcodeVecI16x8ExtMulLowI8x16SName,
 	OpcodeVecI16x8ExtMulHighI8x16S:     OpcodeVecI16x8ExtMulHighI8x16SName,
 	OpcodeVecI16x8ExtMulLowI8x16U:      OpcodeVecI16x8ExtMulLowI8x16UName,
@@ -1538,8 +1538,8 @@ var vectorInstructionName = map[OpcodeVec]string{
 	OpcodeVecF32x4ConvertI32x4U:        OpcodeVecF32x4ConvertI32x4UName,
 	OpcodeVecI32x4TruncSatF64x2SZero:   OpcodeVecI32x4TruncSatF64x2SZeroName,
 	OpcodeVecI32x4TruncSatF64x2UZero:   OpcodeVecI32x4TruncSatF64x2UZeroName,
-	OpcodeVecF64x2ConvertI32x4S:        OpcodeVecF64x2ConvertI32x4SName,
-	OpcodeVecF64x2ConvertI32x4U:        OpcodeVecF64x2ConvertI32x4UName,
+	OpcodeVecF64x2ConvertLowI32x4S:     OpcodeVecF64x2ConvertLowI32x4SName,
+	OpcodeVecF64x2ConvertLowI32x4U:     OpcodeVecF64x2ConvertLowI32x4UName,
 	OpcodeVecF32x4DemoteF64x2Zero:      OpcodeVecF32x4DemoteF64x2ZeroName,
 	OpcodeVecF64x2PromoteLowF32x4Zero:  OpcodeVecF64x2PromoteLowF32x4ZeroName,
 }

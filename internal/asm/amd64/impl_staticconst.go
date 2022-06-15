@@ -110,6 +110,10 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 		// https://www.felixcloutier.com/x86/lea
 		rexPrefix |= RexPrefixW
 		opcodes = []byte{0x8d}
+	case MOVUPD:
+		// https://www.felixcloutier.com/x86/movupd
+		mandatoryPrefix = 0x66
+		opcodes = []byte{0x0f, 0x10}
 	default:
 		err = errorEncodingUnsupported(n)
 		return

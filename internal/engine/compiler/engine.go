@@ -148,14 +148,14 @@ type (
 		// Where we store the status code of Compiler execution.
 		statusCode nativeCallStatusCode
 
-		// Set when statusCode == compilerStatusCallBuiltInFunction}
+		// Set when statusCode == compilerStatusCallBuiltInFunction
 		// Indicating the function call index.
 		builtinFunctionCallIndex wasm.Index
 	}
 
 	// callFrame holds the information to which the caller function can return.
 	// callFrame is created for currently executed function frame as well,
-	// so some of the fields are not yet set when native code is currently executing it.
+	// so some fields are not yet set when native code is currently executing it.
 	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
 	// until it makes a function call.
 	callFrame struct {
@@ -187,8 +187,8 @@ type (
 		parent *code
 	}
 
-	// code corresponds to a function in a module (not insantaited one). This holds the machine code
-	// compiled by Wazero's compiler.
+	// code corresponds to a function in a module (not instantiated one). This holds the machine code
+	// compiled by wazero compiler.
 	code struct {
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
@@ -203,7 +203,7 @@ type (
 		sourceModule *wasm.Module
 	}
 
-	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
+	// staticData holds the read-only data (i.e. outside codeSegment which is marked as executable) per function.
 	// This is used to store jump tables for br_table instructions.
 	// The primary index is the logical separation of multiple data, for example data[0] and data[1]
 	// correspond to different jump tables for different br_table instructions.
@@ -250,7 +250,7 @@ const (
 	callEngineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextnativeCallStatusCodeOffset       = 128
+	callEngineExitContextNativeCallStatusCodeOffset       = 128
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
@@ -294,10 +294,10 @@ const (
 	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
 	interfaceDataOffset = 8
 
-	// Consts for DataInstance.
+	// Consts for wasm.DataInstance.
 	dataInstanceStructSize = 24
 
-	// Consts for ElementInstance.
+	// Consts for wasm.ElementInstance.
 	elementInstanceStructSize = 32
 
 	// pointerSizeLog2 satisfies: 1 << pointerSizeLog2 = sizeOf(uintptr)
@@ -330,7 +330,7 @@ const (
 	nativeCallStatusIntegerDivisionByZero
 )
 
-// causePanic causes a panic with the corresponding error to the status code.
+// causePanic causes a panic with the corresponding error to the nativeCallStatusCode.
 func (s nativeCallStatusCode) causePanic() {
 	var err error
 	switch s {
@@ -495,9 +495,9 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 			return me, wasm.ErrElementOffsetOutOfBounds
 		}
 
-		for i, funcindex := range init.FunctionIndexes {
-			if funcindex != nil {
-				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*funcindex]))
+		for i, funcIdx := range init.FunctionIndexes {
+			if funcIdx != nil {
+				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*funcIdx]))
 			}
 		}
 	}
@@ -820,7 +820,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.M
 
 func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wasm.TableInstance) {
 	tableIndex := ce.popValue()
-	table := tables[tableIndex] // verifed not to be out of range by the func validation at compilation phase.
+	table := tables[tableIndex] // verified not to be out of range by the func validation at compilation phase.
 	num := ce.popValue()
 	ref := ce.popValue()
 	res := table.Grow(ctx, uint32(num), uintptr(ref))
@@ -1094,6 +1094,60 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 			err = compiler.compileV128Shl(o)
 		case *wazeroir.OperationV128Cmp:
 			err = compiler.compileV128Cmp(o)
+		case *wazeroir.OperationV128AddSat:
+			err = compiler.compileV128AddSat(o)
+		case *wazeroir.OperationV128SubSat:
+			err = compiler.compileV128SubSat(o)
+		case *wazeroir.OperationV128Mul:
+			err = compiler.compileV128Mul(o)
+		case *wazeroir.OperationV128Div:
+			err = compiler.compileV128Div(o)
+		case *wazeroir.OperationV128Neg:
+			err = compiler.compileV128Neg(o)
+		case *wazeroir.OperationV128Sqrt:
+			err = compiler.compileV128Sqrt(o)
+		case *wazeroir.OperationV128Abs:
+			err = compiler.compileV128Abs(o)
+		case *wazeroir.OperationV128Popcnt:
+			err = compiler.compileV128Popcnt(o)
+		case *wazeroir.OperationV128Min:
+			err = compiler.compileV128Min(o)
+		case *wazeroir.OperationV128Max:
+			err = compiler.compileV128Max(o)
+		case *wazeroir.OperationV128AvgrU:
+			err = compiler.compileV128AvgrU(o)
+		case *wazeroir.OperationV128Pmin:
+			err = compiler.compileV128Pmin(o)
+		case *wazeroir.OperationV128Pmax:
+			err = compiler.compileV128Pmax(o)
+		case *wazeroir.OperationV128Ceil:
+			err = compiler.compileV128Ceil(o)
+		case *wazeroir.OperationV128Floor:
+			err = compiler.compileV128Floor(o)
+		case *wazeroir.OperationV128Trunc:
+			err = compiler.compileV128Trunc(o)
+		case *wazeroir.OperationV128Nearest:
+			err = compiler.compileV128Nearest(o)
+		case *wazeroir.OperationV128Extend:
+			err = compiler.compileV128Extend(o)
+		case *wazeroir.OperationV128ExtMul:
+			err = compiler.compileV128ExtMul(o)
+		case *wazeroir.OperationV128Q15mulrSatS:
+			err = compiler.compileV128Q15mulrSatS(o)
+		case *wazeroir.OperationV128ExtAddPairwise:
+			err = compiler.compileV128ExtAddPairwise(o)
+		case *wazeroir.OperationV128FloatPromote:
+			err = compiler.compileV128FloatPromote(o)
+		case *wazeroir.OperationV128FloatDemote:
+			err = compiler.compileV128FloatDemote(o)
+		case *wazeroir.OperationV128FConvertFromI:
+			err = compiler.compileV128FConvertFromI(o)
+		case *wazeroir.OperationV128Dot:
+			err = compiler.compileV128Dot(o)
+		case *wazeroir.OperationV128Narrow:
+			err = compiler.compileV128Narrow(o)
+		case *wazeroir.OperationV128ITruncSatFromF:
+			err = compiler.compileV128ITruncSatFromF(o)
 		default:
 			err = errors.New("unsupported")
 		}

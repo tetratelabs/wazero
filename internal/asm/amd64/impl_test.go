@@ -487,7 +487,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX10,
 			},
@@ -497,7 +496,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegX3,
 			},
@@ -507,7 +505,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQU",
 			n: &NodeImpl{
 				Instruction: MOVDQU,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegX15,
 			},
@@ -517,7 +514,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX10,
 			},
@@ -527,7 +523,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegX3,
 			},
@@ -537,7 +532,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "MOVDQA",
 			n: &NodeImpl{
 				Instruction: MOVDQA,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegX15,
 			},
@@ -547,7 +541,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "PACKSSWB",
 			n: &NodeImpl{
 				Instruction: PACKSSWB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegX15,
 			},
@@ -557,7 +550,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmovmskb r15d, xmm10",
 			n: &NodeImpl{
 				Instruction: PMOVMSKB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegR15,
 			},
@@ -567,7 +559,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "movmskps eax, xmm10",
 			n: &NodeImpl{
 				Instruction: MOVMSKPS,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegAX,
 			},
@@ -577,7 +568,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "movmskps r13d, xmm1",
 			n: &NodeImpl{
 				Instruction: MOVMSKPS,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegR13,
 			},
@@ -587,7 +577,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "movmskpd eax, xmm10",
 			n: &NodeImpl{
 				Instruction: MOVMSKPD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX10,
 				DstReg:      RegAX,
 			},
@@ -597,7 +586,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "movmskpd r15d, xmm1",
 			n: &NodeImpl{
 				Instruction: MOVMSKPD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegR15,
 			},
@@ -607,7 +595,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pand xmm15, xmm1",
 			n: &NodeImpl{
 				Instruction: PAND,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegX15,
 			},
@@ -617,7 +604,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "por xmm1, xmm15",
 			n: &NodeImpl{
 				Instruction: POR,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX1,
 			},
@@ -627,7 +613,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pandn xmm13, xmm15",
 			n: &NodeImpl{
 				Instruction: PANDN,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX13,
 			},
@@ -637,7 +622,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psrad xmm13, xmm15",
 			n: &NodeImpl{
 				Instruction: PSRAD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX13,
 			},
@@ -647,7 +631,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psraw xmm1, xmm1",
 			n: &NodeImpl{
 				Instruction: PSRAW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegX1,
 			},
@@ -657,7 +640,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psrlq xmm14, xmm14",
 			n: &NodeImpl{
 				Instruction: PSRLQ,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX14,
 				DstReg:      RegX14,
 			},
@@ -667,7 +649,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psrld xmm3, xmm3",
 			n: &NodeImpl{
 				Instruction: PSRLD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX3,
 			},
@@ -677,7 +658,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psrlw xmm15, xmm1",
 			n: &NodeImpl{
 				Instruction: PSRLW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegX15,
 			},
@@ -687,7 +667,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psllw xmm1, xmm15",
 			n: &NodeImpl{
 				Instruction: PSLLW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX1,
 			},
@@ -697,7 +676,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "punpcklbw xmm1, xmm15",
 			n: &NodeImpl{
 				Instruction: PUNPCKLBW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX1,
 			},
@@ -707,7 +685,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "punpckhbw xmm11, xmm1",
 			n: &NodeImpl{
 				Instruction: PUNPCKHBW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegX11,
 			},
@@ -717,7 +694,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pslld xmm11, xmm1",
 			n: &NodeImpl{
 				Instruction: PSLLD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX1,
 				DstReg:      RegX11,
 			},
@@ -727,7 +703,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "psllq xmm11, xmm15",
 			n: &NodeImpl{
 				Instruction: PSLLQ,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX11,
 			},
@@ -737,7 +712,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "cmpeqps xmm11, xmm15",
 			n: &NodeImpl{
 				Instruction: CMPPS,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX11,
 				Arg:         0, // CMPPS with arg=0 == Pseudo-Op CMPEQPS.
@@ -748,7 +722,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "cmpordps xmm1, xmm5",
 			n: &NodeImpl{
 				Instruction: CMPPS,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX5,
 				DstReg:      RegX1,
 				Arg:         7, // CMPPS with arg=7 == Pseudo-Op CMPORDPS.
@@ -759,7 +732,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "cmplepd xmm11, xmm15",
 			n: &NodeImpl{
 				Instruction: CMPPD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX15,
 				DstReg:      RegX11,
 				Arg:         2, // CMPPD with arg=2 == Pseudo-Op CMPLEPD.
@@ -770,7 +742,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "cmpneqpd xmm1, xmm5",
 			n: &NodeImpl{
 				Instruction: CMPPD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX5,
 				DstReg:      RegX1,
 				Arg:         4, // CMPPD with arg=4 == Pseudo-Op CMPNEQPD.
@@ -781,7 +752,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pcmpgtq xmm10, xmm3",
 			n: &NodeImpl{
 				Instruction: PCMPGTQ,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX10,
 			},
@@ -791,7 +761,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pcmpgtd xmm10, xmm3",
 			n: &NodeImpl{
 				Instruction: PCMPGTD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX10,
 			},
@@ -801,7 +770,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminsd xmm10, xmm3",
 			n: &NodeImpl{
 				Instruction: PMINSD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX3,
 				DstReg:      RegX10,
 			},
@@ -811,7 +779,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxsd xmm1, xmm12",
 			n: &NodeImpl{
 				Instruction: PMAXSD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
@@ -821,7 +788,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxsw xmm1, xmm12",
 			n: &NodeImpl{
 				Instruction: PMAXSW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
@@ -831,7 +797,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminsw xmm1, xmm12",
 			n: &NodeImpl{
 				Instruction: PMINSW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
@@ -841,7 +806,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pcmpgtb xmm1, xmm12",
 			n: &NodeImpl{
 				Instruction: PCMPGTB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
@@ -851,7 +815,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminsb xmm1, xmm12",
 			n: &NodeImpl{
 				Instruction: PMINSB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX12,
 				DstReg:      RegX1,
 			},
@@ -861,7 +824,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxsb xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMAXSB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -871,7 +833,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminud xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMINUD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -881,7 +842,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminuw xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMINUW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -891,7 +851,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pminub xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMINUB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -901,7 +860,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxud xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMAXUD,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -911,7 +869,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxuw xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMAXUW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -921,7 +878,6 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pmaxub xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PMAXUB,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
@@ -931,11 +887,494 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			name: "pcmpgtw xmm1, xmm2",
 			n: &NodeImpl{
 				Instruction: PCMPGTW,
-				Types:       OperandTypesRegisterToRegister,
 				SrcReg:      RegX2,
 				DstReg:      RegX1,
 			},
 			exp: []byte{0x66, 0xf, 0x65, 0xca},
+		},
+
+		{
+			name: "pmullw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PMULLW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xd5, 0xe9},
+		},
+		{
+			name: "pmulld xmm1, xmm11",
+			n: &NodeImpl{
+				Instruction: PMULLD,
+				SrcReg:      RegX11,
+				DstReg:      RegX1,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x38, 0x40, 0xcb},
+		},
+		{
+			name: "pmuludq xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PMULUDQ,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xf4, 0xe9},
+		},
+		{
+			name: "psubsb xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PSUBSB,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xe8, 0xe9},
+		},
+		{
+			name: "psubsw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PSUBSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xe9, 0xe9},
+		},
+		{
+			name: "psubusb xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PSUBUSB,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xd8, 0xe9},
+		},
+		{
+			name: "psubusw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PSUBUSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xd9, 0xe9},
+		},
+		{
+			name: "paddsw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PADDSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xed, 0xe9},
+		},
+		{
+			name: "paddsb xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PADDSB,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xec, 0xe9},
+		},
+		{
+			name: "paddusw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PADDUSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xdd, 0xe9},
+		},
+		{
+			name: "pavgb xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PAVGB,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xe0, 0xe9},
+		},
+		{
+			name: "pavgw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PAVGW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xe3, 0xe9},
+		},
+		{
+			name: "pabsb xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PABSB,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x1c, 0xe9},
+		},
+		{
+			name: "pabsw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PABSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x1d, 0xe9},
+		},
+		{
+			name: "pabsd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PABSD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x1e, 0xe9},
+		},
+		{
+			name: "blendvpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: BLENDVPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x15, 0xe9},
+		},
+		{
+			name: "maxpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MAXPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x5f, 0xe9},
+		},
+		{
+			name: "maxps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MAXPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x5f, 0xe9},
+		},
+		{
+			name: "minpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MINPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x5d, 0xe9},
+		},
+		{
+			name: "minps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MINPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x5d, 0xe9},
+		},
+		{
+			name: "andnpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: ANDNPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x55, 0xe9},
+		},
+		{
+			name: "andnps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: ANDNPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x55, 0xe9},
+		},
+		{
+			name: "mulps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MULPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x59, 0xe9},
+		},
+		{
+			name: "mulpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: MULPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x59, 0xe9},
+		},
+		{
+			name: "divps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: DIVPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x5e, 0xe9},
+		},
+		{
+			name: "divpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: DIVPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x5e, 0xe9},
+		},
+		{
+			name: "sqrtps xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: SQRTPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x44, 0xf, 0x51, 0xe9},
+		},
+		{
+			name: "sqrtpd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: SQRTPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x51, 0xe9},
+		},
+		{
+			name: "roundps xmm13, xmm1, 0",
+			n: &NodeImpl{
+				Instruction: ROUNDPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         0,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x8, 0xe9, 0x0},
+		},
+		{
+			name: "roundps xmm13, xmm1, 1",
+			n: &NodeImpl{
+				Instruction: ROUNDPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         1,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x8, 0xe9, 0x1},
+		},
+		{
+			name: "roundps xmm13, xmm1, 3",
+			n: &NodeImpl{
+				Instruction: ROUNDPS,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         3,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x8, 0xe9, 0x3},
+		},
+		{
+			name: "roundpd xmm13, xmm1, 0",
+			n: &NodeImpl{
+				Instruction: ROUNDPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         0,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x9, 0xe9, 0x0},
+		},
+		{
+			name: "roundpd xmm13, xmm1, 1",
+			n: &NodeImpl{
+				Instruction: ROUNDPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         1,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x9, 0xe9, 0x1},
+		},
+		{
+			name: "roundpd xmm13, xmm1, 3",
+			n: &NodeImpl{
+				Instruction: ROUNDPD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         3,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0x9, 0xe9, 0x3},
+		},
+		{
+			name: "palignr xmm13, xmm1, 3",
+			n: &NodeImpl{
+				Instruction: PALIGNR,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+				Arg:         3,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x3a, 0xf, 0xe9, 0x3},
+		},
+		{
+			name: "punpcklwd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PUNPCKLWD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x61, 0xe9},
+		},
+		{
+			name: "punpckhwd xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PUNPCKHWD,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x69, 0xe9},
+		},
+		{
+			name: "pmulhuw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PMULHUW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0xe4, 0xe9},
+		},
+		{
+			name: "pmuldq xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PMULDQ,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0x28, 0xe9},
+		},
+		{
+			name: "pmulhrsw xmm13, xmm1",
+			n: &NodeImpl{
+				Instruction: PMULHRSW,
+				SrcReg:      RegX1,
+				DstReg:      RegX13,
+			},
+			exp: []byte{0x66, 0x44, 0xf, 0x38, 0xb, 0xe9},
+		},
+
+		{
+			name: "pmovsxbw xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVSXBW, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x20, 0xea},
+		},
+		{
+			name: "pmovsxwd xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVSXWD, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x23, 0xea},
+		},
+		{
+			name: "pmovsxdq xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVSXDQ, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x25, 0xea},
+		},
+		{
+			name: "pmovzxbw xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVZXBW, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x30, 0xea},
+		},
+		{
+			name: "pmovzxwd xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVZXWD, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x33, 0xea},
+		},
+		{
+			name: "pmovzxdq xmm5, xmm10",
+			n:    &NodeImpl{Instruction: PMOVZXDQ, SrcReg: RegX10, DstReg: RegX5},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x35, 0xea},
+		},
+		{
+			name: "pmulhw xmm2, xmm1",
+			n:    &NodeImpl{Instruction: PMULHW, SrcReg: RegX1, DstReg: RegX2},
+			exp:  []byte{0x66, 0xf, 0xe5, 0xd1},
+		},
+		{
+			name: "cmpltps xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CMPEQPS, SrcReg: RegX14, DstReg: RegX1, Arg: 1},
+			exp:  []byte{0x41, 0xf, 0xc2, 0xce, 0x1},
+		},
+		{
+			name: "cmpunordpd xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CMPEQPD, SrcReg: RegX14, DstReg: RegX1, Arg: 3},
+			exp:  []byte{0x66, 0x41, 0xf, 0xc2, 0xce, 0x3},
+		},
+		{
+			name: "cvttps2dq xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTTPS2DQ, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0xf3, 0x41, 0xf, 0x5b, 0xce},
+		},
+		{
+			name: "cvtdq2ps xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTDQ2PS, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x41, 0xf, 0x5b, 0xce},
+		},
+		{
+			name: "movupd xmm1, xmm14",
+			n:    &NodeImpl{Instruction: MOVUPD, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x10, 0xce},
+		},
+		{
+			name: "shufps xmm1, xmm14, 5",
+			n:    &NodeImpl{Instruction: SHUFPS, SrcReg: RegX14, DstReg: RegX1, Arg: 5},
+			exp:  []byte{0x41, 0xf, 0xc6, 0xce, 0x5},
+		},
+		{
+			name: "pmaddwd xmm1, xmm14",
+			n:    &NodeImpl{Instruction: PMADDWD, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0xf5, 0xce},
+		},
+		{
+			name: "cvtdq2pd xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTDQ2PD, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0xf3, 0x41, 0xf, 0xe6, 0xce},
+		},
+		{
+			name: "unpcklps xmm1, xmm14",
+			n:    &NodeImpl{Instruction: UNPCKLPS, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x41, 0xf, 0x14, 0xce},
+		},
+		{
+			name: "packuswb xmm1, xmm14",
+			n:    &NodeImpl{Instruction: PACKUSWB, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x67, 0xce},
+		},
+		{
+			name: "packssdw xmm1, xmm14",
+			n:    &NodeImpl{Instruction: PACKSSDW, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x6b, 0xce},
+		},
+		{
+			name: "packusdw xmm1, xmm14",
+			n:    &NodeImpl{Instruction: PACKUSDW, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x2b, 0xce},
+		},
+		{
+			name: "cvtps2pd xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTPS2PD, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x41, 0xf, 0x5a, 0xce},
+		},
+		{
+			name: "cvtpd2ps xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTPD2PS, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x5a, 0xce},
+		},
+		{
+			name: "pmaddubsw xmm1, xmm14",
+			n:    &NodeImpl{Instruction: PMADDUBSW, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0x38, 0x4, 0xce},
+		},
+		{
+			name: "cvttpd2dq xmm1, xmm14",
+			n:    &NodeImpl{Instruction: CVTTPD2DQ, SrcReg: RegX14, DstReg: RegX1},
+			exp:  []byte{0x66, 0x41, 0xf, 0xe6, 0xce},
 		},
 	}
 
@@ -1020,6 +1459,16 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 				DstReg:      RegX10,
 			},
 			exp: []byte{0x66, 0x41, 0xf, 0x71, 0xf2, 0x8},
+		},
+		{
+			name: "psrad xmm10, 0x1f",
+			n: &NodeImpl{
+				Instruction: PSRAD,
+				Types:       OperandTypesRegisterToRegister,
+				SrcConst:    0x1f,
+				DstReg:      RegX10,
+			},
+			exp: []byte{0x66, 0x41, 0xf, 0x72, 0xe2, 0x1f},
 		},
 	}
 

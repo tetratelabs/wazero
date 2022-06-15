@@ -1814,33 +1814,7 @@ func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 
 // compileNearest implements compiler.compileNearest for the amd64 architecture.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
-	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
-	// If we compile the following Wat by "wasmtime wasm2obj",
-	//
-	// (module
-	//   (func (export "nearest_f32") (param $x f32) (result f32) (f32.nearest (local.get $x)))
-	//   (func (export "nearest_f64") (param $x f64) (result f64) (f64.nearest (local.get $x)))
-	// )
-	//
-	// we see a disassemble of the object via "objdump --disassemble-all" like:
-	//
-	// 0000000000000000 <_wasm_function_0>:
-	// 	0:       55                      push   %rbp
-	// 	1:       48 89 e5                mov    %rsp,%rbp
-	// 	4:       66 0f 3a 0a c0 00       roundss $0x0,%xmm0,%xmm0
-	// 	a:       48 89 ec                mov    %rbp,%rsp
-	// 	d:       5d                      pop    %rbp
-	// 	e:       c3                      retq
-	//
-	// 000000000000000f <_wasm_function_1>:
-	// 	f:        55                      push   %rbp
-	//  10:       48 89 e5                mov    %rsp,%rbp
-	//  13:       66 0f 3a 0b c0 00       roundsd $0x0,%xmm0,%xmm0
-	//  19:       48 89 ec                mov    %rbp,%rsp
-	//  1c:       5d                      pop    %rbp
-	//  1d:       c3                      retq
-	//
-	// Below, we use the same implementation: "rounds{s,d} $0x0,%xmm0,%xmm0" where the mode is set to zero.
+	// Nearest can be performed via ROUND instruction with 0x00 mode.
 	return c.compileRoundInstruction(o.Type == wazeroir.Float32, 0x00)
 }
 
@@ -1886,7 +1860,7 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 // Native min/max instructions return non-NaN value if exactly one of target values
 // is NaN. For example native_{min,max}(5.0, NaN) returns always 5.0, not NaN.
 // However, WebAssembly specifies that min/max must always return NaN if one of values is NaN.
-// Therefore in this function, we have to add conditional jumps to check if one of values is NaN before
+// Therefore, in this function, we have to add conditional jumps to check if one of values is NaN before
 // the native min/max, which is why we cannot simply emit a native min/max instruction here.
 //
 // For the semantics, see wazeroir.Min and wazeroir.Max for detail.
@@ -4675,7 +4649,7 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 }
 
 func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
-	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), amd64ReservedRegisterForCallEngine, callEngineExitContextnativeCallStatusCodeOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), amd64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
 
 	// Write back the cached SP to the actual eng.stackPointer.
 	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp), amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)

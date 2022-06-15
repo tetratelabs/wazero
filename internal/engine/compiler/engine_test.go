@@ -46,7 +46,7 @@ func TestCompiler_VerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
 
 	// Offsets for callEngine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextnativeCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.
