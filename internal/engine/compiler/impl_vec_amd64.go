@@ -2544,7 +2544,7 @@ var (
 	//
 	// Note: the name twop52 is common across various compiler ecosystem.
 	// 	E.g. https://github.com/llvm/llvm-project/blob/92ab024f81e5b64e258b7c3baaf213c7c26fcf40/compiler-rt/lib/builtins/floatdidf.c#L28
-	//  E.g. https://opensource.apple.com/source/clang/clang-425.0.24/src/projects/compiler-rt/lib/floatdidf.c.auto.html
+	// 	E.g. https://opensource.apple.com/source/clang/clang-425.0.24/src/projects/compiler-rt/lib/floatdidf.c.auto.html
 	twop52 = [16]byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x43, // float64(0x1.0p52)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x43, // float64(0x1.0p52)

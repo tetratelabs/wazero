@@ -15,7 +15,7 @@ type Register byte
 const NilRegister Register = 0
 
 // Instruction represents architecture-specific instructions.
-type Instruction uint16
+type Instruction uint16 // to accommodate the high cardinality of vector ops
 
 // ConditionalRegisterState represents architecture-specific conditional
 // register's states.
