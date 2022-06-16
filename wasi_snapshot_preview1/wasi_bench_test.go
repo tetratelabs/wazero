@@ -21,11 +21,11 @@ var testMem = &wasm.MemoryInstance{
 	},
 }
 
-func Test_EnvironGet(t *testing.T) {
-	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
+func Test_Benchmark_EnvironGet(t *testing.T) {
+	sysCtx, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	mod := newModule(make([]byte, 20), sys)
+	mod := newModule(make([]byte, 20), sysCtx)
 	environGet := (&wasi{}).EnvironGet
 
 	require.Equal(t, ErrnoSuccess, environGet(testCtx, mod, 11, 1))
@@ -33,7 +33,7 @@ func Test_EnvironGet(t *testing.T) {
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
+	sysCtx, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 		1, 0, 0, 0, // little endian-encoded offset of "a=b"
 		5, 0, 0, 0, // little endian-encoded offset of "b=cd"
 		0,
-	}, sys)
+	}, sysCtx)
 
 	environGet := (&wasi{}).EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {

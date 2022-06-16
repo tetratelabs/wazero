@@ -157,6 +157,7 @@ func (m *MemoryInstance) WriteUint16Le(_ context.Context, offset uint32, v uint1
 
 // WriteUint32Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteUint32Le(_ context.Context, offset, v uint32) bool {
+	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
 
 	return m.writeUint32Le(offset, v)
 }

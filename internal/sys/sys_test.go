@@ -23,6 +23,7 @@ func TestDefaultSysContext(t *testing.T) {
 		nil,    // randSource
 		nil, 0, // walltime, walltimeResolution
 		nil, 0, // nanotime, nanotimeResolution
+		nil, // nanosleep
 		nil, // openedFiles
 	)
 	require.NoError(t, err)
@@ -42,7 +43,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Zero(t, sysCtx.Nanotime(testCtx)) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, rand.Reader, sysCtx.RandSource())
-	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS())
+	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS(testCtx))
 }
 
 func TestNewContext_Args(t *testing.T) {
@@ -93,6 +94,7 @@ func TestNewContext_Args(t *testing.T) {
 				nil,                              // randSource
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {
@@ -154,6 +156,7 @@ func TestNewContext_Environ(t *testing.T) {
 				nil,                              // randSource
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {
@@ -201,6 +204,7 @@ func TestNewContext_Walltime(t *testing.T) {
 				nil,                    // randSource
 				tc.time, tc.resolution, // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {
@@ -248,6 +252,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 				nil,    // randSource
 				nil, 0, // nanotime, nanotimeResolution
 				tc.time, tc.resolution, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			)
 			if tc.expectedErr == "" {

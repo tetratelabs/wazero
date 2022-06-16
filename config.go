@@ -496,6 +496,27 @@ type ModuleConfig interface {
 	// See WithNanotime
 	WithSysNanotime() ModuleConfig
 
+	// WithNanosleep configures the how to pause the current goroutine for at
+	// least the configured nanoseconds. Defaults to return immediately.
+	//
+	// Ex. To override with your own sleep function:
+	//	moduleConfig = moduleConfig.
+	//		WithNanosleep(func(ctx context.Context, ns int64) {
+	//			rel := unix.NsecToTimespec(ns)
+	//			remain := unix.Timespec{}
+	//			for { // loop until no more time remaining
+	//				err := unix.ClockNanosleep(unix.CLOCK_MONOTONIC, 0, &rel, &remain)
+	//			--snip--
+	//
+	// Note: This does not default to time.Sleep as that violates sandboxing.
+	// Use WithSysNanosleep for a usable implementation.
+	WithNanosleep(sys.Nanosleep) ModuleConfig
+
+	// WithSysNanosleep uses time.Sleep for sys.Nanosleep.
+	//
+	// See WithNanosleep
+	WithSysNanosleep() ModuleConfig
+
 	// WithRandSource configures a source of random bytes. Defaults to crypto/rand.Reader.
 	//
 	// This reader is most commonly used by the functions like "random_get" in "wasi_snapshot_preview1" or "seed" in
@@ -530,6 +551,7 @@ type moduleConfig struct {
 	walltimeResolution sys.ClockResolution
 	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
+	nanosleep          *sys.Nanosleep
 	args               []string
 	// environ is pair-indexed to retain order similar to os.Environ.
 	environ []string
@@ -650,6 +672,18 @@ func (c *moduleConfig) WithSysNanotime() ModuleConfig {
 	return c.WithNanotime(platform.Nanotime, sys.ClockResolution(1))
 }
 
+// WithNanosleep implements ModuleConfig.WithNanosleep
+func (c *moduleConfig) WithNanosleep(nanosleep sys.Nanosleep) ModuleConfig {
+	ret := *c // copy
+	ret.nanosleep = &nanosleep
+	return &ret
+}
+
+// WithSysNanosleep implements ModuleConfig.WithSysNanosleep
+func (c *moduleConfig) WithSysNanosleep() ModuleConfig {
+	return c.WithNanosleep(platform.Nanosleep)
+}
+
 // WithRandSource implements ModuleConfig.WithRandSource
 func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 	ret := c.clone()
@@ -698,6 +732,7 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.randSource,
 		c.walltime, c.walltimeResolution,
 		c.nanotime, c.nanotimeResolution,
+		c.nanosleep,
 		preopens,
 	)
 }

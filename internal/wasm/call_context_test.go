@@ -144,14 +144,15 @@ func TestCallContext_Close(t *testing.T) {
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
 		sysCtx := sys.DefaultContext()
-		sysCtx.FS().OpenFile(&sys.FileEntry{Path: "."})
+		fsCtx := sysCtx.FS(testCtx)
+
+		fsCtx.OpenFile(&sys.FileEntry{Path: "."})
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
 
 		// We use side effects to determine if Close in fact called Context.Close (without repeating sys_test.go).
 		// One side effect of Context.Close is that it clears the openedFiles map. Verify our base case.
-		fsCtx := sysCtx.FS()
 		_, ok := fsCtx.OpenedFile(3)
 		require.True(t, ok, "sysCtx.openedFiles was empty")
 
@@ -169,7 +170,9 @@ func TestCallContext_Close(t *testing.T) {
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		sysCtx := sys.DefaultContext()
-		sysCtx.FS().OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
+		fsCtx := sysCtx.FS(testCtx)
+
+		fsCtx.OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -177,7 +180,7 @@ func TestCallContext_Close(t *testing.T) {
 		require.EqualError(t, m.Close(testCtx), "error closing")
 
 		// Verify our intended side-effect
-		_, ok := sysCtx.FS().OpenedFile(3)
+		_, ok := fsCtx.OpenedFile(3)
 		require.False(t, ok, "expected no opened files")
 	})
 }

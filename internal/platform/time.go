@@ -37,6 +37,10 @@ func NewFakeNanotime() *sys.Nanotime {
 	return &nt
 }
 
+// FakeNanosleep implements sys.Nanosleep by returning without sleeping.
+func FakeNanosleep(context.Context, int64) {
+}
+
 // Walltime implements sys.Walltime with time.Now.
 //
 // Note: This is only notably less efficient than it could be is reading
@@ -65,4 +69,9 @@ func nanotimePortable() int64 {
 // and time.Since if not.
 func Nanotime(context.Context) int64 {
 	return nanotime()
+}
+
+// Nanosleep implements sys.Nanosleep with time.Sleep.
+func Nanosleep(_ context.Context, ns int64) {
+	time.Sleep(time.Duration(ns))
 }

@@ -325,6 +325,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -341,7 +342,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // randSource
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -358,7 +359,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                // randSource
 				&wt, 1,             // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -375,7 +376,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                 // randSource
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -392,7 +393,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,             // randSource
 				&wt, 1,          // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -409,6 +410,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -425,7 +427,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // randSource
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -442,7 +444,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                      // randSource
 				&wt, 1,                   // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -459,7 +461,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,                     // randSource
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				nil, // openedFiles
 			),
 		},
@@ -476,7 +478,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-
+				nil, // nanosleep
 				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS},
@@ -496,6 +498,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS2},
 					4: {Path: ".", FS: testFS2},
@@ -515,6 +518,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 				},
@@ -533,6 +537,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: "/", FS: testFS},
 					4: {Path: ".", FS: testFS2},
@@ -552,6 +557,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
 				map[uint32]*internalsys.FileEntry{ // openedFiles
 					3: {Path: ".", FS: testFS},
 					4: {Path: "/", FS: testFS2},
@@ -820,6 +826,7 @@ func requireSysContext(
 	randSource io.Reader,
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
+	nanosleep *sys.Nanosleep,
 	openedFiles map[uint32]*internalsys.FileEntry,
 ) *internalsys.Context {
 	sysCtx, err := internalsys.NewContext(
@@ -832,6 +839,7 @@ func requireSysContext(
 		randSource,
 		walltime, walltimeResolution,
 		nanotime, nanotimeResolution,
+		nanosleep,
 		openedFiles,
 	)
 	require.NoError(t, err)
