@@ -487,8 +487,11 @@ type ModuleConfig interface {
 	//			return clock.nanotime()
 	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
 	//
-	// Note: This does not default to time.Since as that violates sandboxing.
-	// Use WithSysNanotime for a usable implementation.
+	// Notes:
+	//	* This does not default to time.Since as that violates sandboxing.
+	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//	* If you set this, you should probably set WithNanosleep also.
+	//	* Use WithSysNanotime for a usable implementation.
 	WithNanotime(sys.Nanotime, sys.ClockResolution) ModuleConfig
 
 	// WithSysNanotime uses time.Now for sys.Nanotime with a resolution of 1us.
@@ -508,8 +511,12 @@ type ModuleConfig interface {
 	//				err := unix.ClockNanosleep(unix.CLOCK_MONOTONIC, 0, &rel, &remain)
 	//			--snip--
 	//
-	// Note: This does not default to time.Sleep as that violates sandboxing.
-	// Use WithSysNanosleep for a usable implementation.
+	// Notes:
+	//	* This primarily supports `poll_oneoff` for relative clock events.
+	//	* This does not default to time.Sleep as that violates sandboxing.
+	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//	* If you set this, you should probably set WithNanotime also.
+	//	* Use WithSysNanosleep for a usable implementation.
 	WithNanosleep(sys.Nanosleep) ModuleConfig
 
 	// WithSysNanosleep uses time.Sleep for sys.Nanosleep.

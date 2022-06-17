@@ -417,7 +417,7 @@ is to satisfy WASI:
 
 See https://github.com/WebAssembly/wasi-clocks
 
-## Why default to fake time?
+### Why default to fake time?
 
 WebAssembly has an implicit design pattern of capabilities based security. By
 defaulting to a fake time, we reduce the chance of timing attacks, at the cost
@@ -425,7 +425,7 @@ of requiring configuration to opt-into real clocks.
 
 See https://gruss.cc/files/fantastictimers.pdf for an example attacks.
 
-## Why does fake time increase on reading?
+### Why does fake time increase on reading?
 
 Both the fake nanotime and walltime increase by 1ms on reading. Particularly in
 the case of nanotime, this prevents spinning. For example, when Go compiles
@@ -433,7 +433,7 @@ the case of nanotime, this prevents spinning. For example, when Go compiles
 never increases, the gouroutine is mistaken for being busy. This would be worse
 if a compiler implement sleep using nanotime, yet doesn't check for spinning!
 
-## Why not `time.Clock`?
+### Why not `time.Clock`?
 
 wazero can't use `time.Clock` as a plugin for clock implementation as it is
 only substitutable with build flags (`faketime`) and conflates wall and
@@ -472,6 +472,30 @@ to a POSIX method.
 
 Writing assembly would allow making syscalls without CGO, but comes with the cost that it will require implementations
 across many combinations of OS and architecture.
+
+## sys.Nanosleep
+
+All major programming languages have a `sleep` mechanism to block for a
+duration. Sleep is typically implemented by a WASI `poll_oneoff` relative clock
+subscription.
+
+For example, the below ends up calling `wasi_snapshot_preview1.poll_oneoff`:
+
+```zig
+const std = @import("std");
+pub fn main() !void {
+    std.time.sleep(std.time.ns_per_s * 5);
+}
+```
+
+Besides Zig, this is also the case with TinyGo (`-target=wasi`) and Rust
+(`--target wasm32-wasi`). This isn't the case with Go (`GOOS=js GOARCH=wasm`),
+though. In the latter case, wasm loops on `sys.Nanotime`.
+
+We decided to expose `sys.Nanosleep` to allow overriding the implementation
+used in the common case, even if it isn't used by Go, because this gives an
+easy and efficient closure over a common program function. We also documented
+`sys.Nanotime` to warn users that some compilers don't optimize sleep.
 
 ## Signed encoding of integer global constant initializers
 wazero treats integer global constant initializers signed as their interpretation is not known at declaration time. For
