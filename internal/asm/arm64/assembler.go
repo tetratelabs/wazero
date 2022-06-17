@@ -107,7 +107,7 @@ type Assembler interface {
 
 	// CompileVectorRegisterToVectorRegisterWithConst is the same as CompileVectorRegisterToVectorRegister but the
 	// additional constant can be provided.
-	// For example, the const can be used to specify the shift amount for USHLL instruction.
+	// For example, the const can be used to specify the shift amount for USHLLIMM instruction.
 	CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg, dstReg asm.Register,
 		arrangement VectorArrangement, c asm.ConstantValue)
 
@@ -115,4 +115,15 @@ type Assembler interface {
 	// the memory and the destination is the dstReg.
 	CompileLoadStaticConstToVectorRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register,
 		arrangement VectorArrangement)
+
+	// CompileTwoVectorRegistersToVectorRegister adds an instruction where source are two vectors and destination is one
+	// vector. The vector's arrangement can be specified `arrangement`.
+	CompileTwoVectorRegistersToVectorRegister(instruction asm.Instruction, srcReg, srcReg2, dstReg asm.Register,
+		arrangement VectorArrangement)
+
+	// CompileTwoVectorRegistersToVectorRegisterWithConst is the same as CompileTwoVectorRegistersToVectorRegister except
+	// that this also accept additional constant.
+	// For example EXIT instruction needs the extraction target immediate as const.
+	CompileTwoVectorRegistersToVectorRegisterWithConst(instruction asm.Instruction, srcReg, srcReg2, dstReg asm.Register,
+		arrangement VectorArrangement, c asm.ConstantValue)
 }

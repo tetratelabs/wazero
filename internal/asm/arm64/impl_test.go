@@ -37,16 +37,16 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "NOP",
 		},
 		{
-			in:  &NodeImpl{Instruction: BEQ, Types: OperandTypesNoneToRegister, DstReg: RegR1},
-			exp: "BEQ R1",
+			in:  &NodeImpl{Instruction: BCONDEQ, Types: OperandTypesNoneToRegister, DstReg: RegR1},
+			exp: "BCONDEQ R1",
 		},
 		{
-			in:  &NodeImpl{Instruction: BNE, Types: OperandTypesNoneToMemory, DstReg: RegR1, DstConst: 0x1234},
-			exp: "BNE [R1 + 0x1234]",
+			in:  &NodeImpl{Instruction: BCONDNE, Types: OperandTypesNoneToMemory, DstReg: RegR1, DstConst: 0x1234},
+			exp: "BCONDNE [R1 + 0x1234]",
 		},
 		{
-			in:  &NodeImpl{Instruction: BNE, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: NOP}},
-			exp: "BNE {NOP}",
+			in:  &NodeImpl{Instruction: BCONDNE, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: NOP}},
+			exp: "BCONDNE {NOP}",
 		},
 		{
 			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: RegV0, DstReg: RegV10},
@@ -229,9 +229,9 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
-	a.CompileJumpToRegister(BNE, RegR27)
+	a.CompileJumpToRegister(BCONDNE, RegR27)
 	actualNode := a.Current
-	require.Equal(t, BNE, actualNode.Instruction)
+	require.Equal(t, BCONDNE, actualNode.Instruction)
 	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
@@ -239,9 +239,9 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 
 func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
-	a.CompileJumpToMemory(BNE, RegR27)
+	a.CompileJumpToMemory(BCONDNE, RegR27)
 	actualNode := a.Current
-	require.Equal(t, BNE, actualNode.Instruction)
+	require.Equal(t, BCONDNE, actualNode.Instruction)
 	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
@@ -451,6 +451,19 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
 	require.Equal(t, VectorIndex(1), actualNode.SrcVectorIndex)
 	require.Equal(t, VectorIndex(2), actualNode.DstVectorIndex)
+}
+
+func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
+	a := NewAssemblerImpl(RegR10)
+	a.CompileTwoVectorRegistersToVectorRegister(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.Instruction)
+	require.Equal(t, RegV3, actualNode.SrcReg)
+	require.Equal(t, RegV15, actualNode.SrcReg2)
+	require.Equal(t, RegV10, actualNode.DstReg)
+	require.Equal(t, OperandTypeTwoVectorRegisters, actualNode.Types.src)
+	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
 }
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
@@ -876,70 +889,257 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		srcIndex, dstIndex VectorIndex
 		exp                []byte
 	}{
-		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
+			inst: ZIP1,
+			name: "zip1 v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x39, 0x2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			inst: ADDV,
+			name: "addv b10, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0xb8, 0x31, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			inst: VORR,
+			name: "orr v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0xa2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			inst: VORR,
+			name: "orr v10.8b, v10.8b, v2.8b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement8B,
+			exp:  []byte{0x4a, 0x1d, 0xa2, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fadd v10.2d, v10.2d, v2.2d",
 			x1:   RegV2,
 			x2:   RegV10,
 			inst: VFADDD,
-			exp: []byte{
-				0x4a, 0xd4, 0x6a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-			},
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0xd5, 0x62, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
+			name: "fadd v10.4s, v10.4s, v2.4s",
 			x1:   RegV2,
 			x2:   RegV10,
 			inst: VFADDS,
-			exp: []byte{
-				0x4a, 0xd4, 0x2a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-			},
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0xd5, 0x22, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
+			name: "fsub v10.2d, v10.2d, v2.2d",
 			x1:   RegV2,
 			x2:   RegV10,
 			inst: VFSUBD,
-			exp: []byte{
-				0x4a, 0xd4, 0xea, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-			},
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0xd5, 0xe2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
+			name: "fsub v10.4s, v10.4s, v2.4s",
 			x1:   RegV2,
 			x2:   RegV10,
 			inst: VFSUBS,
-			exp: []byte{
-				0x4a, 0xd4, 0xaa, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-			},
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0xd5, 0xa2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
+			name: "ushll v10.8h, v2.8b, #0",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL,
+			inst: USHLLIMM,
+			exp:  []byte{0x4a, 0xa4, 0x8, 0x2f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8B,
+		},
+		{
+			name: "ushll v10.8h, v2.8b, #7",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: USHLLIMM,
+			exp:  []byte{0x4a, 0xa4, 0xf, 0x2f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8B,
+			c:    7,
+		},
+		{
+			name: "10.8h, v2.8b, #0",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x8, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement16B,
+			c:    8,
+		},
+		{
+			name: "sshr v10.16b, v2.16b, #3",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0xd, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement16B,
+			c:    3,
+		},
+		{
+			name: "sshr v10.16b, v2.16b, #1",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0xf, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement16B,
+			c:    1,
+		},
+		{
+			name: "sshr v10.8b, v2.8b, #3",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0xd, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8B,
+			c:    3,
+		},
+		{
+			name: "sshr v10.8h, v2.8h, #0x10",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x10, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8H,
+			c:    16,
+		},
+		{
+			name: "sshr v10.8h, v2.8h, #0xf",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x11, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8H,
+			c:    15,
+		},
+		{
+			name: "sshr v10.8h, v2.8h, #3",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x1d, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8H,
+			c:    3,
+		},
+		{
+			name: "sshr v10.4h, v2.4h, #0xf",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x11, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement4H,
+			c:    15,
+		},
+		{
+			name: "sshr v10.2s, v2.2s, #0x20",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x20, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2S,
+			c:    32,
+		},
+		{
+			name: "sshr v10.2s, v2.2s, #0x1f",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x21, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2S,
+			c:    31,
+		},
+		{
+			name: "sshr v10.2s, v2.2s, #7",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x39, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2S,
+			c:    7,
+		},
+		{
+			name: "sshr v10.4s, v2.4s, #7",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x39, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement4S,
+			c:    7,
+		},
+		{
+			name: "sshr v10.2d, v2.2d, #0x3f",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x41, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2D,
+			c:    63,
+		},
+		{
+			name: "sshr v10.2d, v2.2d, #0x21",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x5f, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2D,
+			c:    33,
+		},
+		{
+			name: "sshr v10.2d, v2.2d, #1",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHR,
+			exp:  []byte{0x4a, 0x4, 0x7f, 0x4f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2D,
+			c:    1,
+		},
+		{
+			name: "sshll v10.8h, v2.8b, #0",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: SSHLLIMM,
 			exp: []byte{
 				0x4a, 0xa4, 0x8, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
 			arr: VectorArrangement8B,
 		},
 		{
+			name: "sshll v10.8h, v2.8b, #7",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL, exp: []byte{
+			inst: SSHLLIMM, exp: []byte{
 				0x4a, 0xa4, 0xf, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
 			arr: VectorArrangement8B,
 			c:   7,
 		},
 		{
+			name: "sshll v10.4s, v2.4h, #0",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL,
+			inst: SSHLLIMM,
 			exp: []byte{
 				0x4a, 0xa4, 0x10, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
 			arr: VectorArrangement4H,
 		},
 		{
+			name: "sshll v10.4s, v2.4h, #0xf",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL,
+			inst: SSHLLIMM,
 			exp: []byte{
 				0x4a, 0xa4, 0x1f, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
@@ -947,18 +1147,20 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			c:   15,
 		},
 		{
+			name: "sshll v10.2d, v2.2s, #0",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL,
+			inst: SSHLLIMM,
 			exp: []byte{
 				0x4a, 0xa4, 0x20, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
 			arr: VectorArrangement2S,
 		},
 		{
+			name: "sshll v10.2d, v2.2s, #0x1f",
 			x1:   RegV2,
 			x2:   RegV10,
-			inst: SSHLL,
+			inst: SSHLLIMM,
 			exp: []byte{
 				0x4a, 0xa4, 0x3f, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 			},
@@ -969,7 +1171,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "ins v10.s[2], v2.s[1]",
-			inst:     VMOV,
+			inst:     INSELEM,
 			exp:      []byte{0x4a, 0x24, 0x14, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementS,
 			srcIndex: 1,
@@ -979,7 +1181,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "ins v10.s[0], v2.s[3]",
-			inst:     VMOV,
+			inst:     INSELEM,
 			exp:      []byte{0x4a, 0x64, 0x4, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementS,
 			srcIndex: 3,
@@ -989,7 +1191,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "ins v10.b[0], v2.b[0xf]",
-			inst:     VMOV,
+			inst:     INSELEM,
 			exp:      []byte{0x4a, 0x7c, 0x1, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementB,
 			srcIndex: 15,
@@ -999,7 +1201,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "ins v10.d[1], v2.d[0]",
-			inst:     VMOV,
+			inst:     INSELEM,
 			exp:      []byte{0x4a, 0x4, 0x18, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementD,
 			srcIndex: 0,
@@ -1009,7 +1211,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "dup v10.2d, v2.d[0]",
-			inst:     DUP,
+			inst:     DUPELEM,
 			exp:      []byte{0x4a, 0x4, 0x8, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementD,
 			srcIndex: 0,
@@ -1018,7 +1220,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "dup v10.2d, v2.d[1]",
-			inst:     DUP,
+			inst:     DUPELEM,
 			exp:      []byte{0x4a, 0x4, 0x18, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementD,
 			srcIndex: 1,
@@ -1027,7 +1229,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "dup v10.4s, v2.s[3]",
-			inst:     DUP,
+			inst:     DUPELEM,
 			exp:      []byte{0x4a, 0x4, 0x1c, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementS,
 			srcIndex: 3,
@@ -1036,7 +1238,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "dup v10.8h, v2.h[7]",
-			inst:     DUP,
+			inst:     DUPELEM,
 			exp:      []byte{0x4a, 0x4, 0x1e, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementH,
 			srcIndex: 7,
@@ -1045,7 +1247,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			x1:       RegV2,
 			x2:       RegV10,
 			name:     "dup v10.16b, v2.b[0xf]",
-			inst:     DUP,
+			inst:     DUPELEM,
 			exp:      []byte{0x4a, 0x4, 0x1f, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:      VectorArrangementB,
 			srcIndex: 15,
@@ -1053,25 +1255,25 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "umaxp v10.16b, v2.16b, v10.16b",
+			name: "umaxp v10.16b, v10.16b, v2.16b",
 			inst: UMAXP,
-			exp:  []byte{0x4a, 0xa4, 0x2a, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			exp:  []byte{0x4a, 0xa5, 0x22, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement16B,
 		},
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "umaxp v10.8h, v2.8h, v10.8h",
+			name: "umaxp v10.8h, v10.8h, v2.8h",
 			inst: UMAXP,
-			exp:  []byte{0x4a, 0xa4, 0x6a, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			exp:  []byte{0x4a, 0xa5, 0x62, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement8H,
 		},
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "umaxp v10.4s, v2.8h, v10.4s",
+			name: "umaxp v10.4s, v10.4s, v2.4s",
 			inst: UMAXP,
-			exp:  []byte{0x4a, 0xa4, 0xaa, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			exp:  []byte{0x4a, 0xa5, 0xa2, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement4S,
 		},
 		{
@@ -1080,30 +1282,29 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			name: "addp d11, v11.2d",
 			inst: ADDP,
 			exp:  []byte{0x6b, 0xb9, 0xf1, 0x5e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-			arr:  VectorArrangementD,
 		},
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "addp v10.16b, v2.16b, v10.16b",
-			inst: ADDP,
-			exp:  []byte{0x4a, 0xbc, 0x2a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			name: "addp v10.16b, v10.16b, v2.16b",
+			inst: VADDP,
+			exp:  []byte{0x4a, 0xbd, 0x22, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement16B,
 		},
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "addp v10.8h, v2.8h, v10.8h",
-			inst: ADDP,
-			exp:  []byte{0x4a, 0xbc, 0x6a, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			name: "addp v10.8h, v10.8h, v2.8h",
+			inst: VADDP,
+			exp:  []byte{0x4a, 0xbd, 0x62, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement8H,
 		},
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "addp v10.4s, v2.8h, v10.4s",
-			inst: ADDP,
-			exp:  []byte{0x4a, 0xbc, 0xaa, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			name: "addp v10.4s, v10.4s, v2.4s",
+			inst: VADDP,
+			exp:  []byte{0x4a, 0xbd, 0xa2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 			arr:  VectorArrangement4S,
 		},
 		{
@@ -1133,15 +1334,17 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		{
 			x1:   RegV2,
 			x2:   RegV10,
-			name: "cmeq v10.2d, v2.2d, v10.2d",
+			name: "cmeq v10.2d, v10.2d, v2.2d",
+			arr:  VectorArrangement2D,
 			inst: CMEQ,
-			exp:  []byte{0x4a, 0x8c, 0xea, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			exp:  []byte{0x4a, 0x8d, 0xe2, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			x1:   RegRZR,
 			x2:   RegV30,
 			name: "cmeq v30.2d, v30.2d, #0",
-			inst: CMEQ,
+			inst: CMEQZERO,
+			arr:  VectorArrangement2D,
 			exp:  []byte{0xde, 0x9b, 0xe0, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
@@ -1176,6 +1379,135 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			arr:  VectorArrangement16B,
 			exp:  []byte{0xe1, 0x23, 0x1, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
+		{
+			x1:   RegV2,
+			x2:   RegV10,
+			name: "add v10.4s, v10.4s, v2.4s",
+			inst: VADD,
+			exp:  []byte{0x4a, 0x85, 0xa2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement4S,
+		},
+		{
+			x1:   RegV2,
+			x2:   RegV10,
+			name: "add v10.2d, v10.2d, v2.2d",
+			inst: VADD,
+			exp:  []byte{0x4a, 0x85, 0xe2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2D,
+		},
+		{
+			x1:   RegV2,
+			x2:   RegV10,
+			name: "sub v10.8h, v10.8h, v2.8h",
+			inst: VSUB,
+			exp:  []byte{0x4a, 0x85, 0x62, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8H,
+		},
+		{
+			x1:   RegV29,
+			x2:   RegV30,
+			name: "sub v30.16b, v30.16b, v29.16b",
+			inst: VSUB,
+			exp:  []byte{0xde, 0x87, 0x3d, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement16B,
+		},
+		{
+			name: "bic v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: BIC,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0x62, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "eor v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: EOR,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0x22, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "bsl v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: BSL,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0x62, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "bsl v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: BSL,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0x62, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and v10.16b, v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: VAND,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x1d, 0x22, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			// mvn is an alias of NOT: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MVN--Bitwise-NOT--vector---an-alias-of-NOT-?lang=en
+			name: "mvn v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: NOT,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x58, 0x20, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fneg v10.2d, v2.2d",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: VFNEG,
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0xf8, 0xe0, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fneg v10.4s, v2.4s",
+			x1:   RegV2,
+			x2:   RegV10,
+			inst: VFNEG,
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0xf8, 0xa0, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			x1:   RegV2,
+			x2:   RegV10,
+			name: "sshl v10.2d, v10.2d, v2.2d",
+			inst: SSHL,
+			exp:  []byte{0x4a, 0x45, 0xe2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement2D,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "sshl v30.4s, v30.4s, v25.4s",
+			inst: SSHL,
+			exp:  []byte{0xde, 0x47, 0xb9, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement4S,
+		},
+		{
+			x1:   RegV2,
+			x2:   RegV10,
+			name: "ushl v10.8h, v10.8h, v2.8h",
+			inst: USHL,
+			exp:  []byte{0x4a, 0x45, 0x62, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement8H,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "ushl v30.16b, v30.16b, v25.16b",
+			inst: USHL,
+			exp:  []byte{0xde, 0x47, 0x39, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			arr:  VectorArrangement16B,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1208,9 +1540,42 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	}{
 		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
+			name: "umov w10, v0.b[0xf]",
+			n: &NodeImpl{
+				Instruction:       UMOV,
+				SrcReg:            RegV0,
+				DstReg:            RegR10,
+				VectorArrangement: VectorArrangementB,
+				SrcVectorIndex:    15,
+			},
+			exp: []byte{0xa, 0x3c, 0x1f, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "mov w10, v0.s[3]",
+			n: &NodeImpl{
+				Instruction:       UMOV,
+				SrcReg:            RegV0,
+				DstReg:            RegR10,
+				VectorArrangement: VectorArrangementS,
+				SrcVectorIndex:    3,
+			},
+			exp: []byte{0xa, 0x3c, 0x1c, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "mov x5, v30.d[1]",
+			n: &NodeImpl{
+				Instruction:       UMOV,
+				SrcReg:            RegV30,
+				DstReg:            RegR5,
+				VectorArrangement: VectorArrangementD,
+				SrcVectorIndex:    1,
+			},
+			exp: []byte{0xc5, 0x3f, 0x18, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
 			name: "smov w10, v0.b[0xf]",
 			n: &NodeImpl{
-				Instruction:       SMOV,
+				Instruction:       SMOV32,
 				SrcReg:            RegV0,
 				DstReg:            RegR10,
 				VectorArrangement: VectorArrangementB,
@@ -1221,7 +1586,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 		{
 			name: "smov w10, v0.b[0]",
 			n: &NodeImpl{
-				Instruction:       SMOV,
+				Instruction:       SMOV32,
 				SrcReg:            RegV0,
 				DstReg:            RegR10,
 				VectorArrangement: VectorArrangementB,
@@ -1232,7 +1597,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 		{
 			name: "smov w1, v30.h[7]",
 			n: &NodeImpl{
-				Instruction:       SMOV,
+				Instruction:       SMOV32,
 				SrcReg:            RegV30,
 				DstReg:            RegR1,
 				VectorArrangement: VectorArrangementH,
@@ -1243,7 +1608,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 		{
 			name: "smov w1, v30.h[0]",
 			n: &NodeImpl{
-				Instruction:       SMOV,
+				Instruction:       SMOV32,
 				SrcReg:            RegV30,
 				DstReg:            RegR1,
 				VectorArrangement: VectorArrangementH,
@@ -1267,6 +1632,253 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	}
 }
 
+func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
+	tests := []struct {
+		name string
+		n    *NodeImpl
+		exp  []byte
+	}{
+		{
+			name: "orr v30.16b, v10.16b, v1.16b",
+			n: &NodeImpl{
+				Instruction:       VORR,
+				DstReg:            RegV30,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV10,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x5e, 0x1d, 0xa1, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "orr v30.8b, v10.8b, v1.8b",
+			n: &NodeImpl{
+				Instruction:       VORR,
+				DstReg:            RegV30,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV10,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0x5e, 0x1d, 0xa1, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "bsl v0.8b, v15.8b, v1.8b",
+			n: &NodeImpl{
+				Instruction:       BSL,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0xe0, 0x1d, 0x61, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "zip1 v0.4s, v15.4s, v1.4s",
+			n: &NodeImpl{
+				Instruction:       ZIP1,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0xe0, 0x39, 0x81, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "zip1 v0.2d, v15.2d, v1.2d",
+			n: &NodeImpl{
+				Instruction:       ZIP1,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0xe0, 0x39, 0xc1, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "ext v0.16b, v15.16b, v1.16b, #0xf",
+			n: &NodeImpl{
+				Instruction:       EXT,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				SrcConst:          0xf,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xe0, 0x79, 0x1, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "ext v0.16b, v15.16b, v1.16b, #8",
+			n: &NodeImpl{
+				Instruction:       EXT,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				SrcConst:          8,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xe0, 0x41, 0x1, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "ext v0.16b, v15.16b, v1.16b, #0",
+			n: &NodeImpl{
+				Instruction:       EXT,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				SrcConst:          0,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xe0, 0x1, 0x1, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "ext v0.8b, v15.8b, v1.8b, #7",
+			n: &NodeImpl{
+				Instruction:       EXT,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				SrcConst:          7,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0xe0, 0x39, 0x1, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeTwoVectorRegistersToVectorRegister(tc.n)
+			require.NoError(t, err)
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
+	tests := []struct {
+		name string
+		n    *NodeImpl
+		exp  []byte
+	}{
+		{
+			name: "and w30, w30, #1",
+			n: &NodeImpl{
+				Instruction:       ANDIMM32,
+				DstReg:            RegR30,
+				SrcConst:          1,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x3, 0x0, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and w30, w30, #7",
+			n: &NodeImpl{
+				Instruction:       ANDIMM32,
+				DstReg:            RegR30,
+				SrcConst:          0x7,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0xb, 0x0, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and w30, w30, #0xf",
+			n: &NodeImpl{
+				Instruction:       ANDIMM32,
+				DstReg:            RegR30,
+				SrcConst:          0xf,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0xf, 0x0, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and w30, w30, #0x1f",
+			n: &NodeImpl{
+				Instruction:       ANDIMM32,
+				DstReg:            RegR30,
+				SrcConst:          0x1f,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x13, 0x0, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and w30, w30, #0x3f",
+			n: &NodeImpl{
+				Instruction:       ANDIMM32,
+				DstReg:            RegR30,
+				SrcConst:          0x3f,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x17, 0x0, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and x30, x30, #1",
+			n: &NodeImpl{
+				Instruction:       ANDIMM64,
+				DstReg:            RegR30,
+				SrcConst:          1,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x3, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and x30, x30, #7",
+			n: &NodeImpl{
+				Instruction:       ANDIMM64,
+				DstReg:            RegR30,
+				SrcConst:          0x7,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0xb, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and x30, x30, #0xf",
+			n: &NodeImpl{
+				Instruction:       ANDIMM64,
+				DstReg:            RegR30,
+				SrcConst:          0xf,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0xf, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and x30, x30, #0x1f",
+			n: &NodeImpl{
+				Instruction:       ANDIMM64,
+				DstReg:            RegR30,
+				SrcConst:          0x1f,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x13, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "and x30, x30, #0x3f",
+			n: &NodeImpl{
+				Instruction:       ANDIMM64,
+				DstReg:            RegR30,
+				SrcConst:          0x3f,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xde, 0x17, 0x40, 0x92, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeConstToRegister(tc.n)
+			require.NoError(t, err)
+			actual, err := a.Assemble()
+			require.NoError(t, err)
+
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
+	}
+}
+
 func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1275,42 +1887,63 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	}{
 		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
+			name: "ins v10.d[0], x10",
+			n: &NodeImpl{
+				Instruction:       INSGEN,
+				DstReg:            RegV10,
+				SrcReg:            RegR10,
+				VectorArrangement: VectorArrangementD,
+			},
+			exp: []byte{0x4a, 0x1d, 0x8, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "ins v10.d[1], x10",
+			n: &NodeImpl{
+				Instruction:       INSGEN,
+				DstReg:            RegV10,
+				SrcReg:            RegR10,
+				VectorArrangement: VectorArrangementD,
+				DstVectorIndex:    1,
+			},
+			exp: []byte{0x4a, 0x1d, 0x18, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
 			name: "dup v10.2d, x10",
 			n: &NodeImpl{
-				Instruction:       DUP,
+				Instruction:       DUPGEN,
 				SrcReg:            RegR10,
 				DstReg:            RegV10,
-				VectorArrangement: VectorArrangementD,
+				VectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x4a, 0xd, 0x8, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "dup v1.4s, w30",
 			n: &NodeImpl{
-				Instruction:       DUP,
+				Instruction:       DUPGEN,
 				SrcReg:            RegR30,
 				DstReg:            RegV1,
-				VectorArrangement: VectorArrangementS,
+				VectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0xc1, 0xf, 0x4, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "dup v30.8h, w1",
 			n: &NodeImpl{
-				Instruction:       DUP,
+				Instruction:       DUPGEN,
 				SrcReg:            RegR1,
 				DstReg:            RegV30,
-				VectorArrangement: VectorArrangementH,
+				VectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x3e, 0xc, 0x2, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "dup v30.16b, w1",
 			n: &NodeImpl{
-				Instruction:       DUP,
+				Instruction:       DUPGEN,
 				SrcReg:            RegR1,
 				DstReg:            RegV30,
-				VectorArrangement: VectorArrangementB,
+				VectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x3e, 0xc, 0x1, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},

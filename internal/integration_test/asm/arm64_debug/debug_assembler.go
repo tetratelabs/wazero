@@ -309,3 +309,17 @@ func (ta *testAssembler) CompileLoadStaticConstToVectorRegister(instruction asm.
 	ta.goasm.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
 	ta.a.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
 }
+
+// CompileTwoVectorRegistersToVectorRegister implements the same method as documented on arm64.Assembler.
+func (ta *testAssembler) CompileTwoVectorRegistersToVectorRegister(instruction asm.Instruction,
+	srcReg, srcReg2, dstReg asm.Register, arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileTwoVectorRegistersToVectorRegister(instruction, srcReg, srcReg2, dstReg, arrangement)
+	ta.a.CompileTwoVectorRegistersToVectorRegister(instruction, srcReg, srcReg2, dstReg, arrangement)
+}
+
+// CompileTwoVectorRegistersToVectorRegisterWithConst implements the same method as documented on arm64.Assembler.
+func (ta *testAssembler) CompileTwoVectorRegistersToVectorRegisterWithConst(instruction asm.Instruction,
+	srcReg, srcReg2, dstReg asm.Register, arrangement arm64.VectorArrangement, c asm.ConstantValue) {
+	ta.goasm.CompileTwoVectorRegistersToVectorRegisterWithConst(instruction, srcReg, srcReg2, dstReg, arrangement, c)
+	ta.a.CompileTwoVectorRegistersToVectorRegisterWithConst(instruction, srcReg, srcReg2, dstReg, arrangement, c)
+}

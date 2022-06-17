@@ -26,8 +26,7 @@ func TestCompiler(t *testing.T) {
 
 	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures, func(jsonname string) bool {
 		switch path.Base(jsonname) {
-		case "simd_bitwise.json", "simd_boolean.json", "simd_bit_shift.json",
-			"simd_i8x16_cmp.json", "simd_i16x8_cmp.json", "simd_i32x4_cmp.json", "simd_i64x2_cmp.json",
+		case "simd_i8x16_cmp.json", "simd_i16x8_cmp.json", "simd_i32x4_cmp.json", "simd_i64x2_cmp.json",
 			"simd_f32x4_cmp.json", "simd_f64x2_cmp.json", "simd_f32x4_arith.json", "simd_f64x2_arith.json",
 			"simd_i16x8_arith.json", "simd_i64x2_arith.json", "simd_i32x4_arith.json", "simd_i8x16_arith.json",
 			"simd_i16x8_sat_arith.json", "simd_i8x16_sat_arith.json",

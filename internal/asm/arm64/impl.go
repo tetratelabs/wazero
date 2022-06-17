@@ -142,6 +142,7 @@ const (
 	OperandTypeSIMDByte
 	OperandTypeTwoSIMDBytes
 	OperandTypeVectorRegister
+	OperandTypeTwoVectorRegisters
 	OperandTypeStaticConst
 )
 
@@ -172,6 +173,8 @@ func (o OperandType) String() (ret string) {
 		ret = "vector-register"
 	case OperandTypeStaticConst:
 		ret = "static-const"
+	case OperandTypeTwoVectorRegisters:
+		ret = "two-vector-registers"
 	}
 	return
 }
@@ -180,28 +183,29 @@ func (o OperandType) String() (ret string) {
 type OperandTypes struct{ src, dst OperandType }
 
 var (
-	OperandTypesNoneToNone                     = OperandTypes{OperandTypeNone, OperandTypeNone}
-	OperandTypesNoneToRegister                 = OperandTypes{OperandTypeNone, OperandTypeRegister}
-	OperandTypesNoneToMemory                   = OperandTypes{OperandTypeNone, OperandTypeMemory}
-	OperandTypesNoneToBranch                   = OperandTypes{OperandTypeNone, OperandTypeBranch}
-	OperandTypesRegisterToRegister             = OperandTypes{OperandTypeRegister, OperandTypeRegister}
-	OperandTypesLeftShiftedRegisterToRegister  = OperandTypes{OperandTypeLeftShiftedRegister, OperandTypeRegister}
-	OperandTypesTwoRegistersToRegister         = OperandTypes{OperandTypeTwoRegisters, OperandTypeRegister}
-	OperandTypesThreeRegistersToRegister       = OperandTypes{OperandTypeThreeRegisters, OperandTypeRegister}
-	OperandTypesTwoRegistersToNone             = OperandTypes{OperandTypeTwoRegisters, OperandTypeNone}
-	OperandTypesRegisterAndConstToNone         = OperandTypes{OperandTypeRegisterAndConst, OperandTypeNone}
-	OperandTypesRegisterToMemory               = OperandTypes{OperandTypeRegister, OperandTypeMemory}
-	OperandTypesMemoryToRegister               = OperandTypes{OperandTypeMemory, OperandTypeRegister}
-	OperandTypesConstToRegister                = OperandTypes{OperandTypeConst, OperandTypeRegister}
-	OperandTypesSIMDByteToSIMDByte             = OperandTypes{OperandTypeSIMDByte, OperandTypeSIMDByte}
-	OperandTypesSIMDByteToRegister             = OperandTypes{OperandTypeSIMDByte, OperandTypeRegister}
-	OperandTypesTwoSIMDBytesToSIMDByteRegister = OperandTypes{OperandTypeTwoSIMDBytes, OperandTypeSIMDByte}
-	OperandTypesRegisterToVectorRegister       = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
-	OperandTypesVectorRegisterToRegister       = OperandTypes{OperandTypeVectorRegister, OperandTypeRegister}
-	OperandTypesMemoryToVectorRegister         = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
-	OperandTypesVectorRegisterToMemory         = OperandTypes{OperandTypeVectorRegister, OperandTypeMemory}
-	OperandTypesVectorRegisterToVectorRegister = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
-	OperandTypesStaticConstToVectorRegister    = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
+	OperandTypesNoneToNone                         = OperandTypes{OperandTypeNone, OperandTypeNone}
+	OperandTypesNoneToRegister                     = OperandTypes{OperandTypeNone, OperandTypeRegister}
+	OperandTypesNoneToMemory                       = OperandTypes{OperandTypeNone, OperandTypeMemory}
+	OperandTypesNoneToBranch                       = OperandTypes{OperandTypeNone, OperandTypeBranch}
+	OperandTypesRegisterToRegister                 = OperandTypes{OperandTypeRegister, OperandTypeRegister}
+	OperandTypesLeftShiftedRegisterToRegister      = OperandTypes{OperandTypeLeftShiftedRegister, OperandTypeRegister}
+	OperandTypesTwoRegistersToRegister             = OperandTypes{OperandTypeTwoRegisters, OperandTypeRegister}
+	OperandTypesThreeRegistersToRegister           = OperandTypes{OperandTypeThreeRegisters, OperandTypeRegister}
+	OperandTypesTwoRegistersToNone                 = OperandTypes{OperandTypeTwoRegisters, OperandTypeNone}
+	OperandTypesRegisterAndConstToNone             = OperandTypes{OperandTypeRegisterAndConst, OperandTypeNone}
+	OperandTypesRegisterToMemory                   = OperandTypes{OperandTypeRegister, OperandTypeMemory}
+	OperandTypesMemoryToRegister                   = OperandTypes{OperandTypeMemory, OperandTypeRegister}
+	OperandTypesConstToRegister                    = OperandTypes{OperandTypeConst, OperandTypeRegister}
+	OperandTypesSIMDByteToSIMDByte                 = OperandTypes{OperandTypeSIMDByte, OperandTypeSIMDByte}
+	OperandTypesSIMDByteToRegister                 = OperandTypes{OperandTypeSIMDByte, OperandTypeRegister}
+	OperandTypesTwoSIMDBytesToSIMDByteRegister     = OperandTypes{OperandTypeTwoSIMDBytes, OperandTypeSIMDByte}
+	OperandTypesRegisterToVectorRegister           = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
+	OperandTypesVectorRegisterToRegister           = OperandTypes{OperandTypeVectorRegister, OperandTypeRegister}
+	OperandTypesMemoryToVectorRegister             = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
+	OperandTypesVectorRegisterToMemory             = OperandTypes{OperandTypeVectorRegister, OperandTypeMemory}
+	OperandTypesVectorRegisterToVectorRegister     = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
+	OperandTypesTwoVectorRegistersToVectorRegister = OperandTypes{OperandTypeTwoVectorRegisters, OperandTypeVectorRegister}
+	OperandTypesStaticConstToVectorRegister        = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
 )
 
 // String implements fmt.Stringer
@@ -434,6 +438,8 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeVectorRegisterToVectorRegister(n)
 	case OperandTypesStaticConstToVectorRegister:
 		err = a.EncodeStaticConstToVectorRegister(n)
+	case OperandTypesTwoVectorRegistersToVectorRegister:
+		err = a.encodeTwoVectorRegistersToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -706,12 +712,32 @@ func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instructi
 	n.VectorArrangement = arrangement
 }
 
-// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
-// and the destination is the dstReg.
+// CompileLoadStaticConstToVectorRegister implements Assembler.CompileLoadStaticConstToVectorRegister
 func (a *AssemblerImpl) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
 	c asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
 	n := a.newNode(instruction, OperandTypesStaticConstToVectorRegister)
 	n.staticConst = c
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+}
+
+// CompileTwoVectorRegistersToVectorRegister implements Assembler.CompileTwoVectorRegistersToVectorRegister.
+func (a *AssemblerImpl) CompileTwoVectorRegistersToVectorRegister(instruction asm.Instruction, srcReg, srcReg2, dstReg asm.Register,
+	arrangement VectorArrangement) {
+	n := a.newNode(instruction, OperandTypesTwoVectorRegistersToVectorRegister)
+	n.SrcReg = srcReg
+	n.SrcReg2 = srcReg2
+	n.DstReg = dstReg
+	n.VectorArrangement = arrangement
+}
+
+// CompileTwoVectorRegistersToVectorRegisterWithConst implements Assembler.CompileTwoVectorRegistersToVectorRegisterWithConst.
+func (a *AssemblerImpl) CompileTwoVectorRegistersToVectorRegisterWithConst(instruction asm.Instruction,
+	srcReg, srcReg2, dstReg asm.Register, arrangement VectorArrangement, c asm.ConstantValue) {
+	n := a.newNode(instruction, OperandTypesTwoVectorRegistersToVectorRegister)
+	n.SrcReg = srcReg
+	n.SrcReg2 = srcReg2
+	n.SrcConst = c
 	n.DstReg = dstReg
 	n.VectorArrangement = arrangement
 }
@@ -761,7 +787,7 @@ func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 	switch n.Instruction {
-	case B, BEQ, BGE, BGT, BHI, BHS, BLE, BLO, BLS, BLT, BMI, BNE, BVS, BPL:
+	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDPL:
 	default:
 		return errorEncodingUnsupported(n)
 	}
@@ -781,31 +807,31 @@ func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
 		switch n.Instruction {
 		case B:
 			condBits = condBitsUnconditional
-		case BEQ:
+		case BCONDEQ:
 			condBits = 0b0000
-		case BGE:
+		case BCONDGE:
 			condBits = 0b1010
-		case BGT:
+		case BCONDGT:
 			condBits = 0b1100
-		case BHI:
+		case BCONDHI:
 			condBits = 0b1000
-		case BHS:
+		case BCONDHS:
 			condBits = 0b0010
-		case BLE:
+		case BCONDLE:
 			condBits = 0b1101
-		case BLO:
+		case BCONDLO:
 			condBits = 0b0011
-		case BLS:
+		case BCONDLS:
 			condBits = 0b1001
-		case BLT:
+		case BCONDLT:
 			condBits = 0b1011
-		case BMI:
+		case BCONDMI:
 			condBits = 0b0100
-		case BPL:
+		case BCONDPL:
 			condBits = 0b0101
-		case BNE:
+		case BCONDNE:
 			condBits = 0b0001
-		case BVS:
+		case BCONDVS:
 			condBits = 0b0110
 		}
 
@@ -2010,6 +2036,74 @@ func (a *AssemblerImpl) addOrSub64BitRegisters(sfops byte, src1RegBits byte, src
 	})
 }
 
+// See "Logical (immediate)" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Immediate
+var logicalImmediate = map[asm.Instruction]struct {
+	sf, opc  byte
+	resolver func(imm asm.ConstantValue) (imms, immr, N byte, err error)
+}{
+	ANDIMM32: {sf: 0b0, opc: 0b00, resolver: func(imm asm.ConstantValue) (imms, immr, N byte, err error) {
+		if !isBitMaskImmediate(uint64(imm)) {
+			err = fmt.Errorf("const %d must be valid bitmask immediate for %s", imm, InstructionName(ANDIMM64))
+			return
+		}
+		immr, imms, N = bitmaskImmediate(uint64(imm), false)
+		return
+	}},
+	ANDIMM64: {sf: 0b1, opc: 0b00, resolver: func(imm asm.ConstantValue) (imms, immr, N byte, err error) {
+		if !isBitMaskImmediate(uint64(imm)) {
+			err = fmt.Errorf("const %d must be valid bitmask immediate for %s", imm, InstructionName(ANDIMM64))
+			return
+		}
+		immr, imms, N = bitmaskImmediate(uint64(imm), true)
+		return
+	}},
+}
+
+func bitmaskImmediate(c uint64, is64bit bool) (immr, imms, N byte) {
+	var size uint32
+	switch {
+	case c != c>>32|c<<32:
+		size = 64
+	case c != c>>16|c<<48:
+		size = 32
+		c = uint64(int32(c))
+	case c != c>>8|c<<56:
+		size = 16
+		c = uint64(int16(c))
+	case c != c>>4|c<<60:
+		size = 8
+		c = uint64(int8(c))
+	case c != c>>2|c<<62:
+		size = 4
+		c = uint64(int64(c<<60) >> 60)
+	default:
+		size = 2
+		c = uint64(int64(c<<62) >> 62)
+	}
+
+	neg := false
+	if int64(c) < 0 {
+		c = ^c
+		neg = true
+	}
+
+	onesSize, nonZeroPos := getOnesSequenceSize(c)
+	if neg {
+		nonZeroPos = onesSize + nonZeroPos
+		onesSize = size - onesSize
+	}
+
+	var mode byte = 32
+	if is64bit {
+		N, mode = 0b1, 64
+	}
+
+	immr = byte((size - nonZeroPos) & (size - 1) & uint32(mode-1))
+	imms = byte((onesSize - 1) | 63&^(size<<1-1))
+	return
+}
+
 // Exported for inter-op testing with golang-asm.
 // TODO: unexport after golang-asm complete removal.
 func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
@@ -2021,6 +2115,24 @@ func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
 		return err
 	}
 
+	if log, ok := logicalImmediate[n.Instruction]; ok {
+		// See "Logical (immediate)" in
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Immediate
+		imms, immr, N, err := log.resolver(c)
+		if err != nil {
+			return err
+		}
+
+		a.Buf.Write([]byte{
+			(dstRegBits << 5) | dstRegBits,
+			imms<<2 | dstRegBits>>3,
+			N<<6 | immr,
+			log.sf<<7 | log.opc<<5 | 0b10010,
+		})
+		return nil
+	}
+
+	// TODO: refactor and generalize the following like ^ logicalImmediate, etc.
 	switch inst := n.Instruction; inst {
 	case ADD, ADDS, SUB, SUBS:
 		var sfops byte
@@ -2595,141 +2707,6 @@ func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err er
 	return
 }
 
-func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) {
-	if err = checkArrangementIndexPair(n.VectorArrangement, n.SrcVectorIndex); err != nil {
-		return
-	}
-
-	srcVecRegBits, err := vectorRegisterBits(n.SrcReg)
-	if err != nil {
-		return err
-	}
-
-	dstRegBits, err := intRegisterBits(n.DstReg)
-	if err != nil {
-		return err
-	}
-
-	switch n.Instruction {
-	case VMOV, SMOV:
-		var imm4 byte // imm4 as in "Advanced SIMD copy" https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		isSMOV := n.Instruction == SMOV
-		if isSMOV {
-			// SMOV: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SMOV--Signed-Move-vector-element-to-general-purpose-register-
-			imm4 = 0b0101
-		} else {
-			// VMOV is translated as "UMOV": https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-
-			imm4 = 0b0111
-		}
-
-		var imm5 byte
-		var q byte
-		switch n.VectorArrangement {
-		case VectorArrangementB:
-			imm5 |= 0b1
-			imm5 |= byte(n.SrcVectorIndex) << 1
-		case VectorArrangementH:
-			imm5 |= 0b10
-			imm5 |= byte(n.SrcVectorIndex) << 2
-		case VectorArrangementS:
-			if isSMOV {
-				return fmt.Errorf("invalid arrangement for SMOV: %s", n.VectorArrangement.String())
-			}
-			imm5 |= 0b100
-			imm5 |= byte(n.SrcVectorIndex) << 3
-		case VectorArrangementD:
-			if isSMOV {
-				return fmt.Errorf("invalid arrangement for SMOV: %s", n.VectorArrangement.String())
-			}
-
-			imm5 |= 0b1000
-			imm5 |= byte(n.SrcVectorIndex) << 4
-			q = 0b1
-		default:
-			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
-		}
-		a.Buf.Write([]byte{
-			(srcVecRegBits << 5) | dstRegBits,
-			imm4<<3 | 0b100 | srcVecRegBits>>3,
-			imm5,
-			q<<6 | 0b00001110,
-		})
-	default:
-		return errorEncodingUnsupported(n)
-	}
-	return
-}
-
-func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
-	srcRegBits, err := intRegisterBits(n.SrcReg)
-	if err != nil {
-		return err
-	}
-
-	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
-	if err != nil {
-		return err
-	}
-
-	switch n.Instruction {
-	case DUP:
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-
-		var imm5 byte
-		switch n.VectorArrangement {
-		case VectorArrangementB:
-			imm5 = 0b1
-		case VectorArrangementH:
-			imm5 = 0b10
-		case VectorArrangementS:
-			imm5 = 0b100
-		case VectorArrangementD:
-			imm5 = 0b1000
-		default:
-			return fmt.Errorf("unsupported arrangement for DUP: %s", n.VectorArrangement)
-		}
-		a.Buf.Write([]byte{
-			(srcRegBits << 5) | dstVectorRegBits,
-			0b11<<2 | srcRegBits>>3,
-			imm5,
-			0b01_001110,
-		})
-	case VMOV:
-		if err = checkArrangementIndexPair(n.VectorArrangement, n.DstVectorIndex); err != nil {
-			return
-		}
-
-		// VMOV is translated as "INS(Vector, Element)"
-		// Description: https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
-		// Encoding: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--general---Insert-vector-element-from-general-purpose-register-?lang=en
-		var imm5 byte
-		switch n.VectorArrangement {
-		case VectorArrangementB:
-			imm5 |= 0b1
-			imm5 |= byte(n.DstVectorIndex) << 1
-		case VectorArrangementH:
-			imm5 |= 0b10
-			imm5 |= byte(n.DstVectorIndex) << 2
-		case VectorArrangementS:
-			imm5 |= 0b100
-			imm5 |= byte(n.DstVectorIndex) << 3
-		case VectorArrangementD:
-			imm5 |= 0b1000
-			imm5 |= byte(n.DstVectorIndex) << 4
-		default:
-			return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
-		}
-		a.Buf.Write([]byte{
-			(srcRegBits << 5) | dstVectorRegBits,
-			0b000111_00 | srcRegBits>>3,
-			imm5,
-			0b01001110,
-		})
-	default:
-		return errorEncodingUnsupported(n)
-	}
-	return
-}
-
 func (a *AssemblerImpl) EncodeMemoryToVectorRegister(n *NodeImpl) (err error) {
 	srcBaseRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
@@ -2919,6 +2896,539 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 	return
 }
 
+// advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
+	U, Opcode byte
+	// TODO: extract common implementation of qAndSizeResolver.
+	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NOT--Bitwise-NOT--vector--?lang=en
+	NOT: {U: 0b1, Opcode: 0b00101, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b00
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(NOT))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FNEG--vector---Floating-point-Negate--vector--?lang=en
+	VFNEG: {U: 0b1, Opcode: 0b01111, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b00
+		switch arrangement {
+		case VectorArrangement4S:
+			size, Q = 0b10, 0b1
+		case VectorArrangement2S:
+			size, Q = 0b10, 0b0
+		case VectorArrangement2D:
+			size, Q = 0b11, 0b1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFNEG))
+		}
+		return
+	}},
+}
+
+// advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD three same" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDThreeSame = map[asm.Instruction]struct {
+	U, Opcode        byte
+	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/AND--vector---Bitwise-AND--vector--?lang=en
+	VAND: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b00
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(AND))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/BSL--Bitwise-Select-?lang=en
+	BSL: {U: 0b1, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b01
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BSL))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/EOR--vector---Bitwise-Exclusive-OR--vector--?lang=en
+	EOR: {U: 0b1, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b00
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BSL))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ORR--vector--register---Bitwise-inclusive-OR--vector--register--?lang=en
+	VORR: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b10
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VORR))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/BIC--vector--register---Bitwise-bit-Clear--vector--register--?lang=en
+	BIC: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size = 0b01
+		switch arrangement {
+		case VectorArrangement16B:
+			Q = 0b1
+		case VectorArrangement8B:
+			Q = 0b0
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BIC))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--?lang=en
+	VFADDS: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement2S:
+			size, Q = 0b00, 0
+		case VectorArrangement4S:
+			size, Q = 0b00, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFADDS))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--?lang=en
+	VFADDD: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement2D:
+			size, Q = 0b01, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFADDD))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSUB--vector---Floating-point-Subtract--vector--?lang=en
+	VFSUBS: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement2S:
+			size, Q = 0b10, 0
+		case VectorArrangement4S:
+			size, Q = 0b10, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFSUBS))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSUB--vector---Floating-point-Subtract--vector--?lang=en
+	VFSUBD: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement2D:
+			size, Q = 0b11, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFSUBD))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMAXP--Unsigned-Maximum-Pairwise-?lang=en
+	UMAXP: {U: 0b1, Opcode: 0b10100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--register---Compare-bitwise-Equal--vector--?lang=en
+	CMEQ: {U: 0b1, Opcode: 0b10001, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	// https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
+	VADDP: {U: 0b0, Opcode: 0b10111, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADD--vector---Add--vector--?lang=en
+	VADD: {U: 0, Opcode: 0b10000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SUB--vector---Subtract--vector--?lang=en
+	VSUB: {U: 1, Opcode: 0b10000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
+	SSHL: {U: 0, Opcode: 0b01000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+	USHL: {U: 0b1, Opcode: 0b01000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		size, Q = arrangementSizeQ(arrangement)
+		return
+	}},
+}
+
+// advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD across lanes" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
+	U, Opcode byte
+	// TODO: extract common implementation of qAndSizeResolver.
+	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDV--Add-across-Vector-?lang=en
+	ADDV: {U: 0b0, Opcode: 0b11011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, Size byte, err error) {
+		switch arrangement {
+		case VectorArrangement16B:
+			Size, Q = 0b00, 0b1
+		case VectorArrangement8B:
+			Size, Q = 0b00, 0b0
+		case VectorArrangement8H:
+			Size, Q = 0b01, 0b1
+		case VectorArrangement4H:
+			Size, Q = 0b01, 0b0
+		case VectorArrangement4S:
+			Size, Q = 0b10, 0b1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(ADDV))
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMINV--Unsigned-Minimum-across-Vector-?lang=en
+	UMINV: {U: 0b1, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, Size byte, err error) {
+		switch arrangement {
+		case VectorArrangement16B:
+			Size, Q = 0b00, 0b1
+		case VectorArrangement8B:
+			Size, Q = 0b00, 0b0
+		case VectorArrangement8H:
+			Size, Q = 0b01, 0b1
+		case VectorArrangement4H:
+			Size, Q = 0b01, 0b0
+		case VectorArrangement4S:
+			Size, Q = 0b10, 0b1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(UMINV))
+		}
+		return
+	}},
+}
+
+// advancedSIMDScalarPairwise holds information to encode instructions as "Advanced SIMD scalar pairwise" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDScalarPairwise = map[asm.Instruction]struct {
+	U, Opcode    byte
+	sizeResolver func(arrangement VectorArrangement) (Size byte)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
+	ADDP: {U: 0b0, Opcode: 0b11011, sizeResolver: func(arrangement VectorArrangement) (size byte) {
+		size = 0b11
+		return
+	}},
+}
+
+// advancedSIMDCopy holds information to encode instructions as "Advanced SIMD copy" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDCopy = map[asm.Instruction]struct {
+	op byte
+	// TODO: extract common implementation of resolver.
+	resolver func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-?lang=en
+	DUPELEM: {op: 0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		imm4 = 0b0000
+		q = 0b1
+
+		switch arr {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(srcIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(srcIndex) << 2
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(srcIndex) << 3
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(srcIndex) << 4
+		default:
+			err = fmt.Errorf("unsupported arrangement for DUPELEM: %d", arr)
+		}
+
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-?lang=en
+	DUPGEN: {op: 0b0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		imm4 = 0b0001
+		switch arr {
+		case VectorArrangement8B:
+			imm5 = 0b1
+		case VectorArrangement16B:
+			imm5 = 0b1
+			q = 0b1
+		case VectorArrangement4H:
+			imm5 = 0b10
+		case VectorArrangement8H:
+			imm5 = 0b10
+			q = 0b1
+		case VectorArrangement2S:
+			imm5 = 0b100
+		case VectorArrangement4S:
+			imm5 = 0b100
+			q = 0b1
+		case VectorArrangement2D:
+			imm5 = 0b1000
+			q = 0b1
+		default:
+			err = fmt.Errorf("unsupported arrangement for DUPGEN: %s", arr)
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--general---Insert-vector-element-from-general-purpose-register-?lang=en
+	INSGEN: {op: 0b0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		imm4, q = 0b0011, 0b1
+		switch arr {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(dstIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(dstIndex) << 2
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(dstIndex) << 3
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(dstIndex) << 4
+		default:
+			err = fmt.Errorf("unsupported arrangement for INSGEN: %s", arr)
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
+	UMOV: {op: 0b0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		imm4 = 0b0111
+		switch arr {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(srcIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(srcIndex) << 2
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(srcIndex) << 3
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(srcIndex) << 4
+			q = 0b1
+		default:
+			err = fmt.Errorf("unsupported arrangement for UMOV: %s", arr)
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SMOV--Signed-Move-vector-element-to-general-purpose-register-?lang=en
+	SMOV32: {op: 0b0, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		imm4 = 0b0101
+		switch arr {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(srcIndex) << 1
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(srcIndex) << 2
+		default:
+			err = fmt.Errorf("unsupported arrangement for SMOV32: %s", arr)
+		}
+		return
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/INS--element---Insert-vector-element-from-another-vector-element-?lang=en
+	INSELEM: {op: 0b1, resolver: func(srcIndex, dstIndex VectorIndex, arr VectorArrangement) (imm5, imm4, q byte, err error) {
+		q = 0b1
+		switch arr {
+		case VectorArrangementB:
+			imm5 |= 0b1
+			imm5 |= byte(dstIndex) << 1
+			imm4 = byte(srcIndex)
+		case VectorArrangementH:
+			imm5 |= 0b10
+			imm5 |= byte(dstIndex) << 2
+			imm4 = byte(srcIndex) << 1
+		case VectorArrangementS:
+			imm5 |= 0b100
+			imm5 |= byte(dstIndex) << 3
+			imm4 = byte(srcIndex) << 2
+		case VectorArrangementD:
+			imm5 |= 0b1000
+			imm5 |= byte(dstIndex) << 4
+			imm4 = byte(srcIndex) << 3
+		default:
+			err = fmt.Errorf("unsupported arrangement for INSELEM: %d", arr)
+		}
+		return
+	}},
+}
+
+// advancedSIMDTableLookup holds information to encode instructions as "Advanced SIMD table lookup" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDTableLookup = map[asm.Instruction]struct {
+	op, op2, Len byte
+	qResolver    func(arr VectorArrangement) (q byte)
+}{
+	TBL1: {op: 0, op2: 0, Len: 0b00, qResolver: func(arr VectorArrangement) (q byte) {
+		switch arr {
+		case VectorArrangement16B:
+			q = 0b1
+		case VectorArrangement8B:
+			q = 0b0
+		}
+		return
+	}},
+	TBL2: {op: 0, op2: 0, Len: 0b01, qResolver: func(arr VectorArrangement) (q byte) {
+		switch arr {
+		case VectorArrangement16B:
+			q = 0b1
+		case VectorArrangement8B:
+			q = 0b0
+		}
+		return
+	}},
+}
+
+// advancedSIMDScalarTwoRegisterMisc holds information to encode instructions as "Advanced SIMD scalar two-register miscellaneous" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDScalarTwoRegisterMisc = map[asm.Instruction]struct {
+	U, opcode        byte
+	qAndSizeResolver func(arr VectorArrangement) (q, size byte)
+}{
+	CMEQZERO: {U: 0b0, opcode: 0b01001, qAndSizeResolver: func(arr VectorArrangement) (q, size byte) {
+		size, q = arrangementSizeQ(arr)
+		return
+	}},
+}
+
+// advancedSIMDShiftByImmediate holds information to encode instructions as "Advanced SIMD shift by immediate" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDShiftByImmediate = map[asm.Instruction]struct {
+	U, opcode    byte
+	immQResolver func(shiftAmount int64, arr VectorArrangement) (immh, immb, q byte, err error)
+}{
+	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SSHLL--SSHLL2--Signed-Shift-Left-Long--immediate--
+	SSHLLIMM: {U: 0b0, opcode: 0b10100, immQResolver: immResolverForSIMDSiftLeftByImmediate},
+	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/USHLL--USHLL2--Unsigned-Shift-Left-Long--immediate--
+	USHLLIMM: {U: 0b1, opcode: 0b10100, immQResolver: immResolverForSIMDSiftLeftByImmediate},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHR--Signed-Shift-Right--immediate--?lang=en
+	SSHR: {U: 0b0, opcode: 0b00000, immQResolver: func(shiftAmount int64, arr VectorArrangement) (immh, immb, q byte, err error) {
+		// TODO:
+		switch arr {
+		case VectorArrangement16B, VectorArrangement8B:
+			immh = 0b0001
+			immb = 8 - byte(shiftAmount&0b111)
+			if arr == VectorArrangement16B {
+				q = 1
+			}
+		case VectorArrangement8H, VectorArrangement4H:
+			v := 16 - byte(shiftAmount&0b1111)
+			immb = v & 0b111
+			immh = 0b0010 | (v >> 3)
+			if arr == VectorArrangement8H {
+				q = 1
+			}
+		case VectorArrangement4S, VectorArrangement2S:
+			v := 32 - byte(shiftAmount&0b11111)
+			immb = v & 0b111
+			immh = 0b0100 | (v >> 3)
+			if arr == VectorArrangement4S {
+				q = 1
+			}
+		case VectorArrangement2D:
+			v := 64 - byte(shiftAmount&0b111111)
+			immb = v & 0b111
+			immh = 0b1000 | (v >> 3)
+			q = 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s", arr)
+		}
+		return
+	}},
+}
+
+// advancedSIMDShiftByImmediate holds information to encode instructions as "Advanced SIMD permute" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+var advancedSIMDPermute = map[asm.Instruction]struct {
+	opcode byte
+}{
+	ZIP1: {opcode: 0b011},
+}
+
+func immResolverForSIMDSiftLeftByImmediate(shiftAmount int64, arr VectorArrangement) (immh, immb, q byte, err error) {
+	q = 0b0
+
+	switch arr {
+	case VectorArrangement8B:
+		immb = byte(shiftAmount)
+		immh = 0b0001
+	case VectorArrangement4H:
+		immb = byte(shiftAmount) & 0b111
+		immh = 0b0010 | byte(shiftAmount>>3)
+	case VectorArrangement2S:
+		immb = byte(shiftAmount) & 0b111
+		immh = 0b0100 | byte(shiftAmount>>3)
+	default:
+		err = fmt.Errorf("unsupported arrangement %s", arr)
+	}
+	return
+}
+
+// encodeAdvancedSIMDCopy encodes instruction as "Advanced SIMD copy" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func (a *AssemblerImpl) encodeAdvancedSIMDCopy(srcRegBits, dstRegBits, op, imm5, imm4, q byte) {
+	a.Buf.Write([]byte{
+		(srcRegBits << 5) | dstRegBits,
+		imm4<<3 | 0b1<<2 | srcRegBits>>3,
+		imm5,
+		q<<6 | op<<5 | 0b1110,
+	})
+}
+
+// encodeAdvancedSIMDThreeSame encodes instruction as  "Advanced SIMD three same" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func (a *AssemblerImpl) encodeAdvancedSIMDThreeSame(src1, src2, dst, opcode, size, q, u byte) {
+	a.Buf.Write([]byte{
+		(src2 << 5) | dst,
+		opcode<<3 | 1<<2 | src2>>3,
+		size<<6 | 0b1<<5 | src1,
+		q<<6 | u<<5 | 0b1110,
+	})
+}
+
+// encodeAdvancedSIMDPermute encodes instruction as  "Advanced SIMD permute" in
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+func (a *AssemblerImpl) encodeAdvancedSIMDPermute(src1, src2, dst, opcode, size, q byte) {
+	a.Buf.Write([]byte{
+		(src2 << 5) | dst,
+		opcode<<4 | 0b1<<3 | src2>>3,
+		size<<6 | src1,
+		q<<6 | 0b1110,
+	})
+}
+
 func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err error) {
 	var srcVectorRegBits byte
 	if n.SrcReg != RegRZR {
@@ -2933,271 +3443,216 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 		return err
 	}
 
-	switch n.Instruction {
-	case DUP:
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
-		if n.SrcVectorIndex == VectorIndexNone {
-			return fmt.Errorf("source vector index must be given for %s", InstructionName(DUP))
+	if simdCopy, ok := advancedSIMDCopy[n.Instruction]; ok {
+		imm5, imm4, q, err := simdCopy.resolver(n.SrcVectorIndex, n.DstVectorIndex, n.VectorArrangement)
+		if err != nil {
+			return err
 		}
-		var imm5 byte
-		switch n.VectorArrangement {
-		case VectorArrangementB:
-			imm5 |= 0b1
-			imm5 |= byte(n.SrcVectorIndex) << 1
-		case VectorArrangementH:
-			imm5 |= 0b10
-			imm5 |= byte(n.SrcVectorIndex) << 2
-		case VectorArrangementS:
-			imm5 |= 0b100
-			imm5 |= byte(n.SrcVectorIndex) << 3
-		case VectorArrangementD:
-			imm5 |= 0b1000
-			imm5 |= byte(n.SrcVectorIndex) << 4
-		default:
-			return fmt.Errorf("unsupported arrangement for VMOV: %d", n.VectorArrangement)
-		}
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			0b1<<2 | srcVectorRegBits>>3,
-			imm5,
-			0b0100_1110,
-		})
-	case VMOV:
-		if n.SrcVectorIndex != VectorIndexNone && n.DstVectorIndex != VectorIndexNone {
-			// This case VMOV is translated as MOV(vector, element)
-			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--element---Move-vector-element-to-another-vector-element--an-alias-of-INS--element--
-			var imm5, imm4 byte
-			switch n.VectorArrangement {
-			case VectorArrangementB:
-				imm5 |= 0b1
-				imm5 |= byte(n.DstVectorIndex) << 1
-				imm4 = byte(n.SrcVectorIndex)
-			case VectorArrangementH:
-				imm5 |= 0b10
-				imm5 |= byte(n.DstVectorIndex) << 2
-				imm4 = byte(n.SrcVectorIndex) << 1
-			case VectorArrangementS:
-				imm5 |= 0b100
-				imm5 |= byte(n.DstVectorIndex) << 3
-				imm4 = byte(n.SrcVectorIndex) << 2
-			case VectorArrangementD:
-				imm5 |= 0b1000
-				imm5 |= byte(n.DstVectorIndex) << 4
-				imm4 = byte(n.SrcVectorIndex) << 3
-			default:
-				return fmt.Errorf("unsupported arrangement for VMOV: %d", n.VectorArrangement)
-			}
-			a.Buf.Write([]byte{
-				(srcVectorRegBits << 5) | dstVectorRegBits,
-				imm4<<3 | 1<<2 | srcVectorRegBits>>3,
-				imm5,
-				0b01101110,
-			})
-		} else {
-			// This case VMOV is translated as MOV(vector)
-			if n.VectorArrangement != VectorArrangement16B {
-				return fmt.Errorf("unsupported arrangement for VMOV: %s", n.VectorArrangement)
-			}
-			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/MOV--vector---Move-vector--an-alias-of-ORR--vector--register--
-			a.Buf.Write([]byte{
-				(srcVectorRegBits << 5) | dstVectorRegBits,
-				0b000111<<2 | srcVectorRegBits>>3,
-				0b101<<5 | srcVectorRegBits,
-				0b0100_1110,
-			})
-		}
-	case VADD, VSUB:
-		if n.VectorArrangement == VectorArrangementNone || (n.VectorArrangement >= VectorArrangementB && n.VectorArrangement <= VectorArrangementD) ||
-			(n.VectorArrangement == VectorArrangement1D) {
-			return fmt.Errorf("unsupported arrangement for VADD: %s", n.VectorArrangement)
-		}
-
-		var u byte
-		switch n.Instruction {
-		case VADD:
-			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ADD--vector---Add--vector--
-			u = 0b0
-		case VSUB:
-			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SUB--vector---Subtract--vector--
-			u = 0b1
-		}
-
-		size, q := arrangementSizeQ(n.VectorArrangement)
-		a.Buf.Write([]byte{
-			(dstVectorRegBits << 5) | dstVectorRegBits,
-			0b100001<<2 | dstVectorRegBits>>3,
-			size<<6 | 0b1<<5 | srcVectorRegBits,
-			q<<6 | u<<5 | 0b1110,
-		})
-	case VFADDS, VFADDD, VFSUBS, VFSUBD:
-		var sz, b byte
-		switch n.Instruction {
-		case VFADDS:
-		case VFADDD:
-			sz = 0b1
-		case VFSUBS:
-			b = 0b1
-		case VFSUBD:
-			b = 0b1
-			sz = 0b1
-		}
-
-		// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			0b110101<<2 | srcVectorRegBits>>3,
-			b<<7 | sz<<6 | 0b1<<5 | dstVectorRegBits,
-			0b1<<6 | 0b1110,
-		})
-
-	case SSHLL, USHLL:
-		// SSHLL: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/SSHLL--SSHLL2--Signed-Shift-Left-Long--immediate--
-		// USHLL: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/USHLL--USHLL2--Unsigned-Shift-Left-Long--immediate--
-		var u byte
-		switch n.Instruction {
-		case SSHLL:
-			u = 0b0
-		case USHLL:
-			u = 0b1
-		}
-
-		var immb, immh byte
-		switch n.VectorArrangement {
-		case VectorArrangement8B:
-			if n.SrcConst < 0 || n.SrcConst > 7 {
-				return fmt.Errorf("shift amount on %s must be between 0 and 7 for %s but was %d",
-					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
-			}
-			immb = byte(n.SrcConst)
-			immh = 0b0001
-		case VectorArrangement4H:
-			if n.SrcConst < 0 || n.SrcConst > 15 {
-				return fmt.Errorf("shift amount on %s must be between 0 and 15 for %s but was %d",
-					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
-			}
-			immb = byte(n.SrcConst) & 0b111
-			immh = 0b0010 | byte(n.SrcConst>>3)
-		case VectorArrangement2S:
-			if n.SrcConst < 0 || n.SrcConst > 31 {
-				return fmt.Errorf("shift amount on %s must be between 0 and 31 for %s but was %d",
-					InstructionName(n.Instruction), n.VectorArrangement, n.SrcConst)
-			}
-			immb = byte(n.SrcConst) & 0b111
-			immh = 0b0100 | byte(n.SrcConst>>3)
-		default:
-			return fmt.Errorf("unsupported arrangement for %s: %s",
-				InstructionName(n.Instruction), n.VectorArrangement)
-		}
-
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			0b101001<<2 | srcVectorRegBits>>3,
-			immh<<3 | immb,
-			u<<5 | 0b1111,
-		})
-	case ADDP:
-		var opcode byte
-		var size, q byte
-		var rm, op byte
-		switch n.VectorArrangement {
-		case VectorArrangementD:
-			opcode = 0b10111_0
-			size, q = 0b11, 0b1
-			// ADDP (scalar) https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
-			rm = 0b10001
-			op = 0b1
-		default:
-			// ADDP (vector) https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--vector---Add-Pairwise--vector--?lang=en
-			opcode = 0b10111_1
-			size, q = arrangementSizeQ(n.VectorArrangement)
-			rm = dstVectorRegBits
-			op = 0b0
-		}
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			opcode<<2 | srcVectorRegBits>>3,
-			size<<6 | 0b1<<5 | rm,
-			q<<6 | op<<4 | 0b01110,
-		})
-	case UMAXP:
-		// "Advanced SIMD three same" in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		var opcode, u byte
-		switch n.Instruction {
-		case UMAXP:
-			// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UMAXP--Unsigned-Maximum-Pairwise-
-			opcode, u = 0b10100, 0b1
-		}
-		var size, q byte = arrangementSizeQ(n.VectorArrangement)
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			opcode<<3 | 0b1<<2 | srcVectorRegBits>>3,
-			size<<6 | 0b1<<5 | dstVectorRegBits,
-			q<<6 | u<<5 | 0b01110,
-		})
-	case UMINV:
-		// "Advanced SIMD across lanes" in  https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		var opcode, u byte = 0b11010, 0b1
-		var size, q byte = arrangementSizeQ(n.VectorArrangement)
-
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
-			size<<6 | 0b11000<<1 | opcode>>4,
-			q<<6 | u<<5 | 0b01110,
-		})
-	case CMEQ:
-		const size byte = 0b11
-		if n.SrcReg == RegRZR {
-			// CMEQ (zero, vector)
-			// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--zero---Compare-bitwise-Equal-to-zero--vector--?lang=en
-			a.Buf.Write([]byte{
-				(dstVectorRegBits << 5) | dstVectorRegBits,
-				0b100110<<2 | dstVectorRegBits>>3,
-				size<<6 | 0b1<<5,
-				0b01001110,
-			})
-		} else {
-			// CMEQ (register, vector)
-			// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--register---Compare-bitwise-Equal--vector--?lang=en
-			a.Buf.Write([]byte{
-				(srcVectorRegBits << 5) | dstVectorRegBits,
-				0b100011<<2 | srcVectorRegBits>>3,
-				size<<6 | 0b1<<5 | dstVectorRegBits,
-				0b01101110,
-			})
-		}
-
-	case TBL1, TBL2:
-		// Interpret dstVectorRegBits as the index register (`Rm` in the doc)
-		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-?lang=en
-
-		var l byte // `len` in the doc.
-		switch n.Instruction {
-		case TBL1:
-			l = 0b00
-		case TBL2:
-			l = 0b01
-		}
-
-		var q byte
-		switch n.VectorArrangement {
-		case VectorArrangement16B:
-			q = 0b1
-		case VectorArrangement8B:
-			q = 0b0
-		}
-
-		a.Buf.Write([]byte{
-			(srcVectorRegBits << 5) | dstVectorRegBits,
-			l<<5 | srcVectorRegBits>>3,
-			dstVectorRegBits,
-			q<<6 | 0b1110,
-		})
-	default:
-		return errorEncodingUnsupported(n)
+		a.encodeAdvancedSIMDCopy(srcVectorRegBits, dstVectorRegBits, simdCopy.op, imm5, imm4, q)
+		return nil
 	}
 
-	return nil
+	if scalarPairwise, ok := advancedSIMDScalarPairwise[n.Instruction]; ok {
+		// See "Advanced SIMD scalar pairwise" in
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		size := scalarPairwise.sizeResolver(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			scalarPairwise.Opcode<<4 | 1<<3 | srcVectorRegBits>>3,
+			size<<6 | 0b11<<4 | scalarPairwise.Opcode>>4,
+			0b1<<6 | scalarPairwise.U<<5 | 0b11110,
+		})
+		return
+	}
+
+	if twoRegMisc, ok := advancedSIMDTwoRegisterMisc[n.Instruction]; ok {
+		// See "Advanced SIMD two-register miscellaneous" in
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		q, size, err := twoRegMisc.qAndSizeResolver(n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			twoRegMisc.Opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
+			size<<6 | 0b1<<5 | twoRegMisc.Opcode>>4,
+			q<<6 | twoRegMisc.U<<5 | 0b01110,
+		})
+		return nil
+	}
+
+	if threeSame, ok := advancedSIMDThreeSame[n.Instruction]; ok {
+		q, size, err := threeSame.qAndSizeResolver(n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.encodeAdvancedSIMDThreeSame(srcVectorRegBits, dstVectorRegBits, dstVectorRegBits, threeSame.Opcode, size, q, threeSame.U)
+		return nil
+	}
+
+	if acrossLanes, ok := advancedSIMDAcrossLanes[n.Instruction]; ok {
+		// See "Advanced SIMD across lanes" in
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+		q, size, err := acrossLanes.qAndSizeResolver(n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			acrossLanes.Opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
+			size<<6 | 0b11000<<1 | acrossLanes.Opcode>>4,
+			q<<6 | acrossLanes.U<<5 | 0b01110,
+		})
+		return nil
+	}
+
+	if lookup, ok := advancedSIMDTableLookup[n.Instruction]; ok {
+		q := lookup.qResolver(n.VectorArrangement)
+
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			lookup.Len<<5 | lookup.op<<4 | srcVectorRegBits>>3,
+			lookup.op2<<6 | dstVectorRegBits,
+			q<<6 | 0b1110,
+		})
+		return
+	}
+
+	if scalaTwoMisc, ok := advancedSIMDScalarTwoRegisterMisc[n.Instruction]; ok {
+		q, size := scalaTwoMisc.qAndSizeResolver(n.VectorArrangement)
+		a.Buf.Write([]byte{
+			(dstVectorRegBits << 5) | dstVectorRegBits,
+			0b100110<<2 | dstVectorRegBits>>3,
+			size<<6 | 0b1<<5,
+			q<<6 | scalaTwoMisc.U<<5 | 0b01001110,
+		})
+		return
+	}
+
+	if shiftByImmediate, ok := advancedSIMDShiftByImmediate[n.Instruction]; ok {
+		immh, immb, q, err := shiftByImmediate.immQResolver(n.SrcConst, n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.Buf.Write([]byte{
+			(srcVectorRegBits << 5) | dstVectorRegBits,
+			shiftByImmediate.opcode<<3 | 0b1<<2 | srcVectorRegBits>>3,
+			immh<<3 | immb,
+			q<<6 | shiftByImmediate.U<<5 | 0b1111,
+		})
+		return nil
+	}
+
+	if permute, ok := advancedSIMDPermute[n.Instruction]; ok {
+		size, q := arrangementSizeQ(n.VectorArrangement)
+		a.encodeAdvancedSIMDPermute(srcVectorRegBits, dstVectorRegBits, dstVectorRegBits, permute.opcode, size, q)
+		return
+	}
+	return errorEncodingUnsupported(n)
+}
+
+func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(n *NodeImpl) (err error) {
+	var srcRegBits, srcRegBits2, dstRegBits byte
+	srcRegBits, err = vectorRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	srcRegBits2, err = vectorRegisterBits(n.SrcReg2)
+	if err != nil {
+		return err
+	}
+
+	dstRegBits, err = vectorRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	if threeSame, ok := advancedSIMDThreeSame[n.Instruction]; ok {
+		q, size, err := threeSame.qAndSizeResolver(n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.encodeAdvancedSIMDThreeSame(srcRegBits, srcRegBits2, dstRegBits, threeSame.Opcode, size, q, threeSame.U)
+		return nil
+	}
+
+	if permute, ok := advancedSIMDPermute[n.Instruction]; ok {
+		size, q := arrangementSizeQ(n.VectorArrangement)
+		a.encodeAdvancedSIMDPermute(srcRegBits, srcRegBits2, dstRegBits, permute.opcode, size, q)
+		return
+	}
+
+	if n.Instruction == EXT {
+		// EXT is the only instruction in "Advanced SIMD extract", so inline the encoding here.
+		// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/EXT--Extract-vector-from-pair-of-vectors-?lang=en
+		var q, imm4 byte
+		switch n.VectorArrangement {
+		case VectorArrangement16B:
+			imm4 = 0b1111 & byte(n.SrcConst)
+			q = 0b1
+		case VectorArrangement8B:
+			imm4 = 0b111 & byte(n.SrcConst)
+		default:
+			return fmt.Errorf("invalid arrangement %s for EXT", n.VectorArrangement)
+		}
+		a.Buf.Write([]byte{
+			(srcRegBits2 << 5) | dstRegBits,
+			imm4<<3 | srcRegBits2>>3,
+			srcRegBits,
+			q<<6 | 0b101110,
+		})
+		return
+	}
+	return
+}
+
+func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) {
+	if err = checkArrangementIndexPair(n.VectorArrangement, n.SrcVectorIndex); err != nil {
+		return
+	}
+
+	srcVecRegBits, err := vectorRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstRegBits, err := intRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	if simdCopy, ok := advancedSIMDCopy[n.Instruction]; ok {
+		imm5, imm4, q, err := simdCopy.resolver(n.SrcVectorIndex, n.DstVectorIndex, n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.encodeAdvancedSIMDCopy(srcVecRegBits, dstRegBits, simdCopy.op, imm5, imm4, q)
+		return nil
+	}
+	return errorEncodingUnsupported(n)
+}
+
+func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
+	srcRegBits, err := intRegisterBits(n.SrcReg)
+	if err != nil {
+		return err
+	}
+
+	dstVectorRegBits, err := vectorRegisterBits(n.DstReg)
+	if err != nil {
+		return err
+	}
+
+	if simdCopy, ok := advancedSIMDCopy[n.Instruction]; ok {
+		imm5, imm4, q, err := simdCopy.resolver(n.SrcVectorIndex, n.DstVectorIndex, n.VectorArrangement)
+		if err != nil {
+			return err
+		}
+		a.encodeAdvancedSIMDCopy(srcRegBits, dstVectorRegBits, simdCopy.op, imm5, imm4, q)
+		return nil
+	}
+	return errorEncodingUnsupported(n)
 }
 
 var zeroRegisterBits byte = 0b11111
