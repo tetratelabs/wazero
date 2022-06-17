@@ -13,7 +13,7 @@ import (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16 and
 // https://linux.die.net/man/3/errno
-type Errno = uint32 // alias for parity with wasm.ValueType
+type Errno = uint32 // neither uint16 nor an alias for parity with wasm.ValueType
 
 // ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
 func ErrnoName(errno Errno) string {

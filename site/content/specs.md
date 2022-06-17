@@ -76,53 +76,53 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 <details><summary>Click to see the full list of supported WASI functions</summary>
 <p>
 
-| Function                | Status |    Known Usage |
-|:------------------------|:------:|---------------:|
-| args_get                |   ✅    |         TinyGo |
-| args_sizes_get          |   ✅    |         TinyGo |
-| environ_get             |   ✅    |         TinyGo |
-| environ_sizes_get       |   ✅    |         TinyGo |
-| clock_res_get           |   ✅    |                |
-| clock_time_get          |   ✅    |         TinyGo |
-| fd_advise               |   ❌    |                |
-| fd_allocate             |   ❌    |                |
-| fd_close                |   ✅    |         TinyGo |
-| fd_datasync             |   ❌    |                |
-| fd_fdstat_get           |   ✅    |         TinyGo |
-| fd_fdstat_set_flags     |   ❌    |                |
-| fd_fdstat_set_rights    |   ❌    |                |
-| fd_filestat_get         |   ❌    |                |
-| fd_filestat_set_size    |   ❌    |                |
-| fd_filestat_set_times   |   ❌    |                |
-| fd_pread                |   ❌    |                |
-| fd_prestat_get          |   ✅    |         TinyGo |
-| fd_prestat_dir_name     |   ✅    |         TinyGo |
-| fd_pwrite               |   ❌    |                |
-| fd_read                 |   ✅    |         TinyGo |
-| fd_readdir              |   ❌    |                |
-| fd_renumber             |   ❌    |                |
-| fd_seek                 |   ✅    |         TinyGo |
-| fd_sync                 |   ❌    |                |
-| fd_tell                 |   ❌    |                |
-| fd_write                |   ✅    |                |
-| path_create_directory   |   ❌    |                |
-| path_filestat_get       |   ❌    |                |
-| path_filestat_set_times |   ❌    |                |
-| path_link               |   ❌    |                |
-| path_open               |   ✅    |         TinyGo |
-| path_readlink           |   ❌    |                |
-| path_remove_directory   |   ❌    |                |
-| path_rename             |   ❌    |                |
-| path_symlink            |   ❌    |                |
-| path_unlink_file        |   ❌    |                |
-| poll_oneoff             |   ✅    |         TinyGo |
-| proc_exit               |   ✅    | AssemblyScript |
-| proc_raise              |   ❌    |                |
-| sched_yield             |   ❌    |                |
-| random_get              |   ✅    |                |
-| sock_recv               |   ❌    |                |
-| sock_send               |   ❌    |                |
-| sock_shutdown           |   ❌    |                |
+| Function                | Status |     Known Usage |
+|:------------------------|:------:|----------------:|
+| args_get                |   ✅    |          TinyGo |
+| args_sizes_get          |   ✅    |          TinyGo |
+| environ_get             |   ✅    |          TinyGo |
+| environ_sizes_get       |   ✅    |          TinyGo |
+| clock_res_get           |   ✅    |                 |
+| clock_time_get          |   ✅    |          TinyGo |
+| fd_advise               |   ❌    |                 |
+| fd_allocate             |   ❌    |                 |
+| fd_close                |   ✅    |          TinyGo |
+| fd_datasync             |   ❌    |                 |
+| fd_fdstat_get           |   ✅    |          TinyGo |
+| fd_fdstat_set_flags     |   ❌    |                 |
+| fd_fdstat_set_rights    |   ❌    |                 |
+| fd_filestat_get         |   ❌    |                 |
+| fd_filestat_set_size    |   ❌    |                 |
+| fd_filestat_set_times   |   ❌    |                 |
+| fd_pread                |   ❌    |                 |
+| fd_prestat_get          |   ✅    |          TinyGo |
+| fd_prestat_dir_name     |   ✅    |          TinyGo |
+| fd_pwrite               |   ❌    |                 |
+| fd_read                 |   ✅    |          TinyGo |
+| fd_readdir              |   ❌    |                 |
+| fd_renumber             |   ❌    |                 |
+| fd_seek                 |   ✅    |          TinyGo |
+| fd_sync                 |   ❌    |                 |
+| fd_tell                 |   ❌    |                 |
+| fd_write                |   ✅    |                 |
+| path_create_directory   |   ❌    |                 |
+| path_filestat_get       |   ❌    |                 |
+| path_filestat_set_times |   ❌    |                 |
+| path_link               |   ❌    |                 |
+| path_open               |   ✅    |          TinyGo |
+| path_readlink           |   ❌    |                 |
+| path_remove_directory   |   ❌    |                 |
+| path_rename             |   ❌    |                 |
+| path_symlink            |   ❌    |                 |
+| path_unlink_file        |   ❌    |                 |
+| poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
+| proc_exit               |   ✅    |  AssemblyScript |
+| proc_raise              |   ❌    |                 |
+| sched_yield             |   ❌    |                 |
+| random_get              |   ✅    |                 |
+| sock_recv               |   ❌    |                 |
+| sock_send               |   ❌    |                 |
+| sock_shutdown           |   ❌    |                 |
 
 </p>
 </details>

@@ -19,3 +19,6 @@ type Walltime func(context.Context) (sec int64, nsec int32)
 // Note: There are no constraints on the value return except that it
 // increments. For example, -1 is a valid if the next value is >= 0.
 type Nanotime func(context.Context) int64
+
+// Nanosleep puts the current goroutine to sleep for at least ns nanoseconds.
+type Nanosleep func(ctx context.Context, ns int64)
