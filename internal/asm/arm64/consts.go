@@ -471,32 +471,38 @@ const (
 	ASRW
 	// B is the B instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B
 	B
-	// BCONDEQ is the B.cond instruction with CondEQ. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+
+	// Below are B.cond instructions.
+	// 	* https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// 	* https://developer.arm.com/documentation/dui0802/a/A32-and-T32-Instructions/Condition-codes
+
+	// BCONDEQ is the B.cond instruction with CondEQ.
 	BCONDEQ
-	// BCONDGE is the B.cond instruction with CondGE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDGE is the B.cond instruction with CondGE.
 	BCONDGE
-	// BCONDGT is the B.cond instruction with CondGT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDGT is the B.cond instruction with CondGT.
 	BCONDGT
-	// BCONDHI is the B.cond instruction with CondHI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDHI is the B.cond instruction with CondHI.
 	BCONDHI
-	// BCONDHS is the B.cond instruction with CondHS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDHS is the B.cond instruction with CondHS.
 	BCONDHS
-	// BCONDLE is the B.cond instruction with CondLE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDLE is the B.cond instruction with CondLE.
 	BCONDLE
-	// BCONDLO is the B.cond instruction with CondLO. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDLO is the B.cond instruction with CondLO.
 	BCONDLO
-	// BCONDLS is the B.cond instruction with CondLS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDLS is the B.cond instruction with CondLS.
 	BCONDLS
-	// BCONDLT is the B.cond instruction with CondLT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDLT is the B.cond instruction with CondLT.
 	BCONDLT
-	// BCONDMI is the B.cond instruction with CondMI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDMI is the B.cond instruction with CondMI.
 	BCONDMI
-	// BCONDPL is the B.cond instruction with CondPL. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDPL is the B.cond instruction with CondPL.
 	BCONDPL
-	// BCONDNE is the B.cond instruction with CondNE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDNE is the B.cond instruction with CondNE.
 	BCONDNE
-	// BCONDVS is the B.cond instruction with CondVS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// BCONDVS is the B.cond instruction with CondVS.
 	BCONDVS
+
 	// CLZ is the CLZ instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
 	CLZ
 	// CLZW is the CLZ instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
