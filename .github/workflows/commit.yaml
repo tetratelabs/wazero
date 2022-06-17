@@ -155,7 +155,7 @@ jobs:
       # Unlike the other CGO libraries, WasmEdge requires offline installation.
       - name: Install WasmEdge
         run: |
-          wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | sudo bash -s -- -p /usr/local -e all -v ${WASMEDGE_VERSION}
+          wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | sudo bash -s -- -p /usr/local -e none -v ${WASMEDGE_VERSION}
         # The version here is coupled to internal/integration_test/go.mod, but it
         # isn't always the same as sometimes the Go layer has a broken release.
         env:
