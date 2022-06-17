@@ -3115,6 +3115,7 @@ var advancedSIMDThreeSame = map[asm.Instruction]struct {
 }
 
 func advancedSIMDThreeSameDefaultResolver(arrangement VectorArrangement) (Q, size byte, err error) {
+	// TODO: simply use arrangementSizeQ as the resolver after refactoring other call-site of arrangementSizeQ.
 	size, Q = arrangementSizeQ(arrangement)
 	return
 }
