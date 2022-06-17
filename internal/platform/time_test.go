@@ -67,3 +67,13 @@ func Test_Nanotime(t *testing.T) {
 		})
 	}
 }
+
+func Test_Nanosleep(t *testing.T) {
+	ns := int64(50 * time.Millisecond)
+	start := Nanotime(context.Background())
+	Nanosleep(context.Background(), ns)
+
+	duration := Nanotime(context.Background()) - start
+	max := ns * 2 // max scheduling delay
+	require.True(t, duration > 0 && duration < max, "Nanosleep(%d) slept for %d", ns, duration)
+}

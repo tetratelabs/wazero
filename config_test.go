@@ -721,6 +721,18 @@ func TestModuleConfig_toSysContext_WithNanotime(t *testing.T) {
 	})
 }
 
+// TestModuleConfig_toSysContext_WithNanosleep has to test differently because
+// we can't compare function pointers when functions are passed by value.
+func TestModuleConfig_toSysContext_WithNanosleep(t *testing.T) {
+	sysCtx, err := NewModuleConfig().
+		WithNanosleep(func(ctx context.Context, ns int64) {
+			require.Equal(t, testCtx, ctx)
+		}).(*moduleConfig).toSysContext()
+	require.NoError(t, err)
+	// If below pass, the context was correct!
+	sysCtx.Nanosleep(testCtx, 2)
+}
+
 func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 	tests := []struct {
 		name        string

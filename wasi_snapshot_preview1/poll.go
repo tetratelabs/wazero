@@ -58,6 +58,12 @@ func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscri
 		return ErrnoFault
 	}
 
+	// Eagerly write the number of events which will equal subscriptions unless
+	// there's a fault in parsing (not processing).
+	if !mod.Memory().WriteUint32Le(ctx, resultNevents, nsubscriptions) {
+		return ErrnoFault
+	}
+
 	// Loop through all subscriptions and write their output.
 	for sub := uint32(0); sub < nsubscriptions; sub++ {
 		inOffset := sub * 48
@@ -79,15 +85,10 @@ func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscri
 		// Write the event corresponding to the processed subscription.
 		// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
 		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
-		outBuf[outOffset+8] = byte(errno)        // safe as < 255
-		outBuf[outOffset+10] = eventType
+		outBuf[outOffset+8] = byte(errno)        // uint16, but safe as < 255
+		outBuf[outOffset+9] = 0
+		binary.LittleEndian.PutUint32(outBuf[outOffset+10:], uint32(eventType))
 		// TODO: When FD events are supported, write outOffset+16
-	}
-
-	// At this point, we successfully processed all subscriptions, even if not
-	// all were supported.
-	if !mod.Memory().WriteUint32Le(ctx, resultNevents, nsubscriptions) {
-		return ErrnoFault
 	}
 	return ErrnoSuccess
 }
@@ -95,10 +96,10 @@ func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscri
 // processClockEvent supports only relative clock events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
 func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno {
-	_ /* ID */ = binary.LittleEndian.Uint32(inBuf)             // See below
-	timeout := binary.LittleEndian.Uint64(inBuf[8:])           // nanos if relative
-	_ /* precision */ = binary.LittleEndian.Uint64(inBuf[16:]) // Unused
-	flags := binary.LittleEndian.Uint16(inBuf[24:])
+	_ /* ID */ = binary.LittleEndian.Uint32(inBuf[0:8])          // See below
+	timeout := binary.LittleEndian.Uint64(inBuf[8:16])           // nanos if relative
+	_ /* precision */ = binary.LittleEndian.Uint64(inBuf[16:24]) // Unused
+	flags := binary.LittleEndian.Uint16(inBuf[24:32])
 
 	// subclockflags has only one flag defined:  subscription_clock_abstime
 	switch flags {

@@ -2,6 +2,7 @@ package sys
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"io"
 	"testing"
@@ -42,6 +43,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1_000), sysCtx.WalltimeResolution())
 	require.Zero(t, sysCtx.Nanotime(testCtx)) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
+	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, rand.Reader, sysCtx.RandSource())
 	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS(testCtx))
 }
@@ -295,4 +297,24 @@ func Test_clockResolutionInvalid(t *testing.T) {
 			require.Equal(t, tc.expected, clockResolutionInvalid(tc.resolution))
 		})
 	}
+}
+
+func TestNewContext_Nanosleep(t *testing.T) {
+	var aNs sys.Nanosleep = func(context.Context, int64) {
+	}
+	sysCtx, err := NewContext(
+		0,   // max
+		nil, // args
+		nil,
+		nil,    // stdin
+		nil,    // stdout
+		nil,    // stderr
+		nil,    // randSource
+		nil, 0, // Nanosleep, NanosleepResolution
+		nil, 0, // Nanosleep, NanosleepResolution
+		&aNs, // nanosleep
+		nil,  // openedFiles
+	)
+	require.Nil(t, err)
+	require.Equal(t, &aNs, sysCtx.nanosleep)
 }
