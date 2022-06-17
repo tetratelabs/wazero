@@ -2,19 +2,39 @@ package platform
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
+
+	"github.com/tetratelabs/wazero/sys"
 )
 
-const FakeEpochNanos = int64(1640995200000000000) // midnight UTC 2022-01-01
+const (
+	ms = int64(time.Millisecond)
+	// FakeEpochNanos is midnight UTC 2022-01-01 and exposed for testing
+	FakeEpochNanos = 1640995200000 * ms
+)
 
-// FakeWalltime implements sys.Walltime with FakeEpochNanos.
-func FakeWalltime(context.Context) (sec int64, nsec int32) {
-	return FakeEpochNanos / 1e9, int32(FakeEpochNanos % 1e9)
+// NewFakeWalltime implements sys.Walltime with FakeEpochNanos that increases by 1ms each reading.
+// See /RATIONALE.md
+func NewFakeWalltime() *sys.Walltime {
+	// AddInt64 returns the new value. Adjust so the first reading will be FakeEpochNanos
+	t := FakeEpochNanos - ms
+	var wt sys.Walltime = func(context.Context) (sec int64, nsec int32) {
+		wt := atomic.AddInt64(&t, ms)
+		return wt / 1e9, int32(wt % 1e9)
+	}
+	return &wt
 }
 
-// FakeNanotime implements sys.Nanotime with FakeEpochNanos.
-func FakeNanotime(context.Context) int64 {
-	return FakeEpochNanos
+// NewFakeNanotime implements sys.Nanotime that increases by 1ms each reading.
+// See /RATIONALE.md
+func NewFakeNanotime() *sys.Nanotime {
+	// AddInt64 returns the new value. Adjust so the first reading will be zero.
+	t := int64(0) - ms
+	var nt sys.Nanotime = func(context.Context) int64 {
+		return atomic.AddInt64(&t, ms)
+	}
+	return &nt
 }
 
 // Walltime implements sys.Walltime with time.Now.

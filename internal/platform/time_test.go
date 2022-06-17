@@ -9,6 +9,28 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+func Test_NewFakeWalltime(t *testing.T) {
+	wt := NewFakeWalltime()
+
+	// Base should be the same as FakeEpochNanos
+	sec, nsec := (*wt)(context.Background())
+	ft := time.UnixMicro(FakeEpochNanos / time.Microsecond.Nanoseconds()).UTC()
+	require.Equal(t, ft, time.Unix(sec, int64(nsec)).UTC())
+
+	// next reading should increase by 1ms
+	sec, nsec = (*wt)(context.Background())
+	require.Equal(t, ft.Add(time.Millisecond), time.Unix(sec, int64(nsec)).UTC())
+}
+
+func Test_NewFakeNanotime(t *testing.T) {
+	nt := NewFakeNanotime()
+
+	require.Equal(t, int64(0), (*nt)(context.Background()))
+
+	// next reading should increase by 1ms
+	require.Equal(t, int64(time.Millisecond), (*nt)(context.Background()))
+}
+
 func Test_Walltime(t *testing.T) {
 	now := time.Now().Unix()
 	sec, nsec := Walltime(context.Background())

@@ -57,3 +57,20 @@ func (f *testFile) Close() error                       { return f.closeErr }
 func (f *testFile) Stat() (fs.FileInfo, error)         { return nil, nil }
 func (f *testFile) Read(_ []byte) (int, error)         { return 0, nil }
 func (f *testFile) Seek(_ int64, _ int) (int64, error) { return 0, nil }
+
+func TestFSConfig_Clone(t *testing.T) {
+	fsc := NewFSConfig()
+	cloned := fsc.Clone()
+
+	fsc.preopens[2] = nil
+	fsc.preopenPaths["2"] = 2
+
+	cloned.preopens[1] = nil
+	cloned.preopenPaths["1"] = 1
+
+	// Ensure the maps are not shared
+	require.Equal(t, map[uint32]*FileEntry{2: nil}, fsc.preopens)
+	require.Equal(t, map[string]uint32{"2": 2}, fsc.preopenPaths)
+	require.Equal(t, map[uint32]*FileEntry{1: nil}, cloned.preopens)
+	require.Equal(t, map[string]uint32{"1": 1}, cloned.preopenPaths)
+}

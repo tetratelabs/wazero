@@ -110,7 +110,7 @@ type RuntimeConfig interface {
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
 
-	// WithFeatureSIMD enables the vector value type and vector instructions (aka SIMD).  This defaults to false
+	// WithFeatureSIMD enables the vector value type and vector instructions (aka SIMD). This defaults to false
 	// as the feature was not in WebAssembly 1.0.
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
@@ -171,83 +171,89 @@ var engineLessConfig = &runtimeConfig{
 // support Compiler. Use NewRuntimeConfig to safely detect and fallback to
 // NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigCompiler() RuntimeConfig {
-	ret := *engineLessConfig // copy
+	ret := engineLessConfig.clone()
 	ret.newEngine = compiler.NewEngine
-	return &ret
+	return ret
 }
 
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() RuntimeConfig {
-	ret := *engineLessConfig // copy
+	ret := engineLessConfig.clone()
 	ret.newEngine = interpreter.NewEngine
+	return ret
+}
+
+// clone makes a deep copy of this runtime config.
+func (c *runtimeConfig) clone() *runtimeConfig {
+	ret := *c // copy except maps which share a ref
 	return &ret
 }
 
 // WithFeatureBulkMemoryOperations implements RuntimeConfig.WithFeatureBulkMemoryOperations
 func (c *runtimeConfig) WithFeatureBulkMemoryOperations(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
 	// bulk-memory-operations proposal is mutually-dependant with reference-types proposal.
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureMultiValue implements RuntimeConfig.WithFeatureMultiValue
 func (c *runtimeConfig) WithFeatureMultiValue(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureMutableGlobal implements RuntimeConfig.WithFeatureMutableGlobal
 func (c *runtimeConfig) WithFeatureMutableGlobal(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureNonTrappingFloatToIntConversion implements RuntimeConfig.WithFeatureNonTrappingFloatToIntConversion
 func (c *runtimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureReferenceTypes implements RuntimeConfig.WithFeatureReferenceTypes
 func (c *runtimeConfig) WithFeatureReferenceTypes(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
 	// reference-types proposal is mutually-dependant with bulk-memory-operations proposal.
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureSignExtensionOps implements RuntimeConfig.WithFeatureSignExtensionOps
 func (c *runtimeConfig) WithFeatureSignExtensionOps(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
-	return &ret
+	return ret
 }
 
 // WithFeatureSIMD implements RuntimeConfig.WithFeatureSIMD
 func (c *runtimeConfig) WithFeatureSIMD(enabled bool) RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSIMD, enabled)
-	return &ret
+	return ret
 }
 
 // WithWasmCore1 implements RuntimeConfig.WithWasmCore1
 func (c *runtimeConfig) WithWasmCore1() RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = wasm.Features20191205
-	return &ret
+	return ret
 }
 
 // WithWasmCore2 implements RuntimeConfig.WithWasmCore2
 func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.enabledFeatures = wasm.Features20220419
-	return &ret
+	return ret
 }
 
 // CompiledModule is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
@@ -314,14 +320,20 @@ func NewCompileConfig() CompileConfig {
 	}
 }
 
+// clone makes a deep copy of this compile config.
+func (c *compileConfig) clone() *compileConfig {
+	ret := *c // copy except maps which share a ref
+	return &ret
+}
+
 // WithImportRenamer implements CompileConfig.WithImportRenamer
 func (c *compileConfig) WithImportRenamer(importRenamer api.ImportRenamer) CompileConfig {
 	if importRenamer == nil {
 		return c
 	}
-	ret := *c // copy
+	ret := c.clone()
 	ret.importRenamer = importRenamer
-	return &ret
+	return ret
 }
 
 // WithMemorySizer implements CompileConfig.WithMemorySizer
@@ -329,9 +341,9 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 	if memorySizer == nil {
 		return c
 	}
-	ret := *c // copy
+	ret := c.clone()
 	ret.memorySizer = memorySizer
-	return &ret
+	return ret
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
@@ -446,7 +458,8 @@ type ModuleConfig interface {
 	WithStdout(io.Writer) ModuleConfig
 
 	// WithWalltime configures the wall clock, sometimes referred to as the
-	// real time clock. Defaults to a constant fake result.
+	// real time clock. Defaults to a fake result that increases by 1ms on
+	// each reading.
 	//
 	// Ex. To override with your own clock:
 	//	moduleConfig = moduleConfig.
@@ -465,7 +478,8 @@ type ModuleConfig interface {
 	WithSysWalltime() ModuleConfig
 
 	// WithNanotime configures the monotonic clock, used to measure elapsed
-	// time in nanoseconds. Defaults to a constant fake result.
+	// time in nanoseconds. Defaults to a fake result that increases by 1ms
+	// on each reading.
 	//
 	// Ex. To override with your own clock:
 	//	moduleConfig = moduleConfig.
@@ -512,9 +526,9 @@ type moduleConfig struct {
 	stdout             io.Writer
 	stderr             io.Writer
 	randSource         io.Reader
-	walltimeTime       *sys.Walltime
+	walltime           *sys.Walltime
 	walltimeResolution sys.ClockResolution
-	nanotimeTime       *sys.Nanotime
+	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
 	args               []string
 	// environ is pair-indexed to retain order similar to os.Environ.
@@ -529,21 +543,31 @@ func NewModuleConfig() ModuleConfig {
 	return &moduleConfig{
 		startFunctions: []string{"_start"},
 		environKeys:    map[string]int{},
-
-		fs: internalsys.NewFSConfig(),
+		fs:             internalsys.NewFSConfig(),
 	}
+}
+
+// clone makes a deep copy of this module config.
+func (c *moduleConfig) clone() *moduleConfig {
+	ret := *c // copy except maps which share a ref
+	ret.environKeys = make(map[string]int, len(c.environKeys))
+	for key, value := range c.environKeys {
+		ret.environKeys[key] = value
+	}
+	ret.fs = c.fs.Clone()
+	return &ret
 }
 
 // WithArgs implements ModuleConfig.WithArgs
 func (c *moduleConfig) WithArgs(args ...string) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.args = args
-	return &ret
+	return ret
 }
 
 // WithEnv implements ModuleConfig.WithEnv
 func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	// Check to see if this key already exists and update it.
 	if i, ok := ret.environKeys[key]; ok {
 		ret.environ[i+1] = value // environ is pair-indexed, so the value is 1 after the key.
@@ -551,57 +575,57 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 		ret.environKeys[key] = len(ret.environ)
 		ret.environ = append(ret.environ, key, value)
 	}
-	return &ret
+	return ret
 }
 
 // WithFS implements ModuleConfig.WithFS
 func (c *moduleConfig) WithFS(fs fs.FS) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.fs = ret.fs.WithFS(fs)
-	return &ret
+	return ret
 }
 
 // WithName implements ModuleConfig.WithName
 func (c *moduleConfig) WithName(name string) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.name = name
-	return &ret
+	return ret
 }
 
 // WithStartFunctions implements ModuleConfig.WithStartFunctions
 func (c *moduleConfig) WithStartFunctions(startFunctions ...string) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.startFunctions = startFunctions
-	return &ret
+	return ret
 }
 
 // WithStderr implements ModuleConfig.WithStderr
 func (c *moduleConfig) WithStderr(stderr io.Writer) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.stderr = stderr
-	return &ret
+	return ret
 }
 
 // WithStdin implements ModuleConfig.WithStdin
 func (c *moduleConfig) WithStdin(stdin io.Reader) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.stdin = stdin
-	return &ret
+	return ret
 }
 
 // WithStdout implements ModuleConfig.WithStdout
 func (c *moduleConfig) WithStdout(stdout io.Writer) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.stdout = stdout
-	return &ret
+	return ret
 }
 
 // WithWalltime implements ModuleConfig.WithWalltime
 func (c *moduleConfig) WithWalltime(walltime sys.Walltime, resolution sys.ClockResolution) ModuleConfig {
-	ret := *c // copy
-	ret.walltimeTime = &walltime
+	ret := c.clone()
+	ret.walltime = &walltime
 	ret.walltimeResolution = resolution
-	return &ret
+	return ret
 }
 
 // We choose arbitrary resolutions here because there's no perfect alternative. For example, according to the
@@ -615,10 +639,10 @@ func (c *moduleConfig) WithSysWalltime() ModuleConfig {
 
 // WithNanotime implements ModuleConfig.WithNanotime
 func (c *moduleConfig) WithNanotime(nanotime sys.Nanotime, resolution sys.ClockResolution) ModuleConfig {
-	ret := *c // copy
-	ret.nanotimeTime = &nanotime
+	ret := c.clone()
+	ret.nanotime = &nanotime
 	ret.nanotimeResolution = resolution
-	return &ret
+	return ret
 }
 
 // WithSysNanotime implements ModuleConfig.WithSysNanotime
@@ -628,16 +652,16 @@ func (c *moduleConfig) WithSysNanotime() ModuleConfig {
 
 // WithRandSource implements ModuleConfig.WithRandSource
 func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.randSource = source
-	return &ret
+	return ret
 }
 
 // WithWorkDirFS implements ModuleConfig.WithWorkDirFS
 func (c *moduleConfig) WithWorkDirFS(fs fs.FS) ModuleConfig {
-	ret := *c // copy
+	ret := c.clone()
 	ret.fs = ret.fs.WithWorkDirFS(fs)
-	return &ret
+	return ret
 }
 
 // toSysContext creates a baseline wasm.Context configured by ModuleConfig.
@@ -672,8 +696,8 @@ func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
 		c.stdout,
 		c.stderr,
 		c.randSource,
-		c.walltimeTime, c.walltimeResolution,
-		c.nanotimeTime, c.nanotimeResolution,
+		c.walltime, c.walltimeResolution,
+		c.nanotime, c.nanotimeResolution,
 		preopens,
 	)
 }

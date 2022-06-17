@@ -19,7 +19,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/platform"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -520,90 +519,79 @@ func TestSnapshotPreview1_ClockResGet_Unsupported(t *testing.T) {
 	}
 }
 
-func TestSnapshotPreview1_ClockTimeGet_Realtime(t *testing.T) {
-	resultTimestamp := uint32(1) // arbitrary offset
-	expectedMemory := []byte{
-		'?',                                          // resultTimestamp is after this
-		0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
-		'?', // stopped after encoding
-	}
-
-	mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
-	defer mod.Close(testCtx)
-
-	tests := []struct {
-		name       string
-		invocation func() Errno
-	}{
-		{
-			name: "wasi.ClockTimeGet",
-			invocation: func() Errno {
-				// invoke ClockTimeGet directly and check the memory side effects!
-				return a.ClockTimeGet(testCtx, mod, 0 /* REALTIME */, 0 /* TODO: precision */, resultTimestamp)
-			},
-		},
-		{
-			name: functionClockTimeGet,
-			invocation: func() Errno {
-				results, err := fn.Call(testCtx, 0 /* REALTIME */, 0 /* TODO: precision */, uint64(resultTimestamp))
-				require.NoError(t, err)
-				errno := Errno(results[0]) // results[0] is the errno
-				return errno
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			maskMemory(t, testCtx, mod, len(expectedMemory))
-
-			errno := tc.invocation()
-			require.Zero(t, errno, ErrnoName(errno))
-
-			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
-			require.True(t, ok)
-			require.Equal(t, expectedMemory, actual)
-		})
-	}
-}
-
-func TestSnapshotPreview1_ClockTimeGet_Monotonic(t *testing.T) {
+func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 	resultTimestamp := uint32(1) // arbitrary offset
 
 	mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
 	defer mod.Close(testCtx)
 
-	tests := []struct {
-		name       string
-		invocation func() Errno
+	clocks := []struct {
+		clock          string
+		id             uint32
+		expectedMemory []byte
 	}{
 		{
-			name: "wasi.ClockTimeGet",
-			invocation: func() Errno {
-				return a.ClockTimeGet(testCtx, mod, 1 /* MONOTONIC */, 0 /* TODO: precision */, resultTimestamp)
+			clock: "Realtime",
+			id:    clockIDRealtime,
+			expectedMemory: []byte{
+				'?',                                          // resultTimestamp is after this
+				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
+				'?', // stopped after encoding
 			},
 		},
 		{
-			name: functionClockTimeGet,
-			invocation: func() Errno {
-				results, err := fn.Call(testCtx, 1 /* MONOTONIC */, 0 /* TODO: precision */, uint64(resultTimestamp))
-				require.NoError(t, err)
-				errno := Errno(results[0]) // results[0] is the errno
-				return errno
+			clock: "Monotonic",
+			id:    clockIDMonotonic,
+			expectedMemory: []byte{
+				'?',                                    // resultTimestamp is after this
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // fake nanotime starts at zero
+				'?', // stopped after encoding
 			},
 		},
 	}
 
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			errno := tc.invocation()
-			require.Zero(t, errno, ErrnoName(errno))
+	for _, c := range clocks {
+		cc := c
+		t.Run(cc.clock, func(t *testing.T) {
+			tests := []struct {
+				name       string
+				invocation func() Errno
+			}{
+				{
+					name: "wasi.ClockTimeGet",
+					invocation: func() Errno {
+						return a.ClockTimeGet(testCtx, mod, cc.id, 0 /* TODO: precision */, resultTimestamp)
+					},
+				},
+				{
+					name: functionClockTimeGet,
+					invocation: func() Errno {
+						results, err := fn.Call(testCtx, uint64(cc.id), 0 /* TODO: precision */, uint64(resultTimestamp))
+						require.NoError(t, err)
+						errno := Errno(results[0]) // results[0] is the errno
+						return errno
+					},
+				},
+			}
 
-			tick, ok := mod.Memory().ReadUint64Le(testCtx, resultTimestamp)
-			require.True(t, ok)
-			require.Equal(t, uint64(platform.FakeEpochNanos), tick)
+			for _, tt := range tests {
+				tc := tt
+				t.Run(tc.name, func(t *testing.T) {
+					// Reset the fake clock
+					sysCtx, err := newSysContext(nil, nil, nil)
+					require.NoError(t, err)
+					mod.(*wasm.CallContext).Sys = sysCtx
+
+					maskMemory(t, testCtx, mod, len(cc.expectedMemory))
+
+					errno := tc.invocation()
+					require.Zero(t, errno, ErrnoName(errno))
+
+					actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(cc.expectedMemory)))
+					require.True(t, ok)
+					require.Equal(t, cc.expectedMemory, actual)
+				})
+			}
 		})
 	}
 }
