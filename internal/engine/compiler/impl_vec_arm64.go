@@ -939,7 +939,76 @@ func (c *arm64Compiler) compileV128ShiftImpl(shape wazeroir.Shape, ins asm.Instr
 
 // compileV128Cmp implements compiler.compileV128Cmp for arm64.
 func (c *arm64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	var arr arm64.VectorArrangement
+	if o.Type <= wazeroir.V128CmpTypeI8x16GeU {
+		arr = arm64.VectorArrangement16B
+	} else if o.Type <= wazeroir.V128CmpTypeI16x8GeU {
+		arr = arm64.VectorArrangement8H
+	} else if o.Type <= wazeroir.V128CmpTypeI32x4GeU {
+		arr = arm64.VectorArrangement4S
+	} else if o.Type <= wazeroir.V128CmpTypeI64x2GeS {
+		arr = arm64.VectorArrangement2D
+	} else if o.Type <= wazeroir.V128CmpTypeF32x4Ge {
+		arr = arm64.VectorArrangement4S
+	} else { // f64x2
+		arr = arm64.VectorArrangement2D
+	}
+
+	var result = x1.register
+	switch o.Type {
+	case wazeroir.V128CmpTypeI8x16Eq, wazeroir.V128CmpTypeI16x8Eq, wazeroir.V128CmpTypeI32x4Eq, wazeroir.V128CmpTypeI64x2Eq:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMEQ, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16Ne, wazeroir.V128CmpTypeI16x8Ne, wazeroir.V128CmpTypeI32x4Ne, wazeroir.V128CmpTypeI64x2Ne:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMEQ, x1.register, x2.register, result, arr)
+		// Reverse the condition by flipping all bits.
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.NOT, result, result,
+			arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+	case wazeroir.V128CmpTypeI8x16LtS, wazeroir.V128CmpTypeI16x8LtS, wazeroir.V128CmpTypeI32x4LtS, wazeroir.V128CmpTypeI64x2LtS:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMGT, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16LtU, wazeroir.V128CmpTypeI16x8LtU, wazeroir.V128CmpTypeI32x4LtU:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMHI, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16GtS, wazeroir.V128CmpTypeI16x8GtS, wazeroir.V128CmpTypeI32x4GtS, wazeroir.V128CmpTypeI64x2GtS:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMGT, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16GtU, wazeroir.V128CmpTypeI16x8GtU, wazeroir.V128CmpTypeI32x4GtU:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMHI, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16LeS, wazeroir.V128CmpTypeI16x8LeS, wazeroir.V128CmpTypeI32x4LeS, wazeroir.V128CmpTypeI64x2LeS:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMGE, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16LeU, wazeroir.V128CmpTypeI16x8LeU, wazeroir.V128CmpTypeI32x4LeU:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMHS, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16GeS, wazeroir.V128CmpTypeI16x8GeS, wazeroir.V128CmpTypeI32x4GeS, wazeroir.V128CmpTypeI64x2GeS:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMGE, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeI8x16GeU, wazeroir.V128CmpTypeI16x8GeU, wazeroir.V128CmpTypeI32x4GeU:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMHS, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeF32x4Eq, wazeroir.V128CmpTypeF64x2Eq:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMEQ, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeF32x4Ne, wazeroir.V128CmpTypeF64x2Ne:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMEQ, x2.register, x1.register, result, arr)
+		// Reverse the condition by flipping all bits.
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.NOT, result, result,
+			arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+	case wazeroir.V128CmpTypeF32x4Lt, wazeroir.V128CmpTypeF64x2Lt:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeF32x4Le, wazeroir.V128CmpTypeF64x2Le:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGE, x1.register, x2.register, result, arr)
+	case wazeroir.V128CmpTypeF32x4Gt, wazeroir.V128CmpTypeF64x2Gt:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x2.register, x1.register, result, arr)
+	case wazeroir.V128CmpTypeF32x4Ge, wazeroir.V128CmpTypeF64x2Ge:
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGE, x2.register, x1.register, result, arr)
+	}
+
+	c.markRegisterUnused(x2.register)
+	c.pushVectorRuntimeValueLocationOnRegister(result)
+	return nil
 }
 
 // compileV128AddSat implements compiler.compileV128AddSat for arm64.

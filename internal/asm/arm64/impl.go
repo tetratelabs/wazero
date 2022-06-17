@@ -3049,39 +3049,75 @@ var advancedSIMDThreeSame = map[asm.Instruction]struct {
 		return
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMAXP--Unsigned-Maximum-Pairwise-?lang=en
-	UMAXP: {U: 0b1, Opcode: 0b10100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
-		return
-	}},
+	UMAXP: {U: 0b1, Opcode: 0b10100, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--register---Compare-bitwise-Equal--vector--?lang=en
-	CMEQ: {U: 0b1, Opcode: 0b10001, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
-		return
-	}},
+	CMEQ: {U: 0b1, Opcode: 0b10001, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
 	// https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
-	VADDP: {U: 0b0, Opcode: 0b10111, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
-		return
-	}},
+	VADDP: {U: 0b0, Opcode: 0b10111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADD--vector---Add--vector--?lang=en
-	VADD: {U: 0, Opcode: 0b10000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
-		return
-	}},
+	VADD: {U: 0, Opcode: 0b10000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SUB--vector---Subtract--vector--?lang=en
-	VSUB: {U: 1, Opcode: 0b10000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
-		return
-	}},
+	VSUB: {U: 1, Opcode: 0b10000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
-	SSHL: {U: 0, Opcode: 0b01000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
+	SSHL: {U: 0, Opcode: 0b01000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
+	USHL: {U: 0b1, Opcode: 0b01000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGT--register---Compare-signed-Greater-than--vector--?lang=en
+	CMGT: {U: 0b0, Opcode: 0b00110, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHI--register---Compare-unsigned-Higher--vector--?lang=en
+	CMHI: {U: 0b1, Opcode: 0b00110, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGE--register---Compare-signed-Greater-than-or-Equal--vector--?lang=en
+	CMGE: {U: 0b0, Opcode: 0b00111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHS--register---Compare-unsigned-Higher-or-Same--vector--?lang=en
+	CMHS: {U: 0b1, Opcode: 0b00111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMEQ--register---Floating-point-Compare-Equal--vector--?lang=en
+	FCMEQ: {U: 0b0, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement4S:
+			size, Q = 0b00, 1
+		case VectorArrangement2S:
+			size, Q = 0b00, 0
+		case VectorArrangement2D:
+			size, Q = 0b01, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMEQ))
+		}
 		return
 	}},
-	USHL: {U: 0b1, Opcode: 0b01000, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size, Q = arrangementSizeQ(arrangement)
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGT--register---Floating-point-Compare-Greater-than--vector--?lang=en
+	FCMGT: {U: 0b1, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement4S:
+			size, Q = 0b10, 1
+		case VectorArrangement2S:
+			size, Q = 0b10, 0
+		case VectorArrangement2D:
+			size, Q = 0b11, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMGT))
+		}
 		return
 	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGE--register---Floating-point-Compare-Greater-than-or-Equal--vector--?lang=en
+	FCMGE: {U: 0b1, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
+		switch arrangement {
+		case VectorArrangement4S:
+			size, Q = 0b00, 1
+		case VectorArrangement2S:
+			size, Q = 0b00, 0
+		case VectorArrangement2D:
+			size, Q = 0b01, 1
+		default:
+			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMGE))
+		}
+		return
+	}},
+}
+
+func advancedSIMDThreeSameDefaultResolver(arrangement VectorArrangement) (Q, size byte, err error) {
+	// TODO: simply use arrangementSizeQ as the resolver after refactoring other call-site of arrangementSizeQ.
+	size, Q = arrangementSizeQ(arrangement)
+	return
 }
 
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD across lanes" in

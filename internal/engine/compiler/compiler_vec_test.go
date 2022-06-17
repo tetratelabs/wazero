@@ -2994,11 +2994,6 @@ func f64x2(f1, f2 float64) (ret [16]byte) {
 }
 
 func TestCompiler_compileV128Cmp(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		cmpType     wazeroir.V128CmpType
