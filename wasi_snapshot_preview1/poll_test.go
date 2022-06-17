@@ -83,8 +83,8 @@ func Test_PollOneoff_Errors(t *testing.T) {
 
 	tests := []struct {
 		name                                   string
-		in, out, nsubscriptions, resultNevents uint32 // at offset in
-		mem                                    []byte
+		in, out, nsubscriptions, resultNevents uint32
+		mem                                    []byte // at offset in
 		expectedErrno                          Errno
 		expectedMem                            []byte // at offset out
 	}{
