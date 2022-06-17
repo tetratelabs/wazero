@@ -18,13 +18,13 @@ func newAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 
-// assemblerGoAsmImpl implements asm_arm64.Assembler for golang-asm library.
+// assemblerGoAsmImpl implements arm64.Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
 	*golang_asm.GolangAsmBaseAssembler
 	temporaryRegister asm.Register
 }
 
-// CompileConstToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileConstToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -45,7 +45,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 	return golang_asm.NewGolangAsmNode(inst)
 }
 
-// CompileMemoryToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -57,7 +57,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction
 	a.AddInstruction(inst)
 }
 
-// CompileMemoryWithRegisterOffsetToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryWithRegisterOffsetToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -70,7 +70,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToMemory implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst asm.ConstantValue) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -95,7 +95,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffset(instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -106,7 +106,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileTwoRegistersToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileTwoRegistersToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, destination asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -118,7 +118,7 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instr
 	a.AddInstruction(inst)
 }
 
-// CompileThreeRegistersToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileThreeRegistersToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileThreeRegistersToRegister(instruction asm.Instruction, src1, src2, src3, dst asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -131,7 +131,7 @@ func (a *assemblerGoAsmImpl) CompileThreeRegistersToRegister(instruction asm.Ins
 	a.AddInstruction(inst)
 }
 
-// CompileTwoRegistersToNone implements the same method as documented on asm_arm64.Assembler.
+// CompileTwoRegistersToNone implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -144,7 +144,7 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileRegisterAndConstToNone implements the same method as documented on asm_arm64.Assembler.
+// CompileRegisterAndConstToNone implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterAndConstToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -192,7 +192,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.
 	return golang_asm.NewGolangAsmNode(prog)
 }
 
-// CompileLeftShiftedRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileLeftShiftedRegisterToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(instruction asm.Instruction, shiftedSourceReg asm.Register, shiftNum asm.ConstantValue, srcReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -205,7 +205,7 @@ func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(instruction as
 	a.AddInstruction(inst)
 }
 
-// CompileReadInstructionAddress implements the same method as documented on asm_arm64.Assembler.
+// CompileReadInstructionAddress implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
@@ -262,7 +262,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Re
 	})
 }
 
-// CompileConditionalRegisterSet implements the same method as documented on asm_arm64.Assembler.
+// CompileConditionalRegisterSet implements the same method as documented on arm64.Assembler.
 //
 // We use CSET instruction to set 1 on the register if the condition satisfies:
 // https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
@@ -282,7 +282,7 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
-// CompileTwoSIMDBytesToSIMDByteRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileTwoSIMDBytesToSIMDByteRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
 	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
 	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -300,7 +300,7 @@ func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction a
 
 }
 
-// CompileSIMDByteToSIMDByte implements the same method as documented on asm_arm64.Assembler.
+// CompileSIMDByteToSIMDByte implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -316,7 +316,7 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileSIMDByteToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileSIMDByteToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFlaotReg)
@@ -332,30 +332,42 @@ func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instructi
 	a.AddInstruction(inst)
 }
 
-// CompileMemoryToVectorRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryToVectorRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryToVectorRegister(
 	_ asm.Instruction, _ asm.Register, _ asm.ConstantValue, _ asm.Register, _ asm_arm64.VectorArrangement,
 ) {
 	panic("CompileMemoryToVectorRegister is unsupported with golang-asm")
 }
 
-// CompileVectorRegisterToMemory implements the same method as documented on asm_arm64.Assembler.
+// CompileVectorRegisterToMemory implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemory(_ asm.Instruction, _, _ asm.Register, _ asm.ConstantValue,
 	_ asm_arm64.VectorArrangement) {
 	panic("CompileVectorRegisterToMemory is unsupported with golang-asm")
 }
 
-// CompileMemoryWithRegisterOffsetToVectorRegister  implements the same method as documented on asm_arm64.Assembler.
+// CompileMemoryWithRegisterOffsetToVectorRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToVectorRegister(_ asm.Instruction, _, _ asm.Register, _ asm.Register, _ asm_arm64.VectorArrangement) {
 	panic("CompileMemoryWithRegisterOffsetToVectorRegister is unsupported with golang-asm")
 }
 
-// CompileVectorRegisterToMemoryWithRegisterOffset  implements the same method as documented on asm_arm64.Assembler.
+// CompileVectorRegisterToMemoryWithRegisterOffset implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToMemoryWithRegisterOffset(_ asm.Instruction, _, _, _ asm.Register, _ asm_arm64.VectorArrangement) {
 	panic("CompileVectorRegisterToMemoryWithRegisterOffset is unsupported with golang-asm")
 }
 
-// CompileRegisterToVectorRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileTwoVectorRegistersToVectorRegister implements the same method as documented on arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileTwoVectorRegistersToVectorRegister(instruction asm.Instruction,
+	srcReg, srcReg2, dstReg asm.Register, arrangement asm_arm64.VectorArrangement) {
+	panic("CompileTwoVectorRegistersToVectorRegister is unsupported with golang-asm")
+}
+
+// CompileTwoVectorRegistersToVectorRegisterWithConst implements the same method as documented on arm64.Assembler.
+func (a *assemblerGoAsmImpl) CompileTwoVectorRegistersToVectorRegisterWithConst(instruction asm.Instruction,
+	srcReg, srcReg2, dstReg asm.Register, arrangement asm_arm64.VectorArrangement, value asm.ConstantValue) {
+	panic("CompileTwoVectorRegistersToVectorRegisterWithConst is unsupported with golang-asm")
+}
+
+// CompileRegisterToVectorRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 	arrangement asm_arm64.VectorArrangement, index asm_arm64.VectorIndex) {
 	inst := a.NewProg()
@@ -369,7 +381,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToVectorRegister(instruction asm.Ins
 	a.AddInstruction(inst)
 }
 
-// CompileVectorRegisterToVectorRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileVectorRegisterToVectorRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement asm_arm64.VectorArrangement, srcIndex, dstIndex asm_arm64.VectorIndex) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
@@ -395,11 +407,11 @@ func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction a
 	}
 }
 
-// CompileVectorRegisterToVectorRegisterWithConst implements the same method as documented on asm_arm64.Assembler.
+// CompileVectorRegisterToVectorRegisterWithConst implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg,
 	dstReg asm.Register, arrangement asm_arm64.VectorArrangement, c asm.ConstantValue) {
 	switch instruction {
-	case asm_arm64.USHLL:
+	case asm_arm64.USHLLIMM:
 		var dstArrangement asm_arm64.VectorArrangement
 		if arrangement == asm_arm64.VectorArrangement8B {
 			dstArrangement = asm_arm64.VectorArrangement8H
@@ -421,7 +433,7 @@ func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegisterWithConst(inst
 	}
 }
 
-// CompileVectorRegisterToRegister implements the same method as documented on asm_arm64.Assembler.
+// CompileVectorRegisterToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 	arrangement asm_arm64.VectorArrangement, index asm_arm64.VectorIndex) {
 	inst := a.NewProg()
@@ -594,19 +606,19 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_arm64.ASR:      arm64.AASR,
 	asm_arm64.ASRW:     arm64.AASRW,
 	asm_arm64.B:        arm64.AB,
-	asm_arm64.BEQ:      arm64.ABEQ,
-	asm_arm64.BGE:      arm64.ABGE,
-	asm_arm64.BGT:      arm64.ABGT,
-	asm_arm64.BHI:      arm64.ABHI,
-	asm_arm64.BHS:      arm64.ABHS,
-	asm_arm64.BLE:      arm64.ABLE,
-	asm_arm64.BLO:      arm64.ABLO,
-	asm_arm64.BLS:      arm64.ABLS,
-	asm_arm64.BLT:      arm64.ABLT,
-	asm_arm64.BMI:      arm64.ABMI,
-	asm_arm64.BPL:      arm64.ABPL,
-	asm_arm64.BNE:      arm64.ABNE,
-	asm_arm64.BVS:      arm64.ABVS,
+	asm_arm64.BCONDEQ:  arm64.ABEQ,
+	asm_arm64.BCONDGE:  arm64.ABGE,
+	asm_arm64.BCONDGT:  arm64.ABGT,
+	asm_arm64.BCONDHI:  arm64.ABHI,
+	asm_arm64.BCONDHS:  arm64.ABHS,
+	asm_arm64.BCONDLE:  arm64.ABLE,
+	asm_arm64.BCONDLO:  arm64.ABLO,
+	asm_arm64.BCONDLS:  arm64.ABLS,
+	asm_arm64.BCONDLT:  arm64.ABLT,
+	asm_arm64.BCONDMI:  arm64.ABMI,
+	asm_arm64.BCONDPL:  arm64.ABPL,
+	asm_arm64.BCONDNE:  arm64.ABNE,
+	asm_arm64.BCONDVS:  arm64.ABVS,
 	asm_arm64.CLZ:      arm64.ACLZ,
 	asm_arm64.CLZW:     arm64.ACLZW,
 	asm_arm64.CMP:      arm64.ACMP,
@@ -705,5 +717,5 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_arm64.VMOV:     arm64.AVMOV,
 	asm_arm64.VADD:     arm64.AVADD,
 	asm_arm64.VSUB:     arm64.AVSUB,
-	asm_arm64.USHLL:    arm64.AVUSHLL,
+	asm_arm64.USHLLIMM: arm64.AVUSHLL,
 }

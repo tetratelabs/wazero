@@ -12,7 +12,7 @@ import (
 // See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
 const (
 	// CondEQ is the eq (equal) condition code
-	CondEQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
+	CondEQ = asm.ConditionalRegisterStateUnset + 1 + iota
 	// CondNE is the ne (not equal) condition code
 	CondNE
 	// CondHS is the hs (unsigned higher or same) condition code
@@ -443,7 +443,7 @@ func RegisterName(r asm.Register) string {
 // Arm64-specific instructions.
 //
 // Note: This only defines arm64 instructions used by wazero's compiler.
-// Note: Naming conventions intentionally match the Go assembler: https://go.dev/doc/asm
+// Note: Naming conventions partially match the Go assembler: https://go.dev/doc/asm
 const (
 	// NOP is the NOP instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NOP
 	NOP asm.Instruction = iota
@@ -459,6 +459,10 @@ const (
 	ADR
 	// AND is the AND instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/AND--shifted-register-
 	AND
+	// ANDIMM32 is the AND(immediate) instruction in 32-bit mode https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/AND--immediate---Bitwise-AND--immediate--?lang=en
+	ANDIMM32
+	// ANDIMM64 is the AND(immediate) instruction in 64-bit mode https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/AND--immediate---Bitwise-AND--immediate--?lang=en
+	ANDIMM64
 	// ANDW is the AND instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/AND--register-
 	ANDW
 	// ASR is the ASR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ASR--register-
@@ -467,32 +471,38 @@ const (
 	ASRW
 	// B is the B instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B
 	B
-	// BEQ is the B.cond instruction with CondEQ. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BEQ
-	// BGE is the B.cond instruction with CondGE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BGE
-	// BGT is the B.cond instruction with CondGT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BGT
-	// BHI is the B.cond instruction with CondHI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BHI
-	// BHS is the B.cond instruction with CondHS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BHS
-	// BLE is the B.cond instruction with CondLE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BLE
-	// BLO is the B.cond instruction with CondLO. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BLO
-	// BLS is the B.cond instruction with CondLS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BLS
-	// BLT is the B.cond instruction with CondLT. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BLT
-	// BMI is the B.cond instruction with CondMI. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BMI
-	// BPL is the B.cond instruction with CondPL. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BPL
-	// BNE is the B.cond instruction with CondNE. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BNE
-	// BVS is the B.cond instruction with CondVS. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
-	BVS
+
+	// Below are B.cond instructions.
+	// 	* https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/B-cond
+	// 	* https://developer.arm.com/documentation/dui0802/a/A32-and-T32-Instructions/Condition-codes
+
+	// BCONDEQ is the B.cond instruction with CondEQ.
+	BCONDEQ
+	// BCONDGE is the B.cond instruction with CondGE.
+	BCONDGE
+	// BCONDGT is the B.cond instruction with CondGT.
+	BCONDGT
+	// BCONDHI is the B.cond instruction with CondHI.
+	BCONDHI
+	// BCONDHS is the B.cond instruction with CondHS.
+	BCONDHS
+	// BCONDLE is the B.cond instruction with CondLE.
+	BCONDLE
+	// BCONDLO is the B.cond instruction with CondLO.
+	BCONDLO
+	// BCONDLS is the B.cond instruction with CondLS.
+	BCONDLS
+	// BCONDLT is the B.cond instruction with CondLT.
+	BCONDLT
+	// BCONDMI is the B.cond instruction with CondMI.
+	BCONDMI
+	// BCONDPL is the B.cond instruction with CondPL.
+	BCONDPL
+	// BCONDNE is the B.cond instruction with CondNE.
+	BCONDNE
+	// BCONDVS is the B.cond instruction with CondVS.
+	BCONDVS
+
 	// CLZ is the CLZ instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
 	CLZ
 	// CLZW is the CLZ instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/CLZ
@@ -619,11 +629,11 @@ const (
 	MSUBW
 	// MUL is the MUL instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MUL
 	MUL
-	// MULW is the MUL instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MUL
+	// MULW is the MUL instruction, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MUL
 	MULW
 	// NEG is the NEG instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NEG
 	NEG
-	// NEGW is the NEG instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NEG
+	// NEGW is the NEG instruction, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/NEG
 	NEGW
 	// ORR is the ORR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/ORR--shifted-register-
 	ORR
@@ -677,20 +687,21 @@ const (
 	UDIV
 	// UDIVW is the UDIV instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/UDIV
 	UDIVW
-
 	// VBIT is the BIT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/BIT--vector-
 	VBIT
 	// VCNT is the CNT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/CNT--vector-
 	VCNT
 	// VMOV has different semantics depending on the types of operands:
-	//	* MOV(vector) if the operands are vectors and indexes are not specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector-
-	//	* MOV(vector, element) if the operands are vectors and indexes are specified. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/MOV--vector--element-
-	//	* INS(vector, element) if the src is a general purpose and the dst is a vector. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/INS--vector---general-
-	//	* UMOV(vector) if the dst is a general purpose and the src is a vector. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMOV--vector-
 	//	* LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
-	//	* LDR (literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
+	//	* LDR(literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
 	//	* STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
 	VMOV
+	// UMOV is the UMOV instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
+	UMOV
+	// INSGEN is the INS(general) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--general---Insert-vector-element-from-general-purpose-register-?lang=en
+	INSGEN
+	// INSELEM is the INS(element) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--element---Insert-vector-element-from-another-vector-element-?lang=en
+	INSELEM
 	// VUADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
 	VUADDLV
 	// VADD is the ADD(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
@@ -705,28 +716,62 @@ const (
 	VFSUBS
 	// VFSUBD is the FSUB(vector) instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FSUB--vector-
 	VFSUBD
-	// SSHLL is the SSHLL(vector) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
-	SSHLL
-	// USHLL is the USHLL(vector) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
-	USHLL
+	// SSHL is the SSHL(vector,register) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
+	SSHL
+	// SSHLLIMM is the SSHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	SSHLLIMM
+	// USHL is the USHL(vector,register) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
+	USHL
+	// USHLLIMM is the USHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	USHLLIMM
 	// LD1R is the LD1R instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--
 	LD1R
-	// SMOV is the SMOV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
-	SMOV
-	// DUP is the DUP(element) instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
-	DUP
+	// SMOV32 is the 32-bit variant of SMOV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
+	SMOV32
+	// DUPGEN is the DUP(general) instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--general---Duplicate-general-purpose-register-to-vector-
+	DUPGEN
+	// DUPELEM is the DUP(element) instruction. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/DUP--element---Duplicate-vector-element-to-vector-or-scalar-
+	DUPELEM
 	// UMAXP is the UMAXP(vector) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/UMAXP--vector-
 	UMAXP
 	// UMINV is the UMINV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/UMINV--vector-
 	UMINV
 	// CMEQ is the CMEQ(vector, register) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/CMEQ--vector--register-
 	CMEQ
-	// ADDP is the ADDP(vector) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
+	// CMEQZERO is the CMEP(zero) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--zero---Compare-bitwise-Equal-to-zero--vector--?lang=en
+	CMEQZERO
+	// ADDP is the ADDP(scalar) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
 	ADDP
+	// VADDP is the ADDP(vector) instruction. https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
+	// Note: prefixed by V to distinguish from the non-vector variant of ADDP(scalar).
+	VADDP
 	// TBL1 is the TBL instruction whose source is one vector. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
 	TBL1
 	// TBL2 is the TBL instruction whose source is two vectors. https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/TBL--Table-vector-Lookup-
 	TBL2
+	// NOT is the NOT(vector) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/NOT--Bitwise-NOT--vector--?lang=en
+	NOT
+	// VAND is the AND(vector) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/AND--vector---Bitwise-AND--vector--
+	// Note: prefixed by V to distinguish from the non-vector variant of AND.
+	VAND
+	// VORR is the ORR(vector) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ORR--vector--register---Bitwise-inclusive-OR--vector--register--
+	// Note: prefixed by V to distinguish from the non-vector variant of ORR.
+	VORR
+	// BSL https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/BSL--Bitwise-Select-
+	BSL
+	// BIC is the BIC(vector) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/BIC--vector--register---Bitwise-bit-Clear--vector--register--
+	BIC
+	// VFNEG is the FNEG(vector) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/FNEG--vector---Floating-point-Negate--vector--
+	// Note: prefixed by V to distinguish from the non-vector variant of FNEG.
+	VFNEG
+	// ADDV is the ADDV instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/ADDV--Add-across-Vector-
+	ADDV
+	// ZIP1 is the ZIP1 instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ZIP1--Zip-vectors--primary--?lang=en
+	ZIP1
+	// SSHR is the SSHR(immediate,vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHR--Signed-Shift-Right--immediate--?lang=en
+	SSHR
+	// EXT is the EXT instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/EXT--Extract-vector-from-pair-of-vectors-?lang=en
+	EXT
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -742,17 +787,17 @@ const (
 	VectorArrangement8B
 	// VectorArrangement16B is an arrangement of 16 bytes (128-bit vector)
 	VectorArrangement16B
-	// VectorArrangement4H is an arrangement of 4 halfwords (64-bit vector)
+	// VectorArrangement4H is an arrangement of 4 half precisions (64-bit vector)
 	VectorArrangement4H
-	// VectorArrangement8H is an arrangement of 8 halfwords (128-bit vector)
+	// VectorArrangement8H is an arrangement of 8 half precisions (128-bit vector)
 	VectorArrangement8H
-	// VectorArrangement2S is an arrangement of 2 words (64-bit vector)
+	// VectorArrangement2S is an arrangement of 2 single precisions (64-bit vector)
 	VectorArrangement2S
-	// VectorArrangement4S is an arrangement of 4 words (128-bit vector)
+	// VectorArrangement4S is an arrangement of 4 single precisions (128-bit vector)
 	VectorArrangement4S
-	// VectorArrangement1D is an arrangement of 1 doubleword (64-bit vector)
+	// VectorArrangement1D is an arrangement of 1 double precision (64-bit vector)
 	VectorArrangement1D
-	// VectorArrangement2D is an arrangement of 2 doublewords (128-bit vector)
+	// VectorArrangement2D is an arrangement of 2 double precisions (128-bit vector)
 	VectorArrangement2D
 
 	// Assign each vector size specifier to a vector arrangement ID.
@@ -831,6 +876,10 @@ func InstructionName(i asm.Instruction) string {
 		return "ADR"
 	case AND:
 		return "AND"
+	case ANDIMM32:
+		return "ANDIMM32"
+	case ANDIMM64:
+		return "ANDIMM64"
 	case ANDW:
 		return "ANDW"
 	case ASR:
@@ -839,32 +888,32 @@ func InstructionName(i asm.Instruction) string {
 		return "ASRW"
 	case B:
 		return "B"
-	case BEQ:
-		return "BEQ"
-	case BGE:
-		return "BGE"
-	case BGT:
-		return "BGT"
-	case BHI:
-		return "BHI"
-	case BHS:
-		return "BHS"
-	case BLE:
-		return "BLE"
-	case BLO:
-		return "BLO"
-	case BLS:
-		return "BLS"
-	case BLT:
-		return "BLT"
-	case BMI:
-		return "BMI"
-	case BPL:
-		return "BPL"
-	case BNE:
-		return "BNE"
-	case BVS:
-		return "BVS"
+	case BCONDEQ:
+		return "BCONDEQ"
+	case BCONDGE:
+		return "BCONDGE"
+	case BCONDGT:
+		return "BCONDGT"
+	case BCONDHI:
+		return "BCONDHI"
+	case BCONDHS:
+		return "BCONDHS"
+	case BCONDLE:
+		return "BCONDLE"
+	case BCONDLO:
+		return "BCONDLO"
+	case BCONDLS:
+		return "BCONDLS"
+	case BCONDLT:
+		return "BCONDLT"
+	case BCONDMI:
+		return "BCONDMI"
+	case BCONDPL:
+		return "BCONDPL"
+	case BCONDNE:
+		return "BCONDNE"
+	case BCONDVS:
+		return "BCONDVS"
 	case CLZ:
 		return "CLZ"
 	case CLZW:
@@ -1057,6 +1106,12 @@ func InstructionName(i asm.Instruction) string {
 		return "VUADDLV"
 	case VMOV:
 		return "VMOV"
+	case INSELEM:
+		return "INSELEM"
+	case UMOV:
+		return "UMOV"
+	case INSGEN:
+		return "INSGEN"
 	case VADD:
 		return "VADD"
 	case VFADDS:
@@ -1069,16 +1124,22 @@ func InstructionName(i asm.Instruction) string {
 		return "VFSUBS"
 	case VFSUBD:
 		return "VFSUBD"
-	case SSHLL:
-		return "SSHLL"
-	case USHLL:
-		return "USHLL"
+	case SSHL:
+		return "SSHL"
+	case USHL:
+		return "USHL"
+	case SSHLLIMM:
+		return "SSHLLIMM"
+	case USHLLIMM:
+		return "USHLLIMM"
 	case LD1R:
 		return "LD1R"
-	case SMOV:
-		return "SMOV"
-	case DUP:
-		return "DUP"
+	case SMOV32:
+		return "SMOV32"
+	case DUPGEN:
+		return "DUPGEN"
+	case DUPELEM:
+		return "DUPELEM"
 	case UMAXP:
 		return "UMAXP"
 	case UMINV:
@@ -1087,10 +1148,34 @@ func InstructionName(i asm.Instruction) string {
 		return "CMEQ"
 	case ADDP:
 		return "ADDP"
+	case VADDP:
+		return "VADDP"
 	case TBL1:
 		return "TBL1"
 	case TBL2:
 		return "TBL2"
+	case NOT:
+		return "NOT"
+	case VAND:
+		return "VAND"
+	case VORR:
+		return "VORR"
+	case BSL:
+		return "BSL"
+	case BIC:
+		return "BIC"
+	case VFNEG:
+		return "VFNEG"
+	case ADDV:
+		return "ADDV"
+	case CMEQZERO:
+		return "CMEQZERO"
+	case ZIP1:
+		return "ZIP1"
+	case SSHR:
+		return "SSHR"
+	case EXT:
+		return "EXT"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

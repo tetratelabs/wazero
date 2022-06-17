@@ -110,10 +110,6 @@ func TestCompiler_compileV128Add(t *testing.T) {
 }
 
 func TestCompiler_compileV128Sub(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name        string
@@ -1902,10 +1898,6 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 }
 
 func TestCompiler_compileV128Bitmask(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	u16x8 := func(u1, u2, u3, u4, u5, u6, u7, u8 uint16) (ret [16]byte) {
 		binary.LittleEndian.PutUint16(ret[0:], u1)
@@ -2028,6 +2020,7 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
+
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
@@ -2039,11 +2032,6 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 }
 
 func TestCompiler_compileV128_Not(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler,
 		&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
@@ -2079,10 +2067,6 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 }
 
 func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name        string
@@ -2315,11 +2299,6 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 }
 
 func TestCompiler_compileV128Bitselect(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name                  string
 		selector, x1, x2, exp [16]byte
@@ -2414,11 +2393,6 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 }
 
 func TestCompiler_compileV128Shl(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		shape  wazeroir.Shape
@@ -2704,11 +2678,6 @@ func TestCompiler_compileV128Shl(t *testing.T) {
 }
 
 func TestCompiler_compileV128Shr(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		signed bool

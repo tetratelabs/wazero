@@ -117,10 +117,10 @@ spectest:
 	@$(MAKE) spectest.v2
 
 spectest.v1:
-	go test $$(go list ./... | grep $(spectest_v1_dir)) -v -timeout 120s
+	@go test $$(go list ./... | grep $(spectest_v1_dir)) -timeout 120s
 
 spectest.v2:
-	go test $$(go list ./... | grep $(spectest_v2_dir)) -v -timeout 120s
+	@go test $$(go list ./... | grep $(spectest_v2_dir)) -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 

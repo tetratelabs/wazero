@@ -67,8 +67,8 @@ func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 
 func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 	movValueRegisterToRegister := func(t *testing.T, c *arm64Compiler, src *runtimeValueLocation, dst asm.Register) {
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.VMOV, src.register, dst,
-			arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VORR, src.register, src.register, dst,
+			arm64.VectorArrangement16B)
 		c.locationStack.markRegisterUnused(src.register)
 		src.setRegister(dst)
 		// We have to set the lower 64-bits' location as well.
