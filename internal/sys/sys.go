@@ -136,8 +136,6 @@ func DefaultContext() *Context {
 }
 
 var _ = DefaultContext() // Force panic on bug.
-var wt sys.Walltime = platform.FakeWalltime
-var nt sys.Nanotime = platform.FakeNanotime
 
 // NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
@@ -192,7 +190,7 @@ func NewContext(
 		sysCtx.walltime = walltime
 		sysCtx.walltimeResolution = walltimeResolution
 	} else {
-		sysCtx.walltime = &wt
+		sysCtx.walltime = platform.NewFakeWalltime()
 		sysCtx.walltimeResolution = sys.ClockResolution(time.Microsecond.Nanoseconds())
 	}
 
@@ -203,7 +201,7 @@ func NewContext(
 		sysCtx.nanotime = nanotime
 		sysCtx.nanotimeResolution = nanotimeResolution
 	} else {
-		sysCtx.nanotime = &nt
+		sysCtx.nanotime = platform.NewFakeNanotime()
 		sysCtx.nanotimeResolution = sys.ClockResolution(time.Nanosecond)
 	}
 

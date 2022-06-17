@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -33,9 +34,12 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, eofReader{}, sysCtx.Stdin())
 	require.Equal(t, io.Discard, sysCtx.Stdout())
 	require.Equal(t, io.Discard, sysCtx.Stderr())
-	require.Equal(t, &wt, sysCtx.walltime) // To compare functions, we can only compare pointers.
+	// To compare functions, we can only compare pointers, but the pointer will
+	// change. Hence, we have to compare the results instead.
+	sec, _ := sysCtx.Walltime(testCtx)
+	require.Equal(t, platform.FakeEpochNanos/time.Second.Nanoseconds(), sec)
 	require.Equal(t, sys.ClockResolution(1_000), sysCtx.WalltimeResolution())
-	require.Equal(t, &nt, sysCtx.nanotime) // To compare functions, we can only compare pointers.
+	require.Zero(t, sysCtx.Nanotime(testCtx)) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, rand.Reader, sysCtx.RandSource())
 	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS())
@@ -172,12 +176,12 @@ func TestNewContext_Walltime(t *testing.T) {
 	}{
 		{
 			name:       "ok",
-			time:       &wt,
+			time:       platform.NewFakeWalltime(),
 			resolution: 3,
 		},
 		{
 			name:        "invalid resolution",
-			time:        &wt,
+			time:        platform.NewFakeWalltime(),
 			resolution:  0,
 			expectedErr: "invalid Walltime resolution: 0",
 		},
@@ -219,12 +223,12 @@ func TestNewContext_Nanotime(t *testing.T) {
 	}{
 		{
 			name:       "ok",
-			time:       &nt,
+			time:       platform.NewFakeNanotime(),
 			resolution: 3,
 		},
 		{
 			name:        "invalid resolution",
-			time:        &nt,
+			time:        platform.NewFakeNanotime(),
 			resolution:  0,
 			expectedErr: "invalid Nanotime resolution: 0",
 		},

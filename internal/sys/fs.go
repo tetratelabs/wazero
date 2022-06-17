@@ -121,6 +121,20 @@ func NewFSConfig() *FSConfig {
 	}
 }
 
+// Clone makes a deep copy of this FS config.
+func (c *FSConfig) Clone() *FSConfig {
+	ret := *c // copy except maps which share a ref
+	ret.preopens = make(map[uint32]*FileEntry, len(c.preopens))
+	for key, value := range c.preopens {
+		ret.preopens[key] = value
+	}
+	ret.preopenPaths = make(map[string]uint32, len(c.preopenPaths))
+	for key, value := range c.preopenPaths {
+		ret.preopenPaths[key] = value
+	}
+	return &ret
+}
+
 // setFS maps a path to a file-system. This is only used for base paths: "/" and ".".
 func (c *FSConfig) setFS(path string, fs fs.FS) {
 	// Check to see if this key already exists and update it.
@@ -135,15 +149,15 @@ func (c *FSConfig) setFS(path string, fs fs.FS) {
 }
 
 func (c *FSConfig) WithFS(fs fs.FS) *FSConfig {
-	ret := *c // copy
+	ret := c.Clone()
 	ret.setFS("/", fs)
-	return &ret
+	return ret
 }
 
 func (c *FSConfig) WithWorkDirFS(fs fs.FS) *FSConfig {
-	ret := *c // copy
+	ret := c.Clone()
 	ret.setFS(".", fs)
-	return &ret
+	return ret
 }
 
 func (c *FSConfig) Preopens() (map[uint32]*FileEntry, error) {

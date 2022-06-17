@@ -425,6 +425,14 @@ of requiring configuration to opt-into real clocks.
 
 See https://gruss.cc/files/fantastictimers.pdf for an example attacks.
 
+## Why does fake time increase on reading?
+
+Both the fake nanotime and walltime increase by 1ms on reading. Particularly in
+the case of nanotime, this prevents spinning. For example, when Go compiles
+`time.Sleep` using `GOOS=js GOARCH=wasm`, nanotime is used in a loop. If that
+never increases, the gouroutine is mistaken for being busy. This would be worse
+if a compiler implement sleep using nanotime, yet doesn't check for spinning!
+
 ## Why not `time.Clock`?
 
 wazero can't use `time.Clock` as a plugin for clock implementation as it is
