@@ -3335,7 +3335,6 @@ var advancedSIMDShiftByImmediate = map[asm.Instruction]struct {
 	USHLLIMM: {U: 0b1, opcode: 0b10100, immQResolver: immResolverForSIMDSiftLeftByImmediate},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHR--Signed-Shift-Right--immediate--?lang=en
 	SSHR: {U: 0b0, opcode: 0b00000, immQResolver: func(shiftAmount int64, arr VectorArrangement) (immh, immb, q byte, err error) {
-		// TODO:
 		switch arr {
 		case VectorArrangement16B, VectorArrangement8B:
 			immh = 0b0001
