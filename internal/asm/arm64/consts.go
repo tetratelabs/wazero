@@ -772,6 +772,20 @@ const (
 	SSHR
 	// EXT is the EXT instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/EXT--Extract-vector-from-pair-of-vectors-?lang=en
 	EXT
+	// CMGT is the CMGT(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGT--register---Compare-signed-Greater-than--vector--?lang=en
+	CMGT
+	// CMHI is the CMHI(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHI--register---Compare-unsigned-Higher--vector--?lang=en
+	CMHI
+	// CMGE is the CMGE(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGE--register---Compare-signed-Greater-than-or-Equal--vector--?lang=en
+	CMGE
+	// CMHS is the CMHS(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHS--register---Compare-unsigned-Higher-or-Same--vector--?lang=en
+	CMHS
+	// FCMEQ is the FCMEQ(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMEQ--register---Floating-point-Compare-Equal--vector--?lang=en
+	FCMEQ
+	// FCMGT is the FCMGT(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGT--register---Floating-point-Compare-Greater-than--vector--?lang=en
+	FCMGT
+	// FCMGE is the FCMGE(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGE--register---Floating-point-Compare-Greater-than-or-Equal--vector--?lang=en
+	FCMGE
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1176,6 +1190,20 @@ func InstructionName(i asm.Instruction) string {
 		return "SSHR"
 	case EXT:
 		return "EXT"
+	case CMGT:
+		return "CMGT"
+	case CMHI:
+		return "CMHI"
+	case CMGE:
+		return "CMGE"
+	case CMHS:
+		return "CMHS"
+	case FCMEQ:
+		return "FCMEQ"
+	case FCMGT:
+		return "FCMGT"
+	case FCMGE:
+		return "FCMGE"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

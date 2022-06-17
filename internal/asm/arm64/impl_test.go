@@ -1741,6 +1741,182 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 			},
 			exp: []byte{0xe0, 0x39, 0x1, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
+		{
+			name: "cmeq v0.8b, v15.8b, v1.8b",
+			n: &NodeImpl{
+				Instruction:       CMEQ,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0xe0, 0x8d, 0x21, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmgt v0.16b, v15.16b, v1.16b",
+			n: &NodeImpl{
+				Instruction:       CMGT,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0xe0, 0x35, 0x21, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmhi v0.8h, v15.8h, v1.8h",
+			n: &NodeImpl{
+				Instruction:       CMHI,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0xe0, 0x35, 0x61, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmhi v0.4h, v15.4h, v1.4h",
+			n: &NodeImpl{
+				Instruction:       CMHI,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement4H,
+			},
+			exp: []byte{0xe0, 0x35, 0x61, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmge v0.4s, v15.4s, v1.4s",
+			n: &NodeImpl{
+				Instruction:       CMGE,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0xe0, 0x3d, 0xa1, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmge v0.2s, v15.2s, v1.2s",
+			n: &NodeImpl{
+				Instruction:       CMGE,
+				DstReg:            RegV0,
+				SrcReg:            RegV1,
+				SrcReg2:           RegV15,
+				VectorArrangement: VectorArrangement2S,
+			},
+			exp: []byte{0xe0, 0x3d, 0xa1, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "cmhs v30.2d, v4.2d, v11.2d",
+			n: &NodeImpl{
+				Instruction:       CMHS,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0x9e, 0x3c, 0xeb, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmeq v30.2d, v4.2d, v11.2d",
+			n: &NodeImpl{
+				Instruction:       FCMEQ,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0x9e, 0xe4, 0x6b, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmeq v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       FCMEQ,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0xe4, 0x2b, 0x4e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmeq v30.2s, v4.2s, v11.2s",
+			n: &NodeImpl{
+				Instruction:       FCMEQ,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2S,
+			},
+			exp: []byte{0x9e, 0xe4, 0x2b, 0xe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmgt v30.2d, v4.2d, v11.2d",
+			n: &NodeImpl{
+				Instruction:       FCMGT,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0x9e, 0xe4, 0xeb, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmgt v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       FCMGT,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0xe4, 0xab, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmgt v30.2s, v4.2s, v11.2s",
+			n: &NodeImpl{
+				Instruction:       FCMGT,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2S,
+			},
+			exp: []byte{0x9e, 0xe4, 0xab, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmge v30.2d, v4.2d, v11.2d",
+			n: &NodeImpl{
+				Instruction:       FCMGE,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0x9e, 0xe4, 0x6b, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmge v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       FCMGE,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0xe4, 0x2b, 0x6e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "fcmge v30.2s, v4.2s, v11.2s",
+			n: &NodeImpl{
+				Instruction:       FCMGE,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2S,
+			},
+			exp: []byte{0x9e, 0xe4, 0x2b, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
 	}
 
 	for _, tt := range tests {
