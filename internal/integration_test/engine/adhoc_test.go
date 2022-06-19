@@ -45,6 +45,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"multiple instantiation from same source":           testMultipleInstantiation,
 	"exported function that grows memory":               testMemOps,
 	"import functions with reference type in signature": testReftypeImports,
+	"overflow integer addition":                         testOverflow,
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -79,6 +80,8 @@ var (
 	hugestackWasm []byte
 	//go:embed testdata/reftype_imports.wasm
 	reftypeImportsWasm []byte
+	//go:embed testdata/overflow.wasm
+	overflowWasm []byte
 )
 
 func testReftypeImports(t *testing.T, r wazero.Runtime) {
@@ -118,6 +121,22 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 
 	_, err = fn.Call(testCtx)
 	require.NoError(t, err)
+}
+
+func testOverflow(t *testing.T, r wazero.Runtime) {
+	module, err := r.InstantiateModuleFromBinary(testCtx, overflowWasm)
+	require.NoError(t, err)
+	defer module.Close(testCtx)
+
+	for _, name := range []string{"i32", "i64"} {
+		i32 := module.ExportedFunction(name)
+		require.NotNil(t, i32)
+
+		res, err := i32.Call(testCtx)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), res[0])
+	}
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {
