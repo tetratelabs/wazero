@@ -123,6 +123,8 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 }
 
+// testOverflow ensures that adding one into the maximum integer results in the
+// minimum one. See #636.
 func testOverflow(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromBinary(testCtx, overflowWasm)
 	require.NoError(t, err)
