@@ -786,6 +786,36 @@ const (
 	FCMGT
 	// FCMGE is the FCMGE(register) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGE--register---Floating-point-Compare-Greater-than-or-Equal--vector--?lang=en
 	FCMGE
+	// VFMUL is the FMUL(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMUL--vector---Floating-point-Multiply--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFMUL
+	// VFDIV is the FDIV(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FDIV--vector---Floating-point-Divide--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFDIV
+	// VFSQRT is the FSQRT(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSQRT--vector---Floating-point-Square-Root--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFSQRT
+	// VFMIN is the FMIN(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMIN--vector---Floating-point-minimum--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFMIN
+	// VFMAX is the FMAX(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMAX--vector---Floating-point-Maximum--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFMAX
+	// VFABS is the FABS(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FABS--vector---Floating-point-Absolute-value--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFABS
+	// VFRINTP is the FRINTP(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTP--vector---Floating-point-Round-to-Integral--toward-Plus-infinity--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFRINTP
+	// VFRINTM is the FRINTM(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTM--vector---Floating-point-Round-to-Integral--toward-Minus-infinity--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFRINTM
+	// VFRINTZ is the FRINTZ(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTZ--vector---Floating-point-Round-to-Integral--toward-Zero--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFRINTZ
+	// VFRINTN is the FRINTN(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTN--vector---Floating-point-Round-to-Integral--to-nearest-with-ties-to-even--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFRINTN
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1204,6 +1234,26 @@ func InstructionName(i asm.Instruction) string {
 		return "FCMGT"
 	case FCMGE:
 		return "FCMGE"
+	case VFMUL:
+		return "VFMUL"
+	case VFDIV:
+		return "VFDIV"
+	case VFSQRT:
+		return "VFSQRT"
+	case VFMIN:
+		return "VFMIN"
+	case VFMAX:
+		return "VFMAX"
+	case VFABS:
+		return "VFABS"
+	case VFRINTP:
+		return "VFRINTP"
+	case VFRINTM:
+		return "VFRINTM"
+	case VFRINTZ:
+		return "VFRINTZ"
+	case VFRINTN:
+		return "VFRINTN"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

@@ -628,7 +628,7 @@ func (c *arm64Compiler) compileV128AllTrue(o *wazeroir.OperationV128AllTrue) (er
 		c.assembler.CompileVectorRegisterToVectorRegister(arm64.CMEQZERO, arm64.RegRZR, v,
 			arm64.VectorArrangement2D, arm64.VectorIndexNone, arm64.VectorIndexNone)
 		c.assembler.CompileVectorRegisterToVectorRegister(arm64.ADDP, v, v,
-			arm64.VectorArrangementNone, arm64.VectorIndexNone, arm64.VectorIndexNone)
+			arm64.VectorArrangement2D, arm64.VectorIndexNone, arm64.VectorIndexNone)
 		c.assembler.CompileTwoRegistersToNone(arm64.FCMPD, v, v)
 		c.locationStack.pushRuntimeValueLocationOnConditionalRegister(arm64.CondEQ)
 	} else {
@@ -1023,27 +1023,83 @@ func (c *arm64Compiler) compileV128SubSat(o *wazeroir.OperationV128SubSat) error
 
 // compileV128Mul implements compiler.compileV128Mul for arm64.
 func (c *arm64Compiler) compileV128Mul(o *wazeroir.OperationV128Mul) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	var inst asm.Instruction
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+		inst = arm64.VFMUL
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+		inst = arm64.VFMUL
+	default:
+		// TODO: support for integer mul.
+		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	}
+	return c.compileV128x2BinOp(inst, arr)
 }
 
 // compileV128Div implements compiler.compileV128Div for arm64.
 func (c *arm64Compiler) compileV128Div(o *wazeroir.OperationV128Div) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	var inst asm.Instruction
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+		inst = arm64.VFDIV
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+		inst = arm64.VFDIV
+	}
+	return c.compileV128x2BinOp(inst, arr)
 }
 
 // compileV128Neg implements compiler.compileV128Neg for arm64.
 func (c *arm64Compiler) compileV128Neg(o *wazeroir.OperationV128Neg) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	var inst asm.Instruction
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+		inst = arm64.VFNEG
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+		inst = arm64.VFNEG
+	default:
+		// TODO: support for integer neg.
+		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	}
+	return c.compileV128UniOp(inst, arr)
 }
 
 // compileV128Sqrt implements compiler.compileV128Sqrt for arm64.
 func (c *arm64Compiler) compileV128Sqrt(o *wazeroir.OperationV128Sqrt) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+	}
+	return c.compileV128UniOp(arm64.VFSQRT, arr)
 }
 
 // compileV128Abs implements compiler.compileV128Abs for arm64.
 func (c *arm64Compiler) compileV128Abs(o *wazeroir.OperationV128Abs) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		inst = arm64.VFABS
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		inst = arm64.VFABS
+		arr = arm64.VectorArrangement2D
+	default:
+		// TODO: support for integer abs.
+		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	}
+	return c.compileV128UniOp(inst, arr)
 }
 
 // compileV128Popcnt implements compiler.compileV128Popcnt for arm64.
@@ -1053,12 +1109,38 @@ func (c *arm64Compiler) compileV128Popcnt(o *wazeroir.OperationV128Popcnt) error
 
 // compileV128Min implements compiler.compileV128Min for arm64.
 func (c *arm64Compiler) compileV128Min(o *wazeroir.OperationV128Min) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		inst = arm64.VFMIN
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		inst = arm64.VFMIN
+		arr = arm64.VectorArrangement2D
+	default:
+		// TODO: support for integer min.
+		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	}
+	return c.compileV128x2BinOp(inst, arr)
 }
 
 // compileV128Max implements compiler.compileV128Max for arm64.
 func (c *arm64Compiler) compileV128Max(o *wazeroir.OperationV128Max) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		inst = arm64.VFMAX
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		inst = arm64.VFMAX
+		arr = arm64.VectorArrangement2D
+	default:
+		// TODO: support for integer max.
+		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	}
+	return c.compileV128x2BinOp(inst, arr)
 }
 
 // compileV128AvgrU implements compiler.compileV128AvgrU for arm64.
@@ -1078,22 +1160,50 @@ func (c *arm64Compiler) compileV128Pmax(o *wazeroir.OperationV128Pmax) error {
 
 // compileV128Ceil implements compiler.compileV128Ceil for arm64.
 func (c *arm64Compiler) compileV128Ceil(o *wazeroir.OperationV128Ceil) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+	}
+	return c.compileV128UniOp(arm64.VFRINTP, arr)
 }
 
 // compileV128Floor implements compiler.compileV128Floor for arm64.
 func (c *arm64Compiler) compileV128Floor(o *wazeroir.OperationV128Floor) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+	}
+	return c.compileV128UniOp(arm64.VFRINTM, arr)
 }
 
 // compileV128Trunc implements compiler.compileV128Trunc for arm64.
 func (c *arm64Compiler) compileV128Trunc(o *wazeroir.OperationV128Trunc) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+	}
+	return c.compileV128UniOp(arm64.VFRINTZ, arr)
 }
 
 // compileV128Nearest implements compiler.compileV128Nearest for arm64.
 func (c *arm64Compiler) compileV128Nearest(o *wazeroir.OperationV128Nearest) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var arr arm64.VectorArrangement
+	switch o.Shape {
+	case wazeroir.ShapeF32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeF64x2:
+		arr = arm64.VectorArrangement2D
+	}
+	return c.compileV128UniOp(arm64.VFRINTN, arr)
 }
 
 // compileV128Extend implements compiler.compileV128Extend for arm64.

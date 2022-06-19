@@ -3473,10 +3473,6 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 }
 
 func TestCompiler_compileV128Sqrt(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name   string
@@ -3843,11 +3839,6 @@ func TestCompiler_compileV128Abs(t *testing.T) {
 }
 
 func TestCompiler_compileV128Div(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -4635,11 +4626,6 @@ func TestCompiler_compileV128Popcnt(t *testing.T) {
 }
 
 func TestCompiler_compileV128Round(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name  string
 		shape wazeroir.Shape
