@@ -69,11 +69,14 @@ func Test_Nanotime(t *testing.T) {
 }
 
 func Test_Nanosleep(t *testing.T) {
+	// In CI, Nanosleep(50ms) returned after 197ms.
+	// As we can't control the platform clock, we have to be lenient
 	ns := int64(50 * time.Millisecond)
+	max := ns * 5
+
 	start := Nanotime(context.Background())
 	Nanosleep(context.Background(), ns)
-
 	duration := Nanotime(context.Background()) - start
-	max := ns * 2 // max scheduling delay
+
 	require.True(t, duration > 0 && duration < max, "Nanosleep(%d) slept for %d", ns, duration)
 }
