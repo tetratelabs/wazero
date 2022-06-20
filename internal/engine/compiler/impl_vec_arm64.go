@@ -1233,11 +1233,13 @@ func (c *arm64Compiler) compileV128PseudoMinOrMax(arr arm64.VectorArrangement, m
 
 	x1r, x2r := x1.register, x2.register
 
+	// Sets all bits on each lane if x1r's lane satisfies the condition (min or max), zeros otherwise.
 	if max {
 		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x1r, x2r, result, arr)
 	} else {
 		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x2r, x1r, result, arr)
 	}
+	// Select each bit based on the result bits ^.
 	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.BSL, x1r, x2r, result, arm64.VectorArrangement16B)
 
 	c.markRegisterUnused(x1r, x2r)
