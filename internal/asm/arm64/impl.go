@@ -2855,6 +2855,18 @@ var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 	SADDLP: {U: 0b0, opcode: 0b00010, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UADDLP--Unsigned-Add-Long-Pairwise-?lang=en
 	UADDLP: {U: 0b1, opcode: 0b00010, qAndSize: defaultQAndSize},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZS--vector--integer---Floating-point-Convert-to-Signed-integer--rounding-toward-Zero--vector--?lang=en
+	VFCVTZS: {U: 0b0, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZU--vector--integer---Floating-point-Convert-to-Unsigned-integer--rounding-toward-Zero--vector--?lang=en
+	VFCVTZU: {U: 0b1, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+	}},
 }
 
 // advancedSIMDThreeDifferent holds information to encode instructions as "Advanced SIMD three different" in

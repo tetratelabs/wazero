@@ -874,10 +874,12 @@ const (
 	UMULL
 	// UMULL2 is the UMULL2 instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 	UMULL2
-	// FCVTZS is the FCVTZS instruction
-	FCVTZS
-	// FCVTZU is the FCVTZU instruction
-	FCVTZU
+	// VFCVTZS is the FCVTZS(vector,integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZS--vector--integer---Floating-point-Convert-to-Signed-integer--rounding-toward-Zero--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFCVTZS
+	// VFCVTZU is the FCVTZU(vector,integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZU--vector--integer---Floating-point-Convert-to-Unsigned-integer--rounding-toward-Zero--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFCVTZU
 	// SQXTN is the SQXTN instruction
 	SQXTN
 	// UQXTN is the UQXTN instruction
@@ -1370,11 +1372,10 @@ func InstructionName(i asm.Instruction) string {
 		return "UMULL"
 	case UMULL2:
 		return "UMULL2"
-
-	case FCVTZS:
-		return "FCVTZS"
-	case FCVTZU:
-		return "FCVTZU"
+	case VFCVTZS:
+		return "VFCVTZS"
+	case VFCVTZU:
+		return "VFCVTZU"
 	case SQXTN:
 		return "SQXTN"
 	case UQXTN:
