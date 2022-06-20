@@ -151,7 +151,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement8B, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType8x8u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -161,7 +161,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement8B, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType16x4s:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -171,7 +171,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement4H, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType16x4u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -181,7 +181,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement4H, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType32x2s:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -191,7 +191,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType32x2u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -201,7 +201,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType8Splat:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 1)

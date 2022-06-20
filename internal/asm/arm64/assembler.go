@@ -92,7 +92,7 @@ type Assembler interface {
 
 	// CompileVectorRegisterToVectorRegisterWithConst is the same as CompileVectorRegisterToVectorRegister but the
 	// additional constant can be provided.
-	// For example, the const can be used to specify the shift amount for USHLLIMM instruction.
+	// For example, the const can be used to specify the shift amount for USHLL instruction.
 	CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg, dstReg asm.Register,
 		arrangement VectorArrangement, c asm.ConstantValue)
 

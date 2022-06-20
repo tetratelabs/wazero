@@ -361,7 +361,7 @@ func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegister(instruction a
 func (a *assemblerGoAsmImpl) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction, srcReg,
 	dstReg asm.Register, arrangement asm_arm64.VectorArrangement, c asm.ConstantValue) {
 	switch instruction {
-	case asm_arm64.USHLLIMM:
+	case asm_arm64.USHLL:
 		var dstArrangement asm_arm64.VectorArrangement
 		if arrangement == asm_arm64.VectorArrangement8B {
 			dstArrangement = asm_arm64.VectorArrangement8H
@@ -667,5 +667,5 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	asm_arm64.VMOV:     arm64.AVMOV,
 	asm_arm64.VADD:     arm64.AVADD,
 	asm_arm64.VSUB:     arm64.AVSUB,
-	asm_arm64.USHLLIMM: arm64.AVUSHLL,
+	asm_arm64.USHLL:    arm64.AVUSHLL,
 }
