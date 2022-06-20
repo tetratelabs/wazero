@@ -1264,24 +1264,15 @@ func (c *arm64Compiler) compileV128Nearest(o *wazeroir.OperationV128Nearest) err
 
 // compileV128Extend implements compiler.compileV128Extend for arm64.
 func (c *arm64Compiler) compileV128Extend(o *wazeroir.OperationV128Extend) error {
-
 	var inst asm.Instruction
+	var arr arm64.VectorArrangement
 	if o.UseLow {
 		if o.Signed {
 			inst = arm64.SSHLL
 		} else {
 			inst = arm64.USHLL
 		}
-	} else {
-		if o.Signed {
-			inst = arm64.SSHLL2
-		} else {
-			inst = arm64.USHLL2
-		}
-	}
 
-	var arr arm64.VectorArrangement
-	if o.UseLow {
 		switch o.OriginShape {
 		case wazeroir.ShapeI8x16:
 			arr = arm64.VectorArrangement8B
@@ -1291,6 +1282,11 @@ func (c *arm64Compiler) compileV128Extend(o *wazeroir.OperationV128Extend) error
 			arr = arm64.VectorArrangement2S
 		}
 	} else {
+		if o.Signed {
+			inst = arm64.SSHLL2
+		} else {
+			inst = arm64.USHLL2
+		}
 		arr = defaultArrangementForShape(o.OriginShape)
 	}
 
@@ -1299,24 +1295,15 @@ func (c *arm64Compiler) compileV128Extend(o *wazeroir.OperationV128Extend) error
 
 // compileV128ExtMul implements compiler.compileV128ExtMul for arm64.
 func (c *arm64Compiler) compileV128ExtMul(o *wazeroir.OperationV128ExtMul) error {
-
 	var inst asm.Instruction
-	if o.Signed {
-		if o.UseLow {
-			inst = arm64.SMULL
-		} else {
-			inst = arm64.SMULL2
-		}
-	} else {
-		if o.UseLow {
-			inst = arm64.UMULL
-		} else {
-			inst = arm64.UMULL2
-		}
-	}
-
 	var arr arm64.VectorArrangement
 	if o.UseLow {
+		if o.Signed {
+			inst = arm64.SMULL
+		} else {
+			inst = arm64.UMULL
+		}
+
 		switch o.OriginShape {
 		case wazeroir.ShapeI8x16:
 			arr = arm64.VectorArrangement8B
@@ -1326,6 +1313,11 @@ func (c *arm64Compiler) compileV128ExtMul(o *wazeroir.OperationV128ExtMul) error
 			arr = arm64.VectorArrangement2S
 		}
 	} else {
+		if o.Signed {
+			inst = arm64.SMULL2
+		} else {
+			inst = arm64.UMULL2
+		}
 		arr = defaultArrangementForShape(o.OriginShape)
 	}
 

@@ -874,6 +874,14 @@ const (
 	UMULL
 	// UMULL2 is the UMULL2 instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 	UMULL2
+	// FCVTZS is the FCVTZS instruction
+	FCVTZS
+	// FCVTZU is the FCVTZU instruction
+	FCVTZU
+	// SQXTN is the SQXTN instruction
+	SQXTN
+	// UQXTN is the UQXTN instruction
+	UQXTN
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1362,6 +1370,15 @@ func InstructionName(i asm.Instruction) string {
 		return "UMULL"
 	case UMULL2:
 		return "UMULL2"
+
+	case FCVTZS:
+		return "FCVTZS"
+	case FCVTZU:
+		return "FCVTZU"
+	case SQXTN:
+		return "SQXTN"
+	case UQXTN:
+		return "UQXTN"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }
