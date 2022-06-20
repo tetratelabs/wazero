@@ -232,24 +232,6 @@ func (ta *testAssembler) CompileLeftShiftedRegisterToRegister(
 	ta.a.CompileLeftShiftedRegisterToRegister(instruction, shiftedSourceReg, shiftNum, srcReg, dstReg)
 }
 
-func (ta *testAssembler) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	ta.goasm.CompileSIMDByteToSIMDByte(instruction, srcReg, dstReg)
-	ta.a.CompileSIMDByteToSIMDByte(instruction, srcReg, dstReg)
-}
-
-func (ta *testAssembler) CompileTwoSIMDBytesToSIMDByteRegister(
-	instruction asm.Instruction,
-	srcReg1, srcReg2, dstReg asm.Register,
-) {
-	ta.goasm.CompileTwoSIMDBytesToSIMDByteRegister(instruction, srcReg1, srcReg2, dstReg)
-	ta.a.CompileTwoSIMDBytesToSIMDByteRegister(instruction, srcReg1, srcReg2, dstReg)
-}
-
-func (ta *testAssembler) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	ta.goasm.CompileSIMDByteToRegister(instruction, srcReg, dstReg)
-	ta.a.CompileSIMDByteToRegister(instruction, srcReg, dstReg)
-}
-
 func (ta *testAssembler) CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register) {
 	ta.goasm.CompileConditionalRegisterSet(cond, dstReg)
 	ta.a.CompileConditionalRegisterSet(cond, dstReg)

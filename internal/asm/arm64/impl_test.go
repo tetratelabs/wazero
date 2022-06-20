@@ -95,18 +95,6 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VCNT, Types: OperandTypesSIMDByteToSIMDByte, SrcReg: RegV1, DstReg: RegV2},
-			exp: "VCNT V1.B8, V2.B8",
-		},
-		{
-			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: RegV1, DstReg: RegV2},
-			exp: "VUADDLV V1.B8, V2",
-		},
-		{
-			in:  &NodeImpl{Instruction: VBIT, Types: OperandTypesTwoSIMDBytesToSIMDByteRegister, SrcReg: RegV1, SrcReg2: RegV2, DstReg: RegV3},
-			exp: "VBIT (V1.B8, V2.B8), V3.B8",
-		},
-		{
 			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesMemoryToVectorRegister,
 				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2S},
 			exp: "VMOV [R1], V29.2S",
@@ -339,40 +327,6 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	require.Equal(t, int64(10), actualNode.SrcConst)
 	require.Equal(t, RegR5, actualNode.DstReg)
 	require.Equal(t, OperandTypeLeftShiftedRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
-}
-
-func Test_CompileSIMDByteToSIMDByte(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
-	a.CompileSIMDByteToSIMDByte(VCNT, RegV0, RegV2)
-	actualNode := a.Current
-	require.Equal(t, VCNT, actualNode.Instruction)
-	require.Equal(t, RegV0, actualNode.SrcReg)
-	require.Equal(t, RegV2, actualNode.DstReg)
-	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
-	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
-}
-
-func Test_CompileTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
-	a.CompileTwoSIMDBytesToSIMDByteRegister(VBIT, RegV0, RegV10, RegV2)
-	actualNode := a.Current
-	require.Equal(t, VBIT, actualNode.Instruction)
-	require.Equal(t, RegV0, actualNode.SrcReg)
-	require.Equal(t, RegV10, actualNode.SrcReg2)
-	require.Equal(t, RegV2, actualNode.DstReg)
-	require.Equal(t, OperandTypeTwoSIMDBytes, actualNode.Types.src)
-	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.dst)
-}
-
-func Test_CompileSIMDByteToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
-	a.CompileSIMDByteToRegister(VUADDLV, RegV0, RegV10)
-	actualNode := a.Current
-	require.Equal(t, VUADDLV, actualNode.Instruction)
-	require.Equal(t, RegV0, actualNode.SrcReg)
-	require.Equal(t, RegV10, actualNode.DstReg)
-	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
@@ -889,6 +843,126 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		exp                []byte
 	}{
 		{
+			inst: XTN,
+			name: "xtn v10.2s, v2.2d",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0x28, 0xa1, 0xe},
+		},
+		{
+			inst: XTN,
+			name: "xtn v10.4h, v2.4s",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0x28, 0x61, 0xe},
+		},
+		{
+			inst: XTN,
+			name: "xtn v10.8b, v2.8h",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement8H,
+			exp:  []byte{0x4a, 0x28, 0x21, 0xe},
+		},
+		{
+			inst: REV64,
+			name: "rev64 v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x8, 0x20, 0x4e},
+		},
+		{
+			inst: REV64,
+			name: "rev64 v10.4s, v2.4s",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0x8, 0xa0, 0x4e},
+		},
+		{
+			inst: VCNT,
+			name: "cnt v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0x58, 0x20, 0x4e},
+		},
+		{
+			inst: VCNT,
+			name: "cnt v10.8b, v2.8b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement8B,
+			exp:  []byte{0x4a, 0x58, 0x20, 0xe},
+		},
+		{
+			inst: VNEG,
+			name: "neg v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0xb8, 0x20, 0x6e},
+		},
+		{
+			inst: VNEG,
+			name: "neg v10.8h, v2.18h",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement8H,
+			exp:  []byte{0x4a, 0xb8, 0x60, 0x6e},
+		},
+		{
+			inst: VNEG,
+			name: "neg v10.4s, v2.4s",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0xb8, 0xa0, 0x6e},
+		},
+		{
+			inst: VNEG,
+			name: "neg v10.2d, v2.2d",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0xb8, 0xe0, 0x6e},
+		},
+		{
+			inst: VABS,
+			name: "abs v10.16b, v2.16b",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement16B,
+			exp:  []byte{0x4a, 0xb8, 0x20, 0x4e},
+		},
+		{
+			inst: VABS,
+			name: "abs v10.8h, v2.18h",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement8H,
+			exp:  []byte{0x4a, 0xb8, 0x60, 0x4e},
+		},
+		{
+			inst: VABS,
+			name: "abs v10.4s, v2.4s",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement4S,
+			exp:  []byte{0x4a, 0xb8, 0xa0, 0x4e},
+		},
+		{
+			inst: VABS,
+			name: "abs v10.2d, v2.2d",
+			x1:   RegV2,
+			x2:   RegV10,
+			arr:  VectorArrangement2D,
+			exp:  []byte{0x4a, 0xb8, 0xe0, 0x4e},
+		},
+		{
 			inst: ZIP1,
 			name: "zip1 v10.16b, v10.16b, v2.16b",
 			x1:   RegV2,
@@ -1103,14 +1177,6 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			exp:  []byte{0x4a, 0x4, 0x7f, 0x4f},
 			arr:  VectorArrangement2D,
 			c:    1,
-		},
-		{
-			name: "sshll v10.8h, v2.8b, #0",
-			x1:   RegV2,
-			x2:   RegV10,
-			inst: SSHLLIMM,
-			exp:  []byte{0x4a, 0xa4, 0x8, 0xf},
-			arr:  VectorArrangement8B,
 		},
 		{
 			name: "sshll v10.8h, v2.8b, #7",
@@ -1639,6 +1705,54 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			inst: VFRINTN,
 			exp:  []byte{0x3e, 0x8b, 0x61, 0x4e},
 			arr:  VectorArrangement2D,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "shll v30.8h, v25.8b, #8",
+			inst: SHLL,
+			exp:  []byte{0x3e, 0x3b, 0x21, 0x2e},
+			arr:  VectorArrangement8B,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "shll v30.4s, v25.4h, #16",
+			inst: SHLL,
+			exp:  []byte{0x3e, 0x3b, 0x61, 0x2e},
+			arr:  VectorArrangement4H,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "shll v30.2d, v25.2s, #32",
+			inst: SHLL,
+			exp:  []byte{0x3e, 0x3b, 0xa1, 0x2e},
+			arr:  VectorArrangement2S,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv h30, v25.16b",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0x30, 0x6e},
+			arr:  VectorArrangement16B,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv s30, v25.8h",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0x70, 0x6e},
+			arr:  VectorArrangement8H,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv d30, v25.4s",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0xb0, 0x6e},
+			arr:  VectorArrangement4S,
 		},
 	}
 
@@ -2177,6 +2291,281 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 				VectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xf4, 0x6b, 0x4e},
+		},
+		{
+			name: "mul v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       VMUL,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0x9c, 0xab, 0x4e},
+		},
+		{
+			name: "mul v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       VMUL,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x9c, 0x2b, 0x4e},
+		},
+		{
+			name: "sqadd v30.2d, v4.2d, v11.2d",
+			n: &NodeImpl{
+				Instruction:       VSQADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement2D,
+			},
+			exp: []byte{0x9e, 0xc, 0xeb, 0x4e},
+		},
+		{
+			name: "sqadd v30.8h, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       VSQADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0xc, 0x6b, 0x4e},
+		},
+		{
+			name: "uqadd v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       VUQADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0xc, 0xab, 0x6e},
+		},
+		{
+			name: "uqadd v30.8h, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       VUQADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0xc, 0x6b, 0x6e},
+		},
+		{
+			name: "smax v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       SMAX,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0x64, 0xab, 0x4e},
+		},
+		{
+			name: "smax v30.8h, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       SMAX,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0x64, 0x6b, 0x4e},
+		},
+		{
+			name: "smin v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       SMIN,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x6c, 0x2b, 0x4e},
+		},
+		{
+			name: "smin v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       SMIN,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0x6c, 0xab, 0x4e},
+		},
+		{
+			name: "umin v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       UMIN,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x6c, 0x2b, 0x6e},
+		},
+		{
+			name: "umin v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       UMIN,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0x6c, 0xab, 0x6e},
+		},
+		{
+			name: "umax v30.4s, v4.4s, v11.4s",
+			n: &NodeImpl{
+				Instruction:       UMAX,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement4S,
+			},
+			exp: []byte{0x9e, 0x64, 0xab, 0x6e},
+		},
+		{
+			name: "umax v30.8h, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       UMAX,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0x64, 0x6b, 0x6e},
+		},
+		{
+			name: "umax v30.8h, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       URHADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0x14, 0x6b, 0x6e},
+		},
+		{
+			name: "umax v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       URHADD,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x14, 0x2b, 0x6e},
+		},
+		{
+			name: "sqsub v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       VSQSUB,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x2c, 0x2b, 0x4e},
+		},
+		{
+			name: "sqsub v308hb, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       VSQSUB,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0x2c, 0x6b, 0x4e},
+		},
+		{
+			name: "uqsub v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       VUQSUB,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x2c, 0x2b, 0x6e},
+		},
+		{
+			name: "uqsub v308hb, v4.8h, v11.8h",
+			n: &NodeImpl{
+				Instruction:       VUQSUB,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8H,
+			},
+			exp: []byte{0x9e, 0x2c, 0x6b, 0x6e},
+		},
+		{
+			name: "umlal v0.2d, v6.2s, v2.2s",
+			n: &NodeImpl{
+				Instruction:       VUMLAL,
+				DstReg:            RegV0,
+				SrcReg:            RegV2,
+				SrcReg2:           RegV6,
+				VectorArrangement: VectorArrangement2S,
+			},
+			exp: []byte{0xc0, 0x80, 0xa2, 0x2e},
+		},
+		{
+			name: "umlal v0.4s, v6.4h, v2.4h",
+			n: &NodeImpl{
+				Instruction:       VUMLAL,
+				DstReg:            RegV0,
+				SrcReg:            RegV2,
+				SrcReg2:           RegV6,
+				VectorArrangement: VectorArrangement4H,
+			},
+			exp: []byte{0xc0, 0x80, 0x62, 0x2e},
+		},
+		{
+			name: "umlal v0.8h, v6.8b, v2.8b",
+			n: &NodeImpl{
+				Instruction:       VUMLAL,
+				DstReg:            RegV0,
+				SrcReg:            RegV2,
+				SrcReg2:           RegV6,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0xc0, 0x80, 0x22, 0x2e},
+		},
+		{
+			name: "bit v30.16b, v4.16b, v11.16b",
+			n: &NodeImpl{
+				Instruction:       VBIT,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement16B,
+			},
+			exp: []byte{0x9e, 0x1c, 0xab, 0x6e},
+		},
+		{
+			name: "bit v30.8b, v4.8b, v11.8b",
+			n: &NodeImpl{
+				Instruction:       VBIT,
+				DstReg:            RegV30,
+				SrcReg:            RegV11,
+				SrcReg2:           RegV4,
+				VectorArrangement: VectorArrangement8B,
+			},
+			exp: []byte{0x9e, 0x1c, 0xab, 0x2e},
 		},
 	}
 

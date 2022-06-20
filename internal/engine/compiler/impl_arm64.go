@@ -1651,7 +1651,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	//    MOVD    $10, R0 ;; Load 10.
 	//    FMOVD   R0, F0
 	//    VCNT    V0.B8, V0.B8
-	//    VUADDLV V0.B8, V0
+	//    UADDLV  V0.B8, V0
 	//
 	var movInst asm.Instruction
 	if o.Type == wazeroir.UnsignedInt32 {
@@ -1660,8 +1660,10 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 		movInst = arm64.FMOVD
 	}
 	c.assembler.CompileRegisterToRegister(movInst, reg, freg)
-	c.assembler.CompileSIMDByteToSIMDByte(arm64.VCNT, freg, freg)
-	c.assembler.CompileSIMDByteToRegister(arm64.VUADDLV, freg, freg)
+	c.assembler.CompileVectorRegisterToVectorRegister(arm64.VCNT, freg, freg,
+		arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
+	c.assembler.CompileVectorRegisterToVectorRegister(arm64.UADDLV, freg, freg, arm64.VectorArrangement8B,
+		arm64.VectorIndexNone, arm64.VectorIndexNone)
 
 	c.assembler.CompileRegisterToRegister(movInst, freg, reg)
 
@@ -2189,7 +2191,8 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
 	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
-	c.assembler.CompileTwoSIMDBytesToSIMDByteRegister(arm64.VBIT, freg, x2.register, x1.register)
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VBIT,
+		freg, x2.register, x1.register, arm64.VectorArrangement16B)
 
 	c.markRegisterUnused(x2.register)
 	c.pushRuntimeValueLocationOnRegister(x1.register, x1.valueType)

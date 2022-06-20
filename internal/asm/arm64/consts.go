@@ -535,7 +535,7 @@ const (
 	FCVTSD
 	// FCVTZSD is the FCVTZS instruction, for double precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSD
-	// FCVTZSD is the FCVTZS instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
+	// FCVTZSDW is the FCVTZS instruction, for double precision in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSDW
 	// FCVTZSS is the FCVTZS instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Floating-point-Instructions/FCVTZS--scalar--integer-
 	FCVTZSS
@@ -702,8 +702,8 @@ const (
 	INSGEN
 	// INSELEM is the INS(element) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--element---Insert-vector-element-from-another-vector-element-?lang=en
 	INSELEM
-	// VUADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
-	VUADDLV
+	// UADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
+	UADDLV
 	// VADD is the ADD(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
 	VADD
 	// VFADDS is the FADD(vector) instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
@@ -816,6 +816,46 @@ const (
 	// VFRINTN is the FRINTN(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTN--vector---Floating-point-Round-to-Integral--to-nearest-with-ties-to-even--vector--?lang=en
 	// Note: prefixed by V to distinguish from the non-vector variant.
 	VFRINTN
+	// VMUL is the MUL(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/MUL--vector---Multiply--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VMUL
+	// VNEG is the NEG(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NEG--vector---Negate--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VNEG
+	// VABS is the ABS(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ABS--Absolute-value--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VABS
+	// VSQADD is the SQADD(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQADD--Signed-saturating-Add-?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VSQADD
+	// VUQADD is the UQADD(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQADD--Unsigned-saturating-Add-?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VUQADD
+	// VSQSUB is the SQSUB(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQSUB--Signed-saturating-Subtract-?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VSQSUB
+	// VUQSUB is the UQSUB(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQSUB--Unsigned-saturating-Subtract-?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VUQSUB
+	// SMIN is the SMIN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SMIN--Signed-Minimum--vector--?lang=en
+	SMIN
+	// SMAX is the SMAX instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SMAX--Signed-Maximum--vector--?lang=en
+	SMAX
+	// UMIN is the UMIN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMIN--Unsigned-Minimum--vector--?lang=en
+	UMIN
+	// UMAX is the UMAX instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMAX--Unsigned-Maximum--vector--?lang=en
+	UMAX
+	// URHADD is the URHADD instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/URHADD--Unsigned-Rounding-Halving-Add-?lang=en
+	URHADD
+	// REV64 is the REV64 instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/REV64--Reverse-elements-in-64-bit-doublewords--vector--?lang=en
+	REV64
+	// XTN is the XTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/XTN--XTN2--Extract-Narrow-?lang=en
+	XTN
+	// VUMLAL is the UMLAL(vector) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMLAL--UMLAL2--vector---Unsigned-Multiply-Add-Long--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VUMLAL
+	// SHLL is the SHLL instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SHLL--SHLL2--Shift-Left-Long--by-element-size--?lang=en
+	SHLL
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1146,8 +1186,8 @@ func InstructionName(i asm.Instruction) string {
 		return "VBIT"
 	case VCNT:
 		return "VCNT"
-	case VUADDLV:
-		return "VUADDLV"
+	case UADDLV:
+		return "UADDLV"
 	case VMOV:
 		return "VMOV"
 	case INSELEM:
@@ -1254,6 +1294,38 @@ func InstructionName(i asm.Instruction) string {
 		return "VFRINTZ"
 	case VFRINTN:
 		return "VFRINTN"
+	case VMUL:
+		return "VMUL"
+	case VNEG:
+		return "VNEG"
+	case VABS:
+		return "VABS"
+	case VSQADD:
+		return "VSQADD"
+	case VUQADD:
+		return "VUQADD"
+	case SMIN:
+		return "SMIN"
+	case SMAX:
+		return "SMAX"
+	case UMIN:
+		return "UMIN"
+	case UMAX:
+		return "UMAX"
+	case URHADD:
+		return "URHADD"
+	case VSQSUB:
+		return "VSQSUB"
+	case VUQSUB:
+		return "VUQSUB"
+	case REV64:
+		return "REV64"
+	case XTN:
+		return "XTN"
+	case VUMLAL:
+		return "VUMLAL"
+	case SHLL:
+		return "SHLL"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }
