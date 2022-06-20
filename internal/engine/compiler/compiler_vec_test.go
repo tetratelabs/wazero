@@ -7084,11 +7084,6 @@ func TestCompiler_compileV128FConvertFromI(t *testing.T) {
 }
 
 func TestCompiler_compileV128Dot(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		x1, x2, exp [16]byte

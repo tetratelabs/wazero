@@ -1356,8 +1356,35 @@ func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.OperationV128FConve
 }
 
 // compileV128Dot implements compiler.compileV128Dot for arm64.
-func (c *arm64Compiler) compileV128Dot(o *wazeroir.OperationV128Dot) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128Dot(*wazeroir.OperationV128Dot) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	x1r, x2r := x1.register, x2.register
+
+	// Multiply lower integers and get the 32-bit results into tmp.
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.SMULL, x1r, x2r, tmp, arm64.VectorArrangement4H)
+	// Multiply higher integers and get the 32-bit results into x1r.
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.SMULL2, x1r, x2r, x1r, arm64.VectorArrangement8H)
+	// Adds these two results into x1r.
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VADDP, x1r, tmp, x1r, arm64.VectorArrangement4S)
+
+	c.markRegisterUnused(x2r)
+	c.pushVectorRuntimeValueLocationOnRegister(x1r)
+
+	return nil
 }
 
 // compileV128Narrow implements compiler.compileV128Narrow for arm64.
