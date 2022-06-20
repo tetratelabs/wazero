@@ -718,12 +718,12 @@ const (
 	VFSUBD
 	// SSHL is the SSHL(vector,register) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
 	SSHL
-	// SSHLLIMM is the SSHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
-	SSHLLIMM
+	// SSHLL is the SSHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	SSHLL
 	// USHL is the USHL(vector,register) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
 	USHL
-	// USHLLIMM is the USHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
-	USHLLIMM
+	// USHLL is the USHLL(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	USHLL
 	// LD1R is the LD1R instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LD1R--Load-one-single-element-structure-and-Replicate-to-all-lanes--of-one-register--
 	LD1R
 	// SMOV32 is the 32-bit variant of SMOV(vector) instruction. https://developer.arm.com/documentation/100069/0610/A64-SIMD-Vector-Instructions/SMOV--vector-
@@ -856,6 +856,34 @@ const (
 	VUMLAL
 	// SHLL is the SHLL instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SHLL--SHLL2--Shift-Left-Long--by-element-size--?lang=en
 	SHLL
+	// SADDLP is the SADDLP instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SADDLP--Signed-Add-Long-Pairwise-?lang=en
+	SADDLP
+	// UADDLP is the UADDLP instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UADDLP--Unsigned-Add-Long-Pairwise-?lang=en
+	UADDLP
+	// SSHLL2 is the SSHLL2(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	SSHLL2
+	// USHLL2 is the USHLL2(vector,immediate) instruction. https://developer.arm.com/documentation/dui0801/h/A64-SIMD-Vector-Instructions/SSHLL--SSHLL2--vector-
+	USHLL2
+	// SQRDMULH is the SQRDMULH(vector) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQRDMULH--vector---Signed-saturating-Rounding-Doubling-Multiply-returning-High-half-?lang=en
+	SQRDMULH
+	// SMULL is the SMULL(vector) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SMULL--SMULL2--vector---Signed-Multiply-Long--vector--?lang=en
+	SMULL
+	// SMULL2 is the SMULL2(vector) instruction. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SMULL--SMULL2--vector---Signed-Multiply-Long--vector--?lang=en
+	SMULL2
+	// UMULL is the UMULL instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+	UMULL
+	// UMULL2 is the UMULL2 instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+	UMULL2
+	// VFCVTZS is the FCVTZS(vector,integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZS--vector--integer---Floating-point-Convert-to-Signed-integer--rounding-toward-Zero--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFCVTZS
+	// VFCVTZU is the FCVTZU(vector,integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZU--vector--integer---Floating-point-Convert-to-Unsigned-integer--rounding-toward-Zero--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VFCVTZU
+	// SQXTN is the SQXTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
+	SQXTN
+	// UQXTN is the UQXTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQXTN--UQXTN2--Unsigned-saturating-extract-Narrow-?lang=en
+	UQXTN
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1212,10 +1240,10 @@ func InstructionName(i asm.Instruction) string {
 		return "SSHL"
 	case USHL:
 		return "USHL"
-	case SSHLLIMM:
-		return "SSHLLIMM"
-	case USHLLIMM:
-		return "USHLLIMM"
+	case SSHLL:
+		return "SSHLL"
+	case USHLL:
+		return "USHLL"
 	case LD1R:
 		return "LD1R"
 	case SMOV32:
@@ -1326,6 +1354,32 @@ func InstructionName(i asm.Instruction) string {
 		return "VUMLAL"
 	case SHLL:
 		return "SHLL"
+	case SSHLL2:
+		return "SSHLL2"
+	case USHLL2:
+		return "USHLL2"
+	case SQRDMULH:
+		return "SQRDMULH"
+	case SADDLP:
+		return "SADDLP"
+	case UADDLP:
+		return "UADDLP"
+	case SMULL:
+		return "SMULL"
+	case SMULL2:
+		return "SMULL2"
+	case UMULL:
+		return "UMULL"
+	case UMULL2:
+		return "UMULL2"
+	case VFCVTZS:
+		return "VFCVTZS"
+	case VFCVTZU:
+		return "VFCVTZU"
+	case SQXTN:
+		return "SQXTN"
+	case UQXTN:
+		return "UQXTN"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

@@ -5094,11 +5094,6 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 }
 
 func TestCompiler_compileV128ExtMul(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name           string
 		shape          wazeroir.Shape
@@ -5759,11 +5754,6 @@ func TestCompiler_compileV128ExtMul(t *testing.T) {
 }
 
 func TestCompiler_compileV128Extend(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name           string
 		shape          wazeroir.Shape
@@ -6237,10 +6227,6 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 }
 
 func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name        string
@@ -6508,10 +6494,6 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 }
 
 func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name   string
@@ -7179,10 +7161,6 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 }
 
 func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name        string

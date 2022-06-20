@@ -151,7 +151,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement8B, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType8x8u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -161,7 +161,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement8B, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType16x4s:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -171,7 +171,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement4H, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType16x4u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -181,7 +181,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement4H, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType32x2s:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -191,7 +191,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SSHLL, result, result,
 			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType32x2u:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
@@ -201,7 +201,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileMemoryWithRegisterOffsetToVectorRegister(arm64.VMOV,
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementD,
 		)
-		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLLIMM, result, result,
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.USHLL, result, result,
 			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone)
 	case wazeroir.V128LoadType8Splat:
 		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 1)
@@ -1264,22 +1264,80 @@ func (c *arm64Compiler) compileV128Nearest(o *wazeroir.OperationV128Nearest) err
 
 // compileV128Extend implements compiler.compileV128Extend for arm64.
 func (c *arm64Compiler) compileV128Extend(o *wazeroir.OperationV128Extend) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	var arr arm64.VectorArrangement
+	if o.UseLow {
+		if o.Signed {
+			inst = arm64.SSHLL
+		} else {
+			inst = arm64.USHLL
+		}
+
+		switch o.OriginShape {
+		case wazeroir.ShapeI8x16:
+			arr = arm64.VectorArrangement8B
+		case wazeroir.ShapeI16x8:
+			arr = arm64.VectorArrangement4H
+		case wazeroir.ShapeI32x4:
+			arr = arm64.VectorArrangement2S
+		}
+	} else {
+		if o.Signed {
+			inst = arm64.SSHLL2
+		} else {
+			inst = arm64.USHLL2
+		}
+		arr = defaultArrangementForShape(o.OriginShape)
+	}
+
+	return c.compileV128UniOp(inst, arr)
 }
 
 // compileV128ExtMul implements compiler.compileV128ExtMul for arm64.
 func (c *arm64Compiler) compileV128ExtMul(o *wazeroir.OperationV128ExtMul) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	var arr arm64.VectorArrangement
+	if o.UseLow {
+		if o.Signed {
+			inst = arm64.SMULL
+		} else {
+			inst = arm64.UMULL
+		}
+
+		switch o.OriginShape {
+		case wazeroir.ShapeI8x16:
+			arr = arm64.VectorArrangement8B
+		case wazeroir.ShapeI16x8:
+			arr = arm64.VectorArrangement4H
+		case wazeroir.ShapeI32x4:
+			arr = arm64.VectorArrangement2S
+		}
+	} else {
+		if o.Signed {
+			inst = arm64.SMULL2
+		} else {
+			inst = arm64.UMULL2
+		}
+		arr = defaultArrangementForShape(o.OriginShape)
+	}
+
+	return c.compileV128x2BinOp(inst, arr)
 }
 
 // compileV128Q15mulrSatS implements compiler.compileV128Q15mulrSatS for arm64.
-func (c *arm64Compiler) compileV128Q15mulrSatS(o *wazeroir.OperationV128Q15mulrSatS) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128Q15mulrSatS(*wazeroir.OperationV128Q15mulrSatS) error {
+	return c.compileV128x2BinOp(arm64.SQRDMULH, arm64.VectorArrangement8H)
 }
 
 // compileV128ExtAddPairwise implements compiler.compileV128ExtAddPairwise for arm64.
 func (c *arm64Compiler) compileV128ExtAddPairwise(o *wazeroir.OperationV128ExtAddPairwise) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	if o.Signed {
+		inst = arm64.SADDLP
+	} else {
+		inst = arm64.UADDLP
+	}
+	return c.compileV128UniOp(inst, defaultArrangementForShape(o.OriginShape))
 }
 
 // compileV128FloatPromote implements compiler.compileV128FloatPromote for arm64.
@@ -1308,6 +1366,35 @@ func (c *arm64Compiler) compileV128Narrow(o *wazeroir.OperationV128Narrow) error
 }
 
 // compileV128ITruncSatFromF implements compiler.compileV128ITruncSatFromF for arm64.
-func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) (err error) {
+	v := c.locationStack.popV128()
+	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	var cvt asm.Instruction
+	if o.Signed {
+		cvt = arm64.VFCVTZS
+	} else {
+		cvt = arm64.VFCVTZU
+	}
+
+	c.assembler.CompileVectorRegisterToVectorRegister(cvt, v.register, v.register,
+		defaultArrangementForShape(o.OriginShape), arm64.VectorIndexNone, arm64.VectorIndexNone,
+	)
+
+	if o.OriginShape == wazeroir.ShapeF64x2 {
+		var narrow asm.Instruction
+		if o.Signed {
+			narrow = arm64.SQXTN
+		} else {
+			narrow = arm64.UQXTN
+		}
+		c.assembler.CompileVectorRegisterToVectorRegister(narrow, v.register, v.register,
+			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone,
+		)
+	}
+
+	c.pushVectorRuntimeValueLocationOnRegister(v.register)
+	return
 }
