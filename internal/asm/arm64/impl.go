@@ -2899,283 +2899,260 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
-	U, Opcode byte
-	// TODO: extract common implementation of qAndSizeResolver.
-	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+	U, opcode byte
+	qAndSize  map[VectorArrangement]qAndSize
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NOT--Bitwise-NOT--vector--?lang=en
-	NOT: {U: 0b1, Opcode: 0b00101, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b00
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(NOT))
-		}
-		return
-	}},
+	NOT: {U: 0b1, opcode: 0b00101,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b00, q: 0b1},
+			VectorArrangement8B:  {size: 0b00, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FNEG--vector---Floating-point-Negate--vector--?lang=en
-	VFNEG: {U: 0b1, Opcode: 0b01111, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b00
-		switch arrangement {
-		case VectorArrangement4S:
-			size, Q = 0b10, 0b1
-		case VectorArrangement2S:
-			size, Q = 0b10, 0b0
-		case VectorArrangement2D:
-			size, Q = 0b11, 0b1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFNEG))
-		}
-		return
+	VFNEG: {U: 0b1, opcode: 0b01111,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b10, q: 0b1},
+			VectorArrangement2S: {size: 0b10, q: 0b0},
+			VectorArrangement2D: {size: 0b11, q: 0b1},
+		},
+	},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FABS--vector---Floating-point-Absolute-value--vector--?lang=en
+	VFABS: {U: 0, opcode: 0b01111, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSQRT--vector---Floating-point-Square-Root--vector--?lang=en
+	VFSQRT: {U: 1, opcode: 0b11111, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTM--vector---Floating-point-Round-to-Integral--toward-Minus-infinity--vector--?lang=en
+	VFRINTM: {U: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b01, q: 0b1},
+		VectorArrangement4S: {size: 0b00, q: 0b1},
+		VectorArrangement2S: {size: 0b00, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTN--vector---Floating-point-Round-to-Integral--to-nearest-with-ties-to-even--vector--?lang=en
+	VFRINTN: {U: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b01, q: 0b1},
+		VectorArrangement4S: {size: 0b00, q: 0b1},
+		VectorArrangement2S: {size: 0b00, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTP--vector---Floating-point-Round-to-Integral--toward-Plus-infinity--vector--?lang=en
+	VFRINTP: {U: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTZ--vector---Floating-point-Round-to-Integral--toward-Zero--vector--?lang=en
+	VFRINTZ: {U: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {size: 0b11, q: 0b1},
+		VectorArrangement4S: {size: 0b10, q: 0b1},
+		VectorArrangement2S: {size: 0b10, q: 0b0},
 	}},
 }
 
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD three same" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDThreeSame = map[asm.Instruction]struct {
-	U, Opcode        byte
-	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+	U, Opcode byte
+	qAndSize  map[VectorArrangement]qAndSize
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/AND--vector---Bitwise-AND--vector--?lang=en
-	VAND: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b00
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(AND))
-		}
-		return
-	}},
+	VAND: {U: 0b0, Opcode: 0b00011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b00, q: 0b1},
+			VectorArrangement8B:  {size: 0b00, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/BSL--Bitwise-Select-?lang=en
-	BSL: {U: 0b1, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b01
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BSL))
-		}
-		return
-	}},
+	BSL: {U: 0b1, Opcode: 0b00011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b01, q: 0b1},
+			VectorArrangement8B:  {size: 0b01, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/EOR--vector---Bitwise-Exclusive-OR--vector--?lang=en
-	EOR: {U: 0b1, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b00
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BSL))
-		}
-		return
-	}},
+	EOR: {U: 0b1, Opcode: 0b00011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b00, q: 0b1},
+			VectorArrangement8B:  {size: 0b00, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ORR--vector--register---Bitwise-inclusive-OR--vector--register--?lang=en
-	VORR: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b10
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VORR))
-		}
-		return
-	}},
+	VORR: {U: 0b0, Opcode: 0b00011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b10, q: 0b1},
+			VectorArrangement8B:  {size: 0b10, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/BIC--vector--register---Bitwise-bit-Clear--vector--register--?lang=en
-	BIC: {U: 0b0, Opcode: 0b00011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		size = 0b01
-		switch arrangement {
-		case VectorArrangement16B:
-			Q = 0b1
-		case VectorArrangement8B:
-			Q = 0b0
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(BIC))
-		}
-		return
-	}},
+	BIC: {U: 0b0, Opcode: 0b00011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b01, q: 0b1},
+			VectorArrangement8B:  {size: 0b01, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--?lang=en
-	VFADDS: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement2S:
-			size, Q = 0b00, 0
-		case VectorArrangement4S:
-			size, Q = 0b00, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFADDS))
-		}
-		return
-	}},
+	VFADDS: {U: 0b0, Opcode: 0b11010,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FADD--vector---Floating-point-Add--vector--?lang=en
-	VFADDD: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement2D:
-			size, Q = 0b01, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFADDD))
-		}
-		return
-	}},
+	VFADDD: {U: 0b0, Opcode: 0b11010,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSUB--vector---Floating-point-Subtract--vector--?lang=en
-	VFSUBS: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement2S:
-			size, Q = 0b10, 0
-		case VectorArrangement4S:
-			size, Q = 0b10, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFSUBS))
-		}
-		return
-	}},
+	VFSUBS: {U: 0b0, Opcode: 0b11010,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b10, q: 0b1},
+			VectorArrangement2S: {size: 0b10, q: 0b0},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSUB--vector---Floating-point-Subtract--vector--?lang=en
-	VFSUBD: {U: 0b0, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement2D:
-			size, Q = 0b11, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(VFSUBD))
-		}
-		return
-	}},
+	VFSUBD: {U: 0b0, Opcode: 0b11010,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement2D: {size: 0b11, q: 0b1},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMAXP--Unsigned-Maximum-Pairwise-?lang=en
-	UMAXP: {U: 0b1, Opcode: 0b10100, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	UMAXP: {U: 0b1, Opcode: 0b10100, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--register---Compare-bitwise-Equal--vector--?lang=en
-	CMEQ: {U: 0b1, Opcode: 0b10001, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	CMEQ: {U: 0b1, Opcode: 0b10001, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/dui0801/g/A64-SIMD-Vector-Instructions/ADDP--vector-
-	VADDP: {U: 0b0, Opcode: 0b10111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	VADDP: {U: 0b0, Opcode: 0b10111, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADD--vector---Add--vector--?lang=en
-	VADD: {U: 0, Opcode: 0b10000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	VADD: {U: 0, Opcode: 0b10000, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SUB--vector---Subtract--vector--?lang=en
-	VSUB: {U: 1, Opcode: 0b10000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	VSUB: {U: 1, Opcode: 0b10000, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
-	SSHL: {U: 0, Opcode: 0b01000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	SSHL: {U: 0, Opcode: 0b01000, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SSHL--Signed-Shift-Left--register--?lang=en
-	USHL: {U: 0b1, Opcode: 0b01000, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	USHL: {U: 0b1, Opcode: 0b01000, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGT--register---Compare-signed-Greater-than--vector--?lang=en
-	CMGT: {U: 0b0, Opcode: 0b00110, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	CMGT: {U: 0b0, Opcode: 0b00110, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHI--register---Compare-unsigned-Higher--vector--?lang=en
-	CMHI: {U: 0b1, Opcode: 0b00110, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	CMHI: {U: 0b1, Opcode: 0b00110, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMGE--register---Compare-signed-Greater-than-or-Equal--vector--?lang=en
-	CMGE: {U: 0b0, Opcode: 0b00111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	CMGE: {U: 0b0, Opcode: 0b00111, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMHS--register---Compare-unsigned-Higher-or-Same--vector--?lang=en
-	CMHS: {U: 0b1, Opcode: 0b00111, qAndSizeResolver: advancedSIMDThreeSameDefaultResolver},
+	CMHS: {U: 0b1, Opcode: 0b00111, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMEQ--register---Floating-point-Compare-Equal--vector--?lang=en
-	FCMEQ: {U: 0b0, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement4S:
-			size, Q = 0b00, 1
-		case VectorArrangement2S:
-			size, Q = 0b00, 0
-		case VectorArrangement2D:
-			size, Q = 0b01, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMEQ))
-		}
-		return
-	}},
+	FCMEQ: {U: 0b0, Opcode: 0b11100,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGT--register---Floating-point-Compare-Greater-than--vector--?lang=en
-	FCMGT: {U: 0b1, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement4S:
-			size, Q = 0b10, 1
-		case VectorArrangement2S:
-			size, Q = 0b10, 0
-		case VectorArrangement2D:
-			size, Q = 0b11, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMGT))
-		}
-		return
-	}},
+	FCMGT: {U: 0b1, Opcode: 0b11100,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b10, q: 0b1},
+			VectorArrangement2S: {size: 0b10, q: 0b0},
+			VectorArrangement2D: {size: 0b11, q: 0b1},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCMGE--register---Floating-point-Compare-Greater-than-or-Equal--vector--?lang=en
-	FCMGE: {U: 0b1, Opcode: 0b11100, qAndSizeResolver: func(arrangement VectorArrangement) (Q, size byte, err error) {
-		switch arrangement {
-		case VectorArrangement4S:
-			size, Q = 0b00, 1
-		case VectorArrangement2S:
-			size, Q = 0b00, 0
-		case VectorArrangement2D:
-			size, Q = 0b01, 1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(FCMGE))
-		}
-		return
-	}},
+	FCMGE: {U: 0b1, Opcode: 0b11100,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMIN--vector---Floating-point-minimum--vector--?lang=en
+	VFMIN: {U: 0b0, Opcode: 0b11110,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b10, q: 0b1},
+			VectorArrangement2S: {size: 0b10, q: 0b0},
+			VectorArrangement2D: {size: 0b11, q: 0b1},
+		},
+	},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMAX--vector---Floating-point-Maximum--vector--?lang=en
+	VFMAX: {U: 0b0, Opcode: 0b11110,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FMUL--vector---Floating-point-Multiply--vector--?lang=en
+	VFMUL: {U: 0b1, Opcode: 0b11011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FDIV--vector---Floating-point-Divide--vector--?lang=en
+	VFDIV: {U: 0b1, Opcode: 0b11111,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement4S: {size: 0b00, q: 0b1},
+			VectorArrangement2S: {size: 0b00, q: 0b0},
+			VectorArrangement2D: {size: 0b01, q: 0b1},
+		},
+	},
 }
 
-func advancedSIMDThreeSameDefaultResolver(arrangement VectorArrangement) (Q, size byte, err error) {
-	// TODO: simply use arrangementSizeQ as the resolver after refactoring other call-site of arrangementSizeQ.
-	size, Q = arrangementSizeQ(arrangement)
-	return
+// aAndSize is a pair of "Q" and "size" that appear in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
+type qAndSize struct{ q, size byte }
+
+// defaultQAndSize maps a vector arrangement to the default qAndSize which is encoded by many instructions.
+var defaultQAndSize = map[VectorArrangement]qAndSize{
+	VectorArrangement8B:  {size: 0b00, q: 0b0},
+	VectorArrangement16B: {size: 0b00, q: 0b1},
+	VectorArrangement4H:  {size: 0b01, q: 0b0},
+	VectorArrangement8H:  {size: 0b01, q: 0b1},
+	VectorArrangement2S:  {size: 0b10, q: 0b0},
+	VectorArrangement4S:  {size: 0b10, q: 0b1},
+	VectorArrangement1D:  {size: 0b11, q: 0b0},
+	VectorArrangement2D:  {size: 0b11, q: 0b1},
 }
 
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD across lanes" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
 	U, Opcode byte
-	// TODO: extract common implementation of qAndSizeResolver.
-	qAndSizeResolver func(arrangement VectorArrangement) (Q, Size byte, err error)
+	qAndSize  map[VectorArrangement]qAndSize
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDV--Add-across-Vector-?lang=en
-	ADDV: {U: 0b0, Opcode: 0b11011, qAndSizeResolver: func(arrangement VectorArrangement) (Q, Size byte, err error) {
-		switch arrangement {
-		case VectorArrangement16B:
-			Size, Q = 0b00, 0b1
-		case VectorArrangement8B:
-			Size, Q = 0b00, 0b0
-		case VectorArrangement8H:
-			Size, Q = 0b01, 0b1
-		case VectorArrangement4H:
-			Size, Q = 0b01, 0b0
-		case VectorArrangement4S:
-			Size, Q = 0b10, 0b1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(ADDV))
-		}
-		return
-	}},
+	ADDV: {U: 0b0, Opcode: 0b11011,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b00, q: 0b1},
+			VectorArrangement8B:  {size: 0b00, q: 0b0},
+			VectorArrangement8H:  {size: 0b01, q: 0b1},
+			VectorArrangement4H:  {size: 0b01, q: 0b0},
+			VectorArrangement4S:  {size: 0b10, q: 0b1},
+		},
+	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMINV--Unsigned-Minimum-across-Vector-?lang=en
-	UMINV: {U: 0b1, Opcode: 0b11010, qAndSizeResolver: func(arrangement VectorArrangement) (Q, Size byte, err error) {
-		switch arrangement {
-		case VectorArrangement16B:
-			Size, Q = 0b00, 0b1
-		case VectorArrangement8B:
-			Size, Q = 0b00, 0b0
-		case VectorArrangement8H:
-			Size, Q = 0b01, 0b1
-		case VectorArrangement4H:
-			Size, Q = 0b01, 0b0
-		case VectorArrangement4S:
-			Size, Q = 0b10, 0b1
-		default:
-			err = fmt.Errorf("unsupported arrangement %s for %s", arrangement.String(), InstructionName(UMINV))
-		}
-		return
-	}},
+	UMINV: {U: 0b1, Opcode: 0b11010,
+		qAndSize: map[VectorArrangement]qAndSize{
+			VectorArrangement16B: {size: 0b00, q: 0b1},
+			VectorArrangement8B:  {size: 0b00, q: 0b0},
+			VectorArrangement8H:  {size: 0b01, q: 0b1},
+			VectorArrangement4H:  {size: 0b01, q: 0b0},
+			VectorArrangement4S:  {size: 0b10, q: 0b1},
+		},
+	},
 }
 
 // advancedSIMDScalarPairwise holds information to encode instructions as "Advanced SIMD scalar pairwise" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDScalarPairwise = map[asm.Instruction]struct {
-	U, Opcode    byte
-	sizeResolver func(arrangement VectorArrangement) (Size byte)
+	U, Opcode byte
+	size      map[VectorArrangement]byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
-	ADDP: {U: 0b0, Opcode: 0b11011, sizeResolver: func(arrangement VectorArrangement) (size byte) {
-		size = 0b11
-		return
-	}},
+	ADDP: {U: 0b0, Opcode: 0b11011, size: map[VectorArrangement]byte{VectorArrangement2D: 0b11}},
 }
 
 // advancedSIMDCopy holds information to encode instructions as "Advanced SIMD copy" in
@@ -3325,38 +3302,20 @@ var advancedSIMDCopy = map[asm.Instruction]struct {
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTableLookup = map[asm.Instruction]struct {
 	op, op2, Len byte
-	qResolver    func(arr VectorArrangement) (q byte)
+	q            map[VectorArrangement]byte
 }{
-	TBL1: {op: 0, op2: 0, Len: 0b00, qResolver: func(arr VectorArrangement) (q byte) {
-		switch arr {
-		case VectorArrangement16B:
-			q = 0b1
-		case VectorArrangement8B:
-			q = 0b0
-		}
-		return
-	}},
-	TBL2: {op: 0, op2: 0, Len: 0b01, qResolver: func(arr VectorArrangement) (q byte) {
-		switch arr {
-		case VectorArrangement16B:
-			q = 0b1
-		case VectorArrangement8B:
-			q = 0b0
-		}
-		return
-	}},
+	TBL1: {op: 0, op2: 0, Len: 0b00, q: map[VectorArrangement]byte{VectorArrangement16B: 0b1, VectorArrangement8B: 0b0}},
+	TBL2: {op: 0, op2: 0, Len: 0b01, q: map[VectorArrangement]byte{VectorArrangement16B: 0b1, VectorArrangement8B: 0b0}},
 }
 
 // advancedSIMDScalarTwoRegisterMisc holds information to encode instructions as "Advanced SIMD scalar two-register miscellaneous" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDScalarTwoRegisterMisc = map[asm.Instruction]struct {
-	U, opcode        byte
-	qAndSizeResolver func(arr VectorArrangement) (q, size byte)
+	U, opcode byte
+	qAndSize  map[VectorArrangement]qAndSize
 }{
-	CMEQZERO: {U: 0b0, opcode: 0b01001, qAndSizeResolver: func(arr VectorArrangement) (q, size byte) {
-		size, q = arrangementSizeQ(arr)
-		return
-	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--zero---Compare-bitwise-Equal-to-zero--vector--?lang=en
+	CMEQZERO: {U: 0b0, opcode: 0b01001, qAndSize: defaultQAndSize},
 }
 
 // advancedSIMDShiftByImmediate holds information to encode instructions as "Advanced SIMD shift by immediate" in
@@ -3490,7 +3449,10 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 	if scalarPairwise, ok := advancedSIMDScalarPairwise[n.Instruction]; ok {
 		// See "Advanced SIMD scalar pairwise" in
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		size := scalarPairwise.sizeResolver(n.VectorArrangement)
+		size, ok := scalarPairwise.size[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
+		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			scalarPairwise.Opcode<<4 | 1<<3 | srcVectorRegBits>>3,
@@ -3503,47 +3465,49 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 	if twoRegMisc, ok := advancedSIMDTwoRegisterMisc[n.Instruction]; ok {
 		// See "Advanced SIMD two-register miscellaneous" in
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		q, size, err := twoRegMisc.qAndSizeResolver(n.VectorArrangement)
-		if err != nil {
-			return err
+		qs, ok := twoRegMisc.qAndSize[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
 		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
-			twoRegMisc.Opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
-			size<<6 | 0b1<<5 | twoRegMisc.Opcode>>4,
-			q<<6 | twoRegMisc.U<<5 | 0b01110,
+			twoRegMisc.opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
+			qs.size<<6 | 0b1<<5 | twoRegMisc.opcode>>4,
+			qs.q<<6 | twoRegMisc.U<<5 | 0b01110,
 		})
 		return nil
 	}
 
 	if threeSame, ok := advancedSIMDThreeSame[n.Instruction]; ok {
-		q, size, err := threeSame.qAndSizeResolver(n.VectorArrangement)
-		if err != nil {
-			return err
+		qs, ok := threeSame.qAndSize[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
 		}
-		a.encodeAdvancedSIMDThreeSame(srcVectorRegBits, dstVectorRegBits, dstVectorRegBits, threeSame.Opcode, size, q, threeSame.U)
+		a.encodeAdvancedSIMDThreeSame(srcVectorRegBits, dstVectorRegBits, dstVectorRegBits, threeSame.Opcode, qs.size, qs.q, threeSame.U)
 		return nil
 	}
 
 	if acrossLanes, ok := advancedSIMDAcrossLanes[n.Instruction]; ok {
 		// See "Advanced SIMD across lanes" in
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
-		q, size, err := acrossLanes.qAndSizeResolver(n.VectorArrangement)
-		if err != nil {
-			return err
+		qs, ok := acrossLanes.qAndSize[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
 		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			acrossLanes.Opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
-			size<<6 | 0b11000<<1 | acrossLanes.Opcode>>4,
-			q<<6 | acrossLanes.U<<5 | 0b01110,
+			qs.size<<6 | 0b11000<<1 | acrossLanes.Opcode>>4,
+			qs.q<<6 | acrossLanes.U<<5 | 0b01110,
 		})
 		return nil
 	}
 
 	if lookup, ok := advancedSIMDTableLookup[n.Instruction]; ok {
-		q := lookup.qResolver(n.VectorArrangement)
-
+		q, ok := lookup.q[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
+		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			lookup.Len<<5 | lookup.op<<4 | srcVectorRegBits>>3,
@@ -3554,12 +3518,15 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 	}
 
 	if scalaTwoMisc, ok := advancedSIMDScalarTwoRegisterMisc[n.Instruction]; ok {
-		q, size := scalaTwoMisc.qAndSizeResolver(n.VectorArrangement)
+		qs, ok := scalaTwoMisc.qAndSize[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
+		}
 		a.Buf.Write([]byte{
 			(dstVectorRegBits << 5) | dstVectorRegBits,
 			0b100110<<2 | dstVectorRegBits>>3,
-			size<<6 | 0b1<<5,
-			q<<6 | scalaTwoMisc.U<<5 | 0b01001110,
+			qs.size<<6 | 0b1<<5,
+			qs.q<<6 | scalaTwoMisc.U<<5 | 0b01001110,
 		})
 		return
 	}
@@ -3604,11 +3571,11 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(n *NodeImpl) (e
 	}
 
 	if threeSame, ok := advancedSIMDThreeSame[n.Instruction]; ok {
-		q, size, err := threeSame.qAndSizeResolver(n.VectorArrangement)
-		if err != nil {
-			return err
+		qs, ok := threeSame.qAndSize[n.VectorArrangement]
+		if !ok {
+			return fmt.Errorf("unsupported vector arrangement %s for %s", n.VectorArrangement, InstructionName(n.Instruction))
 		}
-		a.encodeAdvancedSIMDThreeSame(srcRegBits, srcRegBits2, dstRegBits, threeSame.Opcode, size, q, threeSame.U)
+		a.encodeAdvancedSIMDThreeSame(srcRegBits, srcRegBits2, dstRegBits, threeSame.Opcode, qs.size, qs.q, threeSame.U)
 		return nil
 	}
 
