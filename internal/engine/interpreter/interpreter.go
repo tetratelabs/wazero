@@ -1058,7 +1058,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindEq:
 			var b bool
 			switch wazeroir.UnsignedType(op.b1) {
-			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
+			case wazeroir.UnsignedTypeI32:
+				v2, v1 := ce.popValue(), ce.popValue()
+				b = uint32(v1) == uint32(v2)
+			case wazeroir.UnsignedTypeI64:
 				v2, v1 := ce.popValue(), ce.popValue()
 				b = v1 == v2
 			case wazeroir.UnsignedTypeF32:
