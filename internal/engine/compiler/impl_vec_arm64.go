@@ -1366,6 +1366,35 @@ func (c *arm64Compiler) compileV128Narrow(o *wazeroir.OperationV128Narrow) error
 }
 
 // compileV128ITruncSatFromF implements compiler.compileV128ITruncSatFromF for arm64.
-func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) (err error) {
+	v := c.locationStack.popV128()
+	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	var cvt asm.Instruction
+	if o.Signed {
+		cvt = arm64.VFCVTZS
+	} else {
+		cvt = arm64.VFCVTZU
+	}
+
+	c.assembler.CompileVectorRegisterToVectorRegister(cvt, v.register, v.register,
+		defaultArrangementForShape(o.OriginShape), arm64.VectorIndexNone, arm64.VectorIndexNone,
+	)
+
+	if o.OriginShape == wazeroir.ShapeF64x2 {
+		var narrow asm.Instruction
+		if o.Signed {
+			narrow = arm64.SQXTN
+		} else {
+			narrow = arm64.UQXTN
+		}
+		c.assembler.CompileVectorRegisterToVectorRegister(narrow, v.register, v.register,
+			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone,
+		)
+	}
+
+	c.pushVectorRuntimeValueLocationOnRegister(v.register)
+	return
 }
