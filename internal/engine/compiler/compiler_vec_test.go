@@ -3385,11 +3385,6 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 }
 
 func TestCompiler_compileV128AvgrU(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -3540,11 +3535,6 @@ func TestCompiler_compileV128Sqrt(t *testing.T) {
 }
 
 func TestCompiler_compileV128Mul(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -3635,11 +3625,6 @@ func TestCompiler_compileV128Mul(t *testing.T) {
 }
 
 func TestCompiler_compileV128Neg(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		shape  wazeroir.Shape
@@ -3737,11 +3722,6 @@ func TestCompiler_compileV128Neg(t *testing.T) {
 }
 
 func TestCompiler_compileV128Abs(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		shape  wazeroir.Shape
@@ -3915,10 +3895,6 @@ func TestCompiler_compileV128Div(t *testing.T) {
 }
 
 func TestCompiler_compileV128Min(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 
 	tests := []struct {
 		name        string
@@ -4109,11 +4085,6 @@ func TestCompiler_compileV128Min(t *testing.T) {
 }
 
 func TestCompiler_compileV128Max(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -4317,11 +4288,6 @@ func TestCompiler_compileV128Max(t *testing.T) {
 }
 
 func TestCompiler_compileV128AddSat(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -4434,11 +4400,6 @@ func TestCompiler_compileV128AddSat(t *testing.T) {
 }
 
 func TestCompiler_compileV128SubSat(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -4551,11 +4512,6 @@ func TestCompiler_compileV128SubSat(t *testing.T) {
 }
 
 func TestCompiler_compileV128Popcnt(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		v, exp [16]byte

@@ -765,51 +765,6 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	}
 }
 
-func TestAssemblerImpl_EncodeSIMDByteToSIMDByte(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n:      &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesSIMDByteToSIMDByte},
-				expErr: "ADR is unsupported for from:simd-byte,to:simd-byte type",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeSIMDByteToSIMDByte(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	const inst = arm64.VCNT
-	t.Run(arm64.InstructionName(inst), func(t *testing.T) {
-		floatRegs := []asm.Register{arm64.RegV0, arm64.RegV10, arm64.RegV21, arm64.RegV31}
-		for _, src := range floatRegs {
-			for _, dst := range floatRegs {
-				src, dst := src, dst
-				t.Run(fmt.Sprintf("src=%s,dst=%s", arm64.RegisterName(src), arm64.RegisterName(dst)), func(t *testing.T) {
-					goasm := newGoasmAssembler(t, asm.NilRegister)
-					goasm.CompileSIMDByteToSIMDByte(inst, src, dst)
-					expected, err := goasm.Assemble()
-					require.NoError(t, err)
-
-					a := arm64.NewAssemblerImpl(arm64.RegR27)
-					err = a.EncodeSIMDByteToSIMDByte(&arm64.NodeImpl{Instruction: inst, SrcReg: src, DstReg: dst})
-					require.NoError(t, err)
-
-					actual := a.Bytes()
-					require.Equal(t, expected, actual)
-
-				})
-			}
-		}
-	})
-}
-
 func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
@@ -1228,51 +1183,6 @@ func TestAssemblerImpl_multipleLargeOffest(t *testing.T) {
 	expected, err := goasm.Assemble()
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
-}
-
-func TestAssemblerImpl_EncodeTwoSIMDBytesToSIMDByteRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n:      &arm64.NodeImpl{Instruction: arm64.B, Types: arm64.OperandTypesTwoSIMDBytesToSIMDByteRegister},
-				expErr: "B is unsupported for from:two-simd-bytes,to:simd-byte type",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeTwoSIMDBytesToSIMDByteRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	for _, inst := range []asm.Instruction{arm64.VBIT} {
-		regs := []asm.Register{arm64.RegV0, arm64.RegV10, arm64.RegV30}
-		for _, src1 := range regs {
-			for _, src2 := range regs {
-				for _, dst := range regs {
-					n := &arm64.NodeImpl{Instruction: inst, SrcReg: src1, SrcReg2: src2, DstReg: dst,
-						Types: arm64.OperandTypesTwoSIMDBytesToSIMDByteRegister}
-					t.Run(n.String(), func(t *testing.T) {
-						goasm := newGoasmAssembler(t, asm.NilRegister)
-						goasm.CompileTwoSIMDBytesToSIMDByteRegister(n.Instruction, n.SrcReg, n.SrcReg2, n.DstReg)
-						expected, err := goasm.Assemble()
-						require.NoError(t, err)
-
-						a := arm64.NewAssemblerImpl(arm64.RegR27)
-						err = a.EncodeTwoSIMDBytesToSIMDByteRegister(n)
-						require.NoError(t, err)
-						actual := a.Bytes()
-						require.Equal(t, expected, actual)
-					})
-				}
-			}
-		}
-	}
 }
 
 func conditionalRegisterToState(r asm.Register) asm.ConditionalRegisterState {

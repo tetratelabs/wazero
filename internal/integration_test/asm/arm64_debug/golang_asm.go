@@ -282,40 +282,6 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
-// CompileTwoSIMDBytesToSIMDByteRegister implements the same method as documented on arm64.Assembler.
-func (a *assemblerGoAsmImpl) CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
-	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
-	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
-
-	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
-	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
-	inst := a.NewProg()
-	inst.As = castAsGolangAsmInstruction[instruction]
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = dstVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = src1VReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
-	inst.Reg = src2VReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
-	a.AddInstruction(inst)
-
-}
-
-// CompileSIMDByteToSIMDByte implements the same method as documented on arm64.Assembler.
-func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
-	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
-
-	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
-	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
-	inst := a.NewProg()
-	inst.As = castAsGolangAsmInstruction[instruction]
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = dstVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = srcVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
-	a.AddInstruction(inst)
-}
-
 // CompileSIMDByteToRegister implements the same method as documented on arm64.Assembler.
 func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]

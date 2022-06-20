@@ -1013,30 +1013,88 @@ func (c *arm64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
 
 // compileV128AddSat implements compiler.compileV128AddSat for arm64.
 func (c *arm64Compiler) compileV128AddSat(o *wazeroir.OperationV128AddSat) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	if o.Signed {
+		inst = arm64.VSQADD
+	} else {
+		inst = arm64.VUQADD
+	}
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128SubSat implements compiler.compileV128SubSat for arm64.
 func (c *arm64Compiler) compileV128SubSat(o *wazeroir.OperationV128SubSat) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	var inst asm.Instruction
+	if o.Signed {
+		inst = arm64.VSQSUB
+	} else {
+		inst = arm64.VUQSUB
+	}
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128Mul implements compiler.compileV128Mul for arm64.
-func (c *arm64Compiler) compileV128Mul(o *wazeroir.OperationV128Mul) error {
-	var arr arm64.VectorArrangement
-	var inst asm.Instruction
+func (c *arm64Compiler) compileV128Mul(o *wazeroir.OperationV128Mul) (err error) {
 	switch o.Shape {
-	case wazeroir.ShapeF32x4:
-		arr = arm64.VectorArrangement4S
-		inst = arm64.VFMUL
-	case wazeroir.ShapeF64x2:
-		arr = arm64.VectorArrangement2D
-		inst = arm64.VFMUL
-	default:
-		// TODO: support for integer mul.
-		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	case wazeroir.ShapeI8x16, wazeroir.ShapeI16x8, wazeroir.ShapeI32x4:
+		err = c.compileV128x2BinOp(arm64.VMUL, defaultArrangementForShape(o.Shape))
+	case wazeroir.ShapeF32x4, wazeroir.ShapeF64x2:
+		err = c.compileV128x2BinOp(arm64.VFMUL, defaultArrangementForShape(o.Shape))
+	case wazeroir.ShapeI64x2:
+		x2 := c.locationStack.popV128()
+		if err = c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+			return
+		}
+
+		x1 := c.locationStack.popV128()
+		if err = c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+			return
+		}
+
+		src1, src2 := x1.register, x2.register
+
+		tmp1, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+		c.markRegisterUsed(tmp1)
+
+		tmp2, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+
+		c.markRegisterUsed(tmp2)
+
+		tmp3, err := c.allocateRegister(registerTypeVector)
+		if err != nil {
+			return err
+		}
+
+		// Following the algorithm in https://chromium-review.googlesource.com/c/v8/v8/+/1781696
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.REV64, src2, tmp2,
+			arm64.VectorArrangement4S, arm64.VectorIndexNone, arm64.VectorIndexNone)
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VMUL, src1, tmp2, tmp2, arm64.VectorArrangement4S)
+
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.XTN, src1, tmp1,
+			arm64.VectorArrangement2D, arm64.VectorIndexNone, arm64.VectorIndexNone)
+
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.VADDP, tmp2, tmp2, arm64.VectorArrangement4S,
+			arm64.VectorIndexNone, arm64.VectorIndexNone,
+		)
+
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.XTN, src2, tmp3,
+			arm64.VectorArrangement2D, arm64.VectorIndexNone, arm64.VectorIndexNone)
+
+		c.assembler.CompileVectorRegisterToVectorRegister(arm64.SHLL, tmp2, src1,
+			arm64.VectorArrangement2S, arm64.VectorIndexNone, arm64.VectorIndexNone)
+
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VUMLAL, tmp3, tmp1, src1, arm64.VectorArrangement2S)
+
+		c.markRegisterUnused(src2, tmp1, tmp2)
+		c.pushVectorRuntimeValueLocationOnRegister(src1)
 	}
-	return c.compileV128x2BinOp(inst, arr)
+	return
 }
 
 // compileV128Div implements compiler.compileV128Div for arm64.
@@ -1056,20 +1114,13 @@ func (c *arm64Compiler) compileV128Div(o *wazeroir.OperationV128Div) error {
 
 // compileV128Neg implements compiler.compileV128Neg for arm64.
 func (c *arm64Compiler) compileV128Neg(o *wazeroir.OperationV128Neg) error {
-	var arr arm64.VectorArrangement
 	var inst asm.Instruction
-	switch o.Shape {
-	case wazeroir.ShapeF32x4:
-		arr = arm64.VectorArrangement4S
+	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		inst = arm64.VNEG
+	} else { // Floating point lanes
 		inst = arm64.VFNEG
-	case wazeroir.ShapeF64x2:
-		arr = arm64.VectorArrangement2D
-		inst = arm64.VFNEG
-	default:
-		// TODO: support for integer neg.
-		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 	}
-	return c.compileV128UniOp(inst, arr)
+	return c.compileV128UniOp(inst, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128Sqrt implements compiler.compileV128Sqrt for arm64.
@@ -1087,65 +1138,70 @@ func (c *arm64Compiler) compileV128Sqrt(o *wazeroir.OperationV128Sqrt) error {
 // compileV128Abs implements compiler.compileV128Abs for arm64.
 func (c *arm64Compiler) compileV128Abs(o *wazeroir.OperationV128Abs) error {
 	var inst asm.Instruction
-	var arr arm64.VectorArrangement
-	switch o.Shape {
-	case wazeroir.ShapeF32x4:
+	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		inst = arm64.VABS
+	} else { // Floating point lanes
 		inst = arm64.VFABS
-		arr = arm64.VectorArrangement4S
-	case wazeroir.ShapeF64x2:
-		inst = arm64.VFABS
-		arr = arm64.VectorArrangement2D
-	default:
-		// TODO: support for integer abs.
-		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 	}
-	return c.compileV128UniOp(inst, arr)
+	return c.compileV128UniOp(inst, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128Popcnt implements compiler.compileV128Popcnt for arm64.
 func (c *arm64Compiler) compileV128Popcnt(o *wazeroir.OperationV128Popcnt) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	return c.compileV128UniOp(arm64.VCNT, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128Min implements compiler.compileV128Min for arm64.
 func (c *arm64Compiler) compileV128Min(o *wazeroir.OperationV128Min) error {
 	var inst asm.Instruction
-	var arr arm64.VectorArrangement
-	switch o.Shape {
-	case wazeroir.ShapeF32x4:
+	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		if o.Signed {
+			inst = arm64.SMIN
+		} else {
+			inst = arm64.UMIN
+		}
+	} else { // Floating point lanes
 		inst = arm64.VFMIN
+	}
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
+}
+
+func defaultArrangementForShape(s wazeroir.Shape) (arr arm64.VectorArrangement) {
+	switch s {
+	case wazeroir.ShapeI8x16:
+		arr = arm64.VectorArrangement16B
+	case wazeroir.ShapeI16x8:
+		arr = arm64.VectorArrangement8H
+	case wazeroir.ShapeI32x4:
+		arr = arm64.VectorArrangement4S
+	case wazeroir.ShapeI64x2:
+		arr = arm64.VectorArrangement2D
+	case wazeroir.ShapeF32x4:
 		arr = arm64.VectorArrangement4S
 	case wazeroir.ShapeF64x2:
-		inst = arm64.VFMIN
 		arr = arm64.VectorArrangement2D
-	default:
-		// TODO: support for integer min.
-		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 	}
-	return c.compileV128x2BinOp(inst, arr)
+	return
 }
 
 // compileV128Max implements compiler.compileV128Max for arm64.
 func (c *arm64Compiler) compileV128Max(o *wazeroir.OperationV128Max) error {
 	var inst asm.Instruction
-	var arr arm64.VectorArrangement
-	switch o.Shape {
-	case wazeroir.ShapeF32x4:
+	if o.Shape <= wazeroir.ShapeI64x2 { // Integer lanes
+		if o.Signed {
+			inst = arm64.SMAX
+		} else {
+			inst = arm64.UMAX
+		}
+	} else { // Floating point lanes
 		inst = arm64.VFMAX
-		arr = arm64.VectorArrangement4S
-	case wazeroir.ShapeF64x2:
-		inst = arm64.VFMAX
-		arr = arm64.VectorArrangement2D
-	default:
-		// TODO: support for integer max.
-		return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
 	}
-	return c.compileV128x2BinOp(inst, arr)
+	return c.compileV128x2BinOp(inst, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128AvgrU implements compiler.compileV128AvgrU for arm64.
 func (c *arm64Compiler) compileV128AvgrU(o *wazeroir.OperationV128AvgrU) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	return c.compileV128x2BinOp(arm64.URHADD, defaultArrangementForShape(o.Shape))
 }
 
 // compileV128Pmin implements compiler.compileV128Pmin for arm64.

@@ -48,17 +48,6 @@ type Assembler interface {
 		srcReg, dstReg asm.Register,
 	)
 
-	// CompileSIMDByteToSIMDByte adds an instruction where source and destination operand is the SIMD register
-	// specified as `srcReg.B8` and `dstReg.B8` where `.B8` part of register is called "arrangement".
-	// See https://stackoverflow.com/questions/57294672/what-is-arrangement-specifier-16b-8b-in-arm-assembly-language-instructions
-	//
-	// TODO: implement this in CompileVectorRegisterToVectorRegister.
-	CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register)
-
-	// CompileTwoSIMDBytesToSIMDByteRegister adds an instruction where source operand is two SIMD registers specified as `srcReg1.B8`,
-	// and `srcReg2.B8` and the destination is the one SIMD register `dstReg.B8`.
-	CompileTwoSIMDBytesToSIMDByteRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register)
-
 	// CompileSIMDByteToRegister adds an instruction where source operand is the SIMD register specified as `srcReg.B8`,
 	// and the destination is the register `dstReg`.
 	CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register)

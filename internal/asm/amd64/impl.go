@@ -798,7 +798,7 @@ func (a *AssemblerImpl) EncodeNoneToRegister(n *NodeImpl) (err error) {
 	modRM := 0b11_000_000 | // Specifying that opeand is register.
 		regBits
 	if n.Instruction == JMP {
-		// JMP's Opcode is defined as "FF /4" meaning that we have to have "4"
+		// JMP's opcode is defined as "FF /4" meaning that we have to have "4"
 		// in 4-6th bits in the ModRM byte. https://www.felixcloutier.com/x86/jmp
 		modRM |= 0b00_100_000
 	} else if n.Instruction == NEGQ {
