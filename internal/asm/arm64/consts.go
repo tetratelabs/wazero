@@ -880,9 +880,9 @@ const (
 	// VFCVTZU is the FCVTZU(vector,integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZU--vector--integer---Floating-point-Convert-to-Unsigned-integer--rounding-toward-Zero--vector--?lang=en
 	// Note: prefixed by V to distinguish from the non-vector variant.
 	VFCVTZU
-	// SQXTN is the SQXTN instruction
+	// SQXTN is the SQXTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
 	SQXTN
-	// UQXTN is the UQXTN instruction
+	// UQXTN is the UQXTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQXTN--UQXTN2--Unsigned-saturating-extract-Narrow-?lang=en
 	UQXTN
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.

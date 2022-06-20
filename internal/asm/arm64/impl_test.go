@@ -1886,6 +1886,38 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			exp:  []byte{0x3e, 0xbb, 0xe1, 0x6e},
 			arr:  VectorArrangement2D,
 		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "sqxtn v30.2s, v25.2d",
+			inst: SQXTN,
+			exp:  []byte{0x3e, 0x4b, 0xa1, 0xe},
+			arr:  VectorArrangement2S,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "sqxtn v30.4h, v25.4s",
+			inst: SQXTN,
+			exp:  []byte{0x3e, 0x4b, 0x61, 0xe},
+			arr:  VectorArrangement4H,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uqxtn v30.2s, v25.2d",
+			inst: UQXTN,
+			exp:  []byte{0x3e, 0x4b, 0xa1, 0x2e},
+			arr:  VectorArrangement2S,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uqxtn v30.4h, v25.4s",
+			inst: UQXTN,
+			exp:  []byte{0x3e, 0x4b, 0x61, 0x2e},
+			arr:  VectorArrangement4H,
+		},
 	}
 
 	for _, tt := range tests {

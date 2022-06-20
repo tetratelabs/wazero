@@ -2773,18 +2773,18 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 // advancedSIMDTwoRegisterMisc holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
-	U, opcode byte
+	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NOT--Bitwise-NOT--vector--?lang=en
-	NOT: {U: 0b1, opcode: 0b00101,
+	NOT: {u: 0b1, opcode: 0b00101,
 		qAndSize: map[VectorArrangement]qAndSize{
 			VectorArrangement16B: {size: 0b00, q: 0b1},
 			VectorArrangement8B:  {size: 0b00, q: 0b0},
 		},
 	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FNEG--vector---Floating-point-Negate--vector--?lang=en
-	VFNEG: {U: 0b1, opcode: 0b01111,
+	VFNEG: {u: 0b1, opcode: 0b01111,
 		qAndSize: map[VectorArrangement]qAndSize{
 			VectorArrangement4S: {size: 0b10, q: 0b1},
 			VectorArrangement2S: {size: 0b10, q: 0b0},
@@ -2792,81 +2792,85 @@ var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 		},
 	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FABS--vector---Floating-point-Absolute-value--vector--?lang=en
-	VFABS: {U: 0, opcode: 0b01111, qAndSize: map[VectorArrangement]qAndSize{
+	VFABS: {u: 0, opcode: 0b01111, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FSQRT--vector---Floating-point-Square-Root--vector--?lang=en
-	VFSQRT: {U: 1, opcode: 0b11111, qAndSize: map[VectorArrangement]qAndSize{
+	VFSQRT: {u: 1, opcode: 0b11111, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTM--vector---Floating-point-Round-to-Integral--toward-Minus-infinity--vector--?lang=en
-	VFRINTM: {U: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
+	VFRINTM: {u: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b01, q: 0b1},
 		VectorArrangement4S: {size: 0b00, q: 0b1},
 		VectorArrangement2S: {size: 0b00, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTN--vector---Floating-point-Round-to-Integral--to-nearest-with-ties-to-even--vector--?lang=en
-	VFRINTN: {U: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
+	VFRINTN: {u: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b01, q: 0b1},
 		VectorArrangement4S: {size: 0b00, q: 0b1},
 		VectorArrangement2S: {size: 0b00, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTP--vector---Floating-point-Round-to-Integral--toward-Plus-infinity--vector--?lang=en
-	VFRINTP: {U: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
+	VFRINTP: {u: 0, opcode: 0b11000, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FRINTZ--vector---Floating-point-Round-to-Integral--toward-Zero--vector--?lang=en
-	VFRINTZ: {U: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
+	VFRINTZ: {u: 0, opcode: 0b11001, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CNT--Population-Count-per-byte-?lang=en
-	VCNT: {U: 0b0, opcode: 0b00101, qAndSize: map[VectorArrangement]qAndSize{
+	VCNT: {u: 0b0, opcode: 0b00101, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement8B:  {size: 0b00, q: 0b0},
 		VectorArrangement16B: {size: 0b00, q: 0b1},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/NEG--vector---Negate--vector--?lang=en
-	VNEG: {U: 0b1, opcode: 0b01011, qAndSize: defaultQAndSize},
+	VNEG: {u: 0b1, opcode: 0b01011, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ABS--Absolute-value--vector--?lang=en
-	VABS: {U: 0b0, opcode: 0b01011, qAndSize: defaultQAndSize},
+	VABS: {u: 0b0, opcode: 0b01011, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/REV64--Reverse-elements-in-64-bit-doublewords--vector--?lang=en
-	REV64: {U: 0b0, opcode: 0b00000, qAndSize: defaultQAndSize},
+	REV64: {u: 0b0, opcode: 0b00000, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/XTN--XTN2--Extract-Narrow-?lang=en
-	XTN: {U: 0b0, opcode: 0b10010, qAndSize: map[VectorArrangement]qAndSize{
+	XTN: {u: 0b0, opcode: 0b10010, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement2D: {q: 0, size: 0b10},
 		VectorArrangement4S: {q: 0, size: 0b01},
 		VectorArrangement8H: {q: 0, size: 0b00},
 	}},
-	SHLL: {U: 0b1, opcode: 0b10011, qAndSize: map[VectorArrangement]qAndSize{
+	SHLL: {u: 0b1, opcode: 0b10011, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement8B: {q: 0b00, size: 0b00},
 		VectorArrangement4H: {q: 0b00, size: 0b01},
 		VectorArrangement2S: {q: 0b00, size: 0b10},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/CMEQ--zero---Compare-bitwise-Equal-to-zero--vector--?lang=en
-	CMEQZERO: {U: 0b0, opcode: 0b01001, qAndSize: defaultQAndSize},
+	CMEQZERO: {u: 0b0, opcode: 0b01001, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SADDLP--Signed-Add-Long-Pairwise-?lang=en
-	SADDLP: {U: 0b0, opcode: 0b00010, qAndSize: defaultQAndSize},
+	SADDLP: {u: 0b0, opcode: 0b00010, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UADDLP--Unsigned-Add-Long-Pairwise-?lang=en
-	UADDLP: {U: 0b1, opcode: 0b00010, qAndSize: defaultQAndSize},
+	UADDLP: {u: 0b1, opcode: 0b00010, qAndSize: defaultQAndSize},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZS--vector--integer---Floating-point-Convert-to-Signed-integer--rounding-toward-Zero--vector--?lang=en
-	VFCVTZS: {U: 0b0, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
+	VFCVTZS: {u: 0b0, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTZU--vector--integer---Floating-point-Convert-to-Unsigned-integer--rounding-toward-Zero--vector--?lang=en
-	VFCVTZU: {U: 0b1, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
+	VFCVTZU: {u: 0b1, opcode: 0b11011, qAndSize: map[VectorArrangement]qAndSize{
 		VectorArrangement4S: {size: 0b10, q: 0b1},
 		VectorArrangement2S: {size: 0b10, q: 0b0},
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
+	SQXTN: {u: 0b0, opcode: 0b10100, qAndSize: defaultQAndSize},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQXTN--UQXTN2--Unsigned-saturating-extract-Narrow-?lang=en
+	UQXTN: {u: 0b1, opcode: 0b10100, qAndSize: defaultQAndSize},
 }
 
 // advancedSIMDThreeDifferent holds information to encode instructions as "Advanced SIMD three different" in
@@ -3475,7 +3479,7 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 			(srcVectorRegBits << 5) | dstVectorRegBits,
 			twoRegMisc.opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
 			qs.size<<6 | 0b1<<5 | twoRegMisc.opcode>>4,
-			qs.q<<6 | twoRegMisc.U<<5 | 0b01110,
+			qs.q<<6 | twoRegMisc.u<<5 | 0b01110,
 		})
 		return nil
 	}
