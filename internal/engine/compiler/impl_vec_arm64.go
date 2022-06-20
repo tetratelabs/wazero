@@ -1206,12 +1206,43 @@ func (c *arm64Compiler) compileV128AvgrU(o *wazeroir.OperationV128AvgrU) error {
 
 // compileV128Pmin implements compiler.compileV128Pmin for arm64.
 func (c *arm64Compiler) compileV128Pmin(o *wazeroir.OperationV128Pmin) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.Shape), false)
 }
 
 // compileV128Pmax implements compiler.compileV128Pmax for arm64.
 func (c *arm64Compiler) compileV128Pmax(o *wazeroir.OperationV128Pmax) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	return c.compileV128PseudoMinOrMax(defaultArrangementForShape(o.Shape), true)
+}
+
+// compileV128PseudoMinOrMax implements compileV128Pmax and compileV128Pmin.
+func (c *arm64Compiler) compileV128PseudoMinOrMax(arr arm64.VectorArrangement, max bool) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	result, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	x1r, x2r := x1.register, x2.register
+
+	if max {
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x1r, x2r, result, arr)
+	} else {
+		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.FCMGT, x2r, x1r, result, arr)
+	}
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.BSL, x1r, x2r, result, arm64.VectorArrangement16B)
+
+	c.markRegisterUnused(x1r, x2r)
+	c.pushVectorRuntimeValueLocationOnRegister(result)
+	return nil
 }
 
 // compileV128Ceil implements compiler.compileV128Ceil for arm64.

@@ -4833,11 +4833,6 @@ func TestCompiler_compileV128Round(t *testing.T) {
 }
 
 func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
