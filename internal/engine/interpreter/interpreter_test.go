@@ -18,6 +18,15 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
+func TestInterpreter_peekValues(t *testing.T) {
+	ce := &callEngine{}
+	require.Nil(t, ce.peekValues(0))
+
+	ce.stack = []uint64{5, 4, 3, 2, 1}
+	require.Nil(t, ce.peekValues(0))
+	require.Equal(t, []uint64{1, 2}, ce.peekValues(2))
+}
+
 func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 	f1 := &callFrame{}
 	f2 := &callFrame{}

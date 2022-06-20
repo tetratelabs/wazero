@@ -46,7 +46,7 @@ func (l *logger) Before(ctx context.Context, _ []uint64) context.Context {
 func (l *logger) After(ctx context.Context, _ error, _ []uint64) {
 	// Note: We use the nest level directly even though it is the "next" nesting level.
 	// This works because our indent of zero nesting is one tab.
-	l.writeIndented(os.Stdout, true, ctx.Value(nestLevelKey{}).(int))
+	l.writeIndented(os.Stdout, false, ctx.Value(nestLevelKey{}).(int))
 }
 
 // funcName returns the name in priority order: first export name, module-defined name, numeric index.
@@ -78,16 +78,25 @@ func Example_listener() {
 		log.Panicln(err)
 	}
 
-	_, err = r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
+	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout))
 	if err != nil {
 		log.Panicln(err)
 	}
 
+	_, err = mod.ExportedFunction("rand").Call(ctx, 4)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	// We should see the same function called twice: directly and indirectly.
+
 	// Output:
-	// >>	listener.[1]
-	// >>		wasi_snapshot_preview1.random_get
-	// >>		wasi_snapshot_preview1.random_get
-	// >>	listener.[1]
+	//>>	listener.rand
+	//>>		wasi_snapshot_preview1.random_get
+	//<<		wasi_snapshot_preview1.random_get
+	//>>		wasi_snapshot_preview1.random_get
+	//<<		wasi_snapshot_preview1.random_get
+	//<<	listener.rand
 }
 
 // writeIndented writes an indented message like this: ">>\t\t\t$indentLevel$funcName\n"
