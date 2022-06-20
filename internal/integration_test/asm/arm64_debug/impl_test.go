@@ -765,51 +765,6 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	}
 }
 
-func TestAssemblerImpl_EncodeSIMDByteToRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n:      &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesSIMDByteToRegister},
-				expErr: "ADR is unsupported for from:simd-byte,to:register type",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeSIMDByteToRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	const inst = arm64.VUADDLV
-	t.Run(arm64.InstructionName(inst), func(t *testing.T) {
-		floatRegs := []asm.Register{arm64.RegV0, arm64.RegV10, arm64.RegV21, arm64.RegV31}
-		for _, src := range floatRegs {
-			for _, dst := range floatRegs {
-				src, dst := src, dst
-				t.Run(fmt.Sprintf("src=%s,dst=%s", arm64.RegisterName(src), arm64.RegisterName(dst)), func(t *testing.T) {
-					goasm := newGoasmAssembler(t, asm.NilRegister)
-					goasm.CompileSIMDByteToRegister(inst, src, dst)
-					expected, err := goasm.Assemble()
-					require.NoError(t, err)
-
-					a := arm64.NewAssemblerImpl(arm64.RegR27)
-					err = a.EncodeSIMDByteToRegister(&arm64.NodeImpl{Instruction: inst, SrcReg: src, DstReg: dst})
-					require.NoError(t, err)
-
-					actual := a.Bytes()
-					require.Equal(t, expected, actual)
-
-				})
-			}
-		}
-	})
-}
-
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {

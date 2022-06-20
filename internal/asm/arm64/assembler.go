@@ -48,10 +48,6 @@ type Assembler interface {
 		srcReg, dstReg asm.Register,
 	)
 
-	// CompileSIMDByteToRegister adds an instruction where source operand is the SIMD register specified as `srcReg.B8`,
-	// and the destination is the register `dstReg`.
-	CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register)
-
 	// CompileConditionalRegisterSet adds an instruction to set 1 on dstReg if the condition satisfies,
 	// otherwise set 0.
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register)

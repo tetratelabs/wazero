@@ -702,8 +702,8 @@ const (
 	INSGEN
 	// INSELEM is the INS(element) instruction https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/INS--element---Insert-vector-element-from-another-vector-element-?lang=en
 	INSELEM
-	// VUADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
-	VUADDLV
+	// UADDLV is the UADDLV(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/UADDLV--vector-
+	UADDLV
 	// VADD is the ADD(vector) instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/ADD--vector-
 	VADD
 	// VFADDS is the FADD(vector) instruction, for single precision. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/FADD--vector-
@@ -1186,8 +1186,8 @@ func InstructionName(i asm.Instruction) string {
 		return "VBIT"
 	case VCNT:
 		return "VCNT"
-	case VUADDLV:
-		return "VUADDLV"
+	case UADDLV:
+		return "UADDLV"
 	case VMOV:
 		return "VMOV"
 	case INSELEM:

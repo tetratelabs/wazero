@@ -95,10 +95,6 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: VUADDLV, Types: OperandTypesSIMDByteToRegister, SrcReg: RegV1, DstReg: RegV2},
-			exp: "VUADDLV V1.B8, V2",
-		},
-		{
 			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesMemoryToVectorRegister,
 				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2S},
 			exp: "VMOV [R1], V29.2S",
@@ -331,17 +327,6 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	require.Equal(t, int64(10), actualNode.SrcConst)
 	require.Equal(t, RegR5, actualNode.DstReg)
 	require.Equal(t, OperandTypeLeftShiftedRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
-}
-
-func Test_CompileSIMDByteToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
-	a.CompileSIMDByteToRegister(VUADDLV, RegV0, RegV10)
-	actualNode := a.Current
-	require.Equal(t, VUADDLV, actualNode.Instruction)
-	require.Equal(t, RegV0, actualNode.SrcReg)
-	require.Equal(t, RegV10, actualNode.DstReg)
-	require.Equal(t, OperandTypeSIMDByte, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
 }
 
@@ -1744,6 +1729,30 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 			inst: SHLL,
 			exp:  []byte{0x3e, 0x3b, 0xa1, 0x2e},
 			arr:  VectorArrangement2S,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv h30, v25.16b",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0x30, 0x6e},
+			arr:  VectorArrangement16B,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv s30, v25.8h",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0x70, 0x6e},
+			arr:  VectorArrangement8H,
+		},
+		{
+			x1:   RegV25,
+			x2:   RegV30,
+			name: "uaddlv d30, v25.4s",
+			inst: UADDLV,
+			exp:  []byte{0x3e, 0x3b, 0xb0, 0x6e},
+			arr:  VectorArrangement4S,
 		},
 	}
 

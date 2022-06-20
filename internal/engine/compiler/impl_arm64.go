@@ -1651,7 +1651,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	//    MOVD    $10, R0 ;; Load 10.
 	//    FMOVD   R0, F0
 	//    VCNT    V0.B8, V0.B8
-	//    VUADDLV V0.B8, V0
+	//    UADDLV  V0.B8, V0
 	//
 	var movInst asm.Instruction
 	if o.Type == wazeroir.UnsignedInt32 {
@@ -1662,7 +1662,8 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	c.assembler.CompileRegisterToRegister(movInst, reg, freg)
 	c.assembler.CompileVectorRegisterToVectorRegister(arm64.VCNT, freg, freg,
 		arm64.VectorArrangement16B, arm64.VectorIndexNone, arm64.VectorIndexNone)
-	c.assembler.CompileSIMDByteToRegister(arm64.VUADDLV, freg, freg)
+	c.assembler.CompileVectorRegisterToVectorRegister(arm64.UADDLV, freg, freg, arm64.VectorArrangement8B,
+		arm64.VectorIndexNone, arm64.VectorIndexNone)
 
 	c.assembler.CompileRegisterToRegister(movInst, freg, reg)
 

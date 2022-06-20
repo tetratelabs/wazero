@@ -102,8 +102,6 @@ func (n *NodeImpl) String() (ret string) {
 		}
 	case OperandTypesConstToRegister:
 		ret = fmt.Sprintf("%s 0x%x, %s", instName, n.SrcConst, RegisterName(n.DstReg))
-	case OperandTypesSIMDByteToRegister:
-		ret = fmt.Sprintf("%s %s.B8, %s", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg))
 	case OperandTypesRegisterToVectorRegister:
 		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.SrcReg), RegisterName(n.DstReg), n.VectorArrangement, n.DstVectorIndex)
 	case OperandTypesVectorRegisterToRegister:
@@ -192,7 +190,6 @@ var (
 	OperandTypesRegisterToMemory                   = OperandTypes{OperandTypeRegister, OperandTypeMemory}
 	OperandTypesMemoryToRegister                   = OperandTypes{OperandTypeMemory, OperandTypeRegister}
 	OperandTypesConstToRegister                    = OperandTypes{OperandTypeConst, OperandTypeRegister}
-	OperandTypesSIMDByteToRegister                 = OperandTypes{OperandTypeSIMDByte, OperandTypeRegister}
 	OperandTypesRegisterToVectorRegister           = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
 	OperandTypesVectorRegisterToRegister           = OperandTypes{OperandTypeVectorRegister, OperandTypeRegister}
 	OperandTypesMemoryToVectorRegister             = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
@@ -414,8 +411,6 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeMemoryToRegister(n)
 	case OperandTypesConstToRegister:
 		err = a.EncodeConstToRegister(n)
-	case OperandTypesSIMDByteToRegister:
-		err = a.EncodeSIMDByteToRegister(n)
 	case OperandTypesRegisterToVectorRegister:
 		err = a.EncodeRegisterToVectorRegister(n)
 	case OperandTypesVectorRegisterToRegister:
@@ -586,13 +581,6 @@ func (a *AssemblerImpl) CompileLeftShiftedRegisterToRegister(
 	n.SrcReg = srcReg
 	n.SrcReg2 = shiftedSourceReg
 	n.SrcConst = shiftNum
-	n.DstReg = dstReg
-}
-
-// CompileSIMDByteToRegister implements Assembler.CompileSIMDByteToRegister
-func (a *AssemblerImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
-	n := a.newNode(instruction, OperandTypesSIMDByteToRegister)
-	n.SrcReg = srcReg
 	n.DstReg = dstReg
 }
 
@@ -2556,33 +2544,6 @@ func setBitPos(x uint64) (ret uint32) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeSIMDByteToRegister(n *NodeImpl) (err error) {
-	if n.Instruction != VUADDLV {
-		return errorEncodingUnsupported(n)
-	}
-
-	srcRegBits, err := vectorRegisterBits(n.SrcReg)
-	if err != nil {
-		return err
-	}
-
-	dstRegBits, err := vectorRegisterBits(n.DstReg)
-	if err != nil {
-		return err
-	}
-
-	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/UADDLV--Unsigned-sum-Long-across-Vector-
-	a.Buf.Write([]byte{
-		(srcRegBits << 5) | dstRegBits,
-		0b001110_00 | srcRegBits>>3,
-		0b00_110000,
-		0b101110,
-	})
-	return
-}
-
 func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err error) {
 	if arr == VectorArrangementNone {
 		return nil
@@ -2809,7 +2770,7 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 	return
 }
 
-// advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
+// advancedSIMDTwoRegisterMisc holds information to encode instructions as "Advanced SIMD two-register miscellaneous" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 	U, opcode byte
@@ -2890,7 +2851,7 @@ var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 	}},
 }
 
-// advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD three different" in
+// advancedSIMDThreeDifferent holds information to encode instructions as "Advanced SIMD three different" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDThreeDifferent = map[asm.Instruction]struct {
 	u, opcode byte
@@ -3093,11 +3054,11 @@ var defaultQAndSize = map[VectorArrangement]qAndSize{
 // advancedSIMDAcrossLanes holds information to encode instructions as "Advanced SIMD across lanes" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
-	U, Opcode byte
+	u, opcode byte
 	qAndSize  map[VectorArrangement]qAndSize
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDV--Add-across-Vector-?lang=en
-	ADDV: {U: 0b0, Opcode: 0b11011,
+	ADDV: {u: 0b0, opcode: 0b11011,
 		qAndSize: map[VectorArrangement]qAndSize{
 			VectorArrangement16B: {size: 0b00, q: 0b1},
 			VectorArrangement8B:  {size: 0b00, q: 0b0},
@@ -3107,7 +3068,7 @@ var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
 		},
 	},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMINV--Unsigned-Minimum-across-Vector-?lang=en
-	UMINV: {U: 0b1, Opcode: 0b11010,
+	UMINV: {u: 0b1, opcode: 0b11010,
 		qAndSize: map[VectorArrangement]qAndSize{
 			VectorArrangement16B: {size: 0b00, q: 0b1},
 			VectorArrangement8B:  {size: 0b00, q: 0b0},
@@ -3116,16 +3077,23 @@ var advancedSIMDAcrossLanes = map[asm.Instruction]struct {
 			VectorArrangement4S:  {size: 0b10, q: 0b1},
 		},
 	},
+	UADDLV: {u: 0b1, opcode: 0b00011, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement16B: {size: 0b00, q: 0b1},
+		VectorArrangement8B:  {size: 0b00, q: 0b0},
+		VectorArrangement8H:  {size: 0b01, q: 0b1},
+		VectorArrangement4H:  {size: 0b01, q: 0b0},
+		VectorArrangement4S:  {size: 0b10, q: 0b1},
+	}},
 }
 
 // advancedSIMDScalarPairwise holds information to encode instructions as "Advanced SIMD scalar pairwise" in
 // https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Data-Processing----Scalar-Floating-Point-and-Advanced-SIMD?lang=en
 var advancedSIMDScalarPairwise = map[asm.Instruction]struct {
-	U, Opcode byte
+	u, opcode byte
 	size      map[VectorArrangement]byte
 }{
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/ADDP--scalar---Add-Pair-of-elements--scalar--?lang=en
-	ADDP: {U: 0b0, Opcode: 0b11011, size: map[VectorArrangement]byte{VectorArrangement2D: 0b11}},
+	ADDP: {u: 0b0, opcode: 0b11011, size: map[VectorArrangement]byte{VectorArrangement2D: 0b11}},
 }
 
 // advancedSIMDCopy holds information to encode instructions as "Advanced SIMD copy" in
@@ -3439,9 +3407,9 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
-			scalarPairwise.Opcode<<4 | 1<<3 | srcVectorRegBits>>3,
-			size<<6 | 0b11<<4 | scalarPairwise.Opcode>>4,
-			0b1<<6 | scalarPairwise.U<<5 | 0b11110,
+			scalarPairwise.opcode<<4 | 1<<3 | srcVectorRegBits>>3,
+			size<<6 | 0b11<<4 | scalarPairwise.opcode>>4,
+			0b1<<6 | scalarPairwise.u<<5 | 0b11110,
 		})
 		return
 	}
@@ -3489,9 +3457,9 @@ func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err e
 		}
 		a.Buf.Write([]byte{
 			(srcVectorRegBits << 5) | dstVectorRegBits,
-			acrossLanes.Opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
-			qs.size<<6 | 0b11000<<1 | acrossLanes.Opcode>>4,
-			qs.q<<6 | acrossLanes.U<<5 | 0b01110,
+			acrossLanes.opcode<<4 | 0b1<<3 | srcVectorRegBits>>3,
+			qs.size<<6 | 0b11000<<1 | acrossLanes.opcode>>4,
+			qs.q<<6 | acrossLanes.u<<5 | 0b01110,
 		})
 		return nil
 	}
