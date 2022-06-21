@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"encoding/binary"
+	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
@@ -213,6 +214,91 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			require.Equal(t, exp, actual)
 
 			tc.verifyFn(t, env)
+		})
+	}
+}
+
+// TestAmd64Compiler_compileV128Neg_NaNOnTemporary ensures compileV128Neg for floating point variants works well
+// even if the temporary register used by the instruction holds NaN values previously.
+func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
+	tests := []struct {
+		name   string
+		shape  wazeroir.Shape
+		v, exp [16]byte
+	}{
+		{
+			name:  "f32x4",
+			shape: wazeroir.ShapeF32x4,
+			v:     f32x4(51234.12341, -123, float32(math.Inf(1)), 0.1),
+			exp:   f32x4(-51234.12341, 123, float32(math.Inf(-1)), -0.1),
+		},
+		{
+			name:  "f32x4",
+			shape: wazeroir.ShapeF32x4,
+			v:     f32x4(51234.12341, 0, float32(math.Inf(1)), 0.1),
+			exp:   f32x4(-51234.12341, float32(math.Copysign(0, -1)), float32(math.Inf(-1)), -0.1),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			v:     f64x2(1.123, math.Inf(-1)),
+			exp:   f64x2(-1.123, math.Inf(1)),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			v:     f64x2(0, math.Inf(-1)),
+			exp:   f64x2(math.Copysign(0, -1), math.Inf(1)),
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newCompilerEnvironment()
+			compiler := env.requireNewCompiler(t, newCompiler,
+				&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: binary.LittleEndian.Uint64(tc.v[:8]),
+				Hi: binary.LittleEndian.Uint64(tc.v[8:]),
+			})
+			require.NoError(t, err)
+
+			// Ensures that the previous state of temporary register used by Neg holds
+			// NaN values.
+			err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+				Lo: math.Float64bits(math.NaN()),
+				Hi: math.Float64bits(math.NaN()),
+			})
+			require.NoError(t, err)
+
+			// Mark that the temp register is available for Neg instruction below.
+			loc := compiler.runtimeValueLocationStack().popV128()
+			compiler.runtimeValueLocationStack().markRegisterUnused(loc.register)
+
+			// Now compiling Neg where it uses temporary register holding NaN values at this point.
+			err = compiler.compileV128Neg(&wazeroir.OperationV128Neg{Shape: tc.shape})
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
+
+			lo, hi := env.stackTopAsV128()
+			var actual [16]byte
+			binary.LittleEndian.PutUint64(actual[:8], lo)
+			binary.LittleEndian.PutUint64(actual[8:], hi)
+			require.Equal(t, tc.exp, actual)
 		})
 	}
 }

@@ -1589,9 +1589,14 @@ func (c *amd64Compiler) compileV128NegFloat(s wazeroir.Shape) error {
 		leftShiftInst, leftShiftAmount, xorInst = amd64.PSLLQ, 63, amd64.XORPD
 	}
 
-	// Set all bits on tmp by CMPPD with arg=0 (== pseudo CMPEQPS instruction).
+	// Clear all bits on tmp.
+	c.assembler.CompileRegisterToRegister(amd64.XORPS, tmp, tmp)
+	// Set all bits on tmp by CMPPD with arg=0 (== pseudo CMPEQPD instruction).
 	// See https://www.felixcloutier.com/x86/cmpps
-	c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, tmp, tmp, 0)
+	//
+	// Note: if we do not clear all the bits ^ with XORPS, this might end up not setting ones on some lane
+	// if the lane is NaN.
+	c.assembler.CompileRegisterToRegisterWithArg(amd64.CMPPD, tmp, tmp, 0x8)
 	// Do the left shift on each lane to set only the most significant bit in each.
 	c.assembler.CompileConstToRegister(leftShiftInst, leftShiftAmount, tmp)
 	// Get the negated result by XOR on each lane with tmp.
