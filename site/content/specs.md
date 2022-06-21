@@ -33,24 +33,24 @@ as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
 wazero conforms with tests defined alongside WebAssembly Core
-Specification [1.0][1] and [2.0][14]. This is the default [RuntimeConfig][7].
+Specification [1.0][1] and [2.0][14].
 
-The WebAssembly Core Specification [2.0][2] is in draft form and wazero has
-[work in progress][8] towards that. Opt in via the below configuration:
+By default, the runtime configuration only enables WebAssembly 1.0 features, but
+you can opt in via the below configuration:
 ```go
 rConfig = wazero.NewRuntimeConfig().WithWasmCore2()
 ```
 
-One current limitation of wazero is that it doesn't fully implement the Text
-Format, yet, e.g. compiling `.wat` files. The intent is to [finish this][9],
-and meanwhile users can work around this using tools such as `wat2wasm` to
+One current limitation of wazero is that it doesn't implement the Text
+Format, e.g. compiling `.wat` files. Users can work around this using tools such as `wat2wasm` to
 compile the text format into the binary format. In practice, the text format is
 too low level for most users, so delays here have limited impact.
 
-#### Post 2.0 Features
+#### Post 1.0 Features
 Features regardless of W3C release are inventoried in the [Proposals][10].
 repository. wazero implements [Finished Proposals][11] based on user demand,
-using [wazero.RuntimeConfig][7] feature flags.
+using [wazero.RuntimeConfig][7] feature flags. Currently, all the finished proposals
+are included in [2.0][14] Working Draft.
 
 Features not yet assigned to a W3C release are not reliable. Encourage the
 [WebAssembly community][12] to formalize features you rely on, so that they
