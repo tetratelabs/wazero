@@ -795,23 +795,24 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 		}
 	}()
 
-	if f.Kind == wasm.FunctionKindWasm {
-		if f.FunctionListener != nil {
-			ctx = f.FunctionListener.Before(ctx, params)
-		}
-		for _, param := range params {
-			ce.pushValue(param)
-		}
-		ce.callNativeFunc(ctx, m, compiled)
-		results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
-		if f.FunctionListener != nil {
-			// TODO: This doesn't get the error due to use of panic to propagate them.
-			f.FunctionListener.After(ctx, nil, results)
-		}
-	} else {
-		results = ce.callGoFunc(ctx, m, compiled, params)
+	for _, param := range params {
+		ce.pushValue(param)
 	}
+
+	ce.callFunction(ctx, m, compiled)
+
+	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
 	return
+}
+
+func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+	if f.hostFn != nil {
+		ce.callGoFuncWithStack(ctx, callCtx, f)
+	} else if lsn := f.source.FunctionListener; lsn != nil {
+		ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
+	} else {
+		ce.callNativeFunc(ctx, callCtx, f)
+	}
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
@@ -843,7 +844,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
-	listener := f.source.FunctionListener
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -874,14 +874,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				frame.pc = op.us[0]
 			}
 		case wazeroir.OperationKindCall:
-			f := functions[op.us[0]]
-			if f.hostFn != nil {
-				ce.callGoFuncWithStack(ctx, callCtx, f)
-			} else if listener != nil {
-				ctx = ce.callNativeFuncWithListener(ctx, callCtx, f, listener)
-			} else {
-				ce.callNativeFunc(ctx, callCtx, f)
-			}
+			ce.callFunction(ctx, callCtx, functions[op.us[0]])
 			frame.pc++
 		case wazeroir.OperationKindCallIndirect:
 			offset := ce.popValue()
@@ -899,14 +892,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
 			}
 
-			// Call in.
-			if tf.hostFn != nil {
-				ce.callGoFuncWithStack(ctx, callCtx, tf)
-			} else if listener != nil {
-				ctx = ce.callNativeFuncWithListener(ctx, callCtx, f, listener)
-			} else {
-				ce.callNativeFunc(ctx, callCtx, tf)
-			}
+			ce.callFunction(ctx, callCtx, tf)
 			frame.pc++
 		case wazeroir.OperationKindDrop:
 			ce.drop(op.rs[0])
