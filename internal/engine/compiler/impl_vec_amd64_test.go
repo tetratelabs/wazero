@@ -219,7 +219,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 }
 
 // TestAmd64Compiler_compileV128Neg_NaNOnTemporary ensures compileV128Neg for floating point variants works well
-// even the temporary register used by the instruction hold NaN values.
+// even if the temporary register used by the instruction holds NaN values previously.
 func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 	tests := []struct {
 		name   string

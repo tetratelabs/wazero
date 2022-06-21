@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"errors"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
