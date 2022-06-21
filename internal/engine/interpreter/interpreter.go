@@ -800,11 +800,8 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 	}
 
 	ce.callFunction(ctx, m, compiled)
+
 	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
-	if f.FunctionListener != nil {
-		// TODO: This doesn't get the error due to use of panic to propagate them.
-		f.FunctionListener.After(ctx, nil, results)
-	}
 	return
 }
 
