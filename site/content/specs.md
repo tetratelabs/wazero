@@ -32,8 +32,8 @@ In summary, we hope this section can guide you in terms of what wazero supports
 as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
-wazero conforms with [spectests][6] defined alongside WebAssembly Core
-Specification [1.0][1]. This is the default [RuntimeConfig][7].
+wazero conforms with specification tests defined alongside WebAssembly Core
+Specification [1.0][1] and [2.0][14]. This is the default [RuntimeConfig][7].
 
 The WebAssembly Core Specification [2.0][2] is in draft form and wazero has
 [work in progress][8] towards that. Opt in via the below configuration:
@@ -140,3 +140,4 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 [11]: https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
 [12]: https://www.w3.org/community/webassembly/
 [13]: https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+[14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
