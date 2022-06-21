@@ -24,7 +24,7 @@ func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
 	}
 	c.assembler.CompileRegisterToRegister(arm64.FMOVD, intReg, result)
 
-	// Then, insert the higher bits with VMOV (translated as "ins" instruction).
+	// Then, insert the higher bits with INS(vector,general).
 	intReg = arm64ReservedRegisterForTemporary
 	if o.Hi == 0 {
 		intReg = arm64.RegRZR
@@ -577,7 +577,7 @@ func (c *arm64Compiler) compileV128Shuffle(o *wazeroir.OperationV128Shuffle) (er
 }
 
 // compileV128Swizzle implements compiler.compileV128Swizzle for arm64.
-func (c *arm64Compiler) compileV128Swizzle(o *wazeroir.OperationV128Swizzle) (err error) {
+func (c *arm64Compiler) compileV128Swizzle(*wazeroir.OperationV128Swizzle) (err error) {
 	indexVec := c.locationStack.popV128()
 	if err = c.compileEnsureOnGeneralPurposeRegister(indexVec); err != nil {
 		return
