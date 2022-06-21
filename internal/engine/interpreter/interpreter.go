@@ -809,7 +809,7 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 	if f.hostFn != nil {
 		ce.callGoFuncWithStack(ctx, callCtx, f)
 	} else if lsn := f.source.FunctionListener; lsn != nil {
-		ctx = ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
+		ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
 	} else {
 		ce.callNativeFunc(ctx, callCtx, f)
 	}
