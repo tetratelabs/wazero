@@ -884,6 +884,22 @@ const (
 	SQXTN
 	// UQXTN is the UQXTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQXTN--UQXTN2--Unsigned-saturating-extract-Narrow-?lang=en
 	UQXTN
+	// SQXTN2 is the SQXTN2 instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
+	SQXTN2
+	// SQXTUN is the SQXTUN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTUN--SQXTUN2--Signed-saturating-extract-Unsigned-Narrow-?lang=en
+	SQXTUN
+	// SQXTUN2 is the SQXTUN2 instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTUN--SQXTUN2--Signed-saturating-extract-Unsigned-Narrow-?lang=en
+	SQXTUN2
+	// VSCVTF is the SCVTF(vector, integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SCVTF--vector--integer---Signed-integer-Convert-to-Floating-point--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VSCVTF
+	// VUCVTF is the UCVTF(vector, integer) instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UCVTF--vector--integer---Unsigned-integer-Convert-to-Floating-point--vector--?lang=en
+	// Note: prefixed by V to distinguish from the non-vector variant.
+	VUCVTF
+	// FCVTL is the FCVTL instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTL--FCVTL2--Floating-point-Convert-to-higher-precision-Long--vector--?lang=en
+	FCVTL
+	// FCVTN is the FCVTN instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTN--FCVTN2--Floating-point-Convert-to-lower-precision-Narrow--vector--?lang=en
+	FCVTN
 
 	// instructionEnd is always placed at the bottom of this iota definition to be used in the test.
 	instructionEnd
@@ -1380,6 +1396,20 @@ func InstructionName(i asm.Instruction) string {
 		return "SQXTN"
 	case UQXTN:
 		return "UQXTN"
+	case SQXTN2:
+		return "SQXTN2"
+	case SQXTUN:
+		return "SQXTUN"
+	case SQXTUN2:
+		return "SQXTUN2"
+	case VSCVTF:
+		return "VSCVTF"
+	case VUCVTF:
+		return "VUCVTF"
+	case FCVTL:
+		return "FCVTL"
+	case FCVTN:
+		return "FCVTN"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

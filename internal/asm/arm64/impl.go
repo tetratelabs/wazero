@@ -2868,9 +2868,54 @@ var advancedSIMDTwoRegisterMisc = map[asm.Instruction]struct {
 		VectorArrangement2D: {size: 0b11, q: 0b1},
 	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
-	SQXTN: {u: 0b0, opcode: 0b10100, qAndSize: defaultQAndSize},
+	SQXTN: {u: 0b0, opcode: 0b10100, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement8B: {q: 0b0, size: 0b00},
+		VectorArrangement4H: {q: 0b0, size: 0b01},
+		VectorArrangement2S: {q: 0b0, size: 0b10},
+	}},
+
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTN--SQXTN2--Signed-saturating-extract-Narrow-?lang=en
+	SQXTN2: {u: 0b0, opcode: 0b10100, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement16B: {q: 0b1, size: 0b00},
+		VectorArrangement8H:  {q: 0b1, size: 0b01},
+		VectorArrangement4S:  {q: 0b1, size: 0b10},
+	}},
 	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UQXTN--UQXTN2--Unsigned-saturating-extract-Narrow-?lang=en
 	UQXTN: {u: 0b1, opcode: 0b10100, qAndSize: defaultQAndSize},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTUN--SQXTUN2--Signed-saturating-extract-Unsigned-Narrow-?lang=en
+	SQXTUN: {u: 0b1, opcode: 0b10010, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement8B: {q: 0b0, size: 0b00},
+		VectorArrangement4H: {q: 0b0, size: 0b01},
+		VectorArrangement2S: {q: 0b0, size: 0b10},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SQXTUN--SQXTUN2--Signed-saturating-extract-Unsigned-Narrow-?lang=en
+	SQXTUN2: {u: 0b1, opcode: 0b10010, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement16B: {q: 0b1, size: 0b00},
+		VectorArrangement8H:  {q: 0b1, size: 0b01},
+		VectorArrangement4S:  {q: 0b1, size: 0b10},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/SCVTF--vector--integer---Signed-integer-Convert-to-Floating-point--vector--?lang=en
+	VSCVTF: {u: 0b0, opcode: 0b11101, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {q: 0b1, size: 0b01},
+		VectorArrangement4S: {q: 0b1, size: 0b00},
+		VectorArrangement2S: {q: 0b0, size: 0b00},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UCVTF--vector--integer---Unsigned-integer-Convert-to-Floating-point--vector--?lang=en
+	VUCVTF: {u: 0b1, opcode: 0b11101, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2D: {q: 0b1, size: 0b01},
+		VectorArrangement4S: {q: 0b1, size: 0b00},
+		VectorArrangement2S: {q: 0b0, size: 0b00},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTL--FCVTL2--Floating-point-Convert-to-higher-precision-Long--vector--?lang=en
+	FCVTL: {u: 0b0, opcode: 0b10111, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2S: {size: 0b01, q: 0b0},
+		VectorArrangement4H: {size: 0b00, q: 0b0},
+	}},
+	// https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/FCVTN--FCVTN2--Floating-point-Convert-to-lower-precision-Narrow--vector--?lang=en
+	FCVTN: {u: 0b0, opcode: 0b10110, qAndSize: map[VectorArrangement]qAndSize{
+		VectorArrangement2S: {size: 0b01, q: 0b0},
+		VectorArrangement4H: {size: 0b00, q: 0b0},
+	}},
 }
 
 // advancedSIMDThreeDifferent holds information to encode instructions as "Advanced SIMD three different" in

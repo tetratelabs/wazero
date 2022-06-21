@@ -1,8 +1,6 @@
 package compiler
 
 import (
-	"fmt"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -1374,18 +1372,46 @@ func (c *arm64Compiler) compileV128ExtAddPairwise(o *wazeroir.OperationV128ExtAd
 }
 
 // compileV128FloatPromote implements compiler.compileV128FloatPromote for arm64.
-func (c *arm64Compiler) compileV128FloatPromote(o *wazeroir.OperationV128FloatPromote) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128FloatPromote(*wazeroir.OperationV128FloatPromote) error {
+	return c.compileV128UniOp(arm64.FCVTL, arm64.VectorArrangement2S)
 }
 
 // compileV128FloatDemote implements compiler.compileV128FloatDemote for arm64.
-func (c *arm64Compiler) compileV128FloatDemote(o *wazeroir.OperationV128FloatDemote) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128FloatDemote(*wazeroir.OperationV128FloatDemote) error {
+	return c.compileV128UniOp(arm64.FCVTN, arm64.VectorArrangement2S)
 }
 
 // compileV128FConvertFromI implements compiler.compileV128FConvertFromI for arm64.
-func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.OperationV128FConvertFromI) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.OperationV128FConvertFromI) (err error) {
+	if o.DestinationShape == wazeroir.ShapeF32x4 {
+		if o.Signed {
+			err = c.compileV128UniOp(arm64.VSCVTF, defaultArrangementForShape(o.DestinationShape))
+		} else {
+			err = c.compileV128UniOp(arm64.VUCVTF, defaultArrangementForShape(o.DestinationShape))
+		}
+		return
+	} else { // f64x2
+		v := c.locationStack.popV128()
+		if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+			return
+		}
+		vr := v.register
+
+		var expand, convert asm.Instruction
+		if o.Signed {
+			expand, convert = arm64.SSHLL, arm64.VSCVTF
+		} else {
+			expand, convert = arm64.USHLL, arm64.VUCVTF
+		}
+
+		// Expand lower two 32-bit lanes as two 64-bit lanes.
+		c.assembler.CompileVectorRegisterToVectorRegisterWithConst(expand, vr, vr, arm64.VectorArrangement2S, 0)
+		// Convert these two 64-bit (integer) values on each lane as double precision values.
+		c.assembler.CompileVectorRegisterToVectorRegister(convert, vr, vr, arm64.VectorArrangement2D,
+			arm64.VectorIndexNone, arm64.VectorIndexNone)
+		c.pushVectorRuntimeValueLocationOnRegister(vr)
+	}
+	return
 }
 
 // compileV128Dot implements compiler.compileV128Dot for arm64.
@@ -1422,7 +1448,43 @@ func (c *arm64Compiler) compileV128Dot(*wazeroir.OperationV128Dot) error {
 
 // compileV128Narrow implements compiler.compileV128Narrow for arm64.
 func (c *arm64Compiler) compileV128Narrow(o *wazeroir.OperationV128Narrow) error {
-	return fmt.Errorf("TODO: %s is not implemented yet on arm64 compiler", o.Kind())
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	x1r, x2r := x1.register, x2.register
+
+	var arr, arr2 arm64.VectorArrangement
+	switch o.OriginShape {
+	case wazeroir.ShapeI16x8:
+		arr = arm64.VectorArrangement8B
+		arr2 = arm64.VectorArrangement16B
+	case wazeroir.ShapeI32x4:
+		arr = arm64.VectorArrangement4H
+		arr2 = arm64.VectorArrangement8H
+	}
+
+	var lo, hi asm.Instruction
+	if o.Signed {
+		lo, hi = arm64.SQXTN, arm64.SQXTN2
+	} else {
+		lo, hi = arm64.SQXTUN, arm64.SQXTUN2
+	}
+
+	// Narrow lanes on x1r and write them into lower-half of x1r.
+	c.assembler.CompileVectorRegisterToVectorRegister(lo, x1r, x1r, arr, arm64.VectorIndexNone, arm64.VectorIndexNone)
+	// Narrow lanes on x2r and write them into higher-half of x1r.
+	c.assembler.CompileVectorRegisterToVectorRegister(hi, x2r, x1r, arr2, arm64.VectorIndexNone, arm64.VectorIndexNone)
+
+	c.markRegisterUnused(x2r)
+	c.pushVectorRuntimeValueLocationOnRegister(x1r)
+	return nil
 }
 
 // compileV128ITruncSatFromF implements compiler.compileV128ITruncSatFromF for arm64.
