@@ -176,7 +176,7 @@ type compilerImpl interface {
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
 	runtimeValueLocationStack() *runtimeValueLocationStack
 	setRuntimeValueLocationStack(*runtimeValueLocationStack)
-	compileEnsureOnGeneralPurposeRegister(loc *runtimeValueLocation) error
+	compileEnsureOnRegister(loc *runtimeValueLocation) error
 	compileModuleContextInitialization() error
 	compileNOP()
 }

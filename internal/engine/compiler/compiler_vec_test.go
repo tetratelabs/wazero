@@ -3,7 +3,6 @@ package compiler
 import (
 	"encoding/binary"
 	"math"
-	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/moremath"
@@ -6307,11 +6306,6 @@ func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
 }
 
 func TestCompiler_compileFloatPromote(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		v, exp [16]byte
@@ -6396,11 +6390,6 @@ func TestCompiler_compileFloatPromote(t *testing.T) {
 }
 
 func TestCompiler_compileV128FloatDemote(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name   string
 		v, exp [16]byte
@@ -6684,10 +6673,6 @@ func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
 }
 
 func TestCompiler_compileV128Narrow(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -6746,7 +6731,6 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 				0x80, 0x00, 0x80, 0x00, 0x80, 0x00, 0x80, 0x00,
 			},
 		},
-		// i
 		{
 			name:   "i16x8 u",
 			shape:  wazeroir.ShapeI16x8,
@@ -6937,11 +6921,6 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 }
 
 func TestCompiler_compileV128FConvertFromI(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: implement on amd64.
-		t.Skip()
-	}
-
 	tests := []struct {
 		name      string
 		destShape wazeroir.Shape

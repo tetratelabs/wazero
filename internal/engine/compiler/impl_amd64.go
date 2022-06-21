@@ -279,10 +279,10 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 		x1, x2 = c.locationStack.peek(), c.locationStack.stack[index]
 	}
 
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
@@ -365,7 +365,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		// The previous val is higher 64-bits, and have to use lower 64-bit's runtimeValueLocation for allocation, etc.
 		val = c.locationStack.pop()
 	}
-	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
+	if err := c.compileEnsureOnRegister(val); err != nil {
 		return err
 	}
 
@@ -472,7 +472,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		//      br_if ....
 		// will try to use the result of i64.add, which resides on the (virtual) stack,
 		// as the operand for br_if instruction.
-		if err := c.compileEnsureOnGeneralPurposeRegister(cond); err != nil {
+		if err := c.compileEnsureOnRegister(cond); err != nil {
 			return err
 		}
 		// Check if the value not equals zero.
@@ -564,7 +564,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	}
 
 	// Otherwise, we jump into the selected branch.
-	if err := c.compileEnsureOnGeneralPurposeRegister(index); err != nil {
+	if err := c.compileEnsureOnRegister(index); err != nil {
 		return err
 	}
 
@@ -759,7 +759,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 // compileCallIndirect implements compiler.compileCallIndirect for the amd64 architecture.
 func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	offset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return nil
 	}
 
@@ -900,7 +900,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 		// If the value is on a memory, we have to move it to a register,
 		// otherwise the memory location is overridden by other values
 		// after this drop instruction.
-		if err := c.compileEnsureOnGeneralPurposeRegister(live); err != nil {
+		if err := c.compileEnsureOnRegister(live); err != nil {
 
 			return err
 		}
@@ -917,7 +917,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 // the physical registers or memory stack, or maybe conditional register.
 func (c *amd64Compiler) compileSelect() error {
 	cv := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(cv); err != nil {
+	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
 	}
 
@@ -1024,12 +1024,12 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	}
 
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.peek() // Note this is peek, pop!
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1060,12 +1060,12 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.peek() // Note this is peek, pop!
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1147,10 +1147,10 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instr
 	}
 
 	// We have to make sure that at this point the operands must be on registers.
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1179,12 +1179,12 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instr
 
 func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1200,7 +1200,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 // compileClz implements compiler.compileClz for the amd64 architecture.
 func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	target := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1263,7 +1263,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 // compileCtz implements compiler.compileCtz for the amd64 architecture.
 func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	target := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1315,7 +1315,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 // compilePopcnt implements compiler.compilePopcnt for the amd64 architecture.
 func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	target := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1429,7 +1429,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 	// Ensure that x2 is placed on a register which is not either AX or DX.
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
@@ -1626,12 +1626,12 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 // onto the stack.
 func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1751,7 +1751,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
 func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1769,7 +1769,7 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 // compileNeg implements compiler.compileNeg for the amd64 architecture.
 func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1820,7 +1820,7 @@ func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 
 func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -1866,11 +1866,11 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 // For the semantics, see wazeroir.Min and wazeroir.Max for detail.
 func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1932,11 +1932,11 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	is32Bit := o.Type == wazeroir.Float32
 
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 	tmpReg, err := c.allocateRegister(registerTypeVector)
@@ -1989,7 +1989,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 // compileSqrt implements compiler.compileSqrt for the amd64 architecture.
 func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 	if o.Type == wazeroir.Float32 {
@@ -2003,7 +2003,7 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 // compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the amd64 architecture.
 func (c *amd64Compiler) compileI32WrapFromI64() error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 	c.assembler.CompileRegisterToRegister(amd64.MOVL, target.register, target.register)
@@ -2042,7 +2042,7 @@ func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (er
 // emitUnsignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 32-bit unsigned integer.
 func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping bool) error {
 	source := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(source); err != nil {
+	if err := c.compileEnsureOnRegister(source); err != nil {
 		return err
 	}
 
@@ -2156,7 +2156,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 // emitUnsignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 64-bit unsigned integer.
 func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping bool) error {
 	source := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(source); err != nil {
+	if err := c.compileEnsureOnRegister(source); err != nil {
 		return err
 	}
 
@@ -2270,7 +2270,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 // emitSignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 32-bit signed integer.
 func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bool) error {
 	source := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(source); err != nil {
+	if err := c.compileEnsureOnRegister(source); err != nil {
 		return err
 	}
 
@@ -2388,7 +2388,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 // emitSignedI64TruncFromFloat implements compileITruncFromF when the destination type is a 64-bit signed integer.
 func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit, nonTrapping bool) error {
 	source := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(source); err != nil {
+	if err := c.compileEnsureOnRegister(source); err != nil {
 		return err
 	}
 
@@ -2561,7 +2561,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	// tl;dr is that we have a branch depending on whether or not sign bit is set.
 
 	origin := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
+	if err := c.compileEnsureOnRegister(origin); err != nil {
 		return err
 	}
 
@@ -2638,7 +2638,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction,
 	destinationRegisterType registerType, destinationValueType runtimeValueType) error {
 	origin := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
+	if err := c.compileEnsureOnRegister(origin); err != nil {
 		return err
 	}
 
@@ -2657,7 +2657,7 @@ func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction,
 // compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the amd64 architecture.
 func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -2668,7 +2668,7 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 // compileF64PromoteFromF32 implements compiler.compileF64PromoteFromF32 for the amd64 architecture.
 func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -2754,7 +2754,7 @@ func (c *amd64Compiler) compileSignExtend64From32() error {
 
 func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction) error {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
+	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -2774,12 +2774,12 @@ func (c *amd64Compiler) compileNe(o *wazeroir.OperationNe) error {
 
 func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) (err error) {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -2876,7 +2876,7 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpIns
 // compileEqz implements compiler.compileEqz for the amd64 architecture.
 func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	v := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
@@ -2899,12 +2899,12 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 // compileLt implements compiler.compileLt for the amd64 architecture.
 func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -2946,12 +2946,12 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 // compileGt implements compiler.compileGt for the amd64 architecture.
 func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -2991,12 +2991,12 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 // compileLe implements compiler.compileLe for the amd64 architecture.
 func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -3038,12 +3038,12 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 // compileGe implements compiler.compileGe for the amd64 architecture.
 func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	x2 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -3244,7 +3244,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 // In other words, if the ceil exceeds the memory size, the code exits with nativeCallStatusCodeMemoryOutOfBounds status.
 func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (asm.Register, error) {
 	base := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(base); err != nil {
+	if err := c.compileEnsureOnRegister(base); err != nil {
 		return 0, err
 	}
 
@@ -3305,7 +3305,7 @@ func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
 
 func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instruction, targetSizeInBytes int64) error {
 	val := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
+	if err := c.compileEnsureOnRegister(val); err != nil {
 		return err
 	}
 
@@ -3375,17 +3375,17 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 	}
 
 	copySize := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
 	}
 
 	sourceOffset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(sourceOffset); err != nil {
+	if err := c.compileEnsureOnRegister(sourceOffset); err != nil {
 		return err
 	}
 
 	destinationOffset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+	if err := c.compileEnsureOnRegister(destinationOffset); err != nil {
 		return err
 	}
 
@@ -3541,17 +3541,17 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 	}
 
 	copySize := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
 	}
 
 	sourceOffset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(sourceOffset); err != nil {
+	if err := c.compileEnsureOnRegister(sourceOffset); err != nil {
 		return err
 	}
 
 	destinationOffset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+	if err := c.compileEnsureOnRegister(destinationOffset); err != nil {
 		return err
 	}
 
@@ -3712,17 +3712,17 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 // the code is independent of any module.
 func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	copySize := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(copySize); err != nil {
+	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
 	}
 
 	value := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(value); err != nil {
+	if err := c.compileEnsureOnRegister(value); err != nil {
 		return err
 	}
 
 	destinationOffset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(destinationOffset); err != nil {
+	if err := c.compileEnsureOnRegister(destinationOffset); err != nil {
 		return err
 	}
 
@@ -3862,7 +3862,7 @@ func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 	c.locationStack.markRegisterUsed(ref)
 
 	offset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return err
 	}
 
@@ -3901,12 +3901,12 @@ func (c *amd64Compiler) compileTableGet(o *wazeroir.OperationTableGet) error {
 // compileTableSet implements compiler.compileTableSet for the amd64 architecture.
 func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 	ref := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(ref); err != nil {
+	if err := c.compileEnsureOnRegister(ref); err != nil {
 		return err
 	}
 
 	offset := c.locationStack.pop()
-	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+	if err := c.compileEnsureOnRegister(offset); err != nil {
 		return err
 	}
 
@@ -4130,7 +4130,7 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 // This is usually called at the beginning of methods on compiler interface where we possibly
 // compile instructions without saving the conditional register value.
 // The compile* functions without calling this function is saving the conditional
-// value to the stack or register by invoking compileEnsureOnGeneralPurposeRegister for the top.
+// value to the stack or register by invoking compileEnsureOnRegister for the top.
 func (c *amd64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
@@ -4895,9 +4895,9 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	return nil
 }
 
-// compileEnsureOnGeneralPurposeRegister ensures that the given value is located on a
+// compileEnsureOnRegister ensures that the given value is located on a
 // general purpose register of an appropriate type.
-func (c *amd64Compiler) compileEnsureOnGeneralPurposeRegister(loc *runtimeValueLocation) error {
+func (c *amd64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) error {
 	if loc.onStack() {
 		// Allocate the register.
 		reg, err := c.allocateRegister(loc.getRegisterType())

@@ -112,7 +112,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			require.True(t, loc.onStack())
 
 			// Release the stack-allocated value to register.
-			err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
+			err = compiler.compileEnsureOnRegister(loc)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 			require.True(t, loc.onRegister())
@@ -527,14 +527,14 @@ func TestCompiler_compileSelect(t *testing.T) {
 					x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					env.stack()[x1.stackPointer] = x1Value
 					if tc.x1OnRegister {
-						err = compiler.compileEnsureOnGeneralPurposeRegister(x1)
+						err = compiler.compileEnsureOnRegister(x1)
 						require.NoError(t, err)
 					}
 
 					x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 					env.stack()[x2.stackPointer] = x2Value
 					if tc.x2OnRegister {
-						err = compiler.compileEnsureOnGeneralPurposeRegister(x2)
+						err = compiler.compileEnsureOnRegister(x2)
 						require.NoError(t, err)
 					}
 
@@ -553,7 +553,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 						} else {
 							env.stack()[c.stackPointer] = 0
 						}
-						err = compiler.compileEnsureOnGeneralPurposeRegister(c)
+						err = compiler.compileEnsureOnRegister(c)
 						require.NoError(t, err)
 					} else if tc.condValueOnCondRegister {
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
@@ -693,7 +693,7 @@ func TestCompiler_compileSwap(t *testing.T) {
 			x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			env.stack()[x2.stackPointer] = uint64(x2Value)
 			if tc.x2OnRegister {
-				err = compiler.compileEnsureOnGeneralPurposeRegister(x2)
+				err = compiler.compileEnsureOnRegister(x2)
 				require.NoError(t, err)
 			}
 
@@ -701,7 +701,7 @@ func TestCompiler_compileSwap(t *testing.T) {
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
 				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
-				err = compiler.compileEnsureOnGeneralPurposeRegister(x1)
+				err = compiler.compileEnsureOnRegister(x1)
 				require.NoError(t, err)
 			} else if !tc.x1OnConditionalRegister {
 				x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()

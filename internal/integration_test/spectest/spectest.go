@@ -398,10 +398,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-//
-// filter is a callback which is called with the target json file name and should return true if the engine wants to run tests against it, false otherwise.
-// TODO: remove filter after SIMD completion.
-func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features, filter func(jsonname string) bool) {
+func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -418,9 +415,6 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 	require.True(t, len(jsonfiles) > 1, "len(jsonfiles)=%d (not greater than one)", len(jsonfiles))
 
 	for _, f := range jsonfiles {
-		if !filter(f) {
-			continue
-		}
 		raw, err := testDataFS.ReadFile(f)
 		require.NoError(t, err)
 
