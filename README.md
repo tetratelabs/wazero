@@ -6,7 +6,7 @@ WebAssembly is a way to safely run code compiled in other languages. Runtimes
 execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm`
 extension.
 
-wazero is a [WebAssembly 1.0][1] and [WebAssembly 2.0][2] spec compliant runtime written in Go. It has
+wazero is a WebAssembly Core Specification [1.0][1] and [2.0][2] compliant runtime written in Go. It has
 *zero dependencies*, and doesn't rely on CGO. This means you can run
 applications in other languages and still keep cross compilation.
 
@@ -130,7 +130,7 @@ If interested, check out the [RATIONALE.md][8] and help us optimize further!
 
 ### Conformance
 
-Both runtimes pass [WebAssembly 1.0][7] and [WebAssembly 2.0][14] specification tests on supported platforms:
+Both runtimes pass WebAssembly Core [1.0][7] and [2.0][14] specification tests on supported platforms:
 
 | Runtime     | Usage| amd64 | arm64 | others |
 |:---:|:---:|:---:|:---:|:---:|

@@ -32,7 +32,7 @@ In summary, we hope this section can guide you in terms of what wazero supports
 as well as how to classify a request for a feature we don't yet support.
 
 ### WebAssembly Core
-wazero conforms with specification tests defined alongside WebAssembly Core
+wazero conforms with tests defined alongside WebAssembly Core
 Specification [1.0][1] and [2.0][14]. This is the default [RuntimeConfig][7].
 
 The WebAssembly Core Specification [2.0][2] is in draft form and wazero has
