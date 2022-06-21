@@ -218,6 +218,8 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 	}
 }
 
+// TestAmd64Compiler_compileV128Neg_NaNOnTemporary ensures compileV128Neg for floating point variants works well
+// even the temporary register used by the instruction hold NaN values.
 func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -274,16 +276,13 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Release mark that the temp register is available for Neg instruction below.
+			// Mark that the temp register is available for Neg instruction below.
 			loc := compiler.runtimeValueLocationStack().popV128()
 			compiler.runtimeValueLocationStack().markRegisterUnused(loc.register)
 
 			// Now compiling Neg where it uses temporary register holding NaN values at this point.
 			err = compiler.compileV128Neg(&wazeroir.OperationV128Neg{Shape: tc.shape})
 			require.NoError(t, err)
-
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
-			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
