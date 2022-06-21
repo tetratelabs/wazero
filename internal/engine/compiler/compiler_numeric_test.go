@@ -1374,7 +1374,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								case wazeroir.SignedTypeUint32:
 									// In order to test zero value on non-zero register, we directly assign an register.
 									loc := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
-									err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
+									err = compiler.compileEnsureOnRegister(loc)
 									require.NoError(t, err)
 									env.stack()[loc.stackPointer] = uint64(v)
 								case wazeroir.SignedTypeInt32:

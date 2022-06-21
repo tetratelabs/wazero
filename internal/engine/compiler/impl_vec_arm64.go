@@ -41,12 +41,12 @@ func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
 // compileV128Add implements compiler.compileV128Add for arm64.
 func (c *arm64Compiler) compileV128Add(o *wazeroir.OperationV128Add) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -84,12 +84,12 @@ func (c *arm64Compiler) compileV128Add(o *wazeroir.OperationV128Add) error {
 // compileV128Sub implements compiler.compileV128Sub for arm64.
 func (c *arm64Compiler) compileV128Sub(o *wazeroir.OperationV128Sub) (err error) {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -254,7 +254,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 // compileV128LoadLane implements compiler.compileV128LoadLane for arm64.
 func (c *arm64Compiler) compileV128LoadLane(o *wazeroir.OperationV128LoadLane) (err error) {
 	targetVector := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(targetVector); err != nil {
+	if err = c.compileEnsureOnRegister(targetVector); err != nil {
 		return
 	}
 
@@ -292,7 +292,7 @@ func (c *arm64Compiler) compileV128LoadLane(o *wazeroir.OperationV128LoadLane) (
 // compileV128Store implements compiler.compileV128Store for arm64.
 func (c *arm64Compiler) compileV128Store(o *wazeroir.OperationV128Store) (err error) {
 	v := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err = c.compileEnsureOnRegister(v); err != nil {
 		return
 	}
 
@@ -329,7 +329,7 @@ func (c *arm64Compiler) compileV128StoreLane(o *wazeroir.OperationV128StoreLane)
 	}
 
 	v := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err = c.compileEnsureOnRegister(v); err != nil {
 		return
 	}
 
@@ -352,7 +352,7 @@ func (c *arm64Compiler) compileV128StoreLane(o *wazeroir.OperationV128StoreLane)
 // compileV128ExtractLane implements compiler.compileV128ExtractLane for arm64.
 func (c *arm64Compiler) compileV128ExtractLane(o *wazeroir.OperationV128ExtractLane) (err error) {
 	v := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err = c.compileEnsureOnRegister(v); err != nil {
 		return
 	}
 
@@ -424,12 +424,12 @@ func (c *arm64Compiler) compileV128ExtractLane(o *wazeroir.OperationV128ExtractL
 // compileV128ReplaceLane implements compiler.compileV128ReplaceLane for arm64.
 func (c *arm64Compiler) compileV128ReplaceLane(o *wazeroir.OperationV128ReplaceLane) (err error) {
 	origin := c.locationStack.pop()
-	if err = c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
+	if err = c.compileEnsureOnRegister(origin); err != nil {
 		return
 	}
 
 	vector := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(vector); err != nil {
+	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
 	}
 
@@ -462,7 +462,7 @@ func (c *arm64Compiler) compileV128ReplaceLane(o *wazeroir.OperationV128ReplaceL
 // compileV128Splat implements compiler.compileV128Splat for arm64.
 func (c *arm64Compiler) compileV128Splat(o *wazeroir.OperationV128Splat) (err error) {
 	origin := c.locationStack.pop()
-	if err = c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
+	if err = c.compileEnsureOnRegister(origin); err != nil {
 		return
 	}
 
@@ -579,11 +579,11 @@ func (c *arm64Compiler) compileV128Shuffle(o *wazeroir.OperationV128Shuffle) (er
 // compileV128Swizzle implements compiler.compileV128Swizzle for arm64.
 func (c *arm64Compiler) compileV128Swizzle(*wazeroir.OperationV128Swizzle) (err error) {
 	indexVec := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(indexVec); err != nil {
+	if err = c.compileEnsureOnRegister(indexVec); err != nil {
 		return
 	}
 	baseVec := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(baseVec); err != nil {
+	if err = c.compileEnsureOnRegister(baseVec); err != nil {
 		return
 	}
 
@@ -598,7 +598,7 @@ func (c *arm64Compiler) compileV128Swizzle(*wazeroir.OperationV128Swizzle) (err 
 // compileV128AnyTrue implements compiler.compileV128AnyTrue for arm64.
 func (c *arm64Compiler) compileV128AnyTrue(*wazeroir.OperationV128AnyTrue) (err error) {
 	vector := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(vector); err != nil {
+	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
 	}
 
@@ -617,7 +617,7 @@ func (c *arm64Compiler) compileV128AnyTrue(*wazeroir.OperationV128AnyTrue) (err 
 // compileV128AllTrue implements compiler.compileV128AllTrue for arm64.
 func (c *arm64Compiler) compileV128AllTrue(o *wazeroir.OperationV128AllTrue) (err error) {
 	vector := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(vector); err != nil {
+	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
 	}
 
@@ -669,7 +669,7 @@ var (
 // compileV128BitMask implements compiler.compileV128BitMask for arm64.
 func (c *arm64Compiler) compileV128BitMask(o *wazeroir.OperationV128BitMask) (err error) {
 	vector := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(vector); err != nil {
+	if err = c.compileEnsureOnRegister(vector); err != nil {
 		return
 	}
 
@@ -805,17 +805,17 @@ func (c *arm64Compiler) compileV128Xor(*wazeroir.OperationV128Xor) error {
 // compileV128Bitselect implements compiler.compileV128Bitselect for arm64.
 func (c *arm64Compiler) compileV128Bitselect(*wazeroir.OperationV128Bitselect) error {
 	selector := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(selector); err != nil {
+	if err := c.compileEnsureOnRegister(selector); err != nil {
 		return err
 	}
 
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -834,7 +834,7 @@ func (c *arm64Compiler) compileV128AndNot(*wazeroir.OperationV128AndNot) error {
 
 func (c *arm64Compiler) compileV128UniOp(inst asm.Instruction, arr arm64.VectorArrangement) error {
 	v := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
@@ -846,12 +846,12 @@ func (c *arm64Compiler) compileV128UniOp(inst asm.Instruction, arr arm64.VectorA
 
 func (c *arm64Compiler) compileV128x2BinOp(inst asm.Instruction, arr arm64.VectorArrangement) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -902,12 +902,12 @@ func (c *arm64Compiler) compileV128ShiftImpl(shape wazeroir.Shape, ins asm.Instr
 		arr = arm64.VectorArrangement2D
 	}
 
-	if err := c.compileEnsureOnGeneralPurposeRegister(s); err != nil {
+	if err := c.compileEnsureOnRegister(s); err != nil {
 		return err
 	}
 
 	v := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
@@ -938,12 +938,12 @@ func (c *arm64Compiler) compileV128ShiftImpl(shape wazeroir.Shape, ins asm.Instr
 // compileV128Cmp implements compiler.compileV128Cmp for arm64.
 func (c *arm64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1040,12 +1040,12 @@ func (c *arm64Compiler) compileV128Mul(o *wazeroir.OperationV128Mul) (err error)
 		err = c.compileV128x2BinOp(arm64.VFMUL, defaultArrangementForShape(o.Shape))
 	case wazeroir.ShapeI64x2:
 		x2 := c.locationStack.popV128()
-		if err = c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+		if err = c.compileEnsureOnRegister(x2); err != nil {
 			return
 		}
 
 		x1 := c.locationStack.popV128()
-		if err = c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+		if err = c.compileEnsureOnRegister(x1); err != nil {
 			return
 		}
 
@@ -1215,12 +1215,12 @@ func (c *arm64Compiler) compileV128Pmax(o *wazeroir.OperationV128Pmax) error {
 // compileV128PseudoMinOrMax implements compileV128Pmax and compileV128Pmin.
 func (c *arm64Compiler) compileV128PseudoMinOrMax(arr arm64.VectorArrangement, max bool) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1392,7 +1392,7 @@ func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.OperationV128FConve
 		return
 	} else { // f64x2
 		v := c.locationStack.popV128()
-		if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+		if err = c.compileEnsureOnRegister(v); err != nil {
 			return
 		}
 		vr := v.register
@@ -1417,12 +1417,12 @@ func (c *arm64Compiler) compileV128FConvertFromI(o *wazeroir.OperationV128FConve
 // compileV128Dot implements compiler.compileV128Dot for arm64.
 func (c *arm64Compiler) compileV128Dot(*wazeroir.OperationV128Dot) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1449,12 +1449,12 @@ func (c *arm64Compiler) compileV128Dot(*wazeroir.OperationV128Dot) error {
 // compileV128Narrow implements compiler.compileV128Narrow for arm64.
 func (c *arm64Compiler) compileV128Narrow(o *wazeroir.OperationV128Narrow) error {
 	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
 	}
 
 	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err := c.compileEnsureOnRegister(x1); err != nil {
 		return err
 	}
 
@@ -1490,7 +1490,7 @@ func (c *arm64Compiler) compileV128Narrow(o *wazeroir.OperationV128Narrow) error
 // compileV128ITruncSatFromF implements compiler.compileV128ITruncSatFromF for arm64.
 func (c *arm64Compiler) compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) (err error) {
 	v := c.locationStack.popV128()
-	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err = c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
