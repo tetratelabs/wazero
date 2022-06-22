@@ -2029,6 +2029,9 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	} else {
 		err = c.assembler.CompileStaticConstToRegister(amd64.UCOMISD, u64.LeBytes(float64ForMaximumSigned32bitIntPlusOne), source.register)
 	}
+	if err != nil {
+		return err
+	}
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNotNaN := c.assembler.CompileJump(amd64.JPC) // jump if parity is not set.
@@ -2335,9 +2338,12 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit, nonTrapping bo
 		// At this point, the value is the minimum signed 32-bit int (=-2147483648.000000) or larger than 32-bit maximum.
 		// So, check if the value equals the minimum signed 32-bit int.
 		if isFloat32Bit {
-			c.assembler.CompileStaticConstToRegister(amd64.UCOMISS, []byte{0, 0, 0, 0}, source.register)
+			err = c.assembler.CompileStaticConstToRegister(amd64.UCOMISS, []byte{0, 0, 0, 0}, source.register)
 		} else {
-			c.assembler.CompileStaticConstToRegister(amd64.UCOMISD, []byte{0, 0, 0, 0, 0, 0, 0, 0}, source.register)
+			err = c.assembler.CompileStaticConstToRegister(amd64.UCOMISD, []byte{0, 0, 0, 0, 0, 0, 0, 0}, source.register)
+		}
+		if err != nil {
+			return err
 		}
 
 		jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 32-bit int).
