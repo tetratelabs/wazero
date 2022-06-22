@@ -204,6 +204,7 @@ var (
 	OperandTypesConstToRegister       = OperandTypes{OperandTypeConst, OperandTypeRegister}
 	OperandTypesConstToMemory         = OperandTypes{OperandTypeConst, OperandTypeMemory}
 	OperandTypesStaticConstToRegister = OperandTypes{OperandTypeStaticConst, OperandTypeRegister}
+	OperandTypesRegisterToStaticConst = OperandTypes{OperandTypeRegister, OperandTypeStaticConst}
 )
 
 // String implements fmt.Stringer
@@ -295,6 +296,8 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeMemoryToConst(n)
 	case OperandTypesStaticConstToRegister:
 		err = a.encodeStaticConstToRegister(n)
+	case OperandTypesRegisterToStaticConst:
+		err = a.encodeRegisterToStaticConst(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}

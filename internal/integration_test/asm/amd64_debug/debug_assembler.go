@@ -301,7 +301,12 @@ func (ta *testAssembler) CompileMemoryToConst(
 	return &testNode{goasm: ret.(*golang_asm.GolangAsmNode), n: ret2.(*asm_amd64.NodeImpl)}
 }
 
-// CompileLoadStaticConstToRegister implements Assembler.CompileLoadStaticConstToRegister.
-func (ta *testAssembler) CompileLoadStaticConstToRegister(asm.Instruction, []byte, asm.Register) (err error) {
-	panic("CompileLoadStaticConstToRegister cannot be supported by golang-asm")
+// CompileStaticConstToRegister implements Assembler.CompileStaticConstToRegister.
+func (ta *testAssembler) CompileStaticConstToRegister(asm.Instruction, []byte, asm.Register) (err error) {
+	panic("CompileStaticConstToRegister cannot be supported by golang-asm")
+}
+
+// CompileRegisterToStaticConst implements Assembler.CompileRegisterToStaticConst.
+func (ta *testAssembler) CompileRegisterToStaticConst(asm.Instruction, asm.Register, []byte) (err error) {
+	panic("CompileRegisterToStaticConst cannot be supported by golang-asm")
 }
