@@ -46,7 +46,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -88,7 +88,7 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run the code assembled above.
@@ -147,7 +147,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -193,7 +193,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 

@@ -197,6 +197,7 @@ var (
 	OperandTypesVectorRegisterToVectorRegister     = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
 	OperandTypesTwoVectorRegistersToVectorRegister = OperandTypes{OperandTypeTwoVectorRegisters, OperandTypeVectorRegister}
 	OperandTypesStaticConstToVectorRegister        = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
+	OperandTypesStaticConstToRegister              = OperandTypes{OperandTypeStaticConst, OperandTypeRegister}
 )
 
 // String implements fmt.Stringer
@@ -308,7 +309,7 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	if endOfBinary ||
 		// Also, if the offset between the first usage of the constant pool and
 		// the first constant would exceed 2^20 -1(= 2MiB-1), which is the maximum offset
-		// for load(literal) instruction, flush all the constants in the pool.
+		// for LDR(literal)/ADR instruction, flush all the constants in the pool.
 		(a.Buf.Len()+a.pool.constSizeInBytes-int(*a.pool.firstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 
 		// Before emitting consts, we have to add br instruction to skip the const pool.
@@ -424,8 +425,6 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeVectorRegisterToVectorRegister(n)
 	case OperandTypesStaticConstToVectorRegister:
 		err = a.EncodeStaticConstToVectorRegister(n)
-	case OperandTypesTwoVectorRegistersToVectorRegister:
-		err = a.encodeTwoVectorRegistersToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -673,8 +672,15 @@ func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instructi
 	n.VectorArrangement = arrangement
 }
 
-// CompileLoadStaticConstToVectorRegister implements Assembler.CompileLoadStaticConstToVectorRegister
-func (a *AssemblerImpl) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
+// CompileStaticConstToRegister implements Assembler.CompileStaticConstToVectorRegister
+func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction, c *asm.StaticConst, dstReg asm.Register) {
+	n := a.newNode(instruction, OperandTypesMemoryToRegister)
+	n.staticConst = c
+	n.DstReg = dstReg
+}
+
+// CompileStaticConstToVectorRegister implements Assembler.CompileStaticConstToVectorRegister
+func (a *AssemblerImpl) CompileStaticConstToVectorRegister(instruction asm.Instruction,
 	c *asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
 	n := a.newNode(instruction, OperandTypesStaticConstToVectorRegister)
 	n.staticConst = c
@@ -1838,10 +1844,28 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 		return err
 	}
 
-	// At this point, we don't yet know the target instruction's offset,
+	// At this point, we don't yet know the target offset to read from,
 	// so we emit the ADR instruction with 0 offset, and replace later in the callback.
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
 	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, 0b10000})
+
+	if n.staticConst != nil {
+		adrInstructionOffsetInBinary := uint64(a.Buf.Len())
+		a.addConstPool(n.staticConst, adrInstructionOffsetInBinary)
+		a.setConstPoolCallback(n.staticConst, func(offsetOfConst int) {
+			adrInstructionBytes := a.Buf.Bytes()[adrInstructionOffsetInBinary : adrInstructionOffsetInBinary+4]
+
+			offset := offsetOfConst - int(adrInstructionOffsetInBinary)
+			adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
+			offset >>= 2
+			adrInstructionBytes[0] |= byte((offset) << 5)
+			offset >>= 3
+			adrInstructionBytes[1] |= byte(offset)
+			offset >>= 8
+			adrInstructionBytes[2] |= byte(offset)
+		})
+		return
+	}
 
 	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Find the target instruction node.
@@ -2738,9 +2762,6 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 		return err
 	}
 
-	loadLiteralOffsetInBinary := uint64(a.Buf.Len())
-	a.addConstPool(n.staticConst, loadLiteralOffsetInBinary)
-
 	// LDR (literal, SIMD&FP)
 	// https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--literal--SIMD-FP---Load-SIMD-FP-Register--PC-relative-literal--
 	var opc byte
@@ -2753,6 +2774,9 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 	case VectorArrangementQ:
 		opc, constLength = 0b10, 16
 	}
+
+	loadLiteralOffsetInBinary := uint64(a.Buf.Len())
+	a.addConstPool(n.staticConst, loadLiteralOffsetInBinary)
 
 	if len(n.staticConst.Raw) != constLength {
 		return fmt.Errorf("invalid const length for %s: want %d but was %d",

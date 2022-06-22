@@ -203,6 +203,8 @@ type (
 		sourceModule *wasm.Module
 	}
 
+	// TODO: remove
+	//
 	// staticData holds the read-only data (i.e. outside codeSegment which is marked as executable) per function.
 	// This is used to store jump tables for br_table instructions.
 	// The primary index is the logical separation of multiple data, for example data[0] and data[1]
@@ -837,7 +839,7 @@ func compileHostFunction(sig *wasm.FunctionType) (*code, error) {
 		return nil, err
 	}
 
-	c, _, _, err := compiler.compile()
+	c, _, err := compiler.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -1156,10 +1158,10 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 		}
 	}
 
-	c, staticData, stackPointerCeil, err := compiler.compile()
+	c, stackPointerCeil, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	return &code{codeSegment: c, stackPointerCeil: stackPointerCeil, staticData: staticData}, nil
+	return &code{codeSegment: c, stackPointerCeil: stackPointerCeil}, nil
 }

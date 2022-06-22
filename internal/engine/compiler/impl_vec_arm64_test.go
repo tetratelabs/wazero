@@ -53,7 +53,7 @@ func TestArm64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	env.exec(code)
@@ -202,7 +202,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			env.exec(code)

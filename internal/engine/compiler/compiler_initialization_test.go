@@ -134,7 +134,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			env.exec(code)
@@ -200,7 +200,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.compile()
+				code, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -231,7 +231,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		env.setValueStackBasePointer(stackBasePointer)
 
 		// Generate and run the code under test.
-		code, _, _, err := compiler.compile()
+		code, _, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
 

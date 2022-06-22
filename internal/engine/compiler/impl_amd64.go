@@ -162,7 +162,7 @@ func (c *amd64Compiler) compileHostFunction() error {
 }
 
 // compile implements compiler.compile for the amd64 architecture.
-func (c *amd64Compiler) compile() (code []byte, staticData codeStaticData, stackPointerCeil uint64, err error) {
+func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err error) {
 	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all runtimeValueLocationStack(s)
 	// used for all labels (via setLocationStack), excluding the current one.
 	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.

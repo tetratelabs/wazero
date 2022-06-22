@@ -30,7 +30,7 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 
@@ -66,7 +66,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 
@@ -262,7 +262,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -396,7 +396,7 @@ func TestCompiler_compileStore(t *testing.T) {
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Set the value on the left and right neighboring memoryregion,
@@ -464,7 +464,7 @@ func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate the code under test and run.
-					code, _, _, err := compiler.compile()
+					code, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
