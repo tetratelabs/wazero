@@ -39,7 +39,7 @@ type NodeImpl struct {
 	// JumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .JumpTarget == this.
 	JumpOrigins map[*NodeImpl]struct{}
 
-	staticConst asm.StaticConst
+	staticConst *asm.StaticConst
 }
 
 type NodeFlag byte

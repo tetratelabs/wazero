@@ -36,7 +36,7 @@ type NodeImpl struct {
 	// JumpOrigins hold all the nodes trying to jump into this node. In other words, all the nodes with .JumpTarget == this.
 	JumpOrigins map[*NodeImpl]struct{}
 
-	staticConst asm.StaticConst
+	staticConst *asm.StaticConst
 }
 
 // AssignJumpTarget implements the same method as documented on asm.Node.
@@ -223,7 +223,7 @@ type constPool struct {
 	// firstUseOffsetInBinary is the offset of the first ldr(literal) instruction
 	// which needs to access the const in this constPool.
 	firstUseOffsetInBinary *asm.NodeOffsetInBinary
-	consts                 []asm.StaticConst
+	consts                 []*asm.StaticConst
 	constSizeInBytes       int
 	// offsetFinalizedCallbacks are functions called when the offsets of the
 	// constants in the binary have been determined.
@@ -333,10 +333,11 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 		// Then adding the consts into the binary.
 		for _, c := range a.pool.consts {
 			offsetOfConst := a.Buf.Len()
-			a.Buf.Write(c)
+			a.Buf.Write(c.Raw)
+			c.OffsetInBinary = uint64(offsetOfConst)
 
 			// Invoke callbacks for `c` with the offset of binary where we store `c`.
-			for _, cb := range a.pool.offsetFinalizedCallbacks[asm.StaticConstKey(c)] {
+			for _, cb := range a.pool.offsetFinalizedCallbacks[c.Key()] {
 				cb(offsetOfConst)
 			}
 		}
@@ -351,21 +352,21 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	}
 }
 
-func (a *AssemblerImpl) setConstPoolCallback(c asm.StaticConst, cb func(int)) {
-	key := asm.StaticConstKey(c)
+func (a *AssemblerImpl) setConstPoolCallback(c *asm.StaticConst, cb func(int)) {
+	key := c.Key()
 	a.pool.offsetFinalizedCallbacks[key] = append(a.pool.offsetFinalizedCallbacks[key], cb)
 }
 
-func (a *AssemblerImpl) addConstPool(c asm.StaticConst, useOffset asm.NodeOffsetInBinary) {
+func (a *AssemblerImpl) addConstPool(c *asm.StaticConst, useOffset asm.NodeOffsetInBinary) {
 	if a.pool.firstUseOffsetInBinary == nil {
 		a.pool.firstUseOffsetInBinary = &useOffset
 	}
 
-	key := asm.StaticConstKey(c)
+	key := c.Key()
 	if _, ok := a.pool.offsetFinalizedCallbacks[key]; !ok {
 		a.pool.consts = append(a.pool.consts, c)
 		a.pool.offsetFinalizedCallbacks[key] = []func(int){}
-		a.pool.constSizeInBytes += len(c)
+		a.pool.constSizeInBytes += len(c.Raw)
 	}
 }
 
@@ -674,7 +675,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instructi
 
 // CompileLoadStaticConstToVectorRegister implements Assembler.CompileLoadStaticConstToVectorRegister
 func (a *AssemblerImpl) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
-	c asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
+	c *asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
 	n := a.newNode(instruction, OperandTypesStaticConstToVectorRegister)
 	n.staticConst = c
 	n.DstReg = dstReg
@@ -1722,8 +1723,8 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	// Go's assembler adds a const into the const pool at this point,
 	// regardless of its usage; e.g. if we enter the then block of the following if statement,
 	// the const is not used but it is added into the const pool.
-	var c = make([]byte, 4)
-	binary.LittleEndian.PutUint32(c, uint32(offset))
+	var c = asm.NewStaticConst(make([]byte, 4))
+	binary.LittleEndian.PutUint32(c.Raw, uint32(offset))
 	a.addConstPool(c, uint64(a.Buf.Len()))
 
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L3529-L3532
@@ -2753,9 +2754,9 @@ func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err erro
 		opc, constLength = 0b10, 16
 	}
 
-	if len(n.staticConst) != constLength {
+	if len(n.staticConst.Raw) != constLength {
 		return fmt.Errorf("invalid const length for %s: want %d but was %d",
-			n.VectorArrangement, constLength, len(n.staticConst))
+			n.VectorArrangement, constLength, len(n.staticConst.Raw))
 	}
 
 	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, opc<<6 | 0b11100})

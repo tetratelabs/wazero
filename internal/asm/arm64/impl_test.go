@@ -3246,7 +3246,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 	tests := []struct {
 		name string
-		c    asm.StaticConst
+		c    []byte
 		exp  []byte
 	}{
 		{
@@ -3335,10 +3335,11 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			a.addConstPool(tc.c, 0)
+			sc := asm.NewStaticConst(tc.c)
+			a.addConstPool(sc, 0)
 
 			var called bool
-			a.setConstPoolCallback(tc.c, func(int) {
+			a.setConstPoolCallback(sc, func(int) {
 				called = true
 			})
 
@@ -3364,7 +3365,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 				Instruction:       VMOV,
 				DstReg:            RegV8,
 				VectorArrangement: VectorArrangementQ,
-				staticConst:       []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
 			},
 			exp: []byte{
 				// 0x0: ldr q8, #8
@@ -3383,7 +3384,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 				Instruction:       VMOV,
 				DstReg:            RegV30,
 				VectorArrangement: VectorArrangementD,
-				staticConst:       []byte{1, 2, 3, 4, 5, 6, 7, 8},
+				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4, 5, 6, 7, 8}),
 			},
 			exp: []byte{
 				// 0x0: ldr d30, #8
@@ -3402,7 +3403,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 				Instruction:       VMOV,
 				DstReg:            RegV8,
 				VectorArrangement: VectorArrangementS,
-				staticConst:       []byte{1, 2, 3, 4},
+				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4}),
 			},
 			exp: []byte{
 				// 0x0: ldr s8, #8

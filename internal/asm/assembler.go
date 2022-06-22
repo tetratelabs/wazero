@@ -53,11 +53,19 @@ type ConstantValue = int64
 
 // StaticConst represents an arbitrary constant bytes which are pooled and emitted by assembler into the binary.
 // These constants can be referenced by instructions.
-type StaticConst = []byte
+type StaticConst struct {
+	Raw            []byte
+	OffsetInBinary uint64
+}
 
-// StaticConstKey returns a string whose underlying bytes equal the original const.
-func StaticConstKey(c StaticConst) string {
-	return string(c)
+// Key returns a string whose underlying bytes equal the original const.
+func (s StaticConst) Key() string {
+	return string(s.Raw)
+}
+
+// NewStaticConst returns the pointer to the new NewStaticConst for given bytes.
+func NewStaticConst(raw []byte) *StaticConst {
+	return &StaticConst{Raw: raw}
 }
 
 // AssemblerBase is the common interface for assemblers among multiple architectures.
@@ -78,10 +86,8 @@ type AssemblerBase interface {
 
 	// BuildJumpTable calculates the offsets between the first instruction `initialInstructions[0]`
 	// and others (e.g. initialInstructions[3]), and wrote the calculated offsets into pre-allocated
-	// `table` slice in little endian.
-	//
-	// TODO: This can be hidden into assembler implementation after golang-asm removal.
-	BuildJumpTable(table []byte, initialInstructions []Node)
+	// `table` StaticConst in little endian.
+	BuildJumpTable(table *StaticConst, initialInstructions []Node)
 
 	// CompileStandAlone adds an instruction to take no arguments.
 	CompileStandAlone(instruction Instruction) Node

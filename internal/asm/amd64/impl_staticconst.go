@@ -10,7 +10,7 @@ import (
 
 type constPool struct {
 	firstUseOffsetInBinary *asm.NodeOffsetInBinary
-	consts                 []asm.StaticConst
+	consts                 []*asm.StaticConst
 	poolSizeInBytes        int
 
 	// offsetFinalizedCallbacks are functions called when the offsets of the
@@ -22,11 +22,11 @@ func newConstPool() constPool {
 	return constPool{offsetFinalizedCallbacks: map[string][]func(offsetOfConstInBinary int){}}
 }
 
-func (p *constPool) addConst(c asm.StaticConst) {
-	key := asm.StaticConstKey(c)
+func (p *constPool) addConst(c *asm.StaticConst) {
+	key := c.Key()
 	if _, ok := p.offsetFinalizedCallbacks[key]; !ok {
 		p.consts = append(p.consts, c)
-		p.poolSizeInBytes += len(c)
+		p.poolSizeInBytes += len(c.Raw)
 		p.offsetFinalizedCallbacks[key] = []func(int){}
 	}
 }
@@ -64,8 +64,9 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 
 		for _, c := range a.pool.consts {
 			offset := a.Buf.Len()
-			a.Buf.Write(c)
-			for _, callback := range a.pool.offsetFinalizedCallbacks[asm.StaticConstKey(c)] {
+			c.OffsetInBinary = uint64(offset)
+			a.Buf.Write(c.Raw)
+			for _, callback := range a.pool.offsetFinalizedCallbacks[c.Key()] {
 				callback(offset)
 			}
 		}
@@ -164,7 +165,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex Re
 	rexPrefix |= rex
 
 	var inst []byte
-	key := asm.StaticConstKey(n.staticConst)
+	key := n.staticConst.Key()
 	a.pool.offsetFinalizedCallbacks[key] = append(a.pool.offsetFinalizedCallbacks[key],
 		func(offsetOfConstInBinary int) {
 			bin := a.Buf.Bytes()
@@ -198,9 +199,9 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex Re
 }
 
 // CompileStaticConstToRegister implements Assembler.CompileStaticConstToRegister.
-func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register) (err error) {
-	if len(c)%2 != 0 {
-		err = fmt.Errorf("the length of a static constant must be even but was %d", len(c))
+func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction, c *asm.StaticConst, dstReg asm.Register) (err error) {
+	if len(c.Raw)%2 != 0 {
+		err = fmt.Errorf("the length of a static constant must be even but was %d", len(c.Raw))
 		return
 	}
 
@@ -211,9 +212,9 @@ func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction
 }
 
 // CompileRegisterToStaticConst implements Assembler.CompileRegisterToStaticConst.
-func (a *AssemblerImpl) CompileRegisterToStaticConst(instruction asm.Instruction, srcReg asm.Register, c asm.StaticConst) (err error) {
-	if len(c)%2 != 0 {
-		err = fmt.Errorf("the length of a static constant must be even but was %d", len(c))
+func (a *AssemblerImpl) CompileRegisterToStaticConst(instruction asm.Instruction, srcReg asm.Register, c *asm.StaticConst) (err error) {
+	if len(c.Raw)%2 != 0 {
+		err = fmt.Errorf("the length of a static constant must be even but was %d", len(c.Raw))
 		return
 	}
 
