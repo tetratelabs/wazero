@@ -134,7 +134,6 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 [5]: https://github.com/WebAssembly/WASI
 [6]: https://github.com/WebAssembly/spec/tree/wg-1.0/test/core
 [7]: https://pkg.go.dev/github.com/tetratelabs/wazero#RuntimeConfig
-[8]: https://github.com/tetratelabs/wazero/issues/484
 [9]: https://github.com/tetratelabs/wazero/issues/59
 [10]: https://github.com/WebAssembly/proposals
 [11]: https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
