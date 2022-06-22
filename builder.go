@@ -173,10 +173,21 @@ type ModuleBuilder interface {
 	Compile(context.Context, CompileConfig) (CompiledModule, error)
 
 	// Instantiate is a convenience that calls Compile, then Namespace.InstantiateModule.
+	// Ex.
+	//
+	//	ctx := context.Background()
+	//	r := wazero.NewRuntime()
+	//	defer r.Close(ctx) // This closes everything this Runtime created.
+	//
+	//	hello := func() {
+	//		fmt.Fprintln(stdout, "hello!")
+	//	}
+	//	env, _ := r.NewModuleBuilder("env").
+	//		ExportFunction("hello", hello).
+	//		Instantiate(ctx, r)
 	//
 	// Notes
 	//
-	//	* To instantiate in the root namespace, pass in the wazero.Runtime as Namespace.
 	//	* Closing the Namespace has the same effect as closing the result.
 	//	* Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
 	//	* To avoid using configuration defaults, use Compile instead.
