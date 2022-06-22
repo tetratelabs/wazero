@@ -173,6 +173,7 @@ type ModuleBuilder interface {
 	Compile(context.Context, CompileConfig) (CompiledModule, error)
 
 	// Instantiate is a convenience that calls Compile, then Namespace.InstantiateModule.
+	// To instantiate in the root namespace, pass in the wazero.Runtime as Namespace.
 	//
 	// Notes
 	//
