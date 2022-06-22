@@ -424,6 +424,8 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 		err = a.EncodeVectorRegisterToVectorRegister(n)
 	case OperandTypesStaticConstToVectorRegister:
 		err = a.EncodeStaticConstToVectorRegister(n)
+	case OperandTypesTwoVectorRegistersToVectorRegister:
+		err = a.encodeTwoVectorRegistersToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.Types)
 	}
@@ -1859,7 +1861,7 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 			offset := offsetOfConst - int(adrInstructionOffsetInBinary)
 			adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
 			offset >>= 2
-			adrInstructionBytes[0] |= byte(offset << 4)
+			adrInstructionBytes[0] |= byte(offset << 5)
 			offset >>= 3
 			adrInstructionBytes[1] |= byte(offset)
 			offset >>= 8

@@ -3441,7 +3441,6 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 		name                   string
 		reg                    asm.Register
 		offsetOfConstInBinary  int
-		c                      []byte
 		expADRInstructionBytes []byte
 	}{
 		{
@@ -3449,23 +3448,21 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 			name:                   "adr x12, #8",
 			reg:                    RegR12,
 			offsetOfConstInBinary:  10,
-			c:                      []byte{1, 2, 3, 4},
-			expADRInstructionBytes: []byte{0x2c, 0x0, 0x0, 0x10},
+			expADRInstructionBytes: []byte{0x4c, 0x0, 0x0, 0x10},
 		},
 		{
 			// #0x7fffd = offsetOfConstInBinary - beforeADRByteNum.
-			name:                   "adr x28, #0x7fffd",
+			name:                   "adr x12, #0x7fffd",
 			reg:                    RegR12,
 			offsetOfConstInBinary:  0x7ffff,
-			c:                      []byte{1, 2, 3, 4},
-			expADRInstructionBytes: []byte{0xfc, 0xff, 0x3f, 0x30},
+			expADRInstructionBytes: []byte{0xec, 0xff, 0x3f, 0x30},
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			sc := asm.NewStaticConst(tc.c)
+			sc := asm.NewStaticConst([]byte{1, 2, 3, 4}) // Arbitrary data is fine.
 
 			a := NewAssemblerImpl(asm.NilRegister)
 
@@ -3487,7 +3484,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 			cbs[0](tc.offsetOfConstInBinary)
 
 			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
-			require.Equal(t, actualBytes, tc.expADRInstructionBytes, hex.EncodeToString(actualBytes))
+			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))
 		})
 	}
 }

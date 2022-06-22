@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"encoding/hex"
 	"fmt"
 	"testing"
 	"unsafe"
@@ -298,7 +297,6 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		// Generate the code under test and run.
 		code, _, err := c.compile()
 		require.NoError(t, err)
-		fmt.Println(hex.EncodeToString(code))
 		env.exec(code)
 
 		// Check the returned value.
