@@ -808,7 +808,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	c.assembler.CompileRegisterToRegister(arm64.MOVWU, tmpReg, index.register)
 	c.assembler.SetJumpTargetOnNext(brDefaultIndex)
 
-	// We prepare the static data which holds the offset of
+	// We prepare the asm.StaticConst which holds the offset of
 	// each target's first instruction (incl. default)
 	// relative to the beginning of label tables.
 	//

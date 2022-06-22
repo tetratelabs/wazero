@@ -3433,3 +3433,61 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 		})
 	}
 }
+
+func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
+	const beforeADRByteNum uint64 = 2
+
+	tests := []struct {
+		name                   string
+		reg                    asm.Register
+		offsetOfConstInBinary  int
+		c                      []byte
+		expADRInstructionBytes []byte
+	}{
+		{
+			// #8 = offsetOfConstInBinary - beforeADRByteNum.
+			name:                   "adr x12, #8",
+			reg:                    RegR12,
+			offsetOfConstInBinary:  10,
+			c:                      []byte{1, 2, 3, 4},
+			expADRInstructionBytes: []byte{0x2c, 0x0, 0x0, 0x10},
+		},
+		{
+			// #0x7fffd = offsetOfConstInBinary - beforeADRByteNum.
+			name:                   "adr x28, #0x7fffd",
+			reg:                    RegR12,
+			offsetOfConstInBinary:  0x7ffff,
+			c:                      []byte{1, 2, 3, 4},
+			expADRInstructionBytes: []byte{0xfc, 0xff, 0x3f, 0x30},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			sc := asm.NewStaticConst(tc.c)
+
+			a := NewAssemblerImpl(asm.NilRegister)
+
+			a.Buf.Write(make([]byte, beforeADRByteNum))
+
+			err := a.encodeADR(&NodeImpl{Instruction: ADR, DstReg: tc.reg, staticConst: sc})
+			require.NoError(t, err)
+
+			require.Equal(t, 1, len(a.pool.consts))
+			require.Equal(t, sc, a.pool.consts[0])
+
+			require.Equal(t, beforeADRByteNum, *a.pool.firstUseOffsetInBinary)
+
+			cbs, ok := a.pool.offsetFinalizedCallbacks[sc.Key()]
+			require.True(t, ok)
+			require.Equal(t, 1, len(cbs))
+
+			// Finalize the ADR instruction bytes.
+			cbs[0](tc.offsetOfConstInBinary)
+
+			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
+			require.Equal(t, actualBytes, tc.expADRInstructionBytes, hex.EncodeToString(actualBytes))
+		})
+	}
+}

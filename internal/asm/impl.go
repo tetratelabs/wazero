@@ -41,6 +41,7 @@ func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstr
 			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
 				uint32(nop.OffsetInBinary())-uint32(base))
 		}
+		fmt.Println(code[table.OffsetInBinary:])
 		return nil
 	})
 }

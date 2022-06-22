@@ -197,7 +197,6 @@ var (
 	OperandTypesVectorRegisterToVectorRegister     = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
 	OperandTypesTwoVectorRegistersToVectorRegister = OperandTypes{OperandTypeTwoVectorRegisters, OperandTypeVectorRegister}
 	OperandTypesStaticConstToVectorRegister        = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
-	OperandTypesStaticConstToRegister              = OperandTypes{OperandTypeStaticConst, OperandTypeRegister}
 )
 
 // String implements fmt.Stringer
@@ -1844,13 +1843,15 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 		return err
 	}
 
+	adrInstructionOffsetInBinary := uint64(a.Buf.Len())
+
 	// At this point, we don't yet know the target offset to read from,
 	// so we emit the ADR instruction with 0 offset, and replace later in the callback.
 	// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
 	a.Buf.Write([]byte{dstRegBits, 0x0, 0x0, 0b10000})
 
+	// This case, the ADR's target offset is for the staticConst's initial address.
 	if n.staticConst != nil {
-		adrInstructionOffsetInBinary := uint64(a.Buf.Len())
 		a.addConstPool(n.staticConst, adrInstructionOffsetInBinary)
 		a.setConstPoolCallback(n.staticConst, func(offsetOfConst int) {
 			adrInstructionBytes := a.Buf.Bytes()[adrInstructionOffsetInBinary : adrInstructionOffsetInBinary+4]
@@ -1858,7 +1859,7 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 			offset := offsetOfConst - int(adrInstructionOffsetInBinary)
 			adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
 			offset >>= 2
-			adrInstructionBytes[0] |= byte((offset) << 5)
+			adrInstructionBytes[0] |= byte(offset << 4)
 			offset >>= 3
 			adrInstructionBytes[1] |= byte(offset)
 			offset >>= 8
