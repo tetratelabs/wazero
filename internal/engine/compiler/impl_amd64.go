@@ -95,7 +95,6 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	staticData                           codeStaticData
 }
 
 func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {

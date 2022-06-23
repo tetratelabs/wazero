@@ -71,6 +71,7 @@ func (s *StaticConst) AddOffsetFinalizedCallback(cb func(offsetOfConstInBinary u
 	s.offsetFinalizedCallbacks = append(s.offsetFinalizedCallbacks, cb)
 }
 
+// SetOffsetInBinary finalizes the offset of this StaticConst, and invokes callbacks.
 func (s *StaticConst) SetOffsetInBinary(offset uint64) {
 	s.offsetInBinary = offset
 	for _, cb := range s.offsetFinalizedCallbacks {
