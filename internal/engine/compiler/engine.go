@@ -193,7 +193,6 @@ type (
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for codeStaticData type.
-		staticData codeStaticData
 		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		stackPointerCeil uint64
 
@@ -202,14 +201,6 @@ type (
 		// sourceModule is the module from which this function is compiled. For logging purpose.
 		sourceModule *wasm.Module
 	}
-
-	// TODO: remove
-	//
-	// staticData holds the read-only data (i.e. outside codeSegment which is marked as executable) per function.
-	// This is used to store jump tables for br_table instructions.
-	// The primary index is the logical separation of multiple data, for example data[0] and data[1]
-	// correspond to different jump tables for different br_table instructions.
-	codeStaticData = [][]byte
 )
 
 // createFunction creates a new function which uses the native code compiled.

@@ -12,12 +12,13 @@ package compiler
 import (
 	"errors"
 	"fmt"
+	"math"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"math"
 )
 
 type arm64Compiler struct {
