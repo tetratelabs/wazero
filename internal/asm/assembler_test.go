@@ -35,3 +35,12 @@ func TestStaticConst_AddOffsetFinalizedCallback(t *testing.T) {
 	require.Equal(t, 2, len(p.Consts))
 	require.Equal(t, 2, len(p.addedConsts))
 }
+
+func TestStaticConst_SetOffsetInBinary(t *testing.T) {
+	sc := NewStaticConst([]byte{1})
+	const offset uint64 = 100
+	sc.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
+		require.Equal(t, offset, offsetOfConstInBinary)
+	})
+	sc.SetOffsetInBinary(offset)
+}

@@ -66,7 +66,7 @@ func NewStaticConst(raw []byte) *StaticConst {
 	return &StaticConst{Raw: raw}
 }
 
-// AddOffsetFinalizedCallback adds a callback into OffsetFinalizedCallbacks.
+// AddOffsetFinalizedCallback adds a callback into offsetFinalizedCallbacks.
 func (s *StaticConst) AddOffsetFinalizedCallback(cb func(offsetOfConstInBinary uint64)) {
 	s.offsetFinalizedCallbacks = append(s.offsetFinalizedCallbacks, cb)
 }
