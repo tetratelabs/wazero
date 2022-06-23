@@ -1118,29 +1118,6 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	}
 }
 
-// TestAssemblerImpl_multipleLargeOffset ensures that the const pool flushing strategy matches
-// the one of Go's assembler.
-func TestAssemblerImpl_multipleLargeOffset(t *testing.T) {
-	t.Skip() // TODO
-	goasm := newGoasmAssembler(t, asm.NilRegister)
-	a := arm64.NewAssemblerImpl(arm64.RegR27)
-
-	for _, assembler := range []arm64.Assembler{a, goasm} {
-		for i := 0; i < 10000; i++ {
-			// This will be put into const pool, but the callback won't be set for it.
-			assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegR11, arm64.RegR12, 0xfff0+int64(i*8))
-			// This will also set the call back for it.
-			assembler.CompileRegisterToMemory(arm64.MOVD, arm64.RegR11, arm64.RegR12, (0xfff0+int64(i*8)<<16+8)%(1<<31))
-		}
-	}
-
-	actual, err := a.Assemble()
-	require.NoError(t, err)
-	expected, err := goasm.Assemble()
-	require.NoError(t, err)
-	require.Equal(t, expected, actual)
-}
-
 func conditionalRegisterToState(r asm.Register) asm.ConditionalRegisterState {
 	switch r {
 	case arm64.RegCondEQ:

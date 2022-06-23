@@ -1827,8 +1827,9 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 		a.pool.AddConst(sc, adrInstructionOffsetInBinary)
 		sc.AddOffsetFinalizedCallback(func(offsetOfConst uint64) {
 			adrInstructionBytes := a.Buf.Bytes()[adrInstructionOffsetInBinary : adrInstructionOffsetInBinary+4]
-
 			offset := int(offsetOfConst) - int(adrInstructionOffsetInBinary)
+
+			// See https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
 			adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
 			offset >>= 2
 			adrInstructionBytes[0] |= byte(offset << 5)
