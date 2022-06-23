@@ -54,18 +54,54 @@ type ConstantValue = int64
 // StaticConst represents an arbitrary constant bytes which are pooled and emitted by assembler into the binary.
 // These constants can be referenced by instructions.
 type StaticConst struct {
-	Raw            []byte
+	Raw []byte
+	// OffsetInBinary is the offset of this static const in the result binary.
 	OffsetInBinary uint64
-}
-
-// Key returns a string whose underlying bytes equal the original const.
-func (s StaticConst) Key() string {
-	return string(s.Raw)
+	// OffsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
+	OffsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
 }
 
 // NewStaticConst returns the pointer to the new NewStaticConst for given bytes.
 func NewStaticConst(raw []byte) *StaticConst {
 	return &StaticConst{Raw: raw}
+}
+
+// AddOffsetFinalizedCallback adds a callback into OffsetFinalizedCallbacks.
+func (s *StaticConst) AddOffsetFinalizedCallback(cb func(offsetOfConstInBinary uint64)) {
+	s.OffsetFinalizedCallbacks = append(s.OffsetFinalizedCallbacks, cb)
+}
+
+// StaticConstPool holds a bulk of StaticConst which are yet to be emitted into the binary.
+type StaticConstPool struct {
+	// FirstUseOffsetInBinary holds the offset of the first instruction which accesses this const pool .
+	FirstUseOffsetInBinary *NodeOffsetInBinary
+	Consts                 []*StaticConst
+	// addedConsts is used to deduplicate the consts to reduce the final size of binary.
+	// Note: we can use map on .consts field and remove this field,
+	// but we have the separate field for deduplication in order to have deterministic assembling behavior.
+	addedConsts map[*StaticConst]struct{}
+	// PoolSizeInBytes is the current size of the pool in bytes.
+	PoolSizeInBytes int
+}
+
+// NewStaticConstPool returns the pointer to a new StaticConstPool.
+func NewStaticConstPool() *StaticConstPool {
+	return &StaticConstPool{addedConsts: map[*StaticConst]struct{}{}}
+}
+
+// AddConst adds a *StaticConst into the pool if it's not already added.
+func (p *StaticConstPool) AddConst(c *StaticConst, useOffset NodeOffsetInBinary) {
+	if _, ok := p.addedConsts[c]; ok {
+		return
+	}
+
+	if p.FirstUseOffsetInBinary == nil {
+		p.FirstUseOffsetInBinary = &useOffset
+	}
+
+	p.Consts = append(p.Consts, c)
+	p.PoolSizeInBytes += len(c.Raw)
+	p.addedConsts[c] = struct{}{}
 }
 
 // AssemblerBase is the common interface for assemblers among multiple architectures.

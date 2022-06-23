@@ -381,12 +381,12 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(
 }
 
 // CompileStaticConstToRegister implements Assembler.CompileStaticConstToRegister.
-func (a *assemblerGoAsmImpl) CompileStaticConstToRegister(instruction asm.Instruction, c []byte, dstReg asm.Register) (err error) {
+func (a *assemblerGoAsmImpl) CompileStaticConstToRegister(asm.Instruction, *asm.StaticConst, asm.Register) (err error) {
 	panic("CompileStaticConstToRegister cannot be supported by golangasm")
 }
 
 // CompileRegisterToStaticConst implements Assembler.CompileRegisterToStaticConst.
-func (ta *assemblerGoAsmImpl) CompileRegisterToStaticConst(asm.Instruction, asm.Register, []byte) (err error) {
+func (a *assemblerGoAsmImpl) CompileRegisterToStaticConst(asm.Instruction, asm.Register, *asm.StaticConst) (err error) {
 	panic("CompileRegisterToStaticConst cannot be supported by golang-asm")
 }
 

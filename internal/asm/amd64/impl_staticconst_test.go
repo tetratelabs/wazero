@@ -8,20 +8,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestConstPool_addConst(t *testing.T) {
-	p := newConstPool()
-	cons := asm.NewStaticConst([]byte{1, 2, 3, 4})
-
-	// Loop twice to ensure that the same constant is cached and not added twice.
-	for i := 0; i < 2; i++ {
-		p.addConst(cons)
-		require.Equal(t, 1, len(p.consts))
-		require.Equal(t, len(cons.Raw), p.poolSizeInBytes)
-		_, ok := p.offsetFinalizedCallbacks[cons.Key()]
-		require.True(t, ok)
-	}
-}
-
 func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
 	t.Run("odd count of bytes", func(t *testing.T) {
@@ -74,7 +60,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 		dummyBodyBeforeFlush    []byte
 		firstUseOffsetInBinary  uint64
 		consts                  [][]byte
-		expectedOffsetForConsts []int
+		expectedOffsetForConsts []uint64
 		exp                     []byte
 		maxDisplacement         int
 	}{
@@ -83,7 +69,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			endOfFunction:           true,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
 			consts:                  [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
-			expectedOffsetForConsts: []int{4, 4 + 8}, // 4 = len(dummyBodyBeforeFlush)
+			expectedOffsetForConsts: []uint64{4, 4 + 8}, // 4 = len(dummyBodyBeforeFlush)
 			firstUseOffsetInBinary:  0,
 			exp:                     []byte{'?', '?', '?', '?', 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13},
 			maxDisplacement:         1 << 31, // large displacement will emit the consts at the end of function.
@@ -102,7 +88,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			endOfFunction:           false,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
 			consts:                  [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
-			expectedOffsetForConsts: []int{4 + 2, 4 + 2 + 8}, // 4 = len(dummyBodyBeforeFlush), 2 = the size of jump
+			expectedOffsetForConsts: []uint64{4 + 2, 4 + 2 + 8}, // 4 = len(dummyBodyBeforeFlush), 2 = the size of jump
 			firstUseOffsetInBinary:  0,
 			exp: []byte{'?', '?', '?', '?',
 				0xeb, 0x0c, // short jump with offset = len(consts[0]) + len(consts[1]) = 12 = 0xc.
@@ -114,7 +100,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			endOfFunction:           false,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
 			consts:                  [][]byte{largeData},
-			expectedOffsetForConsts: []int{4 + 5}, // 4 = len(dummyBodyBeforeFlush), 5 = the size of jump
+			expectedOffsetForConsts: []uint64{4 + 5}, // 4 = len(dummyBodyBeforeFlush), 5 = the size of jump
 			firstUseOffsetInBinary:  0,
 			exp: append([]byte{'?', '?', '?', '?',
 				0xe9, 0x0, 0x1, 0x0, 0x0, // short jump with offset = 256 = 0x0, 0x1, 0x0, 0x0 (in Little Endian).
@@ -131,15 +117,14 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 
 			for i, c := range tc.consts {
 				sc := asm.NewStaticConst(c)
-				a.pool.addConst(sc)
-				key := sc.Key()
+				a.pool.AddConst(sc, 100)
 				i := i
-				a.pool.offsetFinalizedCallbacks[key] = append(a.pool.offsetFinalizedCallbacks[key], func(offsetOfConstInBinary int) {
+				sc.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
 					require.Equal(t, tc.expectedOffsetForConsts[i], offsetOfConstInBinary)
 				})
 			}
 
-			a.pool.firstUseOffsetInBinary = &tc.firstUseOffsetInBinary
+			a.pool.FirstUseOffsetInBinary = &tc.firstUseOffsetInBinary
 			a.maybeFlushConstants(tc.endOfFunction)
 
 			require.Equal(t, tc.exp, a.Buf.Bytes())

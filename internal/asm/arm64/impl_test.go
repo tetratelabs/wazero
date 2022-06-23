@@ -3336,10 +3336,10 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
 			sc := asm.NewStaticConst(tc.c)
-			a.addConstPool(sc, 0)
+			a.pool.AddConst(sc, 0)
 
 			var called bool
-			a.setConstPoolCallback(sc, func(int) {
+			sc.AddOffsetFinalizedCallback(func(uint64) {
 				called = true
 			})
 
@@ -3440,7 +3440,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 	tests := []struct {
 		name                   string
 		reg                    asm.Register
-		offsetOfConstInBinary  int
+		offsetOfConstInBinary  uint64
 		expADRInstructionBytes []byte
 	}{
 		{
@@ -3471,17 +3471,15 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 			err := a.encodeADR(&NodeImpl{Instruction: ADR, DstReg: tc.reg, staticConst: sc})
 			require.NoError(t, err)
 
-			require.Equal(t, 1, len(a.pool.consts))
-			require.Equal(t, sc, a.pool.consts[0])
+			require.Equal(t, 1, len(a.pool.Consts))
+			require.Equal(t, sc, a.pool.Consts[0])
 
-			require.Equal(t, beforeADRByteNum, *a.pool.firstUseOffsetInBinary)
+			require.Equal(t, beforeADRByteNum, *a.pool.FirstUseOffsetInBinary)
 
-			cbs, ok := a.pool.offsetFinalizedCallbacks[sc.Key()]
-			require.True(t, ok)
-			require.Equal(t, 1, len(cbs))
+			require.Equal(t, 1, len(sc.OffsetFinalizedCallbacks))
 
 			// Finalize the ADR instruction bytes.
-			cbs[0](tc.offsetOfConstInBinary)
+			sc.OffsetFinalizedCallbacks[0](tc.offsetOfConstInBinary)
 
 			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
 			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))
