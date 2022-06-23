@@ -53,7 +53,7 @@ func TestAmd64Compiler_V128Shuffle_ConstTable_MiddleOfFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
-	code, _, _, err := compiler.compile()
+	code, _, err := compiler.compile()
 	require.NoError(t, err)
 	env.exec(code)
 
@@ -203,7 +203,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -288,7 +288,7 @@ func TestAmd64Compiler_compileV128Neg_NaNOnTemporary(t *testing.T) {
 			require.NoError(t, err)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.compile()
+			code, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 

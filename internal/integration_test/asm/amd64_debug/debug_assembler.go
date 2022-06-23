@@ -109,9 +109,8 @@ func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 }
 
 // BuildJumpTable implements the same method as documented on asm_amd64.Assembler.
-func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.Node) {
-	ta.goasm.BuildJumpTable(table, initialInstructions)
-	ta.a.BuildJumpTable(table, initialInstructions)
+func (ta *testAssembler) BuildJumpTable(table *asm.StaticConst, initialInstructions []asm.Node) {
+	panic("BuildJumpTable is not supported by golang-asm")
 }
 
 // CompileStandAlone implements the same method as documented on asm_amd64.Assembler.
@@ -302,11 +301,11 @@ func (ta *testAssembler) CompileMemoryToConst(
 }
 
 // CompileStaticConstToRegister implements Assembler.CompileStaticConstToRegister.
-func (ta *testAssembler) CompileStaticConstToRegister(asm.Instruction, []byte, asm.Register) (err error) {
+func (ta *testAssembler) CompileStaticConstToRegister(asm.Instruction, *asm.StaticConst, asm.Register) (err error) {
 	panic("CompileStaticConstToRegister cannot be supported by golang-asm")
 }
 
 // CompileRegisterToStaticConst implements Assembler.CompileRegisterToStaticConst.
-func (ta *testAssembler) CompileRegisterToStaticConst(asm.Instruction, asm.Register, []byte) (err error) {
+func (ta *testAssembler) CompileRegisterToStaticConst(asm.Instruction, asm.Register, *asm.StaticConst) (err error) {
 	panic("CompileRegisterToStaticConst cannot be supported by golang-asm")
 }

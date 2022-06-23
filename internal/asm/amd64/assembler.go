@@ -90,9 +90,9 @@ type Assembler interface {
 
 	// CompileStaticConstToRegister adds an instruction where the source operand is asm.StaticConst located in the
 	// memory and the destination is the dstReg.
-	CompileStaticConstToRegister(instruction asm.Instruction, c asm.StaticConst, dstReg asm.Register) error
+	CompileStaticConstToRegister(instruction asm.Instruction, c *asm.StaticConst, dstReg asm.Register) error
 
 	// CompileRegisterToStaticConst adds an instruction where the destination operand is asm.StaticConst located in the
 	// memory and the source is the srcReg.
-	CompileRegisterToStaticConst(instruction asm.Instruction, srcReg asm.Register, c asm.StaticConst) error
+	CompileRegisterToStaticConst(instruction asm.Instruction, srcReg asm.Register, c *asm.StaticConst) error
 }

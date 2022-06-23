@@ -101,7 +101,7 @@ func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 }
 
 // BuildJumpTable implements the same method as documented on arm64.Assembler.
-func (ta *testAssembler) BuildJumpTable(table []byte, initialInstructions []asm.Node) {
+func (ta *testAssembler) BuildJumpTable(table *asm.StaticConst, initialInstructions []asm.Node) {
 	ta.goasm.BuildJumpTable(table, initialInstructions)
 	ta.a.BuildJumpTable(table, initialInstructions)
 }
@@ -284,12 +284,16 @@ func (ta *testAssembler) CompileVectorRegisterToRegister(instruction asm.Instruc
 	ta.a.CompileVectorRegisterToRegister(instruction, srcReg, dstReg, arrangement, index)
 }
 
-// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
-// and the destination is the dstReg.
-func (ta *testAssembler) CompileLoadStaticConstToVectorRegister(instruction asm.Instruction,
-	c asm.StaticConst, dstReg asm.Register, arrangement arm64.VectorArrangement) {
-	ta.goasm.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
-	ta.a.CompileLoadStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
+// CompileStaticConstToVectorRegister implements the same method as documented on arm64.Assembler.
+func (ta *testAssembler) CompileStaticConstToVectorRegister(instruction asm.Instruction,
+	c *asm.StaticConst, dstReg asm.Register, arrangement arm64.VectorArrangement) {
+	ta.goasm.CompileStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
+	ta.a.CompileStaticConstToVectorRegister(instruction, c, dstReg, arrangement)
+}
+
+// CompileStaticConstToRegister implements the same method as documented on arm64.Assembler.
+func (ta *testAssembler) CompileStaticConstToRegister(asm.Instruction, *asm.StaticConst, asm.Register) {
+	panic("CompileStaticConstToRegister is not supported by golang-asm")
 }
 
 // CompileTwoVectorRegistersToVectorRegister implements the same method as documented on arm64.Assembler.

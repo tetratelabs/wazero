@@ -8,28 +8,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-func TestConstPool_addConst(t *testing.T) {
-	p := newConstPool()
-	cons := []byte{1, 2, 3, 4}
-
-	// Loop twice to ensure that the same constant is cached and not added twice.
-	for i := 0; i < 2; i++ {
-		p.addConst(cons)
-		require.Equal(t, 1, len(p.consts))
-		require.Equal(t, len(cons), p.poolSizeInBytes)
-		_, ok := p.offsetFinalizedCallbacks[asm.StaticConstKey(cons)]
-		require.True(t, ok)
-	}
-}
-
 func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
 	a := NewAssemblerImpl()
 	t.Run("odd count of bytes", func(t *testing.T) {
-		err := a.CompileStaticConstToRegister(MOVDQU, []byte{1}, RegAX)
+		err := a.CompileStaticConstToRegister(MOVDQU, asm.NewStaticConst([]byte{1}), RegAX)
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		cons := []byte{1, 2, 3, 4}
+		cons := asm.NewStaticConst([]byte{1, 2, 3, 4})
 		err := a.CompileStaticConstToRegister(MOVDQU, cons, RegAX)
 		require.NoError(t, err)
 		actualNode := a.Current
@@ -43,11 +29,11 @@ func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
 func TestAssemblerImpl_CompileRegisterToStaticConst(t *testing.T) {
 	a := NewAssemblerImpl()
 	t.Run("odd count of bytes", func(t *testing.T) {
-		err := a.CompileRegisterToStaticConst(MOVDQU, RegAX, []byte{1})
+		err := a.CompileRegisterToStaticConst(MOVDQU, RegAX, asm.NewStaticConst([]byte{1}))
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		cons := []byte{1, 2, 3, 4}
+		cons := asm.NewStaticConst([]byte{1, 2, 3, 4})
 		err := a.CompileRegisterToStaticConst(MOVDQU, RegAX, cons)
 		require.NoError(t, err)
 		actualNode := a.Current
@@ -73,8 +59,8 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 		endOfFunction           bool
 		dummyBodyBeforeFlush    []byte
 		firstUseOffsetInBinary  uint64
-		consts                  []asm.StaticConst
-		expectedOffsetForConsts []int
+		consts                  [][]byte
+		expectedOffsetForConsts []uint64
 		exp                     []byte
 		maxDisplacement         int
 	}{
@@ -82,8 +68,8 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			name:                    "end of function",
 			endOfFunction:           true,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
-			consts:                  []asm.StaticConst{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
-			expectedOffsetForConsts: []int{4, 4 + 8}, // 4 = len(dummyBodyBeforeFlush)
+			consts:                  [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
+			expectedOffsetForConsts: []uint64{4, 4 + 8}, // 4 = len(dummyBodyBeforeFlush)
 			firstUseOffsetInBinary:  0,
 			exp:                     []byte{'?', '?', '?', '?', 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13},
 			maxDisplacement:         1 << 31, // large displacement will emit the consts at the end of function.
@@ -92,7 +78,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			name:                   "not flush",
 			endOfFunction:          false,
 			dummyBodyBeforeFlush:   []byte{'?', '?', '?', '?'},
-			consts:                 []asm.StaticConst{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
+			consts:                 [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
 			firstUseOffsetInBinary: 0,
 			exp:                    []byte{'?', '?', '?', '?'},
 			maxDisplacement:        1 << 31, // large displacement will emit the consts at the end of function.
@@ -101,8 +87,8 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			name:                    "not end of function but flush - short jump",
 			endOfFunction:           false,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
-			consts:                  []asm.StaticConst{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
-			expectedOffsetForConsts: []int{4 + 2, 4 + 2 + 8}, // 4 = len(dummyBodyBeforeFlush), 2 = the size of jump
+			consts:                  [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}, {10, 11, 12, 13}},
+			expectedOffsetForConsts: []uint64{4 + 2, 4 + 2 + 8}, // 4 = len(dummyBodyBeforeFlush), 2 = the size of jump
 			firstUseOffsetInBinary:  0,
 			exp: []byte{'?', '?', '?', '?',
 				0xeb, 0x0c, // short jump with offset = len(consts[0]) + len(consts[1]) = 12 = 0xc.
@@ -113,8 +99,8 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			name:                    "not end of function but flush - long jump",
 			endOfFunction:           false,
 			dummyBodyBeforeFlush:    []byte{'?', '?', '?', '?'},
-			consts:                  []asm.StaticConst{largeData},
-			expectedOffsetForConsts: []int{4 + 5}, // 4 = len(dummyBodyBeforeFlush), 5 = the size of jump
+			consts:                  [][]byte{largeData},
+			expectedOffsetForConsts: []uint64{4 + 5}, // 4 = len(dummyBodyBeforeFlush), 5 = the size of jump
 			firstUseOffsetInBinary:  0,
 			exp: append([]byte{'?', '?', '?', '?',
 				0xe9, 0x0, 0x1, 0x0, 0x0, // short jump with offset = 256 = 0x0, 0x1, 0x0, 0x0 (in Little Endian).
@@ -130,15 +116,15 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			a.Buf.Write(tc.dummyBodyBeforeFlush)
 
 			for i, c := range tc.consts {
-				a.pool.addConst(c)
-				key := asm.StaticConstKey(c)
+				sc := asm.NewStaticConst(c)
+				a.pool.AddConst(sc, 100)
 				i := i
-				a.pool.offsetFinalizedCallbacks[key] = append(a.pool.offsetFinalizedCallbacks[key], func(offsetOfConstInBinary int) {
+				sc.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
 					require.Equal(t, tc.expectedOffsetForConsts[i], offsetOfConstInBinary)
 				})
 			}
 
-			a.pool.firstUseOffsetInBinary = &tc.firstUseOffsetInBinary
+			a.pool.FirstUseOffsetInBinary = &tc.firstUseOffsetInBinary
 			a.maybeFlushConstants(tc.endOfFunction)
 
 			require.Equal(t, tc.exp, a.Buf.Bytes())
@@ -150,7 +136,7 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 	tests := []struct {
 		name            string
 		ins             asm.Instruction
-		c               asm.StaticConst
+		c               []byte
 		reg             asm.Register
 		ud2sBeforeConst int
 		exp             []byte
@@ -220,7 +206,7 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl()
 
-			err := a.CompileRegisterToStaticConst(tc.ins, tc.reg, tc.c)
+			err := a.CompileRegisterToStaticConst(tc.ins, tc.reg, asm.NewStaticConst(tc.c))
 			require.NoError(t, err)
 
 			for i := 0; i < tc.ud2sBeforeConst; i++ {
@@ -239,7 +225,7 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 	tests := []struct {
 		name            string
 		ins             asm.Instruction
-		c               asm.StaticConst
+		c               []byte
 		reg             asm.Register
 		ud2sBeforeConst int
 		exp             []byte
@@ -612,7 +598,7 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl()
 
-			err := a.CompileStaticConstToRegister(tc.ins, tc.c, tc.reg)
+			err := a.CompileStaticConstToRegister(tc.ins, asm.NewStaticConst(tc.c), tc.reg)
 			require.NoError(t, err)
 
 			for i := 0; i < tc.ud2sBeforeConst; i++ {

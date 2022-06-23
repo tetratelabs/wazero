@@ -1,7 +1,6 @@
 package golang_asm
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	goasm "github.com/twitchyliquid64/golang-asm"
@@ -87,19 +86,8 @@ func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 }
 
 // BuildJumpTable implements the same method as documented on asm.AssemblerBase.
-func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []asm.Node) {
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Compile the offset table for each target.
-		base := labelInitialInstructions[0].OffsetInBinary()
-		for i, nop := range labelInitialInstructions {
-			if uint64(nop.OffsetInBinary())-uint64(base) >= asm.JumpTableMaximumOffset {
-				return fmt.Errorf("too large br_table")
-			}
-			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.OffsetInBinary())-uint32(base))
-		}
-		return nil
-	})
+func (a *GolangAsmBaseAssembler) BuildJumpTable(*asm.StaticConst, []asm.Node) {
+	panic("BuildJumpTable is not supported by golang-asm")
 }
 
 // AddInstruction is used in architecture specific assembler implementation for golang-asm.

@@ -397,10 +397,16 @@ func (a *assemblerGoAsmImpl) CompileVectorRegisterToRegister(instruction asm.Ins
 	a.AddInstruction(inst)
 }
 
-// CompileLoadStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
+// CompileStaticConstToVectorRegister adds an instruction where the source operand is StaticConstant located in the memory
 // and the destination is the dstReg.
-func (a *assemblerGoAsmImpl) CompileLoadStaticConstToVectorRegister(asm.Instruction,
-	asm.StaticConst, asm.Register, asm_arm64.VectorArrangement) {
+func (a *assemblerGoAsmImpl) CompileStaticConstToVectorRegister(asm.Instruction,
+	*asm.StaticConst, asm.Register, asm_arm64.VectorArrangement) {
+	panic("unsupported in golang-asm")
+}
+
+// CompileStaticConstToRegister adds an instruction where the source operand is StaticConstant located in the memory
+// and the destination is the dstReg.
+func (a *assemblerGoAsmImpl) CompileStaticConstToRegister(asm.Instruction, *asm.StaticConst, asm.Register) {
 	panic("unsupported in golang-asm")
 }
 
