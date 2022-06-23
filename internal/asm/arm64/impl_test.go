@@ -3476,10 +3476,8 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 			require.Equal(t, beforeADRByteNum, *a.pool.FirstUseOffsetInBinary)
 
-			require.Equal(t, 1, len(sc.OffsetFinalizedCallbacks))
-
 			// Finalize the ADR instruction bytes.
-			sc.OffsetFinalizedCallbacks[0](tc.offsetOfConstInBinary)
+			sc.SetOffsetInBinary(tc.offsetOfConstInBinary)
 
 			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
 			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))

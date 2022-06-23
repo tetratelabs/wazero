@@ -110,8 +110,7 @@ func (ta *testAssembler) SetJumpTargetOnNext(nodes ...asm.Node) {
 
 // BuildJumpTable implements the same method as documented on asm_amd64.Assembler.
 func (ta *testAssembler) BuildJumpTable(table *asm.StaticConst, initialInstructions []asm.Node) {
-	ta.goasm.BuildJumpTable(table, initialInstructions)
-	ta.a.BuildJumpTable(table, initialInstructions)
+	panic("BuildJumpTable is not supported by golang-asm")
 }
 
 // CompileStandAlone implements the same method as documented on asm_amd64.Assembler.

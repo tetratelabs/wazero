@@ -38,7 +38,7 @@ func (a *BaseAssemblerImpl) BuildJumpTable(table *StaticConst, labelInitialInstr
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(code[table.OffsetInBinary+uint64(i*4):table.OffsetInBinary+uint64((i+1)*4)],
+			binary.LittleEndian.PutUint32(code[table.offsetInBinary+uint64(i*4):table.offsetInBinary+uint64((i+1)*4)],
 				uint32(nop.OffsetInBinary())-uint32(base))
 		}
 		return nil

@@ -40,12 +40,8 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 		}
 
 		for _, c := range a.pool.Consts {
-			offset := uint64(a.Buf.Len())
-			c.OffsetInBinary = offset
+			c.SetOffsetInBinary(uint64(a.Buf.Len()))
 			a.Buf.Write(c.Raw)
-			for _, callback := range c.OffsetFinalizedCallbacks {
-				callback(offset)
-			}
 		}
 
 		a.pool = asm.NewStaticConstPool() // reset
@@ -142,7 +138,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex Re
 	rexPrefix |= rex
 
 	var inst []byte
-	n.staticConst.OffsetFinalizedCallbacks = append(n.staticConst.OffsetFinalizedCallbacks, func(offsetOfConstInBinary uint64) {
+	n.staticConst.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
 		bin := a.Buf.Bytes()
 		displacement := int(offsetOfConstInBinary) - int(n.OffsetInBinary()) - len(inst)
 		displacementOffsetInInstruction := n.OffsetInBinary() + uint64(len(inst)-4)

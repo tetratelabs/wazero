@@ -56,9 +56,9 @@ type ConstantValue = int64
 type StaticConst struct {
 	Raw []byte
 	// OffsetInBinary is the offset of this static const in the result binary.
-	OffsetInBinary uint64
-	// OffsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
-	OffsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
+	offsetInBinary uint64
+	// offsetFinalizedCallbacks holds callbacks which are called when .OffsetInBinary is finalized by assembler implementation.
+	offsetFinalizedCallbacks []func(offsetOfConstInBinary uint64)
 }
 
 // NewStaticConst returns the pointer to the new NewStaticConst for given bytes.
@@ -68,7 +68,14 @@ func NewStaticConst(raw []byte) *StaticConst {
 
 // AddOffsetFinalizedCallback adds a callback into OffsetFinalizedCallbacks.
 func (s *StaticConst) AddOffsetFinalizedCallback(cb func(offsetOfConstInBinary uint64)) {
-	s.OffsetFinalizedCallbacks = append(s.OffsetFinalizedCallbacks, cb)
+	s.offsetFinalizedCallbacks = append(s.offsetFinalizedCallbacks, cb)
+}
+
+func (s *StaticConst) SetOffsetInBinary(offset uint64) {
+	s.offsetInBinary = offset
+	for _, cb := range s.offsetFinalizedCallbacks {
+		cb(offset)
+	}
 }
 
 // StaticConstPool holds a bulk of StaticConst which are yet to be emitted into the binary.

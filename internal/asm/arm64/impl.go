@@ -319,14 +319,8 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 
 		// Then adding the consts into the binary.
 		for _, c := range a.pool.Consts {
-			offsetOfConst := uint64(a.Buf.Len())
+			c.SetOffsetInBinary(uint64(a.Buf.Len()))
 			a.Buf.Write(c.Raw)
-			c.OffsetInBinary = offsetOfConst
-
-			// Invoke callbacks for `c` with the offset of binary where we store `c`.
-			for _, cb := range c.OffsetFinalizedCallbacks {
-				cb(offsetOfConst)
-			}
 		}
 
 		// arm64 instructions are 4-byte (32-bit) aligned, so we must pad the zero consts here.
