@@ -5,8 +5,6 @@ import (
 	"math"
 )
 
-type NewAssembler func(temporaryRegister Register) (AssemblerBase, error)
-
 // Register represents architecture-specific registers.
 type Register byte
 
