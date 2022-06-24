@@ -444,6 +444,23 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 	}
 }
 
+func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		a := NewAssemblerImpl(asm.NilRegister)
+		err := a.encodeNoneToNone(&NodeImpl{Instruction: ADD})
+		require.EqualError(t, err, "ADD is unsupported for from:none,to:none type")
+	})
+	t.Run("ok", func(t *testing.T) {
+		a := NewAssemblerImpl(asm.NilRegister)
+		err := a.encodeNoneToNone(&NodeImpl{Instruction: NOP})
+		require.NoError(t, err)
+
+		// NOP must be ignored.
+		actual := a.Buf.Bytes()
+		require.Zero(t, len(actual))
+	})
+}
+
 func Test_validateMemoryOffset(t *testing.T) {
 	tests := []struct {
 		offset int64
@@ -2161,6 +2178,432 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	}
 }
 
+func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		tests := []struct {
+			n      *NodeImpl
+			expErr string
+		}{
+			{
+				n: &NodeImpl{Instruction: SUB, Types: OperandTypesLeftShiftedRegisterToRegister,
+					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				expErr: "SUB is unsupported for from:left-shifted-register,to:register type",
+			},
+			{
+				n: &NodeImpl{Instruction: ADD,
+					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				expErr: "shift amount must fit in unsigned 6-bit integer (0-64) but got -1",
+			},
+			{
+				n: &NodeImpl{Instruction: ADD,
+					SrcConst: -1, SrcReg: RegV0, SrcReg2: RegR0, DstReg: RegR0},
+				expErr: "V0 is not integer",
+			},
+			{
+				n: &NodeImpl{Instruction: ADD,
+					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegV0, DstReg: RegR0},
+				expErr: "V0 is not integer",
+			},
+			{
+				n: &NodeImpl{Instruction: ADD,
+					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegV0},
+				expErr: "V0 is not integer",
+			},
+		}
+
+		for _, tt := range tests {
+			tc := tt
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
+			require.EqualError(t, err, tc.expErr)
+		}
+	})
+
+	tests := []struct {
+		name string
+		n    *NodeImpl
+		exp  []byte
+	}{
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegR0,
+				SrcReg2:           RegR29,
+				SrcConst:          1,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x15, 0x4, 0x1d, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegR0,
+				SrcReg2:           RegR29,
+				SrcConst:          2,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x15, 0x8, 0x1d, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegR0,
+				SrcReg2:           RegR29,
+				SrcConst:          8,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x15, 0x20, 0x1d, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegR29,
+				SrcReg2:           RegR0,
+				SrcConst:          16,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xb5, 0x43, 0x0, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegR29,
+				SrcReg2:           RegR0,
+				SrcConst:          64,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xb5, 0x3, 0x0, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegR0,
+				SrcConst:          64,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xf5, 0x3, 0x0, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegRZR,
+				SrcConst:          64,
+				DstReg:            RegR21,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xf5, 0x3, 0x1f, 0x8b},
+		},
+		{
+			name: "ADD",
+			n: &NodeImpl{
+				Instruction:       ADD,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegRZR,
+				SrcConst:          64,
+				DstReg:            RegRZR,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x1f, 0x8b},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
+			require.NoError(t, err)
+
+			actual := a.Buf.Bytes()
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
+	}
+}
+
+func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		tests := []struct {
+			n      *NodeImpl
+			expErr string
+		}{
+			{
+				n: &NodeImpl{Instruction: SUB, Types: OperandTypesTwoRegistersToNone,
+					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				expErr: "SUB is unsupported for from:two-registers,to:none type",
+			},
+			{
+				n: &NodeImpl{Instruction: CMP,
+					SrcReg: RegR0, SrcReg2: RegV0},
+				expErr: "V0 is not integer",
+			},
+			{
+				n: &NodeImpl{Instruction: FCMPS,
+					SrcReg: RegR0, SrcReg2: RegV0},
+				expErr: "R0 is not vector",
+			},
+		}
+
+		for _, tt := range tests {
+			tc := tt
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeTwoRegistersToNone(tc.n)
+			require.EqualError(t, err, tc.expErr)
+		}
+	})
+
+	tests := []struct {
+		name string
+		n    *NodeImpl
+		exp  []byte
+	}{
+		{
+			name: "CMP",
+			n: &NodeImpl{
+				Instruction:       CMP,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegRZR,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x1f, 0xeb},
+		},
+		{
+			name: "CMP",
+			n: &NodeImpl{
+				Instruction:       CMP,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegR30,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xdf, 0x3, 0x1f, 0xeb},
+		},
+		{
+			name: "CMP",
+			n: &NodeImpl{
+				Instruction:       CMP,
+				SrcReg:            RegR30,
+				SrcReg2:           RegRZR,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x1e, 0xeb},
+		},
+		{
+			name: "CMP",
+			n: &NodeImpl{
+				Instruction:       CMP,
+				SrcReg:            RegR30,
+				SrcReg2:           RegR30,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xdf, 0x3, 0x1e, 0xeb},
+		},
+		{
+			name: "CMPW",
+			n: &NodeImpl{
+				Instruction:       CMPW,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegRZR,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x1f, 0x6b},
+		},
+		{
+			name: "CMPW",
+			n: &NodeImpl{
+				Instruction:       CMPW,
+				SrcReg:            RegRZR,
+				SrcReg2:           RegR30,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xdf, 0x3, 0x1f, 0x6b},
+		},
+		{
+			name: "CMPW",
+			n: &NodeImpl{
+				Instruction:       CMPW,
+				SrcReg:            RegR30,
+				SrcReg2:           RegRZR,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xff, 0x3, 0x1e, 0x6b},
+		},
+		{
+			name: "CMPW",
+			n: &NodeImpl{
+				Instruction:       CMPW,
+				SrcReg:            RegR30,
+				SrcReg2:           RegR30,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xdf, 0x3, 0x1e, 0x6b},
+		},
+		{
+			name: "FCMPD",
+			n: &NodeImpl{
+				Instruction:       FCMPD,
+				SrcReg:            RegV0,
+				SrcReg2:           RegV0,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x0, 0x20, 0x60, 0x1e},
+		},
+		{
+			name: "FCMPD",
+			n: &NodeImpl{
+				Instruction:       FCMPD,
+				SrcReg:            RegV0,
+				SrcReg2:           RegV31,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xe0, 0x23, 0x60, 0x1e},
+		},
+		{
+			name: "FCMPD",
+			n: &NodeImpl{
+				Instruction:       FCMPD,
+				SrcReg:            RegV31,
+				SrcReg2:           RegV0,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x0, 0x20, 0x7f, 0x1e},
+		},
+		{
+			name: "FCMPD",
+			n: &NodeImpl{
+				Instruction:       FCMPD,
+				SrcReg:            RegV31,
+				SrcReg2:           RegV31,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xe0, 0x23, 0x7f, 0x1e},
+		},
+		{
+			name: "FCMPS",
+			n: &NodeImpl{
+				Instruction:       FCMPS,
+				SrcReg:            RegV0,
+				SrcReg2:           RegV0,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x0, 0x20, 0x20, 0x1e},
+		},
+		{
+			name: "FCMPS",
+			n: &NodeImpl{
+				Instruction:       FCMPS,
+				SrcReg:            RegV0,
+				SrcReg2:           RegV31,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xe0, 0x23, 0x20, 0x1e},
+		},
+		{
+			name: "FCMPS",
+			n: &NodeImpl{
+				Instruction:       FCMPS,
+				SrcReg:            RegV31,
+				SrcReg2:           RegV0,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0x0, 0x20, 0x3f, 0x1e},
+		},
+		{
+			name: "FCMPS",
+			n: &NodeImpl{
+				Instruction:       FCMPS,
+				SrcReg:            RegV31,
+				SrcReg2:           RegV31,
+				VectorArrangement: VectorArrangementH,
+				SrcVectorIndex:    0,
+			},
+			exp: []byte{0xe0, 0x23, 0x3f, 0x1e},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeTwoRegistersToNone(tc.n)
+			require.NoError(t, err)
+
+			actual := a.Buf.Bytes()
+			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
+	const src1, src2, src3, dst = RegR1, RegR10, RegR30, RegR11
+
+	tests := []struct {
+		name string
+		inst asm.Instruction
+		exp  []byte
+	}{
+		{
+			name: "MSUB/src1=R1,src2=R10,src3=R30,dst=R11",
+			inst: MSUB,
+			exp:  []byte{0xcb, 0xab, 0x1, 0x9b},
+		},
+		{
+			name: "MSUBW/src1=R1,src2=R10,src3=R30,dst=R11",
+			inst: MSUBW,
+			exp:  []byte{0xcb, 0xab, 0x1, 0x1b},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeThreeRegistersToRegister(&NodeImpl{
+				Instruction: tc.inst, SrcReg: src1, SrcReg2: src2, DstReg: src3, DstReg2: dst,
+			})
+			require.NoError(t, err)
+
+			actual := a.Bytes()
+			require.Equal(t, tc.exp, actual[:4])
+		})
+	}
+}
+
 func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 	tests := []struct {
 		name string
@@ -3471,7 +3914,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 	}
 }
 
-func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
+func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
 			n      *NodeImpl
@@ -3494,7 +3937,7 @@ func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeJumpToRegister(tc.n)
+			err := a.encodeJumpToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -3547,7 +3990,7 @@ func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeJumpToRegister(&NodeImpl{Instruction: tc.inst, DstReg: tc.reg})
+			err := a.encodeJumpToRegister(&NodeImpl{Instruction: tc.inst, DstReg: tc.reg})
 			require.NoError(t, err)
 
 			actual := a.Bytes()

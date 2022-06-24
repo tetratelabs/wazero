@@ -349,21 +349,21 @@ func (a *AssemblerImpl) Bytes() []byte {
 func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	switch n.Types {
 	case OperandTypesNoneToNone:
-		err = a.EncodeNoneToNone(n)
+		err = a.encodeNoneToNone(n)
 	case OperandTypesNoneToRegister:
-		err = a.EncodeJumpToRegister(n)
+		err = a.encodeJumpToRegister(n)
 	case OperandTypesNoneToBranch:
 		err = a.EncodeRelativeBranch(n)
 	case OperandTypesRegisterToRegister:
 		err = a.EncodeRegisterToRegister(n)
 	case OperandTypesLeftShiftedRegisterToRegister:
-		err = a.EncodeLeftShiftedRegisterToRegister(n)
+		err = a.encodeLeftShiftedRegisterToRegister(n)
 	case OperandTypesTwoRegistersToRegister:
 		err = a.EncodeTwoRegistersToRegister(n)
 	case OperandTypesThreeRegistersToRegister:
 		err = a.EncodeThreeRegistersToRegister(n)
 	case OperandTypesTwoRegistersToNone:
-		err = a.EncodeTwoRegistersToNone(n)
+		err = a.encodeTwoRegistersToNone(n)
 	case OperandTypesRegisterAndConstToNone:
 		err = a.EncodeRegisterAndConstToNone(n)
 	case OperandTypesRegisterToMemory:
@@ -668,18 +668,14 @@ func errorEncodingUnsupported(n *NodeImpl) error {
 	return fmt.Errorf("%s is unsupported for %s type", InstructionName(n.Instruction), n.Types)
 }
 
-// EncodeNoneToNone is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeNoneToNone(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeNoneToNone(n *NodeImpl) (err error) {
 	if n.Instruction != NOP {
 		err = errorEncodingUnsupported(n)
 	}
 	return
 }
 
-// EncodeJumpToRegister is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeJumpToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeJumpToRegister(n *NodeImpl) (err error) {
 	// "Unconditional branch (register)" in https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Branches--Exception-Generating-and-System-instructions
 	var opc byte
 	switch n.Instruction {
@@ -1320,10 +1316,7 @@ func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// EncodeLeftShiftedRegisterToRegister is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeLeftShiftedRegisterToRegister(n *NodeImpl) (err error) {
-
+func (a *AssemblerImpl) encodeLeftShiftedRegisterToRegister(n *NodeImpl) (err error) {
 	baseRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
@@ -1518,9 +1511,7 @@ func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) 
 	return
 }
 
-// EncodeTwoRegistersToNone is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeTwoRegistersToNone(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case CMPW, CMP:
 		// Compare on two registers is an alias for "SUBS (src1, src2) ZERO"
