@@ -50,173 +50,15 @@ func newGoasmAssembler(t *testing.T, _ asm.Register) arm64.Assembler {
 								arm64.RegisterName(src2),
 								arm64.RegisterName(dst),
 								expected[:4]))
+
+
+								css = append(css, fmt.Sprintf(`{name: "%s", n: &NodeImpl{Instruction: %s, DstReg: Reg%s, SrcConst: %d}, exp: %#v}`,
+									fmt.Sprintf("%s/dst=%s/%#x", arm64.InstructionName(tc.inst), arm64.RegisterName(r), uint64(c)),
+									arm64.InstructionName(tc.inst),
+									arm64.RegisterName(r),
+									c,
+									expected))
 */
-
-func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesConstToRegister,
-					SrcReg: arm64.RegR0, SrcReg2: arm64.RegR0, DstReg: arm64.RegR0},
-				expErr: "ADR is unsupported for from:const,to:register type",
-			},
-			{
-				n:      &arm64.NodeImpl{Instruction: arm64.LSR, Types: arm64.OperandTypesConstToRegister, DstReg: arm64.RegR0},
-				expErr: "LSR with zero constant should be optimized out",
-			},
-			{
-				n:      &arm64.NodeImpl{Instruction: arm64.LSL, Types: arm64.OperandTypesConstToRegister, DstReg: arm64.RegR0},
-				expErr: "LSL with zero constant should be optimized out",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeConstToRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	consts64 := []int64{
-		0x1,
-		0xfff,
-		0xfff << 12,
-		123 << 12,
-		1<<15 + 1,
-		(1<<15 + 1) << 16,
-		(1<<15 + 1) << 32,
-		0x0000_ffff_ffff_ffff,
-		-281470681743361, /* = 0xffff_0000_ffff_ffff */
-		math.MinInt32 + 1,
-		-281474976645121, /* = 0xffff_0000_0000_ffff */
-		1<<20 + 1,
-		1<<20 - 1,
-		1<<23 | 0b01,
-		1<<30 + 1,
-		1 << 1, 1<<1 + 1, 1<<1 - 1, 1<<1 + 0xf,
-		1 << 2, 1<<2 + 1, 1<<2 - 1, 1<<2 + 0xf,
-		1 << 3, 1<<3 + 1, 1<<3 - 1, 1<<3 + 0xf,
-		1 << 4, 1<<4 + 1, 1<<4 - 1, 1<<4 + 0xf,
-		1 << 5, 1<<5 + 1, 1<<5 - 1, 1<<5 + 0xf,
-		1 << 6, 1<<6 + 1, 1<<6 - 1, 1<<6 + 0xf,
-		0xfff << 1, 0xfff<<1 - 1, 0xfff<<1 + 1,
-		0, 1, -1, 2, 3, 10, -10, 123, -123,
-		math.MaxInt16, math.MaxInt32, math.MaxUint32, 0b01000000_00000010, 0xffff_0000, 0xffff_0001, 0xf00_000f,
-		math.MaxInt16 - 1, math.MaxInt32 - 1, math.MaxUint32 - 1, 0b01000000_00000010 - 1, 0xffff_0000 - 1, 0xffff_0001 - 1, 0xf00_000f - 1,
-		math.MaxInt16 + 1, 0b01000000_00001010 - 1, 0xfff_0000 - 1, 0xffe_0001 - 1, 0xe00_000f - 1,
-		(1<<15 + 1) << 16, 0b1_00000000_00000010,
-		1 << 32, 1 << 34, 1 << 40,
-		1<<32 + 1, 1<<34 + 1, 1<<40 + 1,
-		1<<32 - 1, 1<<34 - 1, 1<<40 - 1,
-		1<<32 + 0xf, 1<<34 + 0xf, 1<<40 + 0xf,
-		1<<32 - 0xf, 1<<34 - 0xf, 1<<40 - 0xf,
-		math.MaxInt64, math.MinInt64,
-		1<<30 + 1,
-		0x7000000010000000,
-		0x7000000100000000,
-		0x7000100000000000,
-		87220,
-		(math.MaxInt16 + 2) * 8,
-		-281471681677793,
-		3295005183,
-		-8543223759426509416,
-		-1000000000,
-		0xffffff,
-	}
-
-	tests := []struct {
-		inst   asm.Instruction
-		consts []int64
-	}{
-		{
-			inst:   arm64.ADD,
-			consts: consts64,
-		},
-		{
-			inst:   arm64.ADDS,
-			consts: consts64,
-		},
-		{
-			inst:   arm64.SUB,
-			consts: consts64,
-		},
-		{
-			inst:   arm64.SUBS,
-			consts: consts64,
-		},
-		{
-			inst: arm64.MOVW,
-			consts: []int64{
-				1 << 1, 1<<1 + 1, 1<<1 - 1, 1<<1 + 0xf,
-				1 << 2, 1<<2 + 1, 1<<2 - 1, 1<<2 + 0xf,
-				1 << 3, 1<<3 + 1, 1<<3 - 1, 1<<3 + 0xf,
-				1 << 4, 1<<4 + 1, 1<<4 - 1, 1<<4 + 0xf,
-				1 << 5, 1<<5 + 1, 1<<5 - 1, 1<<5 + 0xf,
-				1 << 6, 1<<6 + 1, 1<<6 - 1, 1<<6 + 0xf,
-				0xfff << 1, 0xfff<<1 - 1, 0xfff<<1 + 1,
-				0, 1, -1, 2, 3, 10, -10, 123, -123,
-				math.MaxInt16, math.MaxInt32, math.MaxUint32, 0b01000000_00000010, 0xffff_0000, 0xffff_0001, 0xf00_000f,
-				math.MaxInt16 - 1, math.MaxInt32 - 1, math.MaxUint32 - 1, 0b01000000_00000010 - 1, 0xffff_0000 - 1, 0xffff_0001 - 1, 0xf00_000f - 1,
-				math.MaxInt16 + 1, 0b01000000_00001010 - 1, 0xfff_0000 - 1, 0xffe_0001 - 1, 0xe00_000f - 1,
-				(1<<15 + 1) << 16, 0b1_00000000_00000010,
-				1 << 30, 1<<30 + 1, 1<<30 - 1, 1<<30 + 0xf, 1<<30 - 0xf,
-				0x7fffffffffffffff,
-				-(1 << 30),
-			},
-		},
-		{
-			inst:   arm64.MOVD,
-			consts: consts64,
-		},
-		{
-			inst:   arm64.LSL,
-			consts: []int64{1, 2, 4, 16, 31, 32, 63},
-		},
-		{
-			inst:   arm64.LSR,
-			consts: []int64{1, 2, 4, 16, 31, 32, 63},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
-			for _, r := range []asm.Register{
-				arm64.RegR0, arm64.RegR10,
-				arm64.RegR30,
-			} {
-				r := r
-				t.Run(arm64.RegisterName(r), func(t *testing.T) {
-					for _, c := range tc.consts {
-						var cs = []int64{c}
-						if tc.inst != arm64.LSR && tc.inst != arm64.LSL && c != 0 {
-							cs = append(cs, -c)
-						}
-						for _, c := range cs {
-							t.Run(fmt.Sprintf("0x%x", uint64(c)), func(t *testing.T) {
-								goasm := newGoasmAssembler(t, arm64.RegR27)
-								goasm.CompileConstToRegister(tc.inst, c, r)
-								expected, err := goasm.Assemble()
-								require.NoError(t, err)
-
-								a := arm64.NewAssemblerImpl(arm64.RegR27)
-								err = a.EncodeConstToRegister(&arm64.NodeImpl{Instruction: tc.inst, SrcConst: c, DstReg: r})
-								require.NoError(t, err)
-
-								actual := a.Bytes()
-								require.Equal(t, expected, actual)
-							})
-						}
-					}
-				})
-			}
-		})
-	}
-}
 
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
@@ -245,11 +87,11 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 		(1 << 28) + 4,
 	}
 	intRegs := []asm.Register{
-		arm64.RegR0, arm64.RegR16,
+		arm64.RegR0,
 		arm64.RegR30,
 	}
 	floatRegs := []asm.Register{
-		arm64.RegV0, arm64.RegV10,
+		arm64.RegV0,
 		arm64.RegV30,
 	}
 	tests := []struct {
