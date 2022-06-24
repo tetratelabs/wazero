@@ -70,6 +70,7 @@ func Equal(t TestingT, expected, actual interface{}, formatWithArgs ...interface
 		return
 	}
 
+	// If we have the same type, and it isn't a string, but the expected and actual values on a different line.
 	// This allows easier comparison without using a diff library.
 	fail(t, "unexpected value", fmt.Sprintf("expected:\n\t%#v\nwas:\n\t%#v\n", expected, actual), formatWithArgs...)
 }

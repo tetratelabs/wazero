@@ -35,225 +35,22 @@ func newGoasmAssembler(t *testing.T, _ asm.Register) arm64.Assembler {
 				expected))
 
 	fmt.Println(strings.Join(cs, ",\n"))
+
+
+						cs = append(cs, fmt.Sprintf(`{name: "%s", inst: %s, src: Reg%s, dst: Reg%s, exp: %#v}`,
+							fmt.Sprintf("%s/src=%s,dst=%s", arm64.InstructionName(tc.inst), arm64.RegisterName(src), arm64.RegisterName(dst)),
+							arm64.InstructionName(tc.inst),
+							arm64.RegisterName(src), arm64.RegisterName(dst),
+							expected[:4]))
+
+							cs = append(cs, fmt.Sprintf(`{name: "%s", inst: %s, src: Reg%s, src2: Reg%s, dst: Reg%s, exp: %#v}`,
+								fmt.Sprintf("src=%s,src2=%s,dst=%s", arm64.RegisterName(src), arm64.RegisterName(src2), arm64.RegisterName(dst)),
+								arm64.InstructionName(tc.inst),
+								arm64.RegisterName(src),
+								arm64.RegisterName(src2),
+								arm64.RegisterName(dst),
+								expected[:4]))
 */
-
-func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesRegisterToRegister,
-					SrcReg: arm64.RegR0, SrcReg2: arm64.RegR0, DstReg: arm64.RegR0},
-				expErr: "ADR is unsupported for from:register,to:register type",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeRegisterToRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
-	intRegsWithoutZero := intRegs[1:]
-	conditionalRegs := []asm.Register{arm64.RegCondEQ, arm64.RegCondNE,
-		arm64.RegCondHS, arm64.RegCondLO, arm64.RegCondMI, arm64.RegCondPL, arm64.RegCondVS, arm64.RegCondVC,
-		arm64.RegCondHI, arm64.RegCondLS, arm64.RegCondGE, arm64.RegCondLT, arm64.RegCondGT, arm64.RegCondLE,
-		arm64.RegCondAL, arm64.RegCondNV}
-	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV15, arm64.RegV31}
-
-	tests := []struct {
-		inst             asm.Instruction
-		srcRegs, dstRegs []asm.Register
-	}{
-		{inst: arm64.ADD, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ADDW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SUB, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.CLZ, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.CLZW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.CSET, srcRegs: conditionalRegs, dstRegs: intRegs},
-		{inst: arm64.FABSS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FABSD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FNEGS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FNEGD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FSQRTD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FSQRTS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FCVTDS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FCVTSD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTMD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTMS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTND, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTNS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTPD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTPS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTZD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FRINTZS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FDIVS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FDIVD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMAXD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMAXS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMIND, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMINS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMULS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMULD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FADDD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FADDS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FCVTZSD, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZSDW, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZSS, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZSSW, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZUD, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZUDW, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZUS, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FCVTZUSW, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FMOVD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMOVS, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FMOVD, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.FMOVS, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.FMOVD, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.FMOVS, srcRegs: floatRegs, dstRegs: intRegs},
-		{inst: arm64.MOVD, srcRegs: intRegs, dstRegs: intRegsWithoutZero},
-		{inst: arm64.MOVWU, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.MRS, srcRegs: []asm.Register{arm64.RegFPSR}, dstRegs: intRegs},
-		{inst: arm64.MSR, srcRegs: intRegs, dstRegs: []asm.Register{arm64.RegFPSR}},
-		{inst: arm64.MUL, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.MULW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.NEG, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.NEGW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.RBIT, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.RBITW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SDIV, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SDIVW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.UDIV, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.UDIVW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SCVTFD, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.SCVTFWD, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.SCVTFS, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.SCVTFWS, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.UCVTFD, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.UCVTFWD, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.UCVTFS, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.UCVTFWS, srcRegs: intRegs, dstRegs: floatRegs},
-		{inst: arm64.SXTB, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SXTBW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SXTH, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SXTHW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SXTW, srcRegs: intRegs, dstRegs: intRegs},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
-			for _, src := range tc.srcRegs {
-				for _, dst := range tc.dstRegs {
-					src, dst := src, dst
-					t.Run(fmt.Sprintf("src=%s,dst=%s", arm64.RegisterName(src), arm64.RegisterName(dst)), func(t *testing.T) {
-						goasm := newGoasmAssembler(t, asm.NilRegister)
-						if tc.inst == arm64.CSET {
-
-							goasm.CompileConditionalRegisterSet(conditionalRegisterToState(src), dst)
-						} else {
-							goasm.CompileRegisterToRegister(tc.inst, src, dst)
-
-						}
-						expected, err := goasm.Assemble()
-						require.NoError(t, err)
-
-						a := arm64.NewAssemblerImpl(asm.NilRegister)
-						err = a.EncodeRegisterToRegister(&arm64.NodeImpl{Instruction: tc.inst, SrcReg: src, DstReg: dst})
-						require.NoError(t, err)
-
-						actual := a.Bytes()
-						require.Equal(t, expected, actual)
-					})
-				}
-			}
-		})
-	}
-}
-
-func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesTwoRegistersToRegister,
-					SrcReg: arm64.RegR0, SrcReg2: arm64.RegR0, DstReg: arm64.RegR0},
-				expErr: "ADR is unsupported for from:two-registers,to:register type",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeThreeRegistersToRegister(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	intRegs := []asm.Register{arm64.RegRZR, arm64.RegR1, arm64.RegR10, arm64.RegR30}
-	floatRegs := []asm.Register{arm64.RegV0, arm64.RegV15, arm64.RegV31}
-
-	tests := []struct {
-		inst             asm.Instruction
-		srcRegs, dstRegs []asm.Register
-	}{
-		{inst: arm64.AND, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ANDW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ORR, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ORRW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.EOR, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.EORW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ASR, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ASRW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.LSL, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.LSLW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.LSR, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.LSRW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.ROR, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.RORW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SDIV, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SDIVW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.UDIV, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.UDIVW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SUB, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.SUBW, srcRegs: intRegs, dstRegs: intRegs},
-		{inst: arm64.FSUBD, srcRegs: floatRegs, dstRegs: floatRegs},
-		{inst: arm64.FSUBS, srcRegs: floatRegs, dstRegs: floatRegs},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(arm64.InstructionName(tc.inst), func(t *testing.T) {
-			for _, src := range tc.srcRegs {
-				for _, src2 := range tc.srcRegs {
-					for _, dst := range tc.dstRegs {
-						src, src2, dst := src, src2, dst
-						t.Run(fmt.Sprintf("src=%s,src2=%s,dst=%s", arm64.RegisterName(src), arm64.RegisterName(src2), arm64.RegisterName(dst)), func(t *testing.T) {
-							goasm := newGoasmAssembler(t, asm.NilRegister)
-							goasm.CompileTwoRegistersToRegister(tc.inst, src, src2, dst)
-							expected, err := goasm.Assemble()
-							require.NoError(t, err)
-
-							a := arm64.NewAssemblerImpl(asm.NilRegister)
-							err = a.EncodeTwoRegistersToRegister(&arm64.NodeImpl{Instruction: tc.inst, SrcReg: src, SrcReg2: src2, DstReg: dst})
-							require.NoError(t, err)
-
-							actual := a.Bytes()
-							require.Equal(t, expected, actual)
-						})
-					}
-				}
-			}
-		})
-	}
-}
 
 func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
@@ -345,7 +142,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		0xfff,
 		0xfff << 12,
 		123 << 12,
-		(1<<15 + 1),
+		1<<15 + 1,
 		(1<<15 + 1) << 16,
 		(1<<15 + 1) << 32,
 		0x0000_ffff_ffff_ffff,
@@ -828,42 +625,4 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 			}
 		})
 	}
-}
-
-func conditionalRegisterToState(r asm.Register) asm.ConditionalRegisterState {
-	switch r {
-	case arm64.RegCondEQ:
-		return arm64.CondEQ
-	case arm64.RegCondNE:
-		return arm64.CondNE
-	case arm64.RegCondHS:
-		return arm64.CondHS
-	case arm64.RegCondLO:
-		return arm64.CondLO
-	case arm64.RegCondMI:
-		return arm64.CondMI
-	case arm64.RegCondPL:
-		return arm64.CondPL
-	case arm64.RegCondVS:
-		return arm64.CondVS
-	case arm64.RegCondVC:
-		return arm64.CondVC
-	case arm64.RegCondHI:
-		return arm64.CondHI
-	case arm64.RegCondLS:
-		return arm64.CondLS
-	case arm64.RegCondGE:
-		return arm64.CondGE
-	case arm64.RegCondLT:
-		return arm64.CondLT
-	case arm64.RegCondGT:
-		return arm64.CondGT
-	case arm64.RegCondLE:
-		return arm64.CondLE
-	case arm64.RegCondAL:
-		return arm64.CondAL
-	case arm64.RegCondNV:
-		return arm64.CondNV
-	}
-	return asm.ConditionalRegisterStateUnset
 }

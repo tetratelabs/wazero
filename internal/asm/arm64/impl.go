@@ -355,13 +355,13 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	case OperandTypesNoneToBranch:
 		err = a.EncodeRelativeBranch(n)
 	case OperandTypesRegisterToRegister:
-		err = a.EncodeRegisterToRegister(n)
+		err = a.encodeRegisterToRegister(n)
 	case OperandTypesLeftShiftedRegisterToRegister:
 		err = a.encodeLeftShiftedRegisterToRegister(n)
 	case OperandTypesTwoRegistersToRegister:
 		err = a.EncodeTwoRegistersToRegister(n)
 	case OperandTypesThreeRegistersToRegister:
-		err = a.EncodeThreeRegistersToRegister(n)
+		err = a.encodeThreeRegistersToRegister(n)
 	case OperandTypesTwoRegistersToNone:
 		err = a.encodeTwoRegistersToNone(n)
 	case OperandTypesRegisterAndConstToNone:
@@ -809,9 +809,7 @@ func checkRegisterToRegisterType(src, dst asm.Register, requireSrcInt, requireDs
 	return
 }
 
-// EncodeRegisterToRegister is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeRegisterToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeRegisterToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
 	case ADD, ADDW, SUB:
 		if err = checkRegisterToRegisterType(n.SrcReg, n.DstReg, true, true); err != nil {
@@ -1469,9 +1467,7 @@ func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// EncodeThreeRegistersToRegister is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeThreeRegistersToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeThreeRegistersToRegister(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case MSUB, MSUBW:
 		// Dst = Src2 - (Src1 * Src3)
