@@ -41,10 +41,6 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "BCONDEQ R1",
 		},
 		{
-			in:  &NodeImpl{Instruction: BCONDNE, Types: OperandTypesNoneToMemory, DstReg: RegR1, DstConst: 0x1234},
-			exp: "BCONDNE [R1 + 0x1234]",
-		},
-		{
 			in:  &NodeImpl{Instruction: BCONDNE, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: NOP}},
 			exp: "BCONDNE {NOP}",
 		},
@@ -223,16 +219,6 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	require.Equal(t, RegR27, actualNode.DstReg)
 	require.Equal(t, OperandTypeNone, actualNode.Types.src)
 	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
-}
-
-func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
-	a.CompileJumpToMemory(BCONDNE, RegR27)
-	actualNode := a.Current
-	require.Equal(t, BCONDNE, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.DstReg)
-	require.Equal(t, OperandTypeNone, actualNode.Types.src)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
@@ -3481,6 +3467,91 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 			actualBytes := a.Buf.Bytes()[beforeADRByteNum : beforeADRByteNum+4]
 			require.Equal(t, tc.expADRInstructionBytes, actualBytes, hex.EncodeToString(actualBytes))
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeJumpToRegister(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		tests := []struct {
+			n      *NodeImpl
+			expErr string
+		}{
+			{
+				n:      &NodeImpl{Instruction: ADD, Types: OperandTypesNoneToRegister},
+				expErr: "ADD is unsupported for from:none,to:register type",
+			},
+			{
+				n:      &NodeImpl{Instruction: RET, DstReg: asm.NilRegister},
+				expErr: "invalid destination register: nil is not integer",
+			},
+			{
+				n:      &NodeImpl{Instruction: RET, DstReg: RegV0},
+				expErr: "invalid destination register: V0 is not integer",
+			},
+		}
+
+		for _, tt := range tests {
+			tc := tt
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeJumpToRegister(tc.n)
+			require.EqualError(t, err, tc.expErr)
+		}
+	})
+
+	tests := []struct {
+		name   string
+		inst   asm.Instruction
+		reg    asm.Register
+		expHex string
+	}{
+		{
+			name:   "B",
+			inst:   B,
+			reg:    RegR0,
+			expHex: "00001fd6000000000000000000000000",
+		},
+		{
+			name:   "B",
+			inst:   B,
+			reg:    RegR5,
+			expHex: "a0001fd6000000000000000000000000",
+		},
+		{
+			name:   "B",
+			inst:   B,
+			reg:    RegR30,
+			expHex: "c0031fd6000000000000000000000000",
+		},
+		{
+			name:   "RET",
+			inst:   RET,
+			reg:    RegR0,
+			expHex: "00005fd6000000000000000000000000",
+		},
+		{
+			name:   "RET",
+			inst:   RET,
+			reg:    RegR5,
+			expHex: "a0005fd6000000000000000000000000",
+		},
+		{
+			name:   "RET",
+			inst:   RET,
+			reg:    RegR30,
+			expHex: "c0035fd6000000000000000000000000",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.EncodeJumpToRegister(&NodeImpl{Instruction: tc.inst, DstReg: tc.reg})
+			require.NoError(t, err)
+
+			actual := a.Bytes()
+			require.Equal(t, tc.expHex, hex.EncodeToString(actual))
 		})
 	}
 }

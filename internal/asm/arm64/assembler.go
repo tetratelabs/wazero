@@ -8,13 +8,6 @@ import (
 type Assembler interface {
 	asm.AssemblerBase
 
-	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by
-	// `baseReg`, and returns the corresponding Node in the assembled linked list.
-	//
-	// Note: this has exactly the same implementation as the same method in asm.AssemblerBase in the homemade assembler.
-	// TODO: this will be removed after golang-asm removal.
-	CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register)
-
 	// CompileMemoryWithRegisterOffsetToRegister adds an instruction where source operand is the memory address
 	// specified as `srcBaseReg + srcOffsetReg` and dst is the register `dstReg`.
 	CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, srcBaseReg, srcOffsetReg, dstReg asm.Register)
