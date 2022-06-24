@@ -2,9 +2,10 @@ package arm64
 
 import (
 	"encoding/hex"
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"testing"
 )
 
 func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {

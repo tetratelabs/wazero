@@ -2,10 +2,11 @@ package arm64
 
 import (
 	"encoding/hex"
-	"github.com/tetratelabs/wazero/internal/asm"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"math"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {

@@ -1,9 +1,10 @@
 package arm64
 
 import (
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"testing"
 )
 
 func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
