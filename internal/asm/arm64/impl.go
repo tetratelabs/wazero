@@ -72,8 +72,6 @@ func (n *NodeImpl) String() (ret string) {
 		ret = instName
 	case OperandTypesNoneToRegister:
 		ret = fmt.Sprintf("%s %s", instName, RegisterName(n.DstReg))
-	case OperandTypesNoneToMemory:
-		ret = fmt.Sprintf("%s [%s + 0x%x]", instName, RegisterName(n.DstReg), n.DstConst)
 	case OperandTypesNoneToBranch:
 		ret = fmt.Sprintf("%s {%v}", instName, n.JumpTarget)
 	case OperandTypesRegisterToRegister:
@@ -179,7 +177,6 @@ type OperandTypes struct{ src, dst OperandType }
 var (
 	OperandTypesNoneToNone                         = OperandTypes{OperandTypeNone, OperandTypeNone}
 	OperandTypesNoneToRegister                     = OperandTypes{OperandTypeNone, OperandTypeRegister}
-	OperandTypesNoneToMemory                       = OperandTypes{OperandTypeNone, OperandTypeMemory}
 	OperandTypesNoneToBranch                       = OperandTypes{OperandTypeNone, OperandTypeBranch}
 	OperandTypesRegisterToRegister                 = OperandTypes{OperandTypeRegister, OperandTypeRegister}
 	OperandTypesLeftShiftedRegisterToRegister      = OperandTypes{OperandTypeLeftShiftedRegister, OperandTypeRegister}
@@ -353,7 +350,7 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	switch n.Types {
 	case OperandTypesNoneToNone:
 		err = a.EncodeNoneToNone(n)
-	case OperandTypesNoneToRegister, OperandTypesNoneToMemory:
+	case OperandTypesNoneToRegister:
 		err = a.EncodeJumpToRegister(n)
 	case OperandTypesNoneToBranch:
 		err = a.EncodeRelativeBranch(n)
@@ -450,12 +447,6 @@ func (a *AssemblerImpl) CompileRegisterToMemory(
 // CompileJump implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	return a.newNode(jmpInstruction, OperandTypesNoneToBranch)
-}
-
-// CompileJumpToMemory implements the same method as documented on asm.AssemblerBase.
-func (a *AssemblerImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register) {
-	n := a.newNode(jmpInstruction, OperandTypesNoneToMemory)
-	n.DstReg = baseReg
 }
 
 // CompileJumpToRegister implements the same method as documented on asm.AssemblerBase.

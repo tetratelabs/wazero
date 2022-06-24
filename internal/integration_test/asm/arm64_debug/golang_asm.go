@@ -166,15 +166,6 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 	return golang_asm.NewGolangAsmNode(br)
 }
 
-// CompileJumpToMemory implements the same method as documented on asm.AssemblerBase.
-func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register) {
-	br := a.NewProg()
-	br.As = castAsGolangAsmInstruction[jmpInstruction]
-	br.To.Type = obj.TYPE_MEM
-	br.To.Reg = castAsGolangAsmRegister[baseReg]
-	a.AddInstruction(br)
-}
-
 // CompileJumpToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ret := a.NewProg()
