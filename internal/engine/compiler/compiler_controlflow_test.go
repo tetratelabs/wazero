@@ -14,10 +14,6 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-	// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
-	// TODO: delete after #233
-	compiler.compileNOP()
-
 	err := compiler.compileHostFunction()
 	require.NoError(t, err)
 
@@ -663,32 +659,27 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 					// and it returns one value.
 					expectedReturnValue := uint32(i * 1000)
 
-					// We have to do compilation in a separate subtest since each compilation takes
-					// the mutex lock and must release on the cleanup of each subtest.
-					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
-						compiler := env.requireNewCompiler(t, newCompiler, nil)
-						err := compiler.compilePreamble()
-						require.NoError(t, err)
-						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
-						require.NoError(t, err)
-						err = compiler.compileReturnFunction()
-						require.NoError(t, err)
+					compiler := env.requireNewCompiler(t, newCompiler, nil)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+					require.NoError(t, err)
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
 
-						c, _, err := compiler.compile()
-						require.NoError(t, err)
+					c, _, err := compiler.compile()
+					require.NoError(t, err)
 
-						f := &function{
-							parent:                &code{codeSegment: c},
-							codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-							moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-							source: &wasm.FunctionInstance{
-								TypeID: targetTypeID,
-							},
-						}
-						me.functions = append(me.functions, f)
-						table[i] = uintptr(unsafe.Pointer(f))
-					})
+					f := &function{
+						parent:                &code{codeSegment: c},
+						codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
+						moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
+						source: &wasm.FunctionInstance{
+							TypeID: targetTypeID,
+						},
+					}
+					me.functions = append(me.functions, f)
+					table[i] = uintptr(unsafe.Pointer(f))
 				}
 
 				for i := 1; i < len(table); i++ {
@@ -832,38 +823,33 @@ func TestCompiler_compileCall(t *testing.T) {
 				ParamNumInUint64: 1, ResultNumInUint64: 1,
 			}
 			for i := 0; i < numCalls; i++ {
-				// Each function takes one arguments, adds the value with 100 + i and returns the result.
+				// Each function takes one argument, adds the value with 100 + i and returns the result.
 				addTargetValue := uint32(100 + i)
 				expectedValue += addTargetValue
 
-				// We have to do compilation in a separate subtest since each compilation takes
-				// the mutex lock and must release on the cleanup of each subtest.
-				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
-					compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: targetFunctionType})
+				compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{Signature: targetFunctionType})
 
-					err := compiler.compilePreamble()
-					require.NoError(t, err)
+				err := compiler.compilePreamble()
+				require.NoError(t, err)
 
-					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
-					require.NoError(t, err)
-					err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
-					require.NoError(t, err)
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+				require.NoError(t, err)
+				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
 
-					err = compiler.compileReturnFunction()
-					require.NoError(t, err)
+				err = compiler.compileReturnFunction()
+				require.NoError(t, err)
 
-					c, _, err := compiler.compile()
-					require.NoError(t, err)
-					index := wasm.Index(i)
-					me.functions = append(me.functions, &function{
-						parent:                &code{codeSegment: c},
-						codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-						moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-					})
-					env.module().Functions = append(env.module().Functions,
-						&wasm.FunctionInstance{Type: targetFunctionType, Idx: index})
+				c, _, err := compiler.compile()
+				require.NoError(t, err)
+				index := wasm.Index(i)
+				me.functions = append(me.functions, &function{
+					parent:                &code{codeSegment: c},
+					codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
+					moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 				})
+				env.module().Functions = append(env.module().Functions,
+					&wasm.FunctionInstance{Type: targetFunctionType, Idx: index})
 			}
 
 			// Now we start building the caller's code.
@@ -950,46 +936,41 @@ func TestCompiler_returnFunction(t *testing.T) {
 		const callFrameNums = 10
 		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcIndex := wasm.Index(0); funcIndex < callFrameNums; funcIndex++ {
-			// We have to do compilation in a separate subtest since each compilation takes
-			// the mutex lock and must release on the cleanup of each subtest.
-			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-			t.Run(fmt.Sprintf("compiling existing callframe %d", funcIndex), func(t *testing.T) {
-				// Each function pushes its funcaddr and soon returns.
-				compiler := env.requireNewCompiler(t, newCompiler, nil)
-				err := compiler.compilePreamble()
-				require.NoError(t, err)
+			// Each function pushes its funcaddr and soon returns.
+			compiler := env.requireNewCompiler(t, newCompiler, nil)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
 
-				// Push its functionIndex.
-				expValue := uint32(funcIndex)
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
-				require.NoError(t, err)
+			// Push its functionIndex.
+			expValue := uint32(funcIndex)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+			require.NoError(t, err)
 
-				err = compiler.compileReturnFunction()
-				require.NoError(t, err)
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
 
-				c, _, err := compiler.compile()
-				require.NoError(t, err)
+			c, _, err := compiler.compile()
+			require.NoError(t, err)
 
-				// Compiles and adds to the engine.
-				f := &function{
-					parent:                &code{codeSegment: c},
-					codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
-					moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
-				}
-				moduleEngine.functions = append(moduleEngine.functions, f)
+			// Compiles and adds to the engine.
+			f := &function{
+				parent:                &code{codeSegment: c},
+				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
+				moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
+			}
+			moduleEngine.functions = append(moduleEngine.functions, f)
 
-				// Pushes the frame whose return address equals the beginning of the function just compiled.
-				frame := callFrame{
-					// Set the return address to the beginning of the function so that we can execute the constI32 above.
-					returnAddress: f.codeInitialAddress,
-					// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
-					returnStackBasePointer: uint64(funcIndex) * 5,
-					function:               f,
-				}
-				ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
-				ce.globalContext.callFrameStackPointer++
-				stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
-			})
+			// Pushes the frame whose return address equals the beginning of the function just compiled.
+			frame := callFrame{
+				// Set the return address to the beginning of the function so that we can execute the constI32 above.
+				returnAddress: f.codeInitialAddress,
+				// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
+				returnStackBasePointer: uint64(funcIndex) * 5,
+				function:               f,
+			}
+			ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
+			ce.globalContext.callFrameStackPointer++
+			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
 		}
 
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())

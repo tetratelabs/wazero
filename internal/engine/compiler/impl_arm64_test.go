@@ -121,7 +121,3 @@ func (c *arm64Compiler) setStackPointerCeil(v uint64) {
 func (c *arm64Compiler) setRuntimeValueLocationStack(s *runtimeValueLocationStack) {
 	c.locationStack = s
 }
-
-func (c *arm64Compiler) compileNOP() {
-	c.assembler.CompileStandAlone(arm64.NOP)
-}

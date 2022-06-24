@@ -123,10 +123,6 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			me := &moduleEngine{functions: make([]*function, 10)}
 			tc.moduleInstance.Engine = me
 
-			// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
-			// TODO: delete after #233
-			compiler.compileNOP()
-
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
 			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters), "expected no usedRegisters")
@@ -184,10 +180,6 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-				// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
-				// TODO: delete after #233
-				compiler.compileNOP()
-
 				err := compiler.compileMaybeGrowValueStack()
 				require.NoError(t, err)
 				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
@@ -212,10 +204,6 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 	t.Run("grow", func(t *testing.T) {
 		env := newCompilerEnvironment()
 		compiler := env.requireNewCompiler(t, newCompiler, nil)
-
-		// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
-		// TODO: delete after #233
-		compiler.compileNOP()
 
 		err := compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)

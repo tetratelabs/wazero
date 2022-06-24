@@ -199,10 +199,6 @@ func (c *arm64Compiler) pushFunctionParams() {
 
 // compilePreamble implements compiler.compilePreamble for the arm64 architecture.
 func (c *arm64Compiler) compilePreamble() error {
-	// The assembler skips the first instruction so we intentionally add NOP here.
-	// TODO: delete after #233
-	c.assembler.CompileStandAlone(arm64.NOP)
-
 	c.pushFunctionParams()
 
 	// Check if it's necessary to grow the value stack before entering function body.
@@ -402,10 +398,6 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileHostFunction() error {
-	// The assembler skips the first instruction so we intentionally add NOP here.
-	// TODO: delete after #233
-	c.assembler.CompileStandAlone(arm64.NOP)
-
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
