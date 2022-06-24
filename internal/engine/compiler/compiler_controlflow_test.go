@@ -14,10 +14,6 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-	// The golang-asm assembler skips the first instruction, so we emit NOP here which is ignored.
-	// TODO: delete after #233
-	compiler.compileNOP()
-
 	err := compiler.compileHostFunction()
 	require.NoError(t, err)
 

@@ -178,7 +178,6 @@ type compilerImpl interface {
 	setRuntimeValueLocationStack(*runtimeValueLocationStack)
 	compileEnsureOnRegister(loc *runtimeValueLocation) error
 	compileModuleContextInitialization() error
-	compileNOP()
 }
 
 const defaultMemoryPageNumInTest = 1
