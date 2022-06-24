@@ -4750,6 +4750,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			require.NoError(t, err)
 
 			actual, err := a.Assemble()
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual, hex.EncodeToString(actual))
 		})
 	}
@@ -7942,6 +7943,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			err := a.encodeRegisterToMemory(tc.n)
 			require.NoError(t, err)
 			actual, err := a.Assemble()
+			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
 		})
 	}
