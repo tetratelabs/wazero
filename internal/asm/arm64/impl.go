@@ -359,13 +359,13 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	case OperandTypesLeftShiftedRegisterToRegister:
 		err = a.encodeLeftShiftedRegisterToRegister(n)
 	case OperandTypesTwoRegistersToRegister:
-		err = a.EncodeTwoRegistersToRegister(n)
+		err = a.encodeTwoRegistersToRegister(n)
 	case OperandTypesThreeRegistersToRegister:
 		err = a.encodeThreeRegistersToRegister(n)
 	case OperandTypesTwoRegistersToNone:
 		err = a.encodeTwoRegistersToNone(n)
 	case OperandTypesRegisterAndConstToNone:
-		err = a.EncodeRegisterAndConstToNone(n)
+		err = a.encodeRegisterAndConstToNone(n)
 	case OperandTypesRegisterToMemory:
 		err = a.EncodeRegisterToMemory(n)
 	case OperandTypesMemoryToRegister:
@@ -1348,9 +1348,7 @@ func (a *AssemblerImpl) encodeLeftShiftedRegisterToRegister(n *NodeImpl) (err er
 	return
 }
 
-// EncodeTwoRegistersToRegister is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeTwoRegistersToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeTwoRegistersToRegister(n *NodeImpl) (err error) {
 	switch inst := n.Instruction; inst {
 	case AND, ANDW, ORR, ORRW, EOR, EORW:
 		// See "Logical (shifted register)" in
@@ -1563,9 +1561,7 @@ func (a *AssemblerImpl) encodeTwoRegistersToNone(n *NodeImpl) (err error) {
 	return
 }
 
-// EncodeRegisterAndConstToNone is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeRegisterAndConstToNone(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeRegisterAndConstToNone(n *NodeImpl) (err error) {
 	if n.Instruction != CMP {
 		return errorEncodingUnsupported(n)
 	}

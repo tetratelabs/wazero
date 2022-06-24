@@ -4537,7 +4537,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeTwoRegistersToRegister(tc.n)
+			err := a.encodeTwoRegistersToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -5109,7 +5109,74 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeTwoRegistersToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, SrcReg2: tc.src2, DstReg: tc.dst})
+			err := a.encodeTwoRegistersToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, SrcReg2: tc.src2, DstReg: tc.dst})
+			require.NoError(t, err)
+
+			actual := a.Bytes()
+			require.Equal(t, tc.exp, actual[:4])
+		})
+	}
+}
+
+func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		tests := []struct {
+			n      *NodeImpl
+			expErr string
+		}{
+			{
+				n: &NodeImpl{Instruction: ADR, Types: OperandTypesRegisterAndConstToNone,
+					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				expErr: "ADR is unsupported for from:register-and-const,to:none type",
+			},
+			{
+				n: &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone,
+					SrcReg: RegR0, SrcConst: 12345},
+				expErr: "immediate for CMP must fit in 0 to 4095 but got 12345",
+			},
+			{
+				n: &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone,
+					SrcReg: RegRZR, SrcConst: 123},
+				expErr: "zero register is not supported for CMP (immediate)",
+			},
+		}
+
+		for _, tt := range tests {
+			tc := tt
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeRegisterAndConstToNone(tc.n)
+			require.EqualError(t, err, tc.expErr)
+		}
+	})
+
+	tests := []struct {
+		name string
+		inst asm.Instruction
+		reg  asm.Register
+		c    int64
+		exp  []byte
+	}{
+		{name: "R1, 0", inst: CMP, reg: RegR1, c: 0, exp: []byte{0x3f, 0x0, 0x0, 0xf1}},
+		{name: "R1, 10", inst: CMP, reg: RegR1, c: 10, exp: []byte{0x3f, 0x28, 0x0, 0xf1}},
+		{name: "R1, 100", inst: CMP, reg: RegR1, c: 100, exp: []byte{0x3f, 0x90, 0x1, 0xf1}},
+		{name: "R1, 300", inst: CMP, reg: RegR1, c: 300, exp: []byte{0x3f, 0xb0, 0x4, 0xf1}},
+		{name: "R1, 4095", inst: CMP, reg: RegR1, c: 4095, exp: []byte{0x3f, 0xfc, 0x3f, 0xf1}},
+		{name: "R10, 0", inst: CMP, reg: RegR10, c: 0, exp: []byte{0x5f, 0x1, 0x0, 0xf1}},
+		{name: "R10, 10", inst: CMP, reg: RegR10, c: 10, exp: []byte{0x5f, 0x29, 0x0, 0xf1}},
+		{name: "R10, 100", inst: CMP, reg: RegR10, c: 100, exp: []byte{0x5f, 0x91, 0x1, 0xf1}},
+		{name: "R10, 300", inst: CMP, reg: RegR10, c: 300, exp: []byte{0x5f, 0xb1, 0x4, 0xf1}},
+		{name: "R10, 4095", inst: CMP, reg: RegR10, c: 4095, exp: []byte{0x5f, 0xfd, 0x3f, 0xf1}},
+		{name: "R30, 0", inst: CMP, reg: RegR30, c: 0, exp: []byte{0xdf, 0x3, 0x0, 0xf1}},
+		{name: "R30, 10", inst: CMP, reg: RegR30, c: 10, exp: []byte{0xdf, 0x2b, 0x0, 0xf1}},
+		{name: "R30, 100", inst: CMP, reg: RegR30, c: 100, exp: []byte{0xdf, 0x93, 0x1, 0xf1}},
+		{name: "R30, 300", inst: CMP, reg: RegR30, c: 300, exp: []byte{0xdf, 0xb3, 0x4, 0xf1}},
+		{name: "R30, 4095", inst: CMP, reg: RegR30, c: 4095, exp: []byte{0xdf, 0xff, 0x3f, 0xf1}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a := NewAssemblerImpl(asm.NilRegister)
+			err := a.encodeRegisterAndConstToNone(&NodeImpl{Instruction: tc.inst, SrcReg: tc.reg, SrcConst: tc.c})
 			require.NoError(t, err)
 
 			actual := a.Bytes()

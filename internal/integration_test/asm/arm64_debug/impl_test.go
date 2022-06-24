@@ -52,62 +52,6 @@ func newGoasmAssembler(t *testing.T, _ asm.Register) arm64.Assembler {
 								expected[:4]))
 */
 
-func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		tests := []struct {
-			n      *arm64.NodeImpl
-			expErr string
-		}{
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.ADR, Types: arm64.OperandTypesRegisterAndConstToNone,
-					SrcReg: arm64.RegR0, SrcReg2: arm64.RegR0, DstReg: arm64.RegR0},
-				expErr: "ADR is unsupported for from:register-and-const,to:none type",
-			},
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.CMP, Types: arm64.OperandTypesRegisterAndConstToNone,
-					SrcReg: arm64.RegR0, SrcConst: 12345},
-				expErr: "immediate for CMP must fit in 0 to 4095 but got 12345",
-			},
-			{
-				n: &arm64.NodeImpl{Instruction: arm64.CMP, Types: arm64.OperandTypesRegisterAndConstToNone,
-					SrcReg: arm64.RegRZR, SrcConst: 123},
-				expErr: "zero register is not supported for CMP (immediate)",
-			},
-		}
-
-		for _, tt := range tests {
-			tc := tt
-			a := arm64.NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeRegisterAndConstToNone(tc.n)
-			require.EqualError(t, err, tc.expErr)
-		}
-	})
-
-	const inst = arm64.CMP
-	for _, reg := range []asm.Register{arm64.RegR1, arm64.RegR10, arm64.RegR30} {
-		for _, c := range []int64{0, 10, 100, 300, 4095} {
-			reg, c := reg, c
-			t.Run(fmt.Sprintf("%s, %d", arm64.RegisterName(reg), c), func(t *testing.T) {
-				goasm := newGoasmAssembler(t, asm.NilRegister)
-				goasm.CompileRegisterAndConstToNone(inst, reg, c)
-				expected, err := goasm.Assemble()
-				require.NoError(t, err)
-				if c == 0 {
-					// This case cannot be supported in golang-asm and it results in miscompilation.
-					expected[3] = 0b111_10001
-				}
-
-				a := arm64.NewAssemblerImpl(asm.NilRegister)
-				err = a.EncodeRegisterAndConstToNone(&arm64.NodeImpl{Instruction: inst, SrcReg: reg, SrcConst: c})
-				require.NoError(t, err)
-
-				actual := a.Bytes()
-				require.Equal(t, expected, actual)
-			})
-		}
-	}
-}
-
 func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
