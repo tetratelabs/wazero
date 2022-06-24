@@ -608,7 +608,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(RegR10)
-			err := a.EncodeVectorRegisterToMemory(tc.n)
+			err := a.encodeVectorRegisterToMemory(tc.n)
 			require.NoError(t, err)
 
 			a.maybeFlushConstPool(true)
@@ -824,7 +824,7 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(RegR10)
-			err := a.EncodeMemoryToVectorRegister(tc.n)
+			err := a.encodeMemoryToVectorRegister(tc.n)
 			require.NoError(t, err)
 
 			a.maybeFlushConstPool(true)
@@ -2064,7 +2064,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeVectorRegisterToVectorRegister(&NodeImpl{
+			err := a.encodeVectorRegisterToVectorRegister(&NodeImpl{
 				Instruction:       tc.inst,
 				SrcReg:            tc.x1,
 				SrcConst:          tc.c,
@@ -2170,7 +2170,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeVectorRegisterToRegister(tc.n)
+			err := a.encodeVectorRegisterToRegister(tc.n)
 			require.NoError(t, err)
 
 			actual := a.Buf.Bytes()
@@ -2599,7 +2599,7 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			actual := a.Bytes()
+			actual := a.bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -3493,7 +3493,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeConstToRegister(tc.n)
+			err := a.encodeConstToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})
@@ -4746,7 +4746,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(RegR27)
-			err := a.EncodeConstToRegister(tc.n)
+			err := a.encodeConstToRegister(tc.n)
 			require.NoError(t, err)
 
 			actual, err := a.Assemble()
@@ -4829,7 +4829,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeRegisterToVectorRegister(tc.n)
+			err := a.encodeRegisterToVectorRegister(tc.n)
 			require.NoError(t, err)
 
 			actual := a.Buf.Bytes()
@@ -5017,7 +5017,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeStaticConstToVectorRegister(tc.n)
+			err := a.encodeStaticConstToVectorRegister(tc.n)
 			require.NoError(t, err)
 			a.maybeFlushConstPool(true)
 
@@ -5159,7 +5159,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 			err := a.encodeJumpToRegister(&NodeImpl{Instruction: tc.inst, DstReg: tc.reg})
 			require.NoError(t, err)
 
-			actual := a.Bytes()
+			actual := a.bytes()
 			require.Equal(t, tc.expHex, hex.EncodeToString(actual))
 		})
 	}
@@ -5681,7 +5681,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			err := a.encodeRegisterToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, DstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.Bytes()
+			actual := a.bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -6278,7 +6278,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 			err := a.encodeTwoRegistersToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, SrcReg2: tc.src2, DstReg: tc.dst})
 			require.NoError(t, err)
 
-			actual := a.Bytes()
+			actual := a.bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -6345,7 +6345,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 			err := a.encodeRegisterAndConstToNone(&NodeImpl{Instruction: tc.inst, SrcReg: tc.reg, SrcConst: tc.c})
 			require.NoError(t, err)
 
-			actual := a.Bytes()
+			actual := a.bytes()
 			require.Equal(t, tc.exp, actual[:4])
 		})
 	}
@@ -6998,7 +6998,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		for n := a.Root; n != nil; n = n.Next {
 			n.OffsetInBinaryField = uint64(a.Buf.Len())
 
-			err := a.EncodeNode(n)
+			err := a.encodeNode(n)
 			require.NoError(t, err)
 		}
 
@@ -7966,7 +7966,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.EncodeRelativeBranch(tc.n)
+			err := a.encodeRelativeBranch(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
 	})

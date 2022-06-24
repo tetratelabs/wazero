@@ -264,13 +264,13 @@ func (a *AssemblerImpl) Assemble() ([]byte, error) {
 
 	for n := a.Root; n != nil; n = n.Next {
 		n.OffsetInBinaryField = uint64(a.Buf.Len())
-		if err := a.EncodeNode(n); err != nil {
+		if err := a.encodeNode(n); err != nil {
 			return nil, err
 		}
 		a.maybeFlushConstPool(n.Next == nil)
 	}
 
-	code := a.Bytes()
+	code := a.bytes()
 	for _, cb := range a.OnGenerateCallbacks {
 		if err := cb(code); err != nil {
 			return nil, err
@@ -330,11 +330,8 @@ func (a *AssemblerImpl) maybeFlushConstPool(endOfBinary bool) {
 	}
 }
 
-// Bytes returns the encoded binary.
-//
-// Exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) Bytes() []byte {
+// bytes returns the encoded binary.
+func (a *AssemblerImpl) bytes() []byte {
 	// 16 bytes alignment to match our impl with golang-asm.
 	// https://github.com/golang/go/blob/release-branch.go1.15/src/cmd/internal/obj/arm64/asm7.go#L62
 	//
@@ -345,15 +342,15 @@ func (a *AssemblerImpl) Bytes() []byte {
 	return a.Buf.Bytes()
 }
 
-// EncodeNode encodes the given node into writer.
-func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
+// encodeNode encodes the given node into writer.
+func (a *AssemblerImpl) encodeNode(n *NodeImpl) (err error) {
 	switch n.Types {
 	case OperandTypesNoneToNone:
 		err = a.encodeNoneToNone(n)
 	case OperandTypesNoneToRegister:
 		err = a.encodeJumpToRegister(n)
 	case OperandTypesNoneToBranch:
-		err = a.EncodeRelativeBranch(n)
+		err = a.encodeRelativeBranch(n)
 	case OperandTypesRegisterToRegister:
 		err = a.encodeRegisterToRegister(n)
 	case OperandTypesLeftShiftedRegisterToRegister:
@@ -371,19 +368,19 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	case OperandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(n)
 	case OperandTypesConstToRegister:
-		err = a.EncodeConstToRegister(n)
+		err = a.encodeConstToRegister(n)
 	case OperandTypesRegisterToVectorRegister:
-		err = a.EncodeRegisterToVectorRegister(n)
+		err = a.encodeRegisterToVectorRegister(n)
 	case OperandTypesVectorRegisterToRegister:
-		err = a.EncodeVectorRegisterToRegister(n)
+		err = a.encodeVectorRegisterToRegister(n)
 	case OperandTypesMemoryToVectorRegister:
-		err = a.EncodeMemoryToVectorRegister(n)
+		err = a.encodeMemoryToVectorRegister(n)
 	case OperandTypesVectorRegisterToMemory:
-		err = a.EncodeVectorRegisterToMemory(n)
+		err = a.encodeVectorRegisterToMemory(n)
 	case OperandTypesVectorRegisterToVectorRegister:
-		err = a.EncodeVectorRegisterToVectorRegister(n)
+		err = a.encodeVectorRegisterToVectorRegister(n)
 	case OperandTypesStaticConstToVectorRegister:
-		err = a.EncodeStaticConstToVectorRegister(n)
+		err = a.encodeStaticConstToVectorRegister(n)
 	case OperandTypesTwoVectorRegistersToVectorRegister:
 		err = a.encodeTwoVectorRegistersToVectorRegister(n)
 	default:
@@ -701,9 +698,8 @@ func (a *AssemblerImpl) encodeJumpToRegister(n *NodeImpl) (err error) {
 	return
 }
 
-// EncodeRelativeBranch is exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeRelativeBranch(n *NodeImpl) (err error) {
+// encodeRelativeBranch is exported for inter-op testing with golang-asm.
+func (a *AssemblerImpl) encodeRelativeBranch(n *NodeImpl) (err error) {
 	switch n.Instruction {
 	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDPL:
 	default:
@@ -2027,9 +2023,7 @@ func bitmaskImmediate(c uint64, is64bit bool) (immr, imms, N byte) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeConstToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeConstToRegister(n *NodeImpl) (err error) {
 	// Alias for readability.
 	c := n.SrcConst
 
@@ -2544,7 +2538,7 @@ func checkArrangementIndexPair(arr VectorArrangement, index VectorIndex) (err er
 	return
 }
 
-func (a *AssemblerImpl) EncodeMemoryToVectorRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeMemoryToVectorRegister(n *NodeImpl) (err error) {
 	srcBaseRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
@@ -2644,7 +2638,7 @@ func arrangementSizeQ(arr VectorArrangement) (size, q byte) {
 	return
 }
 
-func (a *AssemblerImpl) EncodeVectorRegisterToMemory(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeVectorRegisterToMemory(n *NodeImpl) (err error) {
 	srcVectorRegBits, err := vectorRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
@@ -2690,7 +2684,7 @@ func (a *AssemblerImpl) EncodeVectorRegisterToMemory(n *NodeImpl) (err error) {
 	return
 }
 
-func (a *AssemblerImpl) EncodeStaticConstToVectorRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeStaticConstToVectorRegister(n *NodeImpl) (err error) {
 	if n.Instruction != VMOV {
 		return errorEncodingUnsupported(n)
 	}
@@ -3437,7 +3431,7 @@ func (a *AssemblerImpl) encodeAdvancedSIMDPermute(src1, src2, dst, opcode, size,
 	})
 }
 
-func (a *AssemblerImpl) EncodeVectorRegisterToVectorRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *NodeImpl) (err error) {
 	var srcVectorRegBits byte
 	if n.SrcReg != RegRZR {
 		srcVectorRegBits, err = vectorRegisterBits(n.SrcReg)
@@ -3633,7 +3627,7 @@ func (a *AssemblerImpl) encodeTwoVectorRegistersToVectorRegister(n *NodeImpl) (e
 	return
 }
 
-func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeVectorRegisterToRegister(n *NodeImpl) (err error) {
 	if err = checkArrangementIndexPair(n.VectorArrangement, n.SrcVectorIndex); err != nil {
 		return
 	}
@@ -3659,7 +3653,7 @@ func (a *AssemblerImpl) EncodeVectorRegisterToRegister(n *NodeImpl) (err error) 
 	return errorEncodingUnsupported(n)
 }
 
-func (a *AssemblerImpl) EncodeRegisterToVectorRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeRegisterToVectorRegister(n *NodeImpl) (err error) {
 	srcRegBits, err := intRegisterBits(n.SrcReg)
 	if err != nil {
 		return err
