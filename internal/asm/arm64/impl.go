@@ -367,9 +367,9 @@ func (a *AssemblerImpl) EncodeNode(n *NodeImpl) (err error) {
 	case OperandTypesRegisterAndConstToNone:
 		err = a.encodeRegisterAndConstToNone(n)
 	case OperandTypesRegisterToMemory:
-		err = a.EncodeRegisterToMemory(n)
+		err = a.encodeRegisterToMemory(n)
 	case OperandTypesMemoryToRegister:
-		err = a.EncodeMemoryToRegister(n)
+		err = a.encodeMemoryToRegister(n)
 	case OperandTypesConstToRegister:
 		err = a.EncodeConstToRegister(n)
 	case OperandTypesRegisterToVectorRegister:
@@ -1741,9 +1741,7 @@ var storeOrLoadInstructionTable = map[asm.Instruction]struct {
 	FMOVS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
 }
 
-// Exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeRegisterToMemory(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeRegisterToMemory(n *NodeImpl) (err error) {
 	inst, ok := storeOrLoadInstructionTable[n.Instruction]
 	if !ok {
 		return errorEncodingUnsupported(n)
@@ -1848,9 +1846,7 @@ func (a *AssemblerImpl) encodeADR(n *NodeImpl) (err error) {
 	return
 }
 
-// Exported for inter-op testing with golang-asm.
-// TODO: unexport after golang-asm complete removal.
-func (a *AssemblerImpl) EncodeMemoryToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeMemoryToRegister(n *NodeImpl) (err error) {
 	if n.Instruction == ADR {
 		return a.encodeADR(n)
 	}
