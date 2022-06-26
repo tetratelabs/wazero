@@ -738,7 +738,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 	c.assembler.SetJumpTargetOnNext(notLengthExceedJump)
 
-	// Next we check if the target's type matches the operation's one.
+	// next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
 	// by 8 as the offset is the "length" of table in Go's "[]uintptr{}",
 	// and size of uintptr equals 8 bytes == (2^3).
@@ -764,7 +764,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	c.assembler.SetJumpTargetOnNext(jumpIfInitialized)
 
-	// Next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType's typeID.
+	// next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType's typeID.
 	//
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, functionSourceOffset, tmp)
@@ -1403,7 +1403,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
 
-	// Next, we ensure that x1 is placed on AX.
+	// next, we ensure that x1 is placed on AX.
 	x1 := c.locationStack.pop()
 	if x1.onRegister() && x1.register != quotientRegister {
 		// Move x1 to quotientRegister.
@@ -1472,7 +1472,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// If it doesn't equal minus one, we jump to the normal case.
 		nonMinusOneDivisorJmp := c.assembler.CompileJump(amd64.JNE)
 
-		// Next we check if the quotient is the most negative value for the signed integer.
+		// next we check if the quotient is the most negative value for the signed integer.
 		// That means whether or not we try to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1) respectively.
 		if is32Bit {
 			if err := c.assembler.CompileRegisterToStaticConst(amd64.CMPL, x1.register,
@@ -2049,7 +2049,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 	// Jump if the source float value is above or equal math.MaxInt32+1.
 	jmpAboveOrEqualMaxIn32PlusOne := c.assembler.CompileJump(amd64.JCC)
 
-	// Next we convert the value as a signed integer.
+	// next we convert the value as a signed integer.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SL, source.register, result)
 	} else {
@@ -2097,7 +2097,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit, nonTrapping 
 		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SL, source.register, result)
 	}
 
-	// Next, we have to check if the value is from NaN, +Inf.
+	// next, we have to check if the value is from NaN, +Inf.
 	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
 	// This means we check if the result int value is minus or not.
 	c.assembler.CompileRegisterToRegister(amd64.TESTL, result, result)
@@ -2180,7 +2180,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 	// Jump if the source float values is above or equal math.MaxInt64+1.
 	jmpAboveOrEqualMaxIn32PlusOne := c.assembler.CompileJump(amd64.JCC)
 
-	// Next we convert the value as a signed integer.
+	// next we convert the value as a signed integer.
 	if isFloat32Bit {
 		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SQ, source.register, result)
 	} else {
@@ -2228,7 +2228,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit, nonTrapping 
 		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SQ, source.register, result)
 	}
 
-	// Next, we have to check if the value is from NaN, +Inf.
+	// next, we have to check if the value is from NaN, +Inf.
 	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
 	// This means we check if the result int value is minus or not.
 	c.assembler.CompileRegisterToRegister(amd64.TESTQ, result, result)
@@ -2896,7 +2896,7 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpIns
 		c.assembler.CompileNoneToRegister(amd64.SETPS, nanFragReg)
 	}
 
-	// Next, we get the usual comparison flag.
+	// next, we get the usual comparison flag.
 	if shouldEqual {
 		// Set 1 if equal.
 		c.assembler.CompileNoneToRegister(amd64.SETEQ, cmpResultReg)
@@ -4414,7 +4414,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine,
 				callEngineModuleContextFunctionsElement0AddressOffset, tmpRegister)
 
-			// Next, read the address of the target function (= &callEngine.codes[offset])
+			// next, read the address of the target function (= &callEngine.codes[offset])
 			// into targetAddressRegister.
 			c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 				// Note: FunctionIndex is limited up to 2^27 so this offset never exceeds 32-bit integer.
@@ -4512,7 +4512,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Since we return from the function, we need to decrement the callframe stack pointer.
 	c.assembler.CompileNoneToMemory(amd64.DECQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
-	// Next, get the decremented callframe stack pointer into decrementedCallFrameStackPointerRegister.
+	// next, get the decremented callframe stack pointer into decrementedCallFrameStackPointerRegister.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		decrementedCallFrameStackPointerRegister)
@@ -4628,7 +4628,7 @@ func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset, currentCallFrameAddressRegister)
 
-	// Next we shift the stack pointer so we get the actual offset from the address of stack's initial item.
+	// next we shift the stack pointer so we get the actual offset from the address of stack's initial item.
 	c.assembler.CompileConstToRegister(amd64.SHLQ, int64(callFrameDataSizeMostSignificantSetBit), currentCallFrameAddressRegister)
 
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
@@ -4741,7 +4741,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 	// calls (or right after they return), we have free registers at this point.
 	tmpReg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
 
-	// Next we move the base pointer (callEngine.stackBasePointer) to the tmp register.
+	// next we move the base pointer (callEngine.stackBasePointer) to the tmp register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		tmpReg,

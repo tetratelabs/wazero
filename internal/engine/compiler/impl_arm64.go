@@ -301,7 +301,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.assembler.CompileConstToRegister(arm64.SUBS, 1, callFramePointerReg)
 	c.assembler.CompileRegisterToMemory(arm64.MOVD, callFramePointerReg, arm64ReservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
-	// Next we compare the decremented call frame stack pointer with zero.
+	// next we compare the decremented call frame stack pointer with zero.
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, callFramePointerReg, arm64.RegRZR)
 
 	// If the values are identical, we return back to the Go code with returned status.
@@ -1008,7 +1008,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, targetFunctionAddressR
 		arm64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
 		tmp)
 
-	// Next, read the index of the target function (= &ce.functions[offset])
+	// next, read the index of the target function (= &ce.functions[offset])
 	// into codeIndexRegister.
 	if isNilRegister(targetFunctionAddressRegister) {
 		c.assembler.CompileMemoryToRegister(
@@ -1200,7 +1200,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
 
 	c.assembler.SetJumpTargetOnNext(brIfInitialized)
-	// Next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
+	// next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
 	c.assembler.CompileMemoryToRegister(
 		arm64.MOVD,
@@ -2916,7 +2916,7 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 		)
 	}
 
-	// Next, we have to set the return address into callFrameStack[ce.callFrameStackPointer-1].returnAddress.
+	// next, we have to set the return address into callFrameStack[ce.callFrameStackPointer-1].returnAddress.
 	//
 	// "currentCallFrameStackPointerRegister = ce.callFrameStackPointer"
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
@@ -4090,7 +4090,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 		arm64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackElement0AddressOffset,
 		arm64ReservedRegisterForStackBasePointerAddress)
 
-	// Next we move the base pointer (ce.stackBasePointer) to arm64ReservedRegisterForTemporary.
+	// next we move the base pointer (ce.stackBasePointer) to arm64ReservedRegisterForTemporary.
 	c.assembler.CompileMemoryToRegister(arm64.MOVD,
 		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		arm64ReservedRegisterForTemporary)
@@ -4201,7 +4201,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			arm64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		)
 
-		// Next write ce.memoryElement0Address.
+		// next write ce.memoryElement0Address.
 		//
 		// "tmpY = *tmpX (== &memory.Buffer[0])"
 		c.assembler.CompileMemoryToRegister(

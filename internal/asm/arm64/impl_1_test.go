@@ -9,105 +9,105 @@ import (
 )
 
 func TestNodeImpl_AssignJumpTarget(t *testing.T) {
-	n := &NodeImpl{}
-	target := &NodeImpl{}
+	n := &nodeImpl{}
+	target := &nodeImpl{}
 	n.AssignJumpTarget(target)
-	require.Equal(t, n.JumpTarget, target)
+	require.Equal(t, n.jumpTarget, target)
 }
 
 func TestNodeImpl_AssignDestinationConstant(t *testing.T) {
-	n := &NodeImpl{}
+	n := &nodeImpl{}
 	n.AssignDestinationConstant(12345)
-	require.Equal(t, int64(12345), n.DstConst)
+	require.Equal(t, int64(12345), n.dstConst)
 }
 
 func TestNodeImpl_AssignSourceConstant(t *testing.T) {
-	n := &NodeImpl{}
+	n := &nodeImpl{}
 	n.AssignSourceConstant(12345)
-	require.Equal(t, int64(12345), n.SrcConst)
+	require.Equal(t, int64(12345), n.srcConst)
 }
 
 func TestNodeImpl_String(t *testing.T) {
 	tests := []struct {
-		in  *NodeImpl
+		in  *nodeImpl
 		exp string
 	}{
 		{
-			in:  &NodeImpl{Instruction: NOP, Types: OperandTypesNoneToNone},
+			in:  &nodeImpl{instruction: NOP, types: operandTypesNoneToNone},
 			exp: "NOP",
 		},
 		{
-			in:  &NodeImpl{Instruction: BCONDEQ, Types: OperandTypesNoneToRegister, DstReg: RegR1},
+			in:  &nodeImpl{instruction: BCONDEQ, types: operandTypesNoneToRegister, dstReg: RegR1},
 			exp: "BCONDEQ R1",
 		},
 		{
-			in:  &NodeImpl{Instruction: BCONDNE, Types: OperandTypesNoneToBranch, JumpTarget: &NodeImpl{Instruction: NOP}},
+			in:  &nodeImpl{instruction: BCONDNE, types: operandTypesNoneToBranch, jumpTarget: &nodeImpl{instruction: NOP}},
 			exp: "BCONDNE {NOP}",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesRegisterToRegister, SrcReg: RegV0, DstReg: RegV10},
+			in:  &nodeImpl{instruction: ADD, types: operandTypesRegisterToRegister, srcReg: RegV0, dstReg: RegV10},
 			exp: "ADD V0, V10",
 		},
 		{
-			in: &NodeImpl{Instruction: ADD, Types: OperandTypesLeftShiftedRegisterToRegister,
-				SrcReg: RegR0, SrcReg2: RegR11, SrcConst: 4, DstReg: RegR10},
+			in: &nodeImpl{instruction: ADD, types: operandTypesLeftShiftedRegisterToRegister,
+				srcReg: RegR0, srcReg2: RegR11, srcConst: 4, dstReg: RegR10},
 			exp: "ADD (R0, R11 << 4), R10",
 		},
 		{
-			in:  &NodeImpl{Instruction: ADD, Types: OperandTypesTwoRegistersToRegister, SrcReg: RegR0, SrcReg2: RegR8, DstReg: RegR10},
+			in:  &nodeImpl{instruction: ADD, types: operandTypesTwoRegistersToRegister, srcReg: RegR0, srcReg2: RegR8, dstReg: RegR10},
 			exp: "ADD (R0, R8), R10",
 		},
 		{
-			in: &NodeImpl{Instruction: MSUB, Types: OperandTypesThreeRegistersToRegister,
-				SrcReg: RegR0, SrcReg2: RegR8, DstReg: RegR10, DstReg2: RegR1},
+			in: &nodeImpl{instruction: MSUB, types: operandTypesThreeRegistersToRegister,
+				srcReg: RegR0, srcReg2: RegR8, dstReg: RegR10, dstReg2: RegR1},
 			exp: "MSUB (R0, R8, R10), R1)",
 		},
 		{
-			in:  &NodeImpl{Instruction: CMPW, Types: OperandTypesTwoRegistersToNone, SrcReg: RegR0, SrcReg2: RegR8},
+			in:  &nodeImpl{instruction: CMPW, types: operandTypesTwoRegistersToNone, srcReg: RegR0, srcReg2: RegR8},
 			exp: "CMPW (R0, R8)",
 		},
 		{
-			in:  &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone, SrcReg: RegR0, SrcConst: 0x123},
+			in:  &nodeImpl{instruction: CMP, types: operandTypesRegisterAndConstToNone, srcReg: RegR0, srcConst: 0x123},
 			exp: "CMP (R0, 0x123)",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: RegR0, DstReg: RegR8, DstConst: 0x123},
+			in:  &nodeImpl{instruction: MOVD, types: operandTypesRegisterToMemory, srcReg: RegR0, dstReg: RegR8, dstConst: 0x123},
 			exp: "MOVD R0, [R8 + 0x123]",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesRegisterToMemory, SrcReg: RegR0, DstReg: RegR8, DstReg2: RegR6},
+			in:  &nodeImpl{instruction: MOVD, types: operandTypesRegisterToMemory, srcReg: RegR0, dstReg: RegR8, dstReg2: RegR6},
 			exp: "MOVD R0, [R8 + R6]",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: RegR0, SrcConst: 0x123, DstReg: RegR8},
+			in:  &nodeImpl{instruction: MOVD, types: operandTypesMemoryToRegister, srcReg: RegR0, srcConst: 0x123, dstReg: RegR8},
 			exp: "MOVD [R0 + 0x123], R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesMemoryToRegister, SrcReg: RegR0, SrcReg2: RegR6, DstReg: RegR8},
+			in:  &nodeImpl{instruction: MOVD, types: operandTypesMemoryToRegister, srcReg: RegR0, srcReg2: RegR6, dstReg: RegR8},
 			exp: "MOVD [R0 + R6], R8",
 		},
 		{
-			in:  &NodeImpl{Instruction: MOVD, Types: OperandTypesConstToRegister, SrcConst: 0x123, DstReg: RegR8},
+			in:  &nodeImpl{instruction: MOVD, types: operandTypesConstToRegister, srcConst: 0x123, dstReg: RegR8},
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesMemoryToVectorRegister,
-				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2S},
+			in: &nodeImpl{instruction: VMOV, types: operandTypesMemoryToVectorRegister,
+				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2S},
 			exp: "VMOV [R1], V29.2S",
 		},
 		{
-			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesVectorRegisterToMemory,
-				DstReg: RegR1, SrcReg: RegV29, VectorArrangement: VectorArrangementQ},
+			in: &nodeImpl{instruction: VMOV, types: operandTypesVectorRegisterToMemory,
+				dstReg: RegR1, srcReg: RegV29, vectorArrangement: VectorArrangementQ},
 			exp: "VMOV V29.Q, [R1]",
 		},
 		{
-			in: &NodeImpl{Instruction: VMOV, Types: OperandTypesRegisterToVectorRegister,
-				SrcReg: RegR1, DstReg: RegV29, VectorArrangement: VectorArrangement2D, DstVectorIndex: 1},
+			in: &nodeImpl{instruction: VMOV, types: operandTypesRegisterToVectorRegister,
+				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2D, dstVectorIndex: 1},
 			exp: "VMOV R1, V29.2D[1]",
 		},
 		{
-			in: &NodeImpl{Instruction: VCNT, Types: OperandTypesVectorRegisterToVectorRegister,
-				SrcReg: RegV3, DstReg: RegV29, VectorArrangement: VectorArrangement2D, SrcVectorIndex: 1},
+			in: &nodeImpl{instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
+				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1},
 			exp: "VCNT V3.V3, V29.V3",
 		},
 	}
@@ -123,26 +123,26 @@ func TestNodeImpl_String(t *testing.T) {
 func TestAssemblerImpl_addNode(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 
-	root := &NodeImpl{}
+	root := &nodeImpl{}
 	a.addNode(root)
 	require.Equal(t, a.Root, root)
 	require.Equal(t, a.Current, root)
-	require.Nil(t, root.Next)
+	require.Nil(t, root.next)
 
-	next := &NodeImpl{}
+	next := &nodeImpl{}
 	a.addNode(next)
 	require.Equal(t, a.Root, root)
 	require.Equal(t, a.Current, next)
-	require.Equal(t, next, root.Next)
-	require.Nil(t, next.Next)
+	require.Equal(t, next, root.next)
+	require.Nil(t, next.next)
 }
 
 func TestAssemblerImpl_newNode(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
-	actual := a.newNode(MOVD, OperandTypesMemoryToRegister)
-	require.Equal(t, MOVD, actual.Instruction)
-	require.Equal(t, OperandTypeMemory, actual.Types.src)
-	require.Equal(t, OperandTypeRegister, actual.Types.dst)
+	actual := a.newNode(MOVD, operandTypesMemoryToRegister)
+	require.Equal(t, MOVD, actual.instruction)
+	require.Equal(t, operandTypeMemory, actual.types.src)
+	require.Equal(t, operandTypeRegister, actual.types.dst)
 	require.Equal(t, actual, a.Root)
 	require.Equal(t, actual, a.Current)
 }
@@ -151,84 +151,84 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileStandAlone(RET)
 	actualNode := a.Current
-	require.Equal(t, RET, actualNode.Instruction)
-	require.Equal(t, OperandTypeNone, actualNode.Types.src)
-	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
+	require.Equal(t, RET, actualNode.instruction)
+	require.Equal(t, operandTypeNone, actualNode.types.src)
+	require.Equal(t, operandTypeNone, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileConstToRegister(MOVD, 1000, RegR10)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, int64(1000), actualNode.SrcConst)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, OperandTypeConst, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, int64(1000), actualNode.srcConst)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, operandTypeConst, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileRegisterToRegister(MOVD, RegR15, RegR27)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR15, actualNode.SrcReg)
-	require.Equal(t, RegR27, actualNode.DstReg)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR15, actualNode.srcReg)
+	require.Equal(t, RegR27, actualNode.dstReg)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileMemoryToRegister(MOVD, RegR15, 100, RegR27)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR15, actualNode.SrcReg)
-	require.Equal(t, int64(100), actualNode.SrcConst)
-	require.Equal(t, RegR27, actualNode.DstReg)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR15, actualNode.srcReg)
+	require.Equal(t, int64(100), actualNode.srcConst)
+	require.Equal(t, RegR27, actualNode.dstReg)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileRegisterToMemory(MOVD, RegR15, RegR27, 100)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR15, actualNode.SrcReg)
-	require.Equal(t, RegR27, actualNode.DstReg)
-	require.Equal(t, int64(100), actualNode.DstConst)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR15, actualNode.srcReg)
+	require.Equal(t, RegR27, actualNode.dstReg)
+	require.Equal(t, int64(100), actualNode.dstConst)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileJump(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileJump(B)
 	actualNode := a.Current
-	require.Equal(t, B, actualNode.Instruction)
-	require.Equal(t, OperandTypeNone, actualNode.Types.src)
-	require.Equal(t, OperandTypeBranch, actualNode.Types.dst)
+	require.Equal(t, B, actualNode.instruction)
+	require.Equal(t, operandTypeNone, actualNode.types.src)
+	require.Equal(t, operandTypeBranch, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileJumpToRegister(BCONDNE, RegR27)
 	actualNode := a.Current
-	require.Equal(t, BCONDNE, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.DstReg)
-	require.Equal(t, OperandTypeNone, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, BCONDNE, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.dstReg)
+	require.Equal(t, operandTypeNone, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileReadInstructionAddress(RegR10, RET)
 	actualNode := a.Current
-	require.Equal(t, ADR, actualNode.Instruction)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, ADR, actualNode.instruction)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 	require.Equal(t, RET, actualNode.readInstructionAddressBeforeTargetInstruction)
 }
 
@@ -236,174 +236,174 @@ func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileMemoryWithRegisterOffsetToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.SrcReg2)
-	require.Equal(t, RegR0, actualNode.DstReg)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.srcReg2)
+	require.Equal(t, RegR0, actualNode.dstReg)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, RegR0, actualNode.DstReg2)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, RegR0, actualNode.dstReg2)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
 }
 
 func Test_CompileTwoRegistersToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileTwoRegistersToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.SrcReg2)
-	require.Equal(t, RegR0, actualNode.DstReg)
-	require.Equal(t, OperandTypeTwoRegisters, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.srcReg2)
+	require.Equal(t, RegR0, actualNode.dstReg)
+	require.Equal(t, operandTypeTwoRegisters, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_CompileThreeRegistersToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileThreeRegistersToRegister(MOVD, RegR27, RegR10, RegR0, RegR28)
 	actualNode := a.Current
-	require.Equal(t, MOVD, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.SrcReg2)
-	require.Equal(t, RegR0, actualNode.DstReg)
-	require.Equal(t, RegR28, actualNode.DstReg2)
-	require.Equal(t, OperandTypeThreeRegisters, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.srcReg2)
+	require.Equal(t, RegR0, actualNode.dstReg)
+	require.Equal(t, RegR28, actualNode.dstReg2)
+	require.Equal(t, operandTypeThreeRegisters, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_CompileTwoRegistersToNone(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileTwoRegistersToNone(CMP, RegR27, RegR10)
 	actualNode := a.Current
-	require.Equal(t, CMP, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.SrcReg2)
-	require.Equal(t, OperandTypeTwoRegisters, actualNode.Types.src)
-	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
+	require.Equal(t, CMP, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.srcReg2)
+	require.Equal(t, operandTypeTwoRegisters, actualNode.types.src)
+	require.Equal(t, operandTypeNone, actualNode.types.dst)
 }
 
 func Test_CompileRegisterAndConstToNone(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileRegisterAndConstToNone(CMP, RegR27, 10)
 	actualNode := a.Current
-	require.Equal(t, CMP, actualNode.Instruction)
-	require.Equal(t, RegR27, actualNode.SrcReg)
-	require.Equal(t, int64(10), actualNode.SrcConst)
-	require.Equal(t, OperandTypeRegisterAndConst, actualNode.Types.src)
-	require.Equal(t, OperandTypeNone, actualNode.Types.dst)
+	require.Equal(t, CMP, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, int64(10), actualNode.srcConst)
+	require.Equal(t, operandTypeRegisterAndConst, actualNode.types.src)
+	require.Equal(t, operandTypeNone, actualNode.types.dst)
 }
 
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileLeftShiftedRegisterToRegister(ADD, RegR27, 10, RegR28, RegR5)
 	actualNode := a.Current
-	require.Equal(t, ADD, actualNode.Instruction)
-	require.Equal(t, RegR28, actualNode.SrcReg)
-	require.Equal(t, RegR27, actualNode.SrcReg2)
-	require.Equal(t, int64(10), actualNode.SrcConst)
-	require.Equal(t, RegR5, actualNode.DstReg)
-	require.Equal(t, OperandTypeLeftShiftedRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, ADD, actualNode.instruction)
+	require.Equal(t, RegR28, actualNode.srcReg)
+	require.Equal(t, RegR27, actualNode.srcReg2)
+	require.Equal(t, int64(10), actualNode.srcConst)
+	require.Equal(t, RegR5, actualNode.dstReg)
+	require.Equal(t, operandTypeLeftShiftedRegister, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_CompileConditionalRegisterSet(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileConditionalRegisterSet(CondNE, RegR10)
 	actualNode := a.Current
-	require.Equal(t, CSET, actualNode.Instruction)
-	require.Equal(t, RegCondNE, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+	require.Equal(t, CSET, actualNode.instruction)
+	require.Equal(t, RegCondNE, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_CompileMemoryToVectorRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileMemoryToVectorRegister(VMOV, RegR10, 10, RegV3, VectorArrangement1D)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegR10, actualNode.SrcReg)
-	require.Equal(t, int64(10), actualNode.SrcConst)
-	require.Equal(t, RegV3, actualNode.DstReg)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.src)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegR10, actualNode.srcReg)
+	require.Equal(t, int64(10), actualNode.srcConst)
+	require.Equal(t, RegV3, actualNode.dstReg)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
 func Test_CompileVectorRegisterToMemory(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileVectorRegisterToMemory(VMOV, RegV3, RegR10, 12, VectorArrangement1D)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegV3, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, int64(12), actualNode.DstConst)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeMemory, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, int64(12), actualNode.dstConst)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
 func Test_CompileRegisterToVectorRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileRegisterToVectorRegister(VMOV, RegV3, RegR10, VectorArrangement1D, 10)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegV3, actualNode.SrcReg)
-	require.Equal(t, RegR10, actualNode.DstReg)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
-	require.Equal(t, VectorIndex(10), actualNode.DstVectorIndex)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+	require.Equal(t, VectorIndex(10), actualNode.dstVectorIndex)
 }
 
 func Test_CompileVectorRegisterToRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileVectorRegisterToRegister(VMOV, RegR10, RegV3, VectorArrangement1D, 10)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegR10, actualNode.SrcReg)
-	require.Equal(t, RegV3, actualNode.DstReg)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
-	require.Equal(t, VectorIndex(10), actualNode.SrcVectorIndex)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegR10, actualNode.srcReg)
+	require.Equal(t, RegV3, actualNode.dstReg)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+	require.Equal(t, VectorIndex(10), actualNode.srcVectorIndex)
 }
 
 func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileVectorRegisterToVectorRegister(VMOV, RegV3, RegV10, VectorArrangement1D, 1, 2)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegV3, actualNode.SrcReg)
-	require.Equal(t, RegV10, actualNode.DstReg)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.src)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
-	require.Equal(t, VectorIndex(1), actualNode.SrcVectorIndex)
-	require.Equal(t, VectorIndex(2), actualNode.DstVectorIndex)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegV10, actualNode.dstReg)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+	require.Equal(t, VectorIndex(1), actualNode.srcVectorIndex)
+	require.Equal(t, VectorIndex(2), actualNode.dstVectorIndex)
 }
 
 func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 	a := NewAssemblerImpl(RegR10)
 	a.CompileTwoVectorRegistersToVectorRegister(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D)
 	actualNode := a.Current
-	require.Equal(t, VMOV, actualNode.Instruction)
-	require.Equal(t, RegV3, actualNode.SrcReg)
-	require.Equal(t, RegV15, actualNode.SrcReg2)
-	require.Equal(t, RegV10, actualNode.DstReg)
-	require.Equal(t, OperandTypeTwoVectorRegisters, actualNode.Types.src)
-	require.Equal(t, OperandTypeVectorRegister, actualNode.Types.dst)
-	require.Equal(t, VectorArrangement1D, actualNode.VectorArrangement)
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegV15, actualNode.srcReg2)
+	require.Equal(t, RegV10, actualNode.dstReg)
+	require.Equal(t, operandTypeTwoVectorRegisters, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
 }
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
@@ -447,12 +447,12 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		a := NewAssemblerImpl(asm.NilRegister)
-		err := a.encodeNoneToNone(&NodeImpl{Instruction: ADD})
+		err := a.encodeNoneToNone(&nodeImpl{instruction: ADD})
 		require.EqualError(t, err, "ADD is unsupported for from:none,to:none type")
 	})
 	t.Run("ok", func(t *testing.T) {
 		a := NewAssemblerImpl(asm.NilRegister)
-		err := a.encodeNoneToNone(&NodeImpl{Instruction: NOP})
+		err := a.encodeNoneToNone(&nodeImpl{instruction: NOP})
 		require.NoError(t, err)
 
 		// NOP must be ignored.
@@ -486,118 +486,118 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		// Register offset cases.
 		{
 			name: "str b11, [x12, x6]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR12,
-				DstReg2:           RegR6,
-				VectorArrangement: VectorArrangementB,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR12,
+				dstReg2:           RegR6,
+				vectorArrangement: VectorArrangementB,
 			},
 			exp: []byte{0x8b, 0x69, 0x26, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str h11, [x12, x6]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR0,
-				DstReg2:           RegR6,
-				VectorArrangement: VectorArrangementH,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR0,
+				dstReg2:           RegR6,
+				vectorArrangement: VectorArrangementH,
 			},
 			exp: []byte{0xb, 0x68, 0x26, 0x7c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str s11, [x29, x6]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR29,
-				DstReg2:           RegR6,
-				VectorArrangement: VectorArrangementS,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR29,
+				dstReg2:           RegR6,
+				vectorArrangement: VectorArrangementS,
 			},
 			exp: []byte{0xab, 0x6b, 0x26, 0xbc, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str d0, [x0, x0]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV0,
-				DstReg:            RegR0,
-				DstReg2:           RegR0,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV0,
+				dstReg:            RegR0,
+				dstReg2:           RegR0,
+				vectorArrangement: VectorArrangementD,
 			},
 			exp: []byte{0x0, 0x68, 0x20, 0xfc, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str q30, [x30, x29]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV30,
-				DstReg:            RegR30,
-				DstReg2:           RegR29,
-				VectorArrangement: VectorArrangementQ,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV30,
+				dstReg:            RegR30,
+				dstReg2:           RegR29,
+				vectorArrangement: VectorArrangementQ,
 			},
 			exp: []byte{0xde, 0x6b, 0xbd, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		// Constant offset cases.
 		{
 			name: "str b11, [x12, #0x7b]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR12,
-				DstConst:          0x7b,
-				VectorArrangement: VectorArrangementB,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR12,
+				dstConst:          0x7b,
+				vectorArrangement: VectorArrangementB,
 			},
 			exp: []byte{0x8b, 0xed, 0x1, 0x3d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr w10, #0xc ; str h11, [x12, x10]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR12,
-				DstConst:          1 << 30,
-				VectorArrangement: VectorArrangementH,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR12,
+				dstConst:          1 << 30,
+				vectorArrangement: VectorArrangementH,
 			},
 			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0x8b, 0x69, 0x2a, 0x7c, 0x0, 0x0, 0x0, 0x14, 0x0, 0x0, 0x0, 0x40},
 		},
 		{
 			name: "ldr w10, #0xc ; str s11, [x12, x10]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR12,
-				DstConst:          (1 << 28) + 4,
-				VectorArrangement: VectorArrangementS,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR12,
+				dstConst:          (1 << 28) + 4,
+				vectorArrangement: VectorArrangementS,
 			},
 			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0x8b, 0x69, 0x2a, 0xbc, 0x0, 0x0, 0x0, 0x14, 0x4, 0x0, 0x0, 0x10},
 		},
 		{
 			name: "str d11, [x12, #0x3d8]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV11,
-				DstReg:            RegR12,
-				DstConst:          0x3d8,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV11,
+				dstReg:            RegR12,
+				dstConst:          0x3d8,
+				vectorArrangement: VectorArrangementD,
 			},
 			exp: []byte{0x8b, 0xed, 0x1, 0xfd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str q1, [x30]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegV1,
-				DstReg:            RegR30,
-				DstConst:          0,
-				VectorArrangement: VectorArrangementQ,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV1,
+				dstReg:            RegR30,
+				dstConst:          0,
+				vectorArrangement: VectorArrangementQ,
 			},
 			exp: []byte{0xc1, 0x3, 0x80, 0x3d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
@@ -623,197 +623,197 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		// ldr Register offset cases.
 		{
 			name: "ldr b11, [x12, x8]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR12,
-				SrcReg2:           RegR8,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangementB,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR12,
+				srcReg2:           RegR8,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangementB,
 			},
 			exp: []byte{0x8b, 0x69, 0x68, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr h11, [x30, x0]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR30,
-				SrcReg2:           RegR0,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangementH,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR30,
+				srcReg2:           RegR0,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangementH,
 			},
 			exp: []byte{0xcb, 0x6b, 0x60, 0x7c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr s11, [x0, x30]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR0,
-				SrcReg2:           RegR30,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangementS,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR0,
+				srcReg2:           RegR30,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangementS,
 			},
 			exp: []byte{0xb, 0x68, 0x7e, 0xbc, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr d11, [x15, x15]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR15,
-				SrcReg2:           RegR15,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR15,
+				srcReg2:           RegR15,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangementD,
 			},
 			exp: []byte{0xeb, 0x69, 0x6f, 0xfc, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr q30, [x0, x0]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR0,
-				SrcReg2:           RegR0,
-				DstReg:            RegV30,
-				VectorArrangement: VectorArrangementQ,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR0,
+				srcReg2:           RegR0,
+				dstReg:            RegV30,
+				vectorArrangement: VectorArrangementQ,
 			},
 			exp: []byte{0x1e, 0x68, 0xe0, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		// ldr Constant offset cases.
 		{
 			name: "ldr b11, [x12, #0x7b]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				SrcReg:            RegR12,
-				SrcConst:          0x7b,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangementB,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegR12,
+				srcConst:          0x7b,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangementB,
 			},
 			exp: []byte{0x8b, 0xed, 0x41, 0x3d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "str h11, [x12, w30, uxtw]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV11,
-				SrcReg:            RegR12,
-				VectorArrangement: VectorArrangementH,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV11,
+				srcReg:            RegR12,
+				vectorArrangement: VectorArrangementH,
 			},
 			exp: []byte{0x8b, 0x1, 0x40, 0x7d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ldr w10, #0xc ; ldr s11, [x12, x10]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV11,
-				SrcReg:            RegR12,
-				SrcConst:          1 << 28,
-				VectorArrangement: VectorArrangementS,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV11,
+				srcReg:            RegR12,
+				srcConst:          1 << 28,
+				vectorArrangement: VectorArrangementS,
 			},
 			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0x8b, 0x69, 0x6a, 0xbc, 0x0, 0x0, 0x0, 0x14, 0x0, 0x0, 0x0, 0x10},
 		},
 		{
 			name: "ldr w10, #0xc ; ldr d11, [x12, x10]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV11,
-				SrcReg:            RegR12,
-				SrcConst:          1<<29 + 4,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV11,
+				srcReg:            RegR12,
+				srcConst:          1<<29 + 4,
+				vectorArrangement: VectorArrangementD,
 			},
 			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0x8b, 0x69, 0x6a, 0xfc, 0x0, 0x0, 0x0, 0x14, 0x4, 0x0, 0x0, 0x20},
 		},
 		{
 			name: "ldr w10, #0xc ; ldr q1, [x30, x10]",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV1,
-				SrcReg:            RegR30,
-				SrcConst:          1<<17 + 4,
-				VectorArrangement: VectorArrangementQ,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV1,
+				srcReg:            RegR30,
+				srcConst:          1<<17 + 4,
+				vectorArrangement: VectorArrangementQ,
 			},
 			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0xc1, 0x6b, 0xea, 0x3c, 0x0, 0x0, 0x0, 0x14, 0x4, 0x0, 0x2, 0x0},
 		},
 		{
 			name: "ld1r {v11.8b}, [x12]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR12,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR12,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0x8b, 0xc1, 0x40, 0xd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v11.16b}, [x12]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR12,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR12,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x8b, 0xc1, 0x40, 0x4d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v11.4h}, [x12]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR12,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangement4H,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR12,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangement4H,
 			},
 			exp: []byte{0x8b, 0xc5, 0x40, 0xd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v9.8h}, [x0]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR0,
-				DstReg:            RegV0,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR0,
+				dstReg:            RegV0,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x0, 0xc4, 0x40, 0x4d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v11.2s}, [x12]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR12,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR12,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x8b, 0xc9, 0x40, 0xd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v0.4s}, [x0]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR0,
-				DstReg:            RegV0,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR0,
+				dstReg:            RegV0,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x0, 0xc8, 0x40, 0x4d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v11.1d}, [x12]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR12,
-				DstReg:            RegV11,
-				VectorArrangement: VectorArrangement1D,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR12,
+				dstReg:            RegV11,
+				vectorArrangement: VectorArrangement1D,
 			},
 			exp: []byte{0x8b, 0xcd, 0x40, 0xd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
 			name: "ld1r {v0.2d}, [x0]",
-			n: &NodeImpl{
-				Instruction:       LD1R,
-				SrcReg:            RegR0,
-				DstReg:            RegV0,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       LD1R,
+				srcReg:            RegR0,
+				dstReg:            RegV0,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x0, 0xcc, 0x40, 0x4d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
@@ -2063,14 +2063,14 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.encodeVectorRegisterToVectorRegister(&NodeImpl{
-				Instruction:       tc.inst,
-				SrcReg:            tc.x1,
-				SrcConst:          tc.c,
-				DstReg:            tc.x2,
-				VectorArrangement: tc.arr,
-				SrcVectorIndex:    tc.srcIndex,
-				DstVectorIndex:    tc.dstIndex,
+			err := a.encodeVectorRegisterToVectorRegister(&nodeImpl{
+				instruction:       tc.inst,
+				srcReg:            tc.x1,
+				srcConst:          tc.c,
+				dstReg:            tc.x2,
+				vectorArrangement: tc.arr,
+				srcVectorIndex:    tc.srcIndex,
+				dstVectorIndex:    tc.dstIndex,
 			})
 			require.NoError(t, err)
 			actual := a.Buf.Bytes()
@@ -2082,84 +2082,84 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
 			name: "umov w10, v0.b[0xf]",
-			n: &NodeImpl{
-				Instruction:       UMOV,
-				SrcReg:            RegV0,
-				DstReg:            RegR10,
-				VectorArrangement: VectorArrangementB,
-				SrcVectorIndex:    15,
+			n: &nodeImpl{
+				instruction:       UMOV,
+				srcReg:            RegV0,
+				dstReg:            RegR10,
+				vectorArrangement: VectorArrangementB,
+				srcVectorIndex:    15,
 			},
 			exp: []byte{0xa, 0x3c, 0x1f, 0xe},
 		},
 		{
 			name: "mov w10, v0.s[3]",
-			n: &NodeImpl{
-				Instruction:       UMOV,
-				SrcReg:            RegV0,
-				DstReg:            RegR10,
-				VectorArrangement: VectorArrangementS,
-				SrcVectorIndex:    3,
+			n: &nodeImpl{
+				instruction:       UMOV,
+				srcReg:            RegV0,
+				dstReg:            RegR10,
+				vectorArrangement: VectorArrangementS,
+				srcVectorIndex:    3,
 			},
 			exp: []byte{0xa, 0x3c, 0x1c, 0xe},
 		},
 		{
 			name: "mov x5, v30.d[1]",
-			n: &NodeImpl{
-				Instruction:       UMOV,
-				SrcReg:            RegV30,
-				DstReg:            RegR5,
-				VectorArrangement: VectorArrangementD,
-				SrcVectorIndex:    1,
+			n: &nodeImpl{
+				instruction:       UMOV,
+				srcReg:            RegV30,
+				dstReg:            RegR5,
+				vectorArrangement: VectorArrangementD,
+				srcVectorIndex:    1,
 			},
 			exp: []byte{0xc5, 0x3f, 0x18, 0x4e},
 		},
 		{
 			name: "smov w10, v0.b[0xf]",
-			n: &NodeImpl{
-				Instruction:       SMOV32,
-				SrcReg:            RegV0,
-				DstReg:            RegR10,
-				VectorArrangement: VectorArrangementB,
-				SrcVectorIndex:    15,
+			n: &nodeImpl{
+				instruction:       SMOV32,
+				srcReg:            RegV0,
+				dstReg:            RegR10,
+				vectorArrangement: VectorArrangementB,
+				srcVectorIndex:    15,
 			},
 			exp: []byte{0xa, 0x2c, 0x1f, 0xe},
 		},
 		{
 			name: "smov w10, v0.b[0]",
-			n: &NodeImpl{
-				Instruction:       SMOV32,
-				SrcReg:            RegV0,
-				DstReg:            RegR10,
-				VectorArrangement: VectorArrangementB,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       SMOV32,
+				srcReg:            RegV0,
+				dstReg:            RegR10,
+				vectorArrangement: VectorArrangementB,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xa, 0x2c, 0x1, 0xe},
 		},
 		{
 			name: "smov w1, v30.h[7]",
-			n: &NodeImpl{
-				Instruction:       SMOV32,
-				SrcReg:            RegV30,
-				DstReg:            RegR1,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    7,
+			n: &nodeImpl{
+				instruction:       SMOV32,
+				srcReg:            RegV30,
+				dstReg:            RegR1,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    7,
 			},
 			exp: []byte{0xc1, 0x2f, 0x1e, 0xe},
 		},
 		{
 			name: "smov w1, v30.h[0]",
-			n: &NodeImpl{
-				Instruction:       SMOV32,
-				SrcReg:            RegV30,
-				DstReg:            RegR1,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       SMOV32,
+				srcReg:            RegV30,
+				dstReg:            RegR1,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xc1, 0x2f, 0x2, 0xe},
 		},
@@ -2181,32 +2181,32 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *NodeImpl
+			n      *nodeImpl
 			expErr string
 		}{
 			{
-				n: &NodeImpl{Instruction: SUB, Types: OperandTypesLeftShiftedRegisterToRegister,
-					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: SUB, types: operandTypesLeftShiftedRegisterToRegister,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "SUB is unsupported for from:left-shifted-register,to:register type",
 			},
 			{
-				n: &NodeImpl{Instruction: ADD,
-					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADD,
+					srcConst: -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "shift amount must fit in unsigned 6-bit integer (0-64) but got -1",
 			},
 			{
-				n: &NodeImpl{Instruction: ADD,
-					SrcConst: -1, SrcReg: RegV0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADD,
+					srcConst: -1, srcReg: RegV0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &NodeImpl{Instruction: ADD,
-					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegV0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADD,
+					srcConst: -1, srcReg: RegR0, srcReg2: RegV0, dstReg: RegR0},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &NodeImpl{Instruction: ADD,
-					SrcConst: -1, SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegV0},
+				n: &nodeImpl{instruction: ADD,
+					srcConst: -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegV0},
 				expErr: "V0 is not integer",
 			},
 		}
@@ -2221,110 +2221,110 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegR0,
-				SrcReg2:           RegR29,
-				SrcConst:          1,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegR0,
+				srcReg2:           RegR29,
+				srcConst:          1,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x15, 0x4, 0x1d, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegR0,
-				SrcReg2:           RegR29,
-				SrcConst:          2,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegR0,
+				srcReg2:           RegR29,
+				srcConst:          2,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x15, 0x8, 0x1d, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegR0,
-				SrcReg2:           RegR29,
-				SrcConst:          8,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegR0,
+				srcReg2:           RegR29,
+				srcConst:          8,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x15, 0x20, 0x1d, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegR29,
-				SrcReg2:           RegR0,
-				SrcConst:          16,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegR29,
+				srcReg2:           RegR0,
+				srcConst:          16,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xb5, 0x43, 0x0, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegR29,
-				SrcReg2:           RegR0,
-				SrcConst:          64,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegR29,
+				srcReg2:           RegR0,
+				srcConst:          64,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xb5, 0x3, 0x0, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegR0,
-				SrcConst:          64,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegRZR,
+				srcReg2:           RegR0,
+				srcConst:          64,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xf5, 0x3, 0x0, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegRZR,
-				SrcConst:          64,
-				DstReg:            RegR21,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegRZR,
+				srcReg2:           RegRZR,
+				srcConst:          64,
+				dstReg:            RegR21,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xf5, 0x3, 0x1f, 0x8b},
 		},
 		{
 			name: "ADD",
-			n: &NodeImpl{
-				Instruction:       ADD,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegRZR,
-				SrcConst:          64,
-				DstReg:            RegRZR,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       ADD,
+				srcReg:            RegRZR,
+				srcReg2:           RegRZR,
+				srcConst:          64,
+				dstReg:            RegRZR,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xff, 0x3, 0x1f, 0x8b},
 		},
@@ -2346,22 +2346,22 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *NodeImpl
+			n      *nodeImpl
 			expErr string
 		}{
 			{
-				n: &NodeImpl{Instruction: SUB, Types: OperandTypesTwoRegistersToNone,
-					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: SUB, types: operandTypesTwoRegistersToNone,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "SUB is unsupported for from:two-registers,to:none type",
 			},
 			{
-				n: &NodeImpl{Instruction: CMP,
-					SrcReg: RegR0, SrcReg2: RegV0},
+				n: &nodeImpl{instruction: CMP,
+					srcReg: RegR0, srcReg2: RegV0},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &NodeImpl{Instruction: FCMPS,
-					SrcReg: RegR0, SrcReg2: RegV0},
+				n: &nodeImpl{instruction: FCMPS,
+					srcReg: RegR0, srcReg2: RegV0},
 				expErr: "R0 is not vector",
 			},
 		}
@@ -2376,182 +2376,182 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		{
 			name: "CMP",
-			n: &NodeImpl{
-				Instruction:       CMP,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegRZR,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMP,
+				srcReg:            RegRZR,
+				srcReg2:           RegRZR,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xff, 0x3, 0x1f, 0xeb},
 		},
 		{
 			name: "CMP",
-			n: &NodeImpl{
-				Instruction:       CMP,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegR30,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMP,
+				srcReg:            RegRZR,
+				srcReg2:           RegR30,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xdf, 0x3, 0x1f, 0xeb},
 		},
 		{
 			name: "CMP",
-			n: &NodeImpl{
-				Instruction:       CMP,
-				SrcReg:            RegR30,
-				SrcReg2:           RegRZR,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMP,
+				srcReg:            RegR30,
+				srcReg2:           RegRZR,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xff, 0x3, 0x1e, 0xeb},
 		},
 		{
 			name: "CMP",
-			n: &NodeImpl{
-				Instruction:       CMP,
-				SrcReg:            RegR30,
-				SrcReg2:           RegR30,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMP,
+				srcReg:            RegR30,
+				srcReg2:           RegR30,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xdf, 0x3, 0x1e, 0xeb},
 		},
 		{
 			name: "CMPW",
-			n: &NodeImpl{
-				Instruction:       CMPW,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegRZR,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMPW,
+				srcReg:            RegRZR,
+				srcReg2:           RegRZR,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xff, 0x3, 0x1f, 0x6b},
 		},
 		{
 			name: "CMPW",
-			n: &NodeImpl{
-				Instruction:       CMPW,
-				SrcReg:            RegRZR,
-				SrcReg2:           RegR30,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMPW,
+				srcReg:            RegRZR,
+				srcReg2:           RegR30,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xdf, 0x3, 0x1f, 0x6b},
 		},
 		{
 			name: "CMPW",
-			n: &NodeImpl{
-				Instruction:       CMPW,
-				SrcReg:            RegR30,
-				SrcReg2:           RegRZR,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMPW,
+				srcReg:            RegR30,
+				srcReg2:           RegRZR,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xff, 0x3, 0x1e, 0x6b},
 		},
 		{
 			name: "CMPW",
-			n: &NodeImpl{
-				Instruction:       CMPW,
-				SrcReg:            RegR30,
-				SrcReg2:           RegR30,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       CMPW,
+				srcReg:            RegR30,
+				srcReg2:           RegR30,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xdf, 0x3, 0x1e, 0x6b},
 		},
 		{
 			name: "FCMPD",
-			n: &NodeImpl{
-				Instruction:       FCMPD,
-				SrcReg:            RegV0,
-				SrcReg2:           RegV0,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPD,
+				srcReg:            RegV0,
+				srcReg2:           RegV0,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x0, 0x20, 0x60, 0x1e},
 		},
 		{
 			name: "FCMPD",
-			n: &NodeImpl{
-				Instruction:       FCMPD,
-				SrcReg:            RegV0,
-				SrcReg2:           RegV31,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPD,
+				srcReg:            RegV0,
+				srcReg2:           RegV31,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xe0, 0x23, 0x60, 0x1e},
 		},
 		{
 			name: "FCMPD",
-			n: &NodeImpl{
-				Instruction:       FCMPD,
-				SrcReg:            RegV31,
-				SrcReg2:           RegV0,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPD,
+				srcReg:            RegV31,
+				srcReg2:           RegV0,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x0, 0x20, 0x7f, 0x1e},
 		},
 		{
 			name: "FCMPD",
-			n: &NodeImpl{
-				Instruction:       FCMPD,
-				SrcReg:            RegV31,
-				SrcReg2:           RegV31,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPD,
+				srcReg:            RegV31,
+				srcReg2:           RegV31,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xe0, 0x23, 0x7f, 0x1e},
 		},
 		{
 			name: "FCMPS",
-			n: &NodeImpl{
-				Instruction:       FCMPS,
-				SrcReg:            RegV0,
-				SrcReg2:           RegV0,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPS,
+				srcReg:            RegV0,
+				srcReg2:           RegV0,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x0, 0x20, 0x20, 0x1e},
 		},
 		{
 			name: "FCMPS",
-			n: &NodeImpl{
-				Instruction:       FCMPS,
-				SrcReg:            RegV0,
-				SrcReg2:           RegV31,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPS,
+				srcReg:            RegV0,
+				srcReg2:           RegV31,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xe0, 0x23, 0x20, 0x1e},
 		},
 		{
 			name: "FCMPS",
-			n: &NodeImpl{
-				Instruction:       FCMPS,
-				SrcReg:            RegV31,
-				SrcReg2:           RegV0,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPS,
+				srcReg:            RegV31,
+				srcReg2:           RegV0,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0x0, 0x20, 0x3f, 0x1e},
 		},
 		{
 			name: "FCMPS",
-			n: &NodeImpl{
-				Instruction:       FCMPS,
-				SrcReg:            RegV31,
-				SrcReg2:           RegV31,
-				VectorArrangement: VectorArrangementH,
-				SrcVectorIndex:    0,
+			n: &nodeImpl{
+				instruction:       FCMPS,
+				srcReg:            RegV31,
+				srcReg2:           RegV31,
+				vectorArrangement: VectorArrangementH,
+				srcVectorIndex:    0,
 			},
 			exp: []byte{0xe0, 0x23, 0x3f, 0x1e},
 		},
@@ -2593,8 +2593,8 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.encodeThreeRegistersToRegister(&NodeImpl{
-				Instruction: tc.inst, SrcReg: src1, SrcReg2: src2, DstReg: src3, DstReg2: dst,
+			err := a.encodeThreeRegistersToRegister(&nodeImpl{
+				instruction: tc.inst, srcReg: src1, srcReg2: src2, dstReg: src3, dstReg2: dst,
 			})
 			require.NoError(t, err)
 
@@ -2607,780 +2607,780 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		{
 			name: "orr v30.16b, v10.16b, v1.16b",
-			n: &NodeImpl{
-				Instruction:       VORR,
-				DstReg:            RegV30,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV10,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       VORR,
+				dstReg:            RegV30,
+				srcReg:            RegV1,
+				srcReg2:           RegV10,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x5e, 0x1d, 0xa1, 0x4e},
 		},
 		{
 			name: "orr v30.8b, v10.8b, v1.8b",
-			n: &NodeImpl{
-				Instruction:       VORR,
-				DstReg:            RegV30,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV10,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       VORR,
+				dstReg:            RegV30,
+				srcReg:            RegV1,
+				srcReg2:           RegV10,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0x5e, 0x1d, 0xa1, 0xe},
 		},
 		{
 			name: "bsl v0.8b, v15.8b, v1.8b",
-			n: &NodeImpl{
-				Instruction:       BSL,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       BSL,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0xe0, 0x1d, 0x61, 0x2e},
 		},
 		{
 			name: "zip1 v0.4s, v15.4s, v1.4s",
-			n: &NodeImpl{
-				Instruction:       ZIP1,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       ZIP1,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0xe0, 0x39, 0x81, 0x4e},
 		},
 		{
 			name: "zip1 v0.2d, v15.2d, v1.2d",
-			n: &NodeImpl{
-				Instruction:       ZIP1,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       ZIP1,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0xe0, 0x39, 0xc1, 0x4e},
 		},
 		{
 			name: "ext v0.16b, v15.16b, v1.16b, #0xf",
-			n: &NodeImpl{
-				Instruction:       EXT,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				SrcConst:          0xf,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       EXT,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				srcConst:          0xf,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0xe0, 0x79, 0x1, 0x6e},
 		},
 		{
 			name: "ext v0.16b, v15.16b, v1.16b, #8",
-			n: &NodeImpl{
-				Instruction:       EXT,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				SrcConst:          8,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       EXT,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				srcConst:          8,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0xe0, 0x41, 0x1, 0x6e},
 		},
 		{
 			name: "ext v0.16b, v15.16b, v1.16b, #0",
-			n: &NodeImpl{
-				Instruction:       EXT,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				SrcConst:          0,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       EXT,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				srcConst:          0,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0xe0, 0x1, 0x1, 0x6e},
 		},
 		{
 			name: "ext v0.8b, v15.8b, v1.8b, #7",
-			n: &NodeImpl{
-				Instruction:       EXT,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				SrcConst:          7,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       EXT,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				srcConst:          7,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0xe0, 0x39, 0x1, 0x2e},
 		},
 		{
 			name: "cmeq v0.8b, v15.8b, v1.8b",
-			n: &NodeImpl{
-				Instruction:       CMEQ,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       CMEQ,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0xe0, 0x8d, 0x21, 0x2e},
 		},
 		{
 			name: "cmgt v0.16b, v15.16b, v1.16b",
-			n: &NodeImpl{
-				Instruction:       CMGT,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       CMGT,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0xe0, 0x35, 0x21, 0x4e},
 		},
 		{
 			name: "cmhi v0.8h, v15.8h, v1.8h",
-			n: &NodeImpl{
-				Instruction:       CMHI,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       CMHI,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0xe0, 0x35, 0x61, 0x6e},
 		},
 		{
 			name: "cmhi v0.4h, v15.4h, v1.4h",
-			n: &NodeImpl{
-				Instruction:       CMHI,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement4H,
+			n: &nodeImpl{
+				instruction:       CMHI,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement4H,
 			},
 			exp: []byte{0xe0, 0x35, 0x61, 0x2e},
 		},
 		{
 			name: "cmge v0.4s, v15.4s, v1.4s",
-			n: &NodeImpl{
-				Instruction:       CMGE,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       CMGE,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0xe0, 0x3d, 0xa1, 0x4e},
 		},
 		{
 			name: "cmge v0.2s, v15.2s, v1.2s",
-			n: &NodeImpl{
-				Instruction:       CMGE,
-				DstReg:            RegV0,
-				SrcReg:            RegV1,
-				SrcReg2:           RegV15,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       CMGE,
+				dstReg:            RegV0,
+				srcReg:            RegV1,
+				srcReg2:           RegV15,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0xe0, 0x3d, 0xa1, 0xe},
 		},
 		{
 			name: "cmhs v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       CMHS,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       CMHS,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0x3c, 0xeb, 0x6e},
 		},
 		{
 			name: "fcmeq v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       FCMEQ,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       FCMEQ,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xe4, 0x6b, 0x4e},
 		},
 		{
 			name: "fcmeq v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       FCMEQ,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       FCMEQ,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xe4, 0x2b, 0x4e},
 		},
 		{
 			name: "fcmeq v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       FCMEQ,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       FCMEQ,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xe4, 0x2b, 0xe},
 		},
 		{
 			name: "fcmgt v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       FCMGT,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       FCMGT,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xe4, 0xeb, 0x6e},
 		},
 		{
 			name: "fcmgt v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       FCMGT,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       FCMGT,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xe4, 0xab, 0x6e},
 		},
 		{
 			name: "fcmgt v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       FCMGT,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       FCMGT,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xe4, 0xab, 0x2e},
 		},
 		{
 			name: "fcmge v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       FCMGE,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       FCMGE,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xe4, 0x6b, 0x6e},
 		},
 		{
 			name: "fcmge v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       FCMGE,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       FCMGE,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xe4, 0x2b, 0x6e},
 		},
 		{
 			name: "fcmge v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       FCMGE,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       FCMGE,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xe4, 0x2b, 0x2e},
 		},
 		{
 			name: "fdiv v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VFDIV,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VFDIV,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xfc, 0x2b, 0x6e},
 		},
 		{
 			name: "fdiv v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       VFDIV,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       VFDIV,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xfc, 0x2b, 0x2e},
 		},
 		{
 			name: "fdiv v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       VFDIV,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       VFDIV,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xfc, 0x6b, 0x6e},
 		},
 		{
 			name: "fmul v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VFMUL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VFMUL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xdc, 0x2b, 0x6e},
 		},
 		{
 			name: "fmul v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       VFMUL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       VFMUL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xdc, 0x2b, 0x2e},
 		},
 		{
 			name: "fmul v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       VFMUL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       VFMUL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xdc, 0x6b, 0x6e},
 		},
 		{
 			name: "fmin v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VFMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VFMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xf4, 0xab, 0x4e},
 		},
 		{
 			name: "fmin v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       VFMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       VFMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xf4, 0xab, 0xe},
 		},
 		{
 			name: "fmin v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       VFMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       VFMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xf4, 0xeb, 0x4e},
 		},
 		{
 			name: "fmax v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VFMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VFMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xf4, 0x2b, 0x4e},
 		},
 		{
 			name: "fmax v30.2s, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       VFMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       VFMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xf4, 0x2b, 0xe},
 		},
 		{
 			name: "fmax v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       VFMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       VFMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xf4, 0x6b, 0x4e},
 		},
 		{
 			name: "mul v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VMUL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VMUL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0x9c, 0xab, 0x4e},
 		},
 		{
 			name: "mul v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       VMUL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       VMUL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x9c, 0x2b, 0x4e},
 		},
 		{
 			name: "sqadd v30.2d, v4.2d, v11.2d",
-			n: &NodeImpl{
-				Instruction:       VSQADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       VSQADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x9e, 0xc, 0xeb, 0x4e},
 		},
 		{
 			name: "sqadd v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       VSQADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       VSQADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0xc, 0x6b, 0x4e},
 		},
 		{
 			name: "uqadd v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       VUQADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       VUQADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xc, 0xab, 0x6e},
 		},
 		{
 			name: "uqadd v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       VUQADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       VUQADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0xc, 0x6b, 0x6e},
 		},
 		{
 			name: "smax v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       SMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       SMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0x64, 0xab, 0x4e},
 		},
 		{
 			name: "smax v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       SMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       SMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0x64, 0x6b, 0x4e},
 		},
 		{
 			name: "smin v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       SMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       SMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x6c, 0x2b, 0x4e},
 		},
 		{
 			name: "smin v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       SMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       SMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0x6c, 0xab, 0x4e},
 		},
 		{
 			name: "umin v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       UMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       UMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x6c, 0x2b, 0x6e},
 		},
 		{
 			name: "umin v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       UMIN,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       UMIN,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0x6c, 0xab, 0x6e},
 		},
 		{
 			name: "umax v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       UMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       UMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0x64, 0xab, 0x6e},
 		},
 		{
 			name: "umax v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       UMAX,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       UMAX,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0x64, 0x6b, 0x6e},
 		},
 		{
 			name: "umax v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       URHADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       URHADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0x14, 0x6b, 0x6e},
 		},
 		{
 			name: "umax v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       URHADD,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       URHADD,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x14, 0x2b, 0x6e},
 		},
 		{
 			name: "sqsub v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       VSQSUB,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       VSQSUB,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x2c, 0x2b, 0x4e},
 		},
 		{
 			name: "sqsub v308hb, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       VSQSUB,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       VSQSUB,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0x2c, 0x6b, 0x4e},
 		},
 		{
 			name: "uqsub v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       VUQSUB,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       VUQSUB,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x2c, 0x2b, 0x6e},
 		},
 		{
 			name: "uqsub v308hb, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       VUQSUB,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       VUQSUB,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0x2c, 0x6b, 0x6e},
 		},
 		{
 			name: "umlal v0.2d, v6.2s, v2.2s",
-			n: &NodeImpl{
-				Instruction:       VUMLAL,
-				DstReg:            RegV0,
-				SrcReg:            RegV2,
-				SrcReg2:           RegV6,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       VUMLAL,
+				dstReg:            RegV0,
+				srcReg:            RegV2,
+				srcReg2:           RegV6,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0xc0, 0x80, 0xa2, 0x2e},
 		},
 		{
 			name: "umlal v0.4s, v6.4h, v2.4h",
-			n: &NodeImpl{
-				Instruction:       VUMLAL,
-				DstReg:            RegV0,
-				SrcReg:            RegV2,
-				SrcReg2:           RegV6,
-				VectorArrangement: VectorArrangement4H,
+			n: &nodeImpl{
+				instruction:       VUMLAL,
+				dstReg:            RegV0,
+				srcReg:            RegV2,
+				srcReg2:           RegV6,
+				vectorArrangement: VectorArrangement4H,
 			},
 			exp: []byte{0xc0, 0x80, 0x62, 0x2e},
 		},
 		{
 			name: "umlal v0.8h, v6.8b, v2.8b",
-			n: &NodeImpl{
-				Instruction:       VUMLAL,
-				DstReg:            RegV0,
-				SrcReg:            RegV2,
-				SrcReg2:           RegV6,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       VUMLAL,
+				dstReg:            RegV0,
+				srcReg:            RegV2,
+				srcReg2:           RegV6,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0xc0, 0x80, 0x22, 0x2e},
 		},
 		{
 			name: "bit v30.16b, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       VBIT,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       VBIT,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0x1c, 0xab, 0x6e},
 		},
 		{
 			name: "bit v30.8b, v4.8b, v11.8b",
-			n: &NodeImpl{
-				Instruction:       VBIT,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       VBIT,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0x9e, 0x1c, 0xab, 0x2e},
 		},
 		{
 			name: "sqrdmulh v30.8h, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       SQRDMULH,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       SQRDMULH,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0xb4, 0x6b, 0x6e},
 		},
 		{
 			name: "sqrdmulh v30.4s, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       SQRDMULH,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       SQRDMULH,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xb4, 0xab, 0x6e},
 		},
 		{
 			name: "smull v30.8h, v4.8b, v11.8b",
-			n: &NodeImpl{
-				Instruction:       SMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       SMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0x9e, 0xc0, 0x2b, 0xe},
 		},
 		{
 			name: "smull v30.4s, v4.4h, v11.4h",
-			n: &NodeImpl{
-				Instruction:       SMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4H,
+			n: &nodeImpl{
+				instruction:       SMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4H,
 			},
 			exp: []byte{0x9e, 0xc0, 0x6b, 0xe},
 		},
 		{
 			name: "smull v30.2d, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       SMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       SMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xc0, 0xab, 0xe},
 		},
 		{
 			name: "smull2 v30.8h, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       SMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       SMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0xc0, 0x2b, 0x4e},
 		},
 		{
 			name: "smull2 v30.4s, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       SMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       SMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0xc0, 0x6b, 0x4e},
 		},
 		{
 			name: "smull2 v30.2d, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       SMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       SMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xc0, 0xab, 0x4e},
 		},
@@ -3389,67 +3389,67 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 
 		{
 			name: "umull v30.8h, v4.8b, v11.8b",
-			n: &NodeImpl{
-				Instruction:       UMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8B,
+			n: &nodeImpl{
+				instruction:       UMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8B,
 			},
 			exp: []byte{0x9e, 0xc0, 0x2b, 0x2e},
 		},
 		{
 			name: "umull v30.4s, v4.4h, v11.4h",
-			n: &NodeImpl{
-				Instruction:       UMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4H,
+			n: &nodeImpl{
+				instruction:       UMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4H,
 			},
 			exp: []byte{0x9e, 0xc0, 0x6b, 0x2e},
 		},
 		{
 			name: "umull v30.2d, v4.2s, v11.2s",
-			n: &NodeImpl{
-				Instruction:       UMULL,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement2S,
+			n: &nodeImpl{
+				instruction:       UMULL,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement2S,
 			},
 			exp: []byte{0x9e, 0xc0, 0xab, 0x2e},
 		},
 		{
 			name: "umull2 v30.8h, v4.16b, v11.16b",
-			n: &NodeImpl{
-				Instruction:       UMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       UMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x9e, 0xc0, 0x2b, 0x6e},
 		},
 		{
 			name: "umull2 v30.4s, v4.8h, v11.8h",
-			n: &NodeImpl{
-				Instruction:       UMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       UMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x9e, 0xc0, 0x6b, 0x6e},
 		},
 		{
 			name: "umull2 v30.2d, v4.4s, v11.4s",
-			n: &NodeImpl{
-				Instruction:       UMULL2,
-				DstReg:            RegV30,
-				SrcReg:            RegV11,
-				SrcReg2:           RegV4,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       UMULL2,
+				dstReg:            RegV30,
+				srcReg:            RegV11,
+				srcReg2:           RegV4,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0x9e, 0xc0, 0xab, 0x6e},
 		},
@@ -3471,68 +3471,68 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
 			name: "ins v10.d[0], x10",
-			n: &NodeImpl{
-				Instruction:       INSGEN,
-				DstReg:            RegV10,
-				SrcReg:            RegR10,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       INSGEN,
+				dstReg:            RegV10,
+				srcReg:            RegR10,
+				vectorArrangement: VectorArrangementD,
 			},
 			exp: []byte{0x4a, 0x1d, 0x8, 0x4e},
 		},
 		{
 			name: "ins v10.d[1], x10",
-			n: &NodeImpl{
-				Instruction:       INSGEN,
-				DstReg:            RegV10,
-				SrcReg:            RegR10,
-				VectorArrangement: VectorArrangementD,
-				DstVectorIndex:    1,
+			n: &nodeImpl{
+				instruction:       INSGEN,
+				dstReg:            RegV10,
+				srcReg:            RegR10,
+				vectorArrangement: VectorArrangementD,
+				dstVectorIndex:    1,
 			},
 			exp: []byte{0x4a, 0x1d, 0x18, 0x4e},
 		},
 		{
 			name: "dup v10.2d, x10",
-			n: &NodeImpl{
-				Instruction:       DUPGEN,
-				SrcReg:            RegR10,
-				DstReg:            RegV10,
-				VectorArrangement: VectorArrangement2D,
+			n: &nodeImpl{
+				instruction:       DUPGEN,
+				srcReg:            RegR10,
+				dstReg:            RegV10,
+				vectorArrangement: VectorArrangement2D,
 			},
 			exp: []byte{0x4a, 0xd, 0x8, 0x4e},
 		},
 		{
 			name: "dup v1.4s, w30",
-			n: &NodeImpl{
-				Instruction:       DUPGEN,
-				SrcReg:            RegR30,
-				DstReg:            RegV1,
-				VectorArrangement: VectorArrangement4S,
+			n: &nodeImpl{
+				instruction:       DUPGEN,
+				srcReg:            RegR30,
+				dstReg:            RegV1,
+				vectorArrangement: VectorArrangement4S,
 			},
 			exp: []byte{0xc1, 0xf, 0x4, 0x4e},
 		},
 		{
 			name: "dup v30.8h, w1",
-			n: &NodeImpl{
-				Instruction:       DUPGEN,
-				SrcReg:            RegR1,
-				DstReg:            RegV30,
-				VectorArrangement: VectorArrangement8H,
+			n: &nodeImpl{
+				instruction:       DUPGEN,
+				srcReg:            RegR1,
+				dstReg:            RegV30,
+				vectorArrangement: VectorArrangement8H,
 			},
 			exp: []byte{0x3e, 0xc, 0x2, 0x4e},
 		},
 		{
 			name: "dup v30.16b, w1",
-			n: &NodeImpl{
-				Instruction:       DUPGEN,
-				SrcReg:            RegR1,
-				DstReg:            RegV30,
-				VectorArrangement: VectorArrangement16B,
+			n: &nodeImpl{
+				instruction:       DUPGEN,
+				srcReg:            RegR1,
+				dstReg:            RegV30,
+				vectorArrangement: VectorArrangement16B,
 			},
 			exp: []byte{0x3e, 0xc, 0x1, 0x4e},
 		},
@@ -3664,15 +3664,15 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 	tests := []struct {
 		name string
-		n    *NodeImpl
+		n    *nodeImpl
 		exp  []byte
 	}{
 		{
 			name: "ldr q8, #8",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV8,
-				VectorArrangement: VectorArrangementQ,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV8,
+				vectorArrangement: VectorArrangementQ,
 				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
 			},
 			exp: []byte{
@@ -3688,10 +3688,10 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 		},
 		{
 			name: "ldr d30, #8",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV30,
-				VectorArrangement: VectorArrangementD,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV30,
+				vectorArrangement: VectorArrangementD,
 				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4, 5, 6, 7, 8}),
 			},
 			exp: []byte{
@@ -3707,10 +3707,10 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 		},
 		{
 			name: "ldr s8, #8",
-			n: &NodeImpl{
-				Instruction:       VMOV,
-				DstReg:            RegV8,
-				VectorArrangement: VectorArrangementS,
+			n: &nodeImpl{
+				instruction:       VMOV,
+				dstReg:            RegV8,
+				vectorArrangement: VectorArrangementS,
 				staticConst:       asm.NewStaticConst([]byte{1, 2, 3, 4}),
 			},
 			exp: []byte{
@@ -3776,7 +3776,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 
 			a.Buf.Write(make([]byte, beforeADRByteNum))
 
-			err := a.encodeADR(&NodeImpl{Instruction: ADR, DstReg: tc.reg, staticConst: sc})
+			err := a.encodeADR(&nodeImpl{instruction: ADR, dstReg: tc.reg, staticConst: sc})
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(a.pool.Consts))
