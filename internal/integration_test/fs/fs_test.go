@@ -87,7 +87,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 	// Pick anywhere in memory for wasm to write resultSize too. We do this first since it's fixed length
 	// while iovs is variable.
 	resultSizeOff := uint32(0)
-	// Next place iovs
+	// next place iovs
 	iovsOff := uint32(4)
 	// We do not directly write to hardware, there is no need for more than one iovec
 	iovsCount := uint32(1)
@@ -96,7 +96,7 @@ func (f *wasiFile) Read(bytes []byte) (int, error) {
 	iovOff := iovsOff + uint32(8)
 	ok := f.fs.memory.WriteUint32Le(testCtx, iovsOff, iovOff)
 	require.True(f.fs.t, ok)
-	// Next write the length.
+	// next write the length.
 	ok = f.fs.memory.WriteUint32Le(testCtx, iovsOff+uint32(4), uint32(len(bytes)))
 	require.True(f.fs.t, ok)
 

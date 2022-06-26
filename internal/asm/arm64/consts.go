@@ -190,7 +190,7 @@ const (
 	RegFPSR
 
 	// Assign each conditional register state to the unique register ID.
-	// This is to reduce the size of NodeImpl struct without having dedicated field
+	// This is to reduce the size of nodeImpl struct without having dedicated field
 	// for conditional register state which would not be used by most nodes.
 	// This is taking advantage of the fact that conditional operations are always
 	// on a single register and condition code, and never two registers.

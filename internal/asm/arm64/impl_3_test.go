@@ -10,12 +10,12 @@ import (
 func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *NodeImpl
+			n      *nodeImpl
 			expErr string
 		}{
 			{
-				n: &NodeImpl{Instruction: ADR, Types: OperandTypesTwoRegistersToRegister,
-					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADR, types: OperandTypesTwoRegistersToRegister,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:two-registers,to:register type",
 			},
 		}
@@ -595,7 +595,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.encodeTwoRegistersToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, SrcReg2: tc.src2, DstReg: tc.dst})
+			err := a.encodeTwoRegistersToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, srcReg2: tc.src2, dstReg: tc.dst})
 			require.NoError(t, err)
 
 			actual := a.bytes()
@@ -607,22 +607,22 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *NodeImpl
+			n      *nodeImpl
 			expErr string
 		}{
 			{
-				n: &NodeImpl{Instruction: ADR, Types: OperandTypesRegisterAndConstToNone,
-					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADR, types: OperandTypesRegisterAndConstToNone,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:register-and-const,to:none type",
 			},
 			{
-				n: &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone,
-					SrcReg: RegR0, SrcConst: 12345},
+				n: &nodeImpl{instruction: CMP, types: OperandTypesRegisterAndConstToNone,
+					srcReg: RegR0, srcConst: 12345},
 				expErr: "immediate for CMP must fit in 0 to 4095 but got 12345",
 			},
 			{
-				n: &NodeImpl{Instruction: CMP, Types: OperandTypesRegisterAndConstToNone,
-					SrcReg: RegRZR, SrcConst: 123},
+				n: &nodeImpl{instruction: CMP, types: OperandTypesRegisterAndConstToNone,
+					srcReg: RegRZR, srcConst: 123},
 				expErr: "zero register is not supported for CMP (immediate)",
 			},
 		}
@@ -662,7 +662,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.encodeRegisterAndConstToNone(&NodeImpl{Instruction: tc.inst, SrcReg: tc.reg, SrcConst: tc.c})
+			err := a.encodeRegisterAndConstToNone(&nodeImpl{instruction: tc.inst, srcReg: tc.reg, srcConst: tc.c})
 			require.NoError(t, err)
 
 			actual := a.bytes()
@@ -674,12 +674,12 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		tests := []struct {
-			n      *NodeImpl
+			n      *nodeImpl
 			expErr string
 		}{
 			{
-				n: &NodeImpl{Instruction: ADR, Types: OperandTypesRegisterToRegister,
-					SrcReg: RegR0, SrcReg2: RegR0, DstReg: RegR0},
+				n: &nodeImpl{instruction: ADR, types: OperandTypesRegisterToRegister,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:register,to:register type",
 			},
 		}
@@ -1184,7 +1184,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a := NewAssemblerImpl(asm.NilRegister)
-			err := a.encodeRegisterToRegister(&NodeImpl{Instruction: tc.inst, SrcReg: tc.src, DstReg: tc.dst})
+			err := a.encodeRegisterToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, dstReg: tc.dst})
 			require.NoError(t, err)
 
 			actual := a.bytes()
