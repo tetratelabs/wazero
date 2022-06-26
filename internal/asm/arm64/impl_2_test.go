@@ -15,16 +15,16 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: ADR, types: OperandTypesConstToRegister,
+				n: &nodeImpl{instruction: ADR, types: operandTypesConstToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:const,to:register type",
 			},
 			{
-				n:      &nodeImpl{instruction: LSR, types: OperandTypesConstToRegister, dstReg: RegR0},
+				n:      &nodeImpl{instruction: LSR, types: operandTypesConstToRegister, dstReg: RegR0},
 				expErr: "LSR with zero constant should be optimized out",
 			},
 			{
-				n:      &nodeImpl{instruction: LSL, types: OperandTypesConstToRegister, dstReg: RegR0},
+				n:      &nodeImpl{instruction: LSL, types: operandTypesConstToRegister, dstReg: RegR0},
 				expErr: "LSL with zero constant should be optimized out",
 			},
 		}

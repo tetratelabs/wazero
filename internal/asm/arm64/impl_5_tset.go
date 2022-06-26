@@ -14,7 +14,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &nodeImpl{instruction: ADR, types: OperandTypesRegisterToMemory},
+				n:      &nodeImpl{instruction: ADR, types: operandTypesRegisterToMemory},
 				expErr: "ADR is unsupported for from:register,to:memory type",
 			},
 		}

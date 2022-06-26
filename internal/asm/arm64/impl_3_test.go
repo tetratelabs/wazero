@@ -14,7 +14,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: ADR, types: OperandTypesTwoRegistersToRegister,
+				n: &nodeImpl{instruction: ADR, types: operandTypesTwoRegistersToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:two-registers,to:register type",
 			},
@@ -611,17 +611,17 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: ADR, types: OperandTypesRegisterAndConstToNone,
+				n: &nodeImpl{instruction: ADR, types: operandTypesRegisterAndConstToNone,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:register-and-const,to:none type",
 			},
 			{
-				n: &nodeImpl{instruction: CMP, types: OperandTypesRegisterAndConstToNone,
+				n: &nodeImpl{instruction: CMP, types: operandTypesRegisterAndConstToNone,
 					srcReg: RegR0, srcConst: 12345},
 				expErr: "immediate for CMP must fit in 0 to 4095 but got 12345",
 			},
 			{
-				n: &nodeImpl{instruction: CMP, types: OperandTypesRegisterAndConstToNone,
+				n: &nodeImpl{instruction: CMP, types: operandTypesRegisterAndConstToNone,
 					srcReg: RegRZR, srcConst: 123},
 				expErr: "zero register is not supported for CMP (immediate)",
 			},
@@ -678,7 +678,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: ADR, types: OperandTypesRegisterToRegister,
+				n: &nodeImpl{instruction: ADR, types: operandTypesRegisterToRegister,
 					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
 				expErr: "ADR is unsupported for from:register,to:register type",
 			},

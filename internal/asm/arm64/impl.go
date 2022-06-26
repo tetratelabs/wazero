@@ -20,7 +20,7 @@ type nodeImpl struct {
 	// next holds the next node from this node in the assembled linked list.
 	next *nodeImpl
 
-	types                            OperandTypes
+	types                            operandTypes
 	srcReg, srcReg2, dstReg, dstReg2 asm.Register
 	srcConst, dstConst               asm.ConstantValue
 
@@ -66,136 +66,136 @@ func (n *nodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
 func (n *nodeImpl) String() (ret string) {
 	instName := InstructionName(n.instruction)
 	switch n.types {
-	case OperandTypesNoneToNone:
+	case operandTypesNoneToNone:
 		ret = instName
-	case OperandTypesNoneToRegister:
+	case operandTypesNoneToRegister:
 		ret = fmt.Sprintf("%s %s", instName, RegisterName(n.dstReg))
-	case OperandTypesNoneToBranch:
+	case operandTypesNoneToBranch:
 		ret = fmt.Sprintf("%s {%v}", instName, n.jumpTarget)
-	case OperandTypesRegisterToRegister:
+	case operandTypesRegisterToRegister:
 		ret = fmt.Sprintf("%s %s, %s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg))
-	case OperandTypesLeftShiftedRegisterToRegister:
+	case operandTypesLeftShiftedRegisterToRegister:
 		ret = fmt.Sprintf("%s (%s, %s << %d), %s", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), n.srcConst, RegisterName(n.dstReg))
-	case OperandTypesTwoRegistersToRegister:
+	case operandTypesTwoRegistersToRegister:
 		ret = fmt.Sprintf("%s (%s, %s), %s", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), RegisterName(n.dstReg))
-	case OperandTypesThreeRegistersToRegister:
+	case operandTypesThreeRegistersToRegister:
 		ret = fmt.Sprintf("%s (%s, %s, %s), %s)", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), RegisterName(n.dstReg), RegisterName(n.dstReg2))
-	case OperandTypesTwoRegistersToNone:
+	case operandTypesTwoRegistersToNone:
 		ret = fmt.Sprintf("%s (%s, %s)", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2))
-	case OperandTypesRegisterAndConstToNone:
+	case operandTypesRegisterAndConstToNone:
 		ret = fmt.Sprintf("%s (%s, 0x%x)", instName, RegisterName(n.srcReg), n.srcConst)
-	case OperandTypesRegisterToMemory:
+	case operandTypesRegisterToMemory:
 		if n.dstReg2 != asm.NilRegister {
 			ret = fmt.Sprintf("%s %s, [%s + %s]", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), RegisterName(n.dstReg2))
 		} else {
 			ret = fmt.Sprintf("%s %s, [%s + 0x%x]", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.dstConst)
 		}
-	case OperandTypesMemoryToRegister:
+	case operandTypesMemoryToRegister:
 		if n.srcReg2 != asm.NilRegister {
 			ret = fmt.Sprintf("%s [%s + %s], %s", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), RegisterName(n.dstReg))
 		} else {
 			ret = fmt.Sprintf("%s [%s + 0x%x], %s", instName, RegisterName(n.srcReg), n.srcConst, RegisterName(n.dstReg))
 		}
-	case OperandTypesConstToRegister:
+	case operandTypesConstToRegister:
 		ret = fmt.Sprintf("%s 0x%x, %s", instName, n.srcConst, RegisterName(n.dstReg))
-	case OperandTypesRegisterToVectorRegister:
+	case operandTypesRegisterToVectorRegister:
 		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement, n.dstVectorIndex)
-	case OperandTypesVectorRegisterToRegister:
+	case operandTypesVectorRegisterToRegister:
 		ret = fmt.Sprintf("%s %s.%s[%d], %s.%s[%d]", instName, RegisterName(n.srcReg), n.vectorArrangement, n.srcVectorIndex,
 			RegisterName(n.dstReg), n.vectorArrangement, n.dstVectorIndex)
-	case OperandTypesVectorRegisterToMemory:
+	case operandTypesVectorRegisterToMemory:
 		ret = fmt.Sprintf("%s %s.%s, [%s]", instName, RegisterName(n.srcReg), n.vectorArrangement, RegisterName(n.dstReg))
-	case OperandTypesMemoryToVectorRegister:
+	case operandTypesMemoryToVectorRegister:
 		ret = fmt.Sprintf("%s [%s], %s.%s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
-	case OperandTypesVectorRegisterToVectorRegister:
+	case operandTypesVectorRegisterToVectorRegister:
 		ret = fmt.Sprintf("%s %s.%[2]s, %s.%[2]s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
-	case OperandTypesStaticConstToVectorRegister:
+	case operandTypesStaticConstToVectorRegister:
 		ret = fmt.Sprintf("%s $%v %s.%s", instName, n.staticConst, RegisterName(n.dstReg), n.vectorArrangement)
 	}
 	return
 }
 
-// OperandType represents where an operand is placed for an instruction.
+// operandType represents where an operand is placed for an instruction.
 // Note: this is almost the same as obj.AddrType in GO assembler.
-type OperandType byte
+type operandType byte
 
 const (
-	OperandTypeNone OperandType = iota
-	OperandTypeRegister
-	OperandTypeLeftShiftedRegister
-	OperandTypeTwoRegisters
-	OperandTypeThreeRegisters
-	OperandTypeRegisterAndConst
-	OperandTypeMemory
-	OperandTypeConst
-	OperandTypeBranch
-	OperandTypeSIMDByte
-	OperandTypeTwoSIMDBytes
-	OperandTypeVectorRegister
-	OperandTypeTwoVectorRegisters
-	OperandTypeStaticConst
+	operandTypeNone operandType = iota
+	operandTypeRegister
+	operandTypeLeftShiftedRegister
+	operandTypeTwoRegisters
+	operandTypeThreeRegisters
+	operandTypeRegisterAndConst
+	operandTypeMemory
+	operandTypeConst
+	operandTypeBranch
+	operandTypeSIMDByte
+	operandTypeTwoSIMDBytes
+	operandTypeVectorRegister
+	operandTypeTwoVectorRegisters
+	operandTypeStaticConst
 )
 
 // String implements fmt.Stringer.
-func (o OperandType) String() (ret string) {
+func (o operandType) String() (ret string) {
 	switch o {
-	case OperandTypeNone:
+	case operandTypeNone:
 		ret = "none"
-	case OperandTypeRegister:
+	case operandTypeRegister:
 		ret = "register"
-	case OperandTypeLeftShiftedRegister:
+	case operandTypeLeftShiftedRegister:
 		ret = "left-shifted-register"
-	case OperandTypeTwoRegisters:
+	case operandTypeTwoRegisters:
 		ret = "two-registers"
-	case OperandTypeRegisterAndConst:
+	case operandTypeRegisterAndConst:
 		ret = "register-and-const"
-	case OperandTypeMemory:
+	case operandTypeMemory:
 		ret = "memory"
-	case OperandTypeConst:
+	case operandTypeConst:
 		ret = "const"
-	case OperandTypeBranch:
+	case operandTypeBranch:
 		ret = "branch"
-	case OperandTypeSIMDByte:
+	case operandTypeSIMDByte:
 		ret = "simd-byte"
-	case OperandTypeTwoSIMDBytes:
+	case operandTypeTwoSIMDBytes:
 		ret = "two-simd-bytes"
-	case OperandTypeVectorRegister:
+	case operandTypeVectorRegister:
 		ret = "vector-register"
-	case OperandTypeStaticConst:
+	case operandTypeStaticConst:
 		ret = "static-const"
-	case OperandTypeTwoVectorRegisters:
+	case operandTypeTwoVectorRegisters:
 		ret = "two-vector-registers"
 	}
 	return
 }
 
-// OperandTypes represents the only combinations of two OperandTypes used by wazero
-type OperandTypes struct{ src, dst OperandType }
+// operandTypes represents the only combinations of two operandTypes used by wazero
+type operandTypes struct{ src, dst operandType }
 
 var (
-	OperandTypesNoneToNone                         = OperandTypes{OperandTypeNone, OperandTypeNone}
-	OperandTypesNoneToRegister                     = OperandTypes{OperandTypeNone, OperandTypeRegister}
-	OperandTypesNoneToBranch                       = OperandTypes{OperandTypeNone, OperandTypeBranch}
-	OperandTypesRegisterToRegister                 = OperandTypes{OperandTypeRegister, OperandTypeRegister}
-	OperandTypesLeftShiftedRegisterToRegister      = OperandTypes{OperandTypeLeftShiftedRegister, OperandTypeRegister}
-	OperandTypesTwoRegistersToRegister             = OperandTypes{OperandTypeTwoRegisters, OperandTypeRegister}
-	OperandTypesThreeRegistersToRegister           = OperandTypes{OperandTypeThreeRegisters, OperandTypeRegister}
-	OperandTypesTwoRegistersToNone                 = OperandTypes{OperandTypeTwoRegisters, OperandTypeNone}
-	OperandTypesRegisterAndConstToNone             = OperandTypes{OperandTypeRegisterAndConst, OperandTypeNone}
-	OperandTypesRegisterToMemory                   = OperandTypes{OperandTypeRegister, OperandTypeMemory}
-	OperandTypesMemoryToRegister                   = OperandTypes{OperandTypeMemory, OperandTypeRegister}
-	OperandTypesConstToRegister                    = OperandTypes{OperandTypeConst, OperandTypeRegister}
-	OperandTypesRegisterToVectorRegister           = OperandTypes{OperandTypeRegister, OperandTypeVectorRegister}
-	OperandTypesVectorRegisterToRegister           = OperandTypes{OperandTypeVectorRegister, OperandTypeRegister}
-	OperandTypesMemoryToVectorRegister             = OperandTypes{OperandTypeMemory, OperandTypeVectorRegister}
-	OperandTypesVectorRegisterToMemory             = OperandTypes{OperandTypeVectorRegister, OperandTypeMemory}
-	OperandTypesVectorRegisterToVectorRegister     = OperandTypes{OperandTypeVectorRegister, OperandTypeVectorRegister}
-	OperandTypesTwoVectorRegistersToVectorRegister = OperandTypes{OperandTypeTwoVectorRegisters, OperandTypeVectorRegister}
-	OperandTypesStaticConstToVectorRegister        = OperandTypes{OperandTypeStaticConst, OperandTypeVectorRegister}
+	operandTypesNoneToNone                         = operandTypes{operandTypeNone, operandTypeNone}
+	operandTypesNoneToRegister                     = operandTypes{operandTypeNone, operandTypeRegister}
+	operandTypesNoneToBranch                       = operandTypes{operandTypeNone, operandTypeBranch}
+	operandTypesRegisterToRegister                 = operandTypes{operandTypeRegister, operandTypeRegister}
+	operandTypesLeftShiftedRegisterToRegister      = operandTypes{operandTypeLeftShiftedRegister, operandTypeRegister}
+	operandTypesTwoRegistersToRegister             = operandTypes{operandTypeTwoRegisters, operandTypeRegister}
+	operandTypesThreeRegistersToRegister           = operandTypes{operandTypeThreeRegisters, operandTypeRegister}
+	operandTypesTwoRegistersToNone                 = operandTypes{operandTypeTwoRegisters, operandTypeNone}
+	operandTypesRegisterAndConstToNone             = operandTypes{operandTypeRegisterAndConst, operandTypeNone}
+	operandTypesRegisterToMemory                   = operandTypes{operandTypeRegister, operandTypeMemory}
+	operandTypesMemoryToRegister                   = operandTypes{operandTypeMemory, operandTypeRegister}
+	operandTypesConstToRegister                    = operandTypes{operandTypeConst, operandTypeRegister}
+	operandTypesRegisterToVectorRegister           = operandTypes{operandTypeRegister, operandTypeVectorRegister}
+	operandTypesVectorRegisterToRegister           = operandTypes{operandTypeVectorRegister, operandTypeRegister}
+	operandTypesMemoryToVectorRegister             = operandTypes{operandTypeMemory, operandTypeVectorRegister}
+	operandTypesVectorRegisterToMemory             = operandTypes{operandTypeVectorRegister, operandTypeMemory}
+	operandTypesVectorRegisterToVectorRegister     = operandTypes{operandTypeVectorRegister, operandTypeVectorRegister}
+	operandTypesTwoVectorRegistersToVectorRegister = operandTypes{operandTypeTwoVectorRegisters, operandTypeVectorRegister}
+	operandTypesStaticConstToVectorRegister        = operandTypes{operandTypeStaticConst, operandTypeVectorRegister}
 )
 
 // String implements fmt.Stringer
-func (o OperandTypes) String() string {
+func (o operandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
@@ -221,7 +221,7 @@ func NewAssemblerImpl(temporaryRegister asm.Register) *AssemblerImpl {
 }
 
 // newNode creates a new Node and appends it into the linked list.
-func (a *AssemblerImpl) newNode(instruction asm.Instruction, types OperandTypes) *nodeImpl {
+func (a *AssemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
 	n := &nodeImpl{
 		instruction: instruction,
 		next:        nil,
@@ -343,43 +343,43 @@ func (a *AssemblerImpl) bytes() []byte {
 // encodeNode encodes the given node into writer.
 func (a *AssemblerImpl) encodeNode(n *nodeImpl) (err error) {
 	switch n.types {
-	case OperandTypesNoneToNone:
+	case operandTypesNoneToNone:
 		err = a.encodeNoneToNone(n)
-	case OperandTypesNoneToRegister:
+	case operandTypesNoneToRegister:
 		err = a.encodeJumpToRegister(n)
-	case OperandTypesNoneToBranch:
+	case operandTypesNoneToBranch:
 		err = a.encodeRelativeBranch(n)
-	case OperandTypesRegisterToRegister:
+	case operandTypesRegisterToRegister:
 		err = a.encodeRegisterToRegister(n)
-	case OperandTypesLeftShiftedRegisterToRegister:
+	case operandTypesLeftShiftedRegisterToRegister:
 		err = a.encodeLeftShiftedRegisterToRegister(n)
-	case OperandTypesTwoRegistersToRegister:
+	case operandTypesTwoRegistersToRegister:
 		err = a.encodeTwoRegistersToRegister(n)
-	case OperandTypesThreeRegistersToRegister:
+	case operandTypesThreeRegistersToRegister:
 		err = a.encodeThreeRegistersToRegister(n)
-	case OperandTypesTwoRegistersToNone:
+	case operandTypesTwoRegistersToNone:
 		err = a.encodeTwoRegistersToNone(n)
-	case OperandTypesRegisterAndConstToNone:
+	case operandTypesRegisterAndConstToNone:
 		err = a.encodeRegisterAndConstToNone(n)
-	case OperandTypesRegisterToMemory:
+	case operandTypesRegisterToMemory:
 		err = a.encodeRegisterToMemory(n)
-	case OperandTypesMemoryToRegister:
+	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(n)
-	case OperandTypesConstToRegister:
+	case operandTypesConstToRegister:
 		err = a.encodeConstToRegister(n)
-	case OperandTypesRegisterToVectorRegister:
+	case operandTypesRegisterToVectorRegister:
 		err = a.encodeRegisterToVectorRegister(n)
-	case OperandTypesVectorRegisterToRegister:
+	case operandTypesVectorRegisterToRegister:
 		err = a.encodeVectorRegisterToRegister(n)
-	case OperandTypesMemoryToVectorRegister:
+	case operandTypesMemoryToVectorRegister:
 		err = a.encodeMemoryToVectorRegister(n)
-	case OperandTypesVectorRegisterToMemory:
+	case operandTypesVectorRegisterToMemory:
 		err = a.encodeVectorRegisterToMemory(n)
-	case OperandTypesVectorRegisterToVectorRegister:
+	case operandTypesVectorRegisterToVectorRegister:
 		err = a.encodeVectorRegisterToVectorRegister(n)
-	case OperandTypesStaticConstToVectorRegister:
+	case operandTypesStaticConstToVectorRegister:
 		err = a.encodeStaticConstToVectorRegister(n)
-	case OperandTypesTwoVectorRegistersToVectorRegister:
+	case operandTypesTwoVectorRegistersToVectorRegister:
 		err = a.encodeTwoVectorRegistersToVectorRegister(n)
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.types)
@@ -392,7 +392,7 @@ func (a *AssemblerImpl) encodeNode(n *nodeImpl) (err error) {
 
 // CompileStandAlone implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
-	return a.newNode(instruction, OperandTypesNoneToNone)
+	return a.newNode(instruction, operandTypesNoneToNone)
 }
 
 // CompileConstToRegister implements the same method as documented on asm.AssemblerBase.
@@ -401,7 +401,7 @@ func (a *AssemblerImpl) CompileConstToRegister(
 	value asm.ConstantValue,
 	destinationReg asm.Register,
 ) (inst asm.Node) {
-	n := a.newNode(instruction, OperandTypesConstToRegister)
+	n := a.newNode(instruction, operandTypesConstToRegister)
 	n.srcConst = value
 	n.dstReg = destinationReg
 	return n
@@ -409,7 +409,7 @@ func (a *AssemblerImpl) CompileConstToRegister(
 
 // CompileRegisterToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
-	n := a.newNode(instruction, OperandTypesRegisterToRegister)
+	n := a.newNode(instruction, operandTypesRegisterToRegister)
 	n.srcReg = from
 	n.dstReg = to
 }
@@ -421,7 +421,7 @@ func (a *AssemblerImpl) CompileMemoryToRegister(
 	sourceOffsetConst asm.ConstantValue,
 	destinationReg asm.Register,
 ) {
-	n := a.newNode(instruction, OperandTypesMemoryToRegister)
+	n := a.newNode(instruction, operandTypesMemoryToRegister)
 	n.srcReg = sourceBaseReg
 	n.srcConst = sourceOffsetConst
 	n.dstReg = destinationReg
@@ -433,7 +433,7 @@ func (a *AssemblerImpl) CompileRegisterToMemory(
 	sourceRegister, destinationBaseRegister asm.Register,
 	destinationOffsetConst asm.ConstantValue,
 ) {
-	n := a.newNode(instruction, OperandTypesRegisterToMemory)
+	n := a.newNode(instruction, operandTypesRegisterToMemory)
 	n.srcReg = sourceRegister
 	n.dstReg = destinationBaseRegister
 	n.dstConst = destinationOffsetConst
@@ -441,12 +441,12 @@ func (a *AssemblerImpl) CompileRegisterToMemory(
 
 // CompileJump implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
-	return a.newNode(jmpInstruction, OperandTypesNoneToBranch)
+	return a.newNode(jmpInstruction, operandTypesNoneToBranch)
 }
 
 // CompileJumpToRegister implements the same method as documented on asm.AssemblerBase.
 func (a *AssemblerImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
-	n := a.newNode(jmpInstruction, OperandTypesNoneToRegister)
+	n := a.newNode(jmpInstruction, operandTypesNoneToRegister)
 	n.dstReg = reg
 }
 
@@ -455,7 +455,7 @@ func (a *AssemblerImpl) CompileReadInstructionAddress(
 	destinationRegister asm.Register,
 	beforeAcquisitionTargetInstruction asm.Instruction,
 ) {
-	n := a.newNode(ADR, OperandTypesMemoryToRegister)
+	n := a.newNode(ADR, operandTypesMemoryToRegister)
 	n.dstReg = destinationRegister
 	n.readInstructionAddressBeforeTargetInstruction = beforeAcquisitionTargetInstruction
 }
@@ -465,7 +465,7 @@ func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToRegister(
 	instruction asm.Instruction,
 	srcBaseReg, srcOffsetReg, dstReg asm.Register,
 ) {
-	n := a.newNode(instruction, OperandTypesMemoryToRegister)
+	n := a.newNode(instruction, operandTypesMemoryToRegister)
 	n.dstReg = dstReg
 	n.srcReg = srcBaseReg
 	n.srcReg2 = srcOffsetReg
@@ -476,7 +476,7 @@ func (a *AssemblerImpl) CompileRegisterToMemoryWithRegisterOffset(
 	instruction asm.Instruction,
 	srcReg, dstBaseReg, dstOffsetReg asm.Register,
 ) {
-	n := a.newNode(instruction, OperandTypesRegisterToMemory)
+	n := a.newNode(instruction, operandTypesRegisterToMemory)
 	n.srcReg = srcReg
 	n.dstReg = dstBaseReg
 	n.dstReg2 = dstOffsetReg
@@ -484,7 +484,7 @@ func (a *AssemblerImpl) CompileRegisterToMemoryWithRegisterOffset(
 
 // CompileTwoRegistersToRegister implements Assembler.CompileTwoRegistersToRegister
 func (a *AssemblerImpl) CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, dst asm.Register) {
-	n := a.newNode(instruction, OperandTypesTwoRegistersToRegister)
+	n := a.newNode(instruction, operandTypesTwoRegistersToRegister)
 	n.srcReg = src1
 	n.srcReg2 = src2
 	n.dstReg = dst
@@ -495,7 +495,7 @@ func (a *AssemblerImpl) CompileThreeRegistersToRegister(
 	instruction asm.Instruction,
 	src1, src2, src3, dst asm.Register,
 ) {
-	n := a.newNode(instruction, OperandTypesThreeRegistersToRegister)
+	n := a.newNode(instruction, operandTypesThreeRegistersToRegister)
 	n.srcReg = src1
 	n.srcReg2 = src2
 	n.dstReg = src3 // To minimize the size of nodeImpl struct, we reuse dstReg for the third source operand.
@@ -504,7 +504,7 @@ func (a *AssemblerImpl) CompileThreeRegistersToRegister(
 
 // CompileTwoRegistersToNone implements Assembler.CompileTwoRegistersToNone
 func (a *AssemblerImpl) CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register) {
-	n := a.newNode(instruction, OperandTypesTwoRegistersToNone)
+	n := a.newNode(instruction, operandTypesTwoRegistersToNone)
 	n.srcReg = src1
 	n.srcReg2 = src2
 }
@@ -515,7 +515,7 @@ func (a *AssemblerImpl) CompileRegisterAndConstToNone(
 	src asm.Register,
 	srcConst asm.ConstantValue,
 ) {
-	n := a.newNode(instruction, OperandTypesRegisterAndConstToNone)
+	n := a.newNode(instruction, operandTypesRegisterAndConstToNone)
 	n.srcReg = src
 	n.srcConst = srcConst
 }
@@ -527,7 +527,7 @@ func (a *AssemblerImpl) CompileLeftShiftedRegisterToRegister(
 	shiftNum asm.ConstantValue,
 	srcReg, dstReg asm.Register,
 ) {
-	n := a.newNode(instruction, OperandTypesLeftShiftedRegisterToRegister)
+	n := a.newNode(instruction, operandTypesLeftShiftedRegisterToRegister)
 	n.srcReg = srcReg
 	n.srcReg2 = shiftedSourceReg
 	n.srcConst = shiftNum
@@ -536,7 +536,7 @@ func (a *AssemblerImpl) CompileLeftShiftedRegisterToRegister(
 
 // CompileConditionalRegisterSet implements Assembler.CompileConditionalRegisterSet
 func (a *AssemblerImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, dstReg asm.Register) {
-	n := a.newNode(CSET, OperandTypesRegisterToRegister)
+	n := a.newNode(CSET, operandTypesRegisterToRegister)
 	n.srcReg = conditionalRegisterStateToRegister(cond)
 	n.dstReg = dstReg
 }
@@ -544,7 +544,7 @@ func (a *AssemblerImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegist
 // CompileMemoryToVectorRegister implements Assembler.CompileMemoryToVectorRegister
 func (a *AssemblerImpl) CompileMemoryToVectorRegister(
 	instruction asm.Instruction, srcBaseReg asm.Register, dstOffset asm.ConstantValue, dstReg asm.Register, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesMemoryToVectorRegister)
+	n := a.newNode(instruction, operandTypesMemoryToVectorRegister)
 	n.srcReg = srcBaseReg
 	n.srcConst = dstOffset
 	n.dstReg = dstReg
@@ -554,7 +554,7 @@ func (a *AssemblerImpl) CompileMemoryToVectorRegister(
 // CompileMemoryWithRegisterOffsetToVectorRegister implements Assembler.CompileMemoryWithRegisterOffsetToVectorRegister
 func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToVectorRegister(instruction asm.Instruction,
 	srcBaseReg, srcOffsetRegister asm.Register, dstReg asm.Register, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesMemoryToVectorRegister)
+	n := a.newNode(instruction, operandTypesMemoryToVectorRegister)
 	n.srcReg = srcBaseReg
 	n.srcReg2 = srcOffsetRegister
 	n.dstReg = dstReg
@@ -564,7 +564,7 @@ func (a *AssemblerImpl) CompileMemoryWithRegisterOffsetToVectorRegister(instruct
 // CompileVectorRegisterToMemory implements Assembler.CompileVectorRegisterToMemory
 func (a *AssemblerImpl) CompileVectorRegisterToMemory(
 	instruction asm.Instruction, srcReg, dstBaseReg asm.Register, dstOffset asm.ConstantValue, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
+	n := a.newNode(instruction, operandTypesVectorRegisterToMemory)
 	n.srcReg = srcReg
 	n.dstReg = dstBaseReg
 	n.dstConst = dstOffset
@@ -574,7 +574,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToMemory(
 // CompileVectorRegisterToMemoryWithRegisterOffset implements Assembler.CompileVectorRegisterToMemoryWithRegisterOffset
 func (a *AssemblerImpl) CompileVectorRegisterToMemoryWithRegisterOffset(instruction asm.Instruction,
 	srcReg, dstBaseReg, dstOffsetRegister asm.Register, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToMemory)
+	n := a.newNode(instruction, operandTypesVectorRegisterToMemory)
 	n.srcReg = srcReg
 	n.dstReg = dstBaseReg
 	n.dstReg2 = dstOffsetRegister
@@ -584,7 +584,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToMemoryWithRegisterOffset(instruct
 // CompileRegisterToVectorRegister implements Assembler.CompileRegisterToVectorRegister
 func (a *AssemblerImpl) CompileRegisterToVectorRegister(
 	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, index VectorIndex) {
-	n := a.newNode(instruction, OperandTypesRegisterToVectorRegister)
+	n := a.newNode(instruction, operandTypesRegisterToVectorRegister)
 	n.srcReg = srcReg
 	n.dstReg = dstReg
 	n.vectorArrangement = arrangement
@@ -594,7 +594,7 @@ func (a *AssemblerImpl) CompileRegisterToVectorRegister(
 // CompileVectorRegisterToRegister implements Assembler.CompileVectorRegisterToRegister
 func (a *AssemblerImpl) CompileVectorRegisterToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register,
 	arrangement VectorArrangement, index VectorIndex) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToRegister)
+	n := a.newNode(instruction, operandTypesVectorRegisterToRegister)
 	n.srcReg = srcReg
 	n.dstReg = dstReg
 	n.vectorArrangement = arrangement
@@ -604,7 +604,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToRegister(instruction asm.Instruct
 // CompileVectorRegisterToVectorRegister implements Assembler.CompileVectorRegisterToVectorRegister
 func (a *AssemblerImpl) CompileVectorRegisterToVectorRegister(
 	instruction asm.Instruction, srcReg, dstReg asm.Register, arrangement VectorArrangement, srcIndex, dstIndex VectorIndex) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToVectorRegister)
+	n := a.newNode(instruction, operandTypesVectorRegisterToVectorRegister)
 	n.srcReg = srcReg
 	n.dstReg = dstReg
 	n.vectorArrangement = arrangement
@@ -615,7 +615,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToVectorRegister(
 // CompileVectorRegisterToVectorRegisterWithConst implements Assembler.CompileVectorRegisterToVectorRegisterWithConst
 func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instruction asm.Instruction,
 	srcReg, dstReg asm.Register, arrangement VectorArrangement, c asm.ConstantValue) {
-	n := a.newNode(instruction, OperandTypesVectorRegisterToVectorRegister)
+	n := a.newNode(instruction, operandTypesVectorRegisterToVectorRegister)
 	n.srcReg = srcReg
 	n.srcConst = c
 	n.dstReg = dstReg
@@ -624,7 +624,7 @@ func (a *AssemblerImpl) CompileVectorRegisterToVectorRegisterWithConst(instructi
 
 // CompileStaticConstToRegister implements Assembler.CompileStaticConstToVectorRegister
 func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction, c *asm.StaticConst, dstReg asm.Register) {
-	n := a.newNode(instruction, OperandTypesMemoryToRegister)
+	n := a.newNode(instruction, operandTypesMemoryToRegister)
 	n.staticConst = c
 	n.dstReg = dstReg
 }
@@ -632,7 +632,7 @@ func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction
 // CompileStaticConstToVectorRegister implements Assembler.CompileStaticConstToVectorRegister
 func (a *AssemblerImpl) CompileStaticConstToVectorRegister(instruction asm.Instruction,
 	c *asm.StaticConst, dstReg asm.Register, arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesStaticConstToVectorRegister)
+	n := a.newNode(instruction, operandTypesStaticConstToVectorRegister)
 	n.staticConst = c
 	n.dstReg = dstReg
 	n.vectorArrangement = arrangement
@@ -641,7 +641,7 @@ func (a *AssemblerImpl) CompileStaticConstToVectorRegister(instruction asm.Instr
 // CompileTwoVectorRegistersToVectorRegister implements Assembler.CompileTwoVectorRegistersToVectorRegister.
 func (a *AssemblerImpl) CompileTwoVectorRegistersToVectorRegister(instruction asm.Instruction, srcReg, srcReg2, dstReg asm.Register,
 	arrangement VectorArrangement) {
-	n := a.newNode(instruction, OperandTypesTwoVectorRegistersToVectorRegister)
+	n := a.newNode(instruction, operandTypesTwoVectorRegistersToVectorRegister)
 	n.srcReg = srcReg
 	n.srcReg2 = srcReg2
 	n.dstReg = dstReg
@@ -651,7 +651,7 @@ func (a *AssemblerImpl) CompileTwoVectorRegistersToVectorRegister(instruction as
 // CompileTwoVectorRegistersToVectorRegisterWithConst implements Assembler.CompileTwoVectorRegistersToVectorRegisterWithConst.
 func (a *AssemblerImpl) CompileTwoVectorRegistersToVectorRegisterWithConst(instruction asm.Instruction,
 	srcReg, srcReg2, dstReg asm.Register, arrangement VectorArrangement, c asm.ConstantValue) {
-	n := a.newNode(instruction, OperandTypesTwoVectorRegistersToVectorRegister)
+	n := a.newNode(instruction, operandTypesTwoVectorRegistersToVectorRegister)
 	n.srcReg = srcReg
 	n.srcReg2 = srcReg2
 	n.srcConst = c

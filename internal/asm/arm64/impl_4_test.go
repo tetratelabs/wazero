@@ -16,7 +16,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &nodeImpl{instruction: ADD, types: OperandTypesNoneToRegister},
+				n:      &nodeImpl{instruction: ADD, types: operandTypesNoneToRegister},
 				expErr: "ADD is unsupported for from:none,to:register type",
 			},
 			{
@@ -101,7 +101,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &nodeImpl{instruction: SUB, types: OperandTypesMemoryToRegister},
+				n:      &nodeImpl{instruction: SUB, types: operandTypesMemoryToRegister},
 				expErr: "SUB is unsupported for from:memory,to:register type",
 			},
 		}

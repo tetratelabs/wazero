@@ -15,11 +15,11 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 			expErr string
 		}{
 			{
-				n:      &nodeImpl{instruction: B, types: OperandTypesNoneToBranch},
+				n:      &nodeImpl{instruction: B, types: operandTypesNoneToBranch},
 				expErr: "branch target must be set for B",
 			},
 			{
-				n:      &nodeImpl{instruction: SUB, types: OperandTypesNoneToBranch},
+				n:      &nodeImpl{instruction: SUB, types: operandTypesNoneToBranch},
 				expErr: "SUB is unsupported for from:none,to:branch type",
 			},
 		}
