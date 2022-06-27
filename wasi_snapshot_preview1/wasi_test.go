@@ -454,11 +454,11 @@ func Test_FdClose(t *testing.T) {
 		require.NoError(t, err)
 		fsc := sysCtx.FS(testCtx)
 
-		fd, err := fsc.OpenFile(path1)
+		fd, err := fsc.OpenFile(testCtx, path1)
 		require.NoError(t, err)
 		require.Equal(t, fdToClose, fd)
 
-		fd, err = fsc.OpenFile(path2)
+		fd, err = fsc.OpenFile(testCtx, path2)
 		require.NoError(t, err)
 		require.Equal(t, fdToKeep, fd)
 
@@ -469,11 +469,11 @@ func Test_FdClose(t *testing.T) {
 	verify := func(mod api.Module) {
 		// Verify fdToClose is closed and removed from the opened FDs.
 		fsc := getSysCtx(mod).FS(testCtx)
-		_, ok := fsc.OpenedFile(fdToClose)
+		_, ok := fsc.OpenedFile(testCtx, fdToClose)
 		require.False(t, ok)
 
 		// Verify fdToKeep is not closed
-		_, ok = fsc.OpenedFile(fdToKeep)
+		_, ok = fsc.OpenedFile(testCtx, fdToKeep)
 		require.True(t, ok)
 	}
 
@@ -681,7 +681,7 @@ func requireOpenDir(t *testing.T, pathName string) (*internalsys.Context, uint32
 	sysCtx, err := newSysContext(nil, nil, testFS)
 	require.NoError(t, err)
 	fsc := sysCtx.FS(testCtx)
-	fd, err := fsc.OpenFile(pathName)
+	fd, err := fsc.OpenFile(testCtx, pathName)
 	require.NoError(t, err)
 	return sysCtx, fd
 }
@@ -895,7 +895,7 @@ func Test_FdRead(t *testing.T) {
 			require.NoError(t, err)
 			fsc := sysCtx.FS(testCtx)
 
-			fd, err = fsc.OpenFile("test_path")
+			fd, err = fsc.OpenFile(testCtx, "test_path")
 			require.NoError(t, err)
 
 			mod, fn := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
@@ -922,7 +922,7 @@ func Test_FdRead_Errors(t *testing.T) {
 	require.NoError(t, err)
 	fsc := sysCtx.FS(testCtx)
 
-	validFD, err := fsc.OpenFile("test_path")
+	validFD, err := fsc.OpenFile(testCtx, "test_path")
 	require.NoError(t, err)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
@@ -1051,7 +1051,7 @@ func Test_FdSeek(t *testing.T) {
 	require.NoError(t, err)
 
 	fsCtx := sysCtx.FS(testCtx)
-	fd, err := fsCtx.OpenFile("test_path")
+	fd, err := fsCtx.OpenFile(testCtx, "test_path")
 	require.NoError(t, err)
 
 	mod, fn := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
@@ -1126,7 +1126,7 @@ func Test_FdSeek(t *testing.T) {
 					maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 					// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-					f, ok := fsCtx.OpenedFile(fd)
+					f, ok := fsCtx.OpenedFile(testCtx, fd)
 					require.True(t, ok)
 					seeker := f.File.(io.Seeker)
 
@@ -1157,7 +1157,7 @@ func Test_FdSeek_Errors(t *testing.T) {
 	require.NoError(t, err)
 
 	fsCtx := sysCtx.FS(testCtx)
-	validFD, err := fsCtx.OpenFile("test_path")
+	validFD, err := fsCtx.OpenFile(testCtx, "test_path")
 	require.NoError(t, err)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
@@ -1510,7 +1510,7 @@ func Test_PathOpen(t *testing.T) {
 
 		// verify the file was actually opened
 		fsc := getSysCtx(mod).FS(ctx)
-		f, ok := fsc.OpenedFile(expectedFD)
+		f, ok := fsc.OpenedFile(testCtx, expectedFD)
 		require.True(t, ok)
 		require.Equal(t, pathName, f.Path)
 	}
@@ -2026,11 +2026,11 @@ func newContextWithWritableFile(t *testing.T, tmpDir string, pathName string) *i
 	require.NoError(t, err)
 
 	fsc := sysCtx.FS(testCtx)
-	fd, err := fsc.OpenFile(pathName)
+	fd, err := fsc.OpenFile(testCtx, pathName)
 	require.NoError(t, err)
 
 	// Swap the read-only file with a writeable one until #390
-	f, ok := fsc.OpenedFile(fd)
+	f, ok := fsc.OpenedFile(testCtx, fd)
 	require.True(t, ok)
 	f.File.Close()
 	f.File = writeable

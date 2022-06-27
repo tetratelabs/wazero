@@ -48,13 +48,19 @@ type FSContext struct {
 	lastFD uint32
 }
 
+// emptyFSContext is the context associated with EmptyFS.
+//
+// Note: This is not mutable as operations functions do not affect field state.
+var emptyFSContext = &FSContext{
+	fs:          EmptyFS,
+	openedFiles: map[uint32]*FileEntry{},
+	lastFD:      2,
+}
+
+// NewFSContext returns a mutable context if the fs is not EmptyFS.
 func NewFSContext(fs fs.FS) *FSContext {
 	if fs == EmptyFS {
-		return &FSContext{
-			fs:          fs,
-			openedFiles: map[uint32]*FileEntry{},
-			lastFD:      2,
-		}
+		return emptyFSContext
 	}
 	return &FSContext{
 		fs: fs,
@@ -76,7 +82,7 @@ func (c *FSContext) nextFD() uint32 {
 }
 
 // OpenedFile returns a file and true if it was opened or nil and false, if not.
-func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
+func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) {
 	f, ok := c.openedFiles[fd]
 	return f, ok
 }
@@ -86,7 +92,7 @@ func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
 // TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
 // Ex. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
 // See #390
-func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint32, error) {
+func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, perm int */) (uint32, error) {
 	// fs.ValidFile cannot start with '/'
 	fsOpenPath := name
 	if name[0] == '/' {
@@ -95,7 +101,7 @@ func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint3
 
 	f, err := c.fs.Open(fsOpenPath)
 	if err != nil {
-		return 0, &fs.PathError{Op: "open", Path: name, Err: err}
+		return 0, err // Don't wrap the underlying error which is already a PathError!
 	}
 
 	newFD := c.nextFD()
@@ -108,7 +114,7 @@ func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint3
 }
 
 // CloseFile returns true if a file was opened and closed without error, or false if not.
-func (c *FSContext) CloseFile(fd uint32) (bool, error) {
+func (c *FSContext) CloseFile(_ context.Context, fd uint32) (bool, error) {
 	f, ok := c.openedFiles[fd]
 	if !ok {
 		return false, nil

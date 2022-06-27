@@ -168,7 +168,7 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS(testCtx)
 
-		_, err := fsCtx.OpenFile("/foo")
+		_, err := fsCtx.OpenFile(testCtx, "/foo")
 		require.NoError(t, err)
 
 		ns, m1, m2 := newTestNamespace()

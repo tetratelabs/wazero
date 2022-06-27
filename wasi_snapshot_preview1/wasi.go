@@ -676,7 +676,7 @@ func (a *wasi) FdAllocate(ctx context.Context, mod api.Module, fd uint32, offset
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // See https://linux.die.net/man/3/close
 func (a *wasi) FdClose(ctx context.Context, mod api.Module, fd uint32) Errno {
-	if ok, err := getSysCtx(mod).FS(ctx).CloseFile(fd); err != nil {
+	if ok, err := getSysCtx(mod).FS(ctx).CloseFile(ctx, fd); err != nil {
 		return ErrnoIo
 	} else if !ok {
 		return ErrnoBadf
@@ -723,7 +723,7 @@ func (a *wasi) FdDatasync(ctx context.Context, mod api.Module, fd uint32) Errno 
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
 // See https://linux.die.net/man/3/fsync
 func (a *wasi) FdFdstatGet(ctx context.Context, mod api.Module, fd uint32, resultStat uint32) Errno {
-	if _, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd); !ok {
+	if _, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd); !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
@@ -757,7 +757,7 @@ func (a *wasi) FdFdstatGet(ctx context.Context, mod api.Module, fd uint32, resul
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
 func (a *wasi) FdPrestatGet(ctx context.Context, mod api.Module, fd uint32, resultPrestat uint32) Errno {
-	entry, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd)
+	entry, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -830,7 +830,7 @@ func (a *wasi) FdPread(ctx context.Context, mod api.Module, fd, iovs, iovsCount 
 // See FdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 func (a *wasi) FdPrestatDirName(ctx context.Context, mod api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
-	f, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd)
+	f, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -974,7 +974,7 @@ func (a *wasi) FdRenumber(ctx context.Context, mod api.Module, fd, to uint32) Er
 func (a *wasi) FdSeek(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
-	if f, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd); !ok || f.File == nil {
+	if f, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
 		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
@@ -1093,7 +1093,7 @@ func fdReader(ctx context.Context, mod api.Module, fd uint32) io.Reader {
 	sysCtx := getSysCtx(mod)
 	if fd == fdStdin {
 		return sysCtx.Stdin()
-	} else if f, ok := sysCtx.FS(ctx).OpenedFile(fd); !ok {
+	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
 		return nil
 	} else {
 		return f.File
@@ -1110,7 +1110,7 @@ func fdWriter(ctx context.Context, mod api.Module, fd uint32) io.Writer {
 		return sysCtx.Stderr()
 	default:
 		// Check to see if the file descriptor is available
-		if f, ok := sysCtx.FS(ctx).OpenedFile(fd); !ok || f.File == nil {
+		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
 			return nil
 			// fs.FS doesn't declare io.Writer, but implementations such as
 			// os.File implement it.
@@ -1191,7 +1191,7 @@ func (a *wasi) PathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathP
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
 	sysCtx := getSysCtx(mod)
 	fsc := sysCtx.FS(ctx)
-	if _, ok := fsc.OpenedFile(fd); !ok {
+	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return ErrnoBadf
 	}
 
@@ -1200,7 +1200,7 @@ func (a *wasi) PathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathP
 		return ErrnoFault
 	}
 
-	if newFD, err := fsc.OpenFile(string(b)); err != nil {
+	if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 			return ErrnoNoent
@@ -1210,7 +1210,7 @@ func (a *wasi) PathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathP
 			return ErrnoIo
 		}
 	} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
-		_, _ = fsc.CloseFile(newFD)
+		_, _ = fsc.CloseFile(ctx, newFD)
 		return ErrnoFault
 	}
 	return ErrnoSuccess

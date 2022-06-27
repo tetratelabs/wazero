@@ -25,7 +25,7 @@ func TestWithFS(t *testing.T) {
 	fsCtx, ok := v.(*sys.FSContext)
 	require.True(t, ok)
 
-	entry, ok := fsCtx.OpenedFile(3)
+	entry, ok := fsCtx.OpenedFile(ctx, 3)
 	require.True(t, ok)
 	require.Equal(t, "/", entry.Path)
 
@@ -38,6 +38,6 @@ func TestWithFS(t *testing.T) {
 	fsCtx, ok = v.(*sys.FSContext)
 	require.True(t, ok)
 
-	_, ok = fsCtx.OpenedFile(3)
+	_, ok = fsCtx.OpenedFile(ctx, 3)
 	require.False(t, ok)
 }
