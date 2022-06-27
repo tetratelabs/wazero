@@ -144,6 +144,7 @@ func testOverflow(t *testing.T, r wazero.Runtime) {
 	}
 }
 
+// testGlobalExtend ensures that un-signed extension of i32 globals must be zero extended. See #656.
 func testGlobalExtend(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromBinary(testCtx, globalExtendWasm)
 	require.NoError(t, err)
