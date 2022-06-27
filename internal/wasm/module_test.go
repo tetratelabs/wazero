@@ -773,7 +773,7 @@ func TestModule_buildGlobals(t *testing.T) {
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
-		// Higher bits are must be zeroed, not signed-extended. See #656.
+		// Higher bits are must be zeroed for i32 globals, not signed-extended. See #656.
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(uint32(minusOne))},
 		{Type: &GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
 	}
