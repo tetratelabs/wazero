@@ -63,7 +63,8 @@ func Equal(t TestingT, expected, actual interface{}, formatWithArgs ...interface
 
 	// Inline the comparison if the types are likely small:
 	if expectString {
-		fail(t, fmt.Sprintf("expected %q, but was %q", expected, actual), "", formatWithArgs...)
+		// Don't use %q as it escapes newlines!
+		fail(t, fmt.Sprintf("expected \"%s\", but was \"%s\"", expected, actual), "", formatWithArgs...)
 		return
 	} else if et.Kind() < reflect.Array {
 		fail(t, fmt.Sprintf("expected %v, but was %v", expected, actual), "", formatWithArgs...)

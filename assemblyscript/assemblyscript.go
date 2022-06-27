@@ -57,12 +57,12 @@ type Builder interface {
 
 	// Compile compiles the "env" module that can instantiated in any namespace (wazero.Namespace).
 	//
-	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
 
 	// Instantiate instantiates the "env" module into the provided namespace.
 	//
-	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
 }
 

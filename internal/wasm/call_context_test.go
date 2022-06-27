@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
+	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -143,10 +143,11 @@ func TestCallContext_Close(t *testing.T) {
 	}
 
 	t.Run("calls Context.Close()", func(t *testing.T) {
-		sysCtx := sys.DefaultContext()
+		sysCtx := sys.DefaultContext(testfs.FS{"foo": &testfs.File{}})
 		fsCtx := sysCtx.FS(testCtx)
 
-		fsCtx.OpenFile(&sys.FileEntry{Path: "."})
+		_, err := fsCtx.OpenFile("/foo")
+		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -169,10 +170,12 @@ func TestCallContext_Close(t *testing.T) {
 
 	t.Run("error closing", func(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
-		sysCtx := sys.DefaultContext()
+		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS(testCtx)
 
-		fsCtx.OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
+		_, err := fsCtx.OpenFile("/foo")
+		require.NoError(t, err)
 
 		m, err := s.Instantiate(context.Background(), ns, &Module{}, t.Name(), sysCtx, nil)
 		require.NoError(t, err)
@@ -184,13 +187,3 @@ func TestCallContext_Close(t *testing.T) {
 		require.False(t, ok, "expected no opened files")
 	})
 }
-
-// compile-time check to ensure testFile implements fs.File
-var _ fs.File = &testFile{}
-
-type testFile struct{ closeErr error }
-
-func (f *testFile) Close() error                       { return f.closeErr }
-func (f *testFile) Stat() (fs.FileInfo, error)         { return nil, nil }
-func (f *testFile) Read(_ []byte) (int, error)         { return 0, nil }
-func (f *testFile) Seek(_ int64, _ int) (int64, error) { return 0, nil }

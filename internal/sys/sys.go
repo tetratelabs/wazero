@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -28,8 +29,7 @@ type Context struct {
 	nanotimeResolution sys.ClockResolution
 	nanosleep          *sys.Nanosleep
 	randSource         io.Reader
-
-	fs *FSContext
+	fsc                *FSContext
 }
 
 // Args is like os.Args and defaults to nil.
@@ -109,7 +109,7 @@ func (c *Context) Nanosleep(ctx context.Context, ns int64) {
 	(*(c.nanosleep))(ctx, ns)
 }
 
-// FS returns the file system context.
+// FS returns a possibly nil file system context.
 func (c *Context) FS(ctx context.Context) *FSContext {
 	// Override Context when it is passed via context
 	if fsValue := ctx.Value(FSKey{}); fsValue != nil {
@@ -119,7 +119,7 @@ func (c *Context) FS(ctx context.Context) *FSContext {
 		}
 		return fsCtx
 	}
-	return c.fs
+	return c.fsc
 }
 
 // RandSource is a source of random bytes and defaults to crypto/rand.Reader.
@@ -137,19 +137,16 @@ func (eofReader) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
 
-// DefaultContext returns Context with no values set.
-//
-// Note: This isn't a constant because Context.openedFiles is currently mutable even when empty.
-// TODO: Make it an error to open or close files when no FS was assigned.
-func DefaultContext() *Context {
-	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, nil); err != nil {
+// DefaultContext returns Context with no values set except a possibly nil fs.FS
+func DefaultContext(fs fs.FS) *Context {
+	if sysCtx, err := NewContext(0, nil, nil, nil, nil, nil, nil, nil, 0, nil, 0, nil, fs); err != nil {
 		panic(fmt.Errorf("BUG: DefaultContext should never error: %w", err))
 	} else {
 		return sysCtx
 	}
 }
 
-var _ = DefaultContext() // Force panic on bug.
+var _ = DefaultContext(nil) // Force panic on bug.
 var ns sys.Nanosleep = platform.FakeNanosleep
 
 // NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
@@ -163,7 +160,7 @@ func NewContext(
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
-	openedFiles map[uint32]*FileEntry,
+	fs fs.FS,
 ) (sysCtx *Context, err error) {
 	sysCtx = &Context{args: args, environ: environ}
 
@@ -227,7 +224,11 @@ func NewContext(
 		sysCtx.nanosleep = &ns
 	}
 
-	sysCtx.fs = NewFSContext(openedFiles)
+	if fs != nil {
+		sysCtx.fsc = NewFSContext(fs)
+	} else {
+		sysCtx.fsc = NewFSContext(EmptyFS)
+	}
 
 	return
 }

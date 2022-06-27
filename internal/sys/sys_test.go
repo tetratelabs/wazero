@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
+	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -24,8 +25,8 @@ func TestDefaultSysContext(t *testing.T) {
 		nil,    // randSource
 		nil, 0, // walltime, walltimeResolution
 		nil, 0, // nanotime, nanotimeResolution
-		nil, // nanosleep
-		nil, // openedFiles
+		nil,         // nanosleep
+		testfs.FS{}, // fs
 	)
 	require.NoError(t, err)
 
@@ -45,7 +46,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, rand.Reader, sysCtx.RandSource())
-	require.Equal(t, NewFSContext(map[uint32]*FileEntry{}), sysCtx.FS(testCtx))
+	require.Equal(t, NewFSContext(testfs.FS{}), sysCtx.FS(testCtx))
 }
 
 func TestNewContext_Args(t *testing.T) {
@@ -97,7 +98,7 @@ func TestNewContext_Args(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -159,7 +160,7 @@ func TestNewContext_Environ(t *testing.T) {
 				nil, 0,                           // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -207,7 +208,7 @@ func TestNewContext_Walltime(t *testing.T) {
 				tc.time, tc.resolution, // walltime, walltimeResolution
 				nil, 0, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -255,7 +256,7 @@ func TestNewContext_Nanotime(t *testing.T) {
 				nil, 0, // nanotime, nanotimeResolution
 				tc.time, tc.resolution, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			)
 			if tc.expectedErr == "" {
 				require.Nil(t, err)
@@ -313,7 +314,7 @@ func TestNewContext_Nanosleep(t *testing.T) {
 		nil, 0, // Nanosleep, NanosleepResolution
 		nil, 0, // Nanosleep, NanosleepResolution
 		&aNs, // nanosleep
-		nil,  // openedFiles
+		nil,  // fs
 	)
 	require.Nil(t, err)
 	require.Equal(t, &aNs, sysCtx.nanosleep)

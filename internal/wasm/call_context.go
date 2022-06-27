@@ -115,10 +115,11 @@ func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err e
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return false, nil
 	}
-	if sysCtx := m.Sys; sysCtx != nil { // ex nil if from ModuleBuilder
-		return true, sysCtx.FS(ctx).Close(ctx)
+	c = true
+	if sysCtx := m.Sys; sysCtx != nil { // nil if from ModuleBuilder
+		err = sysCtx.FS(ctx).Close(ctx)
 	}
-	return true, nil
+	return
 }
 
 // Memory implements the same method as documented on api.Module.

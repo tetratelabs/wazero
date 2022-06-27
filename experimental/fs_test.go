@@ -3,7 +3,6 @@ package experimental_test
 import (
 	"context"
 	_ "embed"
-	"log"
 	"testing"
 	"testing/fstest"
 
@@ -18,10 +17,7 @@ func TestWithFS(t *testing.T) {
 	mapfs := fstest.MapFS{fileName: &fstest.MapFile{Data: []byte(`animals`)}}
 
 	// Set context to one that has experimental fs config
-	ctx, closer, err := experimental.WithFS(context.Background(), mapfs)
-	if err != nil {
-		log.Panicln(err)
-	}
+	ctx, closer := experimental.WithFS(context.Background(), mapfs)
 	defer closer.Close(ctx)
 
 	v := ctx.Value(sys.FSKey{})
@@ -32,10 +28,16 @@ func TestWithFS(t *testing.T) {
 	entry, ok := fsCtx.OpenedFile(3)
 	require.True(t, ok)
 	require.Equal(t, "/", entry.Path)
-	require.Equal(t, mapfs, entry.FS)
 
-	entry, ok = fsCtx.OpenedFile(4)
+	// Override to nil context, ex to block file access
+	ctx, closer = experimental.WithFS(ctx, nil)
+	defer closer.Close(ctx)
+
+	v = ctx.Value(sys.FSKey{})
+	require.NotNil(t, v)
+	fsCtx, ok = v.(*sys.FSContext)
 	require.True(t, ok)
-	require.Equal(t, ".", entry.Path)
-	require.Equal(t, mapfs, entry.FS)
+
+	_, ok = fsCtx.OpenedFile(3)
+	require.False(t, ok)
 }

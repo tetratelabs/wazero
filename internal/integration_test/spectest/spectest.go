@@ -385,7 +385,7 @@ func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
 	err = s.Engine.CompileModule(testCtx, mod)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(), nil)
+	_, err = s.Instantiate(testCtx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil), nil)
 	require.NoError(t, err)
 }
 

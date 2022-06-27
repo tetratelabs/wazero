@@ -100,7 +100,7 @@ func TestStore_Instantiate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sysCtx := sys.DefaultContext()
+	sysCtx := sys.DefaultContext(nil)
 	mod, err := s.Instantiate(testCtx, ns, m, "", sysCtx, nil)
 	require.NoError(t, err)
 	defer mod.Close(testCtx)
@@ -211,7 +211,7 @@ func TestStore_hammer(t *testing.T) {
 		N = 100
 	}
 	hammer.NewHammer(t, P, N).Run(func(name string) {
-		mod, instantiateErr := s.Instantiate(testCtx, ns, importingModule, name, sys.DefaultContext(), nil)
+		mod, instantiateErr := s.Instantiate(testCtx, ns, importingModule, name, sys.DefaultContext(nil), nil)
 		require.NoError(t, instantiateErr)
 		require.NoError(t, mod.Close(testCtx))
 	}, nil)
