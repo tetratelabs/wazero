@@ -3,6 +3,7 @@ package wazero
 import (
 	"context"
 	"io"
+	"io/fs"
 	"math"
 	"reflect"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -304,8 +306,8 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 	base.(*moduleConfig).nanotime = &nt
 	base.(*moduleConfig).nanotimeResolution = 1
 
-	testFS := fstest.MapFS{}
-	testFS2 := fstest.MapFS{}
+	testFS := testfs.FS{}
+	testFS2 := testfs.FS{"/": &testfs.File{}}
 
 	tests := []struct {
 		name     string
@@ -326,7 +328,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -343,7 +345,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -360,7 +362,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,             // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -377,7 +379,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,              // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -394,7 +396,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,          // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -411,7 +413,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -428,7 +430,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -445,7 +447,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                   // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -462,7 +464,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,                  // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				nil, // openedFiles
+				nil, // fs
 			),
 		},
 		{
@@ -479,10 +481,7 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
 				nil, // nanosleep
-				map[uint32]*internalsys.FileEntry{ // openedFiles
-					3: {Path: "/", FS: testFS},
-					4: {Path: ".", FS: testFS},
-				},
+				testFS,
 			),
 		},
 		{
@@ -498,70 +497,8 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				nil,            // randSource
 				&wt, 1,         // walltime, walltimeResolution
 				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				map[uint32]*internalsys.FileEntry{ // openedFiles
-					3: {Path: "/", FS: testFS2},
-					4: {Path: ".", FS: testFS2},
-				},
-			),
-		},
-		{
-			name:  "WithWorkDirFS",
-			input: base.WithWorkDirFS(testFS),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				map[uint32]*internalsys.FileEntry{ // openedFiles
-					3: {Path: ".", FS: testFS},
-				},
-			),
-		},
-		{
-			name:  "WithFS and WithWorkDirFS",
-			input: base.WithFS(testFS).WithWorkDirFS(testFS2),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				map[uint32]*internalsys.FileEntry{ // openedFiles
-					3: {Path: "/", FS: testFS},
-					4: {Path: ".", FS: testFS2},
-				},
-			),
-		},
-		{
-			name:  "WithWorkDirFS and WithFS",
-			input: base.WithWorkDirFS(testFS).WithFS(testFS2),
-			expected: requireSysContext(t,
-				math.MaxUint32, // max
-				nil,            // args
-				nil,            // environ
-				nil,            // stdin
-				nil,            // stdout
-				nil,            // stderr
-				nil,            // randSource
-				&wt, 1,         // walltime, walltimeResolution
-				&nt, 1, // nanotime, nanotimeResolution
-				nil, // nanosleep
-				map[uint32]*internalsys.FileEntry{ // openedFiles
-					3: {Path: ".", FS: testFS},
-					4: {Path: "/", FS: testFS2},
-				},
+				nil,     // nanosleep
+				testFS2, // fs
 			),
 		},
 	}
@@ -764,16 +701,6 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 			input:       NewModuleConfig().WithEnv("", "a"),
 			expectedErr: "environ invalid: empty key",
 		},
-		{
-			name:        "WithFS nil",
-			input:       NewModuleConfig().WithFS(nil),
-			expectedErr: "FS for / is nil",
-		},
-		{
-			name:        "WithWorkDirFS nil",
-			input:       NewModuleConfig().WithWorkDirFS(nil),
-			expectedErr: "FS for . is nil",
-		},
 	}
 	for _, tt := range tests {
 		tc := tt
@@ -788,8 +715,8 @@ func TestModuleConfig_clone(t *testing.T) {
 	mc := NewModuleConfig().(*moduleConfig)
 	cloned := mc.clone()
 
-	fs1 := fstest.MapFS{}
-	mc.fs.WithWorkDirFS(fs1)
+	// Make post-clone changes
+	mc.fs = fstest.MapFS{}
 	mc.environKeys["2"] = 2
 
 	cloned.environKeys["1"] = 1
@@ -799,9 +726,7 @@ func TestModuleConfig_clone(t *testing.T) {
 	require.Equal(t, map[string]int{"1": 1}, cloned.environKeys)
 
 	// Ensure the fs is not shared
-	preopens, err := cloned.fs.Preopens()
-	require.NoError(t, err)
-	require.Equal(t, map[uint32]*internalsys.FileEntry{}, preopens)
+	require.Nil(t, cloned.fs)
 }
 
 func TestCompiledCode_Close(t *testing.T) {
@@ -839,7 +764,7 @@ func requireSysContext(
 	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
 	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
-	openedFiles map[uint32]*internalsys.FileEntry,
+	fs fs.FS,
 ) *internalsys.Context {
 	sysCtx, err := internalsys.NewContext(
 		max,
@@ -852,7 +777,7 @@ func requireSysContext(
 		walltime, walltimeResolution,
 		nanotime, nanotimeResolution,
 		nanosleep,
-		openedFiles,
+		fs,
 	)
 	require.NoError(t, err)
 	return sysCtx

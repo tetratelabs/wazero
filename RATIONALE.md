@@ -379,6 +379,34 @@ file descriptors if resources aren't managed properly. In other words, blind cop
 violate isolation or endanger the embedding process. In summary, we try to be similar to normal Go code, but often need
 act differently and document `ModuleConfig` is more about emulating, not necessarily performing real system calls.
 
+## File systems
+
+### Why doesn't wazero implement the working directory?
+
+An early design of wazero's API included a `WithWorkDirFS` which allowed
+control over which file a relative path such as "./config.yml" resolved to,
+independent of the root file system. This intended to help separate concerns
+like mutability of files, but it didn't work and was removed.
+
+Compilers that target wasm act differently with regard to the working
+directory. For example, while `GOOS=js` uses host functions to track the
+working directory, WASI host functions do not. wasi-libc, used by TinyGo,
+tracks working directory changes in compiled wasm instead: initially "/" until
+code calls `chdir`.
+
+The only place wazero can standardize a layered concern is via a host function.
+Since WASI doesn't use host functions to track the working directory, we can't
+standardize the storage and initial value of it.
+
+Meanwhile, code may be able to affect the working directory by compiling
+`chdir` into their main function, using an argument or ENV for the initial
+value (possibly `PWD`). Those unable to control the compiled code should only
+use absolute paths in configuration.
+
+See
+* https://github.com/golang/go/blob/go1.19beta1/src/syscall/fs_js.go#L324
+* https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
+
 ### FdPrestatDirName
 
 `FdPrestatDirName` is a WASI function to return the path of the pre-opened directory of a file descriptor.

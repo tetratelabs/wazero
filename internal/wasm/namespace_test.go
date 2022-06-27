@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/sys"
+	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -162,15 +163,18 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 	}
 
 	t.Run("error closing", func(t *testing.T) {
-		sysCtx := sys.DefaultContext()
+		// Right now, the only way to err closing the sys context is if a File.Close erred.
+		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
+		sysCtx := sys.DefaultContext(testFS)
 		fsCtx := sysCtx.FS(testCtx)
 
-		fsCtx.OpenFile(&sys.FileEntry{Path: ".", File: &testFile{errors.New("error closing")}})
+		_, err := fsCtx.OpenFile(testCtx, "/foo")
+		require.NoError(t, err)
 
 		ns, m1, m2 := newTestNamespace()
 		m1.CallCtx.Sys = sysCtx // This should err, but both should close
 
-		err := ns.CloseWithExitCode(testCtx, 2)
+		err = ns.CloseWithExitCode(testCtx, 2)
 		require.EqualError(t, err, "error closing")
 
 		// Both modules were closed

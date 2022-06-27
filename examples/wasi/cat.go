@@ -53,8 +53,7 @@ func main() {
 	}
 
 	// InstantiateModule runs the "_start" function which is what TinyGo compiles "main" to.
-	// * Set the program name (arg[0]) to "wasi" and add args to write "test.txt" to stdout twice.
-	// * We use "/test.txt" or "./test.txt" because WithFS by default maps the workdir "." to "/".
+	// * Set the program name (arg[0]) to "wasi" and add args to write "/test.txt" to stdout twice.
 	if _, err = r.InstantiateModule(ctx, code, config.WithArgs("wasi", os.Args[1])); err != nil {
 		log.Panicln(err)
 	}

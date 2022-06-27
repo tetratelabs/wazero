@@ -442,23 +442,25 @@ func Test_FdAllocate(t *testing.T) {
 }
 
 func Test_FdClose(t *testing.T) {
-	fdToClose := uint32(3) // arbitrary fd
-	fdToKeep := uint32(4)  // another arbitrary fd
+	fdToClose := uint32(4) // arbitrary fd
+	fdToKeep := uint32(5)  // another arbitrary fd
 
 	setupFD := func() (api.Module, api.Function, *wasi) {
 		// fd_close needs to close an open file descriptor. Open two files so that we can tell which is closed.
 		path1, path2 := "a", "b"
-		testFs := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
-		entry1, errno := openFileEntry(testFs, path1)
-		require.Zero(t, errno, ErrnoName(errno))
-		entry2, errno := openFileEntry(testFs, path2)
-		require.Zero(t, errno, ErrnoName(errno))
 
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-			fdToClose: entry1,
-			fdToKeep:  entry2,
-		})
+		testFS := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
+		sysCtx, err := newSysContext(nil, nil, testFS)
 		require.NoError(t, err)
+		fsc := sysCtx.FS(testCtx)
+
+		fd, err := fsc.OpenFile(testCtx, path1)
+		require.NoError(t, err)
+		require.Equal(t, fdToClose, fd)
+
+		fd, err = fsc.OpenFile(testCtx, path2)
+		require.NoError(t, err)
+		require.Equal(t, fdToKeep, fd)
 
 		mod, fn := instantiateModule(testCtx, t, functionFdClose, importFdClose, sysCtx)
 		return mod, fn, a
@@ -467,11 +469,11 @@ func Test_FdClose(t *testing.T) {
 	verify := func(mod api.Module) {
 		// Verify fdToClose is closed and removed from the opened FDs.
 		fsc := getSysCtx(mod).FS(testCtx)
-		_, ok := fsc.OpenedFile(fdToClose)
+		_, ok := fsc.OpenedFile(testCtx, fdToClose)
 		require.False(t, ok)
 
 		// Verify fdToKeep is not closed
-		_, ok = fsc.OpenedFile(fdToKeep)
+		_, ok = fsc.OpenedFile(testCtx, fdToKeep)
 		require.True(t, ok)
 	}
 
@@ -633,11 +635,8 @@ func Test_FdPread(t *testing.T) {
 }
 
 func Test_FdPrestatGet(t *testing.T) {
-	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-
 	pathName := "/tmp"
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: pathName}})
-	require.NoError(t, err)
+	sysCtx, fd := requireOpenDir(t, pathName)
 
 	mod, fn := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
 	defer mod.Close(testCtx)
@@ -677,12 +676,21 @@ func Test_FdPrestatGet(t *testing.T) {
 	})
 }
 
+func requireOpenDir(t *testing.T, pathName string) (*internalsys.Context, uint32) {
+	testFS := fstest.MapFS{pathName[1:]: {Mode: fs.ModeDir}}
+	sysCtx, err := newSysContext(nil, nil, testFS)
+	require.NoError(t, err)
+	fsc := sysCtx.FS(testCtx)
+	fd, err := fsc.OpenFile(testCtx, pathName)
+	require.NoError(t, err)
+	return sysCtx, fd
+}
+
 func Test_FdPrestatGet_Errors(t *testing.T) {
-	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
-	require.NoError(t, err)
+	pathName := "/tmp"
+	sysCtx, fd := requireOpenDir(t, pathName)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdPrestatGet, importFdPrestatGet, sysCtx)
 	defer mod.Close(testCtx)
@@ -721,10 +729,8 @@ func Test_FdPrestatGet_Errors(t *testing.T) {
 }
 
 func Test_FdPrestatDirName(t *testing.T) {
-	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
-	require.NoError(t, err)
+	pathName := "/tmp"
+	sysCtx, fd := requireOpenDir(t, pathName)
 
 	mod, fn := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
 	defer mod.Close(testCtx)
@@ -763,9 +769,8 @@ func Test_FdPrestatDirName(t *testing.T) {
 }
 
 func Test_FdPrestatDirName_Errors(t *testing.T) {
-	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{fd: {Path: "/tmp"}})
-	require.NoError(t, err)
+	pathName := "/tmp"
+	sysCtx, fd := requireOpenDir(t, pathName)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdPrestatDirName, importFdPrestatDirName, sysCtx)
 	defer mod.Close(testCtx)
@@ -841,7 +846,7 @@ func Test_FdPwrite(t *testing.T) {
 }
 
 func Test_FdRead(t *testing.T) {
-	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	var fd uint32
 	iovs := uint32(1) // arbitrary offset
 	initialMemory := []byte{
 		'?',         // `iovs` is after this
@@ -885,10 +890,12 @@ func Test_FdRead(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to read the contents from
-			file, testFS := createFile(t, "test_path", []byte("wazero"))
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-				fd: {Path: "test_path", FS: testFS, File: file},
-			})
+			_, testFS := createFile(t, "test_path", []byte("wazero"))
+			sysCtx, err := newSysContext(nil, nil, testFS)
+			require.NoError(t, err)
+			fsc := sysCtx.FS(testCtx)
+
+			fd, err = fsc.OpenFile(testCtx, "test_path")
 			require.NoError(t, err)
 
 			mod, fn := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
@@ -910,12 +917,12 @@ func Test_FdRead(t *testing.T) {
 }
 
 func Test_FdRead_Errors(t *testing.T) {
-	validFD := uint32(3)                                 // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	file, testFS := createFile(t, "test_path", []byte{}) // file with empty contents
+	_, testFS := createFile(t, "test_path", []byte{}) // file with empty contents
+	sysCtx, err := newSysContext(nil, nil, testFS)
+	require.NoError(t, err)
+	fsc := sysCtx.FS(testCtx)
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-		validFD: {Path: "test_path", FS: testFS, File: file},
-	})
+	validFD, err := fsc.OpenFile(testCtx, "test_path")
 	require.NoError(t, err)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdRead, importFdRead, sysCtx)
@@ -1038,16 +1045,14 @@ func Test_FdRenumber(t *testing.T) {
 }
 
 func Test_FdSeek(t *testing.T) {
-	fd := uint32(3)                                              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	resultNewoffset := uint32(1)                                 // arbitrary offset in `ctx.Memory` for the new offset value
-	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
-
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-		fd: {Path: "test_path", FS: testFS, File: file},
-	})
+	resultNewoffset := uint32(1)                              // arbitrary offset in `ctx.Memory` for the new offset value
+	_, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
+	sysCtx, err := newSysContext(nil, nil, testFS)
 	require.NoError(t, err)
 
 	fsCtx := sysCtx.FS(testCtx)
+	fd, err := fsCtx.OpenFile(testCtx, "test_path")
+	require.NoError(t, err)
 
 	mod, fn := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
 	defer mod.Close(testCtx)
@@ -1121,7 +1126,7 @@ func Test_FdSeek(t *testing.T) {
 					maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 					// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-					f, ok := fsCtx.OpenedFile(fd)
+					f, ok := fsCtx.OpenedFile(testCtx, fd)
 					require.True(t, ok)
 					seeker := f.File.(io.Seeker)
 
@@ -1147,12 +1152,12 @@ func Test_FdSeek(t *testing.T) {
 }
 
 func Test_FdSeek_Errors(t *testing.T) {
-	validFD := uint32(3)                                         // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
+	_, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
+	sysCtx, err := newSysContext(nil, nil, testFS)
+	require.NoError(t, err)
 
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-		validFD: {Path: "test_path", FS: testFS, File: file},
-	})
+	fsCtx := sysCtx.FS(testCtx)
+	validFD, err := fsCtx.OpenFile(testCtx, "test_path")
 	require.NoError(t, err)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdSeek, importFdSeek, sysCtx)
@@ -1193,7 +1198,6 @@ func Test_FdSeek_Errors(t *testing.T) {
 			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
 		})
 	}
-
 }
 
 // Test_FdSync only tests it is stubbed for GrainLang per #271
@@ -1233,7 +1237,7 @@ func Test_FdTell(t *testing.T) {
 }
 
 func Test_FdWrite(t *testing.T) {
-	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	fd := uint32(4)
 	iovs := uint32(1) // arbitrary offset
 	initialMemory := []byte{
 		'?',         // `iovs` is after this
@@ -1280,11 +1284,7 @@ func Test_FdWrite(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to write the contents to
 			pathName := "test_path"
-			file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
-			sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-				fd: {Path: pathName, FS: testFS, File: file},
-			})
-			require.NoError(t, err)
+			sysCtx := newContextWithWritableFile(t, tmpDir, pathName)
 
 			mod, fn := instantiateModule(testCtx, t, functionFdWrite, importFdWrite, sysCtx)
 			defer mod.Close(testCtx)
@@ -1310,16 +1310,10 @@ func Test_FdWrite(t *testing.T) {
 }
 
 func Test_FdWrite_Errors(t *testing.T) {
-	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
-	file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
-
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-		validFD: {Path: pathName, FS: testFS, File: file},
-	})
-	require.NoError(t, err)
+	validFD := uint32(4)
+	sysCtx := newContextWithWritableFile(t, tmpDir, pathName)
 
 	mod, _ := instantiateModule(testCtx, t, functionFdWrite, importFdWrite, sysCtx)
 	defer mod.Close(testCtx)
@@ -1461,7 +1455,6 @@ func Test_PathLink(t *testing.T) {
 
 func Test_PathOpen(t *testing.T) {
 	type pathOpenArgs struct {
-		fd                 uint32
 		dirflags           uint32
 		pathPtr            uint32
 		pathLen            uint32
@@ -1472,11 +1465,13 @@ func Test_PathOpen(t *testing.T) {
 		resultOpenedFd     uint32
 	}
 
-	setup := func(workdirFD uint32, pathName string) (api.Module, api.Function, pathOpenArgs, []byte, uint32) {
+	rootFD := uint32(3) // after 0, 1, and 2, that are stdin/out/err
+	expectedFD := rootFD + 1
+
+	setup := func(pathName string) (api.Module, api.Function, pathOpenArgs, []byte) {
 		// Setup the initial memory to include the path name starting at an offset.
 		initialMemory := append([]byte{'?'}, pathName...)
 
-		expectedFD := workdirFD + 1
 		expectedMemory := append(
 			initialMemory,
 			'?', // `resultOpenedFd` is after this
@@ -1485,7 +1480,6 @@ func Test_PathOpen(t *testing.T) {
 		)
 
 		args := pathOpenArgs{
-			fd:                 workdirFD,
 			dirflags:           0,
 			pathPtr:            1,
 			pathLen:            uint32(len(pathName)),
@@ -1497,18 +1491,17 @@ func Test_PathOpen(t *testing.T) {
 		}
 
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-		sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-			workdirFD: {Path: ".", FS: testFS},
-		})
+		sysCtx, err := newSysContext(nil, nil, testFS)
 		require.NoError(t, err)
+
 		mod, fn := instantiateModule(testCtx, t, functionPathOpen, importPathOpen, sysCtx)
 		maskMemory(t, testCtx, mod, len(expectedMemory))
 		ok := mod.Memory().Write(testCtx, 0, initialMemory)
 		require.True(t, ok)
-		return mod, fn, args, expectedMemory, expectedFD
+		return mod, fn, args, expectedMemory
 	}
 
-	verify := func(ctx context.Context, errno Errno, mod api.Module, pathName string, expectedMemory []byte, expectedFD uint32) {
+	verify := func(ctx context.Context, errno Errno, mod api.Module, pathName string, expectedMemory []byte) {
 		require.Zero(t, errno, ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -1517,54 +1510,48 @@ func Test_PathOpen(t *testing.T) {
 
 		// verify the file was actually opened
 		fsc := getSysCtx(mod).FS(ctx)
-		f, ok := fsc.OpenedFile(expectedFD)
+		f, ok := fsc.OpenedFile(testCtx, expectedFD)
 		require.True(t, ok)
 		require.Equal(t, pathName, f.Path)
 	}
 
 	t.Run("wasi.PathOpen", func(t *testing.T) {
-		workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 		pathName := "wazero"
 
-		mod, _, args, expectedMemory, expectedFD := setup(workdirFD, pathName)
-		errno := a.PathOpen(testCtx, mod, args.fd, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
+		mod, _, args, expectedMemory := setup(pathName)
+		errno := a.PathOpen(testCtx, mod, rootFD, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
 			args.fsRightsBase, args.fsRightsInheriting, args.fdflags, args.resultOpenedFd)
-		verify(testCtx, errno, mod, pathName, expectedMemory, expectedFD)
+		verify(testCtx, errno, mod, pathName, expectedMemory)
 	})
 
 	t.Run(functionPathOpen, func(t *testing.T) {
-		workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 		pathName := "wazero"
 
-		mod, fn, args, expectedMemory, expectedFD := setup(workdirFD, pathName)
-		results, err := fn.Call(testCtx, uint64(args.fd), uint64(args.dirflags), uint64(args.pathPtr), uint64(args.pathLen),
+		mod, fn, args, expectedMemory := setup(pathName)
+		results, err := fn.Call(testCtx, uint64(rootFD), uint64(args.dirflags), uint64(args.pathPtr), uint64(args.pathLen),
 			uint64(args.oflags), args.fsRightsBase, args.fsRightsInheriting, uint64(args.fdflags), uint64(args.resultOpenedFd))
 		require.NoError(t, err)
 		errno := Errno(results[0])
-		verify(testCtx, errno, mod, pathName, expectedMemory, expectedFD)
+		verify(testCtx, errno, mod, pathName, expectedMemory)
 	})
 
 	t.Run("wasi.PathOpen.WithFS", func(t *testing.T) {
-		workdirFD := uint32(100) // dummy fd as it is not used
 		pathName := "wazero"
 
 		// The filesystem initialized in setup() is not used as it will be overridden.
-		mod, _, args, expectedMemory, _ := setup(workdirFD, pathName)
+		mod, _, args, expectedMemory := setup(pathName)
 
 		// Override fs.FS through context
-		workdirFD = uint32(4) // 3 is '/' and 4 is '.'
-		expectedFD := workdirFD + 1
 		expectedMemory[8] = byte(expectedFD) // replace expected memory with expected fd
 		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-		ctx, closer, err := experimental.WithFS(testCtx, testFS)
-		require.NoError(t, err)
+		ctx, closer := experimental.WithFS(testCtx, testFS)
 		defer closer.Close(ctx)
 
-		errno := a.PathOpen(ctx, mod, workdirFD, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
+		errno := a.PathOpen(ctx, mod, rootFD, args.dirflags, args.pathPtr, args.pathLen, args.oflags,
 			args.fsRightsBase, args.fsRightsInheriting, args.fdflags, args.resultOpenedFd)
 		require.Zero(t, errno, ErrnoName(errno))
 
-		verify(ctx, errno, mod, pathName, expectedMemory, expectedFD)
+		verify(ctx, errno, mod, pathName, expectedMemory)
 	})
 }
 
@@ -1572,10 +1559,7 @@ func Test_PathOpen_Errors(t *testing.T) {
 	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	pathName := "wazero"
 	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-
-	sysCtx, err := newSysContext(nil, nil, map[uint32]*internalsys.FileEntry{
-		validFD: {Path: ".", FS: testFS},
-	})
+	sysCtx, err := newSysContext(nil, nil, testFS)
 	require.NoError(t, err)
 
 	mod, _ := instantiateModule(testCtx, t, functionPathOpen, importPathOpen, sysCtx)
@@ -2008,7 +1992,7 @@ func instantiateModule(ctx context.Context, t *testing.T, wasiFunction, wasiImpo
 	return mod, fn
 }
 
-func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.FileEntry) (sysCtx *internalsys.Context, err error) {
+func newSysContext(args, environ []string, fs fs.FS) (sysCtx *internalsys.Context, err error) {
 	return internalsys.NewContext(
 		math.MaxUint32,
 		args,
@@ -2020,7 +2004,7 @@ func newSysContext(args, environ []string, openedFiles map[uint32]*internalsys.F
 		nil, 0,
 		nil, 0,
 		nil, // nanosleep
-		openedFiles,
+		fs,
 	)
 }
 
@@ -2033,6 +2017,25 @@ func createFile(t *testing.T, pathName string, data []byte) (fs.File, fs.FS) {
 	f, err := mapFS.Open(pathName)
 	require.NoError(t, err)
 	return f, mapFS
+}
+
+// newContextWithWritableFile is temporary until we add the ability to open files for writing.
+func newContextWithWritableFile(t *testing.T, tmpDir string, pathName string) *internalsys.Context {
+	writeable, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
+	sysCtx, err := newSysContext(nil, nil, testFS)
+	require.NoError(t, err)
+
+	fsc := sysCtx.FS(testCtx)
+	fd, err := fsc.OpenFile(testCtx, pathName)
+	require.NoError(t, err)
+
+	// Swap the read-only file with a writeable one until #390
+	f, ok := fsc.OpenedFile(testCtx, fd)
+	require.True(t, ok)
+	f.File.Close()
+	f.File = writeable
+
+	return sysCtx
 }
 
 // createWriteableFile uses real files when io.Writer tests are needed.

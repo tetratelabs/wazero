@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"path"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -48,12 +47,12 @@ type Builder interface {
 
 	// Compile compiles the ModuleName module that can instantiated in any namespace (wazero.Namespace).
 	//
-	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
 
 	// Instantiate instantiates the ModuleName module into the provided namespace.
 	//
-	// Note: This has the same effect as the same function name on wazero.ModuleBuilder.
+	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
 }
 
@@ -677,7 +676,7 @@ func (a *wasi) FdAllocate(ctx context.Context, mod api.Module, fd uint32, offset
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // See https://linux.die.net/man/3/close
 func (a *wasi) FdClose(ctx context.Context, mod api.Module, fd uint32) Errno {
-	if ok, err := getSysCtx(mod).FS(ctx).CloseFile(fd); err != nil {
+	if ok, err := getSysCtx(mod).FS(ctx).CloseFile(ctx, fd); err != nil {
 		return ErrnoIo
 	} else if !ok {
 		return ErrnoBadf
@@ -724,7 +723,7 @@ func (a *wasi) FdDatasync(ctx context.Context, mod api.Module, fd uint32) Errno 
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
 // See https://linux.die.net/man/3/fsync
 func (a *wasi) FdFdstatGet(ctx context.Context, mod api.Module, fd uint32, resultStat uint32) Errno {
-	if _, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd); !ok {
+	if _, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd); !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
@@ -758,7 +757,7 @@ func (a *wasi) FdFdstatGet(ctx context.Context, mod api.Module, fd uint32, resul
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
 func (a *wasi) FdPrestatGet(ctx context.Context, mod api.Module, fd uint32, resultPrestat uint32) Errno {
-	entry, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd)
+	entry, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -831,7 +830,7 @@ func (a *wasi) FdPread(ctx context.Context, mod api.Module, fd, iovs, iovsCount 
 // See FdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 func (a *wasi) FdPrestatDirName(ctx context.Context, mod api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
-	f, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd)
+	f, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -975,7 +974,7 @@ func (a *wasi) FdRenumber(ctx context.Context, mod api.Module, fd, to uint32) Er
 func (a *wasi) FdSeek(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
-	if f, ok := getSysCtx(mod).FS(ctx).OpenedFile(fd); !ok || f.File == nil {
+	if f, ok := getSysCtx(mod).FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
 		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
@@ -1094,7 +1093,7 @@ func fdReader(ctx context.Context, mod api.Module, fd uint32) io.Reader {
 	sysCtx := getSysCtx(mod)
 	if fd == fdStdin {
 		return sysCtx.Stdin()
-	} else if f, ok := sysCtx.FS(ctx).OpenedFile(fd); !ok || f.File == nil {
+	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
 		return nil
 	} else {
 		return f.File
@@ -1111,9 +1110,10 @@ func fdWriter(ctx context.Context, mod api.Module, fd uint32) io.Writer {
 		return sysCtx.Stderr()
 	default:
 		// Check to see if the file descriptor is available
-		if f, ok := sysCtx.FS(ctx).OpenedFile(fd); !ok || f.File == nil {
+		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
 			return nil
-			// fs.FS doesn't declare io.Writer, but implementations such as os.File implement it.
+			// fs.FS doesn't declare io.Writer, but implementations such as
+			// os.File implement it.
 		} else if writer, ok := f.File.(io.Writer); !ok {
 			return nil
 		} else {
@@ -1189,9 +1189,9 @@ func (a *wasi) PathLink(ctx context.Context, mod api.Module, oldFd, oldFlags, ol
 // See https://linux.die.net/man/3/openat
 func (a *wasi) PathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
-	fsc := getSysCtx(mod).FS(ctx)
-	dir, ok := fsc.OpenedFile(fd)
-	if !ok || dir.FS == nil {
+	sysCtx := getSysCtx(mod)
+	fsc := sysCtx.FS(ctx)
+	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return ErrnoBadf
 	}
 
@@ -1200,19 +1200,17 @@ func (a *wasi) PathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathP
 		return ErrnoFault
 	}
 
-	// TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
-	// Ex. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
-	// See #390
-	entry, errno := openFileEntry(dir.FS, path.Join(dir.Path, string(b)))
-	if errno != ErrnoSuccess {
-		return errno
-	}
-
-	if newFD, ok := fsc.OpenFile(entry); !ok {
-		_ = entry.File.Close()
-		return ErrnoIo
+	if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return ErrnoNoent
+		case errors.Is(err, fs.ErrExist):
+			return ErrnoExist
+		default:
+			return ErrnoIo
+		}
 	} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
-		_ = entry.File.Close()
+		_, _ = fsc.CloseFile(ctx, newFD)
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1318,25 +1316,6 @@ func getSysCtx(mod api.Module) *sys.Context {
 	} else {
 		return internal.Sys
 	}
-}
-
-func openFileEntry(rootFS fs.FS, pathName string) (*sys.FileEntry, Errno) {
-	f, err := rootFS.Open(pathName)
-	if err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return nil, ErrnoNoent
-		case errors.Is(err, fs.ErrExist):
-			return nil, ErrnoExist
-		default:
-			return nil, ErrnoIo
-		}
-	}
-
-	// TODO: verify if oflags is a directory and fail with ErrnoNotdir if not
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
-
-	return &sys.FileEntry{Path: pathName, FS: rootFS, File: f}, ErrnoSuccess
 }
 
 func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {

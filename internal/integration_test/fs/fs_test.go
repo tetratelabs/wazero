@@ -154,7 +154,7 @@ func TestReader(t *testing.T) {
 	require.NoError(t, err)
 
 	realFs := fstest.MapFS{"animals.txt": &fstest.MapFile{Data: animals}}
-	sys := wazero.NewModuleConfig().WithWorkDirFS(realFs)
+	sys := wazero.NewModuleConfig().WithFS(realFs)
 
 	// Create a module that just delegates to wasi functions.
 	compiled, err := r.CompileModule(testCtx, fsWasm, wazero.NewCompileConfig())

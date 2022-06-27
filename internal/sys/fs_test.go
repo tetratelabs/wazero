@@ -3,24 +3,61 @@ package sys
 import (
 	"context"
 	"errors"
-	"io/fs"
-	"path"
 	"testing"
 
+	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-func TestContext_Close(t *testing.T) {
-	pathName := "test"
-	file := &testFile{}
+func TestEmptyFS(t *testing.T) {
+	testFS := EmptyFS
 
-	fsc := NewFSContext(map[uint32]*FileEntry{
-		3: {Path: "."},
-		4: {Path: path.Join(".", pathName), File: file},
+	t.Run("validates path", func(t *testing.T) {
+		f, err := testFS.Open("/foo.txt")
+		require.Nil(t, f)
+		require.EqualError(t, err, "open /foo.txt: invalid argument")
 	})
+
+	t.Run("path not found", func(t *testing.T) {
+		f, err := testFS.Open("foo.txt")
+		require.Nil(t, f)
+		require.EqualError(t, err, "open foo.txt: file does not exist")
+	})
+}
+
+func TestEmptyFSContext(t *testing.T) {
+	testFS := emptyFSContext
+	expected := &FSContext{
+		fs:          EmptyFS,
+		openedFiles: map[uint32]*FileEntry{},
+		lastFD:      2,
+	}
+
+	t.Run("OpenFile doesn't affect state", func(t *testing.T) {
+		fd, err := testFS.OpenFile(testCtx, "foo.txt")
+		require.Zero(t, fd)
+		require.EqualError(t, err, "open foo.txt: file does not exist")
+
+		// Ensure this didn't modify state
+		require.Equal(t, expected, testFS)
+	})
+
+	t.Run("Close doesn't affect state", func(t *testing.T) {
+		err := testFS.Close(testCtx)
+		require.NoError(t, err)
+
+		// Ensure this didn't modify state
+		require.Equal(t, expected, testFS)
+	})
+}
+
+func TestContext_Close(t *testing.T) {
+	fsc := NewFSContext(testfs.FS{"foo": &testfs.File{}})
+	_, err := fsc.OpenFile(testCtx, "/foo")
+	require.NoError(t, err)
 
 	// Verify base case
 	require.True(t, len(fsc.openedFiles) > 0, "fsc.openedFiles was empty")
@@ -36,41 +73,13 @@ func TestContext_Close(t *testing.T) {
 }
 
 func TestContext_Close_Error(t *testing.T) {
-	file := &testFile{errors.New("error closing")}
+	file := &testfs.File{CloseErr: errors.New("error closing")}
+	fsc := NewFSContext(testfs.FS{"foo": file})
+	_, err := fsc.OpenFile(testCtx, "/foo")
+	require.NoError(t, err)
 
-	fsc := NewFSContext(map[uint32]*FileEntry{
-		3: {Path: ".", File: file},
-		4: {Path: "/", File: file},
-	})
 	require.EqualError(t, fsc.Close(testCtx), "error closing")
 
 	// Paths should clear even under error
 	require.Zero(t, len(fsc.openedFiles), "expected no opened files")
-}
-
-// compile-time check to ensure testFile implements fs.File
-var _ fs.File = &testFile{}
-
-type testFile struct{ closeErr error }
-
-func (f *testFile) Close() error                       { return f.closeErr }
-func (f *testFile) Stat() (fs.FileInfo, error)         { return nil, nil }
-func (f *testFile) Read(_ []byte) (int, error)         { return 0, nil }
-func (f *testFile) Seek(_ int64, _ int) (int64, error) { return 0, nil }
-
-func TestFSConfig_Clone(t *testing.T) {
-	fsc := NewFSConfig()
-	cloned := fsc.Clone()
-
-	fsc.preopens[2] = nil
-	fsc.preopenPaths["2"] = 2
-
-	cloned.preopens[1] = nil
-	cloned.preopenPaths["1"] = 1
-
-	// Ensure the maps are not shared
-	require.Equal(t, map[uint32]*FileEntry{2: nil}, fsc.preopens)
-	require.Equal(t, map[string]uint32{"2": 2}, fsc.preopenPaths)
-	require.Equal(t, map[uint32]*FileEntry{1: nil}, cloned.preopens)
-	require.Equal(t, map[string]uint32{"1": 1}, cloned.preopenPaths)
 }
