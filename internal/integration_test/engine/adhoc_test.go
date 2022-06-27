@@ -46,6 +46,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"exported function that grows memory":               testMemOps,
 	"import functions with reference type in signature": testReftypeImports,
 	"overflow integer addition":                         testOverflow,
+	"un-signed extend global":                           testGlobalExtend,
 }
 
 func TestEngineCompiler(t *testing.T) {
@@ -82,6 +83,8 @@ var (
 	reftypeImportsWasm []byte
 	//go:embed testdata/overflow.wasm
 	overflowWasm []byte
+	//go:embed testdata/global_extend.wasm
+	globalExtendWasm []byte
 )
 
 func testReftypeImports(t *testing.T, r wazero.Runtime) {
@@ -139,6 +142,21 @@ func testOverflow(t *testing.T, r wazero.Runtime) {
 
 		require.Equal(t, uint64(1), res[0])
 	}
+}
+
+// testGlobalExtend ensures that un-signed extension of i32 globals must be zero extended. See #656.
+func testGlobalExtend(t *testing.T, r wazero.Runtime) {
+	module, err := r.InstantiateModuleFromBinary(testCtx, globalExtendWasm)
+	require.NoError(t, err)
+	defer module.Close(testCtx)
+
+	extend := module.ExportedFunction("extend")
+	require.NotNil(t, extend)
+
+	res, err := extend.Call(testCtx)
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(0xffff_ffff), res[0])
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {

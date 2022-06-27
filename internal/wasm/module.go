@@ -555,7 +555,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case int32:
-			g.Val = uint64(v)
+			g.Val = uint64(uint32(v))
 		case int64:
 			g.Val = uint64(v)
 		case float32:

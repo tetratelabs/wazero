@@ -741,6 +741,7 @@ func TestModule_validateExports(t *testing.T) {
 }
 
 func TestModule_buildGlobals(t *testing.T) {
+	minusOne := int32(-1)
 	m := Module{GlobalSection: []*Global{
 		{
 			Type: &GlobalType{Mutable: true, ValType: ValueTypeF64},
@@ -751,6 +752,11 @@ func TestModule_buildGlobals(t *testing.T) {
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
 			Init: &ConstantExpression{Opcode: OpcodeI32Const,
 				Data: leb128.EncodeInt32(math.MaxInt32)},
+		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
+			Init: &ConstantExpression{Opcode: OpcodeI32Const,
+				Data: leb128.EncodeInt32(minusOne)},
 		},
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeV128},
@@ -766,7 +772,9 @@ func TestModule_buildGlobals(t *testing.T) {
 	globals := m.buildGlobals(nil)
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
-		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: math.MaxInt32},
+		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
+		// Higher bits are must be zeroed for i32 globals, not signed-extended. See #656.
+		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(uint32(minusOne))},
 		{Type: &GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
 	}
 	require.Equal(t, expectedGlobals, globals)

@@ -2772,7 +2772,7 @@ func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	if o.Signed {
 		inst = amd64.MOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
 	} else {
-		inst = amd64.MOVQ
+		inst = amd64.MOVL
 	}
 	return c.compileExtendImpl(inst)
 }
