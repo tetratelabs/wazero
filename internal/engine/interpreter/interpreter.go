@@ -116,8 +116,8 @@ func (ce *callEngine) peekValues(count int) []uint64 {
 	if count == 0 {
 		return nil
 	}
-	stackTopIndex := len(ce.stack) - 1
-	peeked := ce.stack[stackTopIndex-count : stackTopIndex]
+	stackLen := len(ce.stack)
+	peeked := ce.stack[stackLen-count : stackLen]
 	values := make([]uint64, 0, count)
 	for i := count - 1; i >= 0; i-- {
 		values = append(values, peeked[i])
