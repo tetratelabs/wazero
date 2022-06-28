@@ -14,6 +14,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -96,7 +97,7 @@ func (c commandActionVal) String() string {
 	case "f32":
 		str := c.Value.(string)
 		if strings.Contains(str, "nan") {
-			v = "nan"
+			v = str
 		} else {
 			ret, _ := strconv.ParseUint(str, 10, 32)
 			v = fmt.Sprintf("%f", math.Float32frombits(uint32(ret)))
@@ -106,7 +107,7 @@ func (c commandActionVal) String() string {
 	case "f64":
 		str := c.Value.(string)
 		if strings.Contains(str, "nan") {
-			v = "nan"
+			v = str
 		} else {
 			ret, _ := strconv.ParseUint(str, 10, 64)
 			v = fmt.Sprintf("%f", math.Float64frombits(ret))
@@ -227,11 +228,7 @@ func buildLaneUint64(raw []interface{}, width, valNum int) (lo, hi uint64) {
 		var v uint64
 		var err error
 		if strings.Contains(str, "nan") {
-			if width == 64 {
-				v = math.Float64bits(math.NaN())
-			} else {
-				v = uint64(math.Float32bits(float32(math.NaN())))
-			}
+			v = getNaNBits(str, width == 32)
 		} else {
 			v, err = strconv.ParseUint(str, 10, width)
 			if err != nil {
@@ -248,13 +245,34 @@ func buildLaneUint64(raw []interface{}, width, valNum int) (lo, hi uint64) {
 	return
 }
 
+func getNaNBits(strValue string, is32bit bool) (ret uint64) {
+	// Note: nan:canonical, nan:arithmetic only appears on the expected values.
+	if is32bit {
+		switch strValue {
+		case "nan:canonical":
+			ret = uint64(moremath.F32CanonicalNaNBits)
+		case "nan:arithmetic":
+			ret = uint64(moremath.F32ArithmeticNaNBits)
+		default:
+			panic("BUG")
+		}
+	} else {
+		switch strValue {
+		case "nan:canonical":
+			ret = moremath.F64CanonicalNaNBits
+		case "nan:arithmetic":
+			ret = moremath.F64ArithmeticNaNBits
+		default:
+			panic("BUG")
+		}
+	}
+	return
+}
+
 func (c commandActionVal) toUint64() (ret uint64) {
 	strValue := c.Value.(string)
 	if strings.Contains(strValue, "nan") {
-		if c.ValType == "f32" {
-			return uint64(math.Float32bits(float32(math.NaN())))
-		}
-		ret = math.Float64bits(math.NaN())
+		ret = getNaNBits(strValue, c.ValType == "f32")
 	} else if c.ValType == "externref" {
 		if c.Value == "null" {
 			ret = 0
@@ -774,7 +792,13 @@ func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[in
 }
 
 func f32Equal(expected, actual float32) (matched bool) {
-	if math.IsNaN(float64(expected)) { // NaN cannot be compared with themselves, so we have to use IsNaN
+	if expBit := math.Float32bits(expected); expBit == moremath.F32CanonicalNaNBits {
+		matched = math.Float32bits(actual)&moremath.F32CanonicalNaNBitsMask == moremath.F32CanonicalNaNBits
+	} else if expBit == moremath.F32ArithmeticNaNBits {
+		b := math.Float32bits(actual)
+		matched = b&moremath.F32ExponentMask == moremath.F32ExponentMask && // Indicates that exponent part equals of NaN.
+			b&moremath.F32ArithmeticNaNPayloadMSB == moremath.F32ArithmeticNaNPayloadMSB
+	} else if math.IsNaN(float64(expected)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 		matched = math.IsNaN(float64(actual))
 	} else {
 		matched = expected == actual
@@ -782,8 +806,14 @@ func f32Equal(expected, actual float32) (matched bool) {
 	return
 }
 
-func f64Equal(actual, expected float64) (matched bool) {
-	if math.IsNaN(expected) { // NaN cannot be compared with themselves, so we have to use IsNaN
+func f64Equal(expected, actual float64) (matched bool) {
+	if expBit := math.Float64bits(expected); expBit == moremath.F64CanonicalNaNBits {
+		matched = math.Float64bits(actual)&moremath.F64CanonicalNaNBitsMask == moremath.F64CanonicalNaNBits
+	} else if expBit == moremath.F64ArithmeticNaNBits {
+		b := math.Float64bits(actual)
+		matched = b&moremath.F64ExponentMask == moremath.F64ExponentMask && // Indicates that exponent part equals of NaN.
+			b&moremath.F64ArithmeticNaNPayloadMSB == moremath.F64ArithmeticNaNPayloadMSB
+	} else if math.IsNaN(expected) { // NaN cannot be compared with themselves, so we have to use IsNaN
 		matched = math.IsNaN(actual)
 	} else {
 		matched = expected == actual

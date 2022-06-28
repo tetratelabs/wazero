@@ -368,7 +368,7 @@
   {"type": "assert_return", "line": 567, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "8954101765007123282"}]}, "expected": [{"type": "f64", "value": "6780419764181964566"}]}, 
   {"type": "assert_return", "line": 568, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "4405641787023763989"}]}, "expected": [{"type": "f64", "value": "4506213966714545194"}]}, 
   {"type": "assert_return", "line": 569, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "2394824404681191749"}]}, "expected": [{"type": "f64", "value": "3500764341454448999"}]}, 
-  {"type": "assert_return", "line": 572, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "9494538992465685200"}]}, "expected": [{"type": "f64", "value": "9221120237041090560"}]}, 
+  {"type": "assert_return", "line": 572, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "9494538992465685200"}]}, "expected": [{"type": "f64", "value": "nan:canonical"}]}, 
   {"type": "assert_return", "line": 573, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "5074882158241187075"}]}, "expected": [{"type": "f64", "value": "4841025724322244342"}]}, 
   {"type": "assert_return", "line": 574, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "1187437724299488295"}]}, "expected": [{"type": "f64", "value": "2897120674751402313"}]}, 
   {"type": "assert_return", "line": 575, "action": {"type": "invoke", "field": "f64.sqrt", "args": [{"type": "f64", "value": "3368223178643061438"}]}, "expected": [{"type": "f64", "value": "3987382964717611901"}]}, 
