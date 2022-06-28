@@ -476,7 +476,9 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	wasmValueType := c.ir.Globals[o.Index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
@@ -625,7 +627,9 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 	return c.compileBranchInto(o.Target)
 }
 
@@ -1251,7 +1255,9 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 
 	// Below, we might end up moving a non-top value first which
 	// might result in changing the flag value.
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	// Save the live values because we pop and release values in drop range below.
 	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start) : c.locationStack.sp]
@@ -1354,7 +1360,9 @@ func (c *arm64Compiler) compileSelect() error {
 
 // compilePick implements compiler.compilePick for the arm64 architecture.
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
 	pickedRegister, err := c.allocateRegister(pickTarget.getRegisterType())
@@ -2831,7 +2839,9 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 // compileMemoryGrow implements compileMemoryGrow variants for arm64 architecture.
 func (c *arm64Compiler) compileMemoryGrow() error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexMemoryGrow); err != nil {
 		return err
@@ -2845,7 +2855,9 @@ func (c *arm64Compiler) compileMemoryGrow() error {
 
 // compileMemorySize implements compileMemorySize variants for arm64 architecture.
 func (c *arm64Compiler) compileMemorySize() error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
@@ -2947,7 +2959,9 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) load target constant.
 func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	var inst asm.Instruction
 	var vt runtimeValueType
@@ -2989,7 +3003,9 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
 func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	// Take a register to load the value.
 	reg, err := c.allocateRegister(registerTypeVector)
@@ -3829,7 +3845,9 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 
 // compileTableGrow implements compiler.compileTableGrow for the arm64 architecture.
 func (c *arm64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
-	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 
 	// Pushes the table index.
 	if err := c.compileConstI32(&wazeroir.OperationConstI32{Value: o.TableIndex}); err != nil {
@@ -3926,7 +3944,7 @@ func (c *arm64Compiler) popValueOnRegister() (v *runtimeValueLocation, err error
 }
 
 // compileEnsureOnRegister emits instructions to ensure that a value is located on a register.
-func (c *arm64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) error {
+func (c *arm64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) (err error) {
 	if loc.onStack() {
 		reg, err := c.allocateRegister(loc.getRegisterType())
 		if err != nil {
@@ -3939,9 +3957,9 @@ func (c *arm64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) error
 
 		c.compileLoadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
-		c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
+		err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
 	}
-	return nil
+	return
 }
 
 // maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
@@ -3951,26 +3969,29 @@ func (c *arm64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) error
 // compile instructions without saving the conditional register value.
 // compile* functions without calling this function is saving the conditional
 // value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
-func (c *arm64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() {
+func (c *arm64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
-			c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
+			err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
 		}
 	}
+	return
 }
 
 // loadConditionalRegisterToGeneralPurposeRegister saves the conditional register value
 // to a general purpose register.
-func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *runtimeValueLocation) {
-	// There must be always at least one free register at this point, as the conditional register located value
-	// is always pushed after consuming at least one value (eqz) or two values for most cases (gt, ge, etc.).
-	reg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
-	c.markRegisterUsed(reg)
+func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *runtimeValueLocation) error {
+	reg, err := c.allocateRegister(loc.getRegisterType())
+	if err != nil {
+		return err
+	}
 
+	c.markRegisterUsed(reg)
 	c.assembler.CompileConditionalRegisterSet(loc.conditionalRegister, reg)
 
 	// Record that now the value is located on a general purpose register.
 	loc.setRegister(reg)
+	return nil
 }
 
 // compileLoadValueOnStackToRegister emits instructions to load the value located on the stack to the assigned register.

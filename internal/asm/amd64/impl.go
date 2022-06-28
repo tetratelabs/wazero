@@ -296,6 +296,9 @@ func (a *AssemblerImpl) EncodeNode(n *nodeImpl) (err error) {
 	default:
 		err = fmt.Errorf("encoder undefined for [%s] operand type", n.types)
 	}
+	if err != nil {
+		err = fmt.Errorf("%w: %s", err, n) // Ensure the error is debuggable by including the string value of the node.
+	}
 	return
 }
 

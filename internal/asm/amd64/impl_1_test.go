@@ -191,9 +191,10 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 func TestAssemblerImpl_encodeNode(t *testing.T) {
 	a := NewAssembler()
 	err := a.EncodeNode(&nodeImpl{
-		types: operandTypes{operandTypeBranch, operandTypeRegister},
+		instruction: ADDPD,
+		types:       operandTypesRegisterToMemory,
 	})
-	require.EqualError(t, err, "encoder undefined for [from:branch,to:register] operand type")
+	require.EqualError(t, err, "ADDPD is unsupported for from:register,to:memory type: ADDPD nil, [nil + 0x0]")
 }
 
 func TestAssemblerImpl_padNOP(t *testing.T) {
