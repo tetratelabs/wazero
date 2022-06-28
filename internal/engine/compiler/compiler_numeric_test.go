@@ -838,7 +838,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
-				exp := float32(moremath.WasmCompatMin(float64(float32(x1)), float64(float32(x2))))
+				exp := moremath.WasmCompatMin32(float32(x1), float32(x2))
 				actual := math.Float32frombits(uint32(raw))
 				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
@@ -855,7 +855,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
-				exp := moremath.WasmCompatMin(x1, x2)
+				exp := moremath.WasmCompatMin64(x1, x2)
 				actual := math.Float64frombits(raw)
 				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
@@ -872,7 +872,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
-				exp := float32(moremath.WasmCompatMax(float64(float32(x1)), float64(float32(x2))))
+				exp := moremath.WasmCompatMax32(float32(x1), float32(x2))
 				actual := math.Float32frombits(uint32(raw))
 				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
@@ -889,7 +889,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				require.NoError(t, err)
 			},
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
-				exp := moremath.WasmCompatMax(x1, x2)
+				exp := moremath.WasmCompatMax64(x1, x2)
 				actual := math.Float64frombits(raw)
 				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))

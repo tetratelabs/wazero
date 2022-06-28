@@ -5,61 +5,108 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func Test_f32Equal(t *testing.T) {
 	tests := []struct {
-		name   string
 		f1, f2 float32
 		exp    bool
 	}{
-		{name: "1", f1: 1.1, f2: 1.1, exp: true},
-		{name: "2", f1: float32(math.NaN()), f2: float32(math.NaN()), exp: true},
-		{name: "3", f1: float32(math.Inf(1)), f2: float32(math.Inf(1)), exp: true},
-		{name: "4", f1: float32(math.Inf(-1)), f2: float32(math.Inf(-1)), exp: true},
-		{name: "5", f1: 1.1, f2: -1.1, exp: false},
-		{name: "6", f1: float32(math.NaN()), f2: -1.1, exp: false},
-		{name: "7", f1: -1.1, f2: float32(math.NaN()), exp: false},
-		{name: "8", f1: float32(math.NaN()), f2: float32(math.Inf(1)), exp: false},
-		{name: "9", f1: float32(math.Inf(1)), f2: float32(math.NaN()), exp: false},
-		{name: "10", f1: float32(math.NaN()), f2: float32(math.Inf(-1)), exp: false},
-		{name: "11", f1: float32(math.Inf(-1)), f2: float32(math.NaN()), exp: false},
+		{f1: 1.1, f2: 1.1, exp: true},
+		{f1: float32(math.NaN()), f2: float32(math.NaN()), exp: true},
+		{f1: float32(math.Inf(1)), f2: float32(math.Inf(1)), exp: true},
+		{f1: float32(math.Inf(-1)), f2: float32(math.Inf(-1)), exp: true},
+		{f1: 1.1, f2: -1.1, exp: false},
+		{f1: float32(math.NaN()), f2: -1.1, exp: false},
+		{f1: -1.1, f2: float32(math.NaN()), exp: false},
+		{f1: float32(math.NaN()), f2: float32(math.Inf(1)), exp: false},
+		{f1: float32(math.Inf(1)), f2: float32(math.NaN()), exp: false},
+		{f1: float32(math.NaN()), f2: float32(math.Inf(-1)), exp: false},
+		{f1: float32(math.Inf(-1)), f2: float32(math.NaN()), exp: false},
+		{
+			f1:  math.Float32frombits(moremath.F32CanonicalNaNBits),
+			f2:  math.Float32frombits(moremath.F32CanonicalNaNBits),
+			exp: true,
+		},
+		{
+			f1:  math.Float32frombits(moremath.F32CanonicalNaNBits),
+			f2:  math.Float32frombits(moremath.F32ArithmeticNaNBits),
+			exp: false,
+		},
+		{
+			f1:  math.Float32frombits(moremath.F32ArithmeticNaNBits),
+			f2:  math.Float32frombits(moremath.F32ArithmeticNaNBits),
+			exp: true,
+		},
+		{
+			f1: math.Float32frombits(moremath.F32ArithmeticNaNBits),
+			f2: math.Float32frombits(moremath.F32ArithmeticNaNBits | 1<<2),
+			// The Wasm spec doesn't differentiate different arithmetic nans.
+			exp: true,
+		},
+		{
+			f1: math.Float32frombits(moremath.F32CanonicalNaNBits),
+			f2: math.Float32frombits(moremath.F32CanonicalNaNBits | 1<<2),
+			// Canonical NaN is unique.
+			exp: false,
+		},
 	}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.exp, f32Equal(tc.f1, tc.f2))
-		})
+	for i, tc := range tests {
+		require.Equal(t, tc.exp, f32Equal(tc.f1, tc.f2), i)
 	}
 }
 
 func Test_f64Equal(t *testing.T) {
 	tests := []struct {
-		name   string
 		f1, f2 float64
 		exp    bool
 	}{
-		{name: "1", f1: 1.1, f2: 1.1, exp: true},
-		{name: "2", f1: math.NaN(), f2: math.NaN(), exp: true},
-		{name: "3", f1: math.Inf(1), f2: math.Inf(1), exp: true},
-		{name: "4", f1: math.Inf(-1), f2: math.Inf(-1), exp: true},
-		{name: "5", f1: 1.1, f2: -1.1, exp: false},
-		{name: "6", f1: math.NaN(), f2: -1.1, exp: false},
-		{name: "7", f1: -1.1, f2: math.NaN(), exp: false},
-		{name: "8", f1: math.NaN(), f2: math.Inf(1), exp: false},
-		{name: "9", f1: math.Inf(1), f2: math.NaN(), exp: false},
-		{name: "10", f1: math.NaN(), f2: math.Inf(-1), exp: false},
-		{name: "11", f1: math.Inf(-1), f2: math.NaN(), exp: false},
+		{f1: 1.1, f2: 1.1, exp: true},
+		{f1: math.NaN(), f2: math.NaN(), exp: true},
+		{f1: math.Inf(1), f2: math.Inf(1), exp: true},
+		{f1: math.Inf(-1), f2: math.Inf(-1), exp: true},
+		{f1: 1.1, f2: -1.1, exp: false},
+		{f1: math.NaN(), f2: -1.1, exp: false},
+		{f1: -1.1, f2: math.NaN(), exp: false},
+		{f1: math.NaN(), f2: math.Inf(1), exp: false},
+		{f1: math.Inf(1), f2: math.NaN(), exp: false},
+		{f1: math.NaN(), f2: math.Inf(-1), exp: false},
+		{f1: math.Inf(-1), f2: math.NaN(), exp: false},
+		{
+			f1:  math.Float64frombits(moremath.F64CanonicalNaNBits),
+			f2:  math.Float64frombits(moremath.F64CanonicalNaNBits),
+			exp: true,
+		},
+		{
+			f1:  math.Float64frombits(moremath.F64CanonicalNaNBits),
+			f2:  math.Float64frombits(moremath.F64ArithmeticNaNBits),
+			exp: false,
+		},
+		{
+			f1:  math.Float64frombits(moremath.F64ArithmeticNaNBits),
+			f2:  math.Float64frombits(moremath.F64ArithmeticNaNBits),
+			exp: true,
+		},
+		{
+			f1: math.Float64frombits(moremath.F64ArithmeticNaNBits),
+			f2: math.Float64frombits(moremath.F64ArithmeticNaNBits | 1<<2),
+			// The Wasm spec doesn't differentiate different arithmetic nans.
+			exp: true,
+		},
+		{
+			f1: math.Float64frombits(moremath.F64CanonicalNaNBits),
+			f2: math.Float64frombits(moremath.F64CanonicalNaNBits | 1<<2),
+			// Canonical NaN is unique.
+			exp: false,
+		},
 	}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.exp, f64Equal(tc.f1, tc.f2))
-		})
+	for i, tc := range tests {
+		require.Equal(t, tc.exp, f64Equal(tc.f1, tc.f2), i)
 	}
 }
 
@@ -471,8 +518,8 @@ func TestCommandActionVal_toUint64s(t *testing.T) {
 			name:                "f32x4",
 			rawCommandActionVal: `{"type": "v128", "lane_type": "f32", "value": ["nan:canonical", "nan:arithmetic", "nan:canonical", "nan:arithmetic"]}`,
 			exp: []uint64{
-				uint64(math.Float32bits(float32(math.NaN()))) | (uint64(math.Float32bits(float32(math.NaN()))) << 32),
-				uint64(math.Float32bits(float32(math.NaN()))) | (uint64(math.Float32bits(float32(math.NaN()))) << 32),
+				uint64(moremath.F32CanonicalNaNBits) | (uint64(moremath.F32ArithmeticNaNBits) << 32),
+				uint64(moremath.F32CanonicalNaNBits) | (uint64(moremath.F32ArithmeticNaNBits) << 32),
 			},
 		},
 		{
@@ -483,7 +530,7 @@ func TestCommandActionVal_toUint64s(t *testing.T) {
 		{
 			name:                "f64x2",
 			rawCommandActionVal: `{"type": "v128", "lane_type": "f64", "value": ["nan:canonical", "nan:arithmetic"]}`,
-			exp:                 []uint64{math.Float64bits(math.NaN()), math.Float64bits(math.NaN())},
+			exp:                 []uint64{moremath.F64CanonicalNaNBits, moremath.F64ArithmeticNaNBits},
 		},
 		{
 			name:                "i8x16",

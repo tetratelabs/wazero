@@ -1423,33 +1423,33 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindCeil:
 			if op.b1 == 0 {
 				// Float32
-				v := math.Ceil(float64(math.Float32frombits(uint32(ce.popValue()))))
-				ce.pushValue(uint64(math.Float32bits(float32(v))))
+				v := moremath.WasmCompatCeilF32(math.Float32frombits(uint32(ce.popValue())))
+				ce.pushValue(uint64(math.Float32bits(v)))
 			} else {
 				// Float64
-				v := math.Ceil(math.Float64frombits(ce.popValue()))
+				v := moremath.WasmCompatCeilF64(math.Float64frombits(ce.popValue()))
 				ce.pushValue(math.Float64bits(v))
 			}
 			frame.pc++
 		case wazeroir.OperationKindFloor:
 			if op.b1 == 0 {
 				// Float32
-				v := math.Floor(float64(math.Float32frombits(uint32(ce.popValue()))))
-				ce.pushValue(uint64(math.Float32bits(float32(v))))
+				v := moremath.WasmCompatFloorF32(math.Float32frombits(uint32(ce.popValue())))
+				ce.pushValue(uint64(math.Float32bits(v)))
 			} else {
 				// Float64
-				v := math.Floor(math.Float64frombits(ce.popValue()))
+				v := moremath.WasmCompatFloorF64(math.Float64frombits(ce.popValue()))
 				ce.pushValue(math.Float64bits(v))
 			}
 			frame.pc++
 		case wazeroir.OperationKindTrunc:
 			if op.b1 == 0 {
 				// Float32
-				v := math.Trunc(float64(math.Float32frombits(uint32(ce.popValue()))))
-				ce.pushValue(uint64(math.Float32bits(float32(v))))
+				v := moremath.WasmCompatTruncF32(math.Float32frombits(uint32(ce.popValue())))
+				ce.pushValue(uint64(math.Float32bits(v)))
 			} else {
 				// Float64
-				v := math.Trunc(math.Float64frombits(ce.popValue()))
+				v := moremath.WasmCompatTruncF64(math.Float64frombits(ce.popValue()))
 				ce.pushValue(math.Float64bits(v))
 			}
 			frame.pc++
@@ -1478,21 +1478,21 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindMin:
 			if op.b1 == 0 {
 				// Float32
-				ce.pushValue(wasmCompatMinFloat32bits(uint32(ce.popValue()), uint32(ce.popValue())))
+				ce.pushValue(WasmCompatMin32bits(uint32(ce.popValue()), uint32(ce.popValue())))
 			} else {
 				v2 := math.Float64frombits(ce.popValue())
 				v1 := math.Float64frombits(ce.popValue())
-				ce.pushValue(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
+				ce.pushValue(math.Float64bits(moremath.WasmCompatMin64(v1, v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindMax:
 			if op.b1 == 0 {
-				ce.pushValue(wasmCompatMaxFloat32bits(uint32(ce.popValue()), uint32(ce.popValue())))
+				ce.pushValue(WasmCompatMax32bits(uint32(ce.popValue()), uint32(ce.popValue())))
 			} else {
 				// Float64
 				v2 := math.Float64frombits(ce.popValue())
 				v1 := math.Float64frombits(ce.popValue())
-				ce.pushValue(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
+				ce.pushValue(math.Float64bits(moremath.WasmCompatMax64(v1, v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindCopysign:
@@ -3357,16 +3357,16 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						uint64(i32MinU(uint32(x1hi>>32), uint32(x2hi>>32)))<<32
 				}
 			case wazeroir.ShapeF32x4:
-				retHi = wasmCompatMinFloat32bits(uint32(x1hi), uint32(x2hi)) |
-					wasmCompatMinFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
-				retLo = wasmCompatMinFloat32bits(uint32(x1lo), uint32(x2lo)) |
-					wasmCompatMinFloat32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
+				retHi = WasmCompatMin32bits(uint32(x1hi), uint32(x2hi)) |
+					WasmCompatMin32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
+				retLo = WasmCompatMin32bits(uint32(x1lo), uint32(x2lo)) |
+					WasmCompatMin32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
 			case wazeroir.ShapeF64x2:
-				retHi = math.Float64bits(moremath.WasmCompatMin(
+				retHi = math.Float64bits(moremath.WasmCompatMin64(
 					math.Float64frombits(x1hi),
 					math.Float64frombits(x2hi),
 				))
-				retLo = math.Float64bits(moremath.WasmCompatMin(
+				retLo = math.Float64bits(moremath.WasmCompatMin64(
 					math.Float64frombits(x1lo),
 					math.Float64frombits(x2lo),
 				))
@@ -3432,16 +3432,16 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						uint64(i32MaxU(uint32(x1hi>>32), uint32(x2hi>>32)))<<32
 				}
 			case wazeroir.ShapeF32x4:
-				retHi = wasmCompatMaxFloat32bits(uint32(x1hi), uint32(x2hi)) |
-					wasmCompatMaxFloat32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
-				retLo = wasmCompatMaxFloat32bits(uint32(x1lo), uint32(x2lo)) |
-					wasmCompatMaxFloat32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
+				retHi = WasmCompatMax32bits(uint32(x1hi), uint32(x2hi)) |
+					WasmCompatMax32bits(uint32(x1hi>>32), uint32(x2hi>>32))<<32
+				retLo = WasmCompatMax32bits(uint32(x1lo), uint32(x2lo)) |
+					WasmCompatMax32bits(uint32(x1lo>>32), uint32(x2lo>>32))<<32
 			case wazeroir.ShapeF64x2:
-				retHi = math.Float64bits(moremath.WasmCompatMax(
+				retHi = math.Float64bits(moremath.WasmCompatMax64(
 					math.Float64frombits(x1hi),
 					math.Float64frombits(x2hi),
 				))
-				retLo = math.Float64bits(moremath.WasmCompatMax(
+				retLo = math.Float64bits(moremath.WasmCompatMax64(
 					math.Float64frombits(x1lo),
 					math.Float64frombits(x2lo),
 				))
@@ -3559,13 +3559,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Ceil:
 			hi, lo := ce.popValue(), ce.popValue()
 			if op.b1 == wazeroir.ShapeF32x4 {
-				lo = uint64(math.Float32bits(float32(math.Ceil(float64(math.Float32frombits(uint32(lo))))))) |
-					(uint64(math.Float32bits(float32(math.Ceil(float64(math.Float32frombits(uint32(lo>>32))))))) << 32)
-				hi = uint64(math.Float32bits(float32(math.Ceil(float64(math.Float32frombits(uint32(hi))))))) |
-					(uint64(math.Float32bits(float32(math.Ceil(float64(math.Float32frombits(uint32(hi>>32))))))) << 32)
+				lo = uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(lo))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(lo>>32))))) << 32)
+				hi = uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(hi))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatCeilF32(math.Float32frombits(uint32(hi>>32))))) << 32)
 			} else {
-				lo = math.Float64bits(math.Ceil(math.Float64frombits(lo)))
-				hi = math.Float64bits(math.Ceil(math.Float64frombits(hi)))
+				lo = math.Float64bits(moremath.WasmCompatCeilF64(math.Float64frombits(lo)))
+				hi = math.Float64bits(moremath.WasmCompatCeilF64(math.Float64frombits(hi)))
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
@@ -3573,13 +3573,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Floor:
 			hi, lo := ce.popValue(), ce.popValue()
 			if op.b1 == wazeroir.ShapeF32x4 {
-				lo = uint64(math.Float32bits(float32(math.Floor(float64(math.Float32frombits(uint32(lo))))))) |
-					(uint64(math.Float32bits(float32(math.Floor(float64(math.Float32frombits(uint32(lo>>32))))))) << 32)
-				hi = uint64(math.Float32bits(float32(math.Floor(float64(math.Float32frombits(uint32(hi))))))) |
-					(uint64(math.Float32bits(float32(math.Floor(float64(math.Float32frombits(uint32(hi>>32))))))) << 32)
+				lo = uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(lo))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(lo>>32))))) << 32)
+				hi = uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(hi))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatFloorF32(math.Float32frombits(uint32(hi>>32))))) << 32)
 			} else {
-				lo = math.Float64bits(math.Floor(math.Float64frombits(lo)))
-				hi = math.Float64bits(math.Floor(math.Float64frombits(hi)))
+				lo = math.Float64bits(moremath.WasmCompatFloorF64(math.Float64frombits(lo)))
+				hi = math.Float64bits(moremath.WasmCompatFloorF64(math.Float64frombits(hi)))
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
@@ -3587,13 +3587,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Trunc:
 			hi, lo := ce.popValue(), ce.popValue()
 			if op.b1 == wazeroir.ShapeF32x4 {
-				lo = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo))))))) |
-					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo>>32))))))) << 32)
-				hi = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi))))))) |
-					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi>>32))))))) << 32)
+				lo = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo>>32))))) << 32)
+				hi = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi>>32))))) << 32)
 			} else {
-				lo = math.Float64bits(math.Trunc(math.Float64frombits(lo)))
-				hi = math.Float64bits(math.Trunc(math.Float64frombits(hi)))
+				lo = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(lo)))
+				hi = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(hi)))
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
@@ -4084,18 +4084,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	ce.popFrame()
 }
 
-func wasmCompatMaxFloat32bits(v1, v2 uint32) uint64 {
-	return uint64(math.Float32bits(float32(moremath.WasmCompatMax(
-		float64(math.Float32frombits(v1)),
-		float64(math.Float32frombits(v2)),
-	))))
+func WasmCompatMax32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(moremath.WasmCompatMax32(
+		math.Float32frombits(v1),
+		math.Float32frombits(v2),
+	)))
 }
 
-func wasmCompatMinFloat32bits(v1, v2 uint32) uint64 {
-	return uint64(math.Float32bits(float32(moremath.WasmCompatMin(
-		float64(math.Float32frombits(v1)),
-		float64(math.Float32frombits(v2)),
-	))))
+func WasmCompatMin32bits(v1, v2 uint32) uint64 {
+	return uint64(math.Float32bits(moremath.WasmCompatMin32(
+		math.Float32frombits(v1),
+		math.Float32frombits(v2),
+	)))
 }
 
 func addFloat32bits(v1, v2 uint32) uint64 {
