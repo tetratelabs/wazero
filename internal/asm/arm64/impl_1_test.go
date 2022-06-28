@@ -2083,7 +2083,6 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 		n    *nodeImpl
 		exp  []byte
 	}{
-		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
 			name: "umov w10, v0.b[0xf]",
 			n: &nodeImpl{
@@ -3472,7 +3471,6 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 		n    *nodeImpl
 		exp  []byte
 	}{
-		// These are not supported in golang-asm, so test it here instead of integration tests.
 		{
 			name: "ins v10.d[0], x10",
 			n: &nodeImpl{

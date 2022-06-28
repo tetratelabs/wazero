@@ -696,7 +696,6 @@ func (a *AssemblerImpl) encodeJumpToRegister(n *nodeImpl) (err error) {
 	return
 }
 
-// encodeRelativeBranch is exported for inter-op testing with golang-asm.
 func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 	switch n.instruction {
 	case B, BCONDEQ, BCONDGE, BCONDGT, BCONDHI, BCONDHS, BCONDLE, BCONDLO, BCONDLS, BCONDLT, BCONDMI, BCONDNE, BCONDVS, BCONDPL:

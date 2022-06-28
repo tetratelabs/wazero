@@ -2,11 +2,6 @@
 // Please refer to https://developer.arm.com/documentation/102374/latest/
 // if unfamiliar with arm64 instructions and semantics.
 //
-// Note: we use arm64 pkg as the assembler (github.com/twitchyliquid64/golang-asm/obj/arm64)
-// which has different notation from the original arm64 assembly. For example,
-// 64-bit variant ldr, str, stur are all corresponding to arm64.MOVD.
-// Please refer to https://pkg.go.dev/cmd/internal/obj/garm64.
-
 package compiler
 
 import (
@@ -2161,10 +2156,6 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// VBIT inserts each bit from the first operand into the destination if the corresponding bit of the second operand is 1,
 	// otherwise it leaves the destination bit unchanged.
 	// See https://developer.arm.com/documentation/dui0801/g/Advanced-SIMD-Instructions--32-bit-/VBIT
-	//
-	// For how to specify "V0.B8" (SIMD register arrangement), see
-	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
-	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
 	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
 	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VBIT,
