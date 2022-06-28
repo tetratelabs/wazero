@@ -31,7 +31,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeConstToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -1284,7 +1284,7 @@ func TestAssemblerImpl_EncodeConstToRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(RegR27)
+			a := NewAssembler(RegR27)
 			err := a.encodeConstToRegister(tc.n)
 			require.NoError(t, err)
 

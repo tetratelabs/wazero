@@ -14,14 +14,14 @@ import (
 		`{name: "%s", inst: %s, dst: Reg%s, exp: %#v}`,
 		fmt.Sprintf("inst=%s/reg=%s", InstructionName(inst), RegisterName(reg)),
 		InstructionName(inst), RegisterName(reg),
-		a.Buf.Bytes(),
+		a.buf.Bytes(),
 	))
 	fmt.Println(strings.Join(cs, ",\n"))
 */
 
 func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeNoneToRegister(&nodeImpl{instruction: ADDL,
 			types: operandTypesNoneToRegister, dstReg: RegAX})
 		require.Error(t, err)
@@ -42,7 +42,7 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 			}
 
 			for _, tt := range tests {
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 				err := a.encodeNoneToRegister(tt.n)
 				require.EqualError(t, err, tt.expErr, tt.expErr)
 			}
@@ -235,10 +235,10 @@ func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		tc := tc
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeNoneToRegister(&nodeImpl{instruction: tc.inst, dstReg: tc.dst})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
@@ -258,7 +258,7 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 			tc := tt
 			t.Run(tc.expErr, func(t *testing.T) {
 				tc := tc
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 				err := a.encodeNoneToMemory(tc.n)
 				require.EqualError(t, err, tc.expErr)
 			})
@@ -474,11 +474,11 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 
 	for _, tc := range tests {
 		tc := tc
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeNoneToMemory(&nodeImpl{types: operandTypesNoneToMemory,
 			instruction: tc.inst, dstReg: tc.dst, dstConst: tc.dstOffset})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
@@ -499,7 +499,7 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeRegisterToNone(tc.n)
 			require.EqualError(t, err, tc.expErr, tc, tc.expErr)
 		}
@@ -580,11 +580,11 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeRegisterToNone(&nodeImpl{instruction: tc.inst,
 			types: operandTypesRegisterToNone, srcReg: tc.reg})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
@@ -612,7 +612,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeRegisterToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -1237,7 +1237,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 	for _, tt := range tests {
 		tc := tt
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeRegisterToRegister(tc.n)
 		require.NoError(t, err, tc.name)
 

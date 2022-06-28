@@ -168,7 +168,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 		for _, tt := range tests {
 			tc := tt
 			t.Run(tc.name, func(t *testing.T) {
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 				tc.setupFn(a)
 
 				actual, err := a.Assemble()
@@ -648,7 +648,7 @@ func TestAssemblerImpl_Assemble_NOPPadding(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(fmt.Sprintf("%s/backward=%v", InstructionName(tc.jmpInst), tc.backward), func(t *testing.T) {
 
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 
 				head := a.CompileStandAlone(RET)
 				var jmps []asm.Node

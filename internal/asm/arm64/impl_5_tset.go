@@ -21,7 +21,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterToMemory(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -932,7 +932,7 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(RegR27)
+			a := NewAssembler(RegR27)
 			err := a.encodeRegisterToMemory(tc.n)
 			require.NoError(t, err)
 			actual, err := a.Assemble()

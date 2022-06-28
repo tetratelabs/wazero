@@ -99,7 +99,7 @@ type amd64Compiler struct {
 
 func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	c := &amd64Compiler{
-		assembler:     amd64.NewAssemblerImpl(),
+		assembler:     amd64.NewAssembler(),
 		locationStack: newRuntimeValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,

@@ -212,7 +212,7 @@ type AssemblerImpl struct {
 	MaxDisplacementForConstantPool int
 }
 
-func NewAssemblerImpl(temporaryRegister asm.Register) *AssemblerImpl {
+func NewAssembler(temporaryRegister asm.Register) *AssemblerImpl {
 	return &AssemblerImpl{
 		Buf: bytes.NewBuffer(nil), temporaryRegister: temporaryRegister,
 		pool:                           asm.NewStaticConstPool(),

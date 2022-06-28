@@ -31,7 +31,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeJumpToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -84,7 +84,7 @@ func TestAssemblerImpl_encodeJumpToRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeJumpToRegister(&nodeImpl{instruction: tc.inst, dstReg: tc.reg})
 			require.NoError(t, err)
 
@@ -108,7 +108,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeMemoryToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -699,7 +699,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(RegR27)
+			a := NewAssembler(RegR27)
 			err := a.encodeMemoryToRegister(tc.n)
 			require.NoError(t, err)
 
@@ -713,7 +713,7 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		const targetBeforeInstruction, dstReg = RET, RegR23
-		a := NewAssemblerImpl(asm.NilRegister)
+		a := NewAssembler(asm.NilRegister)
 
 		a.CompileReadInstructionAddress(dstReg, targetBeforeInstruction)
 		a.CompileConstToRegister(MOVD, 1000, RegR10) // Dummy
@@ -726,14 +726,14 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		a := NewAssemblerImpl(asm.NilRegister)
+		a := NewAssembler(asm.NilRegister)
 		a.CompileReadInstructionAddress(RegR27, NOP)
 		a.CompileConstToRegister(MOVD, 1000, RegR10)
 		_, err := a.Assemble()
 		require.EqualError(t, err, "BUG: target instruction NOP not found for ADR")
 	})
 	t.Run("offset too large", func(t *testing.T) {
-		a := NewAssemblerImpl(asm.NilRegister)
+		a := NewAssembler(asm.NilRegister)
 		a.CompileReadInstructionAddress(RegR27, RET)
 		a.CompileJumpToRegister(RET, RegR25)
 		a.CompileConstToRegister(MOVD, 1000, RegR10)

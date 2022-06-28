@@ -34,7 +34,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeConstToMemory(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -644,7 +644,7 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeConstToMemory(&nodeImpl{instruction: tc.inst,
 			types: operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset)})
 		require.NoError(t, err)
@@ -664,7 +664,7 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeMemoryToConst(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -914,11 +914,11 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeMemoryToConst(&nodeImpl{instruction: tc.inst,
 			types: operandTypesMemoryToConst, srcReg: tc.baseReg, srcConst: tc.offset, dstConst: tc.c})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
@@ -928,7 +928,7 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 			originOffset, targetOffset := uint64(0), uint64(math.MaxInt64)
 			origin := &nodeImpl{instruction: JMP, offsetInBinaryField: originOffset}
 			target := &nodeImpl{offsetInBinaryField: targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.ResolveForwardRelativeJumps(target)
 			require.EqualError(t, err, "too large jump offset 9223372036854775802 for encoding JMP")
 		})
@@ -956,15 +956,15 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				tc := tt
 				origin := &nodeImpl{instruction: tc.instruction, offsetInBinaryField: originOffset}
 				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				a.Buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
+				a.buf.Write([]byte{0, 0, 0, 0, 0, 0}) // Relative long jumps are at most 6 bytes.
 
 				err := a.ResolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
-				actual := binary.LittleEndian.Uint32(a.Buf.Bytes()[tc.writtenOffsetIndexInBinary:])
+				actual := binary.LittleEndian.Uint32(a.buf.Bytes()[tc.writtenOffsetIndexInBinary:])
 				require.Equal(t, tc.expectedOffsetFromEIP, int32(actual))
 			}
 		})
@@ -1002,11 +1002,11 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 				origin.jumpTarget = target
 
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 				err := a.ResolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
-				require.True(t, a.ForceReAssemble)
+				require.True(t, a.forceReAssemble)
 				require.True(t, origin.flag&nodeFlagShortForwardJump == 0)
 			}
 		})
@@ -1033,15 +1033,15 @@ func TestAssemblerImpl_ResolveForwardRelativeJumps(t *testing.T) {
 				target := &nodeImpl{offsetInBinaryField: tc.targetOffset, jumpOrigins: map[*nodeImpl]struct{}{origin: {}}}
 				origin.jumpTarget = target
 
-				a := NewAssemblerImpl()
+				a := NewAssembler()
 
 				// Grow the capacity of buffer so that we could put the offset.
-				a.Buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
+				a.buf.Write([]byte{0, 0}) // Relative short jumps are of 2 bytes.
 
 				err := a.ResolveForwardRelativeJumps(target)
 				require.NoError(t, err)
 
-				actual := a.Buf.Bytes()[1] // For short jumps, the opcode has one opcode so the offset is writte at 2nd byte.
+				actual := a.buf.Bytes()[1] // For short jumps, the opcode has one opcode so the offset is writte at 2nd byte.
 				require.Equal(t, tc.expectedOffsetFromEIP, actual)
 			}
 		})

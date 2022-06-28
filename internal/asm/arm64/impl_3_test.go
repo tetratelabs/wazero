@@ -22,7 +22,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeTwoRegistersToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -594,7 +594,7 @@ func TestAssemblerImpl_EncodeTwoRegistersToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeTwoRegistersToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, srcReg2: tc.src2, dstReg: tc.dst})
 			require.NoError(t, err)
 
@@ -629,7 +629,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterAndConstToNone(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -661,7 +661,7 @@ func TestAssemblerImpl_EncodeRegisterAndConstToNone(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterAndConstToNone(&nodeImpl{instruction: tc.inst, srcReg: tc.reg, srcConst: tc.c})
 			require.NoError(t, err)
 
@@ -686,7 +686,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -1183,7 +1183,7 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterToRegister(&nodeImpl{instruction: tc.inst, srcReg: tc.src, dstReg: tc.dst})
 			require.NoError(t, err)
 

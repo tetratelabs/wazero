@@ -44,7 +44,7 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 			},
 		}
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeConstToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -276,11 +276,11 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeConstToRegister(&nodeImpl{instruction: tc.inst,
 			types: operandTypesConstToRegister, srcConst: tc.c, dstReg: tc.dstReg})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
@@ -296,7 +296,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 			{name: "AX", dst: RegAX, exp: []byte{0x48, 0x8d, 0x5, 0x2, 0x0, 0x0, 0x0, 0x99, 0xc3, 0x99}},
 			{name: "R8", dst: RegR8, exp: []byte{0x4c, 0x8d, 0x5, 0x2, 0x0, 0x0, 0x0, 0x99, 0xc3, 0x99}},
 		} {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 
 			// Setup target.
 			a.CompileReadInstructionAddress(tc.dst, targetBeforeInstruction)
@@ -310,20 +310,20 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		}
 	})
 	t.Run("not found", func(t *testing.T) {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		a.CompileReadInstructionAddress(RegR10, NOP)
 		a.CompileStandAlone(CDQ)
 		_, err := a.Assemble()
 		require.EqualError(t, err, "BUG: target instruction not found for read instruction address")
 	})
 	t.Run("offset too large", func(t *testing.T) {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		a.CompileReadInstructionAddress(RegR10, RET)
 		a.CompileStandAlone(RET)
 		a.CompileStandAlone(CDQ)
 
-		for n := a.Root; n != nil; n = n.next {
-			n.offsetInBinaryField = uint64(a.Buf.Len())
+		for n := a.root; n != nil; n = n.next {
+			n.offsetInBinaryField = uint64(a.buf.Len())
 
 			err := a.EncodeNode(n)
 			require.NoError(t, err)
@@ -332,7 +332,7 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		require.Equal(t, 1, len(a.OnGenerateCallbacks))
 		cb := a.OnGenerateCallbacks[0]
 
-		targetNode := a.Current
+		targetNode := a.current
 		targetNode.offsetInBinaryField = uint64(math.MaxInt64)
 
 		err := cb(nil)
@@ -357,7 +357,7 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			err := a.encodeRegisterToNone(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -571,11 +571,11 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		err := a.encodeRegisterToConst(&nodeImpl{instruction: tc.inst,
 			types: operandTypesRegisterToConst, srcReg: tc.srcReg, dstConst: tc.c})
 		require.NoError(t, err, tc.name)
-		require.Equal(t, tc.exp, a.Buf.Bytes(), tc.name)
+		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
 }
 
