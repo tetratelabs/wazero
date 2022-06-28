@@ -60,8 +60,8 @@ var registerToStaticConstOpcodes = map[asm.Instruction]staticConstOpcode{
 	CMPQ: {opcode: []byte{0x3b}, rex: RexPrefixW},
 }
 
-func (a *AssemblerImpl) encodeRegisterToStaticConst(n *NodeImpl) (err error) {
-	opc, ok := registerToStaticConstOpcodes[n.Instruction]
+func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
+	opc, ok := registerToStaticConstOpcodes[n.instruction]
 	if !ok {
 		return errorEncodingUnsupported(n)
 	}
@@ -104,13 +104,13 @@ var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
 	MOVQ: {opcode: []byte{0x0f, 0x7e}, mandatoryPrefix: 0xf3},
 }
 
-func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 	var opc staticConstOpcode
 	var ok bool
-	if IsVectorRegister(n.DstReg) && (n.Instruction == MOVL || n.Instruction == MOVQ) {
-		opc, ok = staticConstToVectorRegisterOpcodes[n.Instruction]
+	if IsVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
+		opc, ok = staticConstToVectorRegisterOpcodes[n.instruction]
 	} else {
-		opc, ok = staticConstToRegisterOpcodes[n.Instruction]
+		opc, ok = staticConstToRegisterOpcodes[n.instruction]
 	}
 	if !ok {
 		return errorEncodingUnsupported(n)
@@ -119,15 +119,15 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 }
 
 // encodeStaticConstImpl encodes an instruction where mod:r/m points to the memory location of the static constant n.staticConst,
-// and the other operand is the register given at n.SrcReg or n.DstReg.
-func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex RexPrefix, mandatoryPrefix byte) (err error) {
+// and the other operand is the register given at n.srcReg or n.dstReg.
+func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex RexPrefix, mandatoryPrefix byte) (err error) {
 	a.pool.AddConst(n.staticConst, uint64(a.Buf.Len()))
 
 	var reg asm.Register
-	if n.DstReg != asm.NilRegister {
-		reg = n.DstReg
+	if n.dstReg != asm.NilRegister {
+		reg = n.dstReg
 	} else {
-		reg = n.SrcReg
+		reg = n.srcReg
 	}
 
 	reg3Bits, rexPrefix, err := register3bits(reg, registerSpecifierPositionModRMFieldReg)
@@ -173,8 +173,8 @@ func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction
 		return
 	}
 
-	n := a.newNode(instruction, OperandTypesStaticConstToRegister)
-	n.DstReg = dstReg
+	n := a.newNode(instruction, operandTypesStaticConstToRegister)
+	n.dstReg = dstReg
 	n.staticConst = c
 	return
 }
@@ -186,8 +186,8 @@ func (a *AssemblerImpl) CompileRegisterToStaticConst(instruction asm.Instruction
 		return
 	}
 
-	n := a.newNode(instruction, OperandTypesRegisterToStaticConst)
-	n.SrcReg = srcReg
+	n := a.newNode(instruction, operandTypesRegisterToStaticConst)
+	n.srcReg = srcReg
 	n.staticConst = c
 	return
 }

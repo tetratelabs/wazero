@@ -17,7 +17,7 @@ type Assembler interface {
 	CompileRegisterToRegisterWithArg(instruction asm.Instruction, from, to asm.Register, arg byte)
 
 	// CompileMemoryWithIndexToRegister adds an instruction where source operand is the memory address
-	// specified as `srcBaseReg + srcOffsetConst + srcIndex*srcScale` and destination is the register `DstReg`.
+	// specified as `srcBaseReg + srcOffsetConst + srcIndex*srcScale` and destination is the register `dstReg`.
 	// Note: sourceScale must be one of 1, 2, 4, 8.
 	CompileMemoryWithIndexToRegister(
 		instruction asm.Instruction,
@@ -40,7 +40,7 @@ type Assembler interface {
 		arg byte,
 	)
 
-	// CompileRegisterToMemoryWithIndex adds an instruction where source operand is the register `SrcReg`,
+	// CompileRegisterToMemoryWithIndex adds an instruction where source operand is the register `srcReg`,
 	// and the destination is the memory address specified as `dstBaseReg + dstOffsetConst + dstIndex*dstScale`
 	// Note: dstScale must be one of 1, 2, 4, 8.
 	CompileRegisterToMemoryWithIndex(

@@ -483,7 +483,6 @@ func Test_validateMemoryOffset(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
-	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
 		n    *nodeImpl
@@ -620,7 +619,6 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
-	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
 		n    *nodeImpl
