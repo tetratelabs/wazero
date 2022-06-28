@@ -364,7 +364,9 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
-			c.compileReleaseAllRegistersToStack()
+			if err := c.compileReleaseAllRegistersToStack(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -459,7 +461,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
-			c.compileReleaseAllRegistersToStack()
+			if err := c.compileReleaseAllRegistersToStack(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -487,7 +491,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing values on registers to the stack if there's multiple ones to have
 			// the consistent value location state at the beginning of label.
-			c.compileReleaseAllRegistersToStack()
+			if err := c.compileReleaseAllRegistersToStack(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -4306,7 +4312,9 @@ func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err 
 // to understand how the function calls are achieved.
 func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddressRegister asm.Register, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
-	c.compileReleaseAllRegistersToStack()
+	if err := c.compileReleaseAllRegistersToStack(); err != nil {
+		return err
+	}
 
 	// First, we have to make sure that
 	if !isNilRegister(functionAddressRegister) {
@@ -4522,7 +4530,9 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 // to understand how the function calls are achieved.
 func (c *amd64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
-	c.compileReleaseAllRegistersToStack()
+	if err := c.compileReleaseAllRegistersToStack(); err != nil {
+		return err
+	}
 
 	// amd64CallingConventionModuleInstanceAddressRegister holds the module intstance's address
 	// so mark it used so that it won't be used as a free register.
@@ -4641,7 +4651,9 @@ func (c *amd64Compiler) compileCallBuiltinFunction(index wasm.Index) error {
 
 func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCode) error {
 	// Release all the registers as our calling convention requires the caller-save.
-	c.compileReleaseAllRegistersToStack()
+	if err := c.compileReleaseAllRegistersToStack(); err != nil {
+		return err
+	}
 
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
@@ -4685,15 +4697,18 @@ func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 
 // compileReleaseAllRegistersToStack add the instructions to release all the LIVE value
 // in the value location stack at this point into the stack memory location.
-func (c *amd64Compiler) compileReleaseAllRegistersToStack() {
+func (c *amd64Compiler) compileReleaseAllRegistersToStack() (err error) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.compileReleaseRegisterToStack(loc)
 		} else if loc.onConditionalRegister() {
-			c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
+			if err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc); err != nil {
+				return
+			}
 			c.compileReleaseRegisterToStack(loc)
 		}
 	}
+	return
 }
 
 func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
