@@ -4054,16 +4054,18 @@ func (c *arm64Compiler) allocateRegister(t registerType) (reg asm.Register, err 
 // compileReleaseAllRegistersToStack adds instructions to store all the values located on
 // either general purpose or conditional registers onto the memory stack.
 // See releaseRegisterToStack.
-func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
+func (c *arm64Compiler) compileReleaseAllRegistersToStack() (err error) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.compileReleaseRegisterToStack(loc)
 		} else if loc.onConditionalRegister() {
-			c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
+			if err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc); err != nil {
+				return
+			}
 			c.compileReleaseRegisterToStack(loc)
 		}
 	}
-	return nil
+	return
 }
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
