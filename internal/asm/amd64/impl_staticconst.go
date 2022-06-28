@@ -22,7 +22,7 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 		// If the distance between (the first use in binary) and (end of constant pool) can be larger
 		// than MaxDisplacementForConstantPool, we have to emit the constant pool now, otherwise
 		// a const might be unreachable by a literal move whose maximum offset is +- 2^31.
-		((a.pool.PoolSizeInBytes+a.Buf.Len())-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
+		((a.pool.PoolSizeInBytes+a.buf.Len())-int(*a.pool.FirstUseOffsetInBinary)) >= a.MaxDisplacementForConstantPool {
 		if !isEndOfFunction {
 			// Adds the jump instruction to skip the constants if this is not the end of function.
 			//
@@ -30,18 +30,18 @@ func (a *AssemblerImpl) maybeFlushConstants(isEndOfFunction bool) {
 			// small enough to fit all consts after the end of function.
 			if a.pool.PoolSizeInBytes >= math.MaxInt8-2 {
 				// long (near-relative) jump: https://www.felixcloutier.com/x86/jmp
-				a.Buf.WriteByte(0xe9)
+				a.buf.WriteByte(0xe9)
 				a.WriteConst(int64(a.pool.PoolSizeInBytes), 32)
 			} else {
 				// short jump: https://www.felixcloutier.com/x86/jmp
-				a.Buf.WriteByte(0xeb)
+				a.buf.WriteByte(0xeb)
 				a.WriteConst(int64(a.pool.PoolSizeInBytes), 8)
 			}
 		}
 
 		for _, c := range a.pool.Consts {
-			c.SetOffsetInBinary(uint64(a.Buf.Len()))
-			a.Buf.Write(c.Raw)
+			c.SetOffsetInBinary(uint64(a.buf.Len()))
+			a.buf.Write(c.Raw)
 		}
 
 		a.pool = asm.NewStaticConstPool() // reset
@@ -60,8 +60,8 @@ var registerToStaticConstOpcodes = map[asm.Instruction]staticConstOpcode{
 	CMPQ: {opcode: []byte{0x3b}, rex: RexPrefixW},
 }
 
-func (a *AssemblerImpl) encodeRegisterToStaticConst(n *NodeImpl) (err error) {
-	opc, ok := registerToStaticConstOpcodes[n.Instruction]
+func (a *AssemblerImpl) encodeRegisterToStaticConst(n *nodeImpl) (err error) {
+	opc, ok := registerToStaticConstOpcodes[n.instruction]
 	if !ok {
 		return errorEncodingUnsupported(n)
 	}
@@ -104,13 +104,13 @@ var staticConstToVectorRegisterOpcodes = map[asm.Instruction]staticConstOpcode{
 	MOVQ: {opcode: []byte{0x0f, 0x7e}, mandatoryPrefix: 0xf3},
 }
 
-func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
+func (a *AssemblerImpl) encodeStaticConstToRegister(n *nodeImpl) (err error) {
 	var opc staticConstOpcode
 	var ok bool
-	if IsVectorRegister(n.DstReg) && (n.Instruction == MOVL || n.Instruction == MOVQ) {
-		opc, ok = staticConstToVectorRegisterOpcodes[n.Instruction]
+	if IsVectorRegister(n.dstReg) && (n.instruction == MOVL || n.instruction == MOVQ) {
+		opc, ok = staticConstToVectorRegisterOpcodes[n.instruction]
 	} else {
-		opc, ok = staticConstToRegisterOpcodes[n.Instruction]
+		opc, ok = staticConstToRegisterOpcodes[n.instruction]
 	}
 	if !ok {
 		return errorEncodingUnsupported(n)
@@ -119,15 +119,15 @@ func (a *AssemblerImpl) encodeStaticConstToRegister(n *NodeImpl) (err error) {
 }
 
 // encodeStaticConstImpl encodes an instruction where mod:r/m points to the memory location of the static constant n.staticConst,
-// and the other operand is the register given at n.SrcReg or n.DstReg.
-func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex RexPrefix, mandatoryPrefix byte) (err error) {
-	a.pool.AddConst(n.staticConst, uint64(a.Buf.Len()))
+// and the other operand is the register given at n.srcReg or n.dstReg.
+func (a *AssemblerImpl) encodeStaticConstImpl(n *nodeImpl, opcode []byte, rex RexPrefix, mandatoryPrefix byte) (err error) {
+	a.pool.AddConst(n.staticConst, uint64(a.buf.Len()))
 
 	var reg asm.Register
-	if n.DstReg != asm.NilRegister {
-		reg = n.DstReg
+	if n.dstReg != asm.NilRegister {
+		reg = n.dstReg
 	} else {
-		reg = n.SrcReg
+		reg = n.srcReg
 	}
 
 	reg3Bits, rexPrefix, err := register3bits(reg, registerSpecifierPositionModRMFieldReg)
@@ -139,7 +139,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex Re
 
 	var inst []byte
 	n.staticConst.AddOffsetFinalizedCallback(func(offsetOfConstInBinary uint64) {
-		bin := a.Buf.Bytes()
+		bin := a.buf.Bytes()
 		displacement := int(offsetOfConstInBinary) - int(n.OffsetInBinary()) - len(inst)
 		displacementOffsetInInstruction := n.OffsetInBinary() + uint64(len(inst)-4)
 		binary.LittleEndian.PutUint32(bin[displacementOffsetInInstruction:], uint32(int32(displacement)))
@@ -162,7 +162,7 @@ func (a *AssemblerImpl) encodeStaticConstImpl(n *NodeImpl, opcode []byte, rex Re
 		0x0, 0x0, 0x0, 0x0, // Preserve 4 bytes for displacement.
 	)
 
-	a.Buf.Write(inst)
+	a.buf.Write(inst)
 	return
 }
 
@@ -173,8 +173,8 @@ func (a *AssemblerImpl) CompileStaticConstToRegister(instruction asm.Instruction
 		return
 	}
 
-	n := a.newNode(instruction, OperandTypesStaticConstToRegister)
-	n.DstReg = dstReg
+	n := a.newNode(instruction, operandTypesStaticConstToRegister)
+	n.dstReg = dstReg
 	n.staticConst = c
 	return
 }
@@ -186,8 +186,8 @@ func (a *AssemblerImpl) CompileRegisterToStaticConst(instruction asm.Instruction
 		return
 	}
 
-	n := a.newNode(instruction, OperandTypesRegisterToStaticConst)
-	n.SrcReg = srcReg
+	n := a.newNode(instruction, operandTypesRegisterToStaticConst)
+	n.srcReg = srcReg
 	n.staticConst = c
 	return
 }

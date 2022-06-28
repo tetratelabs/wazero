@@ -9,7 +9,7 @@ import (
 )
 
 func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
-	a := NewAssemblerImpl()
+	a := NewAssembler()
 	t.Run("odd count of bytes", func(t *testing.T) {
 		err := a.CompileStaticConstToRegister(MOVDQU, asm.NewStaticConst([]byte{1}), RegAX)
 		require.Error(t, err)
@@ -18,16 +18,16 @@ func TestAssemblerImpl_CompileStaticConstToRegister(t *testing.T) {
 		cons := asm.NewStaticConst([]byte{1, 2, 3, 4})
 		err := a.CompileStaticConstToRegister(MOVDQU, cons, RegAX)
 		require.NoError(t, err)
-		actualNode := a.Current
-		require.Equal(t, MOVDQU, actualNode.Instruction)
-		require.Equal(t, OperandTypeStaticConst, actualNode.Types.src)
-		require.Equal(t, OperandTypeRegister, actualNode.Types.dst)
+		actualNode := a.current
+		require.Equal(t, MOVDQU, actualNode.instruction)
+		require.Equal(t, operandTypeStaticConst, actualNode.types.src)
+		require.Equal(t, operandTypeRegister, actualNode.types.dst)
 		require.Equal(t, cons, actualNode.staticConst)
 	})
 }
 
 func TestAssemblerImpl_CompileRegisterToStaticConst(t *testing.T) {
-	a := NewAssemblerImpl()
+	a := NewAssembler()
 	t.Run("odd count of bytes", func(t *testing.T) {
 		err := a.CompileRegisterToStaticConst(MOVDQU, RegAX, asm.NewStaticConst([]byte{1}))
 		require.Error(t, err)
@@ -36,17 +36,17 @@ func TestAssemblerImpl_CompileRegisterToStaticConst(t *testing.T) {
 		cons := asm.NewStaticConst([]byte{1, 2, 3, 4})
 		err := a.CompileRegisterToStaticConst(MOVDQU, RegAX, cons)
 		require.NoError(t, err)
-		actualNode := a.Current
-		require.Equal(t, MOVDQU, actualNode.Instruction)
-		require.Equal(t, OperandTypeRegister, actualNode.Types.src)
-		require.Equal(t, OperandTypeStaticConst, actualNode.Types.dst)
+		actualNode := a.current
+		require.Equal(t, MOVDQU, actualNode.instruction)
+		require.Equal(t, operandTypeRegister, actualNode.types.src)
+		require.Equal(t, operandTypeStaticConst, actualNode.types.dst)
 		require.Equal(t, cons, actualNode.staticConst)
 	})
 }
 
 func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 	t.Run("no consts", func(t *testing.T) {
-		a := NewAssemblerImpl()
+		a := NewAssembler()
 		// Invoking maybeFlushConstants before encoding consts usage should not panic.
 		a.maybeFlushConstants(false)
 		a.maybeFlushConstants(true)
@@ -111,9 +111,9 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 			a.MaxDisplacementForConstantPool = tc.maxDisplacement
-			a.Buf.Write(tc.dummyBodyBeforeFlush)
+			a.buf.Write(tc.dummyBodyBeforeFlush)
 
 			for i, c := range tc.consts {
 				sc := asm.NewStaticConst(c)
@@ -127,7 +127,7 @@ func TestAssemblerImpl_maybeFlushConstants(t *testing.T) {
 			a.pool.FirstUseOffsetInBinary = &tc.firstUseOffsetInBinary
 			a.maybeFlushConstants(tc.endOfFunction)
 
-			require.Equal(t, tc.exp, a.Buf.Bytes())
+			require.Equal(t, tc.exp, a.buf.Bytes())
 		})
 	}
 }
@@ -204,7 +204,7 @@ func TestAssemblerImpl_encodeRegisterToStaticConst(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 
 			err := a.CompileRegisterToStaticConst(tc.ins, tc.reg, asm.NewStaticConst(tc.c))
 			require.NoError(t, err)
@@ -596,7 +596,7 @@ func TestAssemblerImpl_encodeStaticConstToRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl()
+			a := NewAssembler()
 
 			err := a.CompileStaticConstToRegister(tc.ins, asm.NewStaticConst(tc.c), tc.reg)
 			require.NoError(t, err)

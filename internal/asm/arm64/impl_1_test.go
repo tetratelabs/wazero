@@ -121,7 +121,7 @@ func TestNodeImpl_String(t *testing.T) {
 }
 
 func TestAssemblerImpl_addNode(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 
 	root := &nodeImpl{}
 	a.addNode(root)
@@ -138,7 +138,7 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 }
 
 func TestAssemblerImpl_newNode(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	actual := a.newNode(MOVD, operandTypesMemoryToRegister)
 	require.Equal(t, MOVD, actual.instruction)
 	require.Equal(t, operandTypeMemory, actual.types.src)
@@ -148,7 +148,7 @@ func TestAssemblerImpl_newNode(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileStandAlone(RET)
 	actualNode := a.Current
 	require.Equal(t, RET, actualNode.instruction)
@@ -157,7 +157,7 @@ func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileConstToRegister(MOVD, 1000, RegR10)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -168,7 +168,7 @@ func TestAssemblerImpl_CompileConstToRegister(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileRegisterToRegister(MOVD, RegR15, RegR27)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -179,7 +179,7 @@ func TestAssemblerImpl_CompileRegisterToRegister(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileMemoryToRegister(MOVD, RegR15, 100, RegR27)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -191,7 +191,7 @@ func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileRegisterToMemory(MOVD, RegR15, RegR27, 100)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -203,7 +203,7 @@ func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileJump(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileJump(B)
 	actualNode := a.Current
 	require.Equal(t, B, actualNode.instruction)
@@ -212,7 +212,7 @@ func TestAssemblerImpl_CompileJump(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileJumpToRegister(BCONDNE, RegR27)
 	actualNode := a.Current
 	require.Equal(t, BCONDNE, actualNode.instruction)
@@ -222,7 +222,7 @@ func TestAssemblerImpl_CompileJumpToRegister(t *testing.T) {
 }
 
 func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileReadInstructionAddress(RegR10, RET)
 	actualNode := a.Current
 	require.Equal(t, ADR, actualNode.instruction)
@@ -233,7 +233,7 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 }
 
 func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileMemoryWithRegisterOffsetToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -245,7 +245,7 @@ func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 }
 
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -257,7 +257,7 @@ func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 }
 
 func Test_CompileTwoRegistersToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileTwoRegistersToRegister(MOVD, RegR27, RegR10, RegR0)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -269,7 +269,7 @@ func Test_CompileTwoRegistersToRegister(t *testing.T) {
 }
 
 func Test_CompileThreeRegistersToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileThreeRegistersToRegister(MOVD, RegR27, RegR10, RegR0, RegR28)
 	actualNode := a.Current
 	require.Equal(t, MOVD, actualNode.instruction)
@@ -282,7 +282,7 @@ func Test_CompileThreeRegistersToRegister(t *testing.T) {
 }
 
 func Test_CompileTwoRegistersToNone(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileTwoRegistersToNone(CMP, RegR27, RegR10)
 	actualNode := a.Current
 	require.Equal(t, CMP, actualNode.instruction)
@@ -293,7 +293,7 @@ func Test_CompileTwoRegistersToNone(t *testing.T) {
 }
 
 func Test_CompileRegisterAndConstToNone(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileRegisterAndConstToNone(CMP, RegR27, 10)
 	actualNode := a.Current
 	require.Equal(t, CMP, actualNode.instruction)
@@ -304,7 +304,7 @@ func Test_CompileRegisterAndConstToNone(t *testing.T) {
 }
 
 func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileLeftShiftedRegisterToRegister(ADD, RegR27, 10, RegR28, RegR5)
 	actualNode := a.Current
 	require.Equal(t, ADD, actualNode.instruction)
@@ -317,7 +317,7 @@ func Test_CompileLeftShiftedRegisterToRegister(t *testing.T) {
 }
 
 func Test_CompileConditionalRegisterSet(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileConditionalRegisterSet(CondNE, RegR10)
 	actualNode := a.Current
 	require.Equal(t, CSET, actualNode.instruction)
@@ -328,7 +328,7 @@ func Test_CompileConditionalRegisterSet(t *testing.T) {
 }
 
 func Test_CompileMemoryToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileMemoryToVectorRegister(VMOV, RegR10, 10, RegV3, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -341,7 +341,7 @@ func Test_CompileMemoryToVectorRegister(t *testing.T) {
 }
 
 func Test_CompileVectorRegisterToMemory(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToMemory(VMOV, RegV3, RegR10, 12, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -354,7 +354,7 @@ func Test_CompileVectorRegisterToMemory(t *testing.T) {
 }
 
 func Test_CompileRegisterToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileRegisterToVectorRegister(VMOV, RegV3, RegR10, VectorArrangement1D, 10)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -367,7 +367,7 @@ func Test_CompileRegisterToVectorRegister(t *testing.T) {
 }
 
 func Test_CompileVectorRegisterToRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToRegister(VMOV, RegR10, RegV3, VectorArrangement1D, 10)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -380,7 +380,7 @@ func Test_CompileVectorRegisterToRegister(t *testing.T) {
 }
 
 func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileVectorRegisterToVectorRegister(VMOV, RegV3, RegV10, VectorArrangement1D, 1, 2)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -394,7 +394,7 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 }
 
 func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
-	a := NewAssemblerImpl(RegR10)
+	a := NewAssembler(RegR10)
 	a.CompileTwoVectorRegistersToVectorRegister(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D)
 	actualNode := a.Current
 	require.Equal(t, VMOV, actualNode.instruction)
@@ -446,12 +446,12 @@ func Test_checkRegisterToRegisterType(t *testing.T) {
 
 func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
-		a := NewAssemblerImpl(asm.NilRegister)
+		a := NewAssembler(asm.NilRegister)
 		err := a.encodeNoneToNone(&nodeImpl{instruction: ADD})
 		require.EqualError(t, err, "ADD is unsupported for from:none,to:none type")
 	})
 	t.Run("ok", func(t *testing.T) {
-		a := NewAssemblerImpl(asm.NilRegister)
+		a := NewAssembler(asm.NilRegister)
 		err := a.encodeNoneToNone(&nodeImpl{instruction: NOP})
 		require.NoError(t, err)
 
@@ -483,7 +483,6 @@ func Test_validateMemoryOffset(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
-	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
 		n    *nodeImpl
@@ -606,7 +605,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(RegR10)
+			a := NewAssembler(RegR10)
 			err := a.encodeVectorRegisterToMemory(tc.n)
 			require.NoError(t, err)
 
@@ -620,7 +619,6 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 }
 
 func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
-	// These are not supported by golang-asm, so we test here instead of integration tests.
 	tests := []struct {
 		name string
 		n    *nodeImpl
@@ -822,7 +820,7 @@ func TestAssemblerImpl_EncodeMemoryToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(RegR10)
+			a := NewAssembler(RegR10)
 			err := a.encodeMemoryToVectorRegister(tc.n)
 			require.NoError(t, err)
 
@@ -2062,7 +2060,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeVectorRegisterToVectorRegister(&nodeImpl{
 				instruction:       tc.inst,
 				srcReg:            tc.x1,
@@ -2168,7 +2166,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeVectorRegisterToRegister(tc.n)
 			require.NoError(t, err)
 
@@ -2213,7 +2211,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -2333,7 +2331,7 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeLeftShiftedRegisterToRegister(tc.n)
 			require.NoError(t, err)
 
@@ -2368,7 +2366,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeTwoRegistersToNone(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -2560,7 +2558,7 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeTwoRegistersToNone(tc.n)
 			require.NoError(t, err)
 
@@ -2592,7 +2590,7 @@ func TestAssemblerImpl_EncodeThreeRegistersToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeThreeRegistersToRegister(&nodeImpl{
 				instruction: tc.inst, srcReg: src1, srcReg2: src2, dstReg: src3, dstReg2: dst,
 			})
@@ -3458,7 +3456,7 @@ func TestAssemblerImpl_encodeTwoVectorRegistersToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeTwoVectorRegistersToVectorRegister(tc.n)
 			require.NoError(t, err)
 
@@ -3541,7 +3539,7 @@ func TestAssemblerImpl_EncodeRegisterToVectorRegister(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRegisterToVectorRegister(tc.n)
 			require.NoError(t, err)
 
@@ -3642,7 +3640,7 @@ func TestAssemblerImpl_maybeFlushConstPool(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			sc := asm.NewStaticConst(tc.c)
 			a.pool.AddConst(sc, 0)
 
@@ -3729,7 +3727,7 @@ func TestAssemblerImpl_EncodeStaticConstToVectorRegister(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeStaticConstToVectorRegister(tc.n)
 			require.NoError(t, err)
 			a.maybeFlushConstPool(true)
@@ -3772,7 +3770,7 @@ func TestAssemblerImpl_encodeADR_staticConst(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sc := asm.NewStaticConst([]byte{1, 2, 3, 4}) // Arbitrary data is fine.
 
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 
 			a.Buf.Write(make([]byte, beforeADRByteNum))
 

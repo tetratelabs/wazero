@@ -26,7 +26,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 			err := a.encodeRelativeBranch(tc.n)
 			require.EqualError(t, err, tc.expErr)
 		}
@@ -296,7 +296,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			a := NewAssemblerImpl(asm.NilRegister)
+			a := NewAssembler(asm.NilRegister)
 
 			for i := 0; i < tc.instructionsInPreamble; i++ {
 				a.CompileConstToRegister(MOVD, 1000, RegR10)

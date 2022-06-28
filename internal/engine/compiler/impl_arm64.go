@@ -37,7 +37,7 @@ type arm64Compiler struct {
 
 func newArm64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return &arm64Compiler{
-		assembler:     arm64.NewAssemblerImpl(arm64ReservedRegisterForTemporary),
+		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
 		ir:            ir,
 		labels:        map[string]*arm64LabelInfo{},

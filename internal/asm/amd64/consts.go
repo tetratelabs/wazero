@@ -850,7 +850,7 @@ func InstructionName(instruction asm.Instruction) string {
 	case PSUBW:
 		return "PSUBW"
 	case PSUBD:
-		return "PSUBL"
+		return "PSUBD"
 	case PSUBQ:
 		return "PSUBQ"
 	case SUBPS:
