@@ -164,7 +164,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *w
 	return ret
 }
 
-// CompilerImpl is the interface used for architecture-independent unit tests in this file.
+// CompilerImpl is the interface used for architecture-independent unit tests in this pkg.
 // This is currently implemented by amd64 and arm64.
 type compilerImpl interface {
 	compiler
