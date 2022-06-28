@@ -509,10 +509,7 @@ func (a *AssemblerImpl) fusedInstructionLength(n *nodeImpl) (ret int32, err erro
 
 // nopOpcodes is the multi byte NOP instructions table derived from section 5.8 "Code Padding with Operand-Size Override and Multibyte NOP"
 // in "AMD Software Optimization Guide for AMD Family 15h Processors" https://www.amd.com/system/files/TechDocs/47414_15h_sw_opt_guide.pdf
-//
-// Note: We use up to 9 bytes NOP variant to line our implementation with Go's assembler.
-// TODO: After golang-asm removal, add 9, 10 and 11 bytes variants.
-var nopOpcodes = [][9]byte{
+var nopOpcodes = [][11]byte{
 	{0x90},
 	{0x66, 0x90},
 	{0x0f, 0x1f, 0x00},
@@ -522,6 +519,8 @@ var nopOpcodes = [][9]byte{
 	{0x0f, 0x1f, 0x80, 0x00, 0x00, 0x00, 0x00},
 	{0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
 	{0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x66, 0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{0x66, 0x66, 0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
 }
 
 func (a *AssemblerImpl) padNOP(num int) {

@@ -115,9 +115,6 @@ func (p *StaticConstPool) AddConst(c *StaticConst, useOffset NodeOffsetInBinary)
 // Note: some of them can be implemented in an arch-independent way, but not all can be
 // implemented as such. However, we intentionally put such arch-dependant methods here
 // in order to provide the common documentation interface.
-//
-// Note: this interface is coupled and heavily influenced by golang-asm's API (i.e. Go's official assembler).
-// Therefore, we will do the refactoring after golang-asm removal.
 type AssemblerBase interface {
 	// Assemble produces the final binary for the assembled operations.
 	Assemble() ([]byte, error)
