@@ -8,7 +8,7 @@ import (
 
 // compileV128Const implements compiler.compileV128Const for arm64.
 func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -128,7 +128,7 @@ func (c *arm64Compiler) compileV128Sub(o *wazeroir.OperationV128Sub) (err error)
 
 // compileV128Load implements compiler.compileV128Load for arm64.
 func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err error) {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 	result, err := c.allocateRegister(registerTypeVector)

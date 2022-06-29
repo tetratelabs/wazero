@@ -10,7 +10,7 @@ import (
 
 // compileV128Const implements compiler.compileV128Const for amd64 architecture.
 func (c *amd64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 

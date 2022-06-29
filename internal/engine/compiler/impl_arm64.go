@@ -476,7 +476,7 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -627,7 +627,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 	return c.compileBranchInto(o.Target)
@@ -1255,7 +1255,7 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 
 	// Below, we might end up moving a non-top value first which
 	// might result in changing the flag value.
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -1360,7 +1360,7 @@ func (c *arm64Compiler) compileSelect() error {
 
 // compilePick implements compiler.compilePick for the arm64 architecture.
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -2839,7 +2839,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 // compileMemoryGrow implements compileMemoryGrow variants for arm64 architecture.
 func (c *arm64Compiler) compileMemoryGrow() error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -2855,7 +2855,7 @@ func (c *arm64Compiler) compileMemoryGrow() error {
 
 // compileMemorySize implements compileMemorySize variants for arm64 architecture.
 func (c *arm64Compiler) compileMemorySize() error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -2959,7 +2959,7 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) load target constant.
 func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -3003,7 +3003,7 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
 func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -3845,7 +3845,7 @@ func (c *arm64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 
 // compileTableGrow implements compiler.compileTableGrow for the arm64 architecture.
 func (c *arm64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -3962,14 +3962,14 @@ func (c *arm64Compiler) compileEnsureOnRegister(loc *runtimeValueLocation) (err 
 	return
 }
 
-// maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
+// maybeCompileMoveTopConditionalToGeneralPurposeRegister moves the top value on the stack
 // if the value is located on a conditional register.
 //
 // This is usually called at the beginning of methods on compiler interface where we possibly
 // compile instructions without saving the conditional register value.
 // compile* functions without calling this function is saving the conditional
 // value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
-func (c *arm64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
+func (c *arm64Compiler) maybeCompileMoveTopConditionalToGeneralPurposeRegister() (err error) {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
 			err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)

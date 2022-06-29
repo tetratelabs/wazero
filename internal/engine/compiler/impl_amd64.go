@@ -244,7 +244,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 
 // compileGlobalGet implements compiler.compileGlobalGet for the amd64 architecture.
 func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -348,7 +348,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 
 // compileBr implements compiler.compileBr for the amd64 architecture.
 func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 	return c.branchInto(o.Target)
@@ -927,7 +927,7 @@ func (c *amd64Compiler) compileSelect() error {
 
 // compilePick implements compiler.compilePick for the amd64 architecture.
 func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -1378,7 +1378,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		remainderRegister = amd64.RegDX
 	)
 
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -1669,7 +1669,7 @@ func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 // compileShiftOp adds instructions for shift operations (SHR, SHL, ROTR, ROTL)
 // where we have to place the second value (shift counts) on the CX register.
 func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -3396,7 +3396,7 @@ func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instructio
 
 // compileMemoryGrow implements compiler.compileMemoryGrow for the amd64 architecture.
 func (c *amd64Compiler) compileMemoryGrow() error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -3413,7 +3413,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 
 // compileMemorySize implements compiler.compileMemorySize for the amd64 architecture.
 func (c *amd64Compiler) compileMemorySize() error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4021,7 +4021,7 @@ func (c *amd64Compiler) compileTableSet(o *wazeroir.OperationTableSet) error {
 
 // compileTableGrow implements compiler.compileTableGrow for the amd64 architecture.
 func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4107,7 +4107,7 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 
 // compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4122,7 +4122,7 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 
 // compileConstI64 implements compiler.compileConstI64 for the amd64 architecture.
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4138,7 +4138,7 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 
 // compileConstF32 implements compiler.compileConstF32 for the amd64 architecture.
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4162,7 +4162,7 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 
 // compileConstF64 implements compiler.compileConstF64 for the amd64 architecture.
 func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
-	if err := c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
 		return err
 	}
 
@@ -4207,14 +4207,14 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 	}
 }
 
-// maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
+// maybeCompileMoveTopConditionalToGeneralPurposeRegister moves the top value on the stack
 // if the value is located on a conditional register.
 //
 // This is usually called at the beginning of methods on compiler interface where we possibly
 // compile instructions without saving the conditional register value.
-// The compile* functions without calling this function is saving the conditional
+// The compileXXX functions without calling this function is saving the conditional
 // value to the stack or register by invoking compileEnsureOnRegister for the top.
-func (c *amd64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
+func (c *amd64Compiler) maybeCompileMoveTopConditionalToGeneralPurposeRegister() (err error) {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
 			if err = c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc); err != nil {
@@ -4228,7 +4228,7 @@ func (c *amd64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegist
 // loadConditionalRegisterToGeneralPurposeRegister saves the conditional register value
 // to a general purpose register.
 func (c *amd64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(loc *runtimeValueLocation) error {
-	reg, err := c.allocateRegister(loc.getRegisterType())
+	reg, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
 	}

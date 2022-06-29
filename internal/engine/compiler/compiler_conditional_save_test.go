@@ -15,21 +15,22 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 
+	// Place the f32 local.
+	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: 1.0})
+	require.NoError(t, err)
+
 	// Generate constants to occupy all the unreserved GP registers.
 	for i := 0; i < len(unreservedGeneralPurposeRegisters); i++ {
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 100})
 		require.NoError(t, err)
 	}
 
-	// Ensures that no free registers are available.
-	_, ok := compiler.runtimeValueLocationStack().takeFreeRegister(registerTypeGeneralPurpose)
-	require.False(t, ok)
-
-	// Generate conditional flag via floating point comparisons
-	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: 1.0})
+	// Pick the f32 floating point local (1.0) twice.
+	err = compiler.compilePick(&wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 	require.NoError(t, err)
-	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: 2.0})
+	err = compiler.compilePick(&wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 	require.NoError(t, err)
+	// Generate conditional flag via floating point comparisons.
 	err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
 	require.NoError(t, err)
 
@@ -37,7 +38,14 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	l := compiler.runtimeValueLocationStack().peek()
 	require.True(t, l.onConditionalRegister())
 
-	// On function return, the conditional value must be saved to a general purpose reg, and then written to stack.
+	// Ensures that no free registers are available.
+	_, ok := compiler.runtimeValueLocationStack().takeFreeRegister(registerTypeGeneralPurpose)
+	require.False(t, ok)
+
+	// We should be able to use the conditional value (an i32 value in Wasm) as an operand for, say, i32.add.
+	err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+	require.NoError(t, err)
+
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
@@ -46,5 +54,6 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	require.NoError(t, err)
 	env.exec(code)
 
-	require.Equal(t, uint32(1), env.stackTopAsUint32()) // expect 1 as the result of 1.0 < 2.0.
+	// expect 101 = 100(== the integer const) + 1 (== flag value == the result of (1.0 <= 1.0))
+	require.Equal(t, uint32(101), env.stackTopAsUint32())
 }
