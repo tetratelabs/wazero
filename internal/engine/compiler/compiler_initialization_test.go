@@ -201,40 +201,62 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 			})
 		}
 	})
+
+	var defaultValueStackLen = uint64(initialValueStackSize)
 	t.Run("grow", func(t *testing.T) {
-		env := newCompilerEnvironment()
-		compiler := env.requireNewCompiler(t, newCompiler, nil)
+		tests := []struct {
+			name             string
+			stackPointerCeil uint64
+			stackBasePointer uint64
+		}{
+			{
+				name:             "ceil=6/sbp=len-5",
+				stackPointerCeil: 6,
+				stackBasePointer: defaultValueStackLen - 5,
+			},
+			{
+				name:             "ceil=10000/sbp=0",
+				stackPointerCeil: 10000,
+				stackBasePointer: 0,
+			},
+		}
 
-		err := compiler.compileMaybeGrowValueStack()
-		require.NoError(t, err)
+		for _, tc := range tests {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				env := newCompilerEnvironment()
+				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-		// On the return from grow value stack, we simply return.
-		err = compiler.compileReturnFunction()
-		require.NoError(t, err)
+				err := compiler.compileMaybeGrowValueStack()
+				require.NoError(t, err)
 
-		stackPointerCeil := uint64(6)
-		compiler.setStackPointerCeil(stackPointerCeil)
-		valueStackLen := uint64(len(env.stack()))
-		stackBasePointer := valueStackLen - 5 // Ceil > valueStackLen - stackBasePointer = need to grow!
-		env.setValueStackBasePointer(stackBasePointer)
+				// On the return from grow value stack, we simply return.
+				err = compiler.compileReturnFunction()
+				require.NoError(t, err)
 
-		// Generate and run the code under test.
-		code, _, err := compiler.compile()
-		require.NoError(t, err)
-		env.exec(code)
+				// Generate code under test with the given stackPointerCeil.
+				compiler.setStackPointerCeil(tc.stackPointerCeil)
+				code, _, err := compiler.compile()
+				require.NoError(t, err)
 
-		// Check if the call exits with builtin function call status.
-		require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
+				// And run the code with the specified stackBasePointer.
+				env.setValueStackBasePointer(tc.stackBasePointer)
+				env.exec(code)
 
-		// Reenter from the return address.
-		returnAddress := env.callFrameStackPeek().returnAddress
-		require.True(t, returnAddress != 0, "returnAddress was non-zero %d", returnAddress)
-		nativecall(
-			returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
-			uintptr(unsafe.Pointer(env.module())),
-		)
+				// Check if the call exits with builtin function call status.
+				require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 
-		// Check the result. This should be "Returned".
-		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
+				// Reenter from the return address.
+				returnAddress := env.callFrameStackPeek().returnAddress
+				require.True(t, returnAddress != 0, "returnAddress was zero %d", returnAddress)
+				nativecall(
+					returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
+					uintptr(unsafe.Pointer(env.module())),
+				)
+
+				// Check the result. This should be "Returned".
+				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
+			})
+		}
 	})
 }

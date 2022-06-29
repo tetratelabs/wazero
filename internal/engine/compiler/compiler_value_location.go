@@ -201,10 +201,10 @@ func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
 	} else {
 		v.stack[v.sp] = loc
 	}
+	v.sp++
 	if v.sp > v.stackPointerCeil {
 		v.stackPointerCeil = v.sp
 	}
-	v.sp++
 }
 
 func (v *runtimeValueLocationStack) pop() (loc *runtimeValueLocation) {
