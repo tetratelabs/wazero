@@ -202,6 +202,8 @@ func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
 		v.stack[v.sp] = loc
 	}
 	v.sp++
+	// stackPointerCeil must be set after sp is incremented since
+	// we skip the stack grow if len(valueStack) >= basePointer+stackPointerCeil.
 	if v.sp > v.stackPointerCeil {
 		v.stackPointerCeil = v.sp
 	}
