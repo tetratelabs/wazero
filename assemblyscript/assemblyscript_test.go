@@ -371,14 +371,14 @@ func TestSeed_error(t *testing.T) {
 		{
 			name:   "not 8 bytes",
 			source: bytes.NewReader([]byte{0, 1}),
-			expectedErr: `error reading Module.RandSource: unexpected EOF (recovered by wazero)
+			expectedErr: `error reading random seed: unexpected EOF (recovered by wazero)
 wasm stack trace:
 	env.seed() f64`,
 		},
 		{
 			name:   "error reading",
 			source: iotest.ErrReader(errors.New("ice cream")),
-			expectedErr: `error reading Module.RandSource: ice cream (recovered by wazero)
+			expectedErr: `error reading random seed: ice cream (recovered by wazero)
 wasm stack trace:
 	env.seed() f64`,
 		},

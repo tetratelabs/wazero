@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 const (
@@ -56,7 +57,7 @@ const (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
 func (a *wasi) ClockResGet(ctx context.Context, mod api.Module, id uint32, resultResolution uint32) Errno {
-	sysCtx := getSysCtx(mod)
+	sysCtx := mod.(*wasm.CallContext).Sys
 
 	var resolution uint64 // ns
 	switch id {
@@ -99,7 +100,7 @@ func (a *wasi) ClockResGet(ctx context.Context, mod api.Module, id uint32, resul
 // See https://linux.die.net/man/3/clock_gettime
 func (a *wasi) ClockTimeGet(ctx context.Context, mod api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: precision is currently ignored.
-	sysCtx := getSysCtx(mod)
+	sysCtx := mod.(*wasm.CallContext).Sys
 
 	var val uint64
 	switch id {

@@ -281,10 +281,7 @@ func (b *moduleBuilder) ExportGlobalF64(name string, v float64) ModuleBuilder {
 
 // Compile implements ModuleBuilder.Compile
 func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (CompiledModule, error) {
-	config, ok := cConfig.(*compileConfig)
-	if !ok {
-		panic(fmt.Errorf("unsupported wazero.CompileConfig implementation: %#v", cConfig))
-	}
+	config := cConfig.(*compileConfig)
 
 	// Verify the maximum limit here, so we don't have to pass it to wasm.NewHostModule
 	for name, mem := range b.nameToMemory {

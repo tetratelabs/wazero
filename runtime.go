@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -125,10 +124,7 @@ func NewRuntime() Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
-	config, ok := rConfig.(*runtimeConfig)
-	if !ok {
-		panic(fmt.Errorf("unsupported wazero.RuntimeConfig implementation: %#v", rConfig))
-	}
+	config := rConfig.(*runtimeConfig)
 	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures))
 	return &runtime{
 		store:           store,
@@ -164,11 +160,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 		return nil, errors.New("binary == nil")
 	}
 
-	config, ok := cConfig.(*compileConfig)
-	if !ok {
-		panic(fmt.Errorf("unsupported wazero.CompileConfig implementation: %#v", cConfig))
-	}
-
+	config := cConfig.(*compileConfig)
 	if len(binary) < 4 || !bytes.Equal(binary[0:4], binaryformat.Magic) {
 		return nil, errors.New("invalid binary")
 	}

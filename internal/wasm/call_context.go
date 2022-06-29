@@ -13,9 +13,9 @@ import (
 // compile time check to ensure CallContext implements api.Module
 var _ api.Module = &CallContext{}
 
-func NewCallContext(ns *Namespace, instance *ModuleInstance, Sys *internalsys.Context) *CallContext {
+func NewCallContext(ns *Namespace, instance *ModuleInstance, sys *internalsys.Context) *CallContext {
 	zero := uint64(0)
-	return &CallContext{memory: instance.Memory, module: instance, ns: ns, Sys: Sys, closed: &zero}
+	return &CallContext{memory: instance.Memory, module: instance, ns: ns, Sys: sys, closed: &zero}
 }
 
 // CallContext is a function call context bound to a module. This is important as one module's functions can call

@@ -70,7 +70,7 @@ func (r *wazeroRuntime) Name() string {
 func (r *wazeroRuntime) log(ctx context.Context, m api.Module, offset, byteCount uint32) {
 	buf, ok := m.Memory().Read(ctx, offset, byteCount)
 	if !ok {
-		panic(fmt.Errorf("Memory.Read(%d, %d) out of range", offset, byteCount))
+		panic("out of memory reading log buffer")
 	}
 	if err := r.logFn(buf); err != nil {
 		panic(err)
