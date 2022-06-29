@@ -3,6 +3,7 @@ package wasi_snapshot_preview1
 import (
 	"testing"
 
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -121,7 +122,7 @@ func Test_PollOneoff_Errors(t *testing.T) {
 			mem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				eventTypeFdRead, 0x0, 0x0, 0x0,
-				fdStdin, 0x0, 0x0, 0x0, // valid readable FD
+				internalsys.FdStdin, 0x0, 0x0, 0x0, // valid readable FD
 				'?', // stopped after encoding
 			},
 			expectedErrno: ErrnoSuccess,

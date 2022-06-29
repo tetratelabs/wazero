@@ -27,7 +27,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -156,7 +155,7 @@ func (a *assemblyscript) abort(
 	columnNumber uint32,
 ) {
 	if !a.abortMessageDisabled {
-		sysCtx := getSysCtx(mod)
+		sysCtx := mod.(*wasm.CallContext).Sys
 		msg, err := readAssemblyScriptString(ctx, mod, message)
 		if err != nil {
 			return
@@ -184,9 +183,9 @@ func (a *assemblyscript) trace(
 	case traceDisabled:
 		return
 	case traceStdout:
-		writer = getSysCtx(mod).Stdout()
+		writer = mod.(*wasm.CallContext).Sys.Stdout()
 	case traceStderr:
-		writer = getSysCtx(mod).Stderr()
+		writer = mod.(*wasm.CallContext).Sys.Stderr()
 	}
 
 	msg, err := readAssemblyScriptString(ctx, mod, message)
@@ -234,10 +233,10 @@ func formatFloat(f float64) string {
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
 func (a *assemblyscript) seed(mod api.Module) float64 {
-	randSource := getSysCtx(mod).RandSource()
+	randSource := mod.(*wasm.CallContext).Sys.RandSource()
 	v, err := ieee754.DecodeFloat64(randSource)
 	if err != nil {
-		panic(fmt.Errorf("error reading Module.RandSource: %w", err))
+		panic(fmt.Errorf("error reading random seed: %w", err))
 	}
 	return v
 }
@@ -268,12 +267,4 @@ func decodeUTF16(b []byte) string {
 	}
 
 	return string(utf16.Decode(u16s))
-}
-
-func getSysCtx(mod api.Module) *internalsys.Context {
-	if internal, ok := mod.(*wasm.CallContext); !ok {
-		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", mod))
-	} else {
-		return internal.Sys
-	}
 }

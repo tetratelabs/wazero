@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 
 	"github.com/tetratelabs/wazero/api"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-eventtype-enumu8
@@ -114,7 +116,8 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 	// unaffected. Since this function only supports relative timeout, we can
 	// skip clock ID validation and use a single sleep function.
 
-	getSysCtx(mod).Nanosleep(ctx, int64(timeout))
+	sysCtx := mod.(*wasm.CallContext).Sys
+	sysCtx.Nanosleep(ctx, int64(timeout))
 	return ErrnoSuccess
 }
 
@@ -122,12 +125,13 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 // subscriptions are not yet supported.
 func processFDEvent(ctx context.Context, mod api.Module, eventType byte, inBuf []byte) Errno {
 	fd := binary.LittleEndian.Uint32(inBuf)
+	sysCtx := mod.(*wasm.CallContext).Sys
 
 	// Choose the best error, which falls back to unsupported, until we support files.
 	errno := ErrnoNotsup
-	if eventType == eventTypeFdRead && fdReader(ctx, mod, fd) == nil {
+	if eventType == eventTypeFdRead && internalsys.FdReader(ctx, sysCtx, fd) == nil {
 		errno = ErrnoBadf
-	} else if eventType == eventTypeFdWrite && fdWriter(ctx, mod, fd) == nil {
+	} else if eventType == eventTypeFdWrite && internalsys.FdWriter(ctx, sysCtx, fd) == nil {
 		errno = ErrnoBadf
 	}
 

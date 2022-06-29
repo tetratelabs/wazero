@@ -23,16 +23,6 @@ var (
 	zero    = wasm.Index(0)
 )
 
-func TestNewRuntimeWithConfig_PanicsOnWrongImpl(t *testing.T) {
-	// It causes maintenance to define an impl of RuntimeConfig in tests just to verify the error when it is wrong.
-	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
-	err := require.CapturePanic(func() {
-		NewRuntimeWithConfig(nil)
-	})
-
-	require.EqualError(t, err, "unsupported wazero.RuntimeConfig implementation: <nil>")
-}
-
 func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -514,35 +504,6 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 			require.Zero(t, r.(*runtime).store.Engine.CompiledModuleCount())
 		})
 	}
-}
-
-func TestRuntime_InstantiateModule_PanicsOnWrongCompiledCodeImpl(t *testing.T) {
-	// It causes maintenance to define an impl of CompiledModule in tests just to verify the error when it is wrong.
-	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
-	r := NewRuntime()
-	defer r.Close(testCtx)
-
-	err := require.CapturePanic(func() {
-		_, _ = r.InstantiateModule(testCtx, nil, NewModuleConfig())
-	})
-
-	require.EqualError(t, err, "unsupported wazero.CompiledModule implementation: <nil>")
-}
-
-func TestRuntime_InstantiateModule_PanicsOnWrongModuleConfigImpl(t *testing.T) {
-	r := NewRuntime()
-	defer r.Close(testCtx)
-
-	code, err := r.CompileModule(testCtx, binaryformat.EncodeModule(&wasm.Module{}), NewCompileConfig())
-	require.NoError(t, err)
-
-	// It causes maintenance to define an impl of ModuleConfig in tests just to verify the error when it is wrong.
-	// Instead, we pass nil which is implicitly the wrong type, as that's less work!
-	err = require.CapturePanic(func() {
-		_, _ = r.InstantiateModule(testCtx, code, nil)
-	})
-
-	require.EqualError(t, err, "unsupported wazero.ModuleConfig implementation: <nil>")
 }
 
 // TestRuntime_InstantiateModule_WithName tests that we can pre-validate (cache) a module and instantiate it under

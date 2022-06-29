@@ -57,7 +57,7 @@ func Example_withFS() {
 
 	// Try to read the path!
 	if path, ok := mod.Memory().Read(ctx, uint32(pathOffset), uint32(pathLen)); !ok {
-		log.Panicf("Memory.Read(%d,%d) out of range of memory size %d", pathOffset, pathLen, mod.Memory().Size(ctx))
+		log.Panicln("out of memory reading path")
 	} else {
 		fmt.Println(string(path))
 	}

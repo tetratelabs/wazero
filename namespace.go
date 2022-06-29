@@ -67,15 +67,8 @@ func (ns *namespace) InstantiateModule(
 	compiled CompiledModule,
 	mConfig ModuleConfig,
 ) (mod api.Module, err error) {
-	code, ok := compiled.(*compiledModule)
-	if !ok {
-		panic(fmt.Errorf("unsupported wazero.CompiledModule implementation: %#v", compiled))
-	}
-
-	config, ok := mConfig.(*moduleConfig)
-	if !ok {
-		panic(fmt.Errorf("unsupported wazero.ModuleConfig implementation: %#v", mConfig))
-	}
+	code := compiled.(*compiledModule)
+	config := mConfig.(*moduleConfig)
 
 	var sysCtx *internalsys.Context
 	if sysCtx, err = config.toSysContext(); err != nil {
@@ -117,7 +110,7 @@ func (ns *namespace) InstantiateModule(
 		}
 		if _, err = start.Call(ctx); err != nil {
 			_ = mod.Close(ctx) // Don't leak the module on error.
-			if _, ok = err.(*sys.ExitError); ok {
+			if _, ok := err.(*sys.ExitError); ok {
 				return // Don't wrap an exit error
 			}
 			err = fmt.Errorf("module[%s] function[%s] failed: %w", name, fn, err)

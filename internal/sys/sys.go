@@ -113,11 +113,7 @@ func (c *Context) Nanosleep(ctx context.Context, ns int64) {
 func (c *Context) FS(ctx context.Context) *FSContext {
 	// Override Context when it is passed via context
 	if fsValue := ctx.Value(FSKey{}); fsValue != nil {
-		fsCtx, ok := fsValue.(*FSContext)
-		if !ok {
-			panic(fmt.Errorf("unsupported fs key: %v", fsValue))
-		}
-		return fsCtx
+		return fsValue.(*FSContext)
 	}
 	return c.fsc
 }

@@ -2,10 +2,17 @@ package sys
 
 import (
 	"context"
-	"errors"
+	"io"
 	"io/fs"
 	"math"
 	"sync/atomic"
+	"syscall"
+)
+
+const (
+	FdStdin = iota
+	FdStdout
+	FdStderr
 )
 
 // FSKey is a context.Context Value key. It allows overriding fs.FS for WASI.
@@ -81,7 +88,7 @@ func (c *FSContext) nextFD() uint32 {
 	return atomic.AddUint32(&c.lastFD, 1)
 }
 
-// OpenedFile returns a file and true if it was opened or nil and false, if not.
+// OpenedFile returns a file and true if it was opened or nil and false, if syscall.EBADF.
 func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) {
 	f, ok := c.openedFiles[fd]
 	return f, ok
@@ -107,27 +114,27 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 	newFD := c.nextFD()
 	if newFD == 0 {
 		_ = f.Close()
-		return 0, &fs.PathError{Op: "open", Path: name, Err: errors.New("out of file descriptors")}
+		return 0, syscall.EBADF
 	}
 	c.openedFiles[newFD] = &FileEntry{Path: name, File: f}
 	return newFD, nil
 }
 
-// CloseFile returns true if a file was opened and closed without error, or false if not.
-func (c *FSContext) CloseFile(_ context.Context, fd uint32) (bool, error) {
+// CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
+func (c *FSContext) CloseFile(_ context.Context, fd uint32) bool {
 	f, ok := c.openedFiles[fd]
 	if !ok {
-		return false, nil
+		return false
 	}
 	delete(c.openedFiles, fd)
 
-	if f.File == nil { // TODO: currently, this means it is a pre-opened filesystem, but this may change later.
-		return true, nil
+	if f.File == nil { // The root entry
+		return true
 	}
 	if err := f.File.Close(); err != nil {
-		return false, err
+		return false
 	}
-	return true, nil
+	return true
 }
 
 // Close implements io.Closer
@@ -142,4 +149,35 @@ func (c *FSContext) Close(_ context.Context) (err error) {
 		}
 	}
 	return
+}
+
+// FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
+func FdWriter(ctx context.Context, sysCtx *Context, fd uint32) io.Writer {
+	switch fd {
+	case FdStdout:
+		return sysCtx.Stdout()
+	case FdStderr:
+		return sysCtx.Stderr()
+	default:
+		// Check to see if the file descriptor is available
+		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
+			return nil
+		} else if writer, ok := f.File.(io.Writer); !ok {
+			// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
+			return nil
+		} else {
+			return writer
+		}
+	}
+}
+
+// FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
+func FdReader(ctx context.Context, sysCtx *Context, fd uint32) io.Reader {
+	if fd == FdStdin {
+		return sysCtx.Stdin()
+	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
+		return nil
+	} else {
+		return f.File
+	}
 }

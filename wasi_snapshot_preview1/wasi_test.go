@@ -468,7 +468,7 @@ func Test_FdClose(t *testing.T) {
 
 	verify := func(mod api.Module) {
 		// Verify fdToClose is closed and removed from the opened FDs.
-		fsc := getSysCtx(mod).FS(testCtx)
+		fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
 		_, ok := fsc.OpenedFile(testCtx, fdToClose)
 		require.False(t, ok)
 
@@ -1509,7 +1509,7 @@ func Test_PathOpen(t *testing.T) {
 		require.Equal(t, expectedMemory, actual)
 
 		// verify the file was actually opened
-		fsc := getSysCtx(mod).FS(ctx)
+		fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
 		f, ok := fsc.OpenedFile(testCtx, expectedFD)
 		require.True(t, ok)
 		require.Equal(t, pathName, f.Path)
