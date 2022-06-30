@@ -137,21 +137,37 @@ func TestNodeImpl_String(t *testing.T) {
 			in: &nodeImpl{instruction: MOVL, types: operandTypesMemoryToRegister,
 				srcReg: RegDX, srcConst: 1, srcMemIndex: RegR12, srcMemScale: 2,
 				dstReg: RegAX},
-			exp: "MOVL [DX + 1 + R12*0x2], AX",
+			exp: "MOVL [DX + 0x1 + R12*0x2], AX",
 		},
 		{
 			in: &nodeImpl{instruction: CMPQ, types: operandTypesMemoryToConst,
 				srcReg: RegDX, srcConst: 1, srcMemIndex: RegR12, srcMemScale: 2,
 				dstConst: 123},
-			exp: "CMPQ [DX + 1 + R12*0x2], 0x7b",
+			exp: "CMPQ [DX + 0x1 + R12*0x2], 0x7b",
+		},
+		{
+			in:  &nodeImpl{instruction: CMPQ, types: operandTypesMemoryToConst, srcReg: RegDX, srcConst: 1, dstConst: 123},
+			exp: "CMPQ [DX + 0x1], 0x7b",
 		},
 		{
 			in:  &nodeImpl{instruction: MOVQ, types: operandTypesConstToMemory, srcConst: 123, dstReg: RegAX, dstConst: 100, dstMemScale: 8, dstMemIndex: RegR11},
 			exp: "MOVQ 0x7b, [AX + 0x64 + R11*0x8]",
 		},
 		{
+			in:  &nodeImpl{instruction: MOVQ, types: operandTypesConstToMemory, srcConst: 123, dstReg: RegAX, dstConst: 100},
+			exp: "MOVQ 0x7b, [AX + 0x64]",
+		},
+		{
 			in:  &nodeImpl{instruction: MOVQ, types: operandTypesConstToRegister, srcConst: 123, dstReg: RegAX},
 			exp: "MOVQ 0x7b, AX",
+		},
+		{
+			in:  &nodeImpl{instruction: LEAQ, types: operandTypesStaticConstToRegister, staticConst: &asm.StaticConst{Raw: []byte{0xff, 0x01, 0x2, 0xff}}, dstReg: RegAX},
+			exp: "LEAQ $0xff0102ff, AX",
+		},
+		{
+			in:  &nodeImpl{instruction: CMPQ, types: operandTypesRegisterToStaticConst, staticConst: &asm.StaticConst{Raw: []byte{0xff, 0x01, 0x2, 0xff}}, srcReg: RegAX},
+			exp: "CMPQ AX, $0xff0102ff",
 		},
 	}
 

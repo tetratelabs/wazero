@@ -129,17 +129,17 @@ func (n *nodeImpl) String() (ret string) {
 		ret = fmt.Sprintf("%s %s, 0x%x", instName, RegisterName(n.srcReg), n.dstConst)
 	case operandTypesMemoryToRegister:
 		if n.srcMemIndex != asm.NilRegister {
-			ret = fmt.Sprintf("%s [%s + %d + %s*0x%x], %s", instName,
+			ret = fmt.Sprintf("%s [%s + %#x + %s*%#x], %s", instName,
 				RegisterName(n.srcReg), n.srcConst, RegisterName(n.srcMemIndex), n.srcMemScale, RegisterName(n.dstReg))
 		} else {
 			ret = fmt.Sprintf("%s [%s + 0x%x], %s", instName, RegisterName(n.srcReg), n.srcConst, RegisterName(n.dstReg))
 		}
 	case operandTypesMemoryToConst:
 		if n.srcMemIndex != asm.NilRegister {
-			ret = fmt.Sprintf("%s [%s + %d + %s*0x%x], 0x%x", instName,
+			ret = fmt.Sprintf("%s [%s + %#x + %s*0x%x], 0x%x", instName,
 				RegisterName(n.srcReg), n.srcConst, RegisterName(n.srcMemIndex), n.srcMemScale, n.dstConst)
 		} else {
-			ret = fmt.Sprintf("%s [%s + 0x%x], 0x%x", instName, RegisterName(n.srcReg), n.srcConst, n.dstConst)
+			ret = fmt.Sprintf("%s [%s + %#x], 0x%x", instName, RegisterName(n.srcReg), n.srcConst, n.dstConst)
 		}
 	case operandTypesConstToMemory:
 		if n.dstMemIndex != asm.NilRegister {
@@ -150,6 +150,10 @@ func (n *nodeImpl) String() (ret string) {
 		}
 	case operandTypesConstToRegister:
 		ret = fmt.Sprintf("%s 0x%x, %s", instName, n.srcConst, RegisterName(n.dstReg))
+	case operandTypesStaticConstToRegister:
+		ret = fmt.Sprintf("%s $%#x, %s", instName, n.staticConst.Raw, RegisterName(n.dstReg))
+	case operandTypesRegisterToStaticConst:
+		ret = fmt.Sprintf("%s %s, $%#x", instName, RegisterName(n.srcReg), n.staticConst.Raw)
 	}
 	return
 }
