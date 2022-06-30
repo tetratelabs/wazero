@@ -101,16 +101,17 @@ func (n *nodeImpl) String() (ret string) {
 	case operandTypesRegisterToVectorRegister:
 		ret = fmt.Sprintf("%s %s, %s.%s[%d]", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement, n.dstVectorIndex)
 	case operandTypesVectorRegisterToRegister:
-		ret = fmt.Sprintf("%s %s.%s[%d], %s.%s[%d]", instName, RegisterName(n.srcReg), n.vectorArrangement, n.srcVectorIndex,
-			RegisterName(n.dstReg), n.vectorArrangement, n.dstVectorIndex)
+		ret = fmt.Sprintf("%s %s.%s[%d], %s", instName, RegisterName(n.srcReg), n.vectorArrangement, n.srcVectorIndex, RegisterName(n.dstReg))
 	case operandTypesVectorRegisterToMemory:
 		ret = fmt.Sprintf("%s %s.%s, [%s]", instName, RegisterName(n.srcReg), n.vectorArrangement, RegisterName(n.dstReg))
 	case operandTypesMemoryToVectorRegister:
 		ret = fmt.Sprintf("%s [%s], %s.%s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
 	case operandTypesVectorRegisterToVectorRegister:
-		ret = fmt.Sprintf("%s %s.%[2]s, %s.%[2]s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
+		ret = fmt.Sprintf("%s %[2]s.%[4]s, %[3]s.%[4]s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
 	case operandTypesStaticConstToVectorRegister:
-		ret = fmt.Sprintf("%s $%v %s.%s", instName, n.staticConst, RegisterName(n.dstReg), n.vectorArrangement)
+		ret = fmt.Sprintf("%s $%#x %s.%s", instName, n.staticConst.Raw, RegisterName(n.dstReg), n.vectorArrangement)
+	case operandTypesTwoVectorRegistersToVectorRegister:
+		ret = fmt.Sprintf("%s (%s.%[5]s, %[3]s.%[5]s), %[4]s.%[5]s", instName, RegisterName(n.srcReg), RegisterName(n.srcReg2), RegisterName(n.dstReg), n.vectorArrangement)
 	}
 	return
 }
