@@ -265,6 +265,19 @@ func Test_CompileMemoryWithRegisterOffsetToRegister(t *testing.T) {
 	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
+func Test_CompileMemoryWithRegisterOffsetToVectorRegister(t *testing.T) {
+	a := NewAssembler(RegR10)
+	a.CompileMemoryWithRegisterOffsetToVectorRegister(MOVD, RegR27, RegR10, RegV31, VectorArrangementS)
+	actualNode := a.Current
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegR27, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.srcReg2)
+	require.Equal(t, RegV31, actualNode.dstReg)
+	require.Equal(t, VectorArrangementS, actualNode.vectorArrangement)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+}
+
 func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileRegisterToMemoryWithRegisterOffset(MOVD, RegR27, RegR10, RegR0)
@@ -274,6 +287,19 @@ func Test_CompileRegisterToMemoryWithRegisterOffset(t *testing.T) {
 	require.Equal(t, RegR10, actualNode.dstReg)
 	require.Equal(t, RegR0, actualNode.dstReg2)
 	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+}
+
+func Test_CompileVectorRegisterToMemoryWithRegisterOffset(t *testing.T) {
+	a := NewAssembler(RegR10)
+	a.CompileVectorRegisterToMemoryWithRegisterOffset(MOVD, RegV31, RegR10, RegR0, VectorArrangement2D)
+	actualNode := a.Current
+	require.Equal(t, MOVD, actualNode.instruction)
+	require.Equal(t, RegV31, actualNode.srcReg)
+	require.Equal(t, RegR10, actualNode.dstReg)
+	require.Equal(t, RegR0, actualNode.dstReg2)
+	require.Equal(t, VectorArrangement2D, actualNode.vectorArrangement)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
 	require.Equal(t, operandTypeMemory, actualNode.types.dst)
 }
 
@@ -414,6 +440,19 @@ func Test_CompileVectorRegisterToVectorRegister(t *testing.T) {
 	require.Equal(t, VectorIndex(2), actualNode.dstVectorIndex)
 }
 
+func Test_CompileVectorRegisterToVectorRegisterWithConst(t *testing.T) {
+	a := NewAssembler(RegR10)
+	a.CompileVectorRegisterToVectorRegisterWithConst(VMOV, RegV3, RegV10, VectorArrangement1D, 1234)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegV10, actualNode.dstReg)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+	require.Equal(t, int64(1234), actualNode.srcConst)
+}
+
 func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 	a := NewAssembler(RegR10)
 	a.CompileTwoVectorRegistersToVectorRegister(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D)
@@ -425,6 +464,45 @@ func Test_CompileTwoVectorRegistersToVectorRegister(t *testing.T) {
 	require.Equal(t, operandTypeTwoVectorRegisters, actualNode.types.src)
 	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
 	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+}
+
+func Test_CompileTwoVectorRegistersToVectorRegisterWithConst(t *testing.T) {
+	a := NewAssembler(RegR10)
+	a.CompileTwoVectorRegistersToVectorRegisterWithConst(VMOV, RegV3, RegV15, RegV10, VectorArrangement1D, 1234)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, RegV3, actualNode.srcReg)
+	require.Equal(t, RegV15, actualNode.srcReg2)
+	require.Equal(t, int64(1234), actualNode.srcConst)
+	require.Equal(t, RegV10, actualNode.dstReg)
+	require.Equal(t, operandTypeTwoVectorRegisters, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement1D, actualNode.vectorArrangement)
+}
+
+func Test_CompileStaticConstToVectorRegister(t *testing.T) {
+	s := asm.NewStaticConst([]byte{1, 2, 3, 4})
+	a := NewAssembler(RegR10)
+	a.CompileStaticConstToVectorRegister(VMOV, s, RegV3, VectorArrangement2D)
+	actualNode := a.Current
+	require.Equal(t, VMOV, actualNode.instruction)
+	require.Equal(t, s, actualNode.staticConst)
+	require.Equal(t, RegV3, actualNode.dstReg)
+	require.Equal(t, operandTypeStaticConst, actualNode.types.src)
+	require.Equal(t, operandTypeVectorRegister, actualNode.types.dst)
+	require.Equal(t, VectorArrangement2D, actualNode.vectorArrangement)
+}
+
+func Test_CompileStaticConstToRegister(t *testing.T) {
+	s := asm.NewStaticConst([]byte{1, 2, 3, 4})
+	a := NewAssembler(RegR10)
+	a.CompileStaticConstToRegister(ADR, s, RegR27)
+	actualNode := a.Current
+	require.Equal(t, ADR, actualNode.instruction)
+	require.Equal(t, s, actualNode.staticConst)
+	require.Equal(t, RegR27, actualNode.dstReg)
+	require.Equal(t, operandTypeMemory, actualNode.types.src)
+	require.Equal(t, operandTypeRegister, actualNode.types.dst)
 }
 
 func Test_checkRegisterToRegisterType(t *testing.T) {
