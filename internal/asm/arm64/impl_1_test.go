@@ -108,7 +108,28 @@ func TestNodeImpl_String(t *testing.T) {
 		{
 			in: &nodeImpl{instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
 				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1},
-			exp: "VCNT V3.V3, V29.V3",
+			exp: "VCNT V3.2D, V29.2D",
+		},
+		{
+			in: &nodeImpl{instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
+				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1},
+			exp: "VCNT V3.2D, V29.2D",
+		},
+		{
+			in: &nodeImpl{instruction: UMOV, types: operandTypesVectorRegisterToRegister,
+				srcReg: RegV31, dstReg: RegR8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1},
+			exp: "UMOV V31.S[1], R8",
+		},
+		{
+			in: &nodeImpl{instruction: UMOV, types: operandTypesTwoVectorRegistersToVectorRegister,
+				srcReg: RegV31, srcReg2: RegV1, dstReg: RegV8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1},
+			exp: "UMOV (V31.S, V1.S), V8.S",
+		},
+		{
+			in: &nodeImpl{instruction: VORR, types: operandTypesStaticConstToVectorRegister,
+				staticConst: &asm.StaticConst{Raw: []byte{1, 2, 3, 4}},
+				dstReg:      RegV8, vectorArrangement: VectorArrangement16B, srcVectorIndex: 1},
+			exp: "VORR $0x01020304 V8.16B",
 		},
 	}
 
