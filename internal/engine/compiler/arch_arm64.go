@@ -9,6 +9,8 @@ import (
 // init initializes variables for the arm64 architecture
 func init() {
 	newArchContext = newArchContextImpl
+	unreservedGeneralPurposeRegisters = arm64UnreservedGeneralPurposeRegisters
+	unreservedVectorRegisters = arm64UnreservedVectorRegisters
 }
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
@@ -39,11 +41,6 @@ func newArchContextImpl() archContext {
 		minimum32BitSignedInt: math.MinInt32,
 		minimum64BitSignedInt: math.MinInt64,
 	}
-}
-
-func init() {
-	unreservedGeneralPurposeRegisters = arm64UnreservedGeneralPurposeRegisters
-	unreservedVectorRegisters = arm64UnreservedVectorRegisters
 }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
