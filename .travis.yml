@@ -1,0 +1,24 @@
+# See https://docs.travis-ci.com/user/reference/overview/#for-a-particular-travisyml-configuration
+# run `travis lint` prior to check-in!
+os: freebsd
+language: bash
+go: 1.17.x
+
+cache:
+  directories:
+    - $HOME/go/pkg/mod
+
+git:
+  depth: false  # TRAVIS_COMMIT_RANGE requires full commit history.
+
+if: (type = push AND branch = master) OR type = pull_request
+
+before_install: |  # Prevent test build of a documentation or GitHub Actions only change.
+  if [ -n "${TRAVIS_COMMIT_RANGE}" ] && ! git diff --name-only "${TRAVIS_COMMIT_RANGE}" -- \
+    grep -qvE '(\.md)$|$|^(site\/)|^(netlify.toml)|^(.github\/)'; then
+    echo "Stopping job as changes are tested with GitHub Actions"
+    travis_terminate 0
+  fi
+  make check || travis_terminate 1
+
+script: make test spectest.v1 spectest.v2
