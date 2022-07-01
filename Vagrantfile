@@ -1,7 +1,17 @@
+# Vagrant file for FreeBSD
+#
 # Ex.
 #   GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant up
 #   vagrant rsync
 #   vagrant ssh -c "cd wazero; go test ./..."
+#
+# Notes on FreeBSD:
+# * GitHub Actions doesn’t support FreeBSD, and may never.
+# * We could use Travis to run FreeBSD, but it would split our CI config.
+# * Using Vagrant directly is easier to debug than vmactions/freebsd-vm.
+# * GitHub Actions only supports virtualization on MacOS.
+# * GitHub Actions removed vagrant from the image starting with macos-11.
+# * Since VirtualBox doesn't work on arm64, freebsd/arm64 is untestable.
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/freebsd13"

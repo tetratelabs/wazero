@@ -47,14 +47,7 @@ jobs:
 
       - run: make spectest.${{ matrix.spec-version }}
 
-  # Notes on FreeBSD:
-  # * GitHub Actions doesn’t support FreeBSD, and may never.
-  # * We could use Travis to run FreeBSD, but it would split our CI config.
-  # * Using Vagrant directly is easier to debug than vmactions/freebsd-vm.
-  # * GitHub Actions only supports virtualization on MacOS.
-  # * GitHub Actions removed vagrant from the image starting with macos-11.
-  # * Since VirtualBox doesn't work on arm64, freebsd/arm64 is untestable.
-  test_freebsd:
+  test_freebsd:  # See /Vagrantfile for notes
     name: ${{ matrix.spec-version }} - freebsd/amd64, Go-${{ matrix.go-version }}
     runs-on: macos-12
     strategy:
@@ -85,7 +78,6 @@ jobs:
       - name: Configure Vagrant
         run: |  # This ensures the same version of Go is used inside Vagrant.
           GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant up
-          vagrant rsync
 
       - name: make spectest.${{ matrix.spec-version }}
         run: vagrant ssh -c "cd wazero && make spectest.${{ matrix.spec-version }}"
