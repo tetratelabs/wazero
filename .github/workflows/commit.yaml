@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:  # use latest available versions and be consistent on all workflows!
-        os: [ubuntu-20.04, macos-11, windows-2022]
+        os: [ubuntu-20.04, macos-12, windows-2022]
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
         - "1.18"
@@ -91,6 +91,38 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: bash <(curl -s https://codecov.io/bash)
+
+  test_freebsd:  # See /Vagrantfile for notes
+    name: amd64, FreeBSD, Go-${{ matrix.go-version }}
+    runs-on: macos-12
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        go-version:
+          - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+          - "1.18"
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:  # Note: This isn't really used, it is just to match versions.
+          go-version: ${{ matrix.go-version }}
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.vagrant.d/boxes
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum','Vagrantfile') }}-${{ matrix.spec-version }}
+
+      - name: Install Vagrant
+        run: brew install --cask vagrant
+
+      - name: Configure Vagrant
+        run: |  # This ensures the same version of Go is used inside Vagrant.
+          GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant up
+
+      - name: make test
+        run: vagrant ssh -c "cd wazero && make test"
 
   test_scratch:
     name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}

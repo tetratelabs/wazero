@@ -1,4 +1,4 @@
-//go:build !(darwin || linux || windows)
+//go:build !(darwin || linux || freebsd || windows)
 
 package platform
 

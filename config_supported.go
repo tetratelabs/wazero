@@ -5,7 +5,7 @@
 //
 // Meanwhile, users who know their runtime.GOOS can operate with the compiler
 // may choose to use NewRuntimeConfigCompiler explicitly.
-//go:build (amd64 || arm64) && (darwin || linux || windows)
+//go:build (amd64 || arm64) && (darwin || linux || freebsd || windows)
 
 package wazero
 

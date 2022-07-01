@@ -1,9 +1,12 @@
 // This uses syscall.Mprotect. Go's SDK only supports this on darwin and linux.
-//go:build darwin || linux
+//go:build darwin || linux || freebsd
 
 package platform
 
-import "syscall"
+import (
+	"syscall"
+	"unsafe"
+)
 
 func munmapCodeSegment(code []byte) error {
 	return syscall.Munmap(code)
@@ -51,6 +54,23 @@ func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	copy(mmapFunc, code)
 
 	// Then we're done with writing code, change the permission to RX.
-	err = syscall.Mprotect(mmapFunc, syscall.PROT_READ|syscall.PROT_EXEC)
+	err = mprotect(mmapFunc, syscall.PROT_READ|syscall.PROT_EXEC)
 	return mmapFunc, err
+}
+
+var _zero uintptr
+
+// mprotect is like syscall.Mprotect, defined locally so that freebsd compiles.
+func mprotect(b []byte, prot int) (err error) {
+	var _p0 unsafe.Pointer
+	if len(b) > 0 {
+		_p0 = unsafe.Pointer(&b[0])
+	} else {
+		_p0 = unsafe.Pointer(&_zero)
+	}
+	_, _, e1 := syscall.Syscall(syscall.SYS_MPROTECT, uintptr(_p0), uintptr(len(b)), uintptr(prot))
+	if e1 != 0 {
+		err = syscall.Errno(e1)
+	}
+	return
 }

@@ -168,14 +168,14 @@ systems are ones we test, but that doesn't necessarily mean other operating
 system versions won't work.
 
 We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
-[GitHub Actions][11].
+[GitHub Actions][11], as well FreeBSD via Vagrant/VirtualBox.
 
 * Interpreter
   * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
-  * MacOS and Windows are only tested on amd64.
+  * FreeBSD, MacOS and Windows are only tested on amd64.
 * Compiler
   * Linux is tested on amd64 (native) as well arm64 via emulation.
-  * MacOS and Windows are only tested on amd64.
+  * FreeBSD, MacOS and Windows are only tested on amd64.
 
 wazero has no dependencies and doesn't require CGO. This means it can also be
 embedded in an application that doesn't use an operating system. This is a main

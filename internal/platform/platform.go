@@ -12,7 +12,7 @@ import (
 // CompilerSupported is exported for tests and includes constraints here and also the assembler.
 func CompilerSupported() bool {
 	switch runtime.GOOS {
-	case "darwin", "windows", "linux":
+	case "darwin", "windows", "linux", "freebsd":
 	default:
 		return false
 	}
