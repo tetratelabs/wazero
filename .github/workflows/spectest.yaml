@@ -80,9 +80,7 @@ jobs:
           key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum','Vagrantfile') }}-${{ matrix.spec-version }}
 
       - name: Install Vagrant
-        run: |
-          brew install --cask vagrant
-          brew install --cask virtualbox
+        run: brew install --cask vagrant
 
       - name: Configure Vagrant
         run: |  # This ensures the same version of Go is used inside Vagrant.
