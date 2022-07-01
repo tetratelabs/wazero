@@ -19,7 +19,7 @@ defaults:
 
 jobs:
   test_amd64:
-    name: ${{ matrix.spec-version }} / amd64, Go-${{ matrix.go-version }}
+    name: ${{ matrix.spec-version }} - linux/amd64, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
@@ -46,6 +46,51 @@ jobs:
           key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.spec-version }}
 
       - run: make spectest.${{ matrix.spec-version }}
+
+  # Notes on FreeBSD:
+  # * GitHub Actions doesn’t support FreeBSD, and may never.
+  # * We could use Travis to run FreeBSD, but it would split our CI config.
+  # * Using Vagrant directly is easier to debug than vmactions/freebsd-vm.
+  # * GitHub Actions only supports virtualization on MacOS.
+  # * GitHub Actions removed vagrant from the image starting with macos-11.
+  # * Since VirtualBox doesn't work on arm64, freebsd/arm64 is untestable.
+  test_freebsd:
+    name: ${{ matrix.spec-version }} - freebsd/amd64, Go-${{ matrix.go-version }}
+    runs-on: macos-12
+    strategy:
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
+      matrix:
+        go-version:
+          - "1.17"
+          - "1.18"
+        spec-version:
+          - "v1"
+          - "v2"
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:  # Note: This isn't really used, it is just to match versions.
+          go-version: ${{ matrix.go-version }}
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.vagrant.d/boxes
+          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum','Vagrantfile') }}-${{ matrix.spec-version }}
+
+      - name: Install Vagrant
+        run: |
+          brew install --cask vagrant
+          brew install --cask virtualbox
+
+      - name: Configure Vagrant
+        run: |  # This ensures the same version of Go is used inside Vagrant.
+          GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant up
+          vagrant rsync
+
+      - name: make spectest.${{ matrix.spec-version }}
+        run: vagrant ssh -c "cd wazero && make spectest.${{ matrix.spec-version }}"
 
   test_scratch:
     name: ${{ matrix.spec-version }} / ${{ matrix.arch }}, Go-${{ matrix.go-version }}
