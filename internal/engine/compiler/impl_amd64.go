@@ -1229,7 +1229,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		return err
 	}
 
-	if runtime.GOOS != "darwin" {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "freebsd" {
 		if o.Type == wazeroir.UnsignedInt32 {
 			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {
