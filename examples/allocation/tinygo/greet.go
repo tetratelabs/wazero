@@ -25,7 +25,9 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().
+		// Enable WebAssembly 2.0 support, which is required for TinyGo 0.24+.
+		WithWasmCore2())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a Go-defined module named "env" that exports a function to
