@@ -151,6 +151,9 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case wasm.OpcodeDropName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-parametricmathsfdrop
 		opCode = wasm.OpcodeDrop
 		next = p.beginFieldOrInstruction
+	case wasm.OpcodeUnreachableName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-control
+		opCode = wasm.OpcodeUnreachable
+		next = p.beginFieldOrInstruction
 
 	case wasm.OpcodeF32ConstName: // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeF32Const

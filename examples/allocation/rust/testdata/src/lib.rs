@@ -3,8 +3,8 @@ extern crate core;
 extern crate wee_alloc;
 
 use alloc::vec::Vec;
-use std::slice;
 use std::mem::MaybeUninit;
+use std::slice;
 
 /// Prints a greeting to the console using [`log`].
 fn greet(name: &String) {
@@ -40,10 +40,7 @@ extern "C" {
 ///
 /// Note: The input parameters were returned by [`allocate`]. This is not an
 /// ownership transfer, so the inputs can be reused after this call.
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "greet"
-)]
+#[cfg_attr(all(target_arch = "wasm32"), export_name = "greet")]
 #[no_mangle]
 pub unsafe extern "C" fn _greet(ptr: u32, len: u32) {
     greet(&ptr_to_string(ptr, len));
@@ -56,10 +53,7 @@ pub unsafe extern "C" fn _greet(ptr: u32, len: u32) {
 /// [`deallocate`] when finished.
 /// Note: This uses a u64 instead of two result values for compatibility with
 /// WebAssembly 1.0.
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "greeting"
-)]
+#[cfg_attr(all(target_arch = "wasm32"), export_name = "greeting")]
 #[no_mangle]
 pub unsafe extern "C" fn _greeting(ptr: u32, len: u32) -> u64 {
     let name = &ptr_to_string(ptr, len);
@@ -98,14 +92,16 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 ///
 /// This is an ownership transfer, which means the caller must call
 /// [`deallocate`] when finished.
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "allocate"
-)]
+#[cfg_attr(all(target_arch = "wasm32"), export_name = "allocate")]
 #[no_mangle]
-pub extern "C" fn allocate(size: u32) -> *mut u8 {
+pub extern "C" fn _allocate(size: u32) -> *mut u8 {
+    allocate(size as usize)
+}
+
+/// Allocates size bytes and leaks the pointer where they start.
+fn allocate(size: usize) -> *mut u8 {
     // Allocate the amount of bytes needed.
-    let vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(size as usize);
+    let vec: Vec<MaybeUninit<u8>> = Vec::with_capacity(size);
 
     // into_raw leaks the memory to the caller.
     Box::into_raw(vec.into_boxed_slice()) as *mut u8
@@ -114,14 +110,13 @@ pub extern "C" fn allocate(size: u32) -> *mut u8 {
 
 /// WebAssembly export that deallocates a pointer of the given size (linear
 /// memory offset, byteCount) allocated by [`allocate`].
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "deallocate"
-)]
+#[cfg_attr(all(target_arch = "wasm32"), export_name = "deallocate")]
 #[no_mangle]
-pub extern "C" fn deallocate(ptr: u32, size: u32) {
-    unsafe {
-        // Retake the pointer which allows its memory to be freed.
-        let _ = Vec::from_raw_parts(ptr as *mut u8, 0, size as usize);
-    }
+pub unsafe extern "C" fn _deallocate(ptr: u32, size: u32) {
+    deallocate(ptr as *mut u8, size as usize);
+}
+
+/// Retakes the pointer which allows its memory to be freed.
+unsafe fn deallocate(ptr: *mut u8, size: usize) {
+    let _ = Vec::from_raw_parts(ptr, 0, size);
 }

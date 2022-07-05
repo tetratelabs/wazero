@@ -428,9 +428,15 @@ type ModuleConfig interface {
 	// WithName configures the module name. Defaults to what was decoded or overridden via CompileConfig.WithModuleName.
 	WithName(string) ModuleConfig
 
-	// WithStartFunctions configures the functions to call after the module is instantiated. Defaults to "_start".
+	// WithStartFunctions configures the functions to call after the module is
+	// instantiated. Defaults to "_start".
 	//
-	// Note: If any function doesn't exist, it is skipped. However, all functions that do exist are called in order.
+	// Notes
+	//
+	//	* If any function doesn't exist, it is skipped. However, all functions
+	//	  that do exist are called in order.
+	//	* Some start functions may exit the module during instantiate with a
+	//	  sys.ExitError (ex. emscripten), preventing use of exported functions.
 	WithStartFunctions(...string) ModuleConfig
 
 	// WithStderr configures where standard error (file descriptor 2) is written. Defaults to io.Discard.

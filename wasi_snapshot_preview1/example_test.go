@@ -46,7 +46,9 @@ func Example() {
 	if mod != nil {
 		defer mod.Close(ctx)
 	}
-	// Print the exit code
+
+	// Note: Most compilers do not exit the module after running "_start", unless
+	// there was an error. This allows you to call exported functions.
 	if exitErr, ok := err.(*sys.ExitError); ok {
 		fmt.Printf("exit_code: %d\n", exitErr.ExitCode())
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // FuncName returns the naming convention of "moduleName.funcName".
@@ -113,6 +114,10 @@ type stackTrace struct {
 func (s *stackTrace) FromRecovered(recovered interface{}) error {
 	if buildoptions.IsDebugMode {
 		debug.PrintStack()
+	}
+
+	if exitErr, ok := recovered.(*sys.ExitError); ok { // Don't wrap an exit error!
+		return exitErr
 	}
 
 	stack := strings.Join(s.frames, "\n\t")

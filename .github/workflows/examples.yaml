@@ -6,6 +6,8 @@ on:
       - '.github/workflows/examples.yaml'
       - 'examples/*/testdata/*.go'
       - 'examples/*/*/testdata/*.go'
+      - 'examples/*/testdata/*/*.go'
+      - 'examples/*/testdata/*/*.c'
       - 'examples/*/testdata/*.ts'
       - 'Makefile'
   push:
@@ -14,6 +16,9 @@ on:
       - '.github/workflows/examples.yaml'
       - 'examples/*/testdata/*.go'
       - 'examples/*/*/testdata/*.go'
+      - 'examples/*/testdata/*/*.go'
+      - 'examples/*/testdata/*/*.c'
+      - 'examples/*/testdata/*.ts'
       - 'Makefile'
 
 jobs:
@@ -28,16 +33,25 @@ jobs:
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
+      - name: Install latest Zig
+        uses: goto-bus-stop/setup-zig@v1
+        with:  # on laptop, use `brew install zig`
+          version: 0.9.1
+
       - name: Checkout
         uses: actions/checkout@v3
 
       # TinyGo -> Wasm is not idempotent, so we only check things build.
       - name: Build TinyGO examples
-        run: make build.examples
+        run: make build.examples.tinygo
 
       # AssemblyScript -> Wasm is not idempotent, so we only check things build.
       - name: Build AssemblyScript examples
         run: make build.examples.as
+
+      # zig-cc -> Wasm is not idempotent, so we only check things build.
+      - name: Build zig-cc examples
+        run: make build.examples.zig-cc
 
       # TinyGo -> Wasm is not idempotent, so we only check things build.
       - name: Build bench cases
