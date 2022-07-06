@@ -305,7 +305,7 @@ https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/m
 
 ## Exit
 
-### Wny do we return a `sys.ExitError` on exit code zero?
+### Why do we return a `sys.ExitError` on exit code zero?
 
 It may be surprising to find an error returned on success (exit code zero).
 This can be explained easier when you think of function returns: When results
