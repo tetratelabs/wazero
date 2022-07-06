@@ -22,8 +22,7 @@ var catFS embed.FS
 //go:embed testdata/tinygo/cat.wasm
 var catWasmTinyGo []byte
 
-// catWasmZigCc was compiled from the directory testdata/zig-cc:
-//	zig cc cat.c -o cat.wasm --target=wasm32-wasi -O3
+// catWasmZigCc was compiled from testdata/zig-cc/cat.c
 //go:embed testdata/zig-cc/cat.wasm
 var catWasmZigCc []byte
 
