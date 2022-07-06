@@ -93,6 +93,35 @@ func TestAbort(t *testing.T) {
 	}
 }
 
+var unreachableAfterAbort = `(module
+  (import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
+  (func $main
+    i32.const 0
+    i32.const 0
+    i32.const 0
+    i32.const 0
+    call $~lib/builtins/abort
+	unreachable ;; If abort doesn't panic, this code is reached.
+  )
+  (start $main)
+)`
+
+// TestAbort_StopsExecution ensures code that follows an abort isn't invoked.
+func TestAbort_StopsExecution(t *testing.T) {
+	r := wazero.NewRuntime()
+	defer r.Close(testCtx)
+
+	_, err := NewBuilder(r).WithAbortMessageDisabled().Instantiate(testCtx, r)
+	require.NoError(t, err)
+
+	abortWasm, err := watzero.Wat2Wasm(unreachableAfterAbort)
+	require.NoError(t, err)
+
+	_, err = r.InstantiateModuleFromBinary(testCtx, abortWasm)
+	require.Error(t, err)
+	require.Equal(t, uint32(255), err.(*sys.ExitError).ExitCode())
+}
+
 func TestSeed(t *testing.T) {
 	r := wazero.NewRuntime()
 	defer r.Close(testCtx)

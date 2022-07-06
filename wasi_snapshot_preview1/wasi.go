@@ -22,7 +22,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/sys"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -365,22 +365,6 @@ const (
 	// importPollOneoff is the WebAssembly 1.0 Text format import of functionPollOneoff.
 	importPollOneoff = `(import "wasi_snapshot_preview1" "poll_oneoff"
     (func $wasi.poll_oneoff (param $in i32) (param $out i32) (param $nsubscriptions i32) (param $result.nevents i32) (result (;errno;) i32)))`
-
-	// functionProcExit terminates the execution of the module with an exit code.
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-	functionProcExit = "proc_exit"
-
-	// importProcExit is the WebAssembly 1.0 Text format import of functionProcExit.
-	importProcExit = `(import "wasi_snapshot_preview1" "proc_exit"
-    (func $wasi.proc_exit (param $rval i32)))`
-
-	// functionProcRaise sends a signal to the process of the calling thread.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-proc_raisesig-signal---errno
-	functionProcRaise = "proc_raise"
-
-	// importProcRaise is the WebAssembly 1.0 Text format import of functionProcRaise.
-	importProcRaise = `(import "wasi_snapshot_preview1" "proc_raise"
-    (func $wasi.proc_raise (param $sig i32) (result (;errno;) i32)))`
 
 	// functionSchedYield temporarily yields execution of the calling thread.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sched_yield---errno
@@ -892,7 +876,7 @@ func (a *wasi) FdPwrite(ctx context.Context, mod api.Module, fd, iovs, iovsCount
 // See https://linux.die.net/man/3/readv
 func (a *wasi) FdRead(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
-	reader := sys.FdReader(ctx, sysCtx, fd)
+	reader := internalsys.FdReader(ctx, sysCtx, fd)
 	if reader == nil {
 		return ErrnoBadf
 	}
@@ -1054,7 +1038,7 @@ func (a *wasi) FdTell(ctx context.Context, mod api.Module, fd, resultOffset uint
 // See https://linux.die.net/man/3/writev
 func (a *wasi) FdWrite(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
-	writer := sys.FdWriter(ctx, sysCtx, fd)
+	writer := internalsys.FdWriter(ctx, sysCtx, fd)
 	if writer == nil {
 		return ErrnoBadf
 	}
@@ -1066,6 +1050,8 @@ func (a *wasi) FdWrite(ctx context.Context, mod api.Module, fd, iovs, iovsCount,
 		if !ok {
 			return ErrnoFault
 		}
+		// Note: emscripten has been known to write zero length iovec. However,
+		// it is not common in other compilers, so we don't optimize for it.
 		l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
 		if !ok {
 			return ErrnoFault
@@ -1202,24 +1188,6 @@ func (a *wasi) PathSymlink(ctx context.Context, mod api.Module, oldPath, oldPath
 
 // PathUnlinkFile is the WASI function named functionPathUnlinkFile
 func (a *wasi) PathUnlinkFile(ctx context.Context, mod api.Module, fd, path, pathLen uint32) Errno {
-	return ErrnoNosys // stubbed for GrainLang per #271
-}
-
-// ProcExit is the WASI function that terminates the execution of the module with an exit code.
-// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
-//
-// * rval - The exit code.
-//
-// In wazero, this calls api.Module CloseWithExitCode.
-//
-// Note: importProcExit shows this signature in the WebAssembly 1.0 Text Format.
-// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-func (a *wasi) ProcExit(ctx context.Context, mod api.Module, exitCode uint32) {
-	_ = mod.CloseWithExitCode(ctx, exitCode)
-}
-
-// ProcRaise is the WASI function named functionProcRaise
-func (a *wasi) ProcRaise(ctx context.Context, mod api.Module, sig uint32) Errno {
 	return ErrnoNosys // stubbed for GrainLang per #271
 }
 

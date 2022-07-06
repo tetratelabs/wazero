@@ -13,7 +13,8 @@ import (
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/sys"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 type (
@@ -345,7 +346,7 @@ func (s *Store) Instantiate(
 	ns *Namespace,
 	module *Module,
 	name string,
-	sys *sys.Context,
+	sys *internalsys.Context,
 	functionListenerFactory experimentalapi.FunctionListenerFactory,
 ) (*CallContext, error) {
 	if ctx == nil {
@@ -386,7 +387,7 @@ func (s *Store) instantiate(
 	ns *Namespace,
 	module *Module,
 	name string,
-	sys *sys.Context,
+	sysCtx *internalsys.Context,
 	functionListenerFactory experimentalapi.FunctionListenerFactory,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {
@@ -451,13 +452,17 @@ func (s *Store) instantiate(
 	}
 
 	// Compile the default context for calls to this module.
-	m.CallCtx = NewCallContext(ns, m, sys)
+	m.CallCtx = NewCallContext(ns, m, sysCtx)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		if _, err = f.Module.Engine.Call(ctx, m.CallCtx, f); err != nil {
+		_, err = f.Module.Engine.Call(ctx, m.CallCtx, f)
+
+		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
+			return nil, exitErr
+		} else if err != nil {
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
 	}

@@ -28,6 +28,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // Instantiate instantiates the "env" module used by AssemblyScript into the runtime default namespace.
@@ -166,7 +167,16 @@ func (a *assemblyscript) abort(
 		}
 		_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 	}
-	_ = mod.CloseWithExitCode(ctx, 255)
+
+	// AssemblyScript expects the exit code to be 255
+	// See https://github.com/AssemblyScript/assemblyscript/blob/v0.20.13/tests/compiler/wasi/abort.js#L14
+	exitCode := uint32(255)
+
+	// Ensure other callers see the exit code.
+	_ = mod.CloseWithExitCode(ctx, exitCode)
+
+	// Prevent any code from executing after this function.
+	panic(sys.NewExitError(mod.Name(), exitCode))
 }
 
 // trace implements the same named function in AssemblyScript (ex. trace('Hello World!'))

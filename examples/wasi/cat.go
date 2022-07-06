@@ -4,11 +4,13 @@ import (
 	"context"
 	"embed"
 	_ "embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/sys"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
@@ -16,9 +18,13 @@ import (
 //go:embed testdata/test.txt
 var catFS embed.FS
 
-// catWasm was compiled the TinyGo source testdata/cat.go
-//go:embed testdata/cat.wasm
-var catWasm []byte
+// catWasmTinyGo was compiled from testdata/tinygo/cat.go
+//go:embed testdata/tinygo/cat.wasm
+var catWasmTinyGo []byte
+
+// catWasmZigCc was compiled from testdata/zig-cc/cat.c
+//go:embed testdata/zig-cc/cat.wasm
+var catWasmZigCc []byte
 
 // main writes an input file to stdout, just like `cat`.
 //
@@ -40,12 +46,29 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Combine the above into our baseline config, overriding defaults (which discards stdout and has no file system).
-	config := wazero.NewModuleConfig().WithStdout(os.Stdout).WithFS(rooted)
+	// Combine the above into our baseline config, overriding defaults.
+	config := wazero.NewModuleConfig().
+		// By default, I/O streams are discarded and there's no file system.
+		WithStdout(os.Stdout).WithStderr(os.Stderr).WithFS(rooted)
 
 	// Instantiate WASI, which implements system I/O such as console output.
 	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		log.Panicln(err)
+	}
+
+	// Choose the binary we want to test. Most compilers that implement WASI
+	// are portable enough to use binaries interchangeably.
+	var catWasm []byte
+	compiler := os.Getenv("WASM_COMPILER")
+	switch compiler {
+	case "":
+		fallthrough // default to TinyGo
+	case "tinygo":
+		catWasm = catWasmTinyGo
+	case "zig-cc":
+		catWasm = catWasmZigCc
+	default:
+		log.Panicln("unknown compiler", compiler)
 	}
 
 	// Compile the WebAssembly module using the default configuration.
@@ -54,9 +77,16 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// InstantiateModule runs the "_start" function which is what TinyGo compiles "main" to.
-	// * Set the program name (arg[0]) to "wasi" and add args to write "/test.txt" to stdout twice.
+	// InstantiateModule runs the "_start" function, WASI's "main".
+	// * Set the program name (arg[0]) to "wasi"; arg[1] should be "/test.txt".
 	if _, err = r.InstantiateModule(ctx, code, config.WithArgs("wasi", os.Args[1])); err != nil {
-		log.Panicln(err)
+
+		// Note: Most compilers do not exit the module after running "_start",
+		// unless there was an error. This allows you to call exported functions.
+		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
+			fmt.Fprintf(os.Stderr, "exit_code: %d\n", exitErr.ExitCode())
+		} else if !ok {
+			log.Panicln(err)
+		}
 	}
 }

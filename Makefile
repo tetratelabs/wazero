@@ -46,11 +46,19 @@ build.bench:
 build.examples.as:
 	@cd ./examples/assemblyscript/testdata && npm install && npm run build
 
-tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go)
-.PHONY: build.examples
-build.examples: $(tinygo_sources)
+tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go)
+.PHONY: build.examples.tinygo
+build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
+	done
+
+# We use zig to build C as it is easy to install and embeds a copy of zig-cc.
+c_sources := $(wildcard examples/*/testdata/*.c examples/*/*/testdata/*.c examples/*/testdata/*/*.c)
+.PHONY: build.examples.zig-cc
+build.examples.zig-cc: $(c_sources)
+	@for f in $^; do \
+	    zig cc $$f -o $$(echo $$f | sed -e 's/\.c/\.wasm/') --target=wasm32-wasi -O3; \
 	done
 
 spectest_base_dir := internal/integration_test/spectest

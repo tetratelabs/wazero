@@ -199,7 +199,6 @@ type compiler interface {
 	// compileV128Add adds instructions to perform wazeroir.OperationV128Add.
 	compileV128Add(o *wazeroir.OperationV128Add) error
 	// compileV128Sub adds instructions to perform wazeroir.OperationV128Sub.
-	// compileV128Sub adds instructions to perform wazeroir.OperationV128Sub.
 	compileV128Sub(o *wazeroir.OperationV128Sub) error
 	// compileV128Load adds instructions to perform wazeroir.OperationV128Load.
 	compileV128Load(o *wazeroir.OperationV128Load) error
