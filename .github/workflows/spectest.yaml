@@ -121,7 +121,8 @@ jobs:
       - name: Set up QEMU
         if: ${{ matrix.arch != 'amd64' }}
         uses: docker/setup-qemu-action@v2
-        with:
+        with:  # Avoid docker.io rate-limits; built with internal-images.yml
+          image: ghcr.io/tetratelabs/wazero-internal:binfmt
           platforms: ${{ matrix.arch }}
 
       - name: Build scratch container
