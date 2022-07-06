@@ -98,10 +98,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 ///
 /// This is an ownership transfer, which means the caller must call
 /// [`deallocate`] when finished.
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "allocate"
-)]
 #[no_mangle]
 pub extern "C" fn allocate(size: u32) -> *mut u8 {
     // Allocate the amount of bytes needed.
@@ -114,10 +110,6 @@ pub extern "C" fn allocate(size: u32) -> *mut u8 {
 
 /// WebAssembly export that deallocates a pointer of the given size (linear
 /// memory offset, byteCount) allocated by [`allocate`].
-#[cfg_attr(
-all(target_arch = "wasm32", target_os = "unknown"),
-export_name = "deallocate"
-)]
 #[no_mangle]
 pub extern "C" fn deallocate(ptr: u32, size: u32) {
     unsafe {
