@@ -19,7 +19,7 @@ int main(int argc, char** argv)
       return 1;
     }
 
-    for(;;) {
+    for (;;) {
       len = read(fd, &buf[0], BUF_LEN);
       if (len > 0) {
         write(STDOUT_FILENO, buf, len);
