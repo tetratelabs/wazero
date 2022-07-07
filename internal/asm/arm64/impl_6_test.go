@@ -10,6 +10,9 @@ import (
 )
 
 func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
+	// We only test positive limits, since the negative limits require a reverse branch.
+	// Testing reverse branches would require many megabytes in the code section, making
+	// the test unwieldy.
 	t.Run("offset limits", func(t *testing.T) {
 		tests := []struct {
 			name   string
