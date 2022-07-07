@@ -200,6 +200,14 @@ func (o operandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
+const (
+	maxSignedInt26 int64 = 1<<25 - 1
+	minSignedInt26 int64 = -(1 << 25)
+
+	maxSignedInt19 int64 = 1<<19 - 1
+	minSignedInt19 int64 = -(1 << 19)
+)
+
 // AssemblerImpl implements Assembler.
 type AssemblerImpl struct {
 	asm.BaseAssemblerImpl
@@ -756,8 +764,6 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 		branchInst := code[branchInstOffset : branchInstOffset+4]
 		if condBits == condBitsUnconditional {
 			imm26 := offset / 4
-			const maxSignedInt26 int64 = 1<<25 - 1
-			const minSignedInt26 int64 = -(1 << 25)
 			if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
 				// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
 				// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
@@ -771,12 +777,10 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 			branchInst[3] = (byte(imm26 >> 24 & 0b000000_11)) | 0b000101_00
 		} else {
 			imm19 := offset / 4
-			const maxSignedInt19 int64 = 1<<19 - 1
-			const minSignedInt19 int64 = -(1 << 19)
 			if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
 				// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
 				// and if ever happens, compiler can be fixed.
-				return fmt.Errorf("BUG: relative jump offset %d/4(=%d)must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
+				return fmt.Errorf("BUG: relative jump offset %d/4(=%d) must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
 			}
 			// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B-cond--Branch-conditionally-?lang=en
 			branchInst[0] = (byte(imm19<<5) & 0b111_0_0000) | condBits
