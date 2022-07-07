@@ -18,6 +18,10 @@ import (
 //go:embed testdata/test.txt
 var catFS embed.FS
 
+// catWasmCargoWasi was compiled from testdata/cargo-wasi/cat.rs
+//go:embed testdata/cargo-wasi/cat.wasm
+var catWasmCargoWasi []byte
+
 // catWasmTinyGo was compiled from testdata/tinygo/cat.go
 //go:embed testdata/tinygo/cat.wasm
 var catWasmTinyGo []byte
@@ -59,16 +63,18 @@ func main() {
 	// Choose the binary we want to test. Most compilers that implement WASI
 	// are portable enough to use binaries interchangeably.
 	var catWasm []byte
-	compiler := os.Getenv("WASM_COMPILER")
-	switch compiler {
+	toolchain := os.Getenv("TOOLCHAIN")
+	switch toolchain {
 	case "":
 		fallthrough // default to TinyGo
+	case "cargo-wasi":
+		catWasm = catWasmCargoWasi
 	case "tinygo":
 		catWasm = catWasmTinyGo
 	case "zig-cc":
 		catWasm = catWasmZigCc
 	default:
-		log.Panicln("unknown compiler", compiler)
+		log.Panicln("unknown toolchain", toolchain)
 	}
 
 	// Compile the WebAssembly module using the default configuration.

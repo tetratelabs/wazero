@@ -9,6 +9,10 @@ on:
       - 'examples/*/testdata/*/*.go'
       - 'examples/*/testdata/*/*.c'
       - 'examples/*/testdata/*.ts'
+      - 'examples/*/testdata/*/*.rs'
+      - 'examples/*/testdata/*/Cargo.toml'
+      - 'examples/*/*/testdata/*.rs'
+      - 'examples/*/*/testdata/Cargo.toml'
       - 'Makefile'
   push:
     branches: [main]
@@ -19,9 +23,15 @@ on:
       - 'examples/*/testdata/*/*.go'
       - 'examples/*/testdata/*/*.c'
       - 'examples/*/testdata/*.ts'
+      - 'examples/*/testdata/*/*.rs'
+      - 'examples/*/testdata/*/Cargo.toml'
+      - 'examples/*/*/testdata/*.rs'
+      - 'examples/*/*/testdata/Cargo.toml'
       - 'Makefile'
 
 jobs:
+  # Not all toolchains are idempotent when generating wasm, so we don't check
+  # in %.wasm as a part of this job.
   examples:
     name: Build examples
     runs-on: ubuntu-20.04
@@ -38,21 +48,26 @@ jobs:
         with:  # on laptop, use `brew install zig`
           version: 0.9.1
 
+      - name: Install wasm32-wasi target
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-wasi
+
       - name: Checkout
         uses: actions/checkout@v3
 
-      # TinyGo -> Wasm is not idempotent, so we only check things build.
       - name: Build TinyGO examples
         run: make build.examples.tinygo
 
-      # AssemblyScript -> Wasm is not idempotent, so we only check things build.
       - name: Build AssemblyScript examples
         run: make build.examples.as
 
-      # zig-cc -> Wasm is not idempotent, so we only check things build.
       - name: Build zig-cc examples
         run: make build.examples.zig-cc
 
-      # TinyGo -> Wasm is not idempotent, so we only check things build.
+      - name: Build Rust examples
+        run: make build.examples.rust
+
       - name: Build bench cases
         run: make build.bench

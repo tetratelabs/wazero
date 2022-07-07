@@ -61,6 +61,17 @@ build.examples.zig-cc: $(c_sources)
 	    zig cc $$f -o $$(echo $$f | sed -e 's/\.c/\.wasm/') --target=wasm32-wasi -O3; \
 	done
 
+%/greet.wasm : cargo_target := wasm32-unknown-unknown
+%/cat.wasm : cargo_target := wasm32-wasi
+
+.PHONY: build.examples.rust
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm examples/wasi/testdata/cargo-wasi/cat.wasm
+
+# Builds rust using cargo normally, or cargo-wasi.
+%.wasm: %.rs
+	@(cd $(@D); cargo $(if $(findstring wasi,$(cargo_target)),wasi build,build --target $(cargo_target)) --release)
+	@mv $(@D)/target/$(cargo_target)/release/$(@F) $(@D)
+
 spectest_base_dir := internal/integration_test/spectest
 spectest_v1_dir := $(spectest_base_dir)/v1
 spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata

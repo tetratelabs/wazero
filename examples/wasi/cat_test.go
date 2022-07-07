@@ -11,10 +11,10 @@ import (
 //
 //	go run cat.go /test.txt
 func Test_main(t *testing.T) {
-	for _, compiler := range []string{"tinygo", "zig-cc"} {
-		compiler := compiler
-		t.Run(compiler, func(t *testing.T) {
-			t.Setenv("WASM_COMPILER", compiler)
+	for _, toolchain := range []string{"cargo-wasi", "tinygo", "zig-cc"} {
+		toolchain := toolchain
+		t.Run(toolchain, func(t *testing.T) {
+			t.Setenv("TOOLCHAIN", toolchain)
 			stdout, stderr := maintester.TestMain(t, main, "cat", "/test.txt")
 			require.Equal(t, "", stderr)
 			require.Equal(t, "greet filesystem\n", stdout)

@@ -6,6 +6,8 @@ edition = "2021"
 [lib]
 # cdylib builds a a %.wasm file with `cargo build --release --target wasm32-unknown-unknown`
 crate-type = ["cdylib"]
+name = "greet"
+path = "greet.rs"
 
 [dependencies]
 # wee_aloc is a WebAssembly optimized allocator, which is needed to use non-numeric types like strings.
