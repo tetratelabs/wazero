@@ -758,7 +758,7 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 			imm26 := offset / 4
 			const maxSignedInt26 int64 = 1<<25 - 1
 			const minSignedInt26 int64 = -(1 << 25)
-			if offset < minSignedInt26 || offset > maxSignedInt26 {
+			if imm26 < minSignedInt26 || imm26 > maxSignedInt26 {
 				// In theory this could happen if a Wasm binary has a huge single label (more than 128MB for a single block),
 				// and in that case, we use load the offset into a register and do the register jump, but to avoid the complexity,
 				// we impose this limit for now as that would be *unlikely* happen in practice.
@@ -773,7 +773,7 @@ func (a *AssemblerImpl) encodeRelativeBranch(n *nodeImpl) (err error) {
 			imm19 := offset / 4
 			const maxSignedInt19 int64 = 1<<19 - 1
 			const minSignedInt19 int64 = -(1 << 19)
-			if offset < minSignedInt19 || offset > maxSignedInt19 {
+			if imm19 < minSignedInt19 || imm19 > maxSignedInt19 {
 				// This should be a bug in our compiler as the conditional jumps are only used in the small offsets (~a few bytes),
 				// and if ever happens, compiler can be fixed.
 				return fmt.Errorf("BUG: relative jump offset %d/4(=%d)must be within %d and %d", offset, imm19, minSignedInt19, maxSignedInt19)
