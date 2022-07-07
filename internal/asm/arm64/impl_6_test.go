@@ -12,14 +12,17 @@ import (
 func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 	t.Run("offset limits", func(t *testing.T) {
 		tests := []struct {
+			name   string
 			inst   asm.Instruction
 			offset uint64
 		}{
 			{
+				name:   "B maxSignedInt26*4",
 				inst:   B,
 				offset: uint64(maxSignedInt26 * 4),
 			},
 			{
+				name:   "BCONDEQ maxSignedInt19*4",
 				inst:   BCONDEQ,
 				offset: uint64(maxSignedInt19 * 4),
 			},
@@ -27,7 +30,7 @@ func TestAssemblerImpl_EncodeRelativeJump(t *testing.T) {
 
 		for _, tt := range tests {
 			tc := tt
-			t.Run(fmt.Sprintf("%v %d", tc.inst, tc.offset), func(t *testing.T) {
+			t.Run(tc.name, func(t *testing.T) {
 				a := NewAssembler(asm.NilRegister)
 				n := &nodeImpl{instruction: tc.inst, types: operandTypesNoneToBranch, offsetInBinaryField: 0, jumpTarget: &nodeImpl{offsetInBinaryField: tc.offset}}
 				err := a.encodeRelativeBranch(n)
