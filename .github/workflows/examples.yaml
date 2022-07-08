@@ -4,29 +4,13 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
-      - 'examples/*/testdata/*.go'
-      - 'examples/*/*/testdata/*.go'
-      - 'examples/*/testdata/*/*.go'
-      - 'examples/*/testdata/*/*.c'
-      - 'examples/*/testdata/*.ts'
-      - 'examples/*/testdata/*/*.rs'
-      - 'examples/*/testdata/*/Cargo.toml'
-      - 'examples/*/*/testdata/*.rs'
-      - 'examples/*/*/testdata/Cargo.toml'
+      - 'examples/**'
       - 'Makefile'
   push:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
-      - 'examples/*/testdata/*.go'
-      - 'examples/*/*/testdata/*.go'
-      - 'examples/*/testdata/*/*.go'
-      - 'examples/*/testdata/*/*.c'
-      - 'examples/*/testdata/*.ts'
-      - 'examples/*/testdata/*/*.rs'
-      - 'examples/*/testdata/*/Cargo.toml'
-      - 'examples/*/*/testdata/*.rs'
-      - 'examples/*/*/testdata/Cargo.toml'
+      - 'examples/**'
       - 'Makefile'
 
 jobs:
@@ -35,6 +19,12 @@ jobs:
   examples:
     name: Build examples
     runs-on: ubuntu-20.04
+    strategy:
+      matrix: # use latest available versions and be consistent on all workflows!
+        go-version:
+          - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+          - "1.18"
+
     steps:
       - name: Install latest TinyGo
         run: |  # installing via curl so commands are similar on OS/x
@@ -57,6 +47,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/go/bin
+          key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+
       - name: Build TinyGO examples
         run: make build.examples.tinygo
 
@@ -71,3 +69,6 @@ jobs:
 
       - name: Build bench cases
         run: make build.bench
+
+      - name: Run example tests
+        run: go test ./examples/...
