@@ -43,14 +43,14 @@ years old, it is unlikely to change. This means the only way to create smaller
 wasm is via optimization.
 
 The [cargo-wasi][3] crate includes many optimizations in its release target,
-including `wasm-opt`, a part of [binaryen][3]. `cargo wasi build --release`
+including `wasm-opt`, a part of [binaryen][4]. `cargo wasi build --release`
 generates 82KB of wasm, which is small enough to check in.
 
 ### emscripten
 
 Emscripten is not included as we cannot create a cat program without using
 custom filesystem code. Emscripten only supports WASI I/O for
-[stdin/stdout/stderr][4] and suggest using wasi-libc instead. This is used in
+stdin/stdout/stderr and [suggest using wasi-libc instead][5]. This is used in
 the [zig-cc](testdata/zig-cc) example.
 
 [1]: https://github.com/bytecodealliance/cargo-wasi
