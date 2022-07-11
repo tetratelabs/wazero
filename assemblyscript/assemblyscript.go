@@ -1,19 +1,24 @@
-// Package assemblyscript contains Go-defined special functions imported by AssemblyScript under the module name "env".
+// Package assemblyscript contains Go-defined special functions imported by
+// AssemblyScript under the module name "env".
 //
 // Special Functions
 //
-// AssemblyScript code import the below special functions when not using WASI. Sometimes only "abort"
+// AssemblyScript code import the below special functions when not using WASI.
+// Note: Sometimes only "abort" is imported.
 //
-//	* "abort" - exits with 255 with an abort message written to wazero.ModuleConfig WithStderr.
+//	* "abort" - exits with 255 with an abort message written to
+//	  wazero.ModuleConfig WithStderr.
 //	* "trace" - no output unless.
-//	* "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed values.
+//	* "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed
+//	  values.
 //
 // Relationship to WASI
 //
-// A program compiled to use WASI, via "import wasi" in any file, won't import these functions.
-// See wasi_snapshot_preview1.InstantiateSnapshotPreview1
+// A program compiled to use WASI, via "import wasi" in any file, won't import
+// these functions.
 //
-// See https://www.assemblyscript.org/concepts.html#special-imports
+// See wasi_snapshot_preview1.Instantiate and
+// https://www.assemblyscript.org/concepts.html#special-imports
 package assemblyscript
 
 import (
@@ -31,44 +36,46 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// Instantiate instantiates the "env" module used by AssemblyScript into the runtime default namespace.
+// Instantiate instantiates the "env" module used by AssemblyScript into the
+// runtime default namespace.
 //
 // Notes
 //
 //	* Closing the wazero.Runtime has the same effect as closing the result.
-//	* To instantiate into another wazero.Namespace, use NewBuilder instead.
+//	* To add more functions to the "env" module, use FunctionExporter.
+//	* To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return NewBuilder(r).Instantiate(ctx, r)
+	return r.NewModuleBuilder("env").
+		ExportFunctions(NewFunctionExporter().ExportFunctions()).
+		Instantiate(ctx, r)
 }
 
-// Builder configures the "env" module used by AssemblyScript for later use via Compile or Instantiate.
-type Builder interface {
-	// WithAbortMessageDisabled configures the AssemblyScript abort function to discard any message.
-	WithAbortMessageDisabled() Builder
+// FunctionExporter configures the functions in the "env" module used by
+// AssemblyScript.
+type FunctionExporter interface {
+	// WithAbortMessageDisabled configures the AssemblyScript abort function to
+	// discard any message.
+	WithAbortMessageDisabled() FunctionExporter
 
-	// WithTraceToStdout configures the AssemblyScript trace function to output messages to Stdout, as configured by
-	// wazero.ModuleConfig WithStdout.
-	WithTraceToStdout() Builder
+	// WithTraceToStdout configures the AssemblyScript trace function to output
+	// messages to Stdout, as configured by wazero.ModuleConfig WithStdout.
+	WithTraceToStdout() FunctionExporter
 
-	// WithTraceToStderr configures the AssemblyScript trace function to output messages to Stderr, as configured by
-	// wazero.ModuleConfig WithStderr. Because of the potential volume of trace messages, it is often more appropriate
-	// to use WithTraceToStdout instead.
-	WithTraceToStderr() Builder
-
-	// Compile compiles the "env" module that can instantiated in any namespace (wazero.Namespace).
+	// WithTraceToStderr configures the AssemblyScript trace function to output
+	// messages to Stderr, as configured by wazero.ModuleConfig WithStderr.
 	//
-	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
-	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
+	// Because of the potential volume of trace messages, it is often more
+	// appropriate to use WithTraceToStdout instead.
+	WithTraceToStderr() FunctionExporter
 
-	// Instantiate instantiates the "env" module into the provided namespace.
-	//
-	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
-	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
+	// ExportFunctions builds functions to export with a wazero.ModuleBuilder
+	// named "env".
+	ExportFunctions() (nameToGoFunc map[string]interface{})
 }
 
-// NewBuilder returns a new Builder with trace disabled.
-func NewBuilder(r wazero.Runtime) Builder {
-	return &builder{r: r, traceMode: traceDisabled}
+// NewFunctionExporter returns a FunctionExporter object with trace disabled.
+func NewFunctionExporter() FunctionExporter {
+	return &functionExporter{traceMode: traceDisabled}
 }
 
 type traceMode int
@@ -79,54 +86,44 @@ const (
 	traceStderr   traceMode = 2
 )
 
-type builder struct {
-	r                    wazero.Runtime
+type functionExporter struct {
 	abortMessageDisabled bool
 	traceMode            traceMode
 }
 
-// WithAbortMessageDisabled implements Builder.WithAbortMessageDisabled
-func (b *builder) WithAbortMessageDisabled() Builder {
-	ret := *b // copy
+// WithAbortMessageDisabled implements FunctionExporter.WithAbortMessageDisabled
+func (e *functionExporter) WithAbortMessageDisabled() FunctionExporter {
+	ret := *e // copy
 	ret.abortMessageDisabled = true
 	return &ret
 }
 
-// WithTraceToStdout implements Builder.WithTraceToStdout
-func (b *builder) WithTraceToStdout() Builder {
-	ret := *b // copy
+// WithTraceToStdout implements FunctionExporter.WithTraceToStdout
+func (e *functionExporter) WithTraceToStdout() FunctionExporter {
+	ret := *e // copy
 	ret.traceMode = traceStdout
 	return &ret
 }
 
-// WithTraceToStderr implements Builder.WithTraceToStderr
-func (b *builder) WithTraceToStderr() Builder {
-	ret := *b // copy
+// WithTraceToStderr implements FunctionExporter.WithTraceToStderr
+func (e *functionExporter) WithTraceToStderr() FunctionExporter {
+	ret := *e // copy
 	ret.traceMode = traceStderr
 	return &ret
 }
 
-// moduleBuilder returns a new wazero.ModuleBuilder
-func (b *builder) moduleBuilder() wazero.ModuleBuilder {
-	env := &assemblyscript{abortMessageDisabled: b.abortMessageDisabled, traceMode: b.traceMode}
-	return b.r.NewModuleBuilder("env").
-		ExportFunction("abort", env.abort).
-		ExportFunction("trace", env.trace).
-		ExportFunction("seed", env.seed)
+// ExportFunctions implements FunctionExporter.ExportFunctions
+func (e *functionExporter) ExportFunctions() (nameToGoFunc map[string]interface{}) {
+	env := &assemblyscript{abortMessageDisabled: e.abortMessageDisabled, traceMode: e.traceMode}
+	return map[string]interface{}{
+		"abort": env.abort,
+		"trace": env.trace,
+		"seed":  env.seed,
+	}
 }
 
-// Compile implements Builder.Compile
-func (b *builder) Compile(ctx context.Context, config wazero.CompileConfig) (wazero.CompiledModule, error) {
-	return b.moduleBuilder().Compile(ctx, config)
-}
-
-// Instantiate implements Builder.Instantiate
-func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
-	return b.moduleBuilder().Instantiate(ctx, ns)
-}
-
-// assemblyScript includes "Special imports" only used In AssemblyScript when a user didn't add `import "wasi"` to their
-// entry file.
+// assemblyScript includes "Special imports" only used In AssemblyScript when a
+// user didn't add `import "wasi"` to their entry file.
 //
 // See https://www.assemblyscript.org/concepts.html#special-imports
 // See https://www.assemblyscript.org/concepts.html#targeting-wasi
@@ -137,13 +134,15 @@ type assemblyscript struct {
 	traceMode            traceMode
 }
 
-// abort is called on unrecoverable errors. This is typically present in Wasm compiled from AssemblyScript, if
-// assertions are enabled or errors are thrown.
+// abort is called on unrecoverable errors. This is typically present in Wasm
+// compiled from AssemblyScript, if assertions are enabled or errors are
+// thrown.
 //
-// The implementation writes the message to stderr, unless abortMessageDisabled, and closes the module with exit code
-// 255.
+// The implementation writes the message to stderr, unless
+// abortMessageDisabled, and closes the module with exit code 255.
 //
-// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+// Here's the import in a user's module that ends up using this, in WebAssembly
+// 1.0 (MVP) Text Format:
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
@@ -179,9 +178,11 @@ func (a *assemblyscript) abort(
 	panic(sys.NewExitError(mod.Name(), exitCode))
 }
 
-// trace implements the same named function in AssemblyScript (ex. trace('Hello World!'))
+// trace implements the same named function in AssemblyScript. Ex.
+//	trace('Hello World!')
 //
-// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+// Here's the import in a user's module that ends up using this, in WebAssembly
+// 1.0 (MVP) Text Format:
 //	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
@@ -236,9 +237,11 @@ func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'g', -1, 64)
 }
 
-// seed is called when the AssemblyScript's random number generator needs to be seeded
+// seed is called when the AssemblyScript's random number generator needs to be
+// seeded.
 //
-// Here's the import in a user's module that ends up using this, in WebAssembly 1.0 (MVP) Text Format:
+// Here's the import in a user's module that ends up using this, in WebAssembly
+// 1.0 (MVP) Text Format:
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111

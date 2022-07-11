@@ -291,32 +291,23 @@ func (c *compiledModule) Close(_ context.Context) error {
 // CompileConfig allows you to override what was decoded from wasm, prior to compilation (ModuleBuilder.Compile or
 // Runtime.CompileModule).
 //
-// For example, WithImportRenamer allows you to override hard-coded names that don't match your requirements.
+// For example, WithMemorySizer allows you to override memoryc size that doesn't match your requirements.
 //
 // Note: CompileConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type CompileConfig interface {
-
-	// WithImportRenamer can rename imports or break them into different modules. No default.
-	// A nil function is invalid and ignored.
-	//
-	// Note: This is currently not relevant for ModuleBuilder as it has no means to define imports.
-	WithImportRenamer(api.ImportRenamer) CompileConfig
-
 	// WithMemorySizer are the allocation parameters used for a Wasm memory.
 	// The default is to set cap=min and max=65536 if unset. A nil function is invalid and ignored.
 	WithMemorySizer(api.MemorySizer) CompileConfig
 }
 
 type compileConfig struct {
-	importRenamer api.ImportRenamer
-	memorySizer   api.MemorySizer
+	memorySizer api.MemorySizer
 }
 
 // NewCompileConfig returns a CompileConfig that can be used for configuring module compilation.
 func NewCompileConfig() CompileConfig {
 	return &compileConfig{
-		importRenamer: nil,
-		memorySizer:   wasm.MemorySizer,
+		memorySizer: wasm.MemorySizer,
 	}
 }
 
@@ -324,16 +315,6 @@ func NewCompileConfig() CompileConfig {
 func (c *compileConfig) clone() *compileConfig {
 	ret := *c // copy except maps which share a ref
 	return &ret
-}
-
-// WithImportRenamer implements CompileConfig.WithImportRenamer
-func (c *compileConfig) WithImportRenamer(importRenamer api.ImportRenamer) CompileConfig {
-	if importRenamer == nil {
-		return c
-	}
-	ret := c.clone()
-	ret.importRenamer = importRenamer
-	return ret
 }
 
 // WithMemorySizer implements CompileConfig.WithMemorySizer

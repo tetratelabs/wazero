@@ -174,13 +174,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 		return nil, err
 	}
 
-	// Replace imports if any configuration exists to do so.
-	if importRenamer := config.importRenamer; importRenamer != nil {
-		for _, i := range internal.ImportSection {
-			i.Module, i.Name = importRenamer(i.Type, i.Module, i.Name)
-		}
-	}
-
 	internal.AssignModuleID(binary)
 
 	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {

@@ -409,33 +409,6 @@ func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
 }
 
-// ImportRenamer applies during compilation after a module has been decoded from wasm, but before it is instantiated.
-//
-// For example, you may have a module like below, but the exported functions are in two different modules:
-//	(import "js" "increment" (func $increment (result i32)))
-//	(import "js" "decrement" (func $decrement (result i32)))
-//	(import "js" "wasm_increment" (func $wasm_increment (result i32)))
-//	(import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
-//
-// The below breaks up the imports: "increment" and "decrement" from the module "go" and other functions from "wasm":
-//	renamer := func(externType api.ExternType, oldModule, oldName string) (string, string) {
-//		if externType != api.ExternTypeFunc {
-//			return oldModule, oldName
-//		}
-//		switch oldName {
-//			case "increment", "decrement": return "go", oldName
-//			default: return "wasm", oldName
-//		}
-//	}
-//
-// The resulting CompiledModule imports will look identical to this:
-//	(import "go" "increment" (func $increment (result i32)))
-//	(import "go" "decrement" (func $decrement (result i32)))
-//	(import "wasm" "wasm_increment" (func $wasm_increment (result i32)))
-//	(import "wasm" "wasm_decrement" (func $wasm_decrement (result i32)))
-//
-type ImportRenamer func(externType ExternType, oldModule, oldName string) (newModule, newName string)
-
 // MemorySizer applies during compilation after a module has been decoded from wasm, but before it is instantiated.
 // This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
 //

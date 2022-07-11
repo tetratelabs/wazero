@@ -78,56 +78,6 @@ func TestRuntime_CompileModule(t *testing.T) {
 			Max: 3,
 		}, code.module.MemorySection)
 	})
-
-	t.Run("WithImportReplacements", func(t *testing.T) {
-		testBin, err := watzero.Wat2Wasm(`(module
-  (import "js" "increment" (func $increment (result i32)))
-  (import "js" "decrement" (func $decrement (result i32)))
-  (import "js" "wasm_increment" (func $wasm_increment (result i32)))
-  (import "js" "wasm_decrement" (func $wasm_decrement (result i32)))
-)`)
-		require.NoError(t, err)
-
-		m, err := r.CompileModule(testCtx, testBin, NewCompileConfig().
-			WithImportRenamer(func(externType api.ExternType, oldModule, oldName string) (string, string) {
-				if externType != api.ExternTypeFunc {
-					return oldModule, oldName
-				}
-				switch oldName {
-				case "increment", "decrement":
-					return "go", oldName
-				case "wasm_increment", "wasm_decrement":
-					return "wasm", oldName
-				default:
-					return oldModule, oldName
-				}
-			}))
-		require.NoError(t, err)
-		code := m.(*compiledModule)
-
-		require.Equal(t, []*wasm.Import{
-			{
-				Module: "go", Name: "increment",
-				Type:     wasm.ExternTypeFunc,
-				DescFunc: 0,
-			},
-			{
-				Module: "go", Name: "decrement",
-				Type:     wasm.ExternTypeFunc,
-				DescFunc: 0,
-			},
-			{
-				Module: "wasm", Name: "wasm_increment",
-				Type:     wasm.ExternTypeFunc,
-				DescFunc: 0,
-			},
-			{
-				Module: "wasm", Name: "wasm_decrement",
-				Type:     wasm.ExternTypeFunc,
-				DescFunc: 0,
-			},
-		}, code.module.ImportSection)
-	})
 }
 
 func TestRuntime_CompileModule_Errors(t *testing.T) {

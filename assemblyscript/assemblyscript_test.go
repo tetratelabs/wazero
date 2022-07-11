@@ -41,17 +41,17 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 func TestAbort(t *testing.T) {
 	tests := []struct {
 		name     string
-		enabled  bool
+		exporter FunctionExporter
 		expected string
 	}{
 		{
 			name:     "enabled",
-			enabled:  true,
+			exporter: NewFunctionExporter(),
 			expected: "message at filename:1:2\n",
 		},
 		{
 			name:     "disabled",
-			enabled:  false,
+			exporter: NewFunctionExporter().WithAbortMessageDisabled(),
 			expected: "",
 		},
 	}
@@ -65,13 +65,10 @@ func TestAbort(t *testing.T) {
 
 			out := &bytes.Buffer{}
 
-			if tc.enabled {
-				_, err := Instantiate(testCtx, r)
-				require.NoError(t, err)
-			} else {
-				_, err := NewBuilder(r).WithAbortMessageDisabled().Instantiate(testCtx, r)
-				require.NoError(t, err)
-			}
+			_, err := r.NewModuleBuilder("env").
+				ExportFunctions(tc.exporter.ExportFunctions()).
+				Instantiate(testCtx, r)
+			require.NoError(t, err)
 
 			abortWasm, err := watzero.Wat2Wasm(abortWat)
 			require.NoError(t, err)
@@ -93,6 +90,54 @@ func TestAbort(t *testing.T) {
 	}
 }
 
+func TestAbort_Error(t *testing.T) {
+	tests := []struct {
+		name          string
+		messageUTF16  []byte
+		fileNameUTF16 []byte
+	}{
+		{
+			name:          "bad message",
+			messageUTF16:  encodeUTF16("message")[:5],
+			fileNameUTF16: encodeUTF16("filename"),
+		},
+		{
+			name:          "bad filename",
+			messageUTF16:  encodeUTF16("message"),
+			fileNameUTF16: encodeUTF16("filename")[:5],
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime()
+			defer r.Close(testCtx)
+
+			_, err := Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			abortWasm, err := watzero.Wat2Wasm(abortWat)
+			require.NoError(t, err)
+
+			compiled, err := r.CompileModule(testCtx, abortWasm, wazero.NewCompileConfig())
+			require.NoError(t, err)
+
+			out := &bytes.Buffer{}
+			exporter := wazero.NewModuleConfig().WithName(t.Name()).WithStdout(out)
+			mod, err := r.InstantiateModule(testCtx, compiled, exporter)
+			require.NoError(t, err)
+
+			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), tc.messageUTF16, tc.fileNameUTF16)
+
+			_, err = mod.ExportedFunction("abort").Call(testCtx, uint64(messageOff), uint64(filenameOff), 1, 2)
+			require.NoError(t, err)
+			require.Equal(t, "", out.String()) // nothing output if strings fail to read.
+		})
+	}
+}
+
 var unreachableAfterAbort = `(module
   (import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
   (func $main
@@ -106,12 +151,15 @@ var unreachableAfterAbort = `(module
   (start $main)
 )`
 
-// TestAbort_StopsExecution ensures code that follows an abort isn't invoked.
-func TestAbort_StopsExecution(t *testing.T) {
+// TestAbort_UnreachableAfter ensures code that follows an abort isn't invoked.
+func TestAbort_UnreachableAfter(t *testing.T) {
 	r := wazero.NewRuntime()
 	defer r.Close(testCtx)
 
-	_, err := NewBuilder(r).WithAbortMessageDisabled().Instantiate(testCtx, r)
+	_, err := r.NewModuleBuilder("env").
+		// Disable the abort message as we are passing invalid memory offsets.
+		ExportFunctions(NewFunctionExporter().WithAbortMessageDisabled().ExportFunctions()).
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	abortWasm, err := watzero.Wat2Wasm(unreachableAfterAbort)
@@ -149,47 +197,95 @@ func TestSeed(t *testing.T) {
 	require.Equal(t, uint64(506097522914230528), res[0])
 }
 
+func TestSeed_error(t *testing.T) {
+	tests := []struct {
+		name        string
+		source      io.Reader
+		expectedErr string
+	}{
+		{
+			name:   "not 8 bytes",
+			source: bytes.NewReader([]byte{0, 1}),
+			expectedErr: `error reading random seed: unexpected EOF (recovered by wazero)
+wasm stack trace:
+	env.seed() f64`,
+		},
+		{
+			name:   "error reading",
+			source: iotest.ErrReader(errors.New("ice cream")),
+			expectedErr: `error reading random seed: ice cream (recovered by wazero)
+wasm stack trace:
+	env.seed() f64`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime()
+			defer r.Close(testCtx)
+
+			_, err := Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			seedWasm, err := watzero.Wat2Wasm(seedWat)
+			require.NoError(t, err)
+
+			compiled, err := r.CompileModule(testCtx, seedWasm, wazero.NewCompileConfig())
+			require.NoError(t, err)
+
+			exporter := wazero.NewModuleConfig().WithName(t.Name()).WithRandSource(tc.source)
+			mod, err := r.InstantiateModule(testCtx, compiled, exporter)
+			require.NoError(t, err)
+
+			_, err = mod.ExportedFunction("seed").Call(testCtx)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
 func TestTrace(t *testing.T) {
 	noArgs := []uint64{4, 0, 0, 0, 0, 0, 0}
 	tests := []struct {
 		name     string
-		mode     traceMode
+		exporter FunctionExporter
 		params   []uint64
 		expected string
 	}{
 		{
-			name:     "stderr",
-			mode:     traceStderr,
-			params:   noArgs,
-			expected: "trace: hello\n",
-		},
-		{
-			name:     "stdout",
-			mode:     traceStdout,
-			params:   noArgs,
-			expected: "trace: hello\n",
-		},
-		{
 			name:     "disabled",
-			mode:     traceDisabled,
+			exporter: NewFunctionExporter(),
 			params:   noArgs,
 			expected: "",
 		},
 		{
-			name:     "one",
-			mode:     traceStdout,
+			name:     "ToStderr",
+			exporter: NewFunctionExporter().WithTraceToStderr(),
+			params:   noArgs,
+			expected: "trace: hello\n",
+		},
+		{
+			name:     "ToStdout - no args",
+			exporter: NewFunctionExporter().WithTraceToStdout(),
+			params:   noArgs,
+			expected: "trace: hello\n",
+		},
+		{
+			name:     "ToStdout - one arg",
+			exporter: NewFunctionExporter().WithTraceToStdout(),
 			params:   []uint64{4, 1, api.EncodeF64(1), 0, 0, 0, 0},
 			expected: "trace: hello 1\n",
 		},
 		{
-			name:     "two",
-			mode:     traceStdout,
+			name:     "ToStdout - two args",
+			exporter: NewFunctionExporter().WithTraceToStdout(),
 			params:   []uint64{4, 2, api.EncodeF64(1), api.EncodeF64(2), 0, 0, 0},
 			expected: "trace: hello 1,2\n",
 		},
 		{
-			name: "five",
-			mode: traceStdout,
+			name:     "ToStdout - five args",
+			exporter: NewFunctionExporter().WithTraceToStdout(),
 			params: []uint64{
 				4,
 				5,
@@ -210,24 +306,9 @@ func TestTrace(t *testing.T) {
 			r := wazero.NewRuntime()
 			defer r.Close(testCtx)
 
-			out := &bytes.Buffer{}
-
-			as := NewBuilder(r)
-			modConfig := wazero.NewModuleConfig()
-			switch tc.mode {
-			case traceStderr:
-				as = as.WithTraceToStderr()
-				modConfig = modConfig.WithStderr(out)
-			case traceStdout:
-				as = as.WithTraceToStdout()
-				modConfig = modConfig.WithStdout(out)
-			case traceDisabled:
-				// Set but not used
-				modConfig = modConfig.WithStderr(out)
-				modConfig = modConfig.WithStdout(out)
-			}
-
-			_, err := as.Instantiate(testCtx, r)
+			_, err := r.NewModuleBuilder("env").
+				ExportFunctions(tc.exporter.ExportFunctions()).
+				Instantiate(testCtx, r)
 			require.NoError(t, err)
 
 			traceWasm, err := watzero.Wat2Wasm(traceWat)
@@ -236,7 +317,15 @@ func TestTrace(t *testing.T) {
 			code, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
 			require.NoError(t, err)
 
-			mod, err := r.InstantiateModule(testCtx, code, modConfig)
+			out := &bytes.Buffer{}
+			config := wazero.NewModuleConfig()
+			if tc.name == "ToStderr" {
+				config.WithStderr(out)
+			} else {
+				config.WithStdout(out)
+			}
+
+			mod, err := r.InstantiateModule(testCtx, code, wazero.NewModuleConfig().WithStdout(out).WithStderr(out))
 			require.NoError(t, err)
 
 			message := encodeUTF16("hello")
@@ -252,7 +341,65 @@ func TestTrace(t *testing.T) {
 	}
 }
 
-func TestReadAssemblyScriptString(t *testing.T) {
+func TestTrace_error(t *testing.T) {
+	tests := []struct {
+		name        string
+		message     []byte
+		out         io.Writer
+		expectedErr string
+	}{
+		{
+			name:    "not 8 bytes",
+			message: encodeUTF16("hello")[:5],
+			out:     &bytes.Buffer{},
+			expectedErr: `read an odd number of bytes for utf-16 string: 5 (recovered by wazero)
+wasm stack trace:
+	env.trace(i32,i32,f64,f64,f64,f64,f64)`,
+		},
+		{
+			name:    "error writing",
+			message: encodeUTF16("hello"),
+			out:     &errWriter{err: errors.New("ice cream")},
+			expectedErr: `ice cream (recovered by wazero)
+wasm stack trace:
+	env.trace(i32,i32,f64,f64,f64,f64,f64)`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			r := wazero.NewRuntime()
+			defer r.Close(testCtx)
+
+			_, err := r.NewModuleBuilder("env").
+				ExportFunctions(NewFunctionExporter().WithTraceToStdout().ExportFunctions()).
+				Instantiate(testCtx, r)
+			require.NoError(t, err)
+
+			traceWasm, err := watzero.Wat2Wasm(traceWat)
+			require.NoError(t, err)
+
+			compiled, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
+			require.NoError(t, err)
+
+			exporter := wazero.NewModuleConfig().WithName(t.Name()).WithStdout(tc.out)
+			mod, err := r.InstantiateModule(testCtx, compiled, exporter)
+			require.NoError(t, err)
+
+			ok := mod.Memory().WriteUint32Le(testCtx, 0, uint32(len(tc.message)))
+			require.True(t, ok)
+			ok = mod.Memory().Write(testCtx, uint32(4), tc.message)
+			require.True(t, ok)
+
+			_, err = mod.ExportedFunction("trace").Call(testCtx, 4, 0, 0, 0, 0, 0, 0)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func Test_readAssemblyScriptString(t *testing.T) {
 	tests := []struct {
 		name                  string
 		memory                func(api.Memory)
@@ -325,54 +472,6 @@ func TestReadAssemblyScriptString(t *testing.T) {
 	}
 }
 
-func TestAbort_error(t *testing.T) {
-	tests := []struct {
-		name          string
-		messageUTF16  []byte
-		fileNameUTF16 []byte
-	}{
-		{
-			name:          "bad message",
-			messageUTF16:  encodeUTF16("message")[:5],
-			fileNameUTF16: encodeUTF16("filename"),
-		},
-		{
-			name:          "bad filename",
-			messageUTF16:  encodeUTF16("message"),
-			fileNameUTF16: encodeUTF16("filename")[:5],
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			r := wazero.NewRuntime()
-			defer r.Close(testCtx)
-
-			_, err := Instantiate(testCtx, r)
-			require.NoError(t, err)
-
-			abortWasm, err := watzero.Wat2Wasm(abortWat)
-			require.NoError(t, err)
-
-			compiled, err := r.CompileModule(testCtx, abortWasm, wazero.NewCompileConfig())
-			require.NoError(t, err)
-
-			out := &bytes.Buffer{}
-			config := wazero.NewModuleConfig().WithName(t.Name()).WithStdout(out)
-			mod, err := r.InstantiateModule(testCtx, compiled, config)
-			require.NoError(t, err)
-
-			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), tc.messageUTF16, tc.fileNameUTF16)
-
-			_, err = mod.ExportedFunction("abort").Call(testCtx, uint64(messageOff), uint64(filenameOff), 1, 2)
-			require.NoError(t, err)
-			require.Equal(t, "", out.String()) // nothing output if strings fail to read.
-		})
-	}
-}
-
 func writeAbortMessageAndFileName(t *testing.T, mem api.Memory, messageUTF16, fileNameUTF16 []byte) (int, int) {
 	off := 0
 	ok := mem.WriteUint32Le(testCtx, uint32(off), uint32(len(messageUTF16)))
@@ -389,110 +488,6 @@ func writeAbortMessageAndFileName(t *testing.T, mem api.Memory, messageUTF16, fi
 	ok = mem.Write(testCtx, uint32(off), fileNameUTF16)
 	require.True(t, ok)
 	return messageOff, filenameOff
-}
-
-func TestSeed_error(t *testing.T) {
-	tests := []struct {
-		name        string
-		source      io.Reader
-		expectedErr string
-	}{
-		{
-			name:   "not 8 bytes",
-			source: bytes.NewReader([]byte{0, 1}),
-			expectedErr: `error reading random seed: unexpected EOF (recovered by wazero)
-wasm stack trace:
-	env.seed() f64`,
-		},
-		{
-			name:   "error reading",
-			source: iotest.ErrReader(errors.New("ice cream")),
-			expectedErr: `error reading random seed: ice cream (recovered by wazero)
-wasm stack trace:
-	env.seed() f64`,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			r := wazero.NewRuntime()
-			defer r.Close(testCtx)
-
-			_, err := Instantiate(testCtx, r)
-			require.NoError(t, err)
-
-			seedWasm, err := watzero.Wat2Wasm(seedWat)
-			require.NoError(t, err)
-
-			compiled, err := r.CompileModule(testCtx, seedWasm, wazero.NewCompileConfig())
-			require.NoError(t, err)
-
-			config := wazero.NewModuleConfig().WithName(t.Name()).WithRandSource(tc.source)
-			mod, err := r.InstantiateModule(testCtx, compiled, config)
-			require.NoError(t, err)
-
-			_, err = mod.ExportedFunction("seed").Call(testCtx)
-			require.EqualError(t, err, tc.expectedErr)
-		})
-	}
-}
-
-func TestTrace_error(t *testing.T) {
-	tests := []struct {
-		name        string
-		message     []byte
-		out         io.Writer
-		expectedErr string
-	}{
-		{
-			name:    "not 8 bytes",
-			message: encodeUTF16("hello")[:5],
-			out:     &bytes.Buffer{},
-			expectedErr: `read an odd number of bytes for utf-16 string: 5 (recovered by wazero)
-wasm stack trace:
-	env.trace(i32,i32,f64,f64,f64,f64,f64)`,
-		},
-		{
-			name:    "error writing",
-			message: encodeUTF16("hello"),
-			out:     &errWriter{err: errors.New("ice cream")},
-			expectedErr: `ice cream (recovered by wazero)
-wasm stack trace:
-	env.trace(i32,i32,f64,f64,f64,f64,f64)`,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			r := wazero.NewRuntime()
-			defer r.Close(testCtx)
-
-			_, err := NewBuilder(r).WithTraceToStdout().Instantiate(testCtx, r)
-			require.NoError(t, err)
-
-			traceWasm, err := watzero.Wat2Wasm(traceWat)
-			require.NoError(t, err)
-
-			compiled, err := r.CompileModule(testCtx, traceWasm, wazero.NewCompileConfig())
-			require.NoError(t, err)
-
-			config := wazero.NewModuleConfig().WithName(t.Name()).WithStdout(tc.out)
-			mod, err := r.InstantiateModule(testCtx, compiled, config)
-			require.NoError(t, err)
-
-			ok := mod.Memory().WriteUint32Le(testCtx, 0, uint32(len(tc.message)))
-			require.True(t, ok)
-			ok = mod.Memory().Write(testCtx, uint32(4), tc.message)
-			require.True(t, ok)
-
-			_, err = mod.ExportedFunction("trace").Call(testCtx, 4, 0, 0, 0, 0, 0, 0)
-			require.EqualError(t, err, tc.expectedErr)
-		})
-	}
 }
 
 func encodeUTF16(s string) []byte {
