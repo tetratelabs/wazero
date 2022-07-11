@@ -9,7 +9,6 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -190,12 +189,6 @@ func TestRuntimeConfig_FeatureToggle(t *testing.T) {
 }
 
 func TestCompileConfig(t *testing.T) {
-	im := func(externType api.ExternType, oldModule, oldName string) (newModule, newName string) {
-		return "a", oldName
-	}
-	im2 := func(externType api.ExternType, oldModule, oldName string) (newModule, newName string) {
-		return "b", oldName
-	}
 	mp := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 		return 0, 1, 1
 	}
@@ -204,20 +197,6 @@ func TestCompileConfig(t *testing.T) {
 		with     func(CompileConfig) CompileConfig
 		expected *compileConfig
 	}{
-		{
-			name: "WithImportRenamer",
-			with: func(c CompileConfig) CompileConfig {
-				return c.WithImportRenamer(im)
-			},
-			expected: &compileConfig{importRenamer: im},
-		},
-		{
-			name: "WithImportRenamer twice",
-			with: func(c CompileConfig) CompileConfig {
-				return c.WithImportRenamer(im).WithImportRenamer(im2)
-			},
-			expected: &compileConfig{importRenamer: im2},
-		},
 		{
 			name: "WithMemorySizer",
 			with: func(c CompileConfig) CompileConfig {
@@ -242,7 +221,6 @@ func TestCompileConfig(t *testing.T) {
 
 			// We cannot compare func, but we can compare reflect.Value
 			// See https://go.dev/ref/spec#Comparison_operators
-			require.Equal(t, reflect.ValueOf(tc.expected.importRenamer), reflect.ValueOf(rc.importRenamer))
 			require.Equal(t, reflect.ValueOf(tc.expected.memorySizer), reflect.ValueOf(rc.memorySizer))
 			// The source wasn't modified
 			require.Equal(t, &compileConfig{}, input)
