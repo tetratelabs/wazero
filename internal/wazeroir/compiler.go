@@ -306,8 +306,10 @@ func (c *compiler) handleInstruction() error {
 	op := c.body[c.pc]
 	if buildoptions.IsDebugMode {
 		var instName string
-		if op == wasm.OpcodeVecPrefix || op == wasm.OpcodeMiscPrefix {
+		if op == wasm.OpcodeVecPrefix {
 			instName = wasm.VectorInstructionName(c.body[c.pc+1])
+		} else if op == wasm.OpcodeMiscPrefix {
+			instName = wasm.MiscInstructionName(c.body[c.pc+1])
 		} else {
 			instName = wasm.InstructionName(op)
 		}
