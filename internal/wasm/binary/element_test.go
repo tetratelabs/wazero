@@ -46,12 +46,14 @@ func Test_decodeElementInitValueVector(t *testing.T) {
 func Test_decodeElementConstExprVector(t *testing.T) {
 	tests := []struct {
 		in       []byte
+		refType  wasm.RefType
 		exp      []*wasm.Index
 		features wasm.Features
 	}{
 		{
 			in:       []byte{0},
 			exp:      []*wasm.Index{},
+			refType:  wasm.RefTypeFuncref,
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
@@ -61,6 +63,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeRefFunc, 100, wasm.OpcodeEnd,
 			},
 			exp:      []*wasm.Index{nil, uint32Ptr(100)},
+			refType:  wasm.RefTypeFuncref,
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
@@ -73,6 +76,17 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			exp:      []*wasm.Index{nil, uint32Ptr(165675008), nil},
+			refType:  wasm.RefTypeFuncref,
+			features: wasm.FeatureBulkMemoryOperations,
+		},
+		{
+			in: []byte{
+				2, // Two indexes.
+				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
+				wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd,
+			},
+			exp:      []*wasm.Index{nil, nil},
+			refType:  wasm.RefTypeExternref,
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 	}
@@ -80,9 +94,65 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 	for i, tt := range tests {
 		tc := tt
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			actual, err := decodeElementConstExprVector(bytes.NewReader(tc.in), tc.features)
+			actual, err := decodeElementConstExprVector(bytes.NewReader(tc.in), tc.refType, tc.features)
 			require.NoError(t, err)
 			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
+
+func Test_decodeElementConstExprVector_errors(t *testing.T) {
+	tests := []struct {
+		name     string
+		in       []byte
+		refType  wasm.RefType
+		expErr   string
+		features wasm.Features
+	}{
+		{
+			name:   "eof",
+			expErr: "failed to get the size of constexpr vector: EOF",
+		},
+		{
+			name:   "feature",
+			in:     []byte{1, wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd},
+			expErr: "ref.null is not supported as feature \"bulk-memory-operations\" is disabled",
+		},
+		{
+			name:     "type mismatch - ref.null",
+			in:       []byte{1, wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeFuncref,
+			features: wasm.Features20220419,
+			expErr:   "element type mismatch: want funcref, but constexpr has externref",
+		},
+		{
+			name:     "type mismatch - ref.null",
+			in:       []byte{1, wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeExternref,
+			features: wasm.Features20220419,
+			expErr:   "element type mismatch: want externref, but constexpr has funcref",
+		},
+		{
+			name:     "invalid ref type",
+			in:       []byte{1, wasm.OpcodeRefNull, 0xff, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeExternref,
+			features: wasm.Features20220419,
+			expErr:   "invalid type for ref.null: 0xff",
+		},
+		{
+			name:     "type mismatch - ref.fuc",
+			in:       []byte{1, wasm.OpcodeRefFunc, 0, wasm.OpcodeEnd},
+			refType:  wasm.RefTypeExternref,
+			features: wasm.Features20220419,
+			expErr:   "element type mismatch: want externref, but constexpr has funcref",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := decodeElementConstExprVector(bytes.NewReader(tc.in), tc.refType, tc.features)
+			require.EqualError(t, err, tc.expErr)
 		})
 	}
 }
@@ -146,7 +216,6 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
-
 			name: "active with table index encoded.",
 			in: []byte{
 				2, // Prefix.
@@ -259,21 +328,12 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: wasm.FeatureBulkMemoryOperations,
 		},
 		{
-			name: "passive const expr vector - extern ref type",
-			in: []byte{
-				5, // Prefix.
-				wasm.RefTypeExternref,
-			},
-			expErr:   `ref type must be funcref for element as of WebAssembly 2.0`,
-			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
-		},
-		{
 			name: "passive const expr vector - unknown ref type",
 			in: []byte{
 				5, // Prefix.
 				0xff,
 			},
-			expErr:   `ref type must be funcref for element as of WebAssembly 2.0`,
+			expErr:   `ref type must be funcref or externref for element as of WebAssembly 2.0`,
 			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
 		},
 		{

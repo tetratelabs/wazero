@@ -40,7 +40,7 @@ func decodeElementInitValueVector(r *bytes.Reader) ([]*wasm.Index, error) {
 func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enabledFeatures wasm.Features) ([]*wasm.Index, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("failed to get the size of constexpr vector: %w", err)
 	}
 	vec := make([]*wasm.Index, vs)
 	for i := range vec {
@@ -75,7 +75,7 @@ func decodeElementRefType(r *bytes.Reader) (ret wasm.RefType, err error) {
 		return
 	}
 	if ret != wasm.RefTypeFuncref && ret != wasm.RefTypeExternref {
-		return 0, errors.New("ref type must be funcref for element as of WebAssembly 2.0")
+		return 0, errors.New("ref type must be funcref or externref for element as of WebAssembly 2.0")
 	}
 	return
 }
