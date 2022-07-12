@@ -789,7 +789,7 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 			for i := 0; i < frameCount; i++ {
 				frame := ce.popFrame()
 				fn := frame.f.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				builder.AddFrame(fn.DebugName, fn.Type.Params, fn.Type.Results)
 			}
 			err = builder.FromRecovered(v)
 		}

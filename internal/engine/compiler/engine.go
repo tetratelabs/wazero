@@ -584,11 +584,11 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 			// Handle edge-case where the host function is called directly by Go.
 			if ce.globalContext.callFrameStackPointer == 0 {
 				fn := compiled.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				builder.AddFrame(fn.DebugName, fn.Type.Params, fn.Type.Results)
 			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
 				fn := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].function.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				builder.AddFrame(fn.DebugName, fn.Type.Params, fn.Type.Results)
 			}
 			err = builder.FromRecovered(v)
 		}

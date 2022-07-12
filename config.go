@@ -264,13 +264,16 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 //
 // Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
 type CompiledModule interface {
+	// ImportedFunctions returns all the imported functions (api.FunctionDefinition) in this module.
+	ImportedFunctions() []api.FunctionDefinition
+
+	// ExportedFunctions returns all the exported functions (api.FunctionDefinition) in this module.
+	ExportedFunctions() []api.FunctionDefinition
+
 	// Close releases all the allocated resources for this CompiledModule.
 	//
 	// Note: It is safe to call Close while having outstanding calls from an api.Module instantiated from this.
 	Close(context.Context) error
-
-	// ExportedFunctions returns all the exported functions (api.ExportedFunction) in this module.
-	ExportedFunctions() []api.ExportedFunction
 }
 
 type compiledModule struct {
@@ -291,8 +294,13 @@ func (c *compiledModule) Close(_ context.Context) error {
 	return nil
 }
 
+// ImportedFunctions implements CompiledModule.ImportedFunctions
+func (c *compiledModule) ImportedFunctions() []api.FunctionDefinition {
+	return c.module.ImportedFunctions()
+}
+
 // ExportedFunctions implements CompiledModule.ExportedFunctions
-func (c *compiledModule) ExportedFunctions() []api.ExportedFunction {
+func (c *compiledModule) ExportedFunctions() []api.FunctionDefinition {
 	return c.module.ExportedFunctions()
 }
 

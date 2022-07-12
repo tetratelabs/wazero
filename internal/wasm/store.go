@@ -139,19 +139,8 @@ type (
 		// Idx holds the index of this function instance in the function index namespace (beginning with imports).
 		Idx Index
 
-		// The below metadata are used in function listeners, prior to instantiation:
-
-		// moduleName is the defining module's name
-		moduleName string
-
-		// name is the module-defined name of this function
-		name string
-
-		// paramNames is non-nil when all parameters have names.
-		paramNames []string
-
-		// exportNames is non-nil when the function is exported.
-		exportNames []string
+		// definition is known at compile time.
+		definition api.FunctionDefinition
 
 		// FunctionListener holds a listener to notify when this function is called.
 		FunctionListener experimentalapi.FunctionListener
@@ -174,55 +163,22 @@ type (
 	FunctionTypeID uint32
 )
 
-// Index implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionInstance) Index() uint32 {
-	return f.Idx
-}
-
-// Name implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionInstance) Name() string {
-	return f.name
-}
-
-// ModuleName implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionInstance) ModuleName() string {
-	return f.moduleName
-}
-
-// ExportNames implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionInstance) ExportNames() []string {
-	return f.exportNames
-}
-
-// ParamNames implements the same method as documented on experimental.FunctionDefinition.
-func (f *FunctionInstance) ParamNames() []string {
-	return f.paramNames
+// Definition implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionInstance) Definition() api.FunctionDefinition {
+	return f.definition
 }
 
 // The wazero specific limitations described at RATIONALE.md.
-const (
-	maximumFunctionTypes = 1 << 27
-)
+const maximumFunctionTypes = 1 << 27
 
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
-	types []*FunctionType, typeIDs []FunctionTypeID) {
+	types []*FunctionType) {
 
 	m.Types = types
-	m.TypeIDs = typeIDs
-
-	m.Functions = append(m.Functions, importedFunctions...)
-	for i, f := range functions {
-		// Associate each function with the type instance and the module instance's pointer.
-		f.Module = m
-		f.TypeID = typeIDs[module.FunctionSection[i]]
-		m.Functions = append(m.Functions, f)
-	}
-
-	m.Globals = append(m.Globals, importedGlobals...)
-	m.Globals = append(m.Globals, globals...)
-
+	m.Functions = append(importedFunctions, functions...)
+	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables
 
 	if importedMemory != nil {
@@ -231,7 +187,7 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 		m.Memory = memory
 	}
 
-	m.buildExports(module.ExportSection)
+	m.BuildExports(module.ExportSection)
 	m.buildDataInstances(module.DataSection)
 }
 
@@ -252,7 +208,7 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) buildExports(exports []*Export) {
+func (m *ModuleInstance) BuildExports(exports []*Export) {
 	m.Exports = make(map[string]*ExportInstance, len(exports))
 	for _, exp := range exports {
 		index := exp.Index
@@ -415,19 +371,18 @@ func (s *Store) instantiate(
 	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
 	// If there are no module-defined functions, assume this is a host module.
-	var functions []*FunctionInstance
 	var funcSection SectionID
 	if module.HostFunctionSection == nil {
 		funcSection = SectionIDFunction
-		functions = module.buildFunctions(name, functionListenerFactory)
 	} else {
 		funcSection = SectionIDHostFunction
-		functions = module.buildHostFunctions(name, functionListenerFactory)
 	}
 
+	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
+	functions := m.BuildFunctions(module, functionListenerFactory)
+
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	m := &ModuleInstance{Name: name}
-	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection, typeIDs)
+	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -506,8 +461,9 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			expectedType := module.TypeSection[i.DescFunc]
 			importedFunction := imported.Function
 
-			actualType := importedFunction.Type
-			if !expectedType.EqualsSignature(actualType.Params, actualType.Results) {
+			d := importedFunction.Definition()
+			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
+				actualType := &FunctionType{Params: d.ParamTypes(), Results: d.ResultTypes()}
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
 				return
 			}

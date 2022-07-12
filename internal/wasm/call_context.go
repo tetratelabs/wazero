@@ -155,14 +155,9 @@ type importedFn struct {
 	importedFn      *FunctionInstance
 }
 
-// ParamTypes implements the same method as documented on api.Function.
-func (f *importedFn) ParamTypes() []api.ValueType {
-	return f.importedFn.ParamTypes()
-}
-
-// ResultTypes implements the same method as documented on api.Function.
-func (f *importedFn) ResultTypes() []api.ValueType {
-	return f.importedFn.ResultTypes()
+// Definition implements the same method as documented on api.Function.
+func (f *importedFn) Definition() api.FunctionDefinition {
+	return f.importedFn.definition
 }
 
 // Call implements the same method as documented on api.Function.
@@ -172,16 +167,6 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 	}
 	mod := f.importingModule
 	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
-}
-
-// ParamTypes implements the same method as documented on api.Function.
-func (f *FunctionInstance) ParamTypes() []api.ValueType {
-	return f.Type.Params
-}
-
-// ResultTypes implements the same method as documented on api.Function.
-func (f *FunctionInstance) ResultTypes() []api.ValueType {
-	return f.Type.Results
 }
 
 // Call implements the same method as documented on api.Function.

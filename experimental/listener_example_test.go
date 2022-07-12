@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
@@ -18,12 +19,15 @@ import (
 //go:embed testdata/listener.wasm
 var listenerWasm []byte
 
+// compile-time check to ensure loggerFactory implements experimental.FunctionListenerFactory.
+var _ experimental.FunctionListenerFactory = &loggerFactory{}
+
 // loggerFactory implements experimental.FunctionListenerFactory to log all function calls to the console.
 type loggerFactory struct{}
 
 // NewListener implements the same method as documented on experimental.FunctionListener.
-func (f *loggerFactory) NewListener(fnd experimental.FunctionDefinition) experimental.FunctionListener {
-	return &logger{funcName: []byte(fnd.ModuleName() + "." + funcName(fnd))}
+func (f *loggerFactory) NewListener(moduleName string, fnd api.FunctionDefinition) experimental.FunctionListener {
+	return &logger{funcName: []byte(moduleName + "." + funcName(fnd))}
 }
 
 // nestLevelKey holds state between logger.Before and logger.After to ensure call depth is reflected.
@@ -50,7 +54,7 @@ func (l *logger) After(ctx context.Context, _ error, _ []uint64) {
 }
 
 // funcName returns the name in priority order: first export name, module-defined name, numeric index.
-func funcName(fnd experimental.FunctionDefinition) string {
+func funcName(fnd api.FunctionDefinition) string {
 	if len(fnd.ExportNames()) > 0 {
 		return fnd.ExportNames()[0]
 	}
