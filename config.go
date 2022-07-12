@@ -268,6 +268,9 @@ type CompiledModule interface {
 	//
 	// Note: It is safe to call Close while having outstanding calls from an api.Module instantiated from this.
 	Close(context.Context) error
+
+	// ExportedFunctions returns all the exported functions (api.ExportedFunction) in this module.
+	ExportedFunctions() []api.ExportedFunction
 }
 
 type compiledModule struct {
@@ -286,6 +289,11 @@ func (c *compiledModule) Close(_ context.Context) error {
 	c.compiledEngine.DeleteCompiledModule(c.module)
 	// It is possible the underlying may need to return an error later, but in any case this matches api.Module.Close.
 	return nil
+}
+
+// ExportedFunctions implements CompiledModule.ExportedFunctions
+func (c *compiledModule) ExportedFunctions() []api.ExportedFunction {
+	return c.module.ExportedFunctions()
 }
 
 // CompileConfig allows you to override what was decoded from wasm, prior to compilation (ModuleBuilder.Compile or

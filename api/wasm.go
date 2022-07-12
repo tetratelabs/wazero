@@ -173,7 +173,28 @@ type Closer interface {
 	Close(context.Context) error
 }
 
-// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).
+// ExportedFunction is a WebAssembly function exported in a module (wazero.CompiledModule).
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+type ExportedFunction interface {
+	// Name returns the name of this exported function which is unique across a module.
+	// Note: the empty name is allowed in the WebAssembly specification so returned "" is meaningful.
+	Name() string
+
+	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
+	//
+	// See ValueType documentation for encoding rules.
+	ParamTypes() []ValueType
+
+	// ResultTypes are the possibly empty sequence of value types returned by a function with this signature.
+	//
+	// When WebAssembly 1.0 (20191205), there can be at most one result: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
+	//
+	// See ValueType documentation for decoding rules.
+	ResultTypes() []ValueType
+}
+
+// Function is a WebAssembly function exported from an instantiated module (wazero.Runtime InstantiateModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
