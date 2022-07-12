@@ -279,7 +279,7 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 			offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
 			ceil := offset + len(d.Init)
 			if offset < 0 || ceil > len(m.Memory.Buffer) {
-				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
+				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
 		}
 	}
@@ -291,7 +291,7 @@ func (m *ModuleInstance) applyData(data []*DataSegment) error {
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
 			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
-				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
+				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
 			copy(m.Memory.Buffer[offset:], d.Init)
 		}
