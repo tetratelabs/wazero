@@ -729,6 +729,8 @@ operatorSwitch:
 	case wasm.OpcodeDrop:
 		r := &InclusiveRange{Start: 0, End: 0}
 		if peekValueType == UnsignedTypeV128 {
+			// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
+			// should be translated as drop [0..1] inclusively.
 			r.End++
 		}
 		c.emit(
