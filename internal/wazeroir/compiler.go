@@ -587,6 +587,11 @@ operatorSwitch:
 		}
 		c.pc += n
 
+		if c.unreachableState.on {
+			// If it is currently in unreachable, br is no-op.
+			break operatorSwitch
+		}
+
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := &OperationDrop{Depth: c.getFrameDropRange(targetFrame, false)}
@@ -606,6 +611,11 @@ operatorSwitch:
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
 		c.pc += n
+
+		if c.unreachableState.on {
+			// If it is currently in unreachable, br-if is no-op.
+			break operatorSwitch
+		}
 
 		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
