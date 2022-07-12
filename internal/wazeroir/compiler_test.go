@@ -2457,3 +2457,53 @@ func TestCompile_Vec(t *testing.T) {
 		})
 	}
 }
+
+// TestCompile_unreachable_br_brif ensures that unreachable br and br_if instructions are correctly ignored.
+func TestCompile_unreachable_br_brif(t *testing.T) {
+	tests := []struct {
+		name     string
+		mod      *wasm.Module
+		expected []Operation
+	}{
+		{
+			name: "br",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
+					wasm.OpcodeBlock, 0,
+					wasm.OpcodeBr, 1,
+					wasm.OpcodeEnd, // End the block.
+					wasm.OpcodeEnd, // End the function.
+				}}},
+			},
+			expected: []Operation{&OperationBr{Target: &BranchTarget{}}},
+		},
+		{
+			name: "br_if",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
+					wasm.OpcodeBlock, 0,
+					wasm.OpcodeI32Const, 1,
+					wasm.OpcodeBrIf, 1,
+					wasm.OpcodeEnd, // End the block.
+					wasm.OpcodeEnd, // End the function.
+				}}},
+			},
+			expected: []Operation{&OperationBr{Target: &BranchTarget{}}},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res[0].Operations)
+		})
+	}
+}
