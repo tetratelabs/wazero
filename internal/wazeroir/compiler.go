@@ -305,10 +305,20 @@ func compile(enabledFeatures wasm.Features,
 func (c *compiler) handleInstruction() error {
 	op := c.body[c.pc]
 	if buildoptions.IsDebugMode {
-		fmt.Printf("handling %s, unreachable_state(on=%v,depth=%d)\n",
-			wasm.InstructionName(op),
-			c.unreachableState.on, c.unreachableState.depth,
+		var instName string
+		if op == wasm.OpcodeVecPrefix || op == wasm.OpcodeMiscPrefix {
+			instName = wasm.VectorInstructionName(c.body[c.pc+1])
+		} else {
+			instName = wasm.InstructionName(op)
+		}
+		fmt.Printf("handling %s, unreachable_state(on=%v,depth=%d), stack=%v\n",
+			instName, c.unreachableState.on, c.unreachableState.depth, c.stack,
 		)
+	}
+
+	var peekValueType UnsignedType
+	if len(c.stack) > 0 {
+		peekValueType = c.stackPeek()
 	}
 
 	// Modify the stack according the current instruction.
@@ -717,8 +727,12 @@ operatorSwitch:
 			&OperationCallIndirect{TypeIndex: *index, TableIndex: tableIndex},
 		)
 	case wasm.OpcodeDrop:
+		r := &InclusiveRange{Start: 0, End: 0}
+		if peekValueType == UnsignedTypeV128 {
+			r.End++
+		}
 		c.emit(
-			&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+			&OperationDrop{Depth: r},
 		)
 	case wasm.OpcodeSelect:
 		c.emit(
@@ -2902,6 +2916,11 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 	}
 
 	return ptr, nil
+}
+
+func (c *compiler) stackPeek() (ret UnsignedType) {
+	ret = c.stack[len(c.stack)-1]
+	return
 }
 
 func (c *compiler) stackPop() (ret UnsignedType) {
