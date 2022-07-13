@@ -185,6 +185,12 @@ func formatOperation(w io.StringWriter, b Operation) {
 		str = fmt.Sprintf("v128.const [%#x, %#x]", o.Lo, o.Hi)
 	case *OperationV128Add:
 		str = fmt.Sprintf("v128.add (shape=%s)", shapeName(o.Shape))
+	case *OperationV128ITruncSatFromF:
+		if o.Signed {
+			str = fmt.Sprintf("v128.ITruncSatFrom%sS", shapeName(o.OriginShape))
+		} else {
+			str = fmt.Sprintf("v128.ITruncSatFrom%sU", shapeName(o.OriginShape))
+		}
 	default:
 		panic("unreachable: a bug in wazeroir implementation")
 	}
