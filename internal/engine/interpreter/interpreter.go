@@ -4078,7 +4078,6 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
 			frame.pc++
-			frame.pc++
 		}
 	}
 	ce.popFrame()
