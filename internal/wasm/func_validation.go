@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"strconv"
 	"strings"
 
@@ -76,17 +77,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	// control blocks and value types to check the validity of all instructions.
 	for pc := uint64(0); pc < uint64(len(body)); pc++ {
 		op := body[pc]
-		//if buildoptions.IsDebugMode {
-		var instName string
-		if op == OpcodeMiscPrefix {
-			instName = MiscInstructionName(body[pc+1])
-		} else if op == OpcodeVecPrefix {
-			instName = VectorInstructionName(body[pc+1])
-		} else {
-			instName = InstructionName(op)
+		if buildoptions.IsDebugMode {
+			var instName string
+			if op == OpcodeMiscPrefix {
+				instName = MiscInstructionName(body[pc+1])
+			} else if op == OpcodeVecPrefix {
+				instName = VectorInstructionName(body[pc+1])
+			} else {
+				instName = InstructionName(op)
+			}
+			fmt.Printf("handling %s, stack=%s, blocks: %v\n", instName, valueTypeStack, controlBlockStack)
 		}
-		fmt.Printf("handling %s, stack=%s, blocks: %v\n", instName, valueTypeStack, controlBlockStack)
-		//}
 
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
 			if memory == nil {
