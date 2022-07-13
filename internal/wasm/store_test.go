@@ -137,11 +137,11 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			s, ns := newStore()
 
 			_, err := s.Instantiate(testCtx, ns, &Module{
-				TypeSection:         []*FunctionType{v_v},
-				FunctionSection:     []uint32{0},
-				CodeSection:         []*Code{{Body: []byte{OpcodeEnd}}},
-				ExportSection:       []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
-				functionDefinitions: []*functionDefinition{{funcType: v_v}},
+				TypeSection:               []*FunctionType{v_v},
+				FunctionSection:           []uint32{0},
+				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
+				ExportSection:             []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				FunctionDefinitionSection: []*FunctionDefinition{{funcType: v_v}},
 			}, importedModuleName, nil, nil)
 			require.NoError(t, err)
 
@@ -624,9 +624,9 @@ func Test_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			f := &FunctionInstance{
-				definition: &functionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
 			g := &FunctionInstance{
-				definition: &functionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
+				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{
@@ -658,7 +658,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]*ExportInstance{name: {
-					Function: &FunctionInstance{definition: &functionDefinition{funcType: &FunctionType{}}},
+					Function: &FunctionInstance{definition: &FunctionDefinition{funcType: &FunctionType{}}},
 				}}, Name: moduleName},
 			}
 			m := &Module{

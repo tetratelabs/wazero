@@ -787,7 +787,7 @@ func TestModule_buildFunctions(t *testing.T) {
 		ImportSection:   []*Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
 		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
-		functionDefinitions: []*functionDefinition{
+		FunctionDefinitionSection: []*FunctionDefinition{
 			{index: 0, funcType: v_v},
 			{index: 1, funcType: v_v},
 			{index: 2, funcType: v_v, name: "two"},
@@ -800,9 +800,8 @@ func TestModule_buildFunctions(t *testing.T) {
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
 	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
 	instance.BuildFunctions(m, nil)
-	expectedNames := []string{"counter.[1]", "counter.two", "counter.[3]", "counter.four", "counter.five"}
 	for i, f := range instance.Functions {
-		require.Equal(t, expectedNames[i], f.DebugName)
+		require.Equal(t, i, f.Definition().Index())
 		require.Equal(t, nopCode.Body, f.Body)
 	}
 }

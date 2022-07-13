@@ -458,9 +458,10 @@ func TestInterpreter_Compile(t *testing.T) {
 			},
 			ID: wasm.ModuleID{},
 		}
+		errModule.BuildFunctionDefinitions()
 
 		err := e.CompileModule(testCtx, errModule)
-		require.EqualError(t, err, "failed to lower func[2/2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+		require.EqualError(t, err, "failed to lower func[.$2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		_, ok := e.codes[errModule.ID]

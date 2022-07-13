@@ -16,9 +16,9 @@ func TestFuncName(t *testing.T) {
 		funcIdx                    uint32
 		expected                   string
 	}{ // Only tests a few edge cases to show what it might end up as.
-		{name: "empty", expected: ".[0]"},
+		{name: "empty", expected: ".$0"},
 		{name: "empty module", funcName: "y", expected: ".y"},
-		{name: "empty function", moduleName: "x", funcIdx: 255, expected: "x.[255]"},
+		{name: "empty function", moduleName: "x", funcIdx: 255, expected: "x.$255"},
 		{name: "looks like index in function", moduleName: "x", funcName: "[255]", expected: "x.[255]"},
 		{name: "no special characters", moduleName: "x", funcName: "y", expected: "x.y"},
 		{name: "dots in module", moduleName: "w.x", funcName: "y", expected: "w.x.y"},

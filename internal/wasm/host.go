@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -84,7 +86,7 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
 	m.HostFunctionSection = make([]*reflect.Value, 0, funcCount)
-	m.functionDefinitions = make([]*functionDefinition, 0, funcCount)
+	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, funcCount)
 
 	// Sort names for consistent iteration
 	for k := range nameToGoFunc {
@@ -104,10 +106,11 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 		m.HostFunctionSection = append(m.HostFunctionSection, &fn)
 		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: name, Index: idx})
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: name})
-		m.functionDefinitions = append(m.functionDefinitions, &functionDefinition{
+		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
 			moduleName:  moduleName,
 			index:       idx,
 			name:        name,
+			debugName:   wasmdebug.FuncName(moduleName, name, idx),
 			funcType:    functionType,
 			exportNames: []string{name},
 			paramNames:  nil, // TODO

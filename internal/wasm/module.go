@@ -13,7 +13,6 @@ import (
 	experimental "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // DecodeModule parses the WebAssembly Binary Format (%.wasm) into a Module. This function returns when the input is
@@ -181,8 +180,8 @@ type Module struct {
 	// ID is the sha256 value of the source wasm and is used for caching.
 	ID ModuleID
 
-	// functionDefinitions are built on Validate.
-	functionDefinitions []*functionDefinition
+	// FunctionDefinitionSection is a wazero specific section built on Validate.
+	FunctionDefinitionSection []*FunctionDefinition
 }
 
 // ModuleID represents sha256 hash value uniquely assigned to Module.
@@ -586,7 +585,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 //	* This is exported for tests that don't call Instantiate, notably only
 //	  enginetest.go.
 func (m *ModuleInstance) BuildFunctions(mod *Module, fnlf experimental.FunctionListenerFactory) (fns []*FunctionInstance) {
-	fns = make([]*FunctionInstance, 0, len(mod.functionDefinitions))
+	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
 	if mod.IsHostModule() {
 		for i := range mod.HostFunctionSection {
 			fn := mod.HostFunctionSection[i]
@@ -609,12 +608,11 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, fnlf experimental.FunctionL
 
 	importCount := mod.ImportFuncCount()
 	for i, f := range fns {
-		d := mod.functionDefinitions[uint32(i)+importCount]
+		d := mod.FunctionDefinitionSection[uint32(i)+importCount]
 		f.Module = m
 		f.Idx = d.index
 		f.Type = d.funcType
 		f.definition = d
-		f.DebugName = wasmdebug.FuncName(m.Name, d.name, d.index)
 		if fnlf != nil {
 			f.FunctionListener = fnlf.NewListener(m.Name, d)
 		}

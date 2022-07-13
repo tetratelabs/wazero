@@ -18,11 +18,13 @@ import (
 
 // FuncName returns the naming convention of "moduleName.funcName".
 //
-// * moduleName is the possibly empty name the module was instantiated with.
-// * funcName is the name in the Custom Name section, an export name, or what the host defines.
-// * funcIdx is the position in the function index namespace, prefixed with imported functions.
+//	* moduleName is the possibly empty name the module was instantiated with.
+//	* funcName is the name in the Custom Name section.
+//	* funcIdx is the position in the function index namespace, prefixed with
+//	  imported functions.
 //
-// Note: "moduleName.[funcIdx]" is used when the funcName is empty, as commonly the case in TinyGo.
+// Note: "moduleName.$funcIdx" is used when the funcName is empty, as commonly
+// the case in TinyGo.
 func FuncName(moduleName, funcName string, funcIdx uint32) string {
 	var ret strings.Builder
 
@@ -30,9 +32,8 @@ func FuncName(moduleName, funcName string, funcIdx uint32) string {
 	ret.WriteString(moduleName)
 	ret.WriteByte('.')
 	if funcName == "" {
-		ret.WriteByte('[')
+		ret.WriteByte('$')
 		ret.WriteString(strconv.Itoa(int(funcIdx)))
-		ret.WriteByte(']')
 	} else {
 		ret.WriteString(funcName)
 	}

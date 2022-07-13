@@ -2,11 +2,12 @@ package wasm
 
 import (
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // ImportedFunctions returns the definitions of each imported function.
 func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
-	for _, d := range m.functionDefinitions {
+	for _, d := range m.FunctionDefinitionSection {
 		if d.importDesc != nil {
 			ret = append(ret, d)
 		}
@@ -16,7 +17,7 @@ func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 
 // ExportedFunctions returns the definitions of each exported function.
 func (m *Module) ExportedFunctions() (ret []api.FunctionDefinition) {
-	for _, d := range m.functionDefinitions {
+	for _, d := range m.FunctionDefinitionSection {
 		if d.exportNames != nil {
 			ret = append(ret, d)
 		}
@@ -44,7 +45,7 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 
 	importCount := m.ImportFuncCount()
-	m.functionDefinitions = make([]*functionDefinition, 0, importCount+uint32(len(m.FunctionSection)))
+	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, importCount+uint32(len(m.FunctionSection)))
 
 	importFuncIdx := Index(0)
 	for _, i := range m.ImportSection {
@@ -52,7 +53,7 @@ func (m *Module) BuildFunctionDefinitions() {
 			continue
 		}
 
-		m.functionDefinitions = append(m.functionDefinitions, &functionDefinition{
+		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
 			importDesc: &[2]string{i.Module, i.Name},
 			index:      importFuncIdx,
 			funcType:   m.TypeSection[i.DescFunc],
@@ -61,14 +62,14 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 
 	for codeIndex, typeIndex := range m.FunctionSection {
-		m.functionDefinitions = append(m.functionDefinitions, &functionDefinition{
+		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
 			index:    Index(codeIndex) + importCount,
 			funcType: m.TypeSection[typeIndex],
 		})
 	}
 
 	n, nLen := 0, len(functionNames)
-	for _, d := range m.functionDefinitions {
+	for _, d := range m.FunctionDefinitionSection {
 		// The function name section begins with imports, but can be sparse.
 		// This keeps track of how far in the name section we've searched.
 		funcIdx := d.index
@@ -85,6 +86,7 @@ func (m *Module) BuildFunctionDefinitions() {
 
 		d.moduleName = moduleName
 		d.name = funcName
+		d.debugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
 		d.paramNames = paramNames(localNames, funcIdx, len(d.funcType.Params))
 
 		for _, e := range m.ExportSection {
@@ -95,11 +97,12 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 }
 
-// functionDefinition implements api.FunctionDefinition
-type functionDefinition struct {
+// FunctionDefinition implements api.FunctionDefinition
+type FunctionDefinition struct {
 	moduleName  string
 	index       Index
 	name        string
+	debugName   string
 	funcType    *FunctionType
 	importDesc  *[2]string
 	exportNames []string
@@ -107,22 +110,27 @@ type functionDefinition struct {
 }
 
 // ModuleName implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) ModuleName() string {
+func (f *FunctionDefinition) ModuleName() string {
 	return f.moduleName
 }
 
 // Index implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) Index() uint32 {
+func (f *FunctionDefinition) Index() uint32 {
 	return f.index
 }
 
 // Name implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) Name() string {
+func (f *FunctionDefinition) Name() string {
 	return f.name
 }
 
+// DebugName implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionDefinition) DebugName() string {
+	return f.debugName
+}
+
 // Import implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) Import() (moduleName, name string, isImport bool) {
+func (f *FunctionDefinition) Import() (moduleName, name string, isImport bool) {
 	if importDesc := f.importDesc; importDesc != nil {
 		moduleName, name, isImport = importDesc[0], importDesc[1], true
 	}
@@ -130,21 +138,21 @@ func (f *functionDefinition) Import() (moduleName, name string, isImport bool) {
 }
 
 // ExportNames implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) ExportNames() []string {
+func (f *FunctionDefinition) ExportNames() []string {
 	return f.exportNames
 }
 
 // ParamNames implements the same method as documented on api.FunctionDefinition.
-func (f *functionDefinition) ParamNames() []string {
+func (f *FunctionDefinition) ParamNames() []string {
 	return f.paramNames
 }
 
 // ParamTypes implements api.FunctionDefinition ParamTypes.
-func (f *functionDefinition) ParamTypes() []ValueType {
+func (f *FunctionDefinition) ParamTypes() []ValueType {
 	return f.funcType.Params
 }
 
 // ResultTypes implements api.FunctionDefinition ResultTypes.
-func (f *functionDefinition) ResultTypes() []ValueType {
+func (f *FunctionDefinition) ResultTypes() []ValueType {
 	return f.funcType.Results
 }
