@@ -349,7 +349,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "too many tables in a module: 6 given with limit 5",
 		},
 		{
-			name: "non funcref",
+			name: "unknown ref type",
 			input: &Module{
 				TableSection: []*Table{{}},
 				ElementSection: []*ElementSegment{
@@ -358,11 +358,11 @@ func TestModule_validateTable_Errors(t *testing.T) {
 							Opcode: OpcodeI32Const,
 							Data:   leb128.EncodeUint64(math.MaxUint64),
 						},
-						Type: RefTypeExternref,
+						Type: 0xff,
 					},
 				},
 			},
-			expectedErr: "only funcref element can be used to initialize table, but was externref",
+			expectedErr: "only funcref or externref element can be used to initialize table, but was unknown(0xff)",
 		},
 		{
 			name: "constant derived element offset - decode error",
