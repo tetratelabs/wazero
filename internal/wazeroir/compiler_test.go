@@ -2504,7 +2504,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
 					wasm.OpcodeBlock, 0,
-					wasm.OpcodeBrTable, 1, 1, 1,
+					wasm.OpcodeBrTable, 2, 2, 3,
 					wasm.OpcodeEnd, // End the block.
 					wasm.OpcodeEnd, // End the function.
 				}}},

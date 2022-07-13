@@ -657,6 +657,15 @@ operatorSwitch:
 
 		if c.unreachableState.on {
 			// If it is currently in unreachable, br_table is no-op.
+			// But before proceeding to the next instruction, we must advance the pc
+			// according to the number of br_table targets.
+			for i := uint32(0); i <= numTargets; i++ { // inclusive as we also need to read the index of default target.
+				_, n, err := leb128.DecodeUint32(r)
+				if err != nil {
+					return fmt.Errorf("error reading target %d in br_table: %w", i, err)
+				}
+				c.pc += n
+			}
 			break operatorSwitch
 		}
 
