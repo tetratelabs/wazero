@@ -298,7 +298,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	const valueStackCorruption = "value_stack_corruption"
 	const callStackCorruption = "call_stack_corruption"
 	const expectedReturnValue = 0x1
-	m := (&wasm.Module{
+	m := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}, ResultNumInUint64: 1},
 			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
@@ -342,7 +342,8 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
 		ID: wasm.ModuleID{1},
-	}).BuildFunctionDefinitions()
+	}
+	m.BuildFunctionDefinitions()
 
 	err = s.Engine.CompileModule(testCtx, m)
 	require.NoError(t, err)

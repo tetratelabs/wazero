@@ -191,7 +191,7 @@ func TestStore_hammer(t *testing.T) {
 	_, ok := ns.modules[imported.Name()]
 	require.True(t, ok)
 
-	importingModule := (&Module{
+	importingModule := &Module{
 		TypeSection:     []*FunctionType{v_v},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
@@ -204,7 +204,8 @@ func TestStore_hammer(t *testing.T) {
 		ImportSection: []*Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
-	}).BuildFunctionDefinitions()
+	}
+	importingModule.BuildFunctionDefinitions()
 
 	// Concurrent instantiate, close should test if locks work on the ns. If they don't, we should see leaked modules
 	// after all of these complete, or an error raised.
@@ -285,7 +286,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		engine := s.Engine.(*mockEngine)
 		engine.shouldCompileFail = true
 
-		importingModule := (&Module{
+		importingModule := &Module{
 			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []uint32{0, 0},
 			CodeSection: []*Code{
@@ -295,7 +296,8 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			ImportSection: []*Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
-		}).BuildFunctionDefinitions()
+		}
+		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil, nil)
 		require.EqualError(t, err, "compilation failed: some compilation error")
@@ -313,7 +315,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)
-		importingModule := (&Module{
+		importingModule := &Module{
 			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
@@ -321,7 +323,8 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			ImportSection: []*Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
-		}).BuildFunctionDefinitions()
+		}
+		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil, nil)
 		require.EqualError(t, err, "start function[1] failed: call failed")

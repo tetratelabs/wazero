@@ -29,9 +29,9 @@ func (m *Module) ExportedFunctions() (ret []api.FunctionDefinition) {
 //
 // Note: This is exported for tests who don't use wazero.Runtime or
 // NewHostModule to compile the module.
-func (m *Module) BuildFunctionDefinitions() *Module {
+func (m *Module) BuildFunctionDefinitions() {
 	if len(m.FunctionSection) == 0 {
-		return m
+		return
 	}
 
 	var moduleName string
@@ -93,7 +93,6 @@ func (m *Module) BuildFunctionDefinitions() *Module {
 			}
 		}
 	}
-	return m
 }
 
 // functionDefinition implements api.FunctionDefinition
