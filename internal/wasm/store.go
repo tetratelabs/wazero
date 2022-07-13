@@ -627,10 +627,10 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 			v = GlobalInstanceNullFuncRefValue
 		}
 	case OpcodeRefFunc:
-		// For ref.func const expresssion, we temporarily store the index as value,
+		// For ref.func const expression, we temporarily store the index as value,
 		// and if this is the const expr for global, the value will be further downed to
 		// opaque pointer of the engine-specific compiled function.
-		v, _, _ = leb128.DecodeInt32(r)
+		v, _, _ = leb128.DecodeUint32(r)
 	case OpcodeVecV128Const:
 		v = [2]uint64{binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])}
 	}
