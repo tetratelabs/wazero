@@ -848,6 +848,21 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
 		op := frame.f.body[frame.pc]
+
+		var checkPc bool
+		var prevPc uint64
+		if buildoptions.IstTest {
+			switch op.kind {
+			case wazeroir.OperationKindUnreachable,
+				wazeroir.OperationKindBr,
+				wazeroir.OperationKindBrIf,
+				wazeroir.OperationKindBrTable:
+				checkPc = false
+			default:
+				checkPc, prevPc = true, frame.pc
+			}
+		}
+
 		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
@@ -4078,6 +4093,12 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(retLo)
 			ce.pushValue(retHi)
 			frame.pc++
+		}
+
+		if buildoptions.IstTest {
+			if checkPc && prevPc+1 != frame.pc {
+				panic("BUG in interpreter: program counter must advance by one")
+			}
 		}
 	}
 	ce.popFrame()

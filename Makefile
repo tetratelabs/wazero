@@ -21,6 +21,9 @@ main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing
 # Paths need to all start with ./, so we do that manually vs foreach which strips it.
 main_packages := $(sort $(foreach f,$(dir $(main_sources)),$(if $(findstring ./,$(f)),./,./$(f))))
 
+# test_build_flag is the build tags which are passed for test and spectest recipe.
+test_build_tag = "-tags=wazero_testing"
+
 ensureCompilerFastest := -ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 .PHONY: bench
 bench:
@@ -126,7 +129,7 @@ build.spectest.v2: # Note: SIMD cases are placed in the "simd" subdirectory.
 
 .PHONY: test
 test:
-	@go test $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)') -timeout 120s
+	@go test $(test_build_tag) $$(go list ./... | grep -vE '$(spectest_v1_dir)|$(spectest_v2_dir)') -timeout 120s
 
 .PHONY: coverage
 coverpkg = $(subst $(space),$(comma),$(main_packages))
@@ -140,10 +143,10 @@ spectest:
 	@$(MAKE) spectest.v2
 
 spectest.v1:
-	@go test $$(go list ./... | grep $(spectest_v1_dir)) -timeout 120s
+	@go test $(test_build_tag) $$(go list ./... | grep $(spectest_v1_dir)) -timeout 120s
 
 spectest.v2:
-	@go test $$(go list ./... | grep $(spectest_v2_dir)) -timeout 120s
+	@go test $(test_build_tag) $$(go list ./... | grep $(spectest_v2_dir)) -timeout 120s
 
 golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 
