@@ -732,7 +732,7 @@ func TestModuleInstance_validateData(t *testing.T) {
 	tests := []struct {
 		name   string
 		data   []*DataSegment
-		expErr bool
+		expErr string
 	}{
 		{
 			name: "ok",
@@ -746,14 +746,15 @@ func TestModuleInstance_validateData(t *testing.T) {
 			data: []*DataSegment{
 				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(5)}, Init: []byte{0}},
 			},
-			expErr: true,
+			expErr: "data[0]: out of bounds memory access",
 		},
 		{
 			name: "out of bounds - multi bytes",
 			data: []*DataSegment{
+				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(0)}, Init: []byte{0}},
 				{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(3)}, Init: []byte{0, 1, 2}},
 			},
-			expErr: true,
+			expErr: "data[1]: out of bounds memory access",
 		},
 	}
 
@@ -761,8 +762,8 @@ func TestModuleInstance_validateData(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			err := m.validateData(tc.data)
-			if tc.expErr {
-				require.Error(t, err)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
 			} else {
 				require.NoError(t, err)
 			}
@@ -771,13 +772,22 @@ func TestModuleInstance_validateData(t *testing.T) {
 }
 
 func TestModuleInstance_applyData(t *testing.T) {
-	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
-	err := m.applyData([]*DataSegment{
-		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
-		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
+	t.Run("ok", func(t *testing.T) {
+		m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
+		err := m.applyData([]*DataSegment{
+			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}, Init: []byte{0xa, 0xf}},
+			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{0x1, 0x5}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
 	})
-	require.NoError(t, err)
-	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
+	t.Run("error", func(t *testing.T) {
+		m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
+		err := m.applyData([]*DataSegment{
+			{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeUint32(8)}, Init: []byte{}},
+		})
+		require.EqualError(t, err, "data[0]: out of bounds memory access")
+	})
 }
 
 func globalsContain(globals []*GlobalInstance, want *GlobalInstance) bool {

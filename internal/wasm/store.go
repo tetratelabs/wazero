@@ -273,25 +273,30 @@ func (m *ModuleInstance) buildExports(exports []*Export) {
 	}
 }
 
+// validateData ensures that data segments are valid in terms of memory boundary.
+// Note: this is used only when bulk-memory/reference type feature is disabled.
 func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 	for i, d := range data {
 		if !d.IsPassive() {
 			offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
 			ceil := offset + len(d.Init)
 			if offset < 0 || ceil > len(m.Memory.Buffer) {
-				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
+				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
 		}
 	}
 	return
 }
 
+// applyData uses the given data segments and mutate the memory according to the initial contents on it.
+// This is called after all the validation phase passes and out of bounds memory access error here is
+// not a validation error, but rather a runtime error.
 func (m *ModuleInstance) applyData(data []*DataSegment) error {
 	for i, d := range data {
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
 			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
-				return fmt.Errorf("%s[%d] out of bounds memory access", SectionIDName(SectionIDElement), i)
+				return fmt.Errorf("%s[%d]: out of bounds memory access", SectionIDName(SectionIDData), i)
 			}
 			copy(m.Memory.Buffer[offset:], d.Init)
 		}
