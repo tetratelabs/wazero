@@ -2507,3 +2507,43 @@ func TestCompile_unreachable_br_brif(t *testing.T) {
 		})
 	}
 }
+
+// TestCompile_drop_vectors ensures that wasm.OpcodeDrop on vector values is correctly compiled,
+// which is not covered by spectest.
+func TestCompile_drop_vectors(t *testing.T) {
+	tests := []struct {
+		name     string
+		mod      *wasm.Module
+		expected []Operation
+	}{
+		{
+			name: "basic",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeVecPrefix,
+					wasm.OpcodeVecV128Const, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: []Operation{
+				&OperationV128Const{Lo: 0x1, Hi: 0x2},
+				// InclusiveRange is the range in uint64 representation, so dropping a vector value on top
+				// should be translated as drop [0..1] inclusively.
+				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				&OperationBr{Target: &BranchTarget{}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, res[0].Operations)
+		})
+	}
+}
