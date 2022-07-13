@@ -273,6 +273,8 @@ func (m *ModuleInstance) buildExports(exports []*Export) {
 	}
 }
 
+// validateData ensures that data segments are valid in terms of memory boundary.
+// Note: this is used only when bulk-memory/reference type feature is disabled.
 func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 	for i, d := range data {
 		if !d.IsPassive() {
@@ -286,6 +288,9 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 	return
 }
 
+// applyData uses the given data segments and mutate the memory according to the initial contents on it.
+// This is called after all the validation phase passes and out of bounds memory access error here is
+// not a validation error, but rather a runtime error.
 func (m *ModuleInstance) applyData(data []*DataSegment) error {
 	for i, d := range data {
 		if !d.IsPassive() {
