@@ -3315,6 +3315,7 @@ func TestDecodeBlockType(t *testing.T) {
 			{name: "funcref", in: 0x70, exp: ValueTypeFuncref, expResultNumInUint64: 1},
 			{name: "externref", in: 0x6f, exp: ValueTypeExternref, expResultNumInUint64: 1},
 		} {
+			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				actual, read, err := DecodeBlockType(nil, bytes.NewReader([]byte{tc.in}), Features20220419)
 				require.NoError(t, err)
@@ -3329,6 +3330,21 @@ func TestDecodeBlockType(t *testing.T) {
 					require.Equal(t, tc.exp, actual.Results[0])
 				}
 			})
+		}
+	})
+	t.Run("function type", func(t *testing.T) {
+		types := []*FunctionType{
+			{},
+			{Params: []ValueType{ValueTypeI32}},
+			{Results: []ValueType{ValueTypeI32}},
+			{Params: []ValueType{ValueTypeF32, ValueTypeV128}, Results: []ValueType{ValueTypeI32}},
+			{Params: []ValueType{ValueTypeF32, ValueTypeV128}, Results: []ValueType{ValueTypeI32, ValueTypeF32, ValueTypeV128}},
+		}
+		for index, expected := range types {
+			actual, read, err := DecodeBlockType(types, bytes.NewReader([]byte{byte(index)}), FeatureMultiValue)
+			require.NoError(t, err)
+			require.Equal(t, uint64(1), read)
+			require.Equal(t, expected, actual)
 		}
 	})
 }
