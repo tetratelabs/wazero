@@ -472,7 +472,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			} else {
 				expTypes = make([]ValueType, len(lnLabel.blockType.Results))
 				// Below, we might modify the slice in case of unreachable. Therefore,
-				// we have to copy the content of block result types.
+				// we have to copy the content of block result types, otherwise the original
+				// function type will result in valid values.
 				copy(expTypes, lnLabel.blockType.Results)
 			}
 
