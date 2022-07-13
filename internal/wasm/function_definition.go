@@ -125,9 +125,9 @@ func (f *functionDefinition) Name() string {
 // Import implements the same method as documented on api.FunctionDefinition.
 func (f *functionDefinition) Import() (moduleName, name string, isImport bool) {
 	if importDesc := f.importDesc; importDesc != nil {
-		return importDesc[0], importDesc[1], true
+		moduleName, name, isImport = importDesc[0], importDesc[1], true
 	}
-	return "", "", false
+	return
 }
 
 // ExportNames implements the same method as documented on api.FunctionDefinition.
