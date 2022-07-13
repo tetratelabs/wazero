@@ -176,6 +176,9 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 
 	internal.AssignModuleID(binary)
 
+	// Now that the module is validated, cache the function definitions.
+	internal.BuildFunctionDefinitions()
+
 	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
 		return nil, err
 	}

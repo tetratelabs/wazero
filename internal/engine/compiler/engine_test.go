@@ -3,7 +3,6 @@ package compiler
 import (
 	"context"
 	"fmt"
-	"math"
 	"runtime"
 	"testing"
 	"unsafe"
@@ -16,95 +15,6 @@ import (
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
-// Ensures that the offset consts do not drift when we manipulate the target structs.
-func TestCompiler_VerifyOffsetValue(t *testing.T) {
-	var me moduleEngine
-	require.Equal(t, int(unsafe.Offsetof(me.functions)), moduleEngineFunctionsOffset)
-
-	var ce callEngine
-	// Offsets for callEngine.globalContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.valueStackLen)), callEngineGlobalContextValueStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
-
-	// Offsets for callEngine.moduleContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.tablesElement0Address)), callEngineModuleContextTablesElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.functionsElement0Address)), callEngineModuleContextFunctionsElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.elementInstancesElement0Address)), callEngineModuleContextElementInstancesElement0AddressOffset)
-
-	// Offsets for callEngine.valueStackContext
-	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
-
-	// Offsets for callEngine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset)
-
-	// Size and offsets for callFrame.
-	var frame callFrame
-	require.Equal(t, int(unsafe.Sizeof(frame)), callFrameDataSize)
-	// Sizeof call-frame must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
-	require.True(t, callFrameDataSize&(callFrameDataSize-1) == 0)
-	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
-	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset)
-
-	// Offsets for code.
-	var compiledFunc function
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), functionStackPointerCeilOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset)
-
-	// Offsets for wasm.ModuleInstance.
-	var moduleInstance wasm.ModuleInstance
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TypeIDs)), moduleInstanceTypeIDsOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.DataInstances)), moduleInstanceDataInstancesOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.ElementInstances)), moduleInstanceElementInstancesOffset)
-
-	var functionInstance wasm.FunctionInstance
-	require.Equal(t, int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset)
-
-	// Offsets for wasm.Table.
-	var tableInstance wasm.TableInstance
-	require.Equal(t, int(unsafe.Offsetof(tableInstance.References)), tableInstanceTableOffset)
-	// We add "+8" to get the length of Tables[0].Table
-	// since the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
-	require.Equal(t, int(unsafe.Offsetof(tableInstance.References)+8), tableInstanceTableLenOffset)
-
-	// Offsets for wasm.Memory
-	var memoryInstance wasm.MemoryInstance
-	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)), memoryInstanceBufferOffset)
-	// "+8" because the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
-	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)+8), memoryInstanceBufferLenOffset)
-
-	// Offsets for wasm.GlobalInstance
-	var globalInstance wasm.GlobalInstance
-	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset)
-
-	var dataInstance wasm.DataInstance
-	require.Equal(t, int(unsafe.Sizeof(dataInstance)), dataInstanceStructSize)
-
-	var elementInstance wasm.ElementInstance
-	require.Equal(t, int(unsafe.Sizeof(elementInstance)), elementInstanceStructSize)
-
-	var pointer uintptr
-	require.Equal(t, unsafe.Sizeof(pointer), uintptr(1<<pointerSizeLog2))
-}
 
 // et is used for tests defined in the enginetest package.
 var et = &engineTester{}
@@ -237,10 +147,11 @@ func TestCompiler_CompileModule(t *testing.T) {
 			},
 			ID: wasm.ModuleID{},
 		}
+		errModule.BuildFunctionDefinitions()
 
 		e := et.NewEngine(wasm.Features20191205).(*engine)
 		err := e.CompileModule(testCtx, errModule)
-		require.EqualError(t, err, "failed to lower func[2/2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+		require.EqualError(t, err, "failed to lower func[.$2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
 		_, ok := e.codes[errModule.ID]
@@ -343,6 +254,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		},
 		ID: wasm.ModuleID{1},
 	}
+	m.BuildFunctionDefinitions()
 
 	err = s.Engine.CompileModule(testCtx, m)
 	require.NoError(t, err)

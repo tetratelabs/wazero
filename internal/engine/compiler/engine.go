@@ -273,7 +273,7 @@ const (
 	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 96
+	functionInstanceTypeIDOffset = 80
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
@@ -377,7 +377,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.function.source.DebugName, c.returnAddress, c.returnStackBasePointer,
+		c.function.source.Definition().DebugName(), c.returnAddress, c.returnStackBasePointer,
 	)
 }
 
@@ -421,7 +421,8 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 		for funcIndex := range module.HostFunctionSection {
 			compiled, err := compileHostFunction(module.TypeSection[module.FunctionSection[funcIndex]])
 			if err != nil {
-				return fmt.Errorf("function[%d/%d] %w", funcIndex, len(module.FunctionSection)-1, err)
+				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+				return fmt.Errorf("error compiling host func[%s]: %w", def.DebugName(), err)
 			}
 
 			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
@@ -441,7 +442,8 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 		for funcIndex := range module.FunctionSection {
 			compiled, err := compileWasmFunction(e.enabledFeatures, irs[funcIndex])
 			if err != nil {
-				return fmt.Errorf("function[%d/%d] %w", funcIndex, len(module.FunctionSection)-1, err)
+				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
 
 			// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
@@ -583,12 +585,12 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 			builder := wasmdebug.NewErrorBuilder()
 			// Handle edge-case where the host function is called directly by Go.
 			if ce.globalContext.callFrameStackPointer == 0 {
-				fn := compiled.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				def := compiled.source.Definition()
+				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
-				fn := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].function.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				def := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].function.source.Definition()
+				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 			}
 			err = builder.FromRecovered(v)
 		}

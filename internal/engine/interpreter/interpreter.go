@@ -235,14 +235,14 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 		for i, ir := range irs {
 			compiled, err := e.lowerIR(ir)
 			if err != nil {
-				return fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(module.FunctionSection)-1, err)
+				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
+				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 			}
 			funcs = append(funcs, compiled)
 		}
 	}
 	e.addCodes(module, funcs)
 	return nil
-
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
@@ -788,8 +788,8 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 			frameCount := len(ce.frames)
 			for i := 0; i < frameCount; i++ {
 				frame := ce.popFrame()
-				fn := frame.f.source
-				builder.AddFrame(fn.DebugName, fn.ParamTypes(), fn.ResultTypes())
+				def := frame.f.source.Definition()
+				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 			}
 			err = builder.FromRecovered(v)
 		}

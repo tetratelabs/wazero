@@ -234,7 +234,8 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		code := module.CodeSection[funcIndex]
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
-			return nil, fmt.Errorf("failed to lower func[%d/%d] to wazeroir: %w", funcIndex, len(functions)-1, err)
+			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		}
 		r.Globals = globals
 		r.Functions = functions

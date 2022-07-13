@@ -347,7 +347,7 @@ func TestModule_Validate_Errors(t *testing.T) {
 		{
 			name: "CodeSection and HostFunctionSection",
 			input: &Module{
-				TypeSection:         []*FunctionType{{}},
+				TypeSection:         []*FunctionType{v_v},
 				FunctionSection:     []uint32{0},
 				CodeSection:         []*Code{{Body: []byte{OpcodeEnd}}},
 				HostFunctionSection: []*reflect.Value{&fn},
@@ -467,7 +467,7 @@ func TestModule_validateGlobals(t *testing.T) {
 func TestModule_validateFunctions(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
 		}
@@ -482,7 +482,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("function, but no code", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     nil,
 		}
@@ -492,7 +492,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("function out of range of code", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{1},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		}
@@ -502,7 +502,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("invalid", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 		}
@@ -512,7 +512,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
@@ -523,7 +523,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported after import", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			ImportSection:   []*Import{{Type: ExternTypeFunc}},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
@@ -535,7 +535,7 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 	t.Run("in- exported twice", func(t *testing.T) {
 		m := Module{
-			TypeSection:     []*FunctionType{{}},
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection: []*Export{
@@ -782,25 +782,26 @@ func TestModule_buildGlobals(t *testing.T) {
 
 func TestModule_buildFunctions(t *testing.T) {
 	nopCode := &Code{nil, []byte{OpcodeEnd}}
-	m := Module{
-		TypeSection:   []*FunctionType{{}},
-		ImportSection: []*Import{{Type: ExternTypeFunc}},
-		NameSection: &NameSection{
-			FunctionNames: NameMap{
-				{Index: Index(2), Name: "two"},
-				{Index: Index(4), Name: "four"},
-				{Index: Index(5), Name: "five"},
-			},
-		},
+	m := &Module{
+		TypeSection:     []*FunctionType{v_v},
+		ImportSection:   []*Import{{Type: ExternTypeFunc}},
 		FunctionSection: []Index{0, 0, 0, 0, 0},
 		CodeSection:     []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
+		FunctionDefinitionSection: []*FunctionDefinition{
+			{index: 0, funcType: v_v},
+			{index: 1, funcType: v_v},
+			{index: 2, funcType: v_v, name: "two"},
+			{index: 3, funcType: v_v},
+			{index: 4, funcType: v_v, name: "four"},
+			{index: 5, funcType: v_v, name: "five"},
+		},
 	}
 
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
-	actual := m.buildFunctions("counter", nil)
-	expectedNames := []string{"counter.[1]", "counter.two", "counter.[3]", "counter.four", "counter.five"}
-	for i, f := range actual {
-		require.Equal(t, expectedNames[i], f.DebugName)
+	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
+	instance.BuildFunctions(m, nil)
+	for i, f := range instance.Functions {
+		require.Equal(t, i, f.Definition().Index())
 		require.Equal(t, nopCode.Body, f.Body)
 	}
 }

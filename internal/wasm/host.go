@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
@@ -66,9 +65,10 @@ func NewHostModule(
 		}
 	}
 
-	// Assins the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
+	// Assigns the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
 	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v:%v:%v",
 		moduleName, nameToGoFunc, nameToMemory, nameToGlobal, enabledFeatures)))
+	m.BuildFunctionDefinitions()
 	return
 }
 
@@ -82,9 +82,11 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 	if m.NameSection == nil {
 		m.NameSection = &NameSection{}
 	}
+	moduleName := m.NameSection.ModuleName
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
 	m.HostFunctionSection = make([]*reflect.Value, 0, funcCount)
+	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, funcCount)
 
 	// Sort names for consistent iteration
 	for k := range nameToGoFunc {
@@ -104,6 +106,15 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 		m.HostFunctionSection = append(m.HostFunctionSection, &fn)
 		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: name, Index: idx})
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: name})
+		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
+			moduleName:  moduleName,
+			index:       idx,
+			name:        name,
+			debugName:   wasmdebug.FuncName(moduleName, name, idx),
+			funcType:    functionType,
+			exportNames: []string{name},
+			paramNames:  nil, // TODO
+		})
 	}
 	return nil
 }
@@ -162,33 +173,4 @@ func (m *Module) maybeAddType(ft *FunctionType) Index {
 	result := m.SectionElementCount(SectionIDType)
 	m.TypeSection = append(m.TypeSection, ft)
 	return result
-}
-
-func (m *Module) buildHostFunctions(
-	moduleName string,
-	functionListenerFactory experimental.FunctionListenerFactory,
-) (functions []*FunctionInstance) {
-	// ModuleBuilder has no imports, which means the FunctionSection index is the same as the position in the function
-	// index namespace. Also, it ensures every function has a name. That's why there is less error checking here.
-	var functionNames = m.NameSection.FunctionNames
-	for idx, typeIndex := range m.FunctionSection {
-		fn := m.HostFunctionSection[idx]
-		f := &FunctionInstance{
-			Kind:   kind(fn.Type()),
-			Type:   m.TypeSection[typeIndex],
-			GoFunc: fn,
-			Idx:    Index(idx),
-		}
-		name := functionNames[f.Idx].Name
-		f.moduleName = moduleName
-		f.DebugName = wasmdebug.FuncName(moduleName, name, f.Idx)
-		f.name = name
-		// TODO: add parameter names for host functions (vararg strings that must match arity with param length)
-		f.exportNames = []string{name}
-		if functionListenerFactory != nil {
-			f.FunctionListener = functionListenerFactory.NewListener(f)
-		}
-		functions = append(functions, f)
-	}
-	return
 }

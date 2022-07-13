@@ -96,7 +96,7 @@ func EqualError(t TestingT, err error, expected string, formatWithArgs ...interf
 	}
 	actual := err.Error()
 	if actual != expected {
-		fail(t, fmt.Sprintf("expected error %q, but was %q", expected, actual), "", formatWithArgs...)
+		fail(t, fmt.Sprintf("expected error \"%s\", but was \"%s\"", expected, actual), "", formatWithArgs...)
 	}
 }
 

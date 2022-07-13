@@ -400,6 +400,7 @@ func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
 	mod.ExportSection = append(mod.ExportSection, &wasm.Export{Name: "table", Index: 0, Type: wasm.ExternTypeTable})
 
 	maybeSetMemoryCap(mod)
+	mod.BuildFunctionDefinitions()
 	err = s.Engine.CompileModule(testCtx, mod)
 	require.NoError(t, err)
 
@@ -465,6 +466,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 						}
 
 						maybeSetMemoryCap(mod)
+						mod.BuildFunctionDefinitions()
 						err = s.Engine.CompileModule(testCtx, mod)
 						require.NoError(t, err, msg)
 
@@ -602,6 +604,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 							mod.AssignModuleID(buf)
 
 							maybeSetMemoryCap(mod)
+							mod.BuildFunctionDefinitions()
 							err = s.Engine.CompileModule(testCtx, mod)
 							require.NoError(t, err, msg)
 
@@ -634,6 +637,7 @@ func requireInstantiationError(t *testing.T, s *wasm.Store, ns *wasm.Namespace, 
 	mod.AssignModuleID(buf)
 
 	maybeSetMemoryCap(mod)
+	mod.BuildFunctionDefinitions()
 	err = s.Engine.CompileModule(testCtx, mod)
 	if err != nil {
 		return
@@ -826,7 +830,7 @@ func f64Equal(expected, actual float64) (matched bool) {
 func callFunction(ns *wasm.Namespace, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
 	fn := ns.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(testCtx, params...)
-	return results, fn.ResultTypes(), err
+	return results, fn.Definition().ResultTypes(), err
 }
 
 // requireStripCustomSections strips all the custom sections from the given binary.

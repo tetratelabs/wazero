@@ -137,15 +137,16 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			s, ns := newStore()
 
 			_, err := s.Instantiate(testCtx, ns, &Module{
-				TypeSection:     []*FunctionType{{}},
-				FunctionSection: []uint32{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
-				ExportSection:   []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				TypeSection:               []*FunctionType{v_v},
+				FunctionSection:           []uint32{0},
+				CodeSection:               []*Code{{Body: []byte{OpcodeEnd}}},
+				ExportSection:             []*Export{{Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				FunctionDefinitionSection: []*FunctionDefinition{{funcType: v_v}},
 			}, importedModuleName, nil, nil)
 			require.NoError(t, err)
 
 			m2, err := s.Instantiate(testCtx, ns, &Module{
-				TypeSection:   []*FunctionType{{}},
+				TypeSection:   []*FunctionType{v_v},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection: &Memory{Min: 1, Cap: 1},
 				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
@@ -191,16 +192,20 @@ func TestStore_hammer(t *testing.T) {
 	require.True(t, ok)
 
 	importingModule := &Module{
-		TypeSection:     []*FunctionType{{}},
+		TypeSection:     []*FunctionType{v_v},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		MemorySection:   &Memory{Min: 1, Cap: 1},
-		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: const1}}},
-		TableSection:    []*Table{{Min: 10}},
+		GlobalSection: []*Global{{
+			Type: &GlobalType{ValType: ValueTypeI32},
+			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: leb128.EncodeInt32(1)},
+		}},
+		TableSection: []*Table{{Min: 10}},
 		ImportSection: []*Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
+	importingModule.BuildFunctionDefinitions()
 
 	// Concurrent instantiate, close should test if locks work on the ns. If they don't, we should see leaked modules
 	// after all of these complete, or an error raised.
@@ -258,7 +263,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, ns, &Module{
-			TypeSection: []*FunctionType{{}},
+			TypeSection: []*FunctionType{v_v},
 			ImportSection: []*Import{
 				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
@@ -281,8 +286,8 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		engine := s.Engine.(*mockEngine)
 		engine.shouldCompileFail = true
 
-		_, err = s.Instantiate(testCtx, ns, &Module{
-			TypeSection:     []*FunctionType{{}},
+		importingModule := &Module{
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []uint32{0, 0},
 			CodeSection: []*Code{
 				{Body: []byte{OpcodeEnd}},
@@ -291,7 +296,10 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			ImportSection: []*Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
-		}, importingModuleName, nil, nil)
+		}
+		importingModule.BuildFunctionDefinitions()
+
+		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil, nil)
 		require.EqualError(t, err, "compilation failed: some compilation error")
 	})
 
@@ -307,15 +315,18 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)
-		_, err = s.Instantiate(testCtx, ns, &Module{
-			TypeSection:     []*FunctionType{{}},
+		importingModule := &Module{
+			TypeSection:     []*FunctionType{v_v},
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 			StartSection:    &startFuncIndex,
 			ImportSection: []*Import{
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
-		}, importingModuleName, nil, nil)
+		}
+		importingModule.BuildFunctionDefinitions()
+
+		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil, nil)
 		require.EqualError(t, err, "start function[1] failed: call failed")
 	})
 }
@@ -339,7 +350,7 @@ func TestCallContext_ExportedFunction(t *testing.T) {
 
 	t.Run("imported function", func(t *testing.T) {
 		importing, err := s.Instantiate(testCtx, ns, &Module{
-			TypeSection:   []*FunctionType{{}},
+			TypeSection:   []*FunctionType{v_v},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
 			MemorySection: &Memory{Min: 1, Cap: 1},
 			ExportSection: []*Export{{Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
@@ -401,7 +412,7 @@ func (e *mockModuleEngine) Name() string {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) Call(ctx context.Context, callCtx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
-	if e.callFailIndex >= 0 && f.Idx == Index(e.callFailIndex) {
+	if e.callFailIndex >= 0 && f.Definition().Index() == Index(e.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
@@ -612,8 +623,10 @@ func Test_resolveImports(t *testing.T) {
 	})
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
-			f := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}
-			g := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeI32}}}
+			f := &FunctionInstance{
+				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+			g := &FunctionInstance{
+				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{
@@ -645,7 +658,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]*ExportInstance{name: {
-					Function: &FunctionInstance{Type: &FunctionType{}},
+					Function: &FunctionInstance{definition: &FunctionDefinition{funcType: &FunctionType{}}},
 				}}, Name: moduleName},
 			}
 			m := &Module{

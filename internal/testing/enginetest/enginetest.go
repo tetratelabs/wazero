@@ -26,11 +26,14 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+var (
+	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+	// v_v is a nullary function type (void -> void)
+	v_v = &wasm.FunctionType{}
+)
 
 type EngineTester interface {
 	NewEngine(enabledFeatures wasm.Features) wasm.Engine
@@ -72,24 +75,13 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
 		},
 	}
-
+	m.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
-	var fns []*wasm.FunctionInstance
-	for i := range m.CodeSection {
-		typeIndex := m.FunctionSection[i]
-		f := &wasm.FunctionInstance{
-			Kind:       wasm.FunctionKindWasm,
-			Type:       m.TypeSection[typeIndex],
-			Body:       m.CodeSection[i].Body,
-			LocalTypes: m.CodeSection[i].LocalTypes,
-			Idx:        wasm.Index(i),
-		}
-		fns = append(fns, f)
-	}
-
+	instance := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+	fns := instance.BuildFunctions(m, nil)
 	me, err := e.NewModuleEngine(t.Name(), m, nil, fns, nil, nil)
 	require.NoError(t, err)
 
@@ -113,19 +105,6 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 	require.Equal(t, et.CompiledFunctionPointerValue(me, 0), globals[4].Val)
 }
 
-func getFunctionInstance(module *wasm.Module, index wasm.Index, moduleInstance *wasm.ModuleInstance) *wasm.FunctionInstance {
-	c := module.ImportFuncCount()
-	typeIndex := module.FunctionSection[index]
-	return &wasm.FunctionInstance{
-		Kind:       wasm.FunctionKindWasm,
-		Module:     moduleInstance,
-		Type:       module.TypeSection[typeIndex],
-		Body:       module.CodeSection[index].Body,
-		LocalTypes: module.CodeSection[index].LocalTypes,
-		Idx:        index + c,
-	}
-}
-
 func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	e := et.NewEngine(wasm.Features20191205)
 
@@ -136,22 +115,21 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 		FunctionSection: []uint32{0},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}}},
 	}
-
+	m.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
-	module := &wasm.ModuleInstance{Name: t.Name()}
-	fn := getFunctionInstance(m, 0, module)
-	addFunction(module, "fn", fn)
+	module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+	module.Functions = module.BuildFunctions(m, nil)
 
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions, nil, nil)
-	fn.Module.Engine = me
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
+	fn := module.Functions[0]
 	results, err := me.Call(testCtx, module.CallCtx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
@@ -178,6 +156,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection:     []*wasm.Code{},
 			ID:              wasm.ModuleID{0},
 		}
+		m.BuildFunctionDefinitions()
 		err := e.CompileModule(testCtx, m)
 		require.NoError(t, err)
 
@@ -195,23 +174,19 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		}
 
 		m := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []*wasm.FunctionType{v_v},
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{1},
 		}
-
+		m.BuildFunctionDefinitions()
 		err := e.CompileModule(testCtx, m)
 		require.NoError(t, err)
 
-		moduleFunctions := []*wasm.FunctionInstance{
-			getFunctionInstance(m, 0, nil),
-			getFunctionInstance(m, 1, nil),
-			getFunctionInstance(m, 2, nil),
-			getFunctionInstance(m, 3, nil),
-		}
+		module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+		fns := module.BuildFunctions(m, nil)
 
 		var func1, func2 = uint32(2), uint32(1)
 		tableInits := []wasm.TableInitEntry{
@@ -220,7 +195,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		}
 
 		// Instantiate the module whose table points to its own functions.
-		me, err := e.NewModuleEngine(t.Name(), m, nil, moduleFunctions, tables, tableInits)
+		me, err := e.NewModuleEngine(t.Name(), m, nil, fns, tables, tableInits)
 		require.NoError(t, err)
 
 		// The functions mapped to the table are defined in the same moduleEngine
@@ -234,30 +209,24 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
 
 		importedModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []*wasm.FunctionType{v_v},
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{2},
 		}
-
+		importedModule.BuildFunctionDefinitions()
 		err := e.CompileModule(testCtx, importedModule)
 		require.NoError(t, err)
 
-		importedModuleInstance := &wasm.ModuleInstance{}
-		importedFunctions := []*wasm.FunctionInstance{
-			getFunctionInstance(importedModule, 0, importedModuleInstance),
-			getFunctionInstance(importedModule, 1, importedModuleInstance),
-			getFunctionInstance(importedModule, 2, importedModuleInstance),
-			getFunctionInstance(importedModule, 3, importedModuleInstance),
-		}
-		var moduleFunctions []*wasm.FunctionInstance
+		imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+		importedFunctions := imported.BuildFunctions(importedModule, nil)
 
 		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
+		importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		importedModuleInstance.Engine = imported
+		imported.Engine = importedMe
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importingModule := &wasm.Module{
@@ -266,6 +235,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			CodeSection:     []*wasm.Code{},
 			ID:              wasm.ModuleID{3},
 		}
+		importingModule.BuildFunctionDefinitions()
 		err = e.CompileModule(testCtx, importingModule)
 		require.NoError(t, err)
 
@@ -274,11 +244,14 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&f}},
 		}
 
-		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInits)
+		importing := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+		fns := importing.BuildFunctions(importingModule, nil)
+
+		importingMe, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInits)
+		expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
 		for idx, table := range tables {
 			require.Equal(t, expectedTables[idx], table.References)
 		}
@@ -288,48 +261,38 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
 
 		importedModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []*wasm.FunctionType{v_v},
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{4},
 		}
-
+		importedModule.BuildFunctionDefinitions()
 		err := e.CompileModule(testCtx, importedModule)
 		require.NoError(t, err)
-		importedModuleInstance := &wasm.ModuleInstance{}
-		importedFunctions := []*wasm.FunctionInstance{
-			getFunctionInstance(importedModule, 0, importedModuleInstance),
-			getFunctionInstance(importedModule, 1, importedModuleInstance),
-			getFunctionInstance(importedModule, 2, importedModuleInstance),
-			getFunctionInstance(importedModule, 3, importedModuleInstance),
-		}
+		imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+		importedFunctions := imported.BuildFunctions(importedModule, nil)
 
 		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
+		importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		importedModuleInstance.Engine = imported
+		imported.Engine = importedMe
 
 		importingModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{{}},
+			TypeSection:     []*wasm.FunctionType{v_v},
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{5},
 		}
-
+		importingModule.BuildFunctionDefinitions()
 		err = e.CompileModule(testCtx, importingModule)
 		require.NoError(t, err)
 
-		importingModuleInstance := &wasm.ModuleInstance{}
-		moduleFunctions := []*wasm.FunctionInstance{
-			getFunctionInstance(importedModule, 0, importingModuleInstance),
-			getFunctionInstance(importedModule, 1, importingModuleInstance),
-			getFunctionInstance(importedModule, 2, importingModuleInstance),
-			getFunctionInstance(importedModule, 3, importingModuleInstance),
-		}
+		importing := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+		fns := importing.BuildFunctions(importingModule, nil)
 
 		var func1, func2 = uint32(0), uint32(4)
 		tableInits := []wasm.TableInitEntry{
@@ -337,11 +300,11 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		}
 
 		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, moduleFunctions, tables, tableInits)
+		importingMe, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
 		require.NoError(t, err)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		expectedTables := et.InitTables(importing, map[wasm.Index]int{0: 2}, tableInits)
+		expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
 		for idx, table := range tables {
 			require.Equal(t, expectedTables[idx], table.References)
 		}
@@ -360,17 +323,17 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 
 	memory := &wasm.MemoryInstance{}
 	var mMemory api.Memory
-	hostFn := reflect.ValueOf(func(m api.Module, v uint64) uint64 {
+	host := reflect.ValueOf(func(m api.Module, v uint64) uint64 {
 		mMemory = m.Memory()
 		return v
 	})
 
 	m := &wasm.Module{
-		HostFunctionSection: []*reflect.Value{&hostFn},
+		HostFunctionSection: []*reflect.Value{&host},
 		FunctionSection:     []wasm.Index{0},
 		TypeSection:         []*wasm.FunctionType{sig},
 	}
-
+	m.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
@@ -378,20 +341,13 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	_, ns := wasm.NewStore(features, e)
 	modCtx := wasm.NewCallContext(ns, module, nil)
 
-	f := &wasm.FunctionInstance{
-		GoFunc: &hostFn,
-		Kind:   wasm.FunctionKindGoModule,
-		Type:   sig,
-		Module: module,
-		Idx:    0,
-	}
-
-	me, err := e.NewModuleEngine(t.Name(), m, nil, []*wasm.FunctionInstance{f}, nil, nil)
+	fns := module.BuildFunctions(m, nil)
+	me, err := e.NewModuleEngine(t.Name(), m, nil, fns, nil, nil)
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := me.Call(testCtx, modCtx, f, 3)
+		results, err := me.Call(testCtx, modCtx, fns[0], 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, mMemory)
@@ -590,7 +546,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	one := uint32(1)
 	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, {}},
+		TypeSection:     []*wasm.FunctionType{{Params: []api.ValueType{api.ValueTypeI32}, ParamNumInUint64: 1}, v_v},
 		FunctionSection: []wasm.Index{0, 1},
 		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 2},
 		DataSection: []*wasm.DataSegment{
@@ -615,7 +571,12 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 				wasm.OpcodeEnd,
 			}},
 		},
+		ExportSection: []*wasm.Export{
+			{Name: "grow", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "init", Type: wasm.ExternTypeFunc, Index: 1},
+		},
 	}
+	m.BuildFunctionDefinitions()
 	// Compile the Wasm into wazeroir
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
@@ -625,18 +586,17 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		Name:          t.Name(),
 		Memory:        wasm.NewMemoryInstance(m.MemorySection),
 		DataInstances: []wasm.DataInstance{m.DataSection[0].Init},
+		TypeIDs:       []wasm.FunctionTypeID{0, 1},
 	}
 	var memory api.Memory = module.Memory
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
-	grow := getFunctionInstance(m, 0, module)
-	addFunction(module, "grow", grow)
-	init := getFunctionInstance(m, 1, module)
-	addFunction(module, "init", init)
+	module.Functions = module.BuildFunctions(m, nil)
+	module.BuildExports(m.ExportSection)
+	grow, init := module.Functions[0], module.Functions[1]
 
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions, nil, nil)
-	init.Module.Engine = me
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
@@ -711,21 +671,28 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}
 
 	hostFnVal := reflect.ValueOf(divBy)
-	hostFnModule := &wasm.Module{
+	hostModule := &wasm.Module{
 		HostFunctionSection: []*reflect.Value{&hostFnVal},
 		TypeSection:         []*wasm.FunctionType{ft},
 		FunctionSection:     []wasm.Index{0},
-		ID:                  wasm.ModuleID{0},
+		ExportSection:       []*wasm.Export{{Name: hostFnName, Type: wasm.ExternTypeFunc, Index: 0}},
+		NameSection: &wasm.NameSection{
+			ModuleName:    "host",
+			FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: hostFnName}},
+		},
+		ID: wasm.ModuleID{0},
 	}
+	hostModule.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, hostModule)
+	require.NoError(t, err)
+	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	host.Functions = host.BuildFunctions(hostModule, nil)
+	host.BuildExports(hostModule.ExportSection)
+	hostFn := host.Exports[hostFnName].Function
 
-	err := e.CompileModule(testCtx, hostFnModule)
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions, nil, nil)
 	require.NoError(t, err)
-	hostFn := &wasm.FunctionInstance{GoFunc: &hostFnVal, Kind: wasm.FunctionKindGoNoContext, Type: ft}
-	hostFnModuleInstance := &wasm.ModuleInstance{Name: "host"}
-	addFunction(hostFnModuleInstance, hostFnName, hostFn)
-	hostFnME, err := e.NewModuleEngine(hostFnModuleInstance.Name, hostFnModule, nil, hostFnModuleInstance.Functions, nil, nil)
-	require.NoError(t, err)
-	linkModuleToEngine(hostFnModuleInstance, hostFnME)
+	linkModuleToEngine(host, hostME)
 
 	importedModule := &wasm.Module{
 		ImportSection:   []*wasm.Import{{}},
@@ -736,50 +703,68 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, byte(0), // Calling imported host function ^.
 				wasm.OpcodeEnd}},
 		},
+		ExportSection: []*wasm.Export{
+			{Name: wasmFnName, Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: callHostFnName, Type: wasm.ExternTypeFunc, Index: 2},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName: "imported",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(1), Name: wasmFnName},
+				{Index: wasm.Index(2), Name: callHostFnName},
+			},
+		},
 		ID: wasm.ModuleID{1},
 	}
-
+	importedModule.BuildFunctionDefinitions()
 	err = e.CompileModule(testCtx, importedModule)
 	require.NoError(t, err)
 
-	// To use the function, we first need to add it to a module.
-	imported := &wasm.ModuleInstance{Name: "imported"}
-	addFunction(imported, wasmFnName, getFunctionInstance(importedModule, 0, imported))
-	callHostFn := getFunctionInstance(importedModule, 1, imported)
-	addFunction(imported, callHostFnName, callHostFn)
+	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	importedFunctions := imported.BuildFunctions(importedModule, nil)
+	imported.Functions = append([]*wasm.FunctionInstance{hostFn}, importedFunctions...)
+	imported.BuildExports(importedModule.ExportSection)
+	callHostFn := imported.Exports[callHostFnName].Function
 
 	// Compile the imported module
-	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, hostFnModuleInstance.Functions, imported.Functions, nil, nil)
+	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, []*wasm.FunctionInstance{hostFn}, importedFunctions, nil, nil)
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
 	// To test stack traces, call the same function from another module
 	importingModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{ft},
+		ImportSection:   []*wasm.Import{{}},
 		FunctionSection: []uint32{0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd}},
 		},
-		ImportSection: []*wasm.Import{{}},
-		ID:            wasm.ModuleID{2},
+		ExportSection: []*wasm.Export{
+			{Name: callImportCallHostFnName, Type: wasm.ExternTypeFunc, Index: 1},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName:    "importing",
+			FunctionNames: wasm.NameMap{{Index: wasm.Index(1), Name: callImportCallHostFnName}},
+		},
+		ID: wasm.ModuleID{2},
 	}
+	importingModule.BuildFunctionDefinitions()
 	err = e.CompileModule(testCtx, importingModule)
 	require.NoError(t, err)
 
 	// Add the exported function.
-	importing := &wasm.ModuleInstance{Name: "importing"}
-	addFunction(importing, callImportCallHostFnName, getFunctionInstance(importedModule, 0, importing))
+	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	importingFunctions := importing.BuildFunctions(importingModule, nil)
+	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importingFunctions...)
+	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{callHostFn}, importing.Functions, nil, nil)
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{callHostFn}, importingFunctions, nil, nil)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 
-	// Add the imported functions back to the importing module.
-	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importing.Functions...)
-
-	return hostFnModuleInstance, imported, importing, func() {
-		e.DeleteCompiledModule(hostFnModule)
+	return host, imported, importing, func() {
+		e.DeleteCompiledModule(hostModule)
 		e.DeleteCompiledModule(importedModule)
 		e.DeleteCompiledModule(importingModule)
 	}
@@ -796,16 +781,4 @@ func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for Compiler, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).
 	// callEngineModuleContextModuleInstanceAddressOffset
 	module.CallCtx = wasm.NewCallContext(nil, module, nil)
-}
-
-// addFunction assigns and adds a function to the module.
-func addFunction(module *wasm.ModuleInstance, funcName string, fn *wasm.FunctionInstance) {
-	fn.DebugName = wasmdebug.FuncName(module.Name, funcName, fn.Idx)
-	module.Functions = append(module.Functions, fn)
-	if module.Exports == nil {
-		module.Exports = map[string]*wasm.ExportInstance{}
-	}
-	module.Exports[funcName] = &wasm.ExportInstance{Type: wasm.ExternTypeFunc, Function: fn}
-	// This link is essential for all engines. For example, functions call other functions defined in the same module.
-	fn.Module = module
 }

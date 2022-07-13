@@ -13,24 +13,40 @@ import (
 // See https://github.com/tetratelabs/wazero/issues/451
 type FunctionListenerFactoryKey struct{}
 
-// FunctionListenerFactory returns FunctionListeners to be notified when a function is called.
+// FunctionListenerFactory returns FunctionListeners to be notified when a
+// function is called.
 type FunctionListenerFactory interface {
-	// NewListener returns a FunctionListener for a defined function. If nil is returned, no
-	// listener will be notified.
-	NewListener(FunctionDefinition) FunctionListener
+	// NewListener returns a FunctionListener for a defined function. If nil is
+	// returned, no listener will be notified.
+	//
+	// Params
+	//
+	//	* moduleName - the name this listener was instantiated with, and might
+	//	  vary for the same binary.
+	//	* definition - metadata about this function parsed from its Wasm binary.
+	NewListener(moduleName string, definition api.FunctionDefinition) FunctionListener
 }
 
-// FunctionListener can be registered for any function via FunctionListenerFactory to
-// be notified when the function is called.
+// FunctionListener can be registered for any function via
+// FunctionListenerFactory to be notified when the function is called.
 type FunctionListener interface {
-	// Before is invoked before a function is called. ctx is the context of the caller function.
-	// The returned context will be used as the context of this function call. To add context
-	// information for this function call, add it to ctx and return the updated context. If
-	// no context information is needed, return ctx as is.
+	// Before is invoked before a function is called. The returned context will
+	// be used as the context of this function call.
+	//
+	// Params
+	//
+	//	* ctx - the context of the caller function which must be the same
+	//	  instance or parent of the result.
+	//	* paramValues - api.ValueType encoded parameters.
 	Before(ctx context.Context, paramValues []uint64) context.Context
 
-	// After is invoked after a function is called. ctx is the context of this function call.
-	// The err parameter is nil on success.
+	// After is invoked after a function is called.
+	//
+	// Params
+	//
+	//	* ctx - the context returned by Before.
+	//	* err - nil if the function didn't err
+	//	* resultValues - api.ValueType encoded results.
 	After(ctx context.Context, err error, resultValues []uint64)
 }
 
@@ -44,27 +60,3 @@ type FunctionListener interface {
 // are awkward. Ex. something like timing is difficult as it requires propagating a stack. Otherwise, nested calls will
 // overwrite each other's "since" time. Propagating a stack is further awkward as the After hook needs to know the
 // position to read from which might be subtle.
-
-// FunctionDefinition includes information about a function available pre-instantiation.
-type FunctionDefinition interface {
-	// ModuleName is the possibly empty name of the module defining this function.
-	ModuleName() string
-
-	// Index is the position in the module's function index namespace, imports first.
-	Index() uint32
-
-	// Name is the module-defined name of the function, which is not necessarily the same as its export name.
-	Name() string
-
-	// ExportNames include all exported names for the given function.
-	ExportNames() []string
-
-	// ParamTypes are the parameters of the function.
-	ParamTypes() []api.ValueType
-
-	// ParamNames are index-correlated with ParamTypes or nil if not available for one or more parameters.
-	ParamNames() []string
-
-	// ResultTypes are the results of the function.
-	ResultTypes() []api.ValueType
-}
