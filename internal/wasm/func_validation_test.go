@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -3295,4 +3296,55 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
+}
+
+func TestDecodeBlockType(t *testing.T) {
+	t.Run("primitive", func(t *testing.T) {
+		for _, tc := range []struct {
+			name                 string
+			in                   byte
+			exp                  ValueType
+			expResultNumInUint64 int
+		}{
+			{name: "nil", in: 0x40},
+			{name: "i32", in: 0x7f, exp: ValueTypeI32, expResultNumInUint64: 1},
+			{name: "i64", in: 0x7e, exp: ValueTypeI64, expResultNumInUint64: 1},
+			{name: "f32", in: 0x7d, exp: ValueTypeF32, expResultNumInUint64: 1},
+			{name: "f64", in: 0x7c, exp: ValueTypeF64, expResultNumInUint64: 1},
+			{name: "v128", in: 0x7b, exp: ValueTypeV128, expResultNumInUint64: 2},
+			{name: "funcref", in: 0x70, exp: ValueTypeFuncref, expResultNumInUint64: 1},
+			{name: "externref", in: 0x6f, exp: ValueTypeExternref, expResultNumInUint64: 1},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				actual, read, err := DecodeBlockType(nil, bytes.NewReader([]byte{tc.in}), Features20220419)
+				require.NoError(t, err)
+				require.Equal(t, uint64(1), read)
+				require.Equal(t, 0, len(actual.Params))
+				require.Equal(t, tc.expResultNumInUint64, actual.ResultNumInUint64)
+				require.Equal(t, 0, actual.ParamNumInUint64)
+				if tc.exp == 0 {
+					require.Equal(t, 0, len(actual.Results))
+				} else {
+					require.Equal(t, 1, len(actual.Results))
+					require.Equal(t, tc.exp, actual.Results[0])
+				}
+			})
+		}
+	})
+	t.Run("function type", func(t *testing.T) {
+		types := []*FunctionType{
+			{},
+			{Params: []ValueType{ValueTypeI32}},
+			{Results: []ValueType{ValueTypeI32}},
+			{Params: []ValueType{ValueTypeF32, ValueTypeV128}, Results: []ValueType{ValueTypeI32}},
+			{Params: []ValueType{ValueTypeF32, ValueTypeV128}, Results: []ValueType{ValueTypeI32, ValueTypeF32, ValueTypeV128}},
+		}
+		for index, expected := range types {
+			actual, read, err := DecodeBlockType(types, bytes.NewReader([]byte{byte(index)}), FeatureMultiValue)
+			require.NoError(t, err)
+			require.Equal(t, uint64(1), read)
+			require.Equal(t, expected, actual)
+		}
+	})
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
@@ -76,6 +77,18 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	// control blocks and value types to check the validity of all instructions.
 	for pc := uint64(0); pc < uint64(len(body)); pc++ {
 		op := body[pc]
+		if buildoptions.IsDebugMode {
+			var instName string
+			if op == OpcodeMiscPrefix {
+				instName = MiscInstructionName(body[pc+1])
+			} else if op == OpcodeVecPrefix {
+				instName = VectorInstructionName(body[pc+1])
+			} else {
+				instName = InstructionName(op)
+			}
+			fmt.Printf("handling %s, stack=%s, blocks: %v\n", instName, valueTypeStack, controlBlockStack)
+		}
+
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
 			if memory == nil {
 				return fmt.Errorf("unknown memory access")
@@ -1802,14 +1815,8 @@ func (s *valueTypeStack) String() string {
 		var str string
 		if v == valueTypeUnknown {
 			str = "unknown"
-		} else if v == ValueTypeI32 {
-			str = "i32"
-		} else if v == ValueTypeI64 {
-			str = "i64"
-		} else if v == ValueTypeF32 {
-			str = "f32"
-		} else if v == ValueTypeF64 {
-			str = "f64"
+		} else {
+			str = ValueTypeName(v)
 		}
 		typeStrs = append(typeStrs, str)
 	}
@@ -1852,10 +1859,10 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Fea
 		ret = &FunctionType{Results: []ValueType{ValueTypeF32}, ResultNumInUint64: 1}
 	case -4: // 0x7c in original byte = f64
 		ret = &FunctionType{Results: []ValueType{ValueTypeF64}, ResultNumInUint64: 1}
-	case -5: // 0x7b in original byte = f64
+	case -5: // 0x7b in original byte = v128
 		ret = &FunctionType{Results: []ValueType{ValueTypeV128}, ResultNumInUint64: 2}
 	case -16: // 0x70 in original byte = funcref
-		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
+		ret = &FunctionType{Results: []ValueType{ValueTypeFuncref}, ResultNumInUint64: 1}
 	case -17: // 0x6f in original byte = externref
 		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
 	default:
