@@ -2458,8 +2458,8 @@ func TestCompile_Vec(t *testing.T) {
 	}
 }
 
-// TestCompile_unreachable_br_brif ensures that unreachable br and br_if instructions are correctly ignored.
-func TestCompile_unreachable_br_brif(t *testing.T) {
+// TestCompile_unreachable_Br_BrIf_BrTable ensures that unreachable br/br_if/br_table instructions are correctly ignored.
+func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	tests := []struct {
 		name     string
 		mod      *wasm.Module
@@ -2490,6 +2490,21 @@ func TestCompile_unreachable_br_brif(t *testing.T) {
 					wasm.OpcodeBlock, 0,
 					wasm.OpcodeI32Const, 1,
 					wasm.OpcodeBrIf, 1,
+					wasm.OpcodeEnd, // End the block.
+					wasm.OpcodeEnd, // End the function.
+				}}},
+			},
+			expected: []Operation{&OperationBr{Target: &BranchTarget{}}},
+		},
+		{
+			name: "br_table",
+			mod: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
+					wasm.OpcodeBlock, 0,
+					wasm.OpcodeBrTable, 1, 1, 1,
 					wasm.OpcodeEnd, // End the block.
 					wasm.OpcodeEnd, // End the function.
 				}}},

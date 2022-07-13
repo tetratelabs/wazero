@@ -655,6 +655,11 @@ operatorSwitch:
 		}
 		c.pc += n
 
+		if c.unreachableState.on {
+			// If it is currently in unreachable, br_table is no-op.
+			break operatorSwitch
+		}
+
 		// Read the branch targets.
 		targets := make([]*BranchTargetDrop, numTargets)
 		for i := range targets {
