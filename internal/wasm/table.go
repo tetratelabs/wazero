@@ -177,8 +177,8 @@ func (m *Module) validateTable(enabledFeatures Features, tables []*Table, maximu
 				return nil, fmt.Errorf("unknown table %d as active element target", elem.TableIndex)
 			}
 
-			if elem.Type != RefTypeFuncref {
-				return nil, fmt.Errorf("only funcref element can be used to initialize table, but was %s", RefTypeName(elem.Type))
+			if elem.Type != RefTypeFuncref && elem.Type != RefTypeExternref {
+				return nil, fmt.Errorf("only funcref or externref element can be used to initialize table, but was %s", RefTypeName(elem.Type))
 			}
 
 			// global.get needs to be discovered during initialization
