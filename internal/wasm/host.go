@@ -13,6 +13,7 @@ import (
 func NewHostModule(
 	moduleName string,
 	nameToGoFunc map[string]interface{},
+	funcToNames map[string][]string,
 	nameToMemory map[string]*Memory,
 	nameToGlobal map[string]*Global,
 	enabledFeatures Features,
@@ -33,11 +34,12 @@ func NewHostModule(
 
 	// Check name collision as exports cannot collide on names, regardless of type.
 	for name := range nameToGoFunc {
+		// manually generate the error message as we don't have debug names yet.
 		if _, ok := nameToMemory[name]; ok {
-			return nil, fmt.Errorf("func[%s] exports the same name as a memory", name)
+			return nil, fmt.Errorf("func[%s.%s] exports the same name as a memory", moduleName, name)
 		}
 		if _, ok := nameToGlobal[name]; ok {
-			return nil, fmt.Errorf("func[%s] exports the same name as a global", name)
+			return nil, fmt.Errorf("func[%s.%s] exports the same name as a global", moduleName, name)
 		}
 	}
 	for name := range nameToMemory {
@@ -47,7 +49,7 @@ func NewHostModule(
 	}
 
 	if funcCount > 0 {
-		if err = addFuncs(m, nameToGoFunc, enabledFeatures); err != nil {
+		if err = addFuncs(m, nameToGoFunc, funcToNames, enabledFeatures); err != nil {
 			return
 		}
 	}
@@ -76,7 +78,12 @@ func (m *Module) IsHostModule() bool {
 	return len(m.HostFunctionSection) > 0
 }
 
-func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Features) error {
+func addFuncs(
+	m *Module,
+	nameToGoFunc map[string]interface{},
+	funcToNames map[string][]string,
+	enabledFeatures Features,
+) error {
 	funcCount := uint32(len(nameToGoFunc))
 	funcNames := make([]string, 0, funcCount)
 	if m.NameSection == nil {
@@ -95,26 +102,32 @@ func addFuncs(m *Module, nameToGoFunc map[string]interface{}, enabledFeatures Fe
 	sort.Strings(funcNames)
 
 	for idx := Index(0); idx < funcCount; idx++ {
-		name := funcNames[idx]
-		fn := reflect.ValueOf(nameToGoFunc[name])
+		exportName := funcNames[idx]
+		debugName := wasmdebug.FuncName(moduleName, exportName, idx)
+		fn := reflect.ValueOf(nameToGoFunc[exportName])
 		_, functionType, err := getFunctionType(&fn, enabledFeatures)
 		if err != nil {
-			return fmt.Errorf("func[%s] %w", name, err)
+			return fmt.Errorf("func[%s] %w", debugName, err)
+		}
+		names := funcToNames[exportName]
+		namesLen := len(names)
+		if namesLen > 1 && namesLen-1 != len(functionType.Params) {
+			return fmt.Errorf("func[%s] has %d params, but %d param names", debugName, namesLen-1, len(functionType.Params))
 		}
 
 		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(functionType))
 		m.HostFunctionSection = append(m.HostFunctionSection, &fn)
-		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: name, Index: idx})
-		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: name})
-		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			moduleName:  moduleName,
-			index:       idx,
-			name:        name,
-			debugName:   wasmdebug.FuncName(moduleName, name, idx),
-			funcType:    functionType,
-			exportNames: []string{name},
-			paramNames:  nil, // TODO
-		})
+		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: exportName, Index: idx})
+		if namesLen > 0 {
+			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: names[0]})
+			localNames := &NameMapAssoc{Index: idx}
+			for i, n := range names[1:] {
+				localNames.NameMap = append(localNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
+			}
+			m.NameSection.LocalNames = append(m.NameSection.LocalNames, localNames)
+		} else {
+			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: exportName})
+		}
 	}
 	return nil
 }

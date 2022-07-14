@@ -45,9 +45,9 @@ import (
 //	* To add more functions to the "env" module, use FunctionExporter.
 //	* To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return r.NewModuleBuilder("env").
-		ExportFunctions(NewFunctionExporter().ExportFunctions()).
-		Instantiate(ctx, r)
+	builder := r.NewModuleBuilder("env")
+	NewFunctionExporter().ExportFunctions(builder)
+	return builder.Instantiate(ctx, r)
 }
 
 // FunctionExporter configures the functions in the "env" module used by
@@ -70,7 +70,7 @@ type FunctionExporter interface {
 
 	// ExportFunctions builds functions to export with a wazero.ModuleBuilder
 	// named "env".
-	ExportFunctions() (nameToGoFunc map[string]interface{})
+	ExportFunctions(builder wazero.ModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
@@ -113,13 +113,13 @@ func (e *functionExporter) WithTraceToStderr() FunctionExporter {
 }
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
-func (e *functionExporter) ExportFunctions() (nameToGoFunc map[string]interface{}) {
+func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 	env := &assemblyscript{abortMessageDisabled: e.abortMessageDisabled, traceMode: e.traceMode}
-	return map[string]interface{}{
-		"abort": env.abort,
-		"trace": env.trace,
-		"seed":  env.seed,
-	}
+	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort",
+		"message", "fileName", "lineNumber", "columnNumber")
+	builder.ExportFunction("trace", env.trace, "~lib/builtins/trace",
+		"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4")
+	builder.ExportFunction("seed", env.seed, "~lib/builtins/seed")
 }
 
 // assemblyScript includes "Special imports" only used In AssemblyScript when a

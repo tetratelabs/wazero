@@ -1,9 +1,10 @@
-// Package wasi_snapshot_preview1 contains Go-defined functions to access system calls, such as opening a file, similar
-// to Go's x/sys package. These are accessible from WebAssembly-defined functions via importing ModuleName.
-// All WASI functions return a single Errno result, which is ErrnoSuccess on success.
+// Package wasi_snapshot_preview1 contains Go-defined functions to access
+// system calls, such as opening a file, similar to Go's x/sys package. These
+// are accessible from WebAssembly-defined functions via importing ModuleName.
+// All WASI functions return a single Errno result: ErrnoSuccess on success.
 //
-// Ex. If your source (%.wasm binary) includes an import "wasi_snapshot_preview1", call Instantiate
-// prior to instantiating it. Otherwise, it will error due to missing imports.
+// Ex. Call Instantiate before instantiating any wasm binary that imports
+// "wasi_snapshot_preview1", Otherwise, it will error due to missing imports.
 //	ctx := context.Background()
 //	r := wazero.NewRuntime()
 //	defer r.Close(ctx) // This closes everything this Runtime created.
@@ -31,7 +32,8 @@ import (
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 const ModuleName = "wasi_snapshot_preview1"
 
-// Instantiate instantiates the ModuleName module into the runtime default namespace.
+// Instantiate instantiates the ModuleName module into the runtime default
+// namespace.
 //
 // Notes
 //
@@ -44,12 +46,13 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
 type Builder interface {
 
-	// Compile compiles the ModuleName module that can instantiated in any namespace (wazero.Namespace).
+	// Compile compiles the ModuleName module that can instantiated in any
+	// namespace (wazero.Namespace).
 	//
 	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
 
-	// Instantiate instantiates the ModuleName module into the provided namespace.
+	// Instantiate instantiates the ModuleName module into the given namespace.
 	//
 	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
 	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
@@ -64,7 +67,9 @@ type builder struct{ r wazero.Runtime }
 
 // moduleBuilder returns a new wazero.ModuleBuilder for ModuleName
 func (b *builder) moduleBuilder() wazero.ModuleBuilder {
-	return b.r.NewModuleBuilder(ModuleName).ExportFunctions(wasiFunctions())
+	builder := b.r.NewModuleBuilder(ModuleName)
+	exportFunctions(builder)
+	return builder
 }
 
 // Compile implements Builder.Compile
@@ -437,59 +442,102 @@ const (
 // See https://wwa.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type wasi struct{}
 
-// wasiFunctions returns all go functions that implement wasi.
+// exportFunctions adds all go functions that implement wasi.
 // These should be exported in the module named ModuleName.
-func wasiFunctions() map[string]interface{} {
+func exportFunctions(builder wazero.ModuleBuilder) {
 	a := &wasi{}
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
-	return map[string]interface{}{
-		functionArgsGet:              a.ArgsGet,
-		functionArgsSizesGet:         a.ArgsSizesGet,
-		functionEnvironGet:           a.EnvironGet,
-		functionEnvironSizesGet:      a.EnvironSizesGet,
-		functionClockResGet:          a.ClockResGet,
-		functionClockTimeGet:         a.ClockTimeGet,
-		functionFdAdvise:             a.FdAdvise,
-		functionFdAllocate:           a.FdAllocate,
-		functionFdClose:              a.FdClose,
-		functionFdDatasync:           a.FdDatasync,
-		functionFdFdstatGet:          a.FdFdstatGet,
-		functionFdFdstatSetFlags:     a.FdFdstatSetFlags,
-		functionFdFdstatSetRights:    a.FdFdstatSetRights,
-		functionFdFilestatGet:        a.FdFilestatGet,
-		functionFdFilestatSetSize:    a.FdFilestatSetSize,
-		functionFdFilestatSetTimes:   a.FdFilestatSetTimes,
-		functionFdPread:              a.FdPread,
-		functionFdPrestatGet:         a.FdPrestatGet,
-		functionFdPrestatDirName:     a.FdPrestatDirName,
-		functionFdPwrite:             a.FdPwrite,
-		functionFdRead:               a.FdRead,
-		functionFdReaddir:            a.FdReaddir,
-		functionFdRenumber:           a.FdRenumber,
-		functionFdSeek:               a.FdSeek,
-		functionFdSync:               a.FdSync,
-		functionFdTell:               a.FdTell,
-		functionFdWrite:              a.FdWrite,
-		functionPathCreateDirectory:  a.PathCreateDirectory,
-		functionPathFilestatGet:      a.PathFilestatGet,
-		functionPathFilestatSetTimes: a.PathFilestatSetTimes,
-		functionPathLink:             a.PathLink,
-		functionPathOpen:             a.PathOpen,
-		functionPathReadlink:         a.PathReadlink,
-		functionPathRemoveDirectory:  a.PathRemoveDirectory,
-		functionPathRename:           a.PathRename,
-		functionPathSymlink:          a.PathSymlink,
-		functionPathUnlinkFile:       a.PathUnlinkFile,
-		functionPollOneoff:           a.PollOneoff,
-		functionProcExit:             a.ProcExit,
-		functionProcRaise:            a.ProcRaise,
-		functionSchedYield:           a.SchedYield,
-		functionRandomGet:            a.RandomGet,
-		functionSockRecv:             a.SockRecv,
-		functionSockSend:             a.SockSend,
-		functionSockShutdown:         a.SockShutdown,
-	}
+	builder.ExportFunction(functionArgsGet, a.ArgsGet,
+		functionArgsGet, "argv", "argv_buf")
+	builder.ExportFunction(functionArgsSizesGet, a.ArgsSizesGet,
+		functionArgsSizesGet, "result.argc", "result.argv_buf_size")
+	builder.ExportFunction(functionEnvironGet, a.EnvironGet,
+		functionEnvironGet, "environ", "environ_buf")
+	builder.ExportFunction(functionEnvironSizesGet, a.EnvironSizesGet,
+		functionEnvironSizesGet, "result.environc", "result.environBufSize")
+	builder.ExportFunction(functionClockResGet, a.ClockResGet,
+		functionClockResGet, "id", "result.resolution")
+	builder.ExportFunction(functionClockTimeGet, a.ClockTimeGet,
+		functionClockTimeGet, "id", "precision", "result.timestamp")
+	builder.ExportFunction(functionFdAdvise, a.FdAdvise,
+		functionFdAdvise, "fd", "offset", "len", "result.advice")
+	builder.ExportFunction(functionFdAllocate, a.FdAllocate,
+		functionFdAllocate, "fd", "offset", "len")
+	builder.ExportFunction(functionFdClose, a.FdClose,
+		functionFdClose, "fd")
+	builder.ExportFunction(functionFdDatasync, a.FdDatasync,
+		functionFdDatasync, "fd")
+	builder.ExportFunction(functionFdFdstatGet, a.FdFdstatGet,
+		functionFdFdstatGet, "fd", "result.stat")
+	builder.ExportFunction(functionFdFdstatSetFlags, a.FdFdstatSetFlags,
+		functionFdFdstatSetFlags, "fd", "flags")
+	builder.ExportFunction(functionFdFdstatSetRights, a.FdFdstatSetRights,
+		functionFdFdstatSetRights, "fd", "fs_rights_base", "fs_rights_inheriting")
+	builder.ExportFunction(functionFdFilestatGet, a.FdFilestatGet,
+		functionFdFilestatGet, "fd", "result.buf")
+	builder.ExportFunction(functionFdFilestatSetSize, a.FdFilestatSetSize,
+		functionFdFilestatSetSize, "fd", "size")
+	builder.ExportFunction(functionFdFilestatSetTimes, a.FdFilestatSetTimes,
+		functionFdFilestatSetTimes, "fd", "atim", "mtim", "fst_flags")
+	builder.ExportFunction(functionFdPread, a.FdPread,
+		functionFdPread, "fd", "iovs", "iovs_len", "offset", "result.nread")
+	builder.ExportFunction(functionFdPrestatGet, a.FdPrestatGet,
+		functionFdPrestatGet, "fd", "result.prestat")
+	builder.ExportFunction(functionFdPrestatDirName, a.FdPrestatDirName,
+		functionFdPrestatDirName, "fd", "path", "path_len")
+	builder.ExportFunction(functionFdPwrite, a.FdPwrite,
+		functionFdPwrite, "fd", "iovs", "iovs_len", "offset", "result.nwritten")
+	builder.ExportFunction(functionFdRead, a.FdRead,
+		functionFdRead, "fd", "iovs", "iovs_len", "result.size")
+	builder.ExportFunction(functionFdReaddir, a.FdReaddir,
+		functionFdReaddir, "fd", "buf", "buf_len", "cookie", "result.bufused")
+	builder.ExportFunction(functionFdRenumber, a.FdRenumber,
+		functionFdRenumber, "fd", "to")
+	builder.ExportFunction(functionFdSeek, a.FdSeek,
+		functionFdSeek, "fd", "offset", "whence", "result.newoffset")
+	builder.ExportFunction(functionFdSync, a.FdSync,
+		functionFdSync, "fd")
+	builder.ExportFunction(functionFdTell, a.FdTell,
+		functionFdTell, "fd", "result.offset")
+	builder.ExportFunction(functionFdWrite, a.FdWrite,
+		functionFdWrite, "fd", "iovs", "iovs_len", "result.size")
+	builder.ExportFunction(functionPathCreateDirectory, a.PathCreateDirectory,
+		functionPathCreateDirectory, "fd", "path", "path_len")
+	builder.ExportFunction(functionPathFilestatGet, a.PathFilestatGet,
+		functionPathFilestatGet, "fd", "flags", "path", "path_len", "result.buf")
+	builder.ExportFunction(functionPathFilestatSetTimes, a.PathFilestatSetTimes,
+		functionPathFilestatSetTimes, "fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags")
+	builder.ExportFunction(functionPathLink, a.PathLink,
+		functionPathLink, "old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len")
+	builder.ExportFunction(functionPathOpen, a.PathOpen,
+		functionPathOpen, "fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd")
+	builder.ExportFunction(functionPathReadlink, a.PathReadlink,
+		functionPathReadlink, "fd", "path", "path_len", "buf", "buf_len", "result.bufused")
+	builder.ExportFunction(functionPathRemoveDirectory, a.PathRemoveDirectory,
+		functionPathRemoveDirectory, "fd", "path", "path_len")
+	builder.ExportFunction(functionPathRename, a.PathRename,
+		functionPathRename, "fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len")
+	builder.ExportFunction(functionPathSymlink, a.PathSymlink,
+		functionPathSymlink, "old_path", "old_path_len", "fd", "new_path", "new_path_len")
+	builder.ExportFunction(functionPathUnlinkFile, a.PathUnlinkFile,
+		functionPathUnlinkFile, "fd", "path", "path_len")
+	builder.ExportFunction(functionPollOneoff, a.PollOneoff,
+		functionPollOneoff, "in", "out", "nsubscriptions", "result.nevents")
+	builder.ExportFunction(functionProcExit, a.ProcExit,
+		functionProcExit, "rval")
+	builder.ExportFunction(functionProcRaise, a.ProcRaise,
+		functionProcRaise, "sig")
+	builder.ExportFunction(functionSchedYield, a.SchedYield,
+		functionSchedYield)
+	builder.ExportFunction(functionRandomGet, a.RandomGet,
+		functionRandomGet, "buf", "buf_len")
+	builder.ExportFunction(functionSockRecv, a.SockRecv,
+		functionSockRecv, "fd", "ri_data", "ri_data_count", "ri_flags", "result.ro_datalen", "result.ro_flags")
+	builder.ExportFunction(functionSockSend, a.SockSend,
+		functionSockSend, "fd", "si_data", "si_data_count", "si_flags", "result.so_datalen")
+	builder.ExportFunction(functionSockShutdown, a.SockShutdown,
+		functionSockShutdown, "fd", "how")
 }
 
 // ArgsGet is the WASI function that reads command-line argument data (WithArgs).

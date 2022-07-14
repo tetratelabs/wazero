@@ -305,7 +305,7 @@ func (s *Store) Instantiate(
 	module *Module,
 	name string,
 	sys *internalsys.Context,
-	functionListenerFactory experimentalapi.FunctionListenerFactory,
+	listeners []experimentalapi.FunctionListener,
 ) (*CallContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -329,7 +329,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the namespace so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, functionListenerFactory, importedModules); err != nil {
+	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, listeners, importedModules); err != nil {
 		ns.deleteModule(name)
 		return nil, err
 	} else {
@@ -346,7 +346,7 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	functionListenerFactory experimentalapi.FunctionListenerFactory,
+	listeners []experimentalapi.FunctionListener,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {
 	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
@@ -376,7 +376,7 @@ func (s *Store) instantiate(
 	}
 
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module, functionListenerFactory)
+	functions := m.BuildFunctions(module, listeners)
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)

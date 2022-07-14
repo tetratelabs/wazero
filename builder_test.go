@@ -64,6 +64,26 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
+			name: "ExportFunction with names",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportFunction("1", uint32_uint32, "get", "x")
+			},
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+				},
+				FunctionSection:     []wasm.Index{0},
+				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
+					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+				},
+			},
+		},
+		{
 			name: "ExportFunction overwrites existing",
 			input: func(r Runtime) ModuleBuilder {
 				return r.NewModuleBuilder("").ExportFunction("1", uint32_uint32).ExportFunction("1", uint64_uint32)
