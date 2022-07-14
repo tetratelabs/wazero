@@ -25,9 +25,6 @@ func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
 			ret[e] = d
 		}
 	}
-	if len(ret) == 0 {
-		return nil
-	}
 	return ret
 }
 

@@ -19,8 +19,9 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		expectedExports map[string]api.FunctionDefinition
 	}{
 		{
-			name: "no exports",
-			m:    &Module{},
+			name:            "no exports",
+			m:               &Module{},
+			expectedExports: map[string]api.FunctionDefinition{},
 		},
 		{
 			name: "no functions",
@@ -28,6 +29,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 				ExportSection: []*Export{{Type: ExternTypeGlobal, Index: 0}},
 				GlobalSection: []*Global{{}},
 			},
+			expectedExports: map[string]api.FunctionDefinition{},
 		},
 		{
 			name: "host func",
@@ -44,6 +46,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					funcType:       v_v,
 				},
 			},
+			expectedExports: map[string]api.FunctionDefinition{},
 		},
 		{
 			name: "without imports",
@@ -201,6 +204,7 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			expectedImports: []api.FunctionDefinition{
 				&FunctionDefinition{moduleName: "module", index: 0, debugName: "module.$0", importDesc: &[2]string{"i", "f"}, funcType: v_v},
 			},
+			expectedExports: map[string]api.FunctionDefinition{},
 		},
 	}
 
