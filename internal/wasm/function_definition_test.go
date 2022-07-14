@@ -12,10 +12,11 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 	nopCode := &Code{nil, []byte{OpcodeEnd}}
 	fnV := reflect.ValueOf(func() {})
 	tests := []struct {
-		name                             string
-		m                                *Module
-		expected                         []*FunctionDefinition
-		expectedImports, expectedExports []api.FunctionDefinition
+		name            string
+		m               *Module
+		expected        []*FunctionDefinition
+		expectedImports []api.FunctionDefinition
+		expectedExports map[string]api.FunctionDefinition
 	}{
 		{
 			name: "no exports",
@@ -81,20 +82,20 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					funcType:    v_v,
 				},
 			},
-			expectedExports: []api.FunctionDefinition{
-				&FunctionDefinition{
+			expectedExports: map[string]api.FunctionDefinition{
+				"function_index=0": &FunctionDefinition{
 					index:       0,
 					debugName:   ".$0",
 					exportNames: []string{"function_index=0"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
 				},
-				&FunctionDefinition{
+				"function_index=1": &FunctionDefinition{
 					index:       1,
 					exportNames: []string{"function_index=1"},
 					debugName:   ".$1",
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
-				&FunctionDefinition{
+				"function_index=2": &FunctionDefinition{
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},
@@ -151,21 +152,21 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
 			},
-			expectedExports: []api.FunctionDefinition{
-				&FunctionDefinition{
+			expectedExports: map[string]api.FunctionDefinition{
+				"imported_function": &FunctionDefinition{
 					index:       0,
 					debugName:   ".$0",
 					importDesc:  &[2]string{"", ""},
 					exportNames: []string{"imported_function"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeF32}, Results: []ValueType{ValueTypeI64}},
 				},
-				&FunctionDefinition{
+				"function_index=1": &FunctionDefinition{
 					index:       1,
 					debugName:   ".$1",
 					exportNames: []string{"function_index=1"},
 					funcType:    &FunctionType{Params: []ValueType{ValueTypeF64, ValueTypeI32}, Results: []ValueType{ValueTypeV128, ValueTypeI64}},
 				},
-				&FunctionDefinition{
+				"function_index=2": &FunctionDefinition{
 					index:       2,
 					debugName:   ".$2",
 					exportNames: []string{"function_index=2"},

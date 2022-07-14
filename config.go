@@ -267,15 +267,24 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 //
 // Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
 type CompiledModule interface {
-	// ImportedFunctions returns all the imported functions (api.FunctionDefinition) in this module.
+	// Name returns the module name encoded into the binary or empty if not.
+	Name() string
+
+	// ImportedFunctions returns all the imported functions
+	// (api.FunctionDefinition) in this module or nil if there are none.
+	//
+	// Note: Unlike ExportedFunctions, there is no unique constraint on
+	// imports.
 	ImportedFunctions() []api.FunctionDefinition
 
-	// ExportedFunctions returns all the exported functions (api.FunctionDefinition) in this module.
-	ExportedFunctions() []api.FunctionDefinition
+	// ExportedFunctions returns all the exported functions
+	// (api.FunctionDefinition) in this module keyed on export name.
+	ExportedFunctions() map[string]api.FunctionDefinition
 
 	// Close releases all the allocated resources for this CompiledModule.
 	//
-	// Note: It is safe to call Close while having outstanding calls from an api.Module instantiated from this.
+	// Note: It is safe to call Close while having outstanding calls from an
+	// api.Module instantiated from this.
 	Close(context.Context) error
 }
 
@@ -287,6 +296,14 @@ type compiledModule struct {
 	listeners []experimental.FunctionListener
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
+}
+
+// Name implements CompiledModule.Name
+func (c *compiledModule) Name() (moduleName string) {
+	if ns := c.module.NameSection; ns != nil {
+		moduleName = ns.ModuleName
+	}
+	return
 }
 
 // Close implements CompiledModule.Close
@@ -304,7 +321,7 @@ func (c *compiledModule) ImportedFunctions() []api.FunctionDefinition {
 }
 
 // ExportedFunctions implements CompiledModule.ExportedFunctions
-func (c *compiledModule) ExportedFunctions() []api.FunctionDefinition {
+func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 	return c.module.ExportedFunctions()
 }
 
