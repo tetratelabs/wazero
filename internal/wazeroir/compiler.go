@@ -755,14 +755,14 @@ operatorSwitch:
 		)
 	case wasm.OpcodeSelect:
 		c.emit(
-			&OperationSelect{},
+			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
 		c.pc += 2
 		// Typed select is semantically equivalent to select at runtime.
 		c.emit(
-			&OperationSelect{},
+			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeLocalGet:
 		if index == nil {

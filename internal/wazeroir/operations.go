@@ -931,7 +931,10 @@ func (*OperationDrop) Kind() OperationKind {
 //
 // The engines are expected to pop three values, say [..., x2, x1, c], then if the value "c" equals zero,
 // "x1" is pushed back onto the stack and, otherwise "x2" is pushed back.
-type OperationSelect struct{}
+type OperationSelect struct {
+	// IsTargetVector true if the selection target value's type is wasm.ValueTypeV128.
+	IsTargetVector bool
+}
 
 // Kind implements Operation.Kind
 func (*OperationSelect) Kind() OperationKind {
