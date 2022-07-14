@@ -83,12 +83,17 @@ const (
 	ValueTypeF32 ValueType = 0x7d
 	// ValueTypeF64 is a 64-bit floating point number.
 	ValueTypeF64 ValueType = 0x7c
+
 	// ValueTypeExternref is a externref type.
 	//
-	// Note: in wazero, externref type value are opaque raw 64-bit pointers, and the ValueTypeExternref type
-	// in the signature will be translated as uintptr in wazero's API level.
-	// For example, the import function `(func (import "env" "f") (param externref) (result externref))` can be defined in Go as:
+	// Note: in wazero, externref type value are opaque raw 64-bit pointers,
+	// and the ValueTypeExternref type in the signature will be translated as
+	// uintptr in wazero's API level.
 	//
+	// For example, given the import function:
+	//	(func (import "env" "f") (param externref) (result externref))
+	//
+	// This can be defined in Go as:
 	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
 	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
 	//  })
@@ -221,6 +226,13 @@ type FunctionDefinition interface {
 	// Note: The empty name is allowed in the WebAssembly specification, so ""
 	// is possible.
 	ExportNames() []string
+
+	// IsHostFunction returns true if the function was implemented by the
+	// embedder (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	//
+	// Note: Host functions can be non-deterministic or cause side effects.
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
+	IsHostFunction() bool
 
 	// ParamTypes are the possibly empty sequence of value types accepted by a
 	// function with this signature.

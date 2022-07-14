@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
@@ -130,6 +131,7 @@ func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
 		store:           store,
 		ns:              &namespace{store: store, ns: ns},
 		enabledFeatures: config.enabledFeatures,
+		isInterpreter:   config.isInterpreter,
 	}
 }
 
@@ -138,15 +140,13 @@ type runtime struct {
 	store           *wasm.Store
 	ns              *namespace
 	enabledFeatures wasm.Features
+	isInterpreter   bool
 	compiledModules []*compiledModule
 }
 
 // NewNamespace implements Runtime.NewNamespace.
 func (r *runtime) NewNamespace(ctx context.Context) Namespace {
-	return &namespace{
-		store: r.store,
-		ns:    r.store.NewNamespace(ctx),
-	}
+	return &namespace{store: r.store, ns: r.store.NewNamespace(ctx)}
 }
 
 // Module implements Namespace.Module embedded by Runtime.
@@ -179,13 +179,39 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 	// Now that the module is validated, cache the function definitions.
 	internal.BuildFunctionDefinitions()
 
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	if c.listeners, err = buildListeners(ctx, r, internal); err != nil {
+		return nil, err
+	}
+
 	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
 		return nil, err
 	}
 
-	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 	r.compiledModules = append(r.compiledModules, c)
 	return c, nil
+}
+
+func buildListeners(ctx context.Context, r *runtime, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
+	if ctx == nil {
+		return nil, nil
+	}
+	// Test to see if internal code are using an experimental feature.
+	fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{})
+	if fnlf == nil {
+		return nil, nil
+	}
+	if !r.isInterpreter {
+		return nil, errors.New("context includes a FunctionListenerFactoryKey, which is only supported in the interpreter")
+	}
+	factory := fnlf.(experimentalapi.FunctionListenerFactory)
+	importCount := internal.ImportFuncCount()
+	listeners := make([]experimentalapi.FunctionListener, len(internal.FunctionSection))
+	for i := 0; i < len(listeners); i++ {
+		listeners[i] = factory.NewListener(internal.FunctionDefinitionSection[uint32(i)+importCount])
+	}
+	return listeners, nil
 }
 
 // InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary

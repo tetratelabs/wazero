@@ -61,10 +61,13 @@ func (m *Module) BuildFunctionDefinitions() {
 		importFuncIdx++
 	}
 
+	// At the moment, a module can either be solely wasm or host functions.
+	isHostFunction := m.HostFunctionSection != nil
 	for codeIndex, typeIndex := range m.FunctionSection {
 		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			index:    Index(codeIndex) + importCount,
-			funcType: m.TypeSection[typeIndex],
+			index:          Index(codeIndex) + importCount,
+			funcType:       m.TypeSection[typeIndex],
+			isHostFunction: isHostFunction,
 		})
 	}
 
@@ -99,14 +102,15 @@ func (m *Module) BuildFunctionDefinitions() {
 
 // FunctionDefinition implements api.FunctionDefinition
 type FunctionDefinition struct {
-	moduleName  string
-	index       Index
-	name        string
-	debugName   string
-	funcType    *FunctionType
-	importDesc  *[2]string
-	exportNames []string
-	paramNames  []string
+	moduleName     string
+	index          Index
+	name           string
+	debugName      string
+	isHostFunction bool
+	funcType       *FunctionType
+	importDesc     *[2]string
+	exportNames    []string
+	paramNames     []string
 }
 
 // ModuleName implements the same method as documented on api.FunctionDefinition.
@@ -140,6 +144,11 @@ func (f *FunctionDefinition) Import() (moduleName, name string, isImport bool) {
 // ExportNames implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) ExportNames() []string {
 	return f.exportNames
+}
+
+// IsHostFunction implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionDefinition) IsHostFunction() bool {
+	return f.isHostFunction
 }
 
 // ParamNames implements the same method as documented on api.FunctionDefinition.

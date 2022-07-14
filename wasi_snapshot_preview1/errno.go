@@ -1,7 +1,7 @@
 package wasi_snapshot_preview1
 
 import (
-	"fmt"
+	internalwasi "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 // Errno are the error codes returned by WASI functions.
@@ -17,10 +17,7 @@ type Errno = uint32 // neither uint16 nor an alias for parity with wasm.ValueTyp
 
 // ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
 func ErrnoName(errno Errno) string {
-	if int(errno) < len(errnoToString) {
-		return errnoToString[errno]
-	}
-	return fmt.Sprintf("errno(%d)", errno)
+	return internalwasi.ErrnoName(errno)
 }
 
 // Note: Below prefers POSIX symbol names over WASI ones, even if the docs are from WASI.
@@ -182,83 +179,3 @@ const (
 	// ErrnoNotcapable Extension: Capabilities insufficient.
 	ErrnoNotcapable
 )
-
-var errnoToString = [...]string{
-	ErrnoSuccess:        "ESUCCESS",
-	Errno2big:           "E2BIG",
-	ErrnoAcces:          "EACCES",
-	ErrnoAddrinuse:      "EADDRINUSE",
-	ErrnoAddrnotavail:   "EADDRNOTAVAIL",
-	ErrnoAfnosupport:    "EAFNOSUPPORT",
-	ErrnoAgain:          "EAGAIN",
-	ErrnoAlready:        "EALREADY",
-	ErrnoBadf:           "EBADF",
-	ErrnoBadmsg:         "EBADMSG",
-	ErrnoBusy:           "EBUSY",
-	ErrnoCanceled:       "ECANCELED",
-	ErrnoChild:          "ECHILD",
-	ErrnoConnaborted:    "ECONNABORTED",
-	ErrnoConnrefused:    "ECONNREFUSED",
-	ErrnoConnreset:      "ECONNRESET",
-	ErrnoDeadlk:         "EDEADLK",
-	ErrnoDestaddrreq:    "EDESTADDRREQ",
-	ErrnoDom:            "EDOM",
-	ErrnoDquot:          "EDQUOT",
-	ErrnoExist:          "EEXIST",
-	ErrnoFault:          "EFAULT",
-	ErrnoFbig:           "EFBIG",
-	ErrnoHostunreach:    "EHOSTUNREACH",
-	ErrnoIdrm:           "EIDRM",
-	ErrnoIlseq:          "EILSEQ",
-	ErrnoInprogress:     "EINPROGRESS",
-	ErrnoIntr:           "EINTR",
-	ErrnoInval:          "EINVAL",
-	ErrnoIo:             "EIO",
-	ErrnoIsconn:         "EISCONN",
-	ErrnoIsdir:          "EISDIR",
-	ErrnoLoop:           "ELOOP",
-	ErrnoMfile:          "EMFILE",
-	ErrnoMlink:          "EMLINK",
-	ErrnoMsgsize:        "EMSGSIZE",
-	ErrnoMultihop:       "EMULTIHOP",
-	ErrnoNametoolong:    "ENAMETOOLONG",
-	ErrnoNetdown:        "ENETDOWN",
-	ErrnoNetreset:       "ENETRESET",
-	ErrnoNetunreach:     "ENETUNREACH",
-	ErrnoNfile:          "ENFILE",
-	ErrnoNobufs:         "ENOBUFS",
-	ErrnoNodev:          "ENODEV",
-	ErrnoNoent:          "ENOENT",
-	ErrnoNoexec:         "ENOEXEC",
-	ErrnoNolck:          "ENOLCK",
-	ErrnoNolink:         "ENOLINK",
-	ErrnoNomem:          "ENOMEM",
-	ErrnoNomsg:          "ENOMSG",
-	ErrnoNoprotoopt:     "ENOPROTOOPT",
-	ErrnoNospc:          "ENOSPC",
-	ErrnoNosys:          "ENOSYS",
-	ErrnoNotconn:        "ENOTCONN",
-	ErrnoNotdir:         "ENOTDIR",
-	ErrnoNotempty:       "ENOTEMPTY",
-	ErrnoNotrecoverable: "ENOTRECOVERABLE",
-	ErrnoNotsock:        "ENOTSOCK",
-	ErrnoNotsup:         "ENOTSUP",
-	ErrnoNotty:          "ENOTTY",
-	ErrnoNxio:           "ENXIO",
-	ErrnoOverflow:       "EOVERFLOW",
-	ErrnoOwnerdead:      "EOWNERDEAD",
-	ErrnoPerm:           "EPERM",
-	ErrnoPipe:           "EPIPE",
-	ErrnoProto:          "EPROTO",
-	ErrnoProtonosupport: "EPROTONOSUPPORT",
-	ErrnoPrototype:      "EPROTOTYPE",
-	ErrnoRange:          "ERANGE",
-	ErrnoRofs:           "EROFS",
-	ErrnoSpipe:          "ESPIPE",
-	ErrnoSrch:           "ESRCH",
-	ErrnoStale:          "ESTALE",
-	ErrnoTimedout:       "ETIMEDOUT",
-	ErrnoTxtbsy:         "ETXTBSY",
-	ErrnoXdev:           "EXDEV",
-	ErrnoNotcapable:     "ENOTCAPABLE",
-}

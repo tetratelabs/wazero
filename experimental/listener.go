@@ -18,13 +18,7 @@ type FunctionListenerFactoryKey struct{}
 type FunctionListenerFactory interface {
 	// NewListener returns a FunctionListener for a defined function. If nil is
 	// returned, no listener will be notified.
-	//
-	// Params
-	//
-	//	* moduleName - the name this listener was instantiated with, and might
-	//	  vary for the same binary.
-	//	* definition - metadata about this function parsed from its Wasm binary.
-	NewListener(moduleName string, definition api.FunctionDefinition) FunctionListener
+	NewListener(api.FunctionDefinition) FunctionListener
 }
 
 // FunctionListener can be registered for any function via

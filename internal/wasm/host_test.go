@@ -181,13 +181,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(
-				tc.moduleName,
-				tc.nameToGoFunc,
-				tc.nameToMemory,
-				tc.nameToGlobal,
-				Features20191205|FeatureMultiValue,
-			)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205|FeatureMultiValue)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -227,19 +221,19 @@ func TestNewHostModule_Errors(t *testing.T) {
 		{
 			name:         "not a function",
 			nameToGoFunc: map[string]interface{}{"fn": t},
-			expectedErr:  "func[fn] kind != func: ptr",
+			expectedErr:  "func[.fn] kind != func: ptr",
 		},
 		{
 			name:         "function has multiple results",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
 			nameToMemory: map[string]*Memory{"mem": {Min: 1, Max: 1}},
-			expectedErr:  "func[fn] multiple result types invalid as feature \"multi-value\" is disabled",
+			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
 			name:         "func collides on memory name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
-			expectedErr:  "func[fn] exports the same name as a memory",
+			expectedErr:  "func[.fn] exports the same name as a memory",
 		},
 		{
 			name:         "multiple memories",
@@ -255,7 +249,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 			name:         "func collides on global name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToGlobal: map[string]*Global{"fn": {}},
-			expectedErr:  "func[fn] exports the same name as a global",
+			expectedErr:  "func[.fn] exports the same name as a global",
 		},
 	}
 
@@ -263,7 +257,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal, Features20191205)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

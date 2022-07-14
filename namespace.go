@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -80,15 +79,8 @@ func (ns *namespace) InstantiateModule(
 		name = code.module.NameSection.ModuleName
 	}
 
-	var functionListenerFactory experimentalapi.FunctionListenerFactory
-	if ctx != nil { // Test to see if internal code are using an experimental feature.
-		if fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{}); fnlf != nil {
-			functionListenerFactory = fnlf.(experimentalapi.FunctionListenerFactory)
-		}
-	}
-
 	// Instantiate the module in the appropriate namespace.
-	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx, functionListenerFactory)
+	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx, code.listeners)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {

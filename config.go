@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -148,6 +149,7 @@ func NewRuntimeConfig() RuntimeConfig {
 
 type runtimeConfig struct {
 	enabledFeatures wasm.Features
+	isInterpreter   bool
 	newEngine       func(wasm.Features) wasm.Engine
 }
 
@@ -179,6 +181,7 @@ func NewRuntimeConfigCompiler() RuntimeConfig {
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() RuntimeConfig {
 	ret := engineLessConfig.clone()
+	ret.isInterpreter = true
 	ret.newEngine = interpreter.NewEngine
 	return ret
 }
@@ -280,7 +283,8 @@ type compiledModule struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
-
+	// listeners are present if the code was compiled with a listener
+	listeners []experimental.FunctionListener
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
 }

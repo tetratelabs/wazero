@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// ModuleBuilder is a way to define a WebAssembly 1.0 (20191205) in Go.
+// ModuleBuilder is a way to define a WebAssembly Module in Go.
 //
 // Ex. Below defines and instantiates a module named "env" with one function:
 //
@@ -25,7 +25,8 @@ import (
 //		ExportFunction("hello", hello).
 //		Instantiate(ctx, r)
 //
-// If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
+// If the same module may be instantiated multiple times, it is more efficient
+// to separate steps. Ex.
 //
 //	compiled, _ := r.NewModuleBuilder("env").
 //		ExportFunction("get_random_string", getRandomString).
@@ -37,9 +38,12 @@ import (
 //
 // Notes
 //
-//	* ModuleBuilder is mutable. WithXXX functions return the same instance for chaining.
-//	* WithXXX methods do not return errors, to allow chaining. Any validation errors are deferred until Build.
-//	* Insertion order is not retained. Anything defined by this builder is sorted lexicographically on Build.
+//	* ModuleBuilder is mutable: each method returns the same instance for
+//	  chaining.
+//	* methods do not return errors, to allow chaining. Any validation errors
+//	  are deferred until Compile.
+//	* Insertion order is not retained. Anything defined by this builder is
+//	  sorted lexicographically on Compile.
 type ModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
@@ -48,29 +52,45 @@ type ModuleBuilder interface {
 	//
 	// Parameters
 	//
-	//	* name - the name to export. Ex "random_get"
-	//	* goFunc - the `func` to export.
+	//	* exportName - The name to export. Ex "random_get"
+	//	* goFunc - The `func` to export.
+	//	* names - If present, the first is the api.FunctionDefinition name.
+	//	  If any follow, they must match the count of goFunc's parameters.
 	//
-	// Noting a context exception described later, all parameters or result types must match WebAssembly 1.0 (20191205) value
-	// types. This means uint32, uint64, float32 or float64. Up to one result can be returned.
+	// Ex.
+	//	// Just export the function, and use "abort" in stack traces.
+	// 	builder.ExportFunction("abort", env.abort)
+	//	// Ensure "~lib/builtins/abort" is used in stack traces.
+	//	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort")
+	//	// Allow function listeners to know the param names for logging, etc.
+	//	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort",
+	//		"message", "fileName", "lineNumber", "columnNumber")
+	//
+	// Valid Signature
+	//
+	// Noting a context exception described later, all parameters or result
+	// types must match WebAssembly 1.0 (20191205) value types. This means
+	// uint32, uint64, float32 or float64. Up to one result can be returned.
 	//
 	// Ex. This is a valid host function:
 	//
-	//	addInts := func(x uint32, uint32) uint32 {
+	//	addInts := func(x, y uint32) uint32 {
 	//		return x + y
 	//	}
 	//
-	// Host functions may also have an initial parameter (param[0]) of type context.Context or api.Module.
+	// Host functions may also have an initial parameter (param[0]) of type
+	// context.Context or api.Module.
 	//
 	// Ex. This uses a Go Context:
 	//
-	//	addInts := func(ctx context.Context, x uint32, uint32) uint32 {
+	//	addInts := func(ctx context.Context, x, y uint32) uint32 {
 	//		// add a little extra if we put some in the context!
 	//		return x + y + ctx.Value(extraKey).(uint32)
 	//	}
 	//
-	// Ex. This uses an api.Module to reads the parameters from memory. This is important because there are only numeric
-	// types in Wasm. The only way to share other data is via writing memory and sharing offsets.
+	// Ex. This uses an api.Module to reads the parameters from memory. This is
+	// important because there are only numeric types in Wasm. The only way to
+	// share other data is via writing memory and sharing offsets.
 	//
 	//	addInts := func(ctx context.Context, m api.Module, offset uint32) uint32 {
 	//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
@@ -78,16 +98,17 @@ type ModuleBuilder interface {
 	//		return x + y
 	//	}
 	//
-	// If both parameters exist, they must be in order at positions zero and one.
+	// If both parameters exist, they must be in order at positions 0 and 1.
 	//
-	// Ex. This uses propagates context properly when calling other functions exported in the api.Module:
+	// Ex. This uses propagates context properly when calling other functions
+	// exported in the api.Module:
 	//	callRead := func(ctx context.Context, m api.Module, offset, byteCount uint32) uint32 {
 	//		fn = m.ExportedFunction("__read")
 	//		results, err := fn(ctx, offset, byteCount)
 	//	--snip--
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	ExportFunction(name string, goFunc interface{}) ModuleBuilder
+	ExportFunction(exportName string, goFunc interface{}, names ...string) ModuleBuilder
 
 	// ExportFunctions is a convenience that calls ExportFunction for each key/value in the provided map.
 	ExportFunctions(nameToGoFunc map[string]interface{}) ModuleBuilder
@@ -200,6 +221,7 @@ type moduleBuilder struct {
 	r            *runtime
 	moduleName   string
 	nameToGoFunc map[string]interface{}
+	funcToNames  map[string][]string
 	nameToMemory map[string]*wasm.Memory
 	nameToGlobal map[string]*wasm.Global
 }
@@ -210,14 +232,18 @@ func (r *runtime) NewModuleBuilder(moduleName string) ModuleBuilder {
 		r:            r,
 		moduleName:   moduleName,
 		nameToGoFunc: map[string]interface{}{},
+		funcToNames:  map[string][]string{},
 		nameToMemory: map[string]*wasm.Memory{},
 		nameToGlobal: map[string]*wasm.Global{},
 	}
 }
 
 // ExportFunction implements ModuleBuilder.ExportFunction
-func (b *moduleBuilder) ExportFunction(name string, goFunc interface{}) ModuleBuilder {
-	b.nameToGoFunc[name] = goFunc
+func (b *moduleBuilder) ExportFunction(exportName string, goFunc interface{}, names ...string) ModuleBuilder {
+	b.nameToGoFunc[exportName] = goFunc
+	if len(names) > 0 {
+		b.funcToNames[exportName] = names
+	}
 	return b
 }
 
@@ -295,8 +321,13 @@ func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (Com
 		}
 	}
 
-	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
+	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.funcToNames, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
 	if err != nil {
+		return nil, err
+	}
+
+	c := &compiledModule{module: module, compiledEngine: b.r.store.Engine}
+	if c.listeners, err = buildListeners(ctx, b.r, module); err != nil {
 		return nil, err
 	}
 
@@ -304,7 +335,7 @@ func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (Com
 		return nil, err
 	}
 
-	return &compiledModule{module: module, compiledEngine: b.r.store.Engine}, nil
+	return c, nil
 }
 
 // Instantiate implements ModuleBuilder.Instantiate
