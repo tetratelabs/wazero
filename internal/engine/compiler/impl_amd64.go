@@ -900,6 +900,7 @@ func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
 	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
 	// Plus, x2.register is no longer used.
 	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(selectorReg)
 	return nil
 }
 
