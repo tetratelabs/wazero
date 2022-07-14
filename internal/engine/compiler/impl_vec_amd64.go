@@ -308,7 +308,7 @@ func (c *amd64Compiler) compileV128ExtractLane(o *wazeroir.OperationV128ExtractL
 		}
 		c.assembler.CompileRegisterToRegisterWithArg(amd64.PEXTRB, val.register, result, o.LaneIndex)
 		if o.Signed {
-			c.assembler.CompileRegisterToRegister(amd64.MOVBQSX, result, result)
+			c.assembler.CompileRegisterToRegister(amd64.MOVBLSX, result, result)
 		} else {
 			c.assembler.CompileRegisterToRegister(amd64.MOVBLZX, result, result)
 		}

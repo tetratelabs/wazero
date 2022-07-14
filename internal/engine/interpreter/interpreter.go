@@ -2279,7 +2279,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 				if op.b3 {
 					// sign-extend.
-					v = uint64(int8(u8))
+					v = uint64(uint32(int8(u8)))
 				} else {
 					v = uint64(u8)
 				}
@@ -2292,7 +2292,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 				if op.b3 {
 					// sign-extend.
-					v = uint64(int16(u16))
+					v = uint64(uint32(int16(u16)))
 				} else {
 					v = uint64(u16)
 				}
