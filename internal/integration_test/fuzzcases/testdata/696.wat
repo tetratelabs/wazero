@@ -31,12 +31,12 @@
     )
   )
 
-  (func (export "select with 1 / after calling dummy")
+  (func (export "typed select with 1 / after calling dummy")
     v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
     v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
     i32.const 1 ;; choose 0xffffffffffffffff lane.
     call 0  ;; calling dummy function before select to
-    select
+    select (result v128)
     ;; check the equality.
     i64x2.extract_lane 0
     i64.const 0xffffffffffffffff
@@ -47,11 +47,11 @@
     )
   )
 
-  (func (export "select with 1")
+  (func (export "typed select with 1")
     v128.const i64x2 0xffffffffffffffff 0xffffffffffffffff
     v128.const i64x2 0xeeeeeeeeeeeeeeee 0xeeeeeeeeeeeeeeee
     i32.const 1 ;; choose 0xffffffffffffffff lane.
-    select
+    select (result v128)
     ;; check the equality.
     i64x2.extract_lane 0
     i64.const 0xffffffffffffffff

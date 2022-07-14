@@ -754,12 +754,20 @@ operatorSwitch:
 			&OperationDrop{Depth: r},
 		)
 	case wasm.OpcodeSelect:
+		// If it is on the unreachable state, ignore the instruction.
+		if c.unreachableState.on {
+			break operatorSwitch
+		}
 		c.emit(
 			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
 		c.pc += 2
+		// If it is on the unreachable state, ignore the instruction.
+		if c.unreachableState.on {
+			break operatorSwitch
+		}
 		// Typed select is semantically equivalent to select at runtime.
 		c.emit(
 			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
