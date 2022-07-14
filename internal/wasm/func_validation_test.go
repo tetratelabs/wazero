@@ -3348,3 +3348,36 @@ func TestDecodeBlockType(t *testing.T) {
 		}
 	})
 }
+
+// TestFuncValidation_UnreachableBrTable_NotModifyTypes ensures that we do not modify the
+// original function type during the function validation with the presence of unreachable br_table
+// targeting the function return label.
+func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
+	funcType := &FunctionType{Params: []ValueType{},
+		// Meaning that the signature of outermost label has non-trivial results.
+		Results: []ValueType{i32, i64},
+	}
+	m := &Module{
+		TypeSection:     []*FunctionType{funcType},
+		FunctionSection: []Index{0},
+		CodeSection: []*Code{
+			{Body: []byte{
+				OpcodeUnreachable,
+				// Having br_table in unreachable state.
+				OpcodeI32Const, 1,
+				// Setting the destination as lalbels of index 0 which
+				// is the function return. Therefore, the expected value types
+				// for each label can be "any".
+				OpcodeBrTable, 0, 0, 0,
+				OpcodeEnd,
+			}},
+		},
+	}
+	err := m.validateFunction(FeatureReferenceTypes, 0, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	afterValidationResultTypes := funcType.Results
+	require.Equal(t, 2, len(afterValidationResultTypes))
+	require.Equal(t, i32, afterValidationResultTypes[0])
+	require.Equal(t, i64, afterValidationResultTypes[1])
+}

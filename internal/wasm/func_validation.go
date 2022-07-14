@@ -464,11 +464,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
-			expTypes := lnLabel.blockType.Results
-			if lnLabel.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
-				expTypes = []ValueType{}
+			var expTypes []ValueType
+			if lnLabel.op != OpcodeLoop { // Loop operation doesn't require results since the continuation is the beginning of the loop.
+				expTypes = make([]ValueType, len(lnLabel.blockType.Results))
+				// Below, we might modify the slice in case of unreachable. Therefore,
+				// we have to copy the content of block result types, otherwise the original
+				// function type might result in invalid value types if the block is the outermost label
+				// which equals the function's type.
+				copy(expTypes, lnLabel.blockType.Results)
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
