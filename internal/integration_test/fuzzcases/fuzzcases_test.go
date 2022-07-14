@@ -3,6 +3,7 @@ package fuzzcases
 import (
 	"context"
 	_ "embed"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
 
@@ -26,6 +27,10 @@ func newRuntimeInterpreter() wazero.Runtime {
 
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test695(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
 	for _, tc := range []struct {
 		name string
 		r    wazero.Runtime
