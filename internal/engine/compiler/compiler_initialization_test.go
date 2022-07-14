@@ -111,10 +111,10 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			ce := env.callEngine()
 
 			ir := &wazeroir.CompilationResult{
-				HasMemory:                     tc.moduleInstance.Memory != nil,
-				HasTable:                      len(tc.moduleInstance.Tables) > 0,
-				NeedsAccessToDataInstances:    len(tc.moduleInstance.DataInstances) > 0,
-				NeedsAccessToElementInstances: len(tc.moduleInstance.ElementInstances) > 0,
+				HasMemory:           tc.moduleInstance.Memory != nil,
+				HasTable:            len(tc.moduleInstance.Tables) > 0,
+				HasDataInstances:    len(tc.moduleInstance.DataInstances) > 0,
+				HasElementInstances: len(tc.moduleInstance.ElementInstances) > 0,
 			}
 			for _, g := range tc.moduleInstance.Globals {
 				ir.Globals = append(ir.Globals, g.Type)

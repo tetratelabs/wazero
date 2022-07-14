@@ -241,13 +241,13 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			&OperationDataDrop{1},                 // []
 			&OperationBr{Target: &BranchTarget{}}, // return!
 		},
-		HasMemory:                  true,
-		NeedsAccessToDataInstances: true,
-		LabelCallers:               map[string]uint32{},
-		Signature:                  v_v,
-		Functions:                  []wasm.Index{0},
-		Types:                      []*wasm.FunctionType{v_v},
-		TableTypes:                 []wasm.RefType{},
+		HasMemory:        true,
+		HasDataInstances: true,
+		LabelCallers:     map[string]uint32{},
+		Signature:        v_v,
+		Functions:        []wasm.Index{0},
+		Types:            []*wasm.FunctionType{v_v},
+		TableTypes:       []wasm.RefType{},
 	}
 
 	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)

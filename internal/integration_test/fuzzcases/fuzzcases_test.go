@@ -17,6 +17,8 @@ var (
 	case695 []byte
 	//go:embed testdata/696.wasm
 	case696 []byte
+	//go:embed testdata/699.wasm
+	case699 []byte
 )
 
 func newRuntimeCompiler() wazero.Runtime {
@@ -84,6 +86,29 @@ func Test696(t *testing.T) {
 				_, err := module.ExportedFunction(name).Call(ctx)
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// Test699 ensures that accessing element instances and data instances works
+// without crash even when the access happens in the nested function call.
+func Test699(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		r    wazero.Runtime
+	}{
+		{name: "compiler", r: newRuntimeCompiler()},
+		{name: "interpreter", r: newRuntimeInterpreter()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.r.Close(ctx)
+			_, err := tc.r.InstantiateModuleFromBinary(ctx, case699)
+			require.NoError(t, err)
 		})
 	}
 }

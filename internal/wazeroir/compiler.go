@@ -206,10 +206,10 @@ type CompilationResult struct {
 	HasMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
-	// NeedsAccessToDataInstances is true if the function needs access to data instances via memory.init or data.drop instructions.
-	NeedsAccessToDataInstances bool
-	// NeedsAccessToDataInstances is true if the function needs access to element instances via table.init or elem.drop instructions.
-	NeedsAccessToElementInstances bool
+	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
+	HasDataInstances bool
+	// HasDataInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
+	HasElementInstances bool
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
@@ -220,7 +220,8 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		return nil, err
 	}
 
-	hasMemory, hasTable := mem != nil, len(tables) > 0
+	hasMemory, hasTable, hasDataInstances, hasElementInstances := mem != nil, len(tables) > 0,
+		len(module.DataSection) > 0, len(module.ElementSection) > 0
 
 	tableTypes := make([]wasm.ValueType, len(tables))
 	for i := range tableTypes {
@@ -242,6 +243,8 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		r.Types = module.TypeSection
 		r.HasMemory = hasMemory
 		r.HasTable = hasTable
+		r.HasDataInstances = hasDataInstances
+		r.HasElementInstances = hasElementInstances
 		r.Signature = sig
 		r.TableTypes = tableTypes
 		ret = append(ret, r)
@@ -1668,7 +1671,6 @@ operatorSwitch:
 			c.emit(
 				&OperationMemoryInit{DataIndex: dataIndex},
 			)
-			c.result.NeedsAccessToDataInstances = true
 		case wasm.OpcodeMiscDataDrop:
 			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
@@ -1678,7 +1680,6 @@ operatorSwitch:
 			c.emit(
 				&OperationDataDrop{DataIndex: dataIndex},
 			)
-			c.result.NeedsAccessToDataInstances = true
 		case wasm.OpcodeMiscMemoryCopy:
 			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
 			c.emit(
@@ -1704,7 +1705,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableInit{ElemIndex: elemIndex, TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscElemDrop:
 			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
@@ -1714,7 +1714,6 @@ operatorSwitch:
 			c.emit(
 				&OperationElemDrop{ElemIndex: elemIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table index.
 			dst, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1732,7 +1731,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableGrow:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1743,7 +1741,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableGrow{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableSize:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1754,7 +1751,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableSize{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableFill:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1765,7 +1761,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableFill{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}
