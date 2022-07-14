@@ -4992,7 +4992,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update dataInstancesElement0Address.
-	if c.ir.NeedsAccessToDataInstances {
+	if c.ir.HasDataInstances {
 		// "tmpRegister = &moduleInstance.DataInstances[0]"
 		c.assembler.CompileMemoryToRegister(
 			amd64.MOVQ,
@@ -5008,7 +5008,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update callEngine.moduleContext.elementInstancesElement0Address
-	if c.ir.NeedsAccessToElementInstances {
+	if c.ir.HasElementInstances {
 		// "tmpRegister = &moduleInstance.ElementInstnaces[0]"
 		c.assembler.CompileMemoryToRegister(
 			amd64.MOVQ,

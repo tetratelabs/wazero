@@ -4323,7 +4323,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update dataInstancesElement0Address.
-	if c.ir.NeedsAccessToDataInstances {
+	if c.ir.HasDataInstances {
 		// "tmpX = &moduleInstance.DataInstances[0]"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
@@ -4339,7 +4339,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update callEngine.moduleContext.elementInstancesElement0Address
-	if c.ir.NeedsAccessToElementInstances {
+	if c.ir.HasElementInstances {
 		// "tmpX = &moduleInstance.DataInstances[0]"
 		c.assembler.CompileMemoryToRegister(
 			arm64.MOVD,
