@@ -388,6 +388,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Depth
 		case *wazeroir.OperationSelect:
+			op.b3 = o.IsTargetVector
 		case *wazeroir.OperationPick:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.Depth)
@@ -899,10 +900,19 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			frame.pc++
 		case wazeroir.OperationKindSelect:
 			c := ce.popValue()
-			v2 := ce.popValue()
-			if c == 0 {
-				_ = ce.popValue()
-				ce.pushValue(v2)
+			if op.b3 { // Target is vector.
+				x2Hi, x2Lo := ce.popValue(), ce.popValue()
+				if c == 0 {
+					_, _ = ce.popValue(), ce.popValue() // discard the x1's lo and hi bits.
+					ce.pushValue(x2Lo)
+					ce.pushValue(x2Hi)
+				}
+			} else {
+				v2 := ce.popValue()
+				if c == 0 {
+					_ = ce.popValue()
+					ce.pushValue(v2)
+				}
 			}
 			frame.pc++
 		case wazeroir.OperationKindPick:

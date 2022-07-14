@@ -884,7 +884,7 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 		case *wazeroir.OperationDrop:
 			err = compiler.compileDrop(o)
 		case *wazeroir.OperationSelect:
-			err = compiler.compileSelect()
+			err = compiler.compileSelect(o)
 		case *wazeroir.OperationPick:
 			err = compiler.compilePick(o)
 		case *wazeroir.OperationSwap:

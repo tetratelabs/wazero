@@ -1286,11 +1286,43 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
+func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x1); err != nil {
+		return err
+	}
+
+	c.assembler.CompileTwoRegistersToNone(arm64.CMPW, arm64.RegRZR, selectorRegister)
+	brIfNotZero := c.assembler.CompileJump(arm64.BCONDNE)
+
+	// In this branch, we select the value of x2, so we move the value into x1.register so that
+	// we can have the result in x1.register regardless of the selection.
+	c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.VORR,
+		x2.register, x2.register, x1.register, arm64.VectorArrangement16B)
+
+	c.assembler.SetJumpTargetOnNext(brIfNotZero)
+
+	// As noted, the result exists in x1.register regardless of the selector.
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	// Plus, x2.register is no longer used.
+	c.markRegisterUnused(x2.register)
+	return nil
+}
+
 // compileSelect implements compiler.compileSelect for the arm64 architecture.
-func (c *arm64Compiler) compileSelect() error {
+func (c *arm64Compiler) compileSelect(o *wazeroir.OperationSelect) error {
 	cv, err := c.popValueOnRegister()
 	if err != nil {
 		return err
+	}
+
+	if o.IsTargetVector {
+		return c.compileSelectV128Impl(cv.register)
 	}
 
 	c.markRegisterUsed(cv.register)

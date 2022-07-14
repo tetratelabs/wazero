@@ -7280,3 +7280,58 @@ func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
 		})
 	}
 }
+
+// TestCompiler_compileSelect_v128 is for select instructions on vector values.
+func TestCompiler_compileSelect_v128(t *testing.T) {
+	const x1Lo, x1Hi = uint64(0x1), uint64(0x2)
+	const x2Lo, x2Hi = uint64(0x3), uint64(0x4)
+
+	for _, selector := range []uint32{0, 1} {
+		env := newCompilerEnvironment()
+		compiler := env.requireNewCompiler(t, newCompiler,
+			&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+			Lo: x1Lo,
+			Hi: x1Hi,
+		})
+		require.NoError(t, err)
+
+		err = compiler.compileV128Const(&wazeroir.OperationV128Const{
+			Lo: x2Lo,
+			Hi: x2Hi,
+		})
+		require.NoError(t, err)
+
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: selector})
+		require.NoError(t, err)
+
+		err = compiler.compileSelect(&wazeroir.OperationSelect{IsTargetVector: true})
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+		require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
+
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
+
+		// Generate and run the code under test.
+		code, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
+
+		lo, hi := env.stackTopAsV128()
+		if selector == 0 {
+			require.Equal(t, x2Lo, lo)
+			require.Equal(t, x2Hi, hi)
+		} else {
+			require.Equal(t, x1Lo, lo)
+			require.Equal(t, x1Hi, hi)
+		}
+	}
+}

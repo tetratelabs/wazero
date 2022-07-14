@@ -1525,7 +1525,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				pc++
 				tp := body[pc]
 				if tp != ValueTypeI32 && tp != ValueTypeI64 && tp != ValueTypeF32 && tp != ValueTypeF64 &&
-					tp != api.ValueTypeExternref && tp != ValueTypeFuncref {
+					tp != api.ValueTypeExternref && tp != ValueTypeFuncref && tp != ValueTypeV128 {
 					return fmt.Errorf("invalid type %s for %s", ValueTypeName(tp), OpcodeTypedSelectName)
 				}
 			} else if isReferenceValueType(v1) || isReferenceValueType(v2) {

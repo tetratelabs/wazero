@@ -871,14 +871,51 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
+// compileSelectV128Impl implements compileSelect for vector values.
+func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x1); err != nil {
+		return err
+	}
+
+	// Compare the conditional value with zero.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, selectorReg, 0)
+
+	// Set the jump if the top value is not zero.
+	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
+
+	// In this branch, we select the value of x2, so we move the value into x1.register so that
+	// we can have the result in x1.register regardless of the selection.
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQU, x2.register, x1.register)
+
+	// Else, we don't need to adjust value, just need to jump to the next instruction.
+	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
+
+	// As noted, the result exists in x1.register regardless of the selector.
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	// Plus, x2.register is no longer used.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(selectorReg)
+	return nil
+}
+
 // compileSelect implements compiler.compileSelect for the amd64 architecture.
 //
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
-func (c *amd64Compiler) compileSelect() error {
+func (c *amd64Compiler) compileSelect(o *wazeroir.OperationSelect) error {
 	cv := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
+	}
+
+	if o.IsTargetVector {
+		return c.compileSelectV128Impl(cv.register)
 	}
 
 	x2 := c.locationStack.pop()
