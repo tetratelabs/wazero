@@ -6,6 +6,8 @@ import (
 )
 
 // ImportedFunctions returns the definitions of each imported function.
+//
+// Note: Unlike ExportedFunctions, there is no unique constraint on imports.
 func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 	for _, d := range m.FunctionDefinitionSection {
 		if d.importDesc != nil {
@@ -16,13 +18,14 @@ func (m *Module) ImportedFunctions() (ret []api.FunctionDefinition) {
 }
 
 // ExportedFunctions returns the definitions of each exported function.
-func (m *Module) ExportedFunctions() (ret []api.FunctionDefinition) {
+func (m *Module) ExportedFunctions() map[string]api.FunctionDefinition {
+	ret := map[string]api.FunctionDefinition{}
 	for _, d := range m.FunctionDefinitionSection {
-		if d.exportNames != nil {
-			ret = append(ret, d)
+		for _, e := range d.exportNames {
+			ret[e] = d
 		}
 	}
-	return
+	return ret
 }
 
 // BuildFunctionDefinitions generates function metadata that can be parsed from

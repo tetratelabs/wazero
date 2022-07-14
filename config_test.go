@@ -689,6 +689,7 @@ func TestModuleConfig_toSysContext_Errors(t *testing.T) {
 		})
 	}
 }
+
 func TestModuleConfig_clone(t *testing.T) {
 	mc := NewModuleConfig().(*moduleConfig)
 	cloned := mc.clone()
@@ -707,7 +708,37 @@ func TestModuleConfig_clone(t *testing.T) {
 	require.Nil(t, cloned.fs)
 }
 
-func TestCompiledCode_Close(t *testing.T) {
+func Test_compiledModule_Name(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *compiledModule
+		expected string
+	}{
+		{
+			name:  "no name section",
+			input: &compiledModule{module: &wasm.Module{}},
+		},
+		{
+			name:  "empty name",
+			input: &compiledModule{module: &wasm.Module{NameSection: &wasm.NameSection{}}},
+		},
+		{
+			name:     "name",
+			input:    &compiledModule{module: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "foo"}}},
+			expected: "foo",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, tc.input.Name())
+		})
+	}
+}
+
+func Test_compiledModule_Close(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
 		e := &mockEngine{name: "1", cachedModules: map[*wasm.Module]struct{}{}}
 

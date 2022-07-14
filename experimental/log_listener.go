@@ -12,7 +12,7 @@ import (
 )
 
 // NewLoggingListenerFactory implements FunctionListenerFactory to log all
-// function calls to the writer.
+// functions that have a name to the writer.
 func NewLoggingListenerFactory(writer io.Writer) FunctionListenerFactory {
 	return &loggingListenerFactory{writer}
 }
