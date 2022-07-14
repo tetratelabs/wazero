@@ -786,6 +786,14 @@ func (a *AssemblerImpl) encodeNoneToNone(n *nodeImpl) (err error) {
 	case UD2:
 		// https://mudongliang.github.io/x86/html/file_module_x86_id_318.html
 		_, err = a.buf.Write([]byte{0x0f, 0x0b})
+	case REP_MOVSB:
+		_, err = a.buf.Write([]byte{0xf3, 0xa4})
+	case REP_MOVSQ:
+		_, err = a.buf.Write([]byte{0xf3, RexPrefixW, 0xa5})
+	case STD:
+		_, err = a.buf.Write([]byte{0xfd})
+	case CLD:
+		_, err = a.buf.Write([]byte{0xfc})
 	default:
 		err = errorEncodingUnsupported(n)
 	}
@@ -1197,6 +1205,8 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	UCOMISD: {mandatoryPrefix: 0x66, opcode: []byte{0x0f, 0x2e}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/ucomiss
 	UCOMISS: {opcode: []byte{0x0f, 0x2e}, requireSrcFloat: true, requireDstFloat: true},
+	// https://www.felixcloutier.com/x86/xchg
+	XCHGQ: {opcode: []byte{0x87}, rPrefix: RexPrefixW, srcOnModRMReg: true},
 	// https://www.felixcloutier.com/x86/xor
 	XORL: {opcode: []byte{0x31}, srcOnModRMReg: true},
 	XORQ: {opcode: []byte{0x31}, rPrefix: RexPrefixW, srcOnModRMReg: true},
@@ -2115,6 +2125,17 @@ func (a *AssemblerImpl) encodeConstToRegister(n *nodeImpl) (err error) {
 		} else {
 			a.WriteConst(n.srcConst, 32)
 		}
+	case TESTQ:
+		// https://www.felixcloutier.com/x86/test
+		rexPrefix |= RexPrefixW
+		if n.dstReg == RegAX && !isSigned8bitConst {
+			a.buf.Write([]byte{rexPrefix, 0xa9})
+		} else {
+			modRM := 0b11_000_000 | // Specifying that operand is register
+				regBits
+			a.buf.Write([]byte{rexPrefix, 0xf7, modRM})
+		}
+		a.WriteConst(n.srcConst, 32)
 	case MOVL:
 		// https://www.felixcloutier.com/x86/mov
 		if rexPrefix != RexPrefixNone {

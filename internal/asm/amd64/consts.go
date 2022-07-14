@@ -67,6 +67,8 @@ const (
 	BSRQ
 	// CDQ is the CDQ instruction. https://www.felixcloutier.com/x86/cwd:cdq:cqo
 	CDQ
+	// CLD is the CLD instruction. https://www.felixcloutier.com/x86/cld
+	CLD
 	// CMOVQCS is the CMOVC (move if carry) instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmovcc
 	CMOVQCS
 	// CMPL is the CMP instruction in 32-bit mode. https://www.felixcloutier.com/x86/cmp
@@ -215,6 +217,10 @@ const (
 	PSRLD
 	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
+	// REP_MOVSB is a combination of REP MOVSB instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REP_MOVSB
+	// REP_MOVSB is a combination of REP MOVSQ instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REP_MOVSQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
 	// ROLQ is the ROL instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
@@ -271,6 +277,8 @@ const (
 	SQRTSD
 	// SQRTSS is the SQRTSS instruction. https://www.felixcloutier.com/x86/sqrtss
 	SQRTSS
+	// STD is the STD instruction. https://www.felixcloutier.com/x86/std
+	STD
 	// SUBL is the SUB instruction in 32-bit mode. https://www.felixcloutier.com/x86/sub
 	SUBL
 	// SUBQ is the SUB instruction in 64-bit mode. https://www.felixcloutier.com/x86/sub
@@ -299,6 +307,8 @@ const (
 	XORPS
 	// XORQ is the XOR instruction in 64-bit mode. https://www.felixcloutier.com/x86/xor
 	XORQ
+	// XCHGQ is the XCHG instruction. https://www.felixcloutier.com/x86/xchg
+	XCHGQ
 	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	RET
 	// JMP is the JMP instruction. https://www.felixcloutier.com/x86/jmp
