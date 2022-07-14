@@ -3,11 +3,11 @@ package fuzzcases
 import (
 	"context"
 	_ "embed"
-	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 var ctx = context.Background()
