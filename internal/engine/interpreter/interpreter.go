@@ -2429,23 +2429,23 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 			case wazeroir.ShapeI16x8:
 				for i := 0; i < 4; i++ {
-					if int8(lo>>(i*16)) < 0 {
+					if int16(lo>>(i*16)) < 0 {
 						res |= 1 << i
 					}
 				}
 				for i := 0; i < 4; i++ {
-					if int8(hi>>(i*16)) < 0 {
+					if int16(hi>>(i*16)) < 0 {
 						res |= 1 << (i + 4)
 					}
 				}
 			case wazeroir.ShapeI32x4:
 				for i := 0; i < 2; i++ {
-					if int8(lo>>(i*32)) < 0 {
+					if int32(lo>>(i*32)) < 0 {
 						res |= 1 << i
 					}
 				}
 				for i := 0; i < 2; i++ {
-					if int8(hi>>(i*32)) < 0 {
+					if int32(hi>>(i*32)) < 0 {
 						res |= 1 << (i + 2)
 					}
 				}
