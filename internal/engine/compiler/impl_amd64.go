@@ -3598,21 +3598,42 @@ func (c *amd64Compiler) compileLoadDataInstanceAddress(dataIndex uint32, dst asm
 	)
 }
 
-// compileMemoryCopy implements compiler.compileMemoryCopy for the amd64 architecture.
-func (c *amd64Compiler) compileMemoryCopy() error {
-	return c.compileCopyImpl(false, 0, 0)
-}
+func (c *amd64Compiler) compileCopyLoopImpl(sourceOffset, destinationOffset, copySize asm.Register, backwards bool, bwOffset uint8) {
+	// skip if nothing to copy
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize, 0)
+	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
 
-// compileCopyImpl implements compileTableCopy and compileMemoryCopy.
-//
-// TODO: the compiled code in this function should be reused and compile at once as
-// the code is independent of any module.
-func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableIndex uint32) error {
-	outOfBoundsErrorStatus := nativeCallStatusCodeMemoryOutOfBounds
-	if isTable {
-		outOfBoundsErrorStatus = nativeCallStatusCodeInvalidTableAccess
+	// prepare registers for REP MOVSQ: copy from rsi to rdi, rcx times
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, destinationOffset, amd64.RegDI)
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, sourceOffset, amd64.RegSI)
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, copySize, amd64.RegCX)
+
+	// point on first quadword to copy
+	if backwards {
+		c.assembler.CompileConstToRegister(amd64.ADDQ, -int64(bwOffset), amd64.RegDI)
+		c.assembler.CompileConstToRegister(amd64.ADDQ, -int64(bwOffset), amd64.RegSI)
+		// rep direction backwards
+		c.assembler.CompileStandAlone(amd64.STD)
 	}
 
+	c.assembler.CompileStandAlone(amd64.REPMOVSQ)
+
+	if backwards {
+		// reset direction
+		c.assembler.CompileStandAlone(amd64.CLD)
+	}
+
+	// restore registers
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, destinationOffset, amd64.RegDI)
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, sourceOffset, amd64.RegSI)
+	c.assembler.CompileRegisterToRegister(amd64.XCHGQ, copySize, amd64.RegCX)
+
+	c.assembler.SetJumpTargetOnNext(emptyEightGroupsJump)
+	c.assembler.CompileStandAlone(amd64.NOP)
+}
+
+// compileMemoryCopy implements compiler.compileMemoryCopy for the amd64 architecture.
+func (c *amd64Compiler) compileMemoryCopy() error {
 	copySize := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(copySize); err != nil {
 		return err
@@ -3632,34 +3653,25 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 	if err != nil {
 		return err
 	}
+	c.locationStack.markRegisterUsed(tmp)
 
 	// sourceOffset += size.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, sourceOffset.register)
 	// destinationOffset += size.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
 
-	checkBounds := func(reg asm.Register) asm.Node {
-		if isTable {
-			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-			c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
-			// Compare length.
-			c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, reg)
-		} else {
-			c.assembler.CompileMemoryToRegister(amd64.CMPQ,
-				amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
-				reg)
-		}
-		return c.assembler.CompileJump(amd64.JCC)
-	}
-
 	// Check source bounds and if exceeds the length, exit with out of bounds error.
-	sourceBoundOKJump := checkBounds(sourceOffset.register)
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, sourceOffset.register)
+	sourceBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 	c.assembler.SetJumpTargetOnNext(sourceBoundOKJump)
 
 	// Check destination bounds and if exceeds the length, exit with out of bounds error.
-	destinationBoundOKJump := checkBounds(destinationOffset.register)
-	c.compileExitFromNativeCode(outOfBoundsErrorStatus)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
+		amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, destinationOffset.register)
+	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
 
 	// skip zero size
@@ -3686,81 +3698,36 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 			c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, destinationOffset.register)
 		}
 
-		if isTable {
-			// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
-			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, sourceOffset.register)
-			c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
-			// destinationOffset += table buffer's absolute address.
-			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
-			// sourceOffset += table buffer's absolute address.
-			c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
-			c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(srcTableIndex*8), tmp)
-			c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, sourceOffset.register)
+		// destinationOffset += memory buffer's absolute address.
+		c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
+		// sourceOffset += memory buffer's absolute address.
+		c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, sourceOffset.register)
+
+		beginLoop := c.assembler.CompileStandAlone(amd64.NOP)
+
+		// check copySize % 8 == 0
+		c.assembler.CompileConstToRegister(amd64.TESTQ, 7, copySize.register)
+		breakLoop := c.assembler.CompileJump(amd64.JEQ)
+
+		c.assembler.CompileMemoryToRegister(amd64.MOVBQZX, sourceOffset.register, 0, tmp)
+		c.assembler.CompileRegisterToMemory(amd64.MOVB, tmp, destinationOffset.register, 0)
+
+		if backwards {
+			c.assembler.CompileNoneToRegister(amd64.DECQ, sourceOffset.register)
+			c.assembler.CompileNoneToRegister(amd64.DECQ, destinationOffset.register)
 		} else {
-			// destinationOffset += memory buffer's absolute address.
-			c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
-			// sourceOffset += memory buffer's absolute address.
-			c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, sourceOffset.register)
+			c.assembler.CompileNoneToRegister(amd64.INCQ, sourceOffset.register)
+			c.assembler.CompileNoneToRegister(amd64.INCQ, destinationOffset.register)
 		}
 
-		// handle copySize % 8 in manual mov loop
-		if !isTable {
-			beginLoop := c.assembler.CompileStandAlone(amd64.NOP)
+		c.assembler.CompileNoneToRegister(amd64.DECQ, copySize.register)
+		c.assembler.CompileJump(amd64.JMP).AssignJumpTarget(beginLoop)
 
-			// check copySize % 8 == 0
-			c.assembler.CompileConstToRegister(amd64.TESTQ, 7, copySize.register)
-			breakLoop := c.assembler.CompileJump(amd64.JEQ)
+		c.assembler.SetJumpTargetOnNext(breakLoop)
+		// copySize /= 8
+		c.assembler.CompileConstToRegister(amd64.SHRQ, 3, copySize.register)
 
-			c.assembler.CompileMemoryToRegister(amd64.MOVBQZX, sourceOffset.register, 0, tmp)
-			c.assembler.CompileRegisterToMemory(amd64.MOVB, tmp, destinationOffset.register, 0)
-
-			if backwards {
-				c.assembler.CompileNoneToRegister(amd64.DECQ, sourceOffset.register)
-				c.assembler.CompileNoneToRegister(amd64.DECQ, destinationOffset.register)
-			} else {
-				c.assembler.CompileNoneToRegister(amd64.INCQ, sourceOffset.register)
-				c.assembler.CompileNoneToRegister(amd64.INCQ, destinationOffset.register)
-			}
-
-			c.assembler.CompileNoneToRegister(amd64.DECQ, copySize.register)
-			c.assembler.CompileJump(amd64.JMP).AssignJumpTarget(beginLoop)
-
-			c.assembler.SetJumpTargetOnNext(breakLoop)
-			// copySize /= 8
-			c.assembler.CompileConstToRegister(amd64.SHRQ, 3, copySize.register)
-		}
-
-		// skip if nothing to copy
-		c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
-		emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
-
-		// prepare registers for REP MOVSQ: copy from rsi to rdi, rcx times
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, destinationOffset.register, amd64.RegDI)
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, sourceOffset.register, amd64.RegSI)
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, copySize.register, amd64.RegCX)
-
-		// point on first quadword to copy
-		if backwards {
-			c.assembler.CompileConstToRegister(amd64.ADDQ, -7, amd64.RegDI)
-			c.assembler.CompileConstToRegister(amd64.ADDQ, -7, amd64.RegSI)
-			// rep direction backwards
-			c.assembler.CompileStandAlone(amd64.STD)
-		}
-
-		c.assembler.CompileStandAlone(amd64.REP_MOVSQ)
-
-		if backwards {
-			// reset direction
-			c.assembler.CompileStandAlone(amd64.CLD)
-		}
-
-		// restore registers
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, destinationOffset.register, amd64.RegDI)
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, sourceOffset.register, amd64.RegSI)
-		c.assembler.CompileRegisterToRegister(amd64.XCHGQ, copySize.register, amd64.RegCX)
-
-		c.assembler.SetJumpTargetOnNext(emptyEightGroupsJump)
-		c.assembler.CompileStandAlone(amd64.NOP)
+		c.compileCopyLoopImpl(sourceOffset.register, destinationOffset.register, copySize.register, backwards, 7)
 	}
 
 	// copy backwards
@@ -3774,6 +3741,7 @@ func (c *amd64Compiler) compileCopyImpl(isTable bool, srcTableIndex, dstTableInd
 	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
 		destinationOffset.register, tmp)
 	c.assembler.SetJumpTargetOnNext(skipJump, endJump)
+
 	return nil
 }
 
@@ -3891,7 +3859,95 @@ func (c *amd64Compiler) compileTableInit(o *wazeroir.OperationTableInit) error {
 
 // compileTableCopy implements compiler.compileTableCopy for the amd64 architecture.
 func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
-	return c.compileCopyImpl(true, o.SrcTableIndex, o.DstTableIndex)
+	copySize := c.locationStack.pop()
+	if err := c.compileEnsureOnRegister(copySize); err != nil {
+		return err
+	}
+
+	sourceOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnRegister(sourceOffset); err != nil {
+		return err
+	}
+
+	destinationOffset := c.locationStack.pop()
+	if err := c.compileEnsureOnRegister(destinationOffset); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
+	if err != nil {
+		return err
+	}
+
+	// sourceOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, sourceOffset.register)
+	// destinationOffset += size.
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, copySize.register, destinationOffset.register)
+
+	// Check source bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.SrcTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, sourceOffset.register)
+	sourceBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
+	c.assembler.SetJumpTargetOnNext(sourceBoundOKJump)
+
+	// Check destination bounds and if exceeds the length, exit with out of bounds error.
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.DstTableIndex*8), tmp)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, tmp, tableInstanceTableLenOffset, destinationOffset.register)
+	destinationBoundOKJump := c.assembler.CompileJump(amd64.JCC)
+	c.compileExitFromNativeCode(nativeCallStatusCodeInvalidTableAccess)
+	c.assembler.SetJumpTargetOnNext(destinationBoundOKJump)
+
+	// skip zero size
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
+	skipJump := c.assembler.CompileJump(amd64.JEQ)
+
+	// If dest < source, we can copy forwards
+	c.assembler.CompileRegisterToRegister(amd64.CMPQ, destinationOffset.register, sourceOffset.register)
+	destLowerThanSourceJump := c.assembler.CompileJump(amd64.JLS)
+
+	// if source + size < dest, we can copy forwards
+	c.assembler.CompileRegisterToRegister(amd64.MOVQ, destinationOffset.register, tmp)
+	c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, tmp)
+	c.assembler.CompileRegisterToRegister(amd64.CMPQ, sourceOffset.register, tmp)
+	sourceBoundLowerThanDestJump := c.assembler.CompileJump(amd64.JLS)
+
+	assembleCopySection := func(backwards bool) {
+		// point on first byte to be copied
+		if !backwards {
+			c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, sourceOffset.register)
+			c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, destinationOffset.register)
+		}
+
+		// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
+		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, sourceOffset.register)
+		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
+		// destinationOffset += table buffer's absolute address.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.DstTableIndex*8), tmp)
+		c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
+		// sourceOffset += table buffer's absolute address.
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextTablesElement0AddressOffset, tmp)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmp, int64(o.SrcTableIndex*8), tmp)
+		c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, sourceOffset.register)
+
+		c.compileCopyLoopImpl(sourceOffset.register, destinationOffset.register, copySize.register, backwards, 8)
+	}
+
+	// copy backwards
+	assembleCopySection(true)
+	endJump := c.assembler.CompileJump(amd64.JMP)
+
+	// copy forwards
+	c.assembler.SetJumpTargetOnNext(destLowerThanSourceJump, sourceBoundLowerThanDestJump)
+	assembleCopySection(false)
+
+	c.locationStack.markRegisterUnused(copySize.register, sourceOffset.register,
+		destinationOffset.register, tmp)
+	c.assembler.SetJumpTargetOnNext(skipJump, endJump)
+	return nil
 }
 
 // compileElemDrop implements compiler.compileElemDrop for the amd64 architecture.
