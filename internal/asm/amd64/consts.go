@@ -217,10 +217,10 @@ const (
 	PSRLD
 	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
-	// REP_MOVSB is a combination of REP MOVSB instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
-	REP_MOVSB
-	// REP_MOVSB is a combination of REP MOVSQ instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
-	REP_MOVSQ
+	// REPMOVSB is a combination of REP MOVSB instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REPMOVSB
+	// REPMOVSB is a combination of REP MOVSQ instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REPMOVSQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
 	// ROLQ is the ROL instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
@@ -595,6 +595,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "BSRQ"
 	case CDQ:
 		return "CDQ"
+	case CLD:
+		return "CLD"
 	case CMOVQCS:
 		return "CMOVQCS"
 	case CMPL:
@@ -741,6 +743,10 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PSRLD"
 	case PSRLQ:
 		return "PSRLQ"
+	case REPMOVSB:
+		return "REP MOVSB"
+	case REPMOVSQ:
+		return "REP MOVSQ"
 	case ROLL:
 		return "ROLL"
 	case ROLQ:
@@ -797,6 +803,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "SQRTSD"
 	case SQRTSS:
 		return "SQRTSS"
+	case STD:
+		return "STD"
 	case SUBL:
 		return "SUBL"
 	case SUBQ:
@@ -825,6 +833,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "XORPS"
 	case XORQ:
 		return "XORQ"
+	case XCHGQ:
+		return "XCHGQ"
 	case RET:
 		return "RET"
 	case JMP:

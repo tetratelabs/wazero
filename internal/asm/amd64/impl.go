@@ -786,9 +786,9 @@ func (a *AssemblerImpl) encodeNoneToNone(n *nodeImpl) (err error) {
 	case UD2:
 		// https://mudongliang.github.io/x86/html/file_module_x86_id_318.html
 		_, err = a.buf.Write([]byte{0x0f, 0x0b})
-	case REP_MOVSB:
+	case REPMOVSB:
 		_, err = a.buf.Write([]byte{0xf3, 0xa4})
-	case REP_MOVSQ:
+	case REPMOVSQ:
 		_, err = a.buf.Write([]byte{0xf3, RexPrefixW, 0xa5})
 	case STD:
 		_, err = a.buf.Write([]byte{0xfd})
