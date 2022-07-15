@@ -464,38 +464,38 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
-			var expTypes []ValueType
+			var defaultLabelType []ValueType
 			if lnLabel.op != OpcodeLoop { // Loop operation doesn't require results since the continuation is the beginning of the loop.
-				expTypes = make([]ValueType, len(lnLabel.blockType.Results))
+				defaultLabelType = make([]ValueType, len(lnLabel.blockType.Results))
 				// Below, we might modify the slice in case of unreachable. Therefore,
 				// we have to copy the content of block result types, otherwise the original
 				// function type might result in invalid value types if the block is the outermost label
 				// which equals the function's type.
-				copy(expTypes, lnLabel.blockType.Results)
+				copy(defaultLabelType, lnLabel.blockType.Results)
 			} else {
-				expTypes = lnLabel.blockType.Params
+				defaultLabelType = lnLabel.blockType.Params
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
 				// As of reference-types proposal, br_table on unreachable state
 				// can choose unknown types for expected parameter types for each label.
 				// https://github.com/WebAssembly/reference-types/pull/116
-				for i := range expTypes {
-					index := len(expTypes) - 1 - i
-					exp := expTypes[index]
+				for i := range defaultLabelType {
+					index := len(defaultLabelType) - 1 - i
+					exp := defaultLabelType[index]
 					actual, err := valueTypeStack.pop()
 					if err != nil {
 						return err
 					}
 					if actual == valueTypeUnknown {
 						// Re-assign the expected type to unknown.
-						expTypes[index] = valueTypeUnknown
+						defaultLabelType[index] = valueTypeUnknown
 					} else if actual != exp {
 						return typeMismatchError(true, OpcodeBrTableName, actual, exp, i)
 					}
 				}
 			} else {
-				if err = valueTypeStack.popResults(op, expTypes, false); err != nil {
+				if err = valueTypeStack.popResults(op, defaultLabelType, false); err != nil {
 					return err
 				}
 			}
@@ -505,17 +505,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
 				}
 				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
-				var expType2 []ValueType
+				var tableLabelType []ValueType
 				if label.op != OpcodeLoop {
-					expType2 = label.blockType.Results
+					tableLabelType = label.blockType.Results
 				} else {
-					expType2 = label.blockType.Params
+					tableLabelType = label.blockType.Params
 				}
-				if len(expTypes) != len(expType2) {
-					return fmt.Errorf("inconsistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
+				if len(defaultLabelType) != len(tableLabelType) {
+					return fmt.Errorf("inconsistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, defaultLabelType, ln, tableLabelType, l)
 				}
-				for i := range expTypes {
-					if expTypes[i] != valueTypeUnknown && expTypes[i] != expType2[i] {
+				for i := range defaultLabelType {
+					if defaultLabelType[i] != valueTypeUnknown && defaultLabelType[i] != tableLabelType[i] {
 						return fmt.Errorf("incosistent block type for %s at %d", OpcodeBrTableName, l)
 					}
 				}
