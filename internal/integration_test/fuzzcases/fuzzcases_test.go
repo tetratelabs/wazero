@@ -19,6 +19,8 @@ var (
 	case696 []byte
 	//go:embed testdata/699.wasm
 	case699 []byte
+	//go:embed testdata/701.wasm
+	case701 []byte
 )
 
 func newRuntimeCompiler() wazero.Runtime {
@@ -109,6 +111,34 @@ func Test699(t *testing.T) {
 			defer tc.r.Close(ctx)
 			_, err := tc.r.InstantiateModuleFromBinary(ctx, case699)
 			require.NoError(t, err)
+		})
+	}
+}
+
+// Test701 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
+func Test701(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		r    wazero.Runtime
+	}{
+		{name: "compiler", r: newRuntimeCompiler()},
+		{name: "interpreter", r: newRuntimeInterpreter()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.r.Close(ctx)
+			module, err := tc.r.InstantiateModuleFromBinary(ctx, case701)
+			require.NoError(t, err)
+
+			_, err = module.ExportedFunction("i32.extend16_s").Call(ctx)
+			require.Contains(t, err.Error(), "out of bounds memory access")
+
+			_, err = module.ExportedFunction("i32.extend8_s").Call(ctx)
+			require.Contains(t, err.Error(), "out of bounds memory access")
 		})
 	}
 }
