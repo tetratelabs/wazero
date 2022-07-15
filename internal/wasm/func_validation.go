@@ -465,15 +465,16 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
 			var defaultLabelType []ValueType
+			// Below, we might modify the slice in case of unreachable. Therefore,
+			// we have to copy the content of block result types, otherwise the original
+			// function type might result in invalid value types if the block is the outermost label
+			// which equals the function's type.
 			if lnLabel.op != OpcodeLoop { // Loop operation doesn't require results since the continuation is the beginning of the loop.
 				defaultLabelType = make([]ValueType, len(lnLabel.blockType.Results))
-				// Below, we might modify the slice in case of unreachable. Therefore,
-				// we have to copy the content of block result types, otherwise the original
-				// function type might result in invalid value types if the block is the outermost label
-				// which equals the function's type.
 				copy(defaultLabelType, lnLabel.blockType.Results)
 			} else {
-				defaultLabelType = lnLabel.blockType.Params
+				defaultLabelType = make([]ValueType, len(lnLabel.blockType.Params))
+				copy(defaultLabelType, lnLabel.blockType.Params)
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
