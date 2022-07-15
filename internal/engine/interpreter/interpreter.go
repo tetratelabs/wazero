@@ -1358,7 +1358,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(uint64(uint32(v2) ^ uint32(v1)))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(v2 ^ v1))
+				ce.pushValue(v2 ^ v1)
 			}
 			frame.pc++
 		case wazeroir.OperationKindShl:
@@ -1405,7 +1405,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
 			} else {
 				// UnsignedInt64
-				ce.pushValue(uint64(bits.RotateLeft64(v1, -int(v2))))
+				ce.pushValue(bits.RotateLeft64(v1, -int(v2)))
 			}
 			frame.pc++
 		case wazeroir.OperationKindAbs:
@@ -1648,9 +1648,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					}
 					ce.pushValue(uint64(uint32(int32(v))))
 				case wazeroir.SignedInt64:
-					v := math.Trunc(math.Float64frombits(ce.popValue()))
+					orig := math.Float64frombits(ce.popValue())
+					v := math.Trunc(orig)
 					res := int64(v)
-					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
+					if math.IsNaN(orig) { // NaN cannot be compared with themselves, so we have to use IsNaN
 						if op.b3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
@@ -3597,13 +3598,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Trunc:
 			hi, lo := ce.popValue(), ce.popValue()
 			if op.b1 == wazeroir.ShapeF32x4 {
-				lo = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo))))) |
-					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo>>32))))) << 32)
-				hi = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi))))) |
-					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi>>32))))) << 32)
+				lo = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo))))))) |
+					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo>>32))))))) << 32)
+				hi = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi))))))) |
+					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi>>32))))))) << 32)
 			} else {
-				lo = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(lo)))
-				hi = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(hi)))
+				lo = math.Float64bits(math.Trunc(math.Float64frombits(lo)))
+				hi = math.Float64bits(math.Trunc(math.Float64frombits(hi)))
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
