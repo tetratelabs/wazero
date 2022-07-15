@@ -1785,11 +1785,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindSignExtend32From8:
-			v := int32(int8(ce.popValue()))
+			v := uint32(int8(ce.popValue()))
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindSignExtend32From16:
-			v := int32(int16(ce.popValue()))
+			v := uint32(int16(ce.popValue()))
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindSignExtend64From8:
