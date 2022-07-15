@@ -391,6 +391,42 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_preventMisplacedRegisters(t *testing.T) {
+	env := newCompilerEnvironment()
+	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+
+	rv := []*runtimeValueLocation{{register: 1}, {register: 2}, {register: 3}}
+
+	currentRegisters := func() []asm.Register {
+		out := make([]asm.Register, len(rv))
+		for i := range rv {
+			out[i] = rv[i].register
+		}
+		return out
+	}
+
+	tests := []struct {
+		desired, expected []asm.Register
+		swaps             []int
+	}{
+		{desired: []asm.Register{3, 2, 1}, expected: []asm.Register{3, 2, 1}, swaps: []int{0, 2}},
+		{desired: []asm.Register{3, 1, 2}, expected: []asm.Register{3, 1, 2}, swaps: []int{0, 2, 1, 2}},
+		{desired: []asm.Register{5, 1, 4}, expected: []asm.Register{2, 1, 3}, swaps: []int{1, 0}},
+		{desired: []asm.Register{4, 5, 6}, expected: []asm.Register{1, 2, 3}, swaps: []int{}},
+		{desired: []asm.Register{1, 2, 3}, expected: []asm.Register{1, 2, 3}, swaps: []int{}},
+		{desired: []asm.Register{3, 5, 1}, expected: []asm.Register{3, 2, 1}, swaps: []int{0, 2}},
+	}
+
+	for _, tt := range tests {
+		swaps := compiler.compilePreventCrossedTargetRegisters(rv, tt.desired)
+		require.Equal(t, tt.swaps, swaps)
+		require.Equal(t, tt.expected, currentRegisters())
+		compiler.compileRestorePreventedCrossing(rv, swaps)
+		require.Equal(t, []asm.Register{1, 2, 3}, currentRegisters())
+	}
+
+}
+
 // compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
 	return c.locationStack
