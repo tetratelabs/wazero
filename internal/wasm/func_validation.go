@@ -420,11 +420,13 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
-			targetResultType := target.blockType.Results
+			var targetResultType []ValueType
 			if target.op == OpcodeLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				targetResultType = []ValueType{}
+				targetResultType = target.blockType.Params
+			} else {
+				targetResultType = target.blockType.Results
 			}
 			if err := valueTypeStack.popResults(op, targetResultType, false); err != nil {
 				return err
@@ -472,6 +474,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				// function type might result in invalid value types if the block is the outermost label
 				// which equals the function's type.
 				copy(expTypes, lnLabel.blockType.Results)
+			} else {
+				expTypes = lnLabel.blockType.Params
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
@@ -503,14 +507,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
 				}
 				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
-				expType2 := label.blockType.Results
-				if label.op == OpcodeLoop {
-					// Loop operation doesn't require results since the continuation is
-					// the beginning of the loop.
-					expType2 = []ValueType{}
+				var expType2 []ValueType
+				if label.op != OpcodeLoop {
+					expType2 = label.blockType.Results
+				} else {
+					expType2 = label.blockType.Params
 				}
 				if len(expTypes) != len(expType2) {
-					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
+					return fmt.Errorf("inconsistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
 				}
 				for i := range expTypes {
 					if expTypes[i] != valueTypeUnknown && expTypes[i] != expType2[i] {
