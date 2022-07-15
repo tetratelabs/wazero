@@ -244,6 +244,34 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 	}
 }
 
+func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
+	sizes := []uint32{8, 64, 128, 1000, 16000, 64000}
+
+	for _, size := range sizes {
+		for _, overlap := range []bool{false, true} {
+			b.Run(fmt.Sprintf("%v-%v", size, overlap), func(b *testing.B) {
+				env := newCompilerEnvironment()
+				compiler, _ := newAmd64Compiler(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+				compiler.compilePreamble()
+
+				if !overlap {
+					compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})   // dest
+					compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 777}) // src
+				} else {
+					compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 777}) // dest
+					compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})   // src
+				}
+				compiler.compileConstI32(&wazeroir.OperationConstI32{Value: size})
+				compiler.compileMemoryCopy()
+				compiler.(compilerImpl).compileReturnFunction()
+				code, _, _ := compiler.compile()
+
+				env.execBench(code, b)
+			})
+		}
+	}
+}
+
 func TestCompiler_compileMemoryFill(t *testing.T) {
 	const checkCeil = 50
 
