@@ -21,6 +21,8 @@ var (
 	case699 []byte
 	//go:embed testdata/701.wasm
 	case701 []byte
+	//go:embed testdata/704.wasm
+	case704 []byte
 )
 
 func newRuntimeCompiler() wazero.Runtime {
@@ -139,6 +141,27 @@ func Test701(t *testing.T) {
 
 			_, err = module.ExportedFunction("i32.extend8_s").Call(ctx)
 			require.Contains(t, err.Error(), "out of bounds memory access")
+		})
+	}
+}
+
+func Test704(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		r    wazero.Runtime
+	}{
+		{name: "compiler", r: newRuntimeCompiler()},
+		{name: "interpreter", r: newRuntimeInterpreter()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.r.Close(ctx)
+			_, err := tc.r.InstantiateModuleFromBinary(ctx, case704)
+			require.NoError(t, err)
 		})
 	}
 }
