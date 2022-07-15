@@ -393,11 +393,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
-			targetResultType := target.blockType.Results
+			var targetResultType []ValueType
 			if target.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
-				targetResultType = []ValueType{}
+				targetResultType = target.blockType.Params
+			} else {
+				targetResultType = target.blockType.Results
 			}
 			if err = valueTypeStack.popResults(op, targetResultType, false); err != nil {
 				return err
@@ -411,7 +411,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for %s: index=%d with %d for the current lable stack length",
+					"invalid ln param given for %s: index=%d with %d for the current label stack length",
 					OpcodeBrIfName, index, len(controlBlockStack))
 			}
 			pc += num - 1
@@ -422,8 +422,6 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
 			var targetResultType []ValueType
 			if target.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
 				targetResultType = target.blockType.Params
 			} else {
 				targetResultType = target.blockType.Results
@@ -457,7 +455,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %w", err)
 			} else if int(ln) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for %s: ln=%d with %d for the current lable stack length",
+					"invalid ln param given for %s: ln=%d with %d for the current label stack length",
 					OpcodeBrTableName, ln, len(controlBlockStack))
 			}
 			pc += n + num - 1
