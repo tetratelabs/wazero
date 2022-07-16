@@ -33,10 +33,10 @@ jobs:
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
 
-      - name: Install latest Zig
-        uses: goto-bus-stop/setup-zig@v1
-        with:  # on laptop, use `brew install zig`
-          version: 0.9.1
+      - name: Install Zig
+        run: |  # on laptop, use `brew install --build-from-source zig --HEAD`
+          sudo apt install xz-utils
+          sudo sh -c 'wget -c https://ziglang.org/builds/zig-linux-x86_64-0.10.0-dev.3007+6ba2fb3db.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
 
       - name: Install wasm32-wasi target
         uses: actions-rs/toolchain@v1
