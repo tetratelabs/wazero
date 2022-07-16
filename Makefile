@@ -57,8 +57,8 @@ build.examples.tinygo: $(tinygo_sources)
 c_sources := $(wildcard examples/*/testdata/*.c examples/*/*/testdata/*.c examples/*/testdata/*/*.c)
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
-	@for f in $^; do \
-	    zig cc $$f -o $$(echo $$f | sed -e 's/\.c/\.wasm/') --target=wasm32-wasi -O3; \
+	for f in $^; do \
+	    zig cc --target=wasm32-wasi -O3 -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
 	done
 
 %/greet.wasm : cargo_target := wasm32-unknown-unknown
