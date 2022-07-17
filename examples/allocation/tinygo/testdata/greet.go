@@ -41,7 +41,7 @@ func _greet(ptr, size uint32) {
 	greet(name)
 }
 
-// _greet is a WebAssembly export that accepts a string pointer (linear memory
+// _greeting is a WebAssembly export that accepts a string pointer (linear memory
 // offset) and returns a pointer/size pair packed into a uint64.
 //
 // Note: This uses a uint64 instead of two result values for compatibility with

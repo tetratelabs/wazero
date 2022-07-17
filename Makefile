@@ -57,8 +57,34 @@ build.examples.tinygo: $(tinygo_sources)
 c_sources := $(wildcard examples/*/testdata/*.c examples/*/*/testdata/*.c examples/*/testdata/*/*.c)
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
-	for f in $^; do \
+	@for f in $^; do \
 	    zig cc --target=wasm32-wasi -O3 -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
+	done
+
+# Here are the emcc args we use:
+#
+# * `-Oz` - most optimization for code size.
+# * `--profiling` - adds the name section.
+# * `-s STANDALONE_WASM` - ensures wasm is built for a non-js runtime.
+# * `-s EXPORTED_FUNCTIONS=_malloc,_free` - export allocation functions so that
+#   they can be used externally as "malloc" and "free".
+# * `-s WARN_ON_UNDEFINED_SYMBOLS=0` - imports not defined in JavaScript error
+#   otherwise. See https://github.com/emscripten-core/emscripten/issues/13641
+# * `-s TOTAL_STACK=8KB -s TOTAL_MEMORY=64KB` - reduce memory default from 16MB
+#   to one page (64KB). To do this, we have to reduce the stack size.
+# * `-s ALLOW_MEMORY_GROWTH` - allows "memory.grow" instructions to succeed, but
+#   requires a function import "emscripten_notify_memory_growth".
+emscripten_sources := $(wildcard emscripten/testdata/*.cc)
+.PHONY: build.examples.emscripten
+build.examples.emscripten: $(emscripten_sources)
+	@for f in $^; do \
+		em++ -Oz --profiling \
+		-s STANDALONE_WASM \
+		-s EXPORTED_FUNCTIONS=_malloc,_free \
+		-s WARN_ON_UNDEFINED_SYMBOLS=0 \
+		-s TOTAL_STACK=8KB -s TOTAL_MEMORY=64KB \
+		-s ALLOW_MEMORY_GROWTH \
+		--std=c++17 -o $$(echo $$f | sed -e 's/\.cc/\.wasm/') $$f; \
 	done
 
 %/greet.wasm : cargo_target := wasm32-unknown-unknown
