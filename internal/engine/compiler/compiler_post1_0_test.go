@@ -251,7 +251,8 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 		for _, overlap := range []bool{false, true} {
 			b.Run(fmt.Sprintf("%v-%v", size, overlap), func(b *testing.B) {
 				env := newCompilerEnvironment()
-				compiler, _ := newAmd64Compiler(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+
+				compiler, _ := newCompiler(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
 				compiler.compilePreamble()
 
 				if !overlap {
