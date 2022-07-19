@@ -391,7 +391,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	})
 }
 
-func TestAmd64Compiler_preventMisplacedRegisters(t *testing.T) {
+func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
