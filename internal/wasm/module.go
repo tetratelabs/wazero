@@ -38,7 +38,7 @@ type EncodeModule func(m *Module) (bytes []byte)
 // Differences from the specification:
 // * NameSection is the only key ("name") decoded from the SectionIDCustom.
 // * ExportSection is represented as a map for lookup convenience.
-// * HostFunctionSection is a custom section that contains any go `func`s. It may be present when CodeSection is not.
+// * Code.GoFunc is contains any go `func`. It may be present when Code.Body is not.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
@@ -133,8 +133,10 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDElement.
 	ElementSection []*ElementSegment
 
-	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
-	// When present, the HostFunctionSection must be nil.
+	// CodeSection is index-correlated with FunctionSection and contains each
+	// function's locals and body.
+	//
+	// When present, the HostFunctionSection of the same index must be nil.
 	//
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
@@ -152,13 +154,6 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
-
-	// HostFunctionSection is index-correlated with FunctionSection and contains a host function defined in Go.
-	// When present, the CodeSection must be nil.
-	//
-	// Note: This section currently has no serialization format, so is not encodable.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	HostFunctionSection []*reflect.Value
 
 	// validatedActiveElementSegments are built on Validate when
 	// SectionIDElement is non-empty and all inputs are valid.
@@ -234,10 +229,6 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 func (m *Module) Validate(enabledFeatures Features) error {
 	if err := m.validateStartSection(); err != nil {
 		return err
-	}
-
-	if m.SectionElementCount(SectionIDCode) > 0 && m.SectionElementCount(SectionIDHostFunction) > 0 {
-		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
 	functions, globals, memory, tables, err := m.AllDeclarations()
@@ -588,24 +579,19 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 //	  enginetest.go.
 func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.FunctionListener) (fns []*FunctionInstance) {
 	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
-	if mod.IsHostModule() {
-		for i := range mod.HostFunctionSection {
-			fn := mod.HostFunctionSection[i]
-			fns = append(fns, &FunctionInstance{
-				Kind:   kind(fn.Type()),
-				GoFunc: fn,
-			})
+	for i := range mod.FunctionSection {
+		code := mod.CodeSection[i]
+		fnKind := FunctionKindWasm
+		if fn := code.GoFunc; fn != nil {
+			fnKind = kind(fn.Type())
 		}
-	} else {
-		for i := range mod.FunctionSection {
-			code := mod.CodeSection[i]
-			fns = append(fns, &FunctionInstance{
-				Kind:       FunctionKindWasm,
-				Body:       code.Body,
-				TypeID:     m.TypeIDs[mod.FunctionSection[i]],
-				LocalTypes: code.LocalTypes,
-			})
-		}
+		fns = append(fns, &FunctionInstance{
+			Kind:       fnKind,
+			Body:       code.Body,
+			GoFunc:     code.GoFunc,
+			TypeID:     m.TypeIDs[mod.FunctionSection[i]],
+			LocalTypes: code.LocalTypes,
+		})
 	}
 
 	importCount := mod.ImportFuncCount()
@@ -808,6 +794,15 @@ type Export struct {
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 type Code struct {
+
+	// GoFunc is a host function defined in Go.
+	//
+	// When present, LocalTypes and Body must be nil.
+	//
+	// Note: This has no serialization format, so is not encodable.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
+	GoFunc *reflect.Value
+
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
@@ -954,11 +949,6 @@ const (
 	SectionIDDataCount
 )
 
-// SectionIDHostFunction is a pseudo-section ID for host functions.
-//
-// Note: This is not defined in the WebAssembly 1.0 (20191205) Binary Format.
-const SectionIDHostFunction = SectionID(0xff)
-
 // SectionIDName returns the canonical name of a module section.
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func SectionIDName(sectionID SectionID) string {
@@ -987,8 +977,6 @@ func SectionIDName(sectionID SectionID) string {
 		return "code"
 	case SectionIDData:
 		return "data"
-	case SectionIDHostFunction:
-		return "host_function"
 	case SectionIDDataCount:
 		return "data_count"
 	}

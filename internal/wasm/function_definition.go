@@ -64,13 +64,11 @@ func (m *Module) BuildFunctionDefinitions() {
 		importFuncIdx++
 	}
 
-	// At the moment, a module can either be solely wasm or host functions.
-	isHostFunction := m.HostFunctionSection != nil
 	for codeIndex, typeIndex := range m.FunctionSection {
 		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
 			index:          Index(codeIndex) + importCount,
 			funcType:       m.TypeSection[typeIndex],
-			isHostFunction: isHostFunction,
+			isHostFunction: m.CodeSection[codeIndex].GoFunc != nil,
 		})
 	}
 

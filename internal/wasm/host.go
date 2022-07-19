@@ -74,10 +74,6 @@ func NewHostModule(
 	return
 }
 
-func (m *Module) IsHostModule() bool {
-	return len(m.HostFunctionSection) > 0
-}
-
 func addFuncs(
 	m *Module,
 	nameToGoFunc map[string]interface{},
@@ -92,7 +88,7 @@ func addFuncs(
 	moduleName := m.NameSection.ModuleName
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
-	m.HostFunctionSection = make([]*reflect.Value, 0, funcCount)
+	m.CodeSection = make([]*Code, 0, funcCount)
 	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, funcCount)
 
 	// Sort names for consistent iteration
@@ -116,7 +112,7 @@ func addFuncs(
 		}
 
 		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(functionType))
-		m.HostFunctionSection = append(m.HostFunctionSection, &fn)
+		m.CodeSection = append(m.CodeSection, &Code{GoFunc: &fn})
 		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: exportName, Index: idx})
 		if namesLen > 0 {
 			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: names[0]})

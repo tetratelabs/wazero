@@ -1,10 +1,8 @@
 package wasm
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -202,7 +200,6 @@ func TestModule_SectionElementCount(t *testing.T) {
 	i32, f32 := ValueTypeI32, ValueTypeF32
 	zero := uint32(0)
 	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: const0}
-	fn := reflect.ValueOf(func(api.Module) {})
 
 	tests := []struct {
 		name     string
@@ -218,16 +215,6 @@ func TestModule_SectionElementCount(t *testing.T) {
 			name:     "NameSection",
 			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}},
 			expected: map[string]uint32{"custom": 1},
-		},
-		{
-			name:     "HostFunctionSection",
-			input:    &Module{HostFunctionSection: []*reflect.Value{&fn}},
-			expected: map[string]uint32{"host_function": 1},
-		},
-		{
-			name:     "NameSection and HostFunctionSection",
-			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}, HostFunctionSection: []*reflect.Value{&fn}},
-			expected: map[string]uint32{"custom": 1, "host_function": 1},
 		},
 		{
 			name: "TypeSection",
@@ -311,11 +298,6 @@ func TestModule_SectionElementCount(t *testing.T) {
 				if size := tc.input.SectionElementCount(i); size > 0 {
 					actual[SectionIDName(i)] = size
 				}
-			}
-
-			// SectionIDHostFunction is intentionally not after data
-			if size := tc.input.SectionElementCount(SectionIDHostFunction); size > 0 {
-				actual[SectionIDName(SectionIDHostFunction)] = size
 			}
 			require.Equal(t, tc.expected, actual)
 		})

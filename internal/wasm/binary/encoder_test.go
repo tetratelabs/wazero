@@ -214,7 +214,7 @@ func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
 	fn := reflect.ValueOf(func(wasm.Module) {})
 
 	captured := require.CapturePanic(func() {
-		EncodeModule(&wasm.Module{HostFunctionSection: []*reflect.Value{&fn}})
+		EncodeModule(&wasm.Module{CodeSection: []*wasm.Code{{GoFunc: &fn}}})
 	})
-	require.EqualError(t, captured, "BUG: HostFunctionSection is not encodable")
+	require.EqualError(t, captured, "BUG: GoFunc is not encodable")
 }

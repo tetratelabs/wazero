@@ -329,15 +329,15 @@ func runTestModuleEngine_Call_HostFn_ModuleContext(t *testing.T, et EngineTester
 	})
 
 	m := &wasm.Module{
-		HostFunctionSection: []*reflect.Value{&host},
-		FunctionSection:     []wasm.Index{0},
-		TypeSection:         []*wasm.FunctionType{sig},
+		TypeSection:     []*wasm.FunctionType{sig},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []*wasm.Code{{GoFunc: &host}},
 	}
 	m.BuildFunctionDefinitions()
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 
-	module := &wasm.ModuleInstance{Memory: memory}
+	module := &wasm.ModuleInstance{Memory: memory, TypeIDs: []wasm.FunctionTypeID{0}}
 	_, ns := wasm.NewStore(features, e)
 	modCtx := wasm.NewCallContext(ns, module, nil)
 
@@ -672,10 +672,10 @@ func setupCallTests(t *testing.T, e wasm.Engine) (*wasm.ModuleInstance, *wasm.Mo
 
 	hostFnVal := reflect.ValueOf(divBy)
 	hostModule := &wasm.Module{
-		HostFunctionSection: []*reflect.Value{&hostFnVal},
-		TypeSection:         []*wasm.FunctionType{ft},
-		FunctionSection:     []wasm.Index{0},
-		ExportSection:       []*wasm.Export{{Name: hostFnName, Type: wasm.ExternTypeFunc, Index: 0}},
+		TypeSection:     []*wasm.FunctionType{ft},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []*wasm.Code{{GoFunc: &hostFnVal}},
+		ExportSection:   []*wasm.Export{{Name: hostFnName, Type: wasm.ExternTypeFunc, Index: 0}},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "host",
 			FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: hostFnName}},

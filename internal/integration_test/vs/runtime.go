@@ -2,6 +2,7 @@ package vs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/tetratelabs/wazero"
@@ -167,11 +168,11 @@ func (m *wazeroModule) CallI64_I64(ctx context.Context, funcName string, param u
 
 func (m *wazeroModule) WriteMemory(ctx context.Context, offset uint32, bytes []byte) error {
 	if !m.mod.Memory().Write(ctx, offset, bytes) {
-		return fmt.Errorf("Memory.Write(%d, %d) out of range of memory size %d",
-			offset, len(bytes), m.mod.Memory().Size(ctx))
+		return errors.New("out of memory writing name")
 	}
 	return nil
 }
+
 func (m *wazeroModule) Close(ctx context.Context) (err error) {
 	if mod := m.mod; mod != nil {
 		err = mod.Close(ctx)

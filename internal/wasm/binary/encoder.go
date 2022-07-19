@@ -10,10 +10,6 @@ var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
 // Note: If saving to a file, the conventional extension is wasm
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
 func EncodeModule(m *wasm.Module) (bytes []byte) {
-	if m.SectionElementCount(wasm.SectionIDHostFunction) > 0 {
-		// TODO: See if there's a way to serialize reflect.Value references, potentially by name lookup in a store.
-		panic("BUG: HostFunctionSection is not encodable")
-	}
 	bytes = append(Magic, version...)
 	if m.SectionElementCount(wasm.SectionIDType) > 0 {
 		bytes = append(bytes, encodeTypeSection(m.TypeSection)...)

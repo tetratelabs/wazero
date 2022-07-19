@@ -3,7 +3,6 @@ package wasm
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -57,7 +56,6 @@ func TestSectionIDName(t *testing.T) {
 		{"element", SectionIDElement, "element"},
 		{"code", SectionIDCode, "code"},
 		{"data", SectionIDData, "data"},
-		{"host_function", SectionIDHostFunction, "host_function"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -327,8 +325,6 @@ func TestValidateConstExpression(t *testing.T) {
 
 func TestModule_Validate_Errors(t *testing.T) {
 	zero := Index(0)
-	fn := reflect.ValueOf(func(api.Module) {})
-
 	tests := []struct {
 		name        string
 		input       *Module
@@ -343,16 +339,6 @@ func TestModule_Validate_Errors(t *testing.T) {
 				StartSection:    &zero,
 			},
 			expectedErr: "invalid start function: func[0] has an invalid type",
-		},
-		{
-			name: "CodeSection and HostFunctionSection",
-			input: &Module{
-				TypeSection:         []*FunctionType{v_v},
-				FunctionSection:     []uint32{0},
-				CodeSection:         []*Code{{Body: []byte{OpcodeEnd}}},
-				HostFunctionSection: []*reflect.Value{&fn},
-			},
-			expectedErr: "cannot mix functions and host functions in the same module",
 		},
 	}
 
@@ -781,7 +767,7 @@ func TestModule_buildGlobals(t *testing.T) {
 }
 
 func TestModule_buildFunctions(t *testing.T) {
-	nopCode := &Code{nil, []byte{OpcodeEnd}}
+	nopCode := &Code{Body: []byte{OpcodeEnd}}
 	m := &Module{
 		TypeSection:     []*FunctionType{v_v},
 		ImportSection:   []*Import{{Type: ExternTypeFunc}},

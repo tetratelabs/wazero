@@ -367,14 +367,6 @@ func (s *Store) instantiate(
 	}
 	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
-	// If there are no module-defined functions, assume this is a host module.
-	var funcSection SectionID
-	if module.HostFunctionSection == nil {
-		funcSection = SectionIDFunction
-	} else {
-		funcSection = SectionIDHostFunction
-	}
-
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
 	functions := m.BuildFunctions(module, listeners)
 
@@ -420,7 +412,7 @@ func (s *Store) instantiate(
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {
-			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
+			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
 
