@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
@@ -176,6 +177,10 @@ func (c *compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
+	// GoFunc is present when the result is a host function.
+	// In this case, other fields can be ignored.
+	GoFunc *reflect.Value
+
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
 	// LabelCallers maps Label.String() to the number of callers to that label.
@@ -233,6 +238,10 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		typeID := module.FunctionSection[funcIndex]
 		sig := module.TypeSection[typeID]
 		code := module.CodeSection[funcIndex]
+		if code.GoFunc != nil {
+			ret = append(ret, &CompilationResult{GoFunc: code.GoFunc})
+			continue
+		}
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]

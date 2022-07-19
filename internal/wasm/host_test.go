@@ -68,8 +68,8 @@ func TestNewHostModule(t *testing.T) {
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
 					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet, &fnFdWrite},
+				FunctionSection: []Index{0, 1},
+				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}, {GoFunc: &fnFdWrite}},
 				ExportSection: []*Export{
 					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
 					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
@@ -90,11 +90,11 @@ func TestNewHostModule(t *testing.T) {
 				functionSwap: swap,
 			},
 			expected: &Module{
-				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
-				FunctionSection:     []Index{0},
-				HostFunctionSection: []*reflect.Value{&fnSwap},
-				ExportSection:       []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
-				NameSection:         &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
+				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{GoFunc: &fnSwap}},
+				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},
 		{
@@ -153,8 +153,8 @@ func TestNewHostModule(t *testing.T) {
 				TypeSection: []*FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []Index{0},
-				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}},
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: i32},
@@ -199,14 +199,13 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
-	require.Nil(t, actual.CodeSection) // Host functions are implemented in Go, not Wasm!
 	require.Equal(t, expected.DataSection, actual.DataSection)
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
-	require.Equal(t, len(expected.HostFunctionSection), len(actual.HostFunctionSection))
-	for i := range expected.HostFunctionSection {
-		require.Equal(t, (*expected.HostFunctionSection[i]).Type(), (*actual.HostFunctionSection[i]).Type())
+	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
+	for _, c := range expected.CodeSection {
+		require.Equal(t, c.GoFunc.Type(), c.GoFunc.Type())
 	}
 }
 

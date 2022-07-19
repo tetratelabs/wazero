@@ -417,43 +417,32 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 
-	if module.IsHostModule() {
-		for funcIndex := range module.HostFunctionSection {
-			compiled, err := compileHostFunction(module.TypeSection[module.FunctionSection[funcIndex]])
-			if err != nil {
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	if err != nil {
+		return err
+	}
+	for funcIndex, ir := range irs {
+		var compiled *code
+		if ir.GoFunc != nil {
+			sig := module.TypeSection[module.FunctionSection[funcIndex]]
+			if compiled, err = compileHostFunction(sig); err != nil {
 				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 				return fmt.Errorf("error compiling host func[%s]: %w", def.DebugName(), err)
 			}
-
-			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-			// finalizer due to how moduleEngine.Close is implemented.
-			e.setFinalizer(compiled, releaseCode)
-
-			compiled.indexInModule = wasm.Index(funcIndex)
-			compiled.sourceModule = module
-			funcs = append(funcs, compiled)
-		}
-	} else {
-		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
-		if err != nil {
-			return err
-		}
-
-		for funcIndex := range module.FunctionSection {
-			compiled, err := compileWasmFunction(e.enabledFeatures, irs[funcIndex])
-			if err != nil {
+		} else {
+			if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
 				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 			}
-
-			// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
-			e.setFinalizer(compiled, releaseCode)
-
-			compiled.indexInModule = wasm.Index(funcIndex)
-			compiled.sourceModule = module
-
-			funcs = append(funcs, compiled)
 		}
+
+		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
+		e.setFinalizer(compiled, releaseCode)
+
+		compiled.indexInModule = wasm.Index(funcIndex)
+		compiled.sourceModule = module
+
+		funcs = append(funcs, compiled)
 	}
 	e.addCodes(module, funcs)
 	return nil

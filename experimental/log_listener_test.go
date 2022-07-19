@@ -284,7 +284,9 @@ func Test_loggingListener(t *testing.T) {
 			}
 
 			if tc.isHostFunc {
-				m.HostFunctionSection = []*reflect.Value{&fnV}
+				m.CodeSection = []*wasm.Code{{GoFunc: &fnV}}
+			} else {
+				m.CodeSection = []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}}
 			}
 			m.BuildFunctionDefinitions()
 			l := lf.NewListener(m.FunctionDefinitionSection[0])
@@ -314,6 +316,7 @@ func Test_loggingListener_indentation(t *testing.T) {
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0, 0},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "test",
 			FunctionNames: wasm.NameMap{{Index: 0, Name: "fn1"}, {Index: 1, Name: "fn2"}},

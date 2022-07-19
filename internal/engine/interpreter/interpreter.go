@@ -220,24 +220,21 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	}
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
-	if module.IsHostModule() {
-		// If this is the host module, there's nothing to do as the runtime representation of
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	if err != nil {
+		return err
+	}
+	for i, ir := range irs {
+		// If this is the host function, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
-		for _, hf := range module.HostFunctionSection {
-			funcs = append(funcs, &code{hostFn: hf})
-		}
-	} else {
-		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
-		if err != nil {
-			return err
-		}
-		for i, ir := range irs {
-			compiled, err := e.lowerIR(ir)
-			if err != nil {
-				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
-				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
-			}
+		if ir.GoFunc != nil {
+			funcs = append(funcs, &code{hostFn: ir.GoFunc})
+			continue
+		} else if compiled, err := e.lowerIR(ir); err != nil {
+			def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
+			return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
+		} else {
 			funcs = append(funcs, compiled)
 		}
 	}

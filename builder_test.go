@@ -53,8 +53,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -72,8 +72,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -92,8 +92,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0},
-				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint64_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -113,8 +113,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -137,8 +137,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -162,8 +162,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -457,13 +457,12 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
-	require.Zero(t, len(actual.CodeSection)) // Host functions are implemented in Go, not Wasm!
 	require.Equal(t, expected.DataSection, actual.DataSection)
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
-	require.Equal(t, len(expected.HostFunctionSection), len(actual.HostFunctionSection))
-	for i := range expected.HostFunctionSection {
-		require.Equal(t, (*expected.HostFunctionSection[i]).Type(), (*actual.HostFunctionSection[i]).Type())
+	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
+	for _, c := range expected.CodeSection {
+		require.Equal(t, c.GoFunc.Type(), c.GoFunc.Type())
 	}
 }

@@ -86,6 +86,10 @@ func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 func encodeCode(c *wasm.Code) []byte {
+	if c.GoFunc != nil {
+		panic("BUG: GoFunc is not encodable")
+	}
+
 	// local blocks compress locals while preserving index order by grouping locals of the same type.
 	// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
 	localBlockCount := uint32(0) // how many blocks of locals with the same type (types can repeat!)
