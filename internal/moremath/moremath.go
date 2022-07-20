@@ -39,32 +39,10 @@ func f64ReturnNaNBinOp(xb, yb uint64) float64 {
 	return math.Float64frombits(F64ArithmeticNaNBits)
 }
 
-// f64ReturnNaNUniOp returns a 64-bit NaN value following the NaN propagation procedure as in
-// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
-func f64ReturnNaNUniOp(xb uint64) float64 {
-	if xb&F64CanonicalNaNBitsMask == F64CanonicalNaNBits {
-		return math.Float64frombits(F64CanonicalNaNBits)
-	}
-	// This case, we can return *one of* arithmetic value (meaning that this is un-deterministic as pointed by Wasm spec).
-	// Here, we return the fixed F64ArithmeticNaNBits to have determinism.
-	return math.Float64frombits(F64ArithmeticNaNBits)
-}
-
 // f32ReturnNaNBinOp returns a 32-bit NaN value following the NaN propagation procedure as in
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func f32ReturnNaNBinOp(xb, yb uint32) float32 {
 	if (xb&F32CanonicalNaNBitsMask == F32CanonicalNaNBits) || (yb&F32CanonicalNaNBitsMask == F32CanonicalNaNBits) {
-		return math.Float32frombits(F32CanonicalNaNBits)
-	}
-	// This case, we can return *one of* arithmetic value (meaning that this is un-deterministic as pointed by Wasm spec).
-	// Here, we return the fixed F32ArithmeticNaNBits to have determinism.
-	return math.Float32frombits(F32ArithmeticNaNBits)
-}
-
-// f32ReturnNaNUniOp returns a 32-bit NaN value following the NaN propagation procedure as in
-// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
-func f32ReturnNaNUniOp(xb uint32) float32 {
-	if xb&F32CanonicalNaNBitsMask == F32CanonicalNaNBits {
 		return math.Float32frombits(F32CanonicalNaNBits)
 	}
 	// This case, we can return *one of* arithmetic value (meaning that this is un-deterministic as pointed by Wasm spec).
@@ -157,10 +135,7 @@ func WasmCompatMax32(x, y float32) float32 {
 //
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF32(f float32) float32 {
-	if f32IsNan(f) {
-		return f32ReturnNaNUniOp(math.Float32bits(f))
-	}
-
+	var res float32
 	// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
 	if f != 0 {
 		ceil := float32(math.Ceil(float64(f)))
@@ -169,14 +144,14 @@ func WasmCompatNearestF32(f float32) float32 {
 		distToFloor := math.Abs(float64(f - floor))
 		h := ceil / 2.0
 		if distToCeil < distToFloor {
-			f = ceil
+			res = ceil
 		} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
-			f = ceil
+			res = ceil
 		} else {
-			f = floor
+			res = floor
 		}
 	}
-	return f
+	return returnF32UniOp(f, res)
 }
 
 // WasmCompatNearestF64 is the Wasm spec compatible variant of math.Round, used for Nearest instruction.
@@ -186,11 +161,8 @@ func WasmCompatNearestF32(f float32) float32 {
 //
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF64(f float64) float64 {
-	if math.IsNaN(f) {
-		return f64ReturnNaNUniOp(math.Float64bits(f))
-	}
-
 	// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
+	var res float64
 	if f != 0 {
 		ceil := math.Ceil(f)
 		floor := math.Floor(f)
@@ -198,14 +170,14 @@ func WasmCompatNearestF64(f float64) float64 {
 		distToFloor := math.Abs(f - floor)
 		h := ceil / 2.0
 		if distToCeil < distToFloor {
-			f = ceil
+			res = ceil
 		} else if distToCeil == distToFloor && math.Floor(h) == h {
-			f = ceil
+			res = ceil
 		} else {
-			f = floor
+			res = floor
 		}
 	}
-	return f
+	return returnF64UniOp(f, res)
 }
 
 // WasmCompatCeilF32 is the same as math.Ceil on 32-bit except that
@@ -213,10 +185,7 @@ func WasmCompatNearestF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatCeilF32(f float32) float32 {
-	if f32IsNan(f) {
-		return f32ReturnNaNUniOp(math.Float32bits(f))
-	}
-	return float32(math.Ceil(float64(f)))
+	return returnF32UniOp(f, float32(math.Ceil(float64(f))))
 }
 
 // WasmCompatCeilF64 is the same as math.Ceil on 64-bit except that
@@ -224,10 +193,7 @@ func WasmCompatCeilF32(f float32) float32 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatCeilF64(f float64) float64 {
-	if math.IsNaN(f) {
-		return f64ReturnNaNUniOp(math.Float64bits(f))
-	}
-	return math.Ceil(f)
+	return returnF64UniOp(f, math.Ceil(f))
 }
 
 // WasmCompatFloorF32 is the same as math.Floor on 32-bit except that
@@ -235,10 +201,7 @@ func WasmCompatCeilF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatFloorF32(f float32) float32 {
-	if f32IsNan(f) {
-		return f32ReturnNaNUniOp(math.Float32bits(f))
-	}
-	return float32(math.Floor(float64(f)))
+	return returnF32UniOp(f, float32(math.Floor(float64(f))))
 }
 
 // WasmCompatFloorF64 is the same as math.Floor on 64-bit except that
@@ -246,10 +209,7 @@ func WasmCompatFloorF32(f float32) float32 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatFloorF64(f float64) float64 {
-	if math.IsNaN(f) {
-		return f64ReturnNaNUniOp(math.Float64bits(f))
-	}
-	return math.Floor(f)
+	return returnF64UniOp(f, math.Floor(f))
 }
 
 // WasmCompatTruncF32 is the same as math.Trunc on 32-bit except that
@@ -257,10 +217,7 @@ func WasmCompatFloorF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatTruncF32(f float32) float32 {
-	if f32IsNan(f) {
-		return f32ReturnNaNUniOp(math.Float32bits(f))
-	}
-	return float32(math.Trunc(float64(f)))
+	return returnF32UniOp(f, float32(math.Trunc(float64(f))))
 }
 
 // WasmCompatTruncF64 is the same as math.Trunc on 64-bit except that
@@ -268,13 +225,41 @@ func WasmCompatTruncF32(f float32) float32 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatTruncF64(f float64) float64 {
-	ret := math.Trunc(f)
-	if math.IsNaN(ret) {
-		return f64ReturnNaNUniOp(math.Float64bits(f))
-	}
-	return ret
+	return returnF64UniOp(f, math.Trunc(f))
 }
 
-func f32IsNan(v float32) bool {
+func f32IsNaN(v float32) bool {
 	return v != v // this is how NaN is defined.
+}
+
+func f64IsNaN(v float64) bool {
+	return v != v // this is how NaN is defined.
+}
+
+func returnF32UniOp(original, result float32) float32 {
+	if f32IsNaN(result) {
+		return f32ReturnNaNUniOp(original)
+	}
+	return result
+}
+
+func returnF64UniOp(original, result float64) float64 {
+	if f64IsNaN(result) {
+		return f64ReturnNaNUniOp(original)
+	}
+	return result
+}
+
+func f32ReturnNaNUniOp(original float32) float32 {
+	if !f32IsNaN(original) {
+		return math.Float32frombits(F32CanonicalNaNBits)
+	}
+	return math.Float32frombits(math.Float32bits(original) | F32CanonicalNaNBits)
+}
+
+func f64ReturnNaNUniOp(original float64) float64 {
+	if !f64IsNaN(original) {
+		return math.Float64frombits(F64CanonicalNaNBits)
+	}
+	return math.Float64frombits(math.Float64bits(original) | F64CanonicalNaNBits)
 }
