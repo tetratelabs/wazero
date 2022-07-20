@@ -157,7 +157,7 @@ func WasmCompatMax32(x, y float32) float32 {
 //
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF32(f float32) float32 {
-	if math.IsNaN(float64(f)) {
+	if f32IsNan(f) {
 		return f32ReturnNaNUniOp(math.Float32bits(f))
 	}
 
@@ -213,7 +213,7 @@ func WasmCompatNearestF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatCeilF32(f float32) float32 {
-	if math.IsNaN(float64(f)) {
+	if f32IsNan(f) {
 		return f32ReturnNaNUniOp(math.Float32bits(f))
 	}
 	return float32(math.Ceil(float64(f)))
@@ -235,7 +235,7 @@ func WasmCompatCeilF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatFloorF32(f float32) float32 {
-	if math.IsNaN(float64(f)) {
+	if f32IsNan(f) {
 		return f32ReturnNaNUniOp(math.Float32bits(f))
 	}
 	return float32(math.Floor(float64(f)))
@@ -257,7 +257,7 @@ func WasmCompatFloorF64(f float64) float64 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatTruncF32(f float32) float32 {
-	if math.IsNaN(float64(f)) {
+	if f32IsNan(f) {
 		return f32ReturnNaNUniOp(math.Float32bits(f))
 	}
 	return float32(math.Trunc(float64(f)))
@@ -273,4 +273,8 @@ func WasmCompatTruncF64(f float64) float64 {
 		return f64ReturnNaNUniOp(math.Float64bits(f))
 	}
 	return ret
+}
+
+func f32IsNan(v float32) bool {
+	return v != v // this is how NaN is defined.
 }

@@ -1648,10 +1648,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					}
 					ce.pushValue(uint64(uint32(int32(v))))
 				case wazeroir.SignedInt64:
-					orig := math.Float64frombits(ce.popValue())
-					v := math.Trunc(orig)
+					v := math.Trunc(math.Float64frombits(ce.popValue()))
 					res := int64(v)
-					if math.IsNaN(orig) { // NaN cannot be compared with themselves, so we have to use IsNaN
+					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 						if op.b3 {
 							// non-trapping conversion must cast nan to zero.
 							res = 0
