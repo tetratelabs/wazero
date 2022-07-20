@@ -28,33 +28,11 @@ const (
 	F64ArithmeticNaNBits = F64CanonicalNaNBits | 0b1 // Set first bit to make this as an arithmetic NaN.
 )
 
-// f64ReturnNaNBinOp returns a 64-bit NaN value following the NaN propagation procedure as in
-// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
-func f64ReturnNaNBinOp(xb, yb uint64) float64 {
-	if (xb&F64CanonicalNaNBitsMask == F64CanonicalNaNBits) || (yb&F64CanonicalNaNBitsMask == F64CanonicalNaNBits) {
-		return math.Float64frombits(F64CanonicalNaNBits)
-	}
-	// This case, we can return *one of* arithmetic value (meaning that this is un-deterministic as pointed by Wasm spec).
-	// Here, we return the fixed F64ArithmeticNaNBits to have determinism.
-	return math.Float64frombits(F64ArithmeticNaNBits)
-}
-
-// f32ReturnNaNBinOp returns a 32-bit NaN value following the NaN propagation procedure as in
-// https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
-func f32ReturnNaNBinOp(xb, yb uint32) float32 {
-	if (xb&F32CanonicalNaNBitsMask == F32CanonicalNaNBits) || (yb&F32CanonicalNaNBitsMask == F32CanonicalNaNBits) {
-		return math.Float32frombits(F32CanonicalNaNBits)
-	}
-	// This case, we can return *one of* arithmetic value (meaning that this is un-deterministic as pointed by Wasm spec).
-	// Here, we return the fixed F32ArithmeticNaNBits to have determinism.
-	return math.Float32frombits(F32ArithmeticNaNBits)
-}
-
 // WasmCompatMin64 is the Wasm spec compatible variant of math.Min for 64-bit floating points.
 func WasmCompatMin64(x, y float64) float64 {
 	switch {
 	case math.IsNaN(x) || math.IsNaN(y):
-		return f64ReturnNaNBinOp(math.Float64bits(x), math.Float64bits(y))
+		return returnF64NaNBinOp(x, y)
 	case math.IsInf(x, -1) || math.IsInf(y, -1):
 		return math.Inf(-1)
 	case x == 0 && x == y:
@@ -74,7 +52,7 @@ func WasmCompatMin32(x, y float32) float32 {
 	x64, y64 := float64(x), float64(y)
 	switch {
 	case math.IsNaN(x64) || math.IsNaN(y64):
-		return f32ReturnNaNBinOp(math.Float32bits(x), math.Float32bits(y))
+		return returnF32NaNBinOp(x, y)
 	case math.IsInf(x64, -1) || math.IsInf(y64, -1):
 		return float32(math.Inf(-1))
 	case x == 0 && x == y:
@@ -93,7 +71,7 @@ func WasmCompatMin32(x, y float32) float32 {
 func WasmCompatMax64(x, y float64) float64 {
 	switch {
 	case math.IsNaN(x) || math.IsNaN(y):
-		return f64ReturnNaNBinOp(math.Float64bits(x), math.Float64bits(y))
+		return returnF64NaNBinOp(x, y)
 	case math.IsInf(x, 1) || math.IsInf(y, 1):
 		return math.Inf(1)
 	case x == 0 && x == y:
@@ -113,7 +91,7 @@ func WasmCompatMax32(x, y float32) float32 {
 	x64, y64 := float64(x), float64(y)
 	switch {
 	case math.IsNaN(x64) || math.IsNaN(y64):
-		return f32ReturnNaNBinOp(math.Float32bits(x), math.Float32bits(y))
+		return returnF32NaNBinOp(x, y)
 	case math.IsInf(x64, 1) || math.IsInf(y64, 1):
 		return float32(math.Inf(1))
 	case x == 0 && x == y:
@@ -238,28 +216,38 @@ func f64IsNaN(v float64) bool {
 
 func returnF32UniOp(original, result float32) float32 {
 	if f32IsNaN(result) {
-		return f32ReturnNaNUniOp(original)
+		if !f32IsNaN(original) {
+			return math.Float32frombits(F32CanonicalNaNBits)
+		}
+		return math.Float32frombits(math.Float32bits(original) | F32CanonicalNaNBits)
 	}
 	return result
 }
 
 func returnF64UniOp(original, result float64) float64 {
 	if f64IsNaN(result) {
-		return f64ReturnNaNUniOp(original)
+		if !f64IsNaN(original) {
+			return math.Float64frombits(F64CanonicalNaNBits)
+		}
+		return math.Float64frombits(math.Float64bits(original) | F64CanonicalNaNBits)
 	}
 	return result
 }
 
-func f32ReturnNaNUniOp(original float32) float32 {
-	if !f32IsNaN(original) {
-		return math.Float32frombits(F32CanonicalNaNBits)
+func returnF64NaNBinOp(x, y float64) float64 {
+	if f64IsNaN(x) {
+		return math.Float64frombits(math.Float64bits(x) | F64CanonicalNaNBits)
+	} else if f64IsNaN(y) {
+		return math.Float64frombits(math.Float64bits(y) | F64CanonicalNaNBits)
 	}
-	return math.Float32frombits(math.Float32bits(original) | F32CanonicalNaNBits)
+	return math.Float64frombits(F64CanonicalNaNBits)
 }
 
-func f64ReturnNaNUniOp(original float64) float64 {
-	if !f64IsNaN(original) {
-		return math.Float64frombits(F64CanonicalNaNBits)
+func returnF32NaNBinOp(x, y float32) float32 {
+	if f32IsNaN(x) {
+		return math.Float32frombits(math.Float32bits(x) | F32CanonicalNaNBits)
+	} else if f32IsNaN(y) {
+		return math.Float32frombits(math.Float32bits(y) | F32CanonicalNaNBits)
 	}
-	return math.Float64frombits(math.Float64bits(original) | F64CanonicalNaNBits)
+	return math.Float32frombits(F32CanonicalNaNBits)
 }
