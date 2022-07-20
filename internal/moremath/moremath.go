@@ -268,8 +268,9 @@ func WasmCompatTruncF32(f float32) float32 {
 // propagation.
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func WasmCompatTruncF64(f float64) float64 {
-	if math.IsNaN(f) {
+	ret := math.Trunc(f)
+	if math.IsNaN(ret) {
 		return f64ReturnNaNUniOp(math.Float64bits(f))
 	}
-	return math.Trunc(f)
+	return ret
 }

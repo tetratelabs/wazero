@@ -3598,13 +3598,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Trunc:
 			hi, lo := ce.popValue(), ce.popValue()
 			if op.b1 == wazeroir.ShapeF32x4 {
-				lo = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo))))))) |
-					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(lo>>32))))))) << 32)
-				hi = uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi))))))) |
-					(uint64(math.Float32bits(float32(math.Trunc(float64(math.Float32frombits(uint32(hi>>32))))))) << 32)
+				lo = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(lo>>32))))) << 32)
+				hi = uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi))))) |
+					(uint64(math.Float32bits(moremath.WasmCompatTruncF32(math.Float32frombits(uint32(hi>>32))))) << 32)
 			} else {
-				lo = math.Float64bits(math.Trunc(math.Float64frombits(lo)))
-				hi = math.Float64bits(math.Trunc(math.Float64frombits(hi)))
+				lo = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(lo)))
+				hi = math.Float64bits(moremath.WasmCompatTruncF64(math.Float64frombits(hi)))
 			}
 			ce.pushValue(lo)
 			ce.pushValue(hi)
