@@ -128,6 +128,8 @@ func WasmCompatNearestF32(f float32) float32 {
 		} else {
 			res = floor
 		}
+	} else {
+		res = f
 	}
 	return returnF32UniOp(f, res)
 }
@@ -154,6 +156,8 @@ func WasmCompatNearestF64(f float64) float64 {
 		} else {
 			res = floor
 		}
+	} else {
+		res = f
 	}
 	return returnF64UniOp(f, res)
 }
