@@ -148,9 +148,9 @@ func newModuleVal(m api.Module) reflect.Value {
 	return val
 }
 
-// RequireFunctionType returns the function type corresponding to the function
+// MustFunctionType returns the function type corresponding to the function
 // signature or panics if invalid.
-func RequireFunctionType(fn interface{}) *FunctionType {
+func MustFunctionType(fn interface{}) *FunctionType {
 	fnV := reflect.ValueOf(fn)
 	_, ft, err := getFunctionType(&fnV)
 	if err != nil {

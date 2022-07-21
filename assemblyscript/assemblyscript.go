@@ -182,7 +182,7 @@ func abort(
 
 // traceNoop implements trace in wasm to avoid host call overhead on no-op.
 var traceNoop = &wasm.Func{
-	Type: wasm.RequireFunctionType(traceToStdout),
+	Type: wasm.MustFunctionType(traceToStdout),
 	Code: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 }
 
