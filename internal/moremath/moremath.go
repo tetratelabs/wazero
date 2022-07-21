@@ -19,13 +19,13 @@ const (
 	// F32ExponentMask is used to extract the exponent of 32-bit floating point.
 	F32ExponentMask = uint32(0x7f80_0000)
 	// F32ArithmeticNaNBits is an example 32-bit arithmetic NaN.
-	F32ArithmeticNaNBits = F32CanonicalNaNBits | 0b1 // Set first bit to make this as an arithmetic NaN.
+	F32ArithmeticNaNBits = F32CanonicalNaNBits | 0b1 // Set first bit to make this different from the canonical NaN.
 	// F64ArithmeticNaNPayloadMSB is used to extract the most significant bit of payload of 64-bit arithmetic NaN values
 	F64ArithmeticNaNPayloadMSB = uint64(0x0008_0000_0000_0000)
 	// F64ExponentMask is used to extract the exponent of 64-bit floating point.
 	F64ExponentMask = uint64(0x7ff0_0000_0000_0000)
 	// F64ArithmeticNaNBits is an example 64-bit arithmetic NaN.
-	F64ArithmeticNaNBits = F64CanonicalNaNBits | 0b1 // Set first bit to make this as an arithmetic NaN.
+	F64ArithmeticNaNBits = F64CanonicalNaNBits | 0b1 // Set first bit to make this different from the canonical NaN.
 )
 
 // WasmCompatMin64 is the Wasm spec compatible variant of math.Min for 64-bit floating points.
