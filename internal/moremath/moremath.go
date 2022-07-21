@@ -218,34 +218,34 @@ func f64IsNaN(v float64) bool {
 	return v != v // this is how NaN is defined.
 }
 
-// returnF32UniOp returns the result of 32-bit unary operation. This accepts `original` which is the operand and `result` which is its result,
-// and returns the `result` as-is if the result is not NaN, otherwise following the same logic as in the reference interpreter
-// as well as the amd64 and arm64 floating point handling.
+// returnF32UniOp returns the result of 32-bit unary operation. This accepts `original` which is the operand,
+// and `result` which is its result. This returns the `result` as-is if the result is not NaN. Otherwise, this follows
+// the same logic as in the reference interpreter as well as the amd64 and arm64 floating point handling.
 func returnF32UniOp(original, result float32) float32 {
 	// Following the same logic as in the reference interpreter:
 	// https://github.com/WebAssembly/spec/blob/d48af683f5e6d00c13f775ab07d29a15daf92203/interpreter/exec/fxx.ml#L115-L122
-	if f32IsNaN(result) {
-		if !f32IsNaN(original) {
-			return math.Float32frombits(F32CanonicalNaNBits)
-		}
-		return math.Float32frombits(math.Float32bits(original) | F32CanonicalNaNBits)
+	if !f32IsNaN(result) {
+		return result
 	}
-	return result
+	if !f32IsNaN(original) {
+		return math.Float32frombits(F32CanonicalNaNBits)
+	}
+	return math.Float32frombits(math.Float32bits(original) | F32CanonicalNaNBits)
 }
 
-// returnF64UniOp returns the result of 64-bit unary operation. This accepts `original` which is the operand and `result` which is its result,
-// and returns the `result` as-is if the result is not NaN, otherwise following the same logic as in the reference interpreter
-// as well as the amd64 and arm64 floating point handling.
+// returnF32UniOp returns the result of 64-bit unary operation. This accepts `original` which is the operand,
+// and `result` which is its result. This returns the `result` as-is if the result is not NaN. Otherwise, this follows
+// the same logic as in the reference interpreter as well as the amd64 and arm64 floating point handling.
 func returnF64UniOp(original, result float64) float64 {
 	// Following the same logic as in the reference interpreter (== amd64 and arm64's behavior):
 	// https://github.com/WebAssembly/spec/blob/d48af683f5e6d00c13f775ab07d29a15daf92203/interpreter/exec/fxx.ml#L115-L122
-	if f64IsNaN(result) {
-		if !f64IsNaN(original) {
-			return math.Float64frombits(F64CanonicalNaNBits)
-		}
-		return math.Float64frombits(math.Float64bits(original) | F64CanonicalNaNBits)
+	if !f64IsNaN(result) {
+		return result
 	}
-	return result
+	if !f64IsNaN(original) {
+		return math.Float64frombits(F64CanonicalNaNBits)
+	}
+	return math.Float64frombits(math.Float64bits(original) | F64CanonicalNaNBits)
 }
 
 // returnF64NaNBinOp returns a NaN for 64-bit binary operations. `x` and `y` are original floats
