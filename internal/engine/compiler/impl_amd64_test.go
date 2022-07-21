@@ -395,7 +395,7 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
-	rv := []*runtimeValueLocation{{register: 1}, {register: 2}, {register: 3}}
+	rv := []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}}
 
 	currentRegisters := func() []asm.Register {
 		out := make([]asm.Register, len(rv))
@@ -409,12 +409,12 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 		desired, expected []asm.Register
 		swaps             []int
 	}{
-		{desired: []asm.Register{3, 2, 1}, expected: []asm.Register{3, 2, 1}, swaps: []int{0, 2}},
-		{desired: []asm.Register{3, 1, 2}, expected: []asm.Register{3, 1, 2}, swaps: []int{0, 2, 1, 2}},
-		{desired: []asm.Register{5, 1, 4}, expected: []asm.Register{2, 1, 3}, swaps: []int{1, 0}},
-		{desired: []asm.Register{4, 5, 6}, expected: []asm.Register{1, 2, 3}, swaps: []int{}},
-		{desired: []asm.Register{1, 2, 3}, expected: []asm.Register{1, 2, 3}, swaps: []int{}},
-		{desired: []asm.Register{3, 5, 1}, expected: []asm.Register{3, 2, 1}, swaps: []int{0, 2}},
+		{desired: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, swaps: []int{0, 2}},
+		{desired: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX}, expected: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX}, swaps: []int{0, 2, 1, 2}},
+		{desired: []asm.Register{amd64.RegR9, amd64.RegAX, amd64.RegR8}, expected: []asm.Register{amd64.RegCX, amd64.RegAX, amd64.RegDX}, swaps: []int{1, 0}},
+		{desired: []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10}, expected: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, swaps: []int{}},
+		{desired: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, expected: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, swaps: []int{}},
+		{desired: []asm.Register{amd64.RegDX, amd64.RegR9, amd64.RegAX}, expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, swaps: []int{0, 2}},
 	}
 
 	for _, tt := range tests {
@@ -422,7 +422,7 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 		require.Equal(t, tt.swaps, swaps)
 		require.Equal(t, tt.expected, currentRegisters())
 		compiler.compileRestorePreventedCrossing(rv, swaps)
-		require.Equal(t, []asm.Register{1, 2, 3}, currentRegisters())
+		require.Equal(t, []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, currentRegisters())
 	}
 
 }

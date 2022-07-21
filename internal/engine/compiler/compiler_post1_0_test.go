@@ -290,15 +290,12 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				code, _, err := compiler.compile()
 				requireBenchmarkNoError(b, err)
 
-				env.execBench(code, b)
-
-				for i := 0; i < b.N; i++ {
+				env.execBench(b, code, func() {
 					copy(testMem[destOffset:destOffset+size], testMem[sourceOffset:sourceOffset+size])
-				}
-
-				if !bytes.Equal(mem, testMem) {
-					b.FailNow()
-				}
+					if !bytes.Equal(mem, testMem) {
+						b.FailNow()
+					}
+				})
 			})
 		}
 	}
