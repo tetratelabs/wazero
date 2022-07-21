@@ -9,9 +9,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+const functionPollOneoff = "poll_oneoff"
+
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-eventtype-enumu8
 const (
-	// eventTypeClock is the timeout event named "clock".
+	// eventTypeClock is the timeout event named "name".
 	eventTypeClock = iota
 	// eventTypeFdRead is the data available event named "fd_read".
 	eventTypeFdRead
@@ -19,22 +21,23 @@ const (
 	eventTypeFdWrite
 )
 
-// PollOneoff is the WASI function named functionPollOneoff that concurrently
+// pollOneoff is the WASI function named functionPollOneoff that concurrently
 // polls for the occurrence of a set of events.
 //
 // Parameters
 //
-//	* in - pointer to the subscriptions (48 bytes each)
-//	* out - pointer to the resulting events (32 bytes each)
-//	* nsubscriptions - count of subscriptions, zero returns ErrnoInval.
-//	* resultNevents - count of events.
+//	* in: pointer to the subscriptions (48 bytes each)
+//	* out: pointer to the resulting events (32 bytes each)
+//	* nsubscriptions: count of subscriptions, zero returns ErrnoInval.
+//	* resultNevents: count of events.
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoInval - If the parameters are invalid
-//	* ErrnoNotsup - If a parameters is valid, but not yet supported.
-//	* ErrnoFault - if there is not enough memory to read the subscriptions or write results.
+//	* ErrnoInval: the parameters are invalid
+//	* ErrnoNotsup: a parameters is valid, but not yet supported.
+//	* ErrnoFault: there is not enough memory to read the subscriptions or
+//	  write results.
 //
 // Notes
 //
@@ -43,7 +46,7 @@ const (
 //	* This is similar to `poll` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
-func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
+func pollOneoff(ctx context.Context, mod api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
 	if nsubscriptions == 0 {
 		return ErrnoInval
 	}
@@ -75,7 +78,7 @@ func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscri
 		eventType := inBuf[inOffset+8] // +8 past userdata
 		switch eventType {
 		case eventTypeClock: // handle later
-			// +8 past userdata +8 clock alignment
+			// +8 past userdata +8 name alignment
 			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
 		case eventTypeFdRead, eventTypeFdWrite:
 			// +8 past userdata +4 FD alignment
@@ -95,7 +98,7 @@ func (a *wasi) PollOneoff(ctx context.Context, mod api.Module, in, out, nsubscri
 	return ErrnoSuccess
 }
 
-// processClockEvent supports only relative clock events, as that's what's used
+// processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
 func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno {
 	_ /* ID */ = binary.LittleEndian.Uint32(inBuf[0:8])          // See below
@@ -114,7 +117,7 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 
 	// https://linux.die.net/man/3/clock_settime says relative timers are
 	// unaffected. Since this function only supports relative timeout, we can
-	// skip clock ID validation and use a single sleep function.
+	// skip name ID validation and use a single sleep function.
 
 	sysCtx := mod.(*wasm.CallContext).Sys
 	sysCtx.Nanosleep(ctx, int64(timeout))
@@ -127,7 +130,8 @@ func processFDEvent(ctx context.Context, mod api.Module, eventType byte, inBuf [
 	fd := binary.LittleEndian.Uint32(inBuf)
 	sysCtx := mod.(*wasm.CallContext).Sys
 
-	// Choose the best error, which falls back to unsupported, until we support files.
+	// Choose the best error, which falls back to unsupported, until we support
+	// files.
 	errno := ErrnoNotsup
 	if eventType == eventTypeFdRead && internalsys.FdReader(ctx, sysCtx, fd) == nil {
 		errno = ErrnoBadf

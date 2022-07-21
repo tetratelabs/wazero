@@ -20,6 +20,7 @@ var growWasm []byte
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
+// TestGrow is an integration test until we have an Emscripten example.
 func TestGrow(t *testing.T) {
 	var log bytes.Buffer
 
@@ -40,6 +41,6 @@ func TestGrow(t *testing.T) {
 	require.Error(t, err)
 	require.Zero(t, err.(*sys.ExitError).ExitCode())
 
-	// We expect the memory no-op memory growth hook to be invoked.
-	require.Contains(t, log.String(), "==> env.emscripten_notify_memory_growth(memory_index=0)")
+	// We expect the memory no-op memory growth hook to be invoked as wasm.
+	require.Contains(t, log.String(), "--> env.emscripten_notify_memory_growth(memory_index=0)")
 }

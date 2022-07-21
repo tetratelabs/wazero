@@ -248,7 +248,7 @@ const (
 	// OpcodeRefFunc pushes a funcref value whose index equals the immediate to this opcode.
 	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
 	//
-	// Currently only supported in the constant expression in element segments.
+	// Currently, this is only supported in the constant expression in element segments.
 	OpcodeRefFunc = 0xd2
 
 	// Below are toggled with FeatureSignExtensionOps

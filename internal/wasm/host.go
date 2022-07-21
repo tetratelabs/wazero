@@ -9,6 +9,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
+// Func is a function with an inlined type, typically used for NewHostModule.
+type Func struct {
+	// Type is the equivalent function in the SectionIDType.
+	// This will resolve to an existing or new element.
+	Type *FunctionType
+
+	// Code is the equivalent function in the SectionIDCode.
+	Code *Code
+}
+
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
 func NewHostModule(
 	moduleName string,
@@ -79,7 +89,7 @@ func addFuncs(
 	nameToGoFunc map[string]interface{},
 	funcToNames map[string][]string,
 	enabledFeatures Features,
-) error {
+) (err error) {
 	funcCount := uint32(len(nameToGoFunc))
 	funcNames := make([]string, 0, funcCount)
 	if m.NameSection == nil {
@@ -100,19 +110,36 @@ func addFuncs(
 	for idx := Index(0); idx < funcCount; idx++ {
 		exportName := funcNames[idx]
 		debugName := wasmdebug.FuncName(moduleName, exportName, idx)
-		fn := reflect.ValueOf(nameToGoFunc[exportName])
-		_, functionType, err := getFunctionType(&fn, enabledFeatures)
-		if err != nil {
-			return fmt.Errorf("func[%s] %w", debugName, err)
-		}
-		names := funcToNames[exportName]
-		namesLen := len(names)
-		if namesLen > 1 && namesLen-1 != len(functionType.Params) {
-			return fmt.Errorf("func[%s] has %d params, but %d param names", debugName, namesLen-1, len(functionType.Params))
+
+		gf := nameToGoFunc[exportName]
+		var ft *FunctionType
+		if hf, ok := gf.(*Func); ok {
+			ft = hf.Type
+			m.CodeSection = append(m.CodeSection, hf.Code)
+		} else {
+			fn := reflect.ValueOf(gf)
+			_, ft, err = getFunctionType(&fn)
+			if err != nil {
+				return fmt.Errorf("func[%s] %w", debugName, err)
+			}
+			m.CodeSection = append(m.CodeSection, &Code{GoFunc: &fn})
 		}
 
-		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(functionType))
-		m.CodeSection = append(m.CodeSection, &Code{GoFunc: &fn})
+		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(ft))
+
+		names := funcToNames[exportName]
+		namesLen := len(names)
+		if namesLen > 1 && namesLen-1 != len(ft.Params) {
+			return fmt.Errorf("func[%s] has %d params, but %d param names", debugName, namesLen-1, len(ft.Params))
+		}
+		if len(ft.Results) > 1 {
+			// Guard >1.0 feature multi-value
+			if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
+				err = fmt.Errorf("func[%s] multiple result types invalid as %v", debugName, err)
+				return
+			}
+		}
+
 		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: exportName, Index: idx})
 		if namesLen > 0 {
 			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: names[0]})

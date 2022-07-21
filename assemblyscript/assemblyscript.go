@@ -18,7 +18,9 @@
 // these functions.
 //
 // See wasi_snapshot_preview1.Instantiate and
-// https://www.assemblyscript.org/concepts.html#special-imports
+//	* https://www.assemblyscript.org/concepts.html#special-imports
+//	* https://www.assemblyscript.org/concepts.html#targeting-wasi
+//	* https://www.assemblyscript.org/compiler.html#compiler-options
 package assemblyscript
 
 import (
@@ -114,24 +116,26 @@ func (e *functionExporter) WithTraceToStderr() FunctionExporter {
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
-	env := &assemblyscript{abortMessageDisabled: e.abortMessageDisabled, traceMode: e.traceMode}
-	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort",
+	var abortFn fnAbort
+	if e.abortMessageDisabled {
+		abortFn = abort
+	} else {
+		abortFn = abortWithMessage
+	}
+	var traceFn interface{}
+	switch e.traceMode {
+	case traceDisabled:
+		traceFn = traceNoop
+	case traceStdout:
+		traceFn = traceToStdout
+	case traceStderr:
+		traceFn = traceToStderr
+	}
+	builder.ExportFunction("abort", abortFn, "~lib/builtins/abort",
 		"message", "fileName", "lineNumber", "columnNumber")
-	builder.ExportFunction("trace", env.trace, "~lib/builtins/trace",
+	builder.ExportFunction("trace", traceFn, "~lib/builtins/trace",
 		"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4")
-	builder.ExportFunction("seed", env.seed, "~lib/builtins/seed")
-}
-
-// assemblyScript includes "Special imports" only used In AssemblyScript when a
-// user didn't add `import "wasi"` to their entry file.
-//
-// See https://www.assemblyscript.org/concepts.html#special-imports
-// See https://www.assemblyscript.org/concepts.html#targeting-wasi
-// See https://www.assemblyscript.org/compiler.html#compiler-options
-// See https://github.com/AssemblyScript/assemblyscript/issues/1562
-type assemblyscript struct {
-	abortMessageDisabled bool
-	traceMode            traceMode
+	builder.ExportFunction("seed", seed, "~lib/builtins/seed")
 }
 
 // abort is called on unrecoverable errors. This is typically present in Wasm
@@ -146,27 +150,25 @@ type assemblyscript struct {
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
-func (a *assemblyscript) abort(
-	ctx context.Context,
-	mod api.Module,
-	message uint32,
-	fileName uint32,
-	lineNumber uint32,
-	columnNumber uint32,
-) {
-	if !a.abortMessageDisabled {
-		sysCtx := mod.(*wasm.CallContext).Sys
-		msg, err := readAssemblyScriptString(ctx, mod, message)
-		if err != nil {
-			return
-		}
-		fn, err := readAssemblyScriptString(ctx, mod, fileName)
-		if err != nil {
-			return
-		}
-		_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
-	}
+type fnAbort func(
+	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
+)
 
+// abortWithMessage implements fnAbort
+func abortWithMessage(
+	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
+) {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	msg := requireAssemblyScriptString(ctx, mod, "message", message)
+	fn := requireAssemblyScriptString(ctx, mod, "fileName", fileName)
+	_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+	abort(ctx, mod, message, fileName, lineNumber, columnNumber)
+}
+
+// abortWithMessage implements fnAbort ignoring the message.
+func abort(
+	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
+) {
 	// AssemblyScript expects the exit code to be 255
 	// See https://github.com/AssemblyScript/assemblyscript/blob/v0.20.13/tests/compiler/wasi/abort.js#L14
 	exitCode := uint32(255)
@@ -178,7 +180,27 @@ func (a *assemblyscript) abort(
 	panic(sys.NewExitError(mod.Name(), exitCode))
 }
 
-// trace implements the same named function in AssemblyScript. Ex.
+// traceNoop implements trace in wasm to avoid host call overhead on no-op.
+var traceNoop = &wasm.Func{
+	Type: wasm.MustFunctionType(traceToStdout),
+	Code: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+}
+
+// traceToStdout implements trace to the configured Stdout.
+func traceToStdout(
+	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
+) {
+	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stdout())
+}
+
+// traceToStdout implements trace to the configured Stderr.
+func traceToStderr(
+	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
+) {
+	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stderr())
+}
+
+// traceTo implements the function "trace" in AssemblyScript. Ex.
 //	trace('Hello World!')
 //
 // Here's the import in a user's module that ends up using this, in WebAssembly
@@ -186,26 +208,13 @@ func (a *assemblyscript) abort(
 //	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
-func (a *assemblyscript) trace(
+func traceTo(
 	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
+	writer io.Writer,
 ) {
-	var writer io.Writer
-	switch a.traceMode {
-	case traceDisabled:
-		return
-	case traceStdout:
-		writer = mod.(*wasm.CallContext).Sys.Stdout()
-	case traceStderr:
-		writer = mod.(*wasm.CallContext).Sys.Stderr()
-	}
-
-	msg, err := readAssemblyScriptString(ctx, mod, message)
-	if err != nil {
-		panic(err)
-	}
 	var ret strings.Builder
 	ret.WriteString("trace: ")
-	ret.WriteString(msg)
+	ret.WriteString(requireAssemblyScriptString(ctx, mod, "message", message))
 	if nArgs >= 1 {
 		ret.WriteString(" ")
 		ret.WriteString(formatFloat(arg0))
@@ -227,8 +236,7 @@ func (a *assemblyscript) trace(
 		ret.WriteString(formatFloat(arg4))
 	}
 	ret.WriteByte('\n')
-	_, err = writer.Write([]byte(ret.String()))
-	if err != nil {
+	if _, err := writer.Write([]byte(ret.String())); err != nil {
 		panic(err)
 	}
 }
@@ -245,7 +253,7 @@ func formatFloat(f float64) string {
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
-func (a *assemblyscript) seed(mod api.Module) float64 {
+func seed(mod api.Module) float64 {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
 	v, err := ieee754.DecodeFloat64(randSource)
 	if err != nil {
@@ -254,21 +262,21 @@ func (a *assemblyscript) seed(mod api.Module) float64 {
 	return v
 }
 
-// readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
-func readAssemblyScriptString(ctx context.Context, mod api.Module, offset uint32) (string, error) {
+// requireAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
+func requireAssemblyScriptString(ctx context.Context, mod api.Module, fieldName string, offset uint32) string {
 	// Length is four bytes before pointer.
 	byteCount, ok := mod.Memory().ReadUint32Le(ctx, offset-4)
 	if !ok {
-		return "", fmt.Errorf("Memory.ReadUint32Le(%d) out of range", offset-4)
+		panic(fmt.Errorf("out of memory reading %s", fieldName))
 	}
 	if byteCount%2 != 0 {
-		return "", fmt.Errorf("read an odd number of bytes for utf-16 string: %d", byteCount)
+		panic(fmt.Errorf("invalid UTF-16 reading %s", fieldName))
 	}
 	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
 	if !ok {
-		return "", fmt.Errorf("Memory.Read(%d, %d) out of range", offset, byteCount)
+		panic(fmt.Errorf("out of memory reading %s", fieldName))
 	}
-	return decodeUTF16(buf), nil
+	return decodeUTF16(buf)
 }
 
 func decodeUTF16(b []byte) string {

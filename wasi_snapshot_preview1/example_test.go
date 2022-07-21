@@ -44,7 +44,7 @@ func Example() {
 	// Override default configuration (which discards stdout).
 	mod, err := r.InstantiateModule(ctx, code, wazero.NewModuleConfig().WithStdout(os.Stdout).WithName("wasi-demo"))
 	if mod != nil {
-		defer mod.Close(ctx)
+		defer r.Close(ctx)
 	}
 
 	// Note: Most compilers do not exit the module after running "_start", unless
