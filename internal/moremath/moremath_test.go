@@ -138,6 +138,36 @@ func TestUniOp_NaNPropagation(t *testing.T) {
 	}
 }
 
+func Test_returnF32UniOp(t *testing.T) {
+	for _, tc := range []struct {
+		original, result, exp uint32
+	}{
+		{result: math.Float32bits(1.1), exp: math.Float32bits(1.1)},
+		{original: 1.0, result: math.Float32bits(float32(math.NaN())), exp: F32CanonicalNaNBits},
+		{original: F32ArithmeticNaNBits, result: math.Float32bits(float32(math.NaN())), exp: F32ArithmeticNaNBits},
+		// Even if the MSB of the payload is unset (signaling NaN), the result must it set, therefore an arithmetic NaN.
+		{original: F32ArithmeticNaNBits ^ (1 << 22), result: math.Float32bits(float32(math.NaN())), exp: F32ArithmeticNaNBits},
+	} {
+		actual := returnF32UniOp(math.Float32frombits(tc.original), math.Float32frombits(tc.result))
+		require.Equal(t, tc.exp, math.Float32bits(actual))
+	}
+}
+
+func Test_returnF64UniOp(t *testing.T) {
+	for _, tc := range []struct {
+		original, result, exp uint64
+	}{
+		{result: math.Float64bits(1.1), exp: math.Float64bits(1.1)},
+		{original: 1.0, result: math.Float64bits(math.NaN()), exp: F64CanonicalNaNBits},
+		{original: F64ArithmeticNaNBits, result: math.Float64bits(math.NaN()), exp: F64ArithmeticNaNBits},
+		// Even if the MSB of the payload is unset (signaling NaN), the result must it set, therefore an arithmetic NaN.
+		{original: F64ArithmeticNaNBits ^ (1 << 51), result: math.Float64bits(math.NaN()), exp: F64ArithmeticNaNBits},
+	} {
+		actual := returnF64UniOp(math.Float64frombits(tc.original), math.Float64frombits(tc.result))
+		require.Equal(t, tc.exp, math.Float64bits(actual))
+	}
+}
+
 func Test_returnF32NaNBinOp(t *testing.T) {
 	for _, tc := range []struct {
 		x, y, exp uint32
