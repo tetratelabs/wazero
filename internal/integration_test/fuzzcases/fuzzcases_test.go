@@ -25,6 +25,8 @@ var (
 	case704 []byte
 	//go:embed testdata/708.wasm
 	case708 []byte
+	//go:embed testdata/709.wasm
+	case709 []byte
 )
 
 func newRuntimeCompiler() wazero.Runtime {
@@ -190,6 +192,35 @@ func Test708(t *testing.T) {
 			_, err := tc.r.InstantiateModuleFromBinary(ctx, case708)
 			require.NotNil(t, err)
 			require.Contains(t, err.Error(), "out of bounds memory access")
+		})
+	}
+}
+
+func Test709(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		r    wazero.Runtime
+	}{
+		{name: "compiler", r: newRuntimeCompiler()},
+		{name: "interpreter", r: newRuntimeInterpreter()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.r.Close(ctx)
+			mod, err := tc.r.InstantiateModuleFromBinary(ctx, case709)
+			require.NoError(t, err)
+
+			f := mod.ExportedFunction("f64x2.promote_low_f32x4")
+			require.NotNil(t, f)
+			res, err := f.Call(ctx)
+			require.NoError(t, err)
+
+			require.NotEqual(t, uint64(0), res[0])
+			require.NotEqual(t, uint64(0), res[1])
 		})
 	}
 }

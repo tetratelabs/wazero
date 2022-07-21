@@ -2722,6 +2722,8 @@ func (OperationV128ExtAddPairwise) Kind() OperationKind {
 // OperationV128FloatPromote implements Operation.
 //
 // This corresponds to wasm.OpcodeVecF64x2PromoteLowF32x4ZeroName
+// This discards the higher 64-bit of a vector, and promotes two
+// 32-bit floats in the lower 64-bit as two 64-bit floats.
 type OperationV128FloatPromote struct{}
 
 // Kind implements Operation.Kind.
