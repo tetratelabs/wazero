@@ -17,6 +17,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // Instantiate instantiates the "env" module used by Emscripten into the
@@ -50,13 +51,9 @@ type functionExporter struct{}
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
-	env := &emscripten{}
-	builder.ExportFunction("emscripten_notify_memory_growth", env.emscriptenNotifyMemoryGrowth,
+	builder.ExportFunction("emscripten_notify_memory_growth", emscriptenNotifyMemoryGrowth,
 		"emscripten_notify_memory_growth", "memory_index")
 }
-
-// emscripten implements common imports used by standalone wasm.
-type emscripten struct{}
 
 // emscriptenNotifyMemoryGrowth is called when wasm is compiled with
 // `-s ALLOW_MEMORY_GROWTH` and a "memory.grow" instruction succeeded.
@@ -73,4 +70,7 @@ type emscripten struct{}
 //
 // See https://github.com/emscripten-core/emscripten/blob/3.1.16/system/lib/standalone/standalone.c#L118
 // and https://emscripten.org/docs/api_reference/emscripten.h.html#abi-functions
-func (a *emscripten) emscriptenNotifyMemoryGrowth(uint32) {}
+var emscriptenNotifyMemoryGrowth = &wasm.Func{
+	Type: &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}},
+	Code: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+}

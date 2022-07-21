@@ -261,8 +261,8 @@ func Test_loggingListener(t *testing.T) {
 		},
 	}
 
-	out := bytes.NewBuffer(nil)
-	lf := experimental.NewLoggingListenerFactory(out)
+	var out bytes.Buffer
+	lf := experimental.NewLoggingListenerFactory(&out)
 	fnV := reflect.ValueOf(func() {})
 	for _, tt := range tests {
 		tc := tt

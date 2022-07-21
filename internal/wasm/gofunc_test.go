@@ -87,7 +87,7 @@ func TestGetFunctionType(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.inputFunc)
-			fk, ft, err := getFunctionType(&rVal, Features20191205|FeatureMultiValue)
+			fk, ft, err := getFunctionType(&rVal)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedKind, fk)
 			require.Equal(t, tc.expectedType, ft)
@@ -123,11 +123,6 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 			expectedErr: "result[0] is an error, which is unsupported",
 		},
 		{
-			name:        "multiple results - multi-value not enabled",
-			input:       func() (uint64, uint32) { return 0, 0 },
-			expectedErr: "multiple result types invalid as feature \"multi-value\" is disabled",
-		},
-		{
 			name:        "multiple context types",
 			input:       func(api.Module, context.Context) error { return nil },
 			expectedErr: "param[1] is a context.Context, which may be defined only once as param[0]",
@@ -149,7 +144,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.input)
-			_, _, err := getFunctionType(&rVal, Features20191205)
+			_, _, err := getFunctionType(&rVal)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -254,7 +249,7 @@ func TestPopGoFuncParams(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, Features20220419)
+			fk, _, err := getFunctionType(&goFunc)
 			require.NoError(t, err)
 
 			vals := PopGoFuncParams(&FunctionInstance{Kind: fk, GoFunc: &goFunc}, (&stack{stackVals}).pop)
@@ -407,7 +402,7 @@ func TestCallGoFunc(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, Features20220419)
+			fk, _, err := getFunctionType(&goFunc)
 			require.NoError(t, err)
 
 			results := CallGoFunc(testCtx, callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)

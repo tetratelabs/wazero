@@ -14,6 +14,16 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+func TestContext_FS(t *testing.T) {
+	sysCtx := DefaultContext(testfs.FS{})
+
+	require.Equal(t, NewFSContext(testfs.FS{}), sysCtx.FS(testCtx))
+
+	// can override to something else
+	fsc := NewFSContext(testfs.FS{"foo": &testfs.File{}})
+	require.Equal(t, fsc, sysCtx.FS(context.WithValue(testCtx, FSKey{}, fsc)))
+}
+
 func TestDefaultSysContext(t *testing.T) {
 	sysCtx, err := NewContext(
 		0,      // max

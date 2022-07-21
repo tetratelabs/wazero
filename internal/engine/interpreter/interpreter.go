@@ -111,18 +111,13 @@ func (ce *callEngine) popValue() (v uint64) {
 	return
 }
 
-// peekValues peeks api.ValueType values from the stack and returns them in reverse order.
+// peekValues peeks api.ValueType values from the stack and returns them.
 func (ce *callEngine) peekValues(count int) []uint64 {
 	if count == 0 {
 		return nil
 	}
 	stackLen := len(ce.stack)
-	peeked := ce.stack[stackLen-count : stackLen]
-	values := make([]uint64, 0, count)
-	for i := count - 1; i >= 0; i-- {
-		values = append(values, peeked[i])
-	}
-	return values
+	return ce.stack[stackLen-count : stackLen]
 }
 
 func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {

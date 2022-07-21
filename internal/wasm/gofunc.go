@@ -148,8 +148,19 @@ func newModuleVal(m api.Module) reflect.Value {
 	return val
 }
 
+// RequireFunctionType returns the function type corresponding to the function
+// signature or panics if invalid.
+func RequireFunctionType(fn interface{}) *FunctionType {
+	fnV := reflect.ValueOf(fn)
+	_, ft, err := getFunctionType(&fnV)
+	if err != nil {
+		panic(err)
+	}
+	return ft
+}
+
 // getFunctionType returns the function type corresponding to the function signature or errs if invalid.
-func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKind, ft *FunctionType, err error) {
+func getFunctionType(fn *reflect.Value) (fk FunctionKind, ft *FunctionType, err error) {
 	p := fn.Type()
 
 	if fn.Kind() != reflect.Func {
@@ -168,14 +179,6 @@ func getFunctionType(fn *reflect.Value, enabledFeatures Features) (fk FunctionKi
 	}
 
 	rCount := p.NumOut()
-
-	if rCount > 1 {
-		// Guard >1.0 feature multi-value
-		if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
-			err = fmt.Errorf("multiple result types invalid as %v", err)
-			return
-		}
-	}
 
 	ft = &FunctionType{Params: make([]ValueType, p.NumIn()-pOffset), Results: make([]ValueType, rCount)}
 	ft.CacheNumInUint64()
