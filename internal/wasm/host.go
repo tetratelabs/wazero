@@ -15,7 +15,7 @@ type Func struct {
 	// This will resolve to an existing or new element.
 	Type *FunctionType
 
-	// Type is the equivalent function in the SectionIDCode.
+	// Code is the equivalent function in the SectionIDCode.
 	Code *Code
 }
 
