@@ -218,7 +218,12 @@ func f64IsNaN(v float64) bool {
 	return v != v // this is how NaN is defined.
 }
 
+// returnF32UniOp returns the result of 32-bit unary operation. This accepts `original` which is the operand and `result` which is its result,
+// and returns the `result` as-is if the result is not NaN, otherwise following the same logic as in the reference interpreter
+// as well as the amd64 and arm64 floating point handling.
 func returnF32UniOp(original, result float32) float32 {
+	// Following the same logic as in the reference interpreter:
+	// https://github.com/WebAssembly/spec/blob/d48af683f5e6d00c13f775ab07d29a15daf92203/interpreter/exec/fxx.ml#L115-L122
 	if f32IsNaN(result) {
 		if !f32IsNaN(original) {
 			return math.Float32frombits(F32CanonicalNaNBits)
@@ -228,7 +233,12 @@ func returnF32UniOp(original, result float32) float32 {
 	return result
 }
 
+// returnF64UniOp returns the result of 64-bit unary operation. This accepts `original` which is the operand and `result` which is its result,
+// and returns the `result` as-is if the result is not NaN, otherwise following the same logic as in the reference interpreter
+// as well as the amd64 and arm64 floating point handling.
 func returnF64UniOp(original, result float64) float64 {
+	// Following the same logic as in the reference interpreter (== amd64 and arm64's behavior):
+	// https://github.com/WebAssembly/spec/blob/d48af683f5e6d00c13f775ab07d29a15daf92203/interpreter/exec/fxx.ml#L115-L122
 	if f64IsNaN(result) {
 		if !f64IsNaN(original) {
 			return math.Float64frombits(F64CanonicalNaNBits)
@@ -241,17 +251,15 @@ func returnF64UniOp(original, result float64) float64 {
 func returnF64NaNBinOp(x, y float64) float64 {
 	if f64IsNaN(x) {
 		return math.Float64frombits(math.Float64bits(x) | F64CanonicalNaNBits)
-	} else if f64IsNaN(y) {
+	} else {
 		return math.Float64frombits(math.Float64bits(y) | F64CanonicalNaNBits)
 	}
-	return math.Float64frombits(F64CanonicalNaNBits)
 }
 
 func returnF32NaNBinOp(x, y float32) float32 {
 	if f32IsNaN(x) {
 		return math.Float32frombits(math.Float32bits(x) | F32CanonicalNaNBits)
-	} else if f32IsNaN(y) {
+	} else {
 		return math.Float32frombits(math.Float32bits(y) | F32CanonicalNaNBits)
 	}
-	return math.Float32frombits(F32CanonicalNaNBits)
 }
