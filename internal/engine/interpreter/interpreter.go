@@ -1374,7 +1374,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			v1 := ce.popValue()
 			switch wazeroir.SignedInt(op.b1) {
 			case wazeroir.SignedInt32:
-				ce.pushValue(uint64(int32(v1) >> (uint32(v2) % 32)))
+				ce.pushValue(uint64(uint32(int32(v1) >> (uint32(v2) % 32))))
 			case wazeroir.SignedInt64:
 				ce.pushValue(uint64(int64(v1) >> (v2 % 64)))
 			case wazeroir.SignedUint32:
