@@ -3826,9 +3826,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(retHi)
 			frame.pc++
 		case wazeroir.OperationKindV128FloatPromote:
-			hi, lo := ce.popValue(), ce.popValue()
+			_, lo := ce.popValue(), ce.popValue()
 			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(lo)))))
-			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(hi)))))
+			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(lo >> 32)))))
 			frame.pc++
 		case wazeroir.OperationKindV128FloatDemote:
 			hi, lo := ce.popValue(), ce.popValue()
