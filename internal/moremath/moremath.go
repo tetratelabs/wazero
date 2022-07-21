@@ -248,6 +248,9 @@ func returnF64UniOp(original, result float64) float64 {
 	return result
 }
 
+// returnF64NaNBinOp returns a NaN for 64-bit binary operations. `x` and `y` are original floats
+// and at least one of them is NaN. The returned NaN is guaranteed to comply with the NaN propagation
+// procedure: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func returnF64NaNBinOp(x, y float64) float64 {
 	if f64IsNaN(x) {
 		return math.Float64frombits(math.Float64bits(x) | F64CanonicalNaNBits)
@@ -256,6 +259,9 @@ func returnF64NaNBinOp(x, y float64) float64 {
 	}
 }
 
+// returnF64NaNBinOp returns a NaN for 32-bit binary operations. `x` and `y` are original floats
+// and at least one of them is NaN. The returned NaN is guaranteed to comply with the NaN propagation
+// procedure: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/numerics.html#nan-propagation
 func returnF32NaNBinOp(x, y float32) float32 {
 	if f32IsNaN(x) {
 		return math.Float32frombits(math.Float32bits(x) | F32CanonicalNaNBits)
