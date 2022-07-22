@@ -861,7 +861,6 @@ func (c *amd64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 		// otherwise the memory location is overridden by other values
 		// after this drop instruction.
 		if err := c.compileEnsureOnRegister(live); err != nil {
-
 			return err
 		}
 

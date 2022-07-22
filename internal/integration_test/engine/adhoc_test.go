@@ -122,8 +122,13 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
 
-	_, err = fn.Call(testCtx)
+	res, err := fn.Call(testCtx, 0)
 	require.NoError(t, err)
+
+	require.Equal(t, 100, len(res))
+	for i := uint64(1); i <= 100; i++ {
+		require.Equal(t, i, res[i-1])
+	}
 }
 
 // testOverflow ensures that adding one into the maximum integer results in the
