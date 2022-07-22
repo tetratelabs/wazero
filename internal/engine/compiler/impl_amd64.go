@@ -480,7 +480,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
-	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
+	if err := c.compileDropRange(thenTarget.ToDrop); err != nil {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
@@ -515,7 +515,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
-		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+		if err := c.compileDropRange(o.Default.ToDrop); err != nil {
 			return err
 		}
 		return c.branchInto(o.Default.Target)
@@ -617,7 +617,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := c.emitDropRange(target.ToDrop); err != nil {
+		if err := c.compileDropRange(target.ToDrop); err != nil {
 			return err
 		}
 		if err := c.branchInto(target.Target); err != nil {
@@ -829,10 +829,10 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.emitDropRange(o.Depth)
+	return c.compileDropRange(o.Depth)
 }
 
-func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
+func (c *amd64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {

@@ -53,11 +53,11 @@ func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithFeatureMultiValue(true))
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithFeatureMultiValue(true))
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
