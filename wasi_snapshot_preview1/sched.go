@@ -6,4 +6,4 @@ const functionSchedYield = "sched_yield"
 // yields execution of the calling thread.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-sched_yield---errno
-var schedYield = stubFunction() // stubbed for GrainLang per #271.
+var schedYield = stubFunction(functionSchedYield, nil, nil)

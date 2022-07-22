@@ -34,19 +34,23 @@ const functionRandomGet = "random_get"
 //              buf --^
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-func randomGet(ctx context.Context, mod api.Module, buf uint32, bufLen uint32) (errno Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	randSource := sysCtx.RandSource()
+var randomGet = wasm.NewGoFunc(
+	functionRandomGet, functionRandomGet,
+	[]string{"buf", "buf_len"},
+	func(ctx context.Context, mod api.Module, buf uint32, bufLen uint32) (errno Errno) {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		randSource := sysCtx.RandSource()
 
-	randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
-	if !ok { // out-of-range
-		return ErrnoFault
-	}
+		randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
+		if !ok { // out-of-range
+			return ErrnoFault
+		}
 
-	// We can ignore the returned n as it only != byteCount on error
-	if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
-		return ErrnoIo
-	}
+		// We can ignore the returned n as it only != byteCount on error
+		if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
+			return ErrnoIo
+		}
 
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)

@@ -55,23 +55,39 @@ func Test_environGet_Errors(t *testing.T) {
 			name:       "out-of-memory environPtr",
 			environ:    memorySize,
 			environBuf: validAddress,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_get(environ=65536,environ_buf=0)
+<== EFAULT
+`,
 		},
 		{
 			name:       "out-of-memory environBufPtr",
 			environ:    validAddress,
 			environBuf: memorySize,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65536)
+<== EFAULT
+`,
 		},
 		{
 			name: "environPtr exceeds the maximum valid address by 1",
 			// 4*envCount is the expected length for environPtr, 4 is the size of uint32
 			environ:    memorySize - 4*2 + 1,
 			environBuf: validAddress,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_get(environ=65529,environ_buf=0)
+<== EFAULT
+`,
 		},
 		{
 			name:    "environBufPtr exceeds the maximum valid address by 1",
 			environ: validAddress,
 			// "a=bc", "b=cd" size = size of "a=bc0b=cd0" = 10
 			environBuf: memorySize - 10 + 1,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65527)
+<== EFAULT
+`,
 		},
 	}
 
@@ -81,9 +97,8 @@ func Test_environGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			errno := environGet(testCtx, mod, tc.environ, tc.environBuf)
-			require.Equal(t, ErrnoFault, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+			requireErrno(t, ErrnoFault, mod, functionEnvironGet, uint64(tc.environ), uint64(tc.environBuf))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -134,21 +149,37 @@ func Test_environSizesGet_Errors(t *testing.T) {
 			name:           "out-of-memory environCountPtr",
 			environc:       memorySize,
 			environBufSize: validAddress,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environBufSize=0)
+<== EFAULT
+`,
 		},
 		{
 			name:           "out-of-memory environBufSizePtr",
 			environc:       validAddress,
 			environBufSize: memorySize,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environBufSize=65536)
+<== EFAULT
+`,
 		},
 		{
 			name:           "environCountPtr exceeds the maximum valid address by 1",
 			environc:       memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of environ
 			environBufSize: validAddress,
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environBufSize=0)
+<== EFAULT
+`,
 		},
 		{
 			name:           "environBufSizePtr exceeds the maximum valid size by 1",
 			environc:       validAddress,
 			environBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
+			expectedLog: `
+==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environBufSize=65533)
+<== EFAULT
+`,
 		},
 	}
 
@@ -156,9 +187,10 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			errno := environSizesGet(testCtx, mod, tc.environc, tc.environBufSize)
-			require.Equal(t, ErrnoFault, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+			defer log.Reset()
+
+			requireErrno(t, ErrnoFault, mod, functionEnvironSizesGet, uint64(tc.environc), uint64(tc.environBufSize))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

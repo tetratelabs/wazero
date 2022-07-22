@@ -10,13 +10,57 @@ import (
 )
 
 // Func is a function with an inlined type, typically used for NewHostModule.
+// Any corresponding FunctionType will be reused or added to the Module.
 type Func struct {
-	// Type is the equivalent function in the SectionIDType.
-	// This will resolve to an existing or new element.
-	Type *FunctionType
+	// ExportNames is equivalent to  the same method on api.FunctionDefinition.
+	ExportNames []string
+
+	// Name is equivalent to  the same method on api.FunctionDefinition.
+	Name string
+
+	// ParamTypes is equivalent to  the same method on api.FunctionDefinition.
+	ParamTypes []ValueType
+
+	// ParamNames is equivalent to  the same method on api.FunctionDefinition.
+	ParamNames []string
+
+	// ResultTypes is equivalent to  the same method on api.FunctionDefinition.
+	ResultTypes []ValueType
 
 	// Code is the equivalent function in the SectionIDCode.
 	Code *Code
+}
+
+// NewGoFunc returns a Func for the given parameters or panics.
+func NewGoFunc(exportName string, name string, paramNames []string, fn interface{}) *Func {
+	fnV := reflect.ValueOf(fn)
+	_, ft, err := getFunctionType(&fnV)
+	if err != nil {
+		panic(err)
+	}
+	return &Func{
+		ExportNames: []string{exportName},
+		Name:        name,
+		ParamTypes:  ft.Params,
+		ResultTypes: ft.Results,
+		ParamNames:  paramNames,
+		Code:        &Code{GoFunc: &fnV},
+	}
+}
+
+// WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
+func (f *Func) WithGoFunc(fn interface{}) *Func {
+	ret := *f
+	fnV := reflect.ValueOf(fn)
+	ret.Code = &Code{GoFunc: &fnV}
+	return &ret
+}
+
+// WithWasm returns a copy of the function, replacing its Code.Body.
+func (f *Func) WithWasm(body []byte) *Func {
+	ret := *f
+	ret.Code = &Code{Body: body}
+	return &ret
 }
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -90,67 +134,73 @@ func addFuncs(
 	funcToNames map[string][]string,
 	enabledFeatures Features,
 ) (err error) {
-	funcCount := uint32(len(nameToGoFunc))
-	funcNames := make([]string, 0, funcCount)
 	if m.NameSection == nil {
 		m.NameSection = &NameSection{}
 	}
 	moduleName := m.NameSection.ModuleName
+	nameToFunc := make(map[string]*Func, len(nameToGoFunc))
+	funcNames := make([]string, len(nameToFunc))
+	for k, v := range nameToGoFunc {
+		if hf, ok := v.(*Func); !ok {
+			fn := reflect.ValueOf(v)
+			_, ft, ftErr := getFunctionType(&fn)
+			if ftErr != nil {
+				return fmt.Errorf("func[%s.%s] %w", moduleName, k, ftErr)
+			}
+			hf = &Func{
+				ExportNames: []string{k},
+				Name:        k,
+				ParamTypes:  ft.Params,
+				ResultTypes: ft.Results,
+				Code:        &Code{GoFunc: &fn},
+			}
+			if names := funcToNames[k]; names != nil {
+				namesLen := len(names)
+				if namesLen > 1 && namesLen-1 != len(ft.Params) {
+					return fmt.Errorf("func[%s.%s] has %d params, but %d param names", moduleName, k, namesLen-1, len(ft.Params))
+				}
+				hf.Name = names[0]
+				hf.ParamNames = names[1:]
+			}
+			nameToFunc[k] = hf
+			funcNames = append(funcNames, k)
+		} else {
+			nameToFunc[hf.Name] = hf
+			funcNames = append(funcNames, hf.Name)
+		}
+	}
+
+	// Sort names for consistent iteration
+	sort.Strings(funcNames)
+
+	funcCount := uint32(len(nameToFunc))
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)
 	m.FunctionSection = make([]Index, 0, funcCount)
 	m.CodeSection = make([]*Code, 0, funcCount)
 	m.FunctionDefinitionSection = make([]*FunctionDefinition, 0, funcCount)
 
-	// Sort names for consistent iteration
-	for k := range nameToGoFunc {
-		funcNames = append(funcNames, k)
-	}
-	sort.Strings(funcNames)
-
-	for idx := Index(0); idx < funcCount; idx++ {
-		exportName := funcNames[idx]
-		debugName := wasmdebug.FuncName(moduleName, exportName, idx)
-
-		gf := nameToGoFunc[exportName]
-		var ft *FunctionType
-		if hf, ok := gf.(*Func); ok {
-			ft = hf.Type
-			m.CodeSection = append(m.CodeSection, hf.Code)
-		} else {
-			fn := reflect.ValueOf(gf)
-			_, ft, err = getFunctionType(&fn)
-			if err != nil {
-				return fmt.Errorf("func[%s] %w", debugName, err)
-			}
-			m.CodeSection = append(m.CodeSection, &Code{GoFunc: &fn})
+	idx := Index(0)
+	for _, name := range funcNames {
+		hf := nameToFunc[name]
+		debugName := wasmdebug.FuncName(moduleName, name, idx)
+		typeIdx, typeErr := m.maybeAddType(hf.ParamTypes, hf.ResultTypes, enabledFeatures)
+		if typeErr != nil {
+			return fmt.Errorf("func[%s] %v", debugName, typeErr)
 		}
-
-		m.FunctionSection = append(m.FunctionSection, m.maybeAddType(ft))
-
-		names := funcToNames[exportName]
-		namesLen := len(names)
-		if namesLen > 1 && namesLen-1 != len(ft.Params) {
-			return fmt.Errorf("func[%s] has %d params, but %d param names", debugName, namesLen-1, len(ft.Params))
+		m.FunctionSection = append(m.FunctionSection, typeIdx)
+		m.CodeSection = append(m.CodeSection, hf.Code)
+		for _, export := range hf.ExportNames {
+			m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: export, Index: idx})
 		}
-		if len(ft.Results) > 1 {
-			// Guard >1.0 feature multi-value
-			if err = enabledFeatures.Require(FeatureMultiValue); err != nil {
-				err = fmt.Errorf("func[%s] multiple result types invalid as %v", debugName, err)
-				return
-			}
-		}
-
-		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: exportName, Index: idx})
-		if namesLen > 0 {
-			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: names[0]})
+		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: hf.Name})
+		if len(hf.ParamNames) > 0 {
 			localNames := &NameMapAssoc{Index: idx}
-			for i, n := range names[1:] {
+			for i, n := range hf.ParamNames {
 				localNames.NameMap = append(localNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
 			}
 			m.NameSection.LocalNames = append(m.NameSection.LocalNames, localNames)
-		} else {
-			m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: exportName})
 		}
+		idx++
 	}
 	return nil
 }
@@ -199,14 +249,21 @@ func addGlobals(m *Module, globals map[string]*Global) error {
 	return nil
 }
 
-func (m *Module) maybeAddType(ft *FunctionType) Index {
+func (m *Module) maybeAddType(params, results []ValueType, enabledFeatures Features) (Index, error) {
+	if len(results) > 1 {
+		// Guard >1.0 feature multi-value
+		if err := enabledFeatures.Require(FeatureMultiValue); err != nil {
+			return 0, fmt.Errorf("multiple result types invalid as %v", err)
+		}
+	}
 	for i, t := range m.TypeSection {
-		if t.EqualsSignature(ft.Params, ft.Results) {
-			return Index(i)
+		if t.EqualsSignature(params, results) {
+			return Index(i), nil
 		}
 	}
 
 	result := m.SectionElementCount(SectionIDType)
-	m.TypeSection = append(m.TypeSection, ft)
-	return result
+	toAdd := &FunctionType{Params: params, Results: results}
+	m.TypeSection = append(m.TypeSection, toAdd)
+	return result, nil
 }

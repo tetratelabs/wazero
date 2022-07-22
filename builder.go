@@ -324,6 +324,8 @@ func (b *moduleBuilder) Compile(ctx context.Context, cConfig CompileConfig) (Com
 	module, err := wasm.NewHostModule(b.moduleName, b.nameToGoFunc, b.funcToNames, b.nameToMemory, b.nameToGlobal, b.r.enabledFeatures)
 	if err != nil {
 		return nil, err
+	} else if err = module.Validate(b.r.enabledFeatures); err != nil {
+		return nil, err
 	}
 
 	c := &compiledModule{module: module, compiledEngine: b.r.store.Engine}

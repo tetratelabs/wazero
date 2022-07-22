@@ -21,12 +21,12 @@ func newExample() *wasm.Module {
 	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
-			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
-			{ParamNumInUint64: 0, ResultNumInUint64: 0},
-			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2},
+			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+			{ParamNumInUint64: 0},
+			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
+			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}},
+			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
 		},
 		ImportSection: []*wasm.Import{
 			{

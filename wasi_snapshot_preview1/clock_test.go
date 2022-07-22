@@ -191,16 +191,28 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			name:          "process cputime",
 			clockID:       2,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "thread cputime",
 			clockID:       3,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "undefined",
 			clockID:       100,
 			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
+<== EINVAL
+`,
 		},
 	}
 
@@ -211,9 +223,9 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultTimestamp := uint32(1) // arbitrary offset
-			errno := clockTimeGet(testCtx, mod, tc.clockID, 0 /* TODO: precision */, resultTimestamp)
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+
+			requireErrno(t, tc.expectedErrno, mod, functionClockTimeGet, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -232,11 +244,18 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		{
 			name:            "resultTimestamp out-of-memory",
 			resultTimestamp: memorySize,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+<== EFAULT
+`,
 		},
-
 		{
 			name:            "resultTimestamp exceeds the maximum valid address by 1",
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+<== EFAULT
+`,
 		},
 	}
 
@@ -246,9 +265,8 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			errno := clockTimeGet(testCtx, mod, 0 /* TODO: id */, 0 /* TODO: precision */, tc.resultTimestamp)
-			require.Equal(t, ErrnoFault, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+			requireErrno(t, ErrnoFault, mod, functionClockTimeGet, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

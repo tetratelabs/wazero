@@ -53,8 +53,13 @@ func Benchmark_EnvironGet(b *testing.B) {
 
 	b.Run("environGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if environGet(testCtx, mod, 0, 4) != ErrnoSuccess {
-				b.Fatal()
+			results, err := mod.ExportedFunction(functionEnvironGet).Call(testCtx, uint64(0), uint64(4))
+			if err != nil {
+				b.Fatal(err)
+			}
+			errno := Errno(results[0])
+			if errno != ErrnoSuccess {
+				b.Fatal(ErrnoName(errno))
 			}
 		}
 	})

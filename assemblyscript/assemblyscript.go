@@ -38,6 +38,12 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+const (
+	functionAbort = "abort"
+	functionTrace = "trace"
+	functionSeed  = "seed"
+)
+
 // Instantiate instantiates the "env" module used by AssemblyScript into the
 // runtime default namespace.
 //
@@ -77,65 +83,33 @@ type FunctionExporter interface {
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
 func NewFunctionExporter() FunctionExporter {
-	return &functionExporter{traceMode: traceDisabled}
+	return &functionExporter{abortFn: abortMessageEnabled, traceFn: traceDisabled}
 }
 
-type traceMode int
-
-const (
-	traceDisabled traceMode = 0
-	traceStdout   traceMode = 1
-	traceStderr   traceMode = 2
-)
-
 type functionExporter struct {
-	abortMessageDisabled bool
-	traceMode            traceMode
+	abortFn, traceFn *wasm.Func
 }
 
 // WithAbortMessageDisabled implements FunctionExporter.WithAbortMessageDisabled
 func (e *functionExporter) WithAbortMessageDisabled() FunctionExporter {
-	ret := *e // copy
-	ret.abortMessageDisabled = true
-	return &ret
+	return &functionExporter{abortFn: abortMessageDisabled, traceFn: e.traceFn}
 }
 
 // WithTraceToStdout implements FunctionExporter.WithTraceToStdout
 func (e *functionExporter) WithTraceToStdout() FunctionExporter {
-	ret := *e // copy
-	ret.traceMode = traceStdout
-	return &ret
+	return &functionExporter{abortFn: e.abortFn, traceFn: traceStdout}
 }
 
 // WithTraceToStderr implements FunctionExporter.WithTraceToStderr
 func (e *functionExporter) WithTraceToStderr() FunctionExporter {
-	ret := *e // copy
-	ret.traceMode = traceStderr
-	return &ret
+	return &functionExporter{abortFn: e.abortFn, traceFn: traceStderr}
 }
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
-	var abortFn fnAbort
-	if e.abortMessageDisabled {
-		abortFn = abort
-	} else {
-		abortFn = abortWithMessage
-	}
-	var traceFn interface{}
-	switch e.traceMode {
-	case traceDisabled:
-		traceFn = traceNoop
-	case traceStdout:
-		traceFn = traceToStdout
-	case traceStderr:
-		traceFn = traceToStderr
-	}
-	builder.ExportFunction("abort", abortFn, "~lib/builtins/abort",
-		"message", "fileName", "lineNumber", "columnNumber")
-	builder.ExportFunction("trace", traceFn, "~lib/builtins/trace",
-		"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4")
-	builder.ExportFunction("seed", seed, "~lib/builtins/seed")
+	builder.ExportFunction(functionAbort, e.abortFn)
+	builder.ExportFunction(functionTrace, e.traceFn)
+	builder.ExportFunction(functionSeed, seed)
 }
 
 // abort is called on unrecoverable errors. This is typically present in Wasm
@@ -150,18 +124,26 @@ func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
-type fnAbort func(
-	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
+var abortMessageEnabled = wasm.NewGoFunc(
+	"abort", "~lib/builtins/abort",
+	[]string{"message", "fileName", "lineNumber", "columnNumber"},
+	abortWithMessage,
 )
+
+var abortMessageDisabled = abortMessageEnabled.WithGoFunc(abort)
 
 // abortWithMessage implements fnAbort
 func abortWithMessage(
 	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
 ) {
 	sysCtx := mod.(*wasm.CallContext).Sys
-	msg := requireAssemblyScriptString(ctx, mod, "message", message)
-	fn := requireAssemblyScriptString(ctx, mod, "fileName", fileName)
-	_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+	mem := mod.Memory()
+	// Don't panic if there was a problem reading the message
+	if msg, msgOk := readAssemblyScriptString(ctx, mem, message); msgOk {
+		if fn, fnOk := readAssemblyScriptString(ctx, mem, fileName); fnOk {
+			_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+		}
+	}
 	abort(ctx, mod, message, fileName, lineNumber, columnNumber)
 }
 
@@ -180,25 +162,25 @@ func abort(
 	panic(sys.NewExitError(mod.Name(), exitCode))
 }
 
-// traceNoop implements trace in wasm to avoid host call overhead on no-op.
-var traceNoop = &wasm.Func{
-	Type: wasm.MustFunctionType(traceToStdout),
-	Code: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
-}
+// traceDisabled ignores the input.
+var traceDisabled = traceStdout.WithWasm([]byte{wasm.OpcodeEnd})
 
-// traceToStdout implements trace to the configured Stdout.
-func traceToStdout(
-	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
-) {
-	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stdout())
-}
+// traceStdout implements trace to the configured Stdout.
+var traceStdout = wasm.NewGoFunc(functionTrace, "~lib/builtins/trace",
+	[]string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
+	func(
+		ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
+	) {
+		traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stdout())
+	},
+)
 
-// traceToStdout implements trace to the configured Stderr.
-func traceToStderr(
+// traceStderr implements trace to the configured Stderr.
+var traceStderr = traceStdout.WithGoFunc(func(
 	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
 ) {
 	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stderr())
-}
+})
 
 // traceTo implements the function "trace" in AssemblyScript. Ex.
 //	trace('Hello World!')
@@ -212,9 +194,13 @@ func traceTo(
 	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
 	writer io.Writer,
 ) {
+	msg, ok := readAssemblyScriptString(ctx, mod.Memory(), message)
+	if !ok {
+		return // don't panic if unable to trace
+	}
 	var ret strings.Builder
 	ret.WriteString("trace: ")
-	ret.WriteString(requireAssemblyScriptString(ctx, mod, "message", message))
+	ret.WriteString(msg)
 	if nArgs >= 1 {
 		ret.WriteString(" ")
 		ret.WriteString(formatFloat(arg0))
@@ -236,9 +222,7 @@ func traceTo(
 		ret.WriteString(formatFloat(arg4))
 	}
 	ret.WriteByte('\n')
-	if _, err := writer.Write([]byte(ret.String())); err != nil {
-		panic(err)
-	}
+	_, _ = writer.Write([]byte(ret.String())) // don't crash if trace logging fails
 }
 
 func formatFloat(f float64) string {
@@ -253,30 +237,29 @@ func formatFloat(f float64) string {
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
-func seed(mod api.Module) float64 {
-	randSource := mod.(*wasm.CallContext).Sys.RandSource()
-	v, err := ieee754.DecodeFloat64(randSource)
-	if err != nil {
-		panic(fmt.Errorf("error reading random seed: %w", err))
-	}
-	return v
-}
+var seed = wasm.NewGoFunc(functionSeed, "~lib/builtins/seed", []string{},
+	func(mod api.Module) float64 {
+		randSource := mod.(*wasm.CallContext).Sys.RandSource()
+		v, err := ieee754.DecodeFloat64(randSource)
+		if err != nil {
+			panic(fmt.Errorf("error reading random seed: %w", err))
+		}
+		return v
+	},
+)
 
-// requireAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
-func requireAssemblyScriptString(ctx context.Context, mod api.Module, fieldName string, offset uint32) string {
+// readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
+func readAssemblyScriptString(ctx context.Context, mem api.Memory, offset uint32) (string, bool) {
 	// Length is four bytes before pointer.
-	byteCount, ok := mod.Memory().ReadUint32Le(ctx, offset-4)
+	byteCount, ok := mem.ReadUint32Le(ctx, offset-4)
+	if !ok || byteCount%2 != 0 {
+		return "", false
+	}
+	buf, ok := mem.Read(ctx, offset, byteCount)
 	if !ok {
-		panic(fmt.Errorf("out of memory reading %s", fieldName))
+		return "", false
 	}
-	if byteCount%2 != 0 {
-		panic(fmt.Errorf("invalid UTF-16 reading %s", fieldName))
-	}
-	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
-	if !ok {
-		panic(fmt.Errorf("out of memory reading %s", fieldName))
-	}
-	return decodeUTF16(buf)
+	return decodeUTF16(buf), true
 }
 
 func decodeUTF16(b []byte) string {

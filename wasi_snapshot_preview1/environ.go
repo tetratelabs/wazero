@@ -44,10 +44,14 @@ const (
 // See environSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func environGet(ctx context.Context, mod api.Module, environ uint32, environBuf uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
-}
+var environGet = wasm.NewGoFunc(
+	functionEnvironGet, functionEnvironGet,
+	[]string{"environ", "environ_buf"},
+	func(ctx context.Context, mod api.Module, environ uint32, environBuf uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
+	},
+)
 
 // environSizesGet is the WASI function named functionEnvironSizesGet that
 // reads environment variable sizes.
@@ -80,16 +84,20 @@ func environGet(ctx context.Context, mod api.Module, environ uint32, environBuf 
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-func environSizesGet(ctx context.Context, mod api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	mem := mod.Memory()
+var environSizesGet = wasm.NewGoFunc(
+	functionEnvironSizesGet, functionEnvironSizesGet,
+	[]string{"result.environc", "result.environBufSize"},
+	func(ctx context.Context, mod api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		mem := mod.Memory()
 
-	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
-		return ErrnoFault
-	}
-	if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sysCtx.EnvironSize()) {
-		return ErrnoFault
-	}
+		if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
+			return ErrnoFault
+		}
+		if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sysCtx.EnvironSize()) {
+			return ErrnoFault
+		}
 
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)

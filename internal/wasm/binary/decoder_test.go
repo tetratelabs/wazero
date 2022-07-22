@@ -30,14 +30,8 @@ func TestDecodeModule(t *testing.T) {
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{},
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
-						ParamNumInUint64:  2,
-						ResultNumInUint64: 1,
-					},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32},
-						ParamNumInUint64:  4,
-						ResultNumInUint64: 1,
-					},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
 			},
 		},
@@ -45,14 +39,8 @@ func TestDecodeModule(t *testing.T) {
 			name: "type and import section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32},
-						ParamNumInUint64:  2,
-						ResultNumInUint64: 1,
-					},
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32},
-						ParamNumInUint64:  2,
-						ResultNumInUint64: 1,
-					},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
 				ImportSection: []*wasm.Import{
 					{

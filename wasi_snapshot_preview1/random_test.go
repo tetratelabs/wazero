@@ -92,10 +92,18 @@ func Test_randomGet_SourceError(t *testing.T) {
 		{
 			name:       "error",
 			randSource: iotest.ErrReader(errors.New("RandSource error")),
+			expectedLog: `
+==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
+<== EIO
+`,
 		},
 		{
 			name:       "incomplete",
 			randSource: bytes.NewReader([]byte{1, 2}),
+			expectedLog: `
+==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
+<== EIO
+`,
 		},
 	}
 
@@ -106,9 +114,8 @@ func Test_randomGet_SourceError(t *testing.T) {
 				WithRandSource(tc.randSource))
 			defer r.Close(testCtx)
 
-			errno := randomGet(testCtx, mod, uint32(1), uint32(5)) // arbitrary offset and length
-			require.Equal(t, ErrnoIo, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+			requireErrno(t, ErrnoIo, mod, functionRandomGet, uint64(1), uint64(5)) // arbitrary offset and length
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

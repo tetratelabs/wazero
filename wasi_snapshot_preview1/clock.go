@@ -53,28 +53,32 @@ const (
 // Note: This is similar to `clock_getres` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
-func clockResGet(ctx context.Context, mod api.Module, id uint32, resultResolution uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
+var clockResGet = wasm.NewGoFunc(
+	functionClockResGet, functionClockResGet,
+	[]string{"id", "result.resolution"},
+	func(ctx context.Context, mod api.Module, id uint32, resultResolution uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
 
-	var resolution uint64 // ns
-	switch id {
-	case clockIDRealtime:
-		resolution = uint64(sysCtx.WalltimeResolution())
-	case clockIDMonotonic:
-		resolution = uint64(sysCtx.NanotimeResolution())
-	case clockIDProcessCputime, clockIDThreadCputime:
-		// Similar to many other runtimes, we only support realtime and
-		// monotonic clocks. Other types are slated to be removed from the next
-		// version of WASI.
-		return ErrnoNotsup
-	default:
-		return ErrnoInval
-	}
-	if !mod.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		var resolution uint64 // ns
+		switch id {
+		case clockIDRealtime:
+			resolution = uint64(sysCtx.WalltimeResolution())
+		case clockIDMonotonic:
+			resolution = uint64(sysCtx.NanotimeResolution())
+		case clockIDProcessCputime, clockIDThreadCputime:
+			// Similar to many other runtimes, we only support realtime and
+			// monotonic clocks. Other types are slated to be removed from the next
+			// version of WASI.
+			return ErrnoNotsup
+		default:
+			return ErrnoInval
+		}
+		if !mod.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
+			return ErrnoFault
+		}
+		return ErrnoSuccess
+	},
+)
 
 // clockTimeGet is the WASI function named functionClockTimeGet that returns
 // the time value of a name (time.Now).
@@ -107,28 +111,32 @@ func clockResGet(ctx context.Context, mod api.Module, id uint32, resultResolutio
 // Note: This is similar to `clock_gettime` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
-func clockTimeGet(ctx context.Context, mod api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
-	// TODO: precision is currently ignored.
-	sysCtx := mod.(*wasm.CallContext).Sys
+var clockTimeGet = wasm.NewGoFunc(
+	functionClockTimeGet, functionClockTimeGet,
+	[]string{"id", "precision", "result.timestamp"},
+	func(ctx context.Context, mod api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
+		// TODO: precision is currently ignored.
+		sysCtx := mod.(*wasm.CallContext).Sys
 
-	var val uint64
-	switch id {
-	case clockIDRealtime:
-		sec, nsec := sysCtx.Walltime(ctx)
-		val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
-	case clockIDMonotonic:
-		val = uint64(sysCtx.Nanotime(ctx))
-	case clockIDProcessCputime, clockIDThreadCputime:
-		// Similar to many other runtimes, we only support realtime and
-		// monotonic clocks. Other types are slated to be removed from the next
-		// version of WASI.
-		return ErrnoNotsup
-	default:
-		return ErrnoInval
-	}
+		var val uint64
+		switch id {
+		case clockIDRealtime:
+			sec, nsec := sysCtx.Walltime(ctx)
+			val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
+		case clockIDMonotonic:
+			val = uint64(sysCtx.Nanotime(ctx))
+		case clockIDProcessCputime, clockIDThreadCputime:
+			// Similar to many other runtimes, we only support realtime and
+			// monotonic clocks. Other types are slated to be removed from the next
+			// version of WASI.
+			return ErrnoNotsup
+		default:
+			return ErrnoInval
+		}
 
-	if !mod.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		if !mod.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
+			return ErrnoFault
+		}
+		return ErrnoSuccess
+	},
+)

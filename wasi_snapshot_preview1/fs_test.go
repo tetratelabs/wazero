@@ -113,22 +113,38 @@ func Test_fdFdstatGet(t *testing.T) {
 			name: "file",
 			fd:   fileFd,
 			// TODO: expectedMem for a file
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=4,result.stat=0)
+<== ESUCCESS
+`,
 		},
 		{
 			name: "dir",
 			fd:   dirFd,
 			// TODO: expectedMem for a dir
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=0)
+<== ESUCCESS
+`,
 		},
 		{
 			name:          "bad FD",
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=4294967295,result.stat=0)
+<== EBADF
+`,
 		},
 		{
 			name:       "resultStat exceeds the maximum valid address by 1",
 			fd:         dirFd,
 			resultStat: memorySize - 24 + 1,
 			// TODO: ErrnoFault
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=65513)
+<== ESUCCESS
+`,
 		},
 	}
 
@@ -138,9 +154,8 @@ func Test_fdFdstatGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			errno := fdFdstatGet(testCtx, mod, tc.fd, tc.resultStat)
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
-			require.Equal(t, tc.expectedLog, log.String())
+			requireErrno(t, tc.expectedErrno, mod, functionFdFdstatGet, uint64(tc.fd), uint64(tc.resultStat))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -238,18 +253,27 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		fd            uint32
 		resultPrestat uint32
 		expectedErrno Errno
+		expectedLog   string
 	}{
 		{
 			name:          "invalid FD",
 			fd:            42, // arbitrary invalid FD
 			resultPrestat: 0,  // valid offset
 			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_get(fd=42,result.prestat=0)
+<== EBADF
+`,
 		},
 		{
 			name:          "out-of-memory resultPrestat",
 			fd:            fd,
 			resultPrestat: memorySize,
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
+<== EFAULT
+`,
 		},
 		// TODO: non pre-opened file == api.ErrnoBadf
 	}
@@ -260,8 +284,8 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			errno := fdPrestatGet(testCtx, mod, tc.fd, tc.resultPrestat)
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
+			requireErrno(t, tc.expectedErrno, mod, functionFdPrestatGet, uint64(tc.fd), uint64(tc.resultPrestat))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -307,6 +331,7 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		path          uint32
 		pathLen       uint32
 		expectedErrno Errno
+		expectedLog   string
 	}{
 		{
 			name:          "out-of-memory path",
@@ -314,6 +339,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			path:          memorySize,
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
+<== EFAULT
+`,
 		},
 		{
 			name:          "path exceeds the maximum valid address by 1",
@@ -321,6 +350,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			path:          memorySize - pathLen + 1,
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
+<== EFAULT
+`,
 		},
 		{
 			name:          "pathLen exceeds the length of the dir name",
@@ -328,6 +361,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			path:          validAddress,
 			pathLen:       pathLen + 1,
 			expectedErrno: ErrnoNametoolong,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=0,path_len=5)
+<== ENAMETOOLONG
+`,
 		},
 		{
 			name:          "invalid fd",
@@ -335,6 +372,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			path:          validAddress,
 			pathLen:       pathLen,
 			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=4)
+<== EBADF
+`,
 		},
 		// TODO: non pre-opened file == ErrnoBadf
 	}
@@ -345,8 +386,8 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			errno := fdPrestatDirName(testCtx, mod, tc.fd, tc.path, tc.pathLen)
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
+			requireErrno(t, tc.expectedErrno, mod, functionFdPrestatDirName, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
@@ -410,11 +451,16 @@ func Test_fdRead_Errors(t *testing.T) {
 		fd, iovs, iovsCount, resultSize uint32
 		memory                          []byte
 		expectedErrno                   Errno
+		expectedLog                     string
 	}{
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
+<== EBADF
+`,
 		},
 		{
 			name:          "out-of-memory reading iovs[0].offset",
@@ -422,6 +468,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			iovs:          1,
 			memory:        []byte{'?'},
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
+<== EFAULT
+`,
 		},
 		{
 			name: "out-of-memory reading iovs[0].length",
@@ -432,6 +482,10 @@ func Test_fdRead_Errors(t *testing.T) {
 				9, 0, 0, 0, // = iovs[0].offset
 			},
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
+<== EFAULT
+`,
 		},
 		{
 			name: "iovs[0].offset is outside memory",
@@ -443,6 +497,10 @@ func Test_fdRead_Errors(t *testing.T) {
 				1, 0, 0, 0, // = iovs[0].length
 			},
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
+<== EFAULT
+`,
 		},
 		{
 			name: "length to read exceeds memory by 1",
@@ -455,6 +513,10 @@ func Test_fdRead_Errors(t *testing.T) {
 				'?',
 			},
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
+<== EFAULT
+`,
 		},
 		{
 			name: "resultSize offset is outside memory",
@@ -468,6 +530,10 @@ func Test_fdRead_Errors(t *testing.T) {
 				'?',
 			},
 			expectedErrno: ErrnoFault,
+			expectedLog: `
+==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
+<== EFAULT
+`,
 		},
 	}
 
@@ -481,8 +547,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(testCtx, offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			errno := fdRead(testCtx, mod, tc.fd, tc.iovs+offset, tc.iovsCount+offset, tc.resultSize+offset)
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
+			requireErrno(t, tc.expectedErrno, mod, functionFdRead, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultSize+offset))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

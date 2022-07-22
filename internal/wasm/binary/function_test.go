@@ -23,52 +23,52 @@ func TestFunctionType(t *testing.T) {
 		},
 		{
 			name:     "one param no result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32}, ParamNumInUint64: 1},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 1, i32, 0},
 		},
 		{
 			name:     "no param one result",
-			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32}, ResultNumInUint64: 1},
+			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 0, 1, i32},
 		},
 		{
 			name:     "one param one result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 1, i64, 1, i32},
 		},
 		{
 			name:     "two params no result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, ParamNumInUint64: 2},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 0},
 		},
 		{
 			name:     "two param one result",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}},
 			expected: []byte{0x60, 2, i32, i64, 1, i32},
 		},
 		{
 			name:     "no param two results",
-			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32, i64}, ResultNumInUint64: 2},
+			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 0, 2, i32, i64},
 		},
 		{
 			name:     "one param two results",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32, i64}, ParamNumInUint64: 1, ResultNumInUint64: 2},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 1, i64, 2, i32, i64},
 		},
 		{
 			name:     "two param two results",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 2, i32, i64},
 		},
 		{
 			name:     "two param two results with funcrefs",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, funcRef}, Results: []wasm.ValueType{funcRef, i64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, funcRef}, Results: []wasm.ValueType{funcRef, i64}},
 			expected: []byte{0x60, 2, i32, funcRef, 2, funcRef, i64},
 		},
 		{
 			name:     "two param two results with externrefs",
-			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, externRef}, Results: []wasm.ValueType{externRef, i64}, ParamNumInUint64: 2, ResultNumInUint64: 2},
+			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, externRef}, Results: []wasm.ValueType{externRef, i64}},
 			expected: []byte{0x60, 2, i32, externRef, 2, externRef, i64},
 		},
 	}

@@ -111,96 +111,51 @@ func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Clo
 func exportFunctions(builder wazero.ModuleBuilder) {
 	// Note:se are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
-	builder.ExportFunction(functionArgsGet, argsGet,
-		functionArgsGet, "argv", "argv_buf")
-	builder.ExportFunction(functionArgsSizesGet, argsSizesGet,
-		functionArgsSizesGet, "result.argc", "result.argv_buf_size")
-	builder.ExportFunction(functionEnvironGet, environGet,
-		functionEnvironGet, "environ", "environ_buf")
-	builder.ExportFunction(functionEnvironSizesGet, environSizesGet,
-		functionEnvironSizesGet, "result.environc", "result.environBufSize")
-	builder.ExportFunction(functionClockResGet, clockResGet,
-		functionClockResGet, "id", "result.resolution")
-	builder.ExportFunction(functionClockTimeGet, clockTimeGet,
-		functionClockTimeGet, "id", "precision", "result.timestamp")
-	builder.ExportFunction(functionFdAdvise, fdAdvise,
-		functionFdAdvise, "fd", "offset", "len", "result.advice")
-	builder.ExportFunction(functionFdAllocate, fdAllocate,
-		functionFdAllocate, "fd", "offset", "len")
-	builder.ExportFunction(functionFdClose, fdClose,
-		functionFdClose, "fd")
-	builder.ExportFunction(functionFdDatasync, fdDatasync,
-		functionFdDatasync, "fd")
-	builder.ExportFunction(functionFdFdstatGet, fdFdstatGet,
-		functionFdFdstatGet, "fd", "result.stat")
-	builder.ExportFunction(functionFdFdstatSetFlags, fdFdstatSetFlags,
-		functionFdFdstatSetFlags, "fd", "flags")
-	builder.ExportFunction(functionFdFdstatSetRights, fdFdstatSetRights,
-		functionFdFdstatSetRights, "fd", "fs_rights_base", "fs_rights_inheriting")
-	builder.ExportFunction(functionFdFilestatGet, fdFilestatGet,
-		functionFdFilestatGet, "fd", "result.buf")
-	builder.ExportFunction(functionFdFilestatSetSize, fdFilestatSetSize,
-		functionFdFilestatSetSize, "fd", "size")
-	builder.ExportFunction(functionFdFilestatSetTimes, fdFilestatSetTimes,
-		functionFdFilestatSetTimes, "fd", "atim", "mtim", "fst_flags")
-	builder.ExportFunction(functionFdPread, fdPread,
-		functionFdPread, "fd", "iovs", "iovs_len", "offset", "result.nread")
-	builder.ExportFunction(functionFdPrestatGet, fdPrestatGet,
-		functionFdPrestatGet, "fd", "result.prestat")
-	builder.ExportFunction(functionFdPrestatDirName, fdPrestatDirName,
-		functionFdPrestatDirName, "fd", "path", "path_len")
-	builder.ExportFunction(functionFdPwrite, fdPwrite,
-		functionFdPwrite, "fd", "iovs", "iovs_len", "offset", "result.nwritten")
-	builder.ExportFunction(functionFdRead, fdRead,
-		functionFdRead, "fd", "iovs", "iovs_len", "result.size")
-	builder.ExportFunction(functionFdReaddir, fdReaddir,
-		functionFdReaddir, "fd", "buf", "buf_len", "cookie", "result.bufused")
-	builder.ExportFunction(functionFdRenumber, fdRenumber,
-		functionFdRenumber, "fd", "to")
-	builder.ExportFunction(functionFdSeek, fdSeek,
-		functionFdSeek, "fd", "offset", "whence", "result.newoffset")
-	builder.ExportFunction(functionFdSync, fdSync,
-		functionFdSync, "fd")
-	builder.ExportFunction(functionFdTell, fdTell,
-		functionFdTell, "fd", "result.offset")
-	builder.ExportFunction(functionFdWrite, fdWrite,
-		functionFdWrite, "fd", "iovs", "iovs_len", "result.size")
-	builder.ExportFunction(functionPathCreateDirectory, pathCreateDirectory,
-		functionPathCreateDirectory, "fd", "path", "path_len")
-	builder.ExportFunction(functionPathFilestatGet, pathFilestatGet,
-		functionPathFilestatGet, "fd", "flags", "path", "path_len", "result.buf")
-	builder.ExportFunction(functionPathFilestatSetTimes, pathFilestatSetTimes,
-		functionPathFilestatSetTimes, "fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags")
-	builder.ExportFunction(functionPathLink, pathLink,
-		functionPathLink, "old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len")
-	builder.ExportFunction(functionPathOpen, pathOpen,
-		functionPathOpen, "fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd")
-	builder.ExportFunction(functionPathReadlink, pathReadlink,
-		functionPathReadlink, "fd", "path", "path_len", "buf", "buf_len", "result.bufused")
-	builder.ExportFunction(functionPathRemoveDirectory, pathRemoveDirectory,
-		functionPathRemoveDirectory, "fd", "path", "path_len")
-	builder.ExportFunction(functionPathRename, pathRename,
-		functionPathRename, "fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len")
-	builder.ExportFunction(functionPathSymlink, pathSymlink,
-		functionPathSymlink, "old_path", "old_path_len", "fd", "new_path", "new_path_len")
-	builder.ExportFunction(functionPathUnlinkFile, pathUnlinkFile,
-		functionPathUnlinkFile, "fd", "path", "path_len")
-	builder.ExportFunction(functionPollOneoff, pollOneoff,
-		functionPollOneoff, "in", "out", "nsubscriptions", "result.nevents")
-	builder.ExportFunction(functionProcExit, procExit,
-		functionProcExit, "rval")
-	builder.ExportFunction(functionProcRaise, procRaise,
-		functionProcRaise, "sig")
-	builder.ExportFunction(functionSchedYield, schedYield,
-		functionSchedYield)
-	builder.ExportFunction(functionRandomGet, randomGet,
-		functionRandomGet, "buf", "buf_len")
-	builder.ExportFunction(functionSockRecv, sockRecv,
-		functionSockRecv, "fd", "ri_data", "ri_data_count", "ri_flags", "result.ro_datalen", "result.ro_flags")
-	builder.ExportFunction(functionSockSend, sockSend,
-		functionSockSend, "fd", "si_data", "si_data_count", "si_flags", "result.so_datalen")
-	builder.ExportFunction(functionSockShutdown, sockShutdown,
-		functionSockShutdown, "fd", "how")
+	builder.ExportFunction(argsGet.Name, argsGet)
+	builder.ExportFunction(argsSizesGet.Name, argsSizesGet)
+	builder.ExportFunction(environGet.Name, environGet)
+	builder.ExportFunction(environSizesGet.Name, environSizesGet)
+	builder.ExportFunction(clockResGet.Name, clockResGet)
+	builder.ExportFunction(clockTimeGet.Name, clockTimeGet)
+	builder.ExportFunction(fdAdvise.Name, fdAdvise)
+	builder.ExportFunction(fdAllocate.Name, fdAllocate)
+	builder.ExportFunction(fdClose.Name, fdClose)
+	builder.ExportFunction(fdDatasync.Name, fdDatasync)
+	builder.ExportFunction(fdFdstatGet.Name, fdFdstatGet)
+	builder.ExportFunction(fdFdstatSetFlags.Name, fdFdstatSetFlags)
+	builder.ExportFunction(fdFdstatSetRights.Name, fdFdstatSetRights)
+	builder.ExportFunction(fdFilestatGet.Name, fdFilestatGet)
+	builder.ExportFunction(fdFilestatSetSize.Name, fdFilestatSetSize)
+	builder.ExportFunction(fdFilestatSetTimes.Name, fdFilestatSetTimes)
+	builder.ExportFunction(fdPread.Name, fdPread)
+	builder.ExportFunction(fdPrestatGet.Name, fdPrestatGet)
+	builder.ExportFunction(fdPrestatDirName.Name, fdPrestatDirName)
+	builder.ExportFunction(fdPwrite.Name, fdPwrite)
+	builder.ExportFunction(fdRead.Name, fdRead)
+	builder.ExportFunction(fdReaddir.Name, fdReaddir)
+	builder.ExportFunction(fdRenumber.Name, fdRenumber)
+	builder.ExportFunction(fdSeek.Name, fdSeek)
+	builder.ExportFunction(fdSync.Name, fdSync)
+	builder.ExportFunction(fdTell.Name, fdTell)
+	builder.ExportFunction(fdWrite.Name, fdWrite)
+	builder.ExportFunction(pathCreateDirectory.Name, pathCreateDirectory)
+	builder.ExportFunction(pathFilestatGet.Name, pathFilestatGet)
+	builder.ExportFunction(pathFilestatSetTimes.Name, pathFilestatSetTimes)
+	builder.ExportFunction(pathLink.Name, pathLink)
+	builder.ExportFunction(pathOpen.Name, pathOpen)
+	builder.ExportFunction(pathReadlink.Name, pathReadlink)
+	builder.ExportFunction(pathRemoveDirectory.Name, pathRemoveDirectory)
+	builder.ExportFunction(pathRename.Name, pathRename)
+	builder.ExportFunction(pathSymlink.Name, pathSymlink)
+	builder.ExportFunction(pathUnlinkFile.Name, pathUnlinkFile)
+	builder.ExportFunction(pollOneoff.Name, pollOneoff)
+	builder.ExportFunction(procExit.Name, procExit)
+	builder.ExportFunction(procRaise.Name, procRaise)
+	builder.ExportFunction(schedYield.Name, schedYield)
+	builder.ExportFunction(randomGet.Name, randomGet)
+	builder.ExportFunction(sockRecv.Name, sockRecv)
+	builder.ExportFunction(sockSend.Name, sockSend)
+	builder.ExportFunction(sockShutdown.Name, sockShutdown)
 }
 
 func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {
@@ -225,15 +180,14 @@ func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, va
 	return ErrnoSuccess
 }
 
-// stubFunction returns a function for the given params which returns ErrnoNosys.
-func stubFunction(params ...wasm.ValueType) *wasm.Func {
+// stubFunction stubs for GrainLang per #271.
+func stubFunction(name string, paramTypes []wasm.ValueType, paramNames []string) *wasm.Func {
 	return &wasm.Func{
-		Type: &wasm.FunctionType{
-			Params:            params,
-			Results:           []wasm.ValueType{wasm.ValueTypeI32},
-			ParamNumInUint64:  len(params),
-			ResultNumInUint64: 1,
-		},
-		Code: &wasm.Code{Body: []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd}},
+		Name:        name,
+		ExportNames: []string{name},
+		ParamTypes:  paramTypes,
+		ParamNames:  paramNames,
+		ResultTypes: []wasm.ValueType{i32},
+		Code:        &wasm.Code{Body: []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd}},
 	}
 }
