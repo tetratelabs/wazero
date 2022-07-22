@@ -108,6 +108,11 @@ func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return c, nil
 }
 
+// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
+	return c.locationStack
+}
+
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
@@ -118,11 +123,14 @@ func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	c.locationStack = newStack
 }
 
+// pushRuntimeValueLocationOnRegister implements compiler.pushRuntimeValueLocationOnRegister for amd64.
 func (c *amd64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation) {
 	ret = c.locationStack.pushRuntimeValueLocationOnRegister(reg, vt)
 	c.locationStack.markRegisterUsed(reg)
 	return
 }
+
+// pushVectorRuntimeValueLocationOnRegister implements compiler.pushVectorRuntimeValueLocationOnRegister for amd64.
 func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation) {
 	lowerBitsLocation = c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
@@ -481,7 +489,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
-	if err := c.compileDropRange(thenTarget.ToDrop); err != nil {
+	if err := compileDropRange(c, thenTarget.ToDrop); err != nil {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
@@ -516,7 +524,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
-		if err := c.compileDropRange(o.Default.ToDrop); err != nil {
+		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
 			return err
 		}
 		return c.branchInto(o.Default.Target)
@@ -618,7 +626,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := c.compileDropRange(target.ToDrop); err != nil {
+		if err := compileDropRange(c, target.ToDrop); err != nil {
 			return err
 		}
 		if err := c.branchInto(target.Target); err != nil {
@@ -830,90 +838,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.compileDropRange(o.Depth)
-}
-
-func (c *amd64Compiler) compileDropRange(r *wazeroir.InclusiveRange) (err error) {
-	if r == nil {
-		return
-	} else if r.Start == 0 {
-		for i := 0; i <= r.End; i++ {
-			if loc := c.locationStack.pop(); loc.onRegister() {
-				c.locationStack.releaseRegister(loc)
-			}
-		}
-		return
-	}
-
-	// If the top value is alive, we must ensure that it is not located as a conditional.
-	// Otherwise, the conditional flag might end up modified by the following operation.
-	if err = c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
-		return
-	}
-
-	// liveValues are must be pushed backed after dropping the target range.
-	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start) : c.locationStack.sp]
-	// dropValues are the values on the drop target range.
-	dropValues := c.locationStack.stack[c.locationStack.sp-uint64(r.End) : c.locationStack.sp-uint64(r.Start)+1]
-
-	// These booleans are true if a live value of that type is currently located on the memory stack.
-	// In order to migrate these values, we need a register of the corresponding type.
-	var gpTmp, vecTmp = asm.NilRegister, asm.NilRegister
-	for _, l := range liveValues {
-		if l.onStack() {
-			if l.getRegisterType() == registerTypeGeneralPurpose && gpTmp == asm.NilRegister {
-				gpTmp, err = c.allocateRegister(registerTypeGeneralPurpose)
-				if err != nil {
-					return err
-				}
-			} else if l.getRegisterType() == registerTypeVector && vecTmp == asm.NilRegister {
-				vecTmp, err = c.allocateRegister(registerTypeVector)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// Reset the stack pointer below the end.
-	c.locationStack.sp -= uint64(len(liveValues) + len(dropValues))
-
-	// And, push back the live values again.
-	for _, live := range liveValues {
-		if live.valueType == runtimeValueTypeV128Hi {
-			// Higher bits of vector was already handled together with the lower bits.
-			continue
-		}
-
-		previouslyOnStack := live.onStack()
-		if previouslyOnStack {
-			// If the value is on the stack, load the value on the old location into the temporary value,
-			// and then write it back to the new memory location below.
-			switch live.getRegisterType() {
-			case registerTypeGeneralPurpose:
-				live.setRegister(gpTmp)
-			case registerTypeVector:
-				live.setRegister(vecTmp)
-			}
-			// Load the value into tmp.
-			c.compileLoadValueOnStackToRegister(live)
-		}
-
-		var newLocation *runtimeValueLocation
-		if live.valueType == runtimeValueTypeV128Lo {
-			newLocation = c.pushVectorRuntimeValueLocationOnRegister(live.register)
-		} else {
-			newLocation = c.pushRuntimeValueLocationOnRegister(live.register, live.valueType)
-		}
-
-		if previouslyOnStack {
-			// This case, the location is on the temporary register. Therefore,
-			// we have to release the value there into the *new* memory location
-			// so that the tmp can be used for subsequent live values.
-			c.compileReleaseRegisterToStack(newLocation)
-		}
-	}
-	return nil
+	return compileDropRange(c, o.Depth)
 }
 
 // compileSelectV128Impl implements compileSelect for vector values.
@@ -4266,6 +4191,7 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return nil
 }
 
+// compileLoadValueOnStackToRegister implements compiler.compileLoadValueOnStackToRegister for amd64.
 func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {
@@ -4361,10 +4287,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *runt
 	c.locationStack.markRegisterUsed(reg)
 }
 
-// allocateRegister returns an unused register of the given type. The register will be taken
-// either from the free register pool or by stealing an used register.
-// Note that resulting registers are NOT marked as used so the call site should
-// mark it used if necessary.
+// allocateRegister implements compiler.allocateRegister for amd64.
 func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
@@ -4803,6 +4726,7 @@ func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	}
 }
 
+// compileReleaseRegisterToStack implements compiler.compileReleaseRegisterToStack for amd64.
 func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {

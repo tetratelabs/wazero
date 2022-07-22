@@ -391,11 +391,6 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	})
 }
 
-// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
-	return c.locationStack
-}
-
 // compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
 func (c *amd64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
 	return c.onStackPointerCeilDeterminedCallBack

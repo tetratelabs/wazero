@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -296,4 +297,33 @@ type compiler interface {
 	compileV128Narrow(o *wazeroir.OperationV128Narrow) error
 	// compileV128ITruncSatFromF adds instructions to perform wazeroir.OperationV128ITruncSatFromF.
 	compileV128ITruncSatFromF(o *wazeroir.OperationV128ITruncSatFromF) error
+
+	// compileReleaseRegisterToStack adds instructions to write the value on a register back to memory stack region.
+	compileReleaseRegisterToStack(loc *runtimeValueLocation)
+
+	// compileLoadValueOnStackToRegister adds instructions to load the value located on the stack to the assigned register.
+	compileLoadValueOnStackToRegister(loc *runtimeValueLocation)
+
+	// maybeCompileMoveTopConditionalToGeneralPurposeRegister moves the top value on the stack
+	// if the value is located on a conditional register.
+	//
+	// This is usually called at the beginning of methods on compiler interface where we possibly
+	// compile instructions without saving the conditional register value.
+	// The compileXXX functions without calling this function is saving the conditional
+	// value to the stack or register by invoking compileEnsureOnRegister for the top.
+	maybeCompileMoveTopConditionalToGeneralPurposeRegister() error
+	// allocateRegister returns an unused register of the given type. The register will be taken
+	// either from the free register pool or by stealing a used register.
+	// Note: resulting registers will not be marked as used so the call site should
+	// mark it used if necessary.
+	allocateRegister(t registerType) (reg asm.Register, err error)
+
+	// runtimeValueLocationStack returns the current runtimeValueLocationStack of the compiler implementation.
+	runtimeValueLocationStack() *runtimeValueLocationStack
+
+	// TODO
+	pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation)
+
+	// TODO
+	pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation)
 }

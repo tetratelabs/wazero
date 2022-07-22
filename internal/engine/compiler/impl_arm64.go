@@ -139,16 +139,24 @@ func (c *arm64Compiler) label(labelKey string) *arm64LabelInfo {
 	return c.labels[labelKey]
 }
 
+// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
+	return c.locationStack
+}
+
+// pushRuntimeValueLocationOnRegister implements compiler.pushRuntimeValueLocationOnRegister for arm64.
 func (c *arm64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation) {
 	ret = c.locationStack.pushRuntimeValueLocationOnRegister(reg, vt)
 	c.markRegisterUsed(reg)
 	return
 }
 
-func (c *arm64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) {
-	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
+// pushVectorRuntimeValueLocationOnRegister implements compiler.pushVectorRuntimeValueLocationOnRegister for arm64.
+func (c *arm64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation) {
+	lowerBitsLocation = c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
 	c.markRegisterUsed(reg)
+	return
 }
 
 func (c *arm64Compiler) markRegisterUsed(regs ...asm.Register) {
@@ -695,7 +703,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
-	if err := c.compileDropRange(o.Else.ToDrop); err != nil {
+	if err := compileDropRange(c, o.Else.ToDrop); err != nil {
 		return err
 	}
 	if err := c.compileBranchInto(o.Else.Target); err != nil {
@@ -707,7 +715,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.assembler.SetJumpTargetOnNext(conditionalBR)
-	if err := c.compileDropRange(o.Then.ToDrop); err != nil {
+	if err := compileDropRange(c, o.Then.ToDrop); err != nil {
 		return err
 	}
 	return c.compileBranchInto(o.Then.Target)
@@ -762,7 +770,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		if loc.onRegister() {
 			c.markRegisterUnused(loc.register)
 		}
-		if err := c.compileDropRange(o.Default.ToDrop); err != nil {
+		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
 			return err
 		}
 		return c.compileBranchInto(o.Default.Target)
@@ -872,7 +880,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := c.compileDropRange(target.ToDrop); err != nil {
+		if err := compileDropRange(c, target.ToDrop); err != nil {
 			return err
 		}
 		if err := c.compileBranchInto(target.Target); err != nil {
@@ -1236,54 +1244,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.compileDropRange(o.Depth)
-}
-
-// compileDropRange is the implementation of compileDrop. See compiler.compileDrop.
-func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
-	if r == nil {
-		return nil
-	} else if r.Start == 0 {
-		// When the drop starts from the top of the stack, mark all registers unused.
-		for i := 0; i <= r.End; i++ {
-			if loc := c.locationStack.pop(); loc.onRegister() {
-				c.markRegisterUnused(loc.register)
-			}
-		}
-		return nil
-	}
-
-	// Below, we might end up moving a non-top value first which
-	// might result in changing the flag value.
-	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
-		return err
-	}
-
-	// Save the live values because we pop and release values in drop range below.
-	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start) : c.locationStack.sp]
-	c.locationStack.sp -= uint64(r.Start)
-
-	// Note: drop target range is inclusive.
-	dropNum := r.End - r.Start + 1
-
-	// Then mark all registers used by drop targets unused.
-	for i := 0; i < dropNum; i++ {
-		if loc := c.locationStack.pop(); loc.onRegister() {
-			c.markRegisterUnused(loc.register)
-		}
-	}
-
-	for _, live := range liveValues {
-		// If the value is on a memory, we have to move it to a register,
-		// otherwise the memory location is overridden by other values
-		// after this drop instruction.
-		if err := c.compileEnsureOnRegister(live); err != nil {
-			return err
-		}
-		// Update the runtime memory stack location by pushing onto the location stack.
-		c.locationStack.push(live)
-	}
-	return nil
+	return compileDropRange(c, o.Depth)
 }
 
 func (c *arm64Compiler) compileSelectV128Impl(selectorRegister asm.Register) error {
@@ -4026,7 +3987,7 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 	return nil
 }
 
-// compileLoadValueOnStackToRegister emits instructions to load the value located on the stack to the assigned register.
+// compileLoadValueOnStackToRegister implements compiler.compileLoadValueOnStackToRegister for arm64.
 func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	switch loc.valueType {
 	case runtimeValueTypeI32:
@@ -4055,13 +4016,7 @@ func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 	}
 }
 
-// allocateRegister returns an unused register of the given type. The register will be taken
-// either from the free register pool or by spilling an used register. If we allocate an used register,
-// this adds an instruction to write the value on a register back to memory stack region.
-// Note: resulting registers are NOT marked as used so the call site should mark it used if necessary.
-//
-// TODO: we’d usually prefix this with compileXXX as this might end up emitting instructions,
-// but the name seems awkward.
+// allocateRegister implements compiler.allocateRegister for arm64.
 func (c *arm64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.

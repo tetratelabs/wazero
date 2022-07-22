@@ -102,11 +102,6 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 }
 
-// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
-	return c.locationStack
-}
-
 // compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
 func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
 	return c.onStackPointerCeilDeterminedCallBack
