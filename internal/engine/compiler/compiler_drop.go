@@ -26,31 +26,20 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 		return
 	}
 
-	// liveValues are must be pushed backed after dropping the target range.
-	liveValues := locationStack.stack[locationStack.sp-uint64(r.Start) : locationStack.sp]
-	// dropValues are the values on the drop target range.
-	dropValues := locationStack.stack[locationStack.sp-uint64(r.End)-1 : locationStack.sp-uint64(r.Start)]
+	dropValues, liveValues := locationStack.dropsLivesForInclusiveRange(r)
+
+	// Frees all the registers used by drop target values.
 	for _, dv := range dropValues {
-		locationStack.releaseRegister(dv)
+		if dv.onRegister() {
+			locationStack.releaseRegister(dv)
+		}
 	}
 
-	// These booleans are true if a live value of that type is currently located on the memory stack.
-	// In order to migrate these values, we need a register of the corresponding type.
-	var gpTmp, vecTmp = asm.NilRegister, asm.NilRegister
-	for _, l := range liveValues {
-		if l.onStack() {
-			if l.getRegisterType() == registerTypeGeneralPurpose && gpTmp == asm.NilRegister {
-				gpTmp, err = c.allocateRegister(registerTypeGeneralPurpose)
-				if err != nil {
-					return err
-				}
-			} else if l.getRegisterType() == registerTypeVector && vecTmp == asm.NilRegister {
-				vecTmp, err = c.allocateRegister(registerTypeVector)
-				if err != nil {
-					return err
-				}
-			}
-		}
+	// These registers are not nil if a live value of that type is currently located on the memory stack.
+	// In order to migrate these values, we can use them below.
+	gpTmp, vecTmp, err := getTemporariesForStackedLiveValues(c, liveValues)
+	if err != nil {
+		return err
 	}
 
 	// Reset the stack pointer below the end.
@@ -91,5 +80,36 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 			c.compileReleaseRegisterToStack(newLocation)
 		}
 	}
+	return
+}
+
+func getTemporariesForStackedLiveValues(c compiler, liveValues []*runtimeValueLocation) (gpTmp, vecTmp asm.Register, err error) {
+	gpTmp, vecTmp = asm.NilRegister, asm.NilRegister
+	for _, l := range liveValues {
+		if l.onStack() {
+			if rt := l.getRegisterType(); rt == registerTypeGeneralPurpose && gpTmp == asm.NilRegister {
+				gpTmp, err = c.allocateRegister(registerTypeGeneralPurpose)
+				if err != nil {
+					return
+				}
+			} else if rt == registerTypeVector && vecTmp == asm.NilRegister {
+				vecTmp, err = c.allocateRegister(registerTypeVector)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+	return
+}
+
+// dropsLivesForInclusiveRange returns the live and drop target values for the given wazeroir.InclusiveRange.
+func (v *runtimeValueLocationStack) dropsLivesForInclusiveRange(
+	r *wazeroir.InclusiveRange,
+) (dropValues, liveValues []*runtimeValueLocation) {
+	// liveValues are must be pushed backed after dropping the target range.
+	liveValues = v.stack[v.sp-uint64(r.Start) : v.sp]
+	// dropValues are the values on the drop target range.
+	dropValues = v.stack[v.sp-uint64(r.End)-1 : v.sp-uint64(r.Start)]
 	return
 }
