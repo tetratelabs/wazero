@@ -318,8 +318,8 @@ type compiler interface {
 	allocateRegister(t registerType) (reg asm.Register, err error)
 	// runtimeValueLocationStack returns the current runtimeValueLocationStack of the compiler implementation.
 	runtimeValueLocationStack() *runtimeValueLocationStack
-	// TODO
+	// pushRuntimeValueLocationOnRegister pushes a new runtimeValueLocation on a register `reg` and of the type `vt`.
 	pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation)
-	// TODO
+	// pushRuntimeValueLocationOnRegister pushes a new vector value's runtimeValueLocation on a register `reg`.
 	pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation)
 }
