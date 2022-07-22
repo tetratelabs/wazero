@@ -29,7 +29,7 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	// liveValues are must be pushed backed after dropping the target range.
 	liveValues := locationStack.stack[locationStack.sp-uint64(r.Start) : locationStack.sp]
 	// dropValues are the values on the drop target range.
-	dropValues := locationStack.stack[locationStack.sp-uint64(r.End) : locationStack.sp-uint64(r.Start)+1]
+	dropValues := locationStack.stack[locationStack.sp-uint64(r.End)-1 : locationStack.sp-uint64(r.Start)]
 	for _, dv := range dropValues {
 		locationStack.releaseRegister(dv)
 	}
