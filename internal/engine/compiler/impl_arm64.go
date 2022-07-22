@@ -226,7 +226,7 @@ func (c *arm64Compiler) compilePreamble() error {
 func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	tmpRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point")
 	}
 	tmpX, tmpY := tmpRegs[0], tmpRegs[1]
 
@@ -293,7 +293,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	tmpRegs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point")
 	}
 
 	// Alias for readability.
@@ -4124,7 +4124,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point")
 	}
 	c.markRegisterUsed(regs...)
 

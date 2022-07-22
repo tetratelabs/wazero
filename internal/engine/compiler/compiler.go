@@ -300,7 +300,6 @@ type compiler interface {
 
 	// compileReleaseRegisterToStack adds instructions to write the value on a register back to memory stack region.
 	compileReleaseRegisterToStack(loc *runtimeValueLocation)
-
 	// compileLoadValueOnStackToRegister adds instructions to load the value located on the stack to the assigned register.
 	compileLoadValueOnStackToRegister(loc *runtimeValueLocation)
 
@@ -317,13 +316,10 @@ type compiler interface {
 	// Note: resulting registers will not be marked as used so the call site should
 	// mark it used if necessary.
 	allocateRegister(t registerType) (reg asm.Register, err error)
-
 	// runtimeValueLocationStack returns the current runtimeValueLocationStack of the compiler implementation.
 	runtimeValueLocationStack() *runtimeValueLocationStack
-
 	// TODO
 	pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation)
-
 	// TODO
 	pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation)
 }

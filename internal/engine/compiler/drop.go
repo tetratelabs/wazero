@@ -5,6 +5,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// compileDropRange adds instruction to drop the values on the target range
+// in the architecture independent way.
 func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	locationStack := c.runtimeValueLocationStack()
 	if r == nil {
@@ -28,6 +30,9 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	liveValues := locationStack.stack[locationStack.sp-uint64(r.Start) : locationStack.sp]
 	// dropValues are the values on the drop target range.
 	dropValues := locationStack.stack[locationStack.sp-uint64(r.End) : locationStack.sp-uint64(r.Start)+1]
+	for _, dv := range dropValues {
+		locationStack.releaseRegister(dv)
+	}
 
 	// These booleans are true if a live value of that type is currently located on the memory stack.
 	// In order to migrate these values, we need a register of the corresponding type.

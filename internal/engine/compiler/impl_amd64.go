@@ -4547,7 +4547,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point: " + c.locationStack.String())
 	}
 	c.locationStack.markRegisterUsed(regs...)
 
