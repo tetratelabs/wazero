@@ -51,8 +51,7 @@ type functionExporter struct{}
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
-	builder.ExportFunction("emscripten_notify_memory_growth", emscriptenNotifyMemoryGrowth,
-		"emscripten_notify_memory_growth", "memory_index")
+	builder.ExportFunction(notifyMemoryGrowth.Name, notifyMemoryGrowth)
 }
 
 // emscriptenNotifyMemoryGrowth is called when wasm is compiled with
@@ -70,7 +69,12 @@ func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 //
 // See https://github.com/emscripten-core/emscripten/blob/3.1.16/system/lib/standalone/standalone.c#L118
 // and https://emscripten.org/docs/api_reference/emscripten.h.html#abi-functions
-var emscriptenNotifyMemoryGrowth = &wasm.Func{
-	Type: &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}},
-	Code: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+const functionNotifyMemoryGrowth = "emscripten_notify_memory_growth"
+
+var notifyMemoryGrowth = &wasm.Func{
+	ExportNames: []string{functionNotifyMemoryGrowth},
+	Name:        functionNotifyMemoryGrowth,
+	ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
+	ParamNames:  []string{"memory_index"},
+	Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 }

@@ -143,10 +143,6 @@ func DecodeModule(
 	if names.ModuleName == "" && names.FunctionNames == nil && names.LocalNames == nil {
 		module.NameSection = nil
 	}
-
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
 	return
 }
 

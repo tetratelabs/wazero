@@ -30,8 +30,6 @@ func swap(x, y uint32) (uint32, uint32) {
 }
 
 func TestNewHostModule(t *testing.T) {
-	i32 := ValueTypeI32
-
 	a := wasiAPI{}
 	functionArgsSizesGet := "args_sizes_get"
 	fnArgsSizesGet := reflect.ValueOf(a.ArgsSizesGet)
@@ -65,8 +63,8 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
-					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection: []Index{0, 1},
 				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}, {GoFunc: &fnFdWrite}},
@@ -90,7 +88,7 @@ func TestNewHostModule(t *testing.T) {
 				functionSwap: swap,
 			},
 			expected: &Module{
-				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
+				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{GoFunc: &fnSwap}},
 				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
@@ -151,7 +149,7 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}},

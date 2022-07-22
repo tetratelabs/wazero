@@ -119,7 +119,9 @@ func TestCompile(t *testing.T) {
 			if enabledFeatures == 0 {
 				enabledFeatures = wasm.Features20220419
 			}
-
+			for _, tp := range tc.module.TypeSection {
+				tp.CacheNumInUint64()
+			}
 			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
@@ -535,6 +537,9 @@ func TestCompile_MultiValue(t *testing.T) {
 			if enabledFeatures == 0 {
 				enabledFeatures = wasm.Features20220419
 			}
+			for _, tp := range tc.module.TypeSection {
+				tp.CacheNumInUint64()
+			}
 			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
@@ -565,7 +570,9 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 		Types:        []*wasm.FunctionType{f32_i32},
 		TableTypes:   []wasm.RefType{},
 	}
-
+	for _, tp := range module.TypeSection {
+		tp.CacheNumInUint64()
+	}
 	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
@@ -590,7 +597,9 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 		Types:        []*wasm.FunctionType{i32_i32},
 		TableTypes:   []wasm.RefType{},
 	}
-
+	for _, tp := range module.TypeSection {
+		tp.CacheNumInUint64()
+	}
 	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])

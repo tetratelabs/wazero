@@ -20,10 +20,16 @@ func Test_procExit(t *testing.T) {
 		{
 			name:     "success (exitcode 0)",
 			exitCode: 0,
+			expectedLog: `
+==> wasi_snapshot_preview1.proc_exit(rval=0)
+`,
 		},
 		{
 			name:     "arbitrary non-zero exitcode",
 			exitCode: 42,
+			expectedLog: `
+==> wasi_snapshot_preview1.proc_exit(rval=42)
+`,
 		},
 	}
 
@@ -34,9 +40,9 @@ func Test_procExit(t *testing.T) {
 			defer log.Reset()
 
 			// Since procExit panics, any opcodes afterwards cannot be reached.
-			err := require.CapturePanic(func() { procExit(testCtx, mod, tc.exitCode) })
+			_, err := mod.ExportedFunction(functionProcExit).Call(testCtx, uint64(tc.exitCode))
 			require.Equal(t, tc.exitCode, err.(*sys.ExitError).ExitCode())
-			require.Equal(t, tc.expectedLog, log.String())
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

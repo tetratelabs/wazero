@@ -227,6 +227,10 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 }
 
 func (m *Module) Validate(enabledFeatures Features) error {
+	for _, tp := range m.TypeSection {
+		tp.CacheNumInUint64()
+	}
+
 	if err := m.validateStartSection(); err != nil {
 		return err
 	}
@@ -325,7 +329,9 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
-
+		if m.CodeSection[idx].GoFunc != nil {
+			continue
+		}
 		if err = m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
@@ -667,17 +673,21 @@ type FunctionType struct {
 }
 
 func (f *FunctionType) CacheNumInUint64() {
-	for _, tp := range f.Params {
-		f.ParamNumInUint64++
-		if tp == ValueTypeV128 {
+	if f.ParamNumInUint64 == 0 {
+		for _, tp := range f.Params {
 			f.ParamNumInUint64++
+			if tp == ValueTypeV128 {
+				f.ParamNumInUint64++
+			}
 		}
 	}
 
-	for _, tp := range f.Results {
-		f.ResultNumInUint64++
-		if tp == ValueTypeV128 {
+	if f.ResultNumInUint64 == 0 {
+		for _, tp := range f.Results {
 			f.ResultNumInUint64++
+			if tp == ValueTypeV128 {
+				f.ResultNumInUint64++
+			}
 		}
 	}
 }

@@ -44,10 +44,14 @@ const (
 // See argsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func argsGet(ctx context.Context, mod api.Module, argv, argvBuf uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf)
-}
+var argsGet = wasm.NewGoFunc(
+	functionArgsGet, functionArgsGet,
+	[]string{"argv", "argv_buf"},
+	func(ctx context.Context, mod api.Module, argv, argvBuf uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf)
+	},
+)
 
 // argsSizesGet is the WASI function named functionArgsSizesGet that reads
 // command-line argument sizes.
@@ -78,15 +82,19 @@ func argsGet(ctx context.Context, mod api.Module, argv, argvBuf uint32) Errno {
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-func argsSizesGet(ctx context.Context, mod api.Module, resultArgc, resultArgvBufSize uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	mem := mod.Memory()
+var argsSizesGet = wasm.NewGoFunc(
+	functionArgsSizesGet, functionArgsSizesGet,
+	[]string{"result.argc", "result.argv_buf_size"},
+	func(ctx context.Context, mod api.Module, resultArgc, resultArgvBufSize uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		mem := mod.Memory()
 
-	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
-		return ErrnoFault
-	}
-	if !mem.WriteUint32Le(ctx, resultArgvBufSize, sysCtx.ArgsSize()) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
+			return ErrnoFault
+		}
+		if !mem.WriteUint32Le(ctx, resultArgvBufSize, sysCtx.ArgsSize()) {
+			return ErrnoFault
+		}
+		return ErrnoSuccess
+	},
+)

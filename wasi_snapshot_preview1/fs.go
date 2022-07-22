@@ -50,13 +50,21 @@ const (
 // advisory information on a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_advisefd-fd-offset-filesize-len-filesize-advice-advice---errno
-var fdAdvise = stubFunction(i32, i64, i64, i32) // stubbed for GrainLang per #271.
+var fdAdvise = stubFunction(
+	functionFdAdvise,
+	[]wasm.ValueType{i32, i64, i64, i32},
+	[]string{"fd", "offset", "len", "result.advice"},
+)
 
 // fdAllocate is the WASI function named functionFdAllocate which forces the
 // allocation of space in a file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_allocatefd-fd-offset-filesize-len-filesize---errno
-var fdAllocate = stubFunction(i32, i64, i64) // stubbed for GrainLang per #271.
+var fdAllocate = stubFunction(
+	functionFdAllocate,
+	[]wasm.ValueType{i32, i64, i64},
+	[]string{"fd", "offset", "len"},
+)
 
 // fdClose is the WASI function named functionFdClose which closes a file
 // descriptor.
@@ -73,20 +81,28 @@ var fdAllocate = stubFunction(i32, i64, i64) // stubbed for GrainLang per #271.
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 // and https://linux.die.net/man/3/close
-func fdClose(ctx context.Context, mod api.Module, fd uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	if ok := sysCtx.FS(ctx).CloseFile(ctx, fd); !ok {
-		return ErrnoBadf
-	}
+var fdClose = wasm.NewGoFunc(
+	functionFdClose, functionFdClose,
+	[]string{"fd"},
+	func(ctx context.Context, mod api.Module, fd uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		if ok := sysCtx.FS(ctx).CloseFile(ctx, fd); !ok {
+			return ErrnoBadf
+		}
 
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)
 
 // fdDatasync is the WASI function named functionFdDatasync which synchronizes
 // the data of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
-var fdDatasync = stubFunction(i32) // stubbed for GrainLang per #271.
+var fdDatasync = stubFunction(
+	functionFdDatasync,
+	[]wasm.ValueType{i32},
+	[]string{"fd"},
+)
 
 // fdFdstatGet is the WASI function named functionFdFdstatGet which returns the
 // attributes of a file descriptor.
@@ -125,20 +141,28 @@ var fdDatasync = stubFunction(i32) // stubbed for GrainLang per #271.
 // well as additional fields.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
 // and https://linux.die.net/man/3/fsync
-func fdFdstatGet(ctx context.Context, mod api.Module, fd uint32, resultStat uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	if _, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
-		return ErrnoBadf
-	}
-	// TODO: actually write the fdstat!
-	return ErrnoSuccess
-}
+var fdFdstatGet = wasm.NewGoFunc(
+	functionFdFdstatGet, functionFdFdstatGet,
+	[]string{"fd", "result.stat"},
+	func(ctx context.Context, mod api.Module, fd uint32, resultStat uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		if _, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
+			return ErrnoBadf
+		}
+		// TODO: actually write the fdstat!
+		return ErrnoSuccess
+	},
+)
 
 // fdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags which
 // adjusts the flags associated with a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errnoand is stubbed for GrainLang per #271
-var fdFdstatSetFlags = stubFunction(i32, i32) // stubbed for GrainLang per #271.
+var fdFdstatSetFlags = stubFunction(
+	functionFdFdstatSetFlags,
+	[]wasm.ValueType{i32, i32},
+	[]string{"fd", "flags"},
+)
 
 // fdFdstatSetRights is the WASI function named functionFdFdstatSetRights which
 // adjusts the rights associated with a file descriptor.
@@ -146,31 +170,51 @@ var fdFdstatSetFlags = stubFunction(i32, i32) // stubbed for GrainLang per #271.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_rightsfd-fd-fs_rights_base-rights-fs_rights_inheriting-rights---errno
 //
 // Note: This will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-var fdFdstatSetRights = stubFunction(i32, i64, i64) // stubbed for GrainLang per #271.
+var fdFdstatSetRights = stubFunction(
+	functionFdFdstatSetRights,
+	[]wasm.ValueType{i32, i64, i64},
+	[]string{"fd", "fs_rights_base", "fs_rights_inheriting"},
+)
 
 // fdFilestatGet is the WASI function named functionFdFilestatGet which returns
 // the attributes of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_getfd-fd---errno-filestat
-var fdFilestatGet = stubFunction(i32, i32) // stubbed for GrainLang per #271.
+var fdFilestatGet = stubFunction(
+	functionFdFilestatGet,
+	[]wasm.ValueType{i32, i32},
+	[]string{"fd", "result.buf"},
+)
 
 // fdFilestatSetSize is the WASI function named functionFdFilestatSetSize which
 // adjusts the size of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_sizefd-fd-size-filesize---errno
-var fdFilestatSetSize = stubFunction(i32, i64) // stubbed for GrainLang per #271.
+var fdFilestatSetSize = stubFunction(
+	functionFdFilestatSetSize,
+	[]wasm.ValueType{i32, i64},
+	[]string{"fd", "size"},
+)
 
 // fdFilestatSetTimes is the WASI function named functionFdFilestatSetTimes
 // which adjusts the times of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_timesfd-fd-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
-var fdFilestatSetTimes = stubFunction(i32, i64, i64, i32) // stubbed for GrainLang per #271.
+var fdFilestatSetTimes = stubFunction(
+	functionFdFilestatSetTimes,
+	[]wasm.ValueType{i32, i64, i64, i32},
+	[]string{"fd", "atim", "mtim", "fst_flags"},
+)
 
 // fdPread is the WASI function named functionFdPread which reads from a file
 // descriptor, without using and updating the file descriptor's offset.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_preadfd-fd-iovs-iovec_array-offset-filesize---errno-size
-var fdPread = stubFunction(i32, i32, i32, i64, i32) // stubbed for GrainLang per #271.
+var fdPread = stubFunction(
+	functionFdPread,
+	[]wasm.ValueType{i32, i32, i32, i64, i32},
+	[]string{"fd", "iovs", "iovs_len", "offset", "result.nread"},
+)
 
 // fdPrestatGet is the WASI function named functionFdPrestatGet which returns
 // the prestat data of a file descriptor.
@@ -203,24 +247,28 @@ var fdPread = stubFunction(i32, i32, i32, i64, i32) // stubbed for GrainLang per
 //
 // See fdPrestatDirName and
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
-func fdPrestatGet(ctx context.Context, mod api.Module, fd uint32, resultPrestat uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	entry, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
-	if !ok {
-		return ErrnoBadf
-	}
+var fdPrestatGet = wasm.NewGoFunc(
+	functionFdPrestatGet, functionFdPrestatGet,
+	[]string{"fd", "result.prestat"},
+	func(ctx context.Context, mod api.Module, fd uint32, resultPrestat uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		entry, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+		if !ok {
+			return ErrnoBadf
+		}
 
-	// Zero-value 8-bit tag, and 3-byte zero-value paddings, which is uint32le(0) in short.
-	if !mod.Memory().WriteUint32Le(ctx, resultPrestat, uint32(0)) {
-		return ErrnoFault
-	}
-	// Write the length of the directory name at offset 4.
-	if !mod.Memory().WriteUint32Le(ctx, resultPrestat+4, uint32(len(entry.Path))) {
-		return ErrnoFault
-	}
+		// Zero-value 8-bit tag, and 3-byte zero-value paddings, which is uint32le(0) in short.
+		if !mod.Memory().WriteUint32Le(ctx, resultPrestat, uint32(0)) {
+			return ErrnoFault
+		}
+		// Write the length of the directory name at offset 4.
+		if !mod.Memory().WriteUint32Le(ctx, resultPrestat+4, uint32(len(entry.Path))) {
+			return ErrnoFault
+		}
 
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)
 
 // fdPrestatDirName is the WASI function named functionFdPrestatDirName which
 // returns the path of the pre-opened directory of a file descriptor.
@@ -252,30 +300,37 @@ func fdPrestatGet(ctx context.Context, mod api.Module, fd uint32, resultPrestat 
 //
 // See fdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
-func fdPrestatDirName(ctx context.Context, mod api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
-	if !ok {
-		return ErrnoBadf
-	}
+var fdPrestatDirName = wasm.NewGoFunc(
+	functionFdPrestatDirName, functionFdPrestatDirName,
+	[]string{"fd", "path", "path_len"},
+	func(ctx context.Context, mod api.Module, fd uint32, pathPtr uint32, pathLen uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+		if !ok {
+			return ErrnoBadf
+		}
 
-	// Some runtimes may have another semantics. See /RATIONALE.md
-	if uint32(len(f.Path)) < pathLen {
-		return ErrnoNametoolong
-	}
+		// Some runtimes may have another semantics. See /RATIONALE.md
+		if uint32(len(f.Path)) < pathLen {
+			return ErrnoNametoolong
+		}
 
-	// TODO: fdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
-	if !mod.Memory().Write(ctx, pathPtr, []byte(f.Path)[:pathLen]) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		// TODO: fdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
+		if !mod.Memory().Write(ctx, pathPtr, []byte(f.Path)[:pathLen]) {
+			return ErrnoFault
+		}
+		return ErrnoSuccess
+	},
+)
 
 // fdPwrite is the WASI function named functionFdPwrite which writes to a file
 // descriptor, without using and updating the file descriptor's offset.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_pwritefd-fd-iovs-ciovec_array-offset-filesize---errno-size
-var fdPwrite = stubFunction(i32, i32, i32, i64, i32) // stubbed for GrainLang per #271.
+var fdPwrite = stubFunction(functionFdPwrite,
+	[]wasm.ValueType{i32, i32, i32, i64, i32},
+	[]string{"fd", "iovs", "iovs_len", "offset", "result.nwritten"},
+)
 
 // fdRead is the WASI function named functionFdRead which reads from a file
 // descriptor.
@@ -326,53 +381,65 @@ var fdPwrite = stubFunction(i32, i32, i32, i64, i32) // stubbed for GrainLang pe
 //
 // See fdWrite
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
-func fdRead(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	reader := internalsys.FdReader(ctx, sysCtx, fd)
-	if reader == nil {
-		return ErrnoBadf
-	}
+var fdRead = wasm.NewGoFunc(
+	functionFdRead, functionFdRead,
+	[]string{"fd", "iovs", "iovs_len", "result.size"},
+	func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		reader := internalsys.FdReader(ctx, sysCtx, fd)
+		if reader == nil {
+			return ErrnoBadf
+		}
 
-	var nread uint32
-	for i := uint32(0); i < iovsCount; i++ {
-		iovPtr := iovs + i*8
-		offset, ok := mod.Memory().ReadUint32Le(ctx, iovPtr)
-		if !ok {
+		var nread uint32
+		for i := uint32(0); i < iovsCount; i++ {
+			iovPtr := iovs + i*8
+			offset, ok := mod.Memory().ReadUint32Le(ctx, iovPtr)
+			if !ok {
+				return ErrnoFault
+			}
+			l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
+			if !ok {
+				return ErrnoFault
+			}
+			b, ok := mod.Memory().Read(ctx, offset, l)
+			if !ok {
+				return ErrnoFault
+			}
+			n, err := reader.Read(b) // Note: n <= l
+			nread += uint32(n)
+			if errors.Is(err, io.EOF) {
+				break
+			} else if err != nil {
+				return ErrnoIo
+			}
+		}
+		if !mod.Memory().WriteUint32Le(ctx, resultSize, nread) {
 			return ErrnoFault
 		}
-		l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
-		if !ok {
-			return ErrnoFault
-		}
-		b, ok := mod.Memory().Read(ctx, offset, l)
-		if !ok {
-			return ErrnoFault
-		}
-		n, err := reader.Read(b) // Note: n <= l
-		nread += uint32(n)
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return ErrnoIo
-		}
-	}
-	if !mod.Memory().WriteUint32Le(ctx, resultSize, nread) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)
 
 // fdReaddir is the WASI function named functionFdReaddir which reads directory
 // entries from a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
-var fdReaddir = stubFunction(i32, i32, i32, i64, i32) // stubbed for GrainLang per #271.
+var fdReaddir = stubFunction(
+	functionFdReaddir,
+	[]wasm.ValueType{i32, i32, i32, i64, i32},
+	[]string{"fd", "buf", "buf_len", "cookie", "result.bufused"},
+)
 
 // fdRenumber is the WASI function named functionFdRenumber which atomically
 // replaces a file descriptor by renumbering another file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
-var fdRenumber = stubFunction(i32, i32) // stubbed for GrainLang per #271.
+var fdRenumber = stubFunction(
+	functionFdRenumber,
+	[]wasm.ValueType{i32, i32},
+	[]string{"fd", "to"},
+)
 
 // fdSeek is the WASI function named functionFdSeek which moves the offset of a
 // file descriptor.
@@ -411,43 +478,55 @@ var fdRenumber = stubFunction(i32, i32) // stubbed for GrainLang per #271.
 //
 // See io.Seeker
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
-func fdSeek(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	var seeker io.Seeker
-	// Check to see if the file descriptor is available
-	if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
-		return ErrnoBadf
-		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
-	} else if seeker, ok = f.File.(io.Seeker); !ok {
-		return ErrnoBadf
-	}
+var fdSeek = wasm.NewGoFunc(
+	functionFdSeek, functionFdSeek,
+	[]string{"fd", "offset", "whence", "result.newoffset"},
+	func(ctx context.Context, mod api.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		var seeker io.Seeker
+		// Check to see if the file descriptor is available
+		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
+			return ErrnoBadf
+			// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
+		} else if seeker, ok = f.File.(io.Seeker); !ok {
+			return ErrnoBadf
+		}
 
-	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
-		return ErrnoInval
-	}
-	newOffset, err := seeker.Seek(int64(offset), int(whence))
-	if err != nil {
-		return ErrnoIo
-	}
+		if whence > io.SeekEnd /* exceeds the largest valid whence */ {
+			return ErrnoInval
+		}
+		newOffset, err := seeker.Seek(int64(offset), int(whence))
+		if err != nil {
+			return ErrnoIo
+		}
 
-	if !mod.Memory().WriteUint32Le(ctx, resultNewoffset, uint32(newOffset)) {
-		return ErrnoFault
-	}
+		if !mod.Memory().WriteUint32Le(ctx, resultNewoffset, uint32(newOffset)) {
+			return ErrnoFault
+		}
 
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)
 
 // fdSync is the WASI function named functionFdSync which synchronizes the data
 // and metadata of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
-var fdSync = stubFunction(i32) // stubbed for GrainLang per #271.
+var fdSync = stubFunction(
+	functionFdSync,
+	[]wasm.ValueType{i32},
+	[]string{"fd"},
+)
 
 // fdTell is the WASI function named functionFdTell which returns the current
 // offset of a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_tellfd-fd---errno-filesize
-var fdTell = stubFunction(i32, i32) // stubbed for GrainLang per #271.
+var fdTell = stubFunction(
+	functionFdTell,
+	[]wasm.ValueType{i32, i32},
+	[]string{"fd", "result.offset"},
+)
 
 // fdWrite is the WASI function named functionFdWrite which writes to a file
 // descriptor.
@@ -506,65 +585,85 @@ var fdTell = stubFunction(i32, i32) // stubbed for GrainLang per #271.
 // See fdRead
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
 // and https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
-func fdWrite(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	writer := internalsys.FdWriter(ctx, sysCtx, fd)
-	if writer == nil {
-		return ErrnoBadf
-	}
+var fdWrite = wasm.NewGoFunc(
+	functionFdWrite, functionFdWrite,
+	[]string{"fd", "iovs", "iovs_len", "result.size"},
+	func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		writer := internalsys.FdWriter(ctx, sysCtx, fd)
+		if writer == nil {
+			return ErrnoBadf
+		}
 
-	var nwritten uint32
-	for i := uint32(0); i < iovsCount; i++ {
-		iovPtr := iovs + i*8
-		offset, ok := mod.Memory().ReadUint32Le(ctx, iovPtr)
-		if !ok {
+		var nwritten uint32
+		for i := uint32(0); i < iovsCount; i++ {
+			iovPtr := iovs + i*8
+			offset, ok := mod.Memory().ReadUint32Le(ctx, iovPtr)
+			if !ok {
+				return ErrnoFault
+			}
+			// Note: emscripten has been known to write zero length iovec. However,
+			// it is not common in other compilers, so we don't optimize for it.
+			l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
+			if !ok {
+				return ErrnoFault
+			}
+			b, ok := mod.Memory().Read(ctx, offset, l)
+			if !ok {
+				return ErrnoFault
+			}
+			n, err := writer.Write(b)
+			if err != nil {
+				return ErrnoIo
+			}
+			nwritten += uint32(n)
+		}
+		if !mod.Memory().WriteUint32Le(ctx, resultSize, nwritten) {
 			return ErrnoFault
 		}
-		// Note: emscripten has been known to write zero length iovec. However,
-		// it is not common in other compilers, so we don't optimize for it.
-		l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
-		if !ok {
-			return ErrnoFault
-		}
-		b, ok := mod.Memory().Read(ctx, offset, l)
-		if !ok {
-			return ErrnoFault
-		}
-		n, err := writer.Write(b)
-		if err != nil {
-			return ErrnoIo
-		}
-		nwritten += uint32(n)
-	}
-	if !mod.Memory().WriteUint32Le(ctx, resultSize, nwritten) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+		return ErrnoSuccess
+	},
+)
 
 // pathCreateDirectory is the WASI function named functionPathCreateDirectory
 // which creates a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_create_directoryfd-fd-path-string---errno
-var pathCreateDirectory = stubFunction(i32, i32, i32) // stubbed for GrainLang per #271.
+var pathCreateDirectory = stubFunction(
+	functionPathCreateDirectory,
+	[]wasm.ValueType{i32, i32, i32},
+	[]string{"fd", "path", "path_len"},
+)
 
 // pathFilestatGet is the WASI function named functionPathFilestatGet which
 // returns the attributes of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_getfd-fd-flags-lookupflags-path-string---errno-filestat
-var pathFilestatGet = stubFunction(i32, i32, i32, i32, i32) // stubbed for GrainLang per #271.
+var pathFilestatGet = stubFunction(
+	functionPathFilestatGet,
+	[]wasm.ValueType{i32, i32, i32, i32, i32},
+	[]string{"fd", "flags", "path", "path_len", "result.buf"},
+)
 
 // pathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
 // which adjusts the timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_set_timesfd-fd-flags-lookupflags-path-string-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
-var pathFilestatSetTimes = stubFunction(i32, i32, i32, i32, i64, i64, i32) // stubbed for GrainLang per #271.
+var pathFilestatSetTimes = stubFunction(
+	functionPathFilestatSetTimes,
+	[]wasm.ValueType{i32, i32, i32, i32, i64, i64, i32},
+	[]string{"fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags"},
+)
 
 // pathLink is the WASI function named functionPathLink which adjusts the
 // timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_link
-var pathLink = stubFunction(i32, i32, i32, i32, i32, i32, i32) // stubbed for GrainLang per #271.
+var pathLink = stubFunction(
+	functionPathLink,
+	[]wasm.ValueType{i32, i32, i32, i32, i32, i32, i32},
+	[]string{"old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len"},
+)
 
 // pathOpen is the WASI function named functionPathOpen which opens a file or
 // directory. This returns ErrnoBadf if the fd is invalid.
@@ -620,59 +719,83 @@ var pathLink = stubFunction(i32, i32, i32, i32, i32, i32, i32) // stubbed for Gr
 //	* Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
-func pathOpen(ctx context.Context, mod api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
-	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	fsc := sysCtx.FS(ctx)
-	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
-		return ErrnoBadf
-	}
-
-	b, ok := mod.Memory().Read(ctx, pathPtr, pathLen)
-	if !ok {
-		return ErrnoFault
-	}
-
-	if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return ErrnoNoent
-		case errors.Is(err, fs.ErrExist):
-			return ErrnoExist
-		default:
-			return ErrnoIo
+var pathOpen = wasm.NewGoFunc(
+	functionPathOpen, functionPathOpen,
+	[]string{"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd"},
+	func(ctx context.Context, mod api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
+		fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
+		sysCtx := mod.(*wasm.CallContext).Sys
+		fsc := sysCtx.FS(ctx)
+		if _, ok := fsc.OpenedFile(ctx, fd); !ok {
+			return ErrnoBadf
 		}
-	} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
-		_ = fsc.CloseFile(ctx, newFD)
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
+
+		b, ok := mod.Memory().Read(ctx, pathPtr, pathLen)
+		if !ok {
+			return ErrnoFault
+		}
+
+		if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				return ErrnoNoent
+			case errors.Is(err, fs.ErrExist):
+				return ErrnoExist
+			default:
+				return ErrnoIo
+			}
+		} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
+			_ = fsc.CloseFile(ctx, newFD)
+			return ErrnoFault
+		}
+		return ErrnoSuccess
+	},
+)
 
 // pathReadlink is the WASI function named functionPathReadlink that reads the
 // contents of a symbolic link.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_readlinkfd-fd-path-string-buf-pointeru8-buf_len-size---errno-size
-var pathReadlink = stubFunction(i32, i32, i32, i32, i32, i32) // stubbed for GrainLang per #271.
+var pathReadlink = stubFunction(
+	functionPathReadlink,
+	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
+	[]string{"fd", "path", "path_len", "buf", "buf_len", "result.bufused"},
+)
 
 // pathRemoveDirectory is the WASI function named functionPathRemoveDirectory
 // which removes a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_remove_directoryfd-fd-path-string---errno
-var pathRemoveDirectory = stubFunction(i32, i32, i32) // stubbed for GrainLang per #271.
+var pathRemoveDirectory = stubFunction(
+	functionPathRemoveDirectory,
+	[]wasm.ValueType{i32, i32, i32},
+	[]string{"fd", "path", "path_len"},
+)
 
 // pathRename is the WASI function named functionPathRename which renames a
 // file or directory.
-var pathRename = stubFunction(i32, i32, i32, i32, i32, i32) // stubbed for GrainLang per #271.
+var pathRename = stubFunction(
+	functionPathRename,
+	[]wasm.ValueType{i32, i32, i32, i32, i32, i32},
+	[]string{"fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len"},
+)
 
 // pathSymlink is the WASI function named functionPathSymlink which creates a
 // symbolic link.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_symlink
-var pathSymlink = stubFunction(i32, i32, i32, i32, i32) // stubbed for GrainLang per #271.
+var pathSymlink = stubFunction(
+	functionPathSymlink,
+	[]wasm.ValueType{i32, i32, i32, i32, i32},
+	[]string{"old_path", "old_path_len", "fd", "new_path", "new_path_len"},
+)
 
 // pathUnlinkFile is the WASI function named functionPathUnlinkFile which
 // unlinks a file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_unlink_filefd-fd-path-string---errno
-var pathUnlinkFile = stubFunction(i32, i32, i32) // stubbed for GrainLang per #271.
+var pathUnlinkFile = stubFunction(
+	functionPathUnlinkFile,
+	[]wasm.ValueType{i32, i32, i32},
+	[]string{"fd", "path", "path_len"},
+)

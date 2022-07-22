@@ -51,7 +51,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
@@ -70,7 +70,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
@@ -90,7 +90,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint64_uint32}},
@@ -110,8 +110,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
@@ -134,8 +134,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
@@ -159,8 +159,8 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
@@ -448,6 +448,9 @@ func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.
 func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
+	for _, tp := range expected.TypeSection {
+		tp.CacheNumInUint64()
+	}
 	require.Equal(t, expected.TypeSection, actual.TypeSection)
 	require.Equal(t, expected.ImportSection, actual.ImportSection)
 	require.Equal(t, expected.FunctionSection, actual.FunctionSection)
