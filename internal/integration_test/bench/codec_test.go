@@ -22,7 +22,7 @@ func newExample() *wasm.Module {
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-			{ParamNumInUint64: 0},
+			{},
 			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
 			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}},
