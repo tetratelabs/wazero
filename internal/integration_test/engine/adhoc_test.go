@@ -53,11 +53,11 @@ func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithFeatureMultiValue(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithWasmCore2())
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithFeatureMultiValue(true))
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
@@ -122,7 +122,7 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
 
-	res, err := fn.Call(testCtx, 0)
+	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0)
 	require.NoError(t, err)
 
 	require.Equal(t, 100, len(res))
