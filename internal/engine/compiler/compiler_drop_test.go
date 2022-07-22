@@ -2,10 +2,11 @@ package compiler
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"testing"
 )
 
 func Test_compileDropRange(t *testing.T) {
