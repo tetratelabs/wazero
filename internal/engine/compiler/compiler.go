@@ -313,6 +313,7 @@ type compiler interface {
 	maybeCompileMoveTopConditionalToGeneralPurposeRegister() error
 	// allocateRegister returns an unused register of the given type. The register will be taken
 	// either from the free register pool or by stealing a used register.
+	//
 	// Note: resulting registers will not be marked as used so the call site should
 	// mark it used if necessary.
 	allocateRegister(t registerType) (reg asm.Register, err error)

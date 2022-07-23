@@ -139,7 +139,7 @@ func (c *arm64Compiler) label(labelKey string) *arm64LabelInfo {
 	return c.labels[labelKey]
 }
 
-// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+// runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *arm64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
 	return c.locationStack
 }

@@ -10,7 +10,7 @@ import (
 
 func Test_isIntRegister(t *testing.T) {
 	for _, r := range unreservedGeneralPurposeRegisters {
-		require.True(t, isIntRegister(r))
+		require.True(t, isGeneralPurposeRegister(r))
 	}
 }
 
@@ -65,7 +65,7 @@ func TestRuntimeValueLocationStack_takeFreeRegister(t *testing.T) {
 	// For int registers.
 	r, ok := s.takeFreeRegister(registerTypeGeneralPurpose)
 	require.True(t, ok)
-	require.True(t, isIntRegister(r))
+	require.True(t, isGeneralPurposeRegister(r))
 	// Mark all the int registers used.
 	for _, r := range unreservedGeneralPurposeRegisters {
 		s.markRegisterUsed(r)

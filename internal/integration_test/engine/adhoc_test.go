@@ -122,7 +122,7 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
 
-	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0)
+	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0) // params ignored by wasm
 	require.NoError(t, err)
 
 	require.Equal(t, 100, len(res))

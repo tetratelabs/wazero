@@ -6,7 +6,7 @@ import (
 )
 
 // compileDropRange adds instruction to drop the values on the target range
-// in the architecture independent way.
+// in an architecture independent way.
 func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 	locationStack := c.runtimeValueLocationStack()
 	if r == nil {

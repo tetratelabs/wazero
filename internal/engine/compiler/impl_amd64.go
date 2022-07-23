@@ -108,7 +108,7 @@ func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return c, nil
 }
 
-// compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+// runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
 func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
 	return c.locationStack
 }
