@@ -148,16 +148,30 @@ func newModuleVal(m api.Module) reflect.Value {
 	return val
 }
 
-// getFunctionType returns the function type corresponding to the function signature or errs if invalid.
-func getFunctionType(fn *reflect.Value) (fk FunctionKind, ft *FunctionType, err error) {
-	p := fn.Type()
+// MustParseGoFuncCode parses Code from the go function or panics.
+//
+// Exposing this simplifies definition of host functions in built-in host
+// modules and tests.
+func MustParseGoFuncCode(fn interface{}) *Code {
+	_, _, code, err := parseGoFunc(fn)
+	if err != nil {
+		panic(err)
+	}
+	return code
+}
 
-	if fn.Kind() != reflect.Func {
-		err = fmt.Errorf("kind != func: %s", fn.Kind().String())
+func parseGoFunc(fn interface{}) (params, results []ValueType, code *Code, err error) {
+	fnV := reflect.ValueOf(fn)
+	p := fnV.Type()
+
+	if fnV.Kind() != reflect.Func {
+		err = fmt.Errorf("kind != func: %s", fnV.Kind().String())
 		return
 	}
 
-	fk = kind(p)
+	fk := kind(p)
+	code = &Code{IsHostFunction: true, Kind: fk, GoFunc: &fnV}
+
 	pOffset := 0
 	switch fk {
 	case FunctionKindGoNoContext:
@@ -167,13 +181,14 @@ func getFunctionType(fn *reflect.Value) (fk FunctionKind, ft *FunctionType, err 
 		pOffset = 1
 	}
 
-	rCount := p.NumOut()
-
-	ft = &FunctionType{Params: make([]ValueType, p.NumIn()-pOffset), Results: make([]ValueType, rCount)}
-	for i := 0; i < len(ft.Params); i++ {
+	pCount := p.NumIn() - pOffset
+	if pCount > 0 {
+		params = make([]ValueType, pCount)
+	}
+	for i := 0; i < len(params); i++ {
 		pI := p.In(i + pOffset)
 		if t, ok := getTypeOf(pI.Kind()); ok {
-			ft.Params[i] = t
+			params[i] = t
 			continue
 		}
 
@@ -193,10 +208,14 @@ func getFunctionType(fn *reflect.Value) (fk FunctionKind, ft *FunctionType, err 
 		return
 	}
 
-	for i := 0; i < len(ft.Results); i++ {
+	rCount := p.NumOut()
+	if rCount > 0 {
+		results = make([]ValueType, rCount)
+	}
+	for i := 0; i < len(results); i++ {
 		rI := p.Out(i)
 		if t, ok := getTypeOf(rI.Kind()); ok {
-			ft.Results[i] = t
+			results[i] = t
 			continue
 		}
 

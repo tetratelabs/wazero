@@ -2,7 +2,6 @@ package wazero
 
 import (
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -19,11 +18,9 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 	uint32_uint32 := func(uint32) uint32 {
 		return 0
 	}
-	fnUint32_uint32 := reflect.ValueOf(uint32_uint32)
 	uint64_uint32 := func(uint64) uint32 {
 		return 0
 	}
-	fnUint64_uint32 := reflect.ValueOf(uint64_uint32)
 
 	tests := []struct {
 		name     string
@@ -54,7 +51,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -73,7 +70,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -93,7 +90,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint64_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -114,7 +111,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -138,7 +135,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -163,7 +160,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{{GoFunc: &fnUint32_uint32}, {GoFunc: &fnUint64_uint32}},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -464,8 +461,16 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
+	// TODO: This is copy/paste with /internal/wasm/host_test.go
 	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
-	for _, c := range expected.CodeSection {
-		require.Equal(t, c.GoFunc.Type(), c.GoFunc.Type())
+	for i, c := range expected.CodeSection {
+		actualCode := actual.CodeSection[i]
+		require.True(t, actualCode.IsHostFunction)
+		require.Equal(t, c.Kind, actualCode.Kind)
+		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+
+		// Not wasm
+		require.Nil(t, actualCode.Body)
+		require.Nil(t, actualCode.LocalTypes)
 	}
 }

@@ -830,11 +830,23 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
-	memoryInst := moduleInst.Memory
+	var memoryInst *wasm.MemoryInstance
+	var functions []*function
+	if f.source.IsHostFunction {
+		// Use the caller's memory, which might be different from the defining
+		// module on an imported function.
+		if len(ce.frames) > 0 {
+			memoryInst = ce.frames[len(ce.frames)-1].f.source.Module.Memory
+		} else {
+			memoryInst = moduleInst.Memory
+		}
+	} else {
+		functions = f.source.Module.Engine.(*moduleEngine).functions
+		memoryInst = moduleInst.Memory
+	}
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
 	typeIDs := f.source.Module.TypeIDs
-	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
 	ce.pushFrame(frame)

@@ -438,7 +438,7 @@ value (possibly `PWD`). Those unable to control the compiled code should only
 use absolute paths in configuration.
 
 See
-* https://github.com/golang/go/blob/go1.19beta1/src/syscall/fs_js.go#L324
+* https://github.com/golang/go/blob/go1.19rc2/src/syscall/fs_js.go#L324
 * https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
 
 ### FdPrestatDirName

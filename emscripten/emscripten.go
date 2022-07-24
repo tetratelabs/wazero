@@ -71,10 +71,10 @@ func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 // and https://emscripten.org/docs/api_reference/emscripten.h.html#abi-functions
 const functionNotifyMemoryGrowth = "emscripten_notify_memory_growth"
 
-var notifyMemoryGrowth = &wasm.Func{
+var notifyMemoryGrowth = &wasm.HostFunc{
 	ExportNames: []string{functionNotifyMemoryGrowth},
 	Name:        functionNotifyMemoryGrowth,
 	ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 	ParamNames:  []string{"memory_index"},
-	Code:        &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
+	Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}},
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -227,12 +228,16 @@ type FunctionDefinition interface {
 	// is possible.
 	ExportNames() []string
 
-	// IsHostFunction returns true if the function was implemented by the
-	// embedder (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	// GoFunc is present when the function was implemented by the embedder
+	// (ex via wazero.ModuleBuilder) instead of a wasm binary.
 	//
-	// Note: Host functions can be non-deterministic or cause side effects.
+	// This function can be non-deterministic or cause side effects. It also
+	// has special properties not defined in the WebAssembly Core
+	// specification. Notably, it uses the caller's memory, which might be
+	// different from its defining module.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
-	IsHostFunction() bool
+	GoFunc() *reflect.Value
 
 	// ParamTypes are the possibly empty sequence of value types accepted by a
 	// function with this signature.

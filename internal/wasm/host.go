@@ -2,16 +2,15 @@ package wasm
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
-// Func is a function with an inlined type, typically used for NewHostModule.
+// HostFunc is a function with an inlined type, used for NewHostModule.
 // Any corresponding FunctionType will be reused or added to the Module.
-type Func struct {
+type HostFunc struct {
 	// ExportNames is equivalent to  the same method on api.FunctionDefinition.
 	ExportNames []string
 
@@ -31,35 +30,39 @@ type Func struct {
 	Code *Code
 }
 
-// NewGoFunc returns a Func for the given parameters or panics.
-func NewGoFunc(exportName string, name string, paramNames []string, fn interface{}) *Func {
-	fnV := reflect.ValueOf(fn)
-	_, ft, err := getFunctionType(&fnV)
-	if err != nil {
-		panic(err)
-	}
-	return &Func{
+// NewGoFunc returns a HostFunc for the given parameters or panics.
+func NewGoFunc(exportName string, name string, paramNames []string, fn interface{}) *HostFunc {
+	return (&HostFunc{
 		ExportNames: []string{exportName},
 		Name:        name,
-		ParamTypes:  ft.Params,
-		ResultTypes: ft.Results,
 		ParamNames:  paramNames,
-		Code:        &Code{GoFunc: &fnV},
+	}).MustGoFunc(fn)
+}
+
+// MustGoFunc calls WithGoFunc or panics on error.
+func (f *HostFunc) MustGoFunc(fn interface{}) *HostFunc {
+	if ret, err := f.WithGoFunc(fn); err != nil {
+		panic(err)
+	} else {
+		return ret
 	}
 }
 
 // WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
-func (f *Func) WithGoFunc(fn interface{}) *Func {
+func (f *HostFunc) WithGoFunc(fn interface{}) (*HostFunc, error) {
 	ret := *f
-	fnV := reflect.ValueOf(fn)
-	ret.Code = &Code{GoFunc: &fnV}
-	return &ret
+	var err error
+	ret.ParamTypes, ret.ResultTypes, ret.Code, err = parseGoFunc(fn)
+	return &ret, err
 }
 
 // WithWasm returns a copy of the function, replacing its Code.Body.
-func (f *Func) WithWasm(body []byte) *Func {
+func (f *HostFunc) WithWasm(body []byte) *HostFunc {
 	ret := *f
-	ret.Code = &Code{Body: body}
+	ret.Code = &Code{IsHostFunction: true, Body: body}
+	if f.Code != nil {
+		ret.Code.LocalTypes = f.Code.LocalTypes
+	}
 	return &ret
 }
 
@@ -138,40 +141,45 @@ func addFuncs(
 		m.NameSection = &NameSection{}
 	}
 	moduleName := m.NameSection.ModuleName
-	nameToFunc := make(map[string]*Func, len(nameToGoFunc))
+	nameToFunc := make(map[string]*HostFunc, len(nameToGoFunc))
+	sortedExportNames := make([]string, len(nameToFunc))
+	for k := range nameToGoFunc {
+		sortedExportNames = append(sortedExportNames, k)
+	}
+
+	// Sort names for consistent iteration
+	sort.Strings(sortedExportNames)
+
 	funcNames := make([]string, len(nameToFunc))
-	for k, v := range nameToGoFunc {
-		if hf, ok := v.(*Func); !ok {
-			fn := reflect.ValueOf(v)
-			_, ft, ftErr := getFunctionType(&fn)
+	for _, k := range sortedExportNames {
+		v := nameToGoFunc[k]
+		if hf, ok := v.(*HostFunc); ok {
+			nameToFunc[hf.Name] = hf
+			funcNames = append(funcNames, hf.Name)
+		} else {
+			params, results, code, ftErr := parseGoFunc(v)
 			if ftErr != nil {
 				return fmt.Errorf("func[%s.%s] %w", moduleName, k, ftErr)
 			}
-			hf = &Func{
+			hf = &HostFunc{
 				ExportNames: []string{k},
 				Name:        k,
-				ParamTypes:  ft.Params,
-				ResultTypes: ft.Results,
-				Code:        &Code{GoFunc: &fn},
+				ParamTypes:  params,
+				ResultTypes: results,
+				Code:        code,
 			}
 			if names := funcToNames[k]; names != nil {
 				namesLen := len(names)
-				if namesLen > 1 && namesLen-1 != len(ft.Params) {
-					return fmt.Errorf("func[%s.%s] has %d params, but %d param names", moduleName, k, namesLen-1, len(ft.Params))
+				if namesLen > 1 && namesLen-1 != len(params) {
+					return fmt.Errorf("func[%s.%s] has %d params, but %d param names", moduleName, k, namesLen-1, len(params))
 				}
 				hf.Name = names[0]
 				hf.ParamNames = names[1:]
 			}
 			nameToFunc[k] = hf
 			funcNames = append(funcNames, k)
-		} else {
-			nameToFunc[hf.Name] = hf
-			funcNames = append(funcNames, hf.Name)
 		}
 	}
-
-	// Sort names for consistent iteration
-	sort.Strings(funcNames)
 
 	funcCount := uint32(len(nameToFunc))
 	m.NameSection.FunctionNames = make([]*NameAssoc, 0, funcCount)

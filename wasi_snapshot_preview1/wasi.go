@@ -181,13 +181,16 @@ func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, va
 }
 
 // stubFunction stubs for GrainLang per #271.
-func stubFunction(name string, paramTypes []wasm.ValueType, paramNames []string) *wasm.Func {
-	return &wasm.Func{
+func stubFunction(name string, paramTypes []wasm.ValueType, paramNames []string) *wasm.HostFunc {
+	return &wasm.HostFunc{
 		Name:        name,
 		ExportNames: []string{name},
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []wasm.ValueType{i32},
-		Code:        &wasm.Code{Body: []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd}},
+		Code: &wasm.Code{
+			IsHostFunction: true,
+			Body:           []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd},
+		},
 	}
 }

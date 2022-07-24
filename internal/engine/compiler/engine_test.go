@@ -23,6 +23,11 @@ var et = &engineTester{}
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
+// IsCompiler implements the same method as documented on enginetest.EngineTester.
+func (e *engineTester) IsCompiler() bool {
+	return true
+}
+
 // ListenerFactory implements the same method as documented on enginetest.EngineTester.
 func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 	return nil

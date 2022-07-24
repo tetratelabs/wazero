@@ -87,7 +87,7 @@ func NewFunctionExporter() FunctionExporter {
 }
 
 type functionExporter struct {
-	abortFn, traceFn *wasm.Func
+	abortFn, traceFn *wasm.HostFunc
 }
 
 // WithAbortMessageDisabled implements FunctionExporter.WithAbortMessageDisabled
@@ -130,7 +130,7 @@ var abortMessageEnabled = wasm.NewGoFunc(
 	abortWithMessage,
 )
 
-var abortMessageDisabled = abortMessageEnabled.WithGoFunc(abort)
+var abortMessageDisabled = abortMessageEnabled.MustGoFunc(abort)
 
 // abortWithMessage implements fnAbort
 func abortWithMessage(
@@ -176,7 +176,7 @@ var traceStdout = wasm.NewGoFunc(functionTrace, "~lib/builtins/trace",
 )
 
 // traceStderr implements trace to the configured Stderr.
-var traceStderr = traceStdout.WithGoFunc(func(
+var traceStderr = traceStdout.MustGoFunc(func(
 	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
 ) {
 	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stderr())

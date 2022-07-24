@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -32,11 +31,8 @@ func swap(x, y uint32) (uint32, uint32) {
 func TestNewHostModule(t *testing.T) {
 	a := wasiAPI{}
 	functionArgsSizesGet := "args_sizes_get"
-	fnArgsSizesGet := reflect.ValueOf(a.ArgsSizesGet)
 	functionFdWrite := "fd_write"
-	fnFdWrite := reflect.ValueOf(a.FdWrite)
 	functionSwap := "swap"
-	fnSwap := reflect.ValueOf(swap)
 
 	tests := []struct {
 		name, moduleName string
@@ -67,7 +63,7 @@ func TestNewHostModule(t *testing.T) {
 					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection: []Index{0, 1},
-				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}, {GoFunc: &fnFdWrite}},
+				CodeSection:     []*Code{MustParseGoFuncCode(a.ArgsSizesGet), MustParseGoFuncCode(a.FdWrite)},
 				ExportSection: []*Export{
 					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
 					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
@@ -90,7 +86,7 @@ func TestNewHostModule(t *testing.T) {
 			expected: &Module{
 				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{GoFunc: &fnSwap}},
+				CodeSection:     []*Code{MustParseGoFuncCode(swap)},
 				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
 				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
@@ -152,7 +148,7 @@ func TestNewHostModule(t *testing.T) {
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{GoFunc: &fnArgsSizesGet}},
+				CodeSection:     []*Code{MustParseGoFuncCode(a.ArgsSizesGet)},
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: i32},
@@ -201,9 +197,17 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
+	// TODO: This is copy/paste with /builder_test.go
 	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
-	for _, c := range expected.CodeSection {
-		require.Equal(t, c.GoFunc.Type(), c.GoFunc.Type())
+	for i, c := range expected.CodeSection {
+		actualCode := actual.CodeSection[i]
+		require.True(t, actualCode.IsHostFunction)
+		require.Equal(t, c.Kind, actualCode.Kind)
+		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+
+		// Not wasm
+		require.Nil(t, actualCode.Body)
+		require.Nil(t, actualCode.LocalTypes)
 	}
 }
 

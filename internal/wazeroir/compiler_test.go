@@ -51,10 +51,56 @@ func TestCompile(t *testing.T) {
 				},
 				LabelCallers: map[string]uint32{},
 				Functions:    []uint32{0},
-				Types:        []*wasm.FunctionType{{}},
-				Signature:    &wasm.FunctionType{},
+				Types:        []*wasm.FunctionType{v_v},
+				Signature:    v_v,
 				TableTypes:   []wasm.RefType{},
 			},
+		},
+		{
+			name: "host wasm nullary",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}}},
+			},
+			expected: &CompilationResult{
+				IsHostFunction: true,
+				Operations: []Operation{ // begin with params: []
+					&OperationBr{Target: &BranchTarget{}}, // return!
+				},
+				LabelCallers: map[string]uint32{},
+				Functions:    []uint32{0},
+				Types:        []*wasm.FunctionType{v_v},
+				Signature:    v_v,
+				TableTypes:   []wasm.RefType{},
+			},
+		},
+		{
+			name: "host go nullary",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func() {})},
+			},
+			expected: &CompilationResult{IsHostFunction: true},
+		},
+		{
+			name: "host go api.Module uses memory",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func(api.Module) {})},
+			},
+			expected: &CompilationResult{IsHostFunction: true, UsesMemory: true},
+		},
+		{
+			name: "host go context.Context api.Module uses memory",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func(context.Context, api.Module) {})},
+			},
+			expected: &CompilationResult{IsHostFunction: true, UsesMemory: true},
 		},
 		{
 			name: "identity",
@@ -83,6 +129,61 @@ func TestCompile(t *testing.T) {
 			},
 		},
 		{
+			name: "uses memory",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeI32Const, 8, // memory offset to load
+					wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: &CompilationResult{
+				Operations: []Operation{ // begin with params: []
+					&OperationConstI32{Value: 8}, // [8]
+					&OperationLoad{Type: UnsignedTypeI32, Arg: &MemoryArg{Alignment: 2, Offset: 0}}, // [x]
+					&OperationDrop{Depth: &InclusiveRange{}},                                        // []
+					&OperationBr{Target: &BranchTarget{}},                                           // return!
+				},
+				LabelCallers: map[string]uint32{},
+				Types:        []*wasm.FunctionType{v_v},
+				Functions:    []uint32{0},
+				Signature:    v_v,
+				TableTypes:   []wasm.RefType{},
+				UsesMemory:   true,
+			},
+		},
+		{
+			name: "host uses memory",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{IsHostFunction: true, Body: []byte{
+					wasm.OpcodeI32Const, 8, // memory offset to load
+					wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
+					wasm.OpcodeDrop,
+					wasm.OpcodeEnd,
+				}}},
+			},
+			expected: &CompilationResult{
+				IsHostFunction: true,
+				Operations: []Operation{ // begin with params: []
+					&OperationConstI32{Value: 8}, // [8]
+					&OperationLoad{Type: UnsignedTypeI32, Arg: &MemoryArg{Alignment: 2, Offset: 0}}, // [x]
+					&OperationDrop{Depth: &InclusiveRange{}},                                        // []
+					&OperationBr{Target: &BranchTarget{}},                                           // return!
+				},
+				LabelCallers: map[string]uint32{},
+				Types:        []*wasm.FunctionType{v_v},
+				Functions:    []uint32{0},
+				Signature:    v_v,
+				TableTypes:   []wasm.RefType{},
+				UsesMemory:   true,
+			},
+		},
+		{
 			name: "memory.grow", // Ex to expose ops to grow memory
 			module: requireModuleText(t, `(module
   (func (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
@@ -107,6 +208,7 @@ func TestCompile(t *testing.T) {
 					ResultNumInUint64: 1,
 				},
 				TableTypes: []wasm.RefType{},
+				UsesMemory: true,
 			},
 		},
 	}
@@ -124,7 +226,16 @@ func TestCompile(t *testing.T) {
 			}
 			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, res[0])
+
+			fn := res[0]
+			if fn.GoFunc != nil { // can't compare functions
+				// Special case because reflect.Value can't be compared with Equals
+				require.True(t, fn.IsHostFunction)
+				require.Equal(t, tc.expected.UsesMemory, fn.UsesMemory)
+				require.Equal(t, &tc.module.CodeSection[0].GoFunc, &fn.GoFunc)
+			} else {
+				require.Equal(t, tc.expected, fn)
+			}
 		})
 	}
 }
@@ -244,6 +355,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 			&OperationBr{Target: &BranchTarget{}}, // return!
 		},
 		HasMemory:        true,
+		UsesMemory:       true,
 		HasDataInstances: true,
 		LabelCallers:     map[string]uint32{},
 		Signature:        v_v,
@@ -742,7 +854,7 @@ func TestCompile_Refs(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
@@ -810,7 +922,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
@@ -879,7 +991,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
@@ -933,7 +1045,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.get - non func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -996,7 +1108,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.set - non func param - v128",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -1070,7 +1182,7 @@ func TestCompile_Locals(t *testing.T) {
 		{
 			name: "local.tee - non func param",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{
 					Body: []byte{
@@ -2443,7 +2555,7 @@ func TestCompile_Vec(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
@@ -2477,7 +2589,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2492,7 +2604,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br_if",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2508,7 +2620,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 		{
 			name: "br_table",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeBr, 0, // Return the function -> the followings are unreachable.
@@ -2543,7 +2655,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 		{
 			name: "basic",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
@@ -2581,7 +2693,7 @@ func TestCompile_select_vectors(t *testing.T) {
 		{
 			name: "non typed",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,
@@ -2607,7 +2719,7 @@ func TestCompile_select_vectors(t *testing.T) {
 		{
 			name: "typed",
 			mod: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection: []*wasm.Code{{Body: []byte{
 					wasm.OpcodeVecPrefix,

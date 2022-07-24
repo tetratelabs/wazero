@@ -64,8 +64,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
 	functionType := m.TypeSection[m.FunctionSection[idx]]
-	body := m.CodeSection[idx].Body
-	localTypes := m.CodeSection[idx].LocalTypes
+	code := m.CodeSection[idx]
+	body := code.Body
+	localTypes := code.LocalTypes
 	types := m.TypeSection
 
 	// We start with the outermost control block which is for function return if the code branches into it.
@@ -90,8 +91,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 		}
 
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
-			if memory == nil {
-				return fmt.Errorf("unknown memory access")
+			if memory == nil && !code.IsHostFunction {
+				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
 			align, _, read, err := readMemArg(pc, body)
@@ -272,8 +273,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 			}
 		} else if OpcodeMemorySize <= op && op <= OpcodeMemoryGrow {
-			if memory == nil {
-				return fmt.Errorf("unknown memory access")
+			if memory == nil && !code.IsHostFunction {
+				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
 			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
@@ -1100,7 +1101,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				OpcodeVecV128Load32x2s, OpcodeVecV128Load32x2u, OpcodeVecV128Load8Splat, OpcodeVecV128Load16Splat,
 				OpcodeVecV128Load32Splat, OpcodeVecV128Load64Splat,
 				OpcodeVecV128Load32zero, OpcodeVecV128Load64zero:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				pc++
@@ -1138,7 +1139,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				pc++
@@ -1157,7 +1158,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128StoreName, err)
 				}
 			case OpcodeVecV128Load8Lane, OpcodeVecV128Load16Lane, OpcodeVecV128Load32Lane, OpcodeVecV128Load64Lane:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				attr := vecLoadLanes[vecOpcode]
@@ -1185,7 +1186,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store8Lane, OpcodeVecV128Store16Lane, OpcodeVecV128Store32Lane, OpcodeVecV128Store64Lane:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				attr := vecStoreLanes[vecOpcode]
