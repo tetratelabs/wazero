@@ -92,7 +92,7 @@ func Test_parseGoFunc(t *testing.T) {
 	}
 }
 
-func TestParseGoFunc_Errors(t *testing.T) {
+func Test_parseGoFunc_Errors(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            interface{}
