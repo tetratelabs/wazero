@@ -47,40 +47,47 @@ func compileDropRange(c compiler, r *wazeroir.InclusiveRange) (err error) {
 
 	// Push back the live values again.
 	for _, live := range liveValues {
-		if live.valueType == runtimeValueTypeV128Hi {
-			// Higher bits of vector was already handled together with the lower bits.
-			continue
-		}
-
-		previouslyOnStack := live.onStack()
-		if previouslyOnStack {
-			// If the value is on the stack, load the value on the old location into the temporary value,
-			// and then write it back to the new memory location below.
-			switch live.getRegisterType() {
-			case registerTypeGeneralPurpose:
-				live.setRegister(gpTmp)
-			case registerTypeVector:
-				live.setRegister(vecTmp)
-			}
-			// Load the value into tmp.
-			c.compileLoadValueOnStackToRegister(live)
-		}
-
-		var newLocation *runtimeValueLocation
-		if live.valueType == runtimeValueTypeV128Lo {
-			newLocation = c.pushVectorRuntimeValueLocationOnRegister(live.register)
-		} else {
-			newLocation = c.pushRuntimeValueLocationOnRegister(live.register, live.valueType)
-		}
-
-		if previouslyOnStack {
-			// This case, the location is on the temporary register. Therefore,
-			// we have to release the value there into the *new* memory location
-			// so that the tmp can be used for subsequent live value migrations.
-			c.compileReleaseRegisterToStack(newLocation)
-		}
+		migrateLiveValue(c, live, gpTmp, vecTmp)
 	}
 	return
+}
+
+// migrateLiveValue migrates the live value `live` into the top of the stack. It might be located on the stack
+// and in that case, we have to load it into either `generalPurposeTmpReg` or `vectorTmpReg` temporarily, and
+// write it back into the *new* stack location.
+func migrateLiveValue(c compiler, live *runtimeValueLocation, generalPurposeTmpReg, vectorTmpReg asm.Register) {
+	if live.valueType == runtimeValueTypeV128Hi {
+		// Higher bits of vector was already handled together with the lower bits.
+		return
+	}
+
+	previouslyOnStack := live.onStack()
+	if previouslyOnStack {
+		// If the value is on the stack, load the value on the old location into the temporary value,
+		// and then write it back to the new memory location below.
+		switch live.getRegisterType() {
+		case registerTypeGeneralPurpose:
+			live.setRegister(generalPurposeTmpReg)
+		case registerTypeVector:
+			live.setRegister(vectorTmpReg)
+		}
+		// Load the value into tmp.
+		c.compileLoadValueOnStackToRegister(live)
+	}
+
+	var newLocation *runtimeValueLocation
+	if live.valueType == runtimeValueTypeV128Lo {
+		newLocation = c.pushVectorRuntimeValueLocationOnRegister(live.register)
+	} else {
+		newLocation = c.pushRuntimeValueLocationOnRegister(live.register, live.valueType)
+	}
+
+	if previouslyOnStack {
+		// This case, the location is on the temporary register. Therefore,
+		// we have to release the value there into the *new* memory location
+		// so that the tmp can be used for subsequent live value migrations.
+		c.compileReleaseRegisterToStack(newLocation)
+	}
 }
 
 func getTemporariesForStackedLiveValues(c compiler, liveValues []*runtimeValueLocation) (gpTmp, vecTmp asm.Register, err error) {

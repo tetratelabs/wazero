@@ -184,3 +184,42 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 		}
 	})
 }
+
+func Test_migrateLiveValue(t *testing.T) {
+	t.Run("v128.hi", func(t *testing.T) {
+		migrateLiveValue(nil, &runtimeValueLocation{valueType: runtimeValueTypeV128Hi}, asm.NilRegister, asm.NilRegister)
+	})
+	t.Run("already on register", func(t *testing.T) {
+		// This case, we don't use tmp registers.
+		c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+		require.NoError(t, err)
+
+		// Push the dummy values.
+		for i := 0; i < 10; i++ {
+			_ = c.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+		}
+
+		gpReg := unreservedGeneralPurposeRegisters[0]
+		vReg := unreservedVectorRegisters[0]
+		c.pushRuntimeValueLocationOnRegister(gpReg, runtimeValueTypeI64)
+		c.pushVectorRuntimeValueLocationOnRegister(vReg)
+
+		// Emulate the compileDrop
+		ls := c.runtimeValueLocationStack()
+		vLive, gpLive := ls.popV128(), ls.pop()
+		const dropNum = 5
+		ls.sp -= dropNum
+
+		// Migrate these two values.
+		migrateLiveValue(c, gpLive, asm.NilRegister, asm.NilRegister)
+		migrateLiveValue(c, vLive, asm.NilRegister, asm.NilRegister)
+
+		// Check the new stack location.
+		vectorMigrated, gpMigrated := ls.popV128(), ls.pop()
+		require.Equal(t, uint64(5), gpMigrated.stackPointer)
+		require.Equal(t, uint64(6), vectorMigrated.stackPointer)
+
+		require.Equal(t, gpLive.register, gpMigrated.register)
+		require.Equal(t, vLive.register, vectorMigrated.register)
+	})
+}
