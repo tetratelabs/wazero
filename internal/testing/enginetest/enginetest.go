@@ -29,6 +29,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+const (
+	i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+)
+
 var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
@@ -73,14 +77,14 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 	e := et.NewEngine(wasm.Features20220419)
 
-	i64 := wasm.ValueTypeI64
+	i64 := i64
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
 		FunctionSection: []uint32{0, 0, 0},
 		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{wasm.ValueTypeI64}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
 		},
 	}
 	m.BuildFunctionDefinitions()
@@ -95,7 +99,7 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 
 	nullRefVal := wasm.GlobalInstanceNullFuncRefValue
 	globals := []*wasm.GlobalInstance{
-		{Val: 10, Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32}},
+		{Val: 10, Type: &wasm.GlobalType{ValType: i32}},
 		{Val: uint64(nullRefVal), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
 		{Val: uint64(2), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
 		{Val: uint64(1), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
@@ -118,7 +122,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// Define a basic function which defines two parameters and two results.
 	// This is used to test results when incorrect arity is used.
-	i64 := wasm.ValueTypeI64
+	i64 := i64
 	m := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{
@@ -230,7 +234,8 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			TypeSection:     []*wasm.FunctionType{v_v},
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
-				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{2},
 		}
@@ -330,45 +335,55 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 }
 
 func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem *wasm.Code) {
-	features := wasm.Features20191205
-	e := et.NewEngine(features)
+	e := et.NewEngine(wasm.Features20191205)
+	host, importing, close := setupCallMemTests(t, e, readMem, et.ListenerFactory())
+	defer close()
 
-	sig := &wasm.FunctionType{
-		Results:           []wasm.ValueType{wasm.ValueTypeI64},
-		ResultNumInUint64: 1,
-	}
-	readMemName := readMemWasmName
-	if readMem.GoFunc != nil {
-		readMemName = readMemGoName
-	}
-	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{sig},
-		FunctionSection: []wasm.Index{0},
-		CodeSection:     []*wasm.Code{readMem},
-		NameSection: &wasm.NameSection{
-			ModuleName:    "host",
-			FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: readMemName}},
+	hostMemoryVal := uint64(3)
+	host.Memory = &wasm.MemoryInstance{Buffer: u64.LeBytes(hostMemoryVal), Min: 1, Cap: 1, Max: 1}
+	importingMemoryVal := uint64(6)
+	importing.Memory = &wasm.MemoryInstance{Buffer: u64.LeBytes(importingMemoryVal), Min: 1, Cap: 1, Max: 1}
+
+	tests := []struct {
+		name     string
+		module   *wasm.CallContext
+		fn       *wasm.FunctionInstance
+		expected uint64
+	}{
+		{
+			name:     readMemName,
+			module:   host.CallCtx,
+			fn:       host.Exports[readMemName].Function,
+			expected: hostMemoryVal,
+		},
+		{
+			name:     callReadMemName,
+			module:   host.CallCtx,
+			fn:       host.Exports[callReadMemName].Function,
+			expected: hostMemoryVal,
+		},
+		{
+			name:     callImportReadMemName,
+			module:   importing.CallCtx,
+			fn:       importing.Exports[callImportReadMemName].Function,
+			expected: importingMemoryVal,
+		},
+		{
+			name:     callImportCallReadMemName,
+			module:   importing.CallCtx,
+			fn:       importing.Exports[callImportCallReadMemName].Function,
+			expected: importingMemoryVal,
 		},
 	}
-	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		tc := tt
 
-	memory := &wasm.MemoryInstance{Buffer: u64.LeBytes(3), Min: 1, Cap: 1, Max: 1}
-	module := &wasm.ModuleInstance{Memory: memory, TypeIDs: []wasm.FunctionTypeID{0}}
-	_, ns := wasm.NewStore(features, e)
-	modCtx := wasm.NewCallContext(ns, module, nil)
-
-	fns := module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
-	me, err := e.NewModuleEngine(t.Name(), m, nil, fns, nil, nil)
-	require.NoError(t, err)
-
-	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
-		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := me.Call(testCtx, modCtx, fns[0])
-		require.NoError(t, err)
-		require.Equal(t, uint64(3), results[0])
-	})
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := tc.fn.Module.Engine.Call(testCtx, tc.module, tc.fn)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, results[0])
+		})
+	}
 }
 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
@@ -407,14 +422,14 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 			fn:     host.Exports[divByGoName].Function,
 		},
 		{
-			name:   callHostFnName,
+			name:   callDivByGoName,
 			module: imported.CallCtx,
-			fn:     imported.Exports[callHostFnName].Function,
+			fn:     imported.Exports[callDivByGoName].Function,
 		},
 		{
-			name:   callImportCallHostFnName,
+			name:   callImportCallDivByGoName,
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallHostFnName].Function,
+			fn:     importing.Exports[callImportCallDivByGoName].Function,
 		},
 	}
 	for _, tt := range tests {
@@ -502,7 +517,7 @@ wasm stack trace:
 			name:   "wasm calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: imported.CallCtx,
-			fn:     imported.Exports[callHostFnName].Function,
+			fn:     imported.Exports[callDivByGoName].Function,
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -512,7 +527,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallHostFnName].Function,
+			fn:     importing.Exports[callImportCallDivByGoName].Function,
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -523,7 +538,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallHostFnName].Function,
+			fn:     importing.Exports[callImportCallDivByGoName].Function,
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -534,7 +549,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallHostFnName].Function,
+			fn:     importing.Exports[callImportCallDivByGoName].Function,
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -678,10 +693,10 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 }
 
 const (
-	divByWasmName            = "div_by.wasm"
-	divByGoName              = "div_by.go"
-	callHostFnName           = "call->" + divByGoName
-	callImportCallHostFnName = "call_import->" + callHostFnName
+	divByWasmName             = "div_by.wasm"
+	divByGoName               = "div_by.go"
+	callDivByGoName           = "call->" + divByGoName
+	callImportCallDivByGoName = "call_import->" + callDivByGoName
 )
 
 func divByGo(d uint32) uint32 {
@@ -698,8 +713,10 @@ var divByWasm = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.Opco
 var hostDivByWasm = &wasm.Code{IsHostFunction: true, Body: divByWasm}
 
 const (
-	readMemGoName   = "read_mem.go"
-	readMemWasmName = "read_mem.wasm"
+	readMemName               = "read_mem"
+	callReadMemName           = "call->read_mem"
+	callImportReadMemName     = "call_import->read_mem"
+	callImportCallReadMemName = "call_import->call->read_mem"
 )
 
 func readMemGo(ctx context.Context, m api.Module) uint64 {
@@ -717,7 +734,6 @@ var readMemWasm = []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeI64Load, 0x3, 0x0, w
 var hostReadMemWasm = &wasm.Code{IsHostFunction: true, Body: readMemWasm}
 
 func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
-	i32 := wasm.ValueTypeI32
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}
 
 	divByName := divByWasmName
@@ -758,13 +774,13 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		},
 		ExportSection: []*wasm.Export{
 			{Name: divByWasmName, Type: wasm.ExternTypeFunc, Index: 1},
-			{Name: callHostFnName, Type: wasm.ExternTypeFunc, Index: 2},
+			{Name: callDivByGoName, Type: wasm.ExternTypeFunc, Index: 2},
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName: "imported",
 			FunctionNames: wasm.NameMap{
 				{Index: wasm.Index(1), Name: divByWasmName},
-				{Index: wasm.Index(2), Name: callHostFnName},
+				{Index: wasm.Index(2), Name: callDivByGoName},
 			},
 		},
 		ID: wasm.ModuleID{1},
@@ -777,7 +793,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	importedFunctions := imported.BuildFunctions(importedModule, buildListeners(fnlf, importedModule))
 	imported.Functions = append([]*wasm.FunctionInstance{hostFn}, importedFunctions...)
 	imported.BuildExports(importedModule.ExportSection)
-	callHostFn := imported.Exports[callHostFnName].Function
+	callHostFn := imported.Exports[callDivByGoName].Function
 
 	// Compile the imported module
 	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, []*wasm.FunctionInstance{hostFn}, importedFunctions, nil, nil)
@@ -793,11 +809,11 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd}},
 		},
 		ExportSection: []*wasm.Export{
-			{Name: callImportCallHostFnName, Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: callImportCallDivByGoName, Type: wasm.ExternTypeFunc, Index: 1},
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "importing",
-			FunctionNames: wasm.NameMap{{Index: wasm.Index(1), Name: callImportCallHostFnName}},
+			FunctionNames: wasm.NameMap{{Index: wasm.Index(1), Name: callImportCallDivByGoName}},
 		},
 		ID: wasm.ModuleID{2},
 	}
@@ -819,6 +835,76 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	return host, imported, importing, func() {
 		e.DeleteCompiledModule(hostModule)
 		e.DeleteCompiledModule(importedModule)
+		e.DeleteCompiledModule(importingModule)
+	}
+}
+
+func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
+	ft := &wasm.FunctionType{Results: []wasm.ValueType{i64}, ResultNumInUint64: 1}
+
+	callReadMem := &wasm.Code{ // shows indirect calls still use the same memory
+		IsHostFunction: true,
+		Body:           []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd},
+	}
+	hostModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{ft},
+		FunctionSection: []wasm.Index{0, 0},
+		CodeSection:     []*wasm.Code{readMem, callReadMem},
+		ExportSection: []*wasm.Export{
+			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: callReadMemName, Type: wasm.ExternTypeFunc, Index: 1},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName:    "host",
+			FunctionNames: wasm.NameMap{{Index: 0, Name: readMemName}, {Index: 1, Name: callReadMemName}},
+		},
+		ID: wasm.ModuleID{0},
+	}
+	hostModule.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, hostModule)
+	require.NoError(t, err)
+	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	host.Functions = host.BuildFunctions(hostModule, buildListeners(fnlf, hostModule))
+	host.BuildExports(hostModule.ExportSection)
+	readMemFn := host.Exports[readMemName].Function
+	callReadMemFn := host.Exports[callReadMemName].Function
+
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions, nil, nil)
+	require.NoError(t, err)
+	linkModuleToEngine(host, hostME)
+
+	importingModule := &wasm.Module{
+		TypeSection: []*wasm.FunctionType{ft},
+		ExportSection: []*wasm.Export{
+			{Name: callImportReadMemName, Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: callImportCallReadMemName, Type: wasm.ExternTypeFunc, Index: 1},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName: "importing",
+			FunctionNames: wasm.NameMap{
+				{Index: 0, Name: callImportReadMemName},
+				{Index: 1, Name: callImportCallReadMemName},
+			},
+		},
+		ID: wasm.ModuleID{1},
+	}
+	importingModule.BuildFunctionDefinitions()
+	err = e.CompileModule(testCtx, importingModule)
+	require.NoError(t, err)
+
+	// Add the exported function.
+	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
+	importingFunctions := importing.BuildFunctions(importingModule, buildListeners(fnlf, importingModule))
+	importing.Functions = append([]*wasm.FunctionInstance{readMemFn, callReadMemFn}, importingFunctions...)
+	importing.BuildExports(importingModule.ExportSection)
+
+	// Compile the importing module
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{readMemFn}, importingFunctions, nil, nil)
+	require.NoError(t, err)
+	linkModuleToEngine(importing, importingMe)
+
+	return host, importing, func() {
+		e.DeleteCompiledModule(hostModule)
 		e.DeleteCompiledModule(importingModule)
 	}
 }
