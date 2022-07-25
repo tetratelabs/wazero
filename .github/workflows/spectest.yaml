@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [try1.19]
+    branches: [main]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -26,8 +26,7 @@ jobs:
       matrix:
         go-version:
         - "1.17"
-        - "1.18"
-        - "1.19.0-rc.2"
+        - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
         spec-version:
         - "v1"
         - "v2"
@@ -56,7 +55,7 @@ jobs:
       matrix:
         go-version:
           - "1.17"
-          - "1.18"
+          - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
         spec-version:
           - "v1"
           - "v2"
@@ -91,7 +90,7 @@ jobs:
       matrix:
         go-version:
         - "1.17"
-        - "1.18"
+        - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
         arch:
         - "arm64"
         - "riscv64"

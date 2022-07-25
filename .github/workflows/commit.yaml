@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [try1.19]
+    branches: [main]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -28,7 +28,7 @@ jobs:
       matrix:  # use latest available versions and be consistent on all workflows!
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.18"
+        - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
 
     steps:
       - uses: actions/setup-go@v3
@@ -64,8 +64,7 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2022]
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.18"
-        - "1.19.0-rc.2"
+        - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
 
     steps:
       - uses: actions/setup-go@v3
@@ -101,7 +100,7 @@ jobs:
       matrix:
         go-version:
           - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          - "1.18"
+          - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
 
     steps:
       - uses: actions/setup-go@v3
@@ -133,7 +132,7 @@ jobs:
       matrix:
         go-version:
         - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.18"
+        - "1.19.0-rc.2" # TODO: use 1.19.0 after the release.
         arch:
         - "amd64"
         - "arm64"
