@@ -661,10 +661,10 @@ func testdataPath(filename string) string {
 }
 
 // valuesEq returns true if all the actual result matches exps which are all expressed as uint64.
-// 	* actual,exps: comparison target values which are all represented as uint64, meaning that if valTypes = [V128,I32], then
-//		we have actual/exp = [(lower-64bit of the first V128), (higher-64bit of the first V128), I32].
-// 	* valTypes holds the wasm.ValueType(s) of the original values in Wasm.
-// 	* laneTypes maps the index of valueTypes to laneType if valueTypes[i] == wasm.ValueTypeV128.
+//   - actual,exps: comparison target values which are all represented as uint64, meaning that if valTypes = [V128,I32], then
+//     we have actual/exp = [(lower-64bit of the first V128), (higher-64bit of the first V128), I32].
+//   - valTypes holds the wasm.ValueType(s) of the original values in Wasm.
+//   - laneTypes maps the index of valueTypes to laneType if valueTypes[i] == wasm.ValueTypeV128.
 //
 // Also, if matched == false this returns non-empty valuesMsg which can be used to augment the test failure message.
 func valuesEq(actual, exps []uint64, valTypes []wasm.ValueType, laneTypes map[int]laneType) (matched bool, valuesMsg string) {

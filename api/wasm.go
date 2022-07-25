@@ -54,11 +54,11 @@ func ExternTypeName(et ExternType) string {
 //
 // The following describes how to convert between Wasm and Golang types:
 //
-//	* ValueTypeI32 - uint64(uint32,int32)
-//	* ValueTypeI64 - uint64(int64)
-//	* ValueTypeF32 - EncodeF32 DecodeF32 from float32
-//	* ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//	* ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
+//   - ValueTypeI32 - uint64(uint32,int32)
+//   - ValueTypeI64 - uint64(int64)
+//   - ValueTypeF32 - EncodeF32 DecodeF32 from float32
+//   - ValueTypeF64 - EncodeF64 DecodeF64 from float64
+//   - ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
 //
@@ -127,8 +127,8 @@ func ValueTypeName(t ValueType) string {
 //
 // Notes
 //
-//	* Closing the wazero.Runtime closes any Module it instantiated.
-//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//   - Closing the wazero.Runtime closes any Module it instantiated.
+//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {
@@ -318,9 +318,9 @@ type MutableGlobal interface {
 //
 // Notes
 //
-//	* All functions accept a context.Context, which when nil, default to context.Background.
-//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-//	* This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
+//   - All functions accept a context.Context, which when nil, default to context.Background.
+//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//   - This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
@@ -489,6 +489,7 @@ func DecodeF64(input uint64) float64 {
 // This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
 //
 // Ex. Here's how to set the capacity to max instead of min, when set:
+//
 //	capIsMax := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 //		if maxPages != nil {
 //			return minPages, *maxPages, *maxPages

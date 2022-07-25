@@ -1080,7 +1080,7 @@ func (OperationLoad32) Kind() OperationKind {
 
 // OperationStore implements Operation.
 //
-// This corresponds to wasm.OpcodeI32StoreName wasm.OpcodeI64StoreName wasm.OpcodeF32StoreName wasm.OpcodeF64StoreName
+// # This corresponds to wasm.OpcodeI32StoreName wasm.OpcodeI64StoreName wasm.OpcodeF32StoreName wasm.OpcodeF64StoreName
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
@@ -1096,7 +1096,7 @@ func (*OperationStore) Kind() OperationKind {
 
 // OperationStore8 implements Operation.
 //
-// This corresponds to wasm.OpcodeI32Store8Name wasm.OpcodeI64Store8Name
+// # This corresponds to wasm.OpcodeI32Store8Name wasm.OpcodeI64Store8Name
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
@@ -1111,7 +1111,7 @@ func (OperationStore8) Kind() OperationKind {
 
 // OperationStore16 implements Operation.
 //
-// This corresponds to wasm.OpcodeI32Store16Name wasm.OpcodeI64Store16Name
+// # This corresponds to wasm.OpcodeI32Store16Name wasm.OpcodeI64Store16Name
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
@@ -1126,7 +1126,7 @@ func (OperationStore16) Kind() OperationKind {
 
 // OperationStore32 implements Operation.
 //
-// This corresponds to wasm.OpcodeI64Store32Name
+// # This corresponds to wasm.OpcodeI64Store32Name
 //
 // The engines are expected to check the boundary of memory length, and exit the execution if this exceeds the boundary,
 // otherwise store the corresponding value following the semantics of the corresponding WebAssembly instruction.
@@ -1351,6 +1351,7 @@ func (OperationPopcnt) Kind() OperationKind {
 // OperationDiv implements Operation.
 //
 // This corresponds to wasm.OpcodeI32DivS wasm.OpcodeI32DivU wasm.OpcodeI64DivS
+//
 //	wasm.OpcodeI64DivU wasm.OpcodeF32Div wasm.OpcodeF64Div.
 type OperationDiv struct{ Type SignedType }
 
@@ -1376,7 +1377,7 @@ func (OperationRem) Kind() OperationKind {
 
 // OperationAnd implements Operation.
 //
-// This corresponds to wasm.OpcodeI32AndName wasm.OpcodeI64AndName
+// # This corresponds to wasm.OpcodeI32AndName wasm.OpcodeI64AndName
 //
 // The engines are expected to perform "And" operation on
 // top two values on the stack, and pushes the result.
@@ -1389,7 +1390,7 @@ func (OperationAnd) Kind() OperationKind {
 
 // OperationOr implements Operation.
 //
-// This corresponds to wasm.OpcodeI32OrName wasm.OpcodeI64OrName
+// # This corresponds to wasm.OpcodeI32OrName wasm.OpcodeI64OrName
 //
 // The engines are expected to perform "Or" operation on
 // top two values on the stack, and pushes the result.
@@ -1402,7 +1403,7 @@ func (OperationOr) Kind() OperationKind {
 
 // OperationXor implements Operation.
 //
-// This corresponds to wasm.OpcodeI32XorName wasm.OpcodeI64XorName
+// # This corresponds to wasm.OpcodeI32XorName wasm.OpcodeI64XorName
 //
 // The engines are expected to perform "Xor" operation on
 // top two values on the stack, and pushes the result.
@@ -1415,7 +1416,7 @@ func (OperationXor) Kind() OperationKind {
 
 // OperationShl implements Operation.
 //
-// This corresponds to wasm.OpcodeI32ShlName wasm.OpcodeI64ShlName
+// # This corresponds to wasm.OpcodeI32ShlName wasm.OpcodeI64ShlName
 //
 // The engines are expected to perform "Shl" operation on
 // top two values on the stack, and pushes the result.
@@ -1428,7 +1429,7 @@ func (OperationShl) Kind() OperationKind {
 
 // OperationShr implements Operation.
 //
-// This corresponds to wasm.OpcodeI32ShrSName wasm.OpcodeI32ShrUName wasm.OpcodeI64ShrSName wasm.OpcodeI64ShrUName
+// # This corresponds to wasm.OpcodeI32ShrSName wasm.OpcodeI32ShrUName wasm.OpcodeI64ShrSName wasm.OpcodeI64ShrUName
 //
 // If OperationShr.Type is signed integer, then, the engines are expected to perform arithmetic right shift on the two
 // top values on the stack, otherwise do the logical right shift.
@@ -1441,7 +1442,7 @@ func (OperationShr) Kind() OperationKind {
 
 // OperationRotl implements Operation.
 //
-// This corresponds to wasm.OpcodeI32RotlName wasm.OpcodeI64RotlName
+// # This corresponds to wasm.OpcodeI32RotlName wasm.OpcodeI64RotlName
 //
 // The engines are expected to perform "Rotl" operation on
 // top two values on the stack, and pushes the result.
@@ -1454,7 +1455,7 @@ func (OperationRotl) Kind() OperationKind {
 
 // OperationRotr implements Operation.
 //
-// This corresponds to wasm.OpcodeI32RotrName wasm.OpcodeI64RotrName
+// # This corresponds to wasm.OpcodeI32RotrName wasm.OpcodeI64RotrName
 //
 // The engines are expected to perform "Rotr" operation on
 // top two values on the stack, and pushes the result.
@@ -1517,7 +1518,7 @@ func (OperationTrunc) Kind() OperationKind {
 
 // OperationNearest implements Operation.
 //
-// This corresponds to wasm.OpcodeF32NearestName wasm.OpcodeF64NearestName
+// # This corresponds to wasm.OpcodeF32NearestName wasm.OpcodeF64NearestName
 //
 // Note: this is *not* equivalent to math.Round and instead has the same
 // the semantics of LLVM's rint intrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
@@ -1541,7 +1542,7 @@ func (OperationSqrt) Kind() OperationKind {
 
 // OperationMin implements Operation.
 //
-// This corresponds to wasm.OpcodeF32MinName wasm.OpcodeF64MinName
+// # This corresponds to wasm.OpcodeF32MinName wasm.OpcodeF64MinName
 //
 // The engines are expected to pop two values from the stack, and push back the maximum of
 // these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 1.9].
@@ -1557,7 +1558,7 @@ func (OperationMin) Kind() OperationKind {
 
 // OperationMax implements Operation.
 //
-// This corresponds to wasm.OpcodeF32MaxName wasm.OpcodeF64MaxName
+// # This corresponds to wasm.OpcodeF32MaxName wasm.OpcodeF64MaxName
 //
 // The engines are expected to pop two values from the stack, and push back the maximum of
 // these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 100.1].
@@ -1573,7 +1574,7 @@ func (OperationMax) Kind() OperationKind {
 
 // OperationCopysign implements Operation.
 //
-// This corresponds to wasm.OpcodeF32CopysignName wasm.OpcodeF64CopysignName
+// # This corresponds to wasm.OpcodeF32CopysignName wasm.OpcodeF64CopysignName
 //
 // The engines are expected to pop two float values from the stack, and copy the signbit of
 // the first-popped value to the last one.
@@ -1601,10 +1602,11 @@ func (OperationI32WrapFromI64) Kind() OperationKind {
 // OperationITruncFromF implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeI32TruncF32SName wasm.OpcodeI32TruncF32UName wasm.OpcodeI32TruncF64SName
-// 	wasm.OpcodeI32TruncF64UName wasm.OpcodeI64TruncF32SName wasm.OpcodeI64TruncF32UName wasm.OpcodeI64TruncF64SName
+//
+//	wasm.OpcodeI32TruncF32SName wasm.OpcodeI32TruncF32UName wasm.OpcodeI32TruncF64SName
+//	wasm.OpcodeI32TruncF64UName wasm.OpcodeI64TruncF32SName wasm.OpcodeI64TruncF32UName wasm.OpcodeI64TruncF64SName
 //	wasm.OpcodeI64TruncF64UName. wasm.OpcodeI32TruncSatF32SName wasm.OpcodeI32TruncSatF32UName
-// 	wasm.OpcodeI32TruncSatF64SName wasm.OpcodeI32TruncSatF64UName wasm.OpcodeI64TruncSatF32SName
+//	wasm.OpcodeI32TruncSatF64SName wasm.OpcodeI32TruncSatF64UName wasm.OpcodeI64TruncSatF32SName
 //	wasm.OpcodeI64TruncSatF32UName wasm.OpcodeI64TruncSatF64SName wasm.OpcodeI64TruncSatF64UName
 //
 // See [1] and [2] for when we encounter undefined behavior in the WebAssembly specification if OperationITruncFromF.NonTrapping == false.
@@ -1630,8 +1632,10 @@ func (OperationITruncFromF) Kind() OperationKind {
 // OperationFConvertFromI implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeF32ConvertI32SName wasm.OpcodeF32ConvertI32UName wasm.OpcodeF32ConvertI64SName wasm.OpcodeF32ConvertI64UName
-// 	wasm.OpcodeF64ConvertI32SName wasm.OpcodeF64ConvertI32UName wasm.OpcodeF64ConvertI64SName wasm.OpcodeF64ConvertI64UName
+//
+//	wasm.OpcodeF32ConvertI32SName wasm.OpcodeF32ConvertI32UName wasm.OpcodeF32ConvertI64SName wasm.OpcodeF32ConvertI64UName
+//	wasm.OpcodeF64ConvertI32SName wasm.OpcodeF64ConvertI32UName wasm.OpcodeF64ConvertI64SName wasm.OpcodeF64ConvertI64UName
+//
 // and equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
 type OperationFConvertFromI struct {
 	InputType  SignedInt
@@ -1705,7 +1709,7 @@ func (OperationF64ReinterpretFromI64) Kind() OperationKind {
 
 // OperationExtend implements Operation.
 //
-// This corresponds to wasm.OpcodeI64ExtendI32SName wasm.OpcodeI64ExtendI32UName
+// # This corresponds to wasm.OpcodeI64ExtendI32SName wasm.OpcodeI64ExtendI32UName
 //
 // The engines are expected to extend the 32-bit signed or unsigned int on top of the stack
 // as a 64-bit integer of corresponding signedness. For unsigned case, this is just reinterpreting the
@@ -1988,7 +1992,8 @@ func shapeName(s Shape) (ret string) {
 // OperationV128Add implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16AddName wasm.OpcodeVecI16x8AddName wasm.OpcodeVecI32x4AddName
-// 	wasm.OpcodeVecI64x2AddName wasm.OpcodeVecF32x4AddName wasm.OpcodeVecF64x2AddName
+//
+//	wasm.OpcodeVecI64x2AddName wasm.OpcodeVecF32x4AddName wasm.OpcodeVecF64x2AddName
 type OperationV128Add struct {
 	Shape Shape
 }
@@ -2001,7 +2006,8 @@ func (OperationV128Add) Kind() OperationKind {
 // OperationV128Sub implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16SubName wasm.OpcodeVecI16x8SubName wasm.OpcodeVecI32x4SubName
-// 	wasm.OpcodeVecI64x2SubName wasm.OpcodeVecF32x4SubName wasm.OpcodeVecF64x2SubName
+//
+//	wasm.OpcodeVecI64x2SubName wasm.OpcodeVecF32x4SubName wasm.OpcodeVecF64x2SubName
 type OperationV128Sub struct {
 	Shape Shape
 }
@@ -2046,11 +2052,12 @@ const (
 // OperationV128Load implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecV128LoadName wasm.OpcodeVecV128Load8x8SName wasm.OpcodeVecV128Load8x8UName
-// 	wasm.OpcodeVecV128Load16x4SName wasm.OpcodeVecV128Load16x4UName wasm.OpcodeVecV128Load32x2SName
-// 	wasm.OpcodeVecV128Load32x2UName wasm.OpcodeVecV128Load8SplatName wasm.OpcodeVecV128Load16SplatName
-// 	wasm.OpcodeVecV128Load32SplatName wasm.OpcodeVecV128Load64SplatName wasm.OpcodeVecV128Load32zeroName
-// 	wasm.OpcodeVecV128Load64zeroName
+//
+//	wasm.OpcodeVecV128LoadName wasm.OpcodeVecV128Load8x8SName wasm.OpcodeVecV128Load8x8UName
+//	wasm.OpcodeVecV128Load16x4SName wasm.OpcodeVecV128Load16x4UName wasm.OpcodeVecV128Load32x2SName
+//	wasm.OpcodeVecV128Load32x2UName wasm.OpcodeVecV128Load8SplatName wasm.OpcodeVecV128Load16SplatName
+//	wasm.OpcodeVecV128Load32SplatName wasm.OpcodeVecV128Load64SplatName wasm.OpcodeVecV128Load32zeroName
+//	wasm.OpcodeVecV128Load64zeroName
 type OperationV128Load struct {
 	Type V128LoadType
 	Arg  *MemoryArg
@@ -2064,7 +2071,8 @@ func (OperationV128Load) Kind() OperationKind {
 // OperationV128LoadLane implements Operation.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
-// 	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
+//
+//	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
 type OperationV128LoadLane struct {
 	// LaneIndex is >=0 && <(128/LaneSize).
 	LaneIndex byte
@@ -2081,7 +2089,8 @@ func (OperationV128LoadLane) Kind() OperationKind {
 // OperationV128Store implements Operation.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
-// 	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
+//
+//	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
 type OperationV128Store struct {
 	Arg *MemoryArg
 }
@@ -2094,7 +2103,8 @@ func (OperationV128Store) Kind() OperationKind {
 // OperationV128StoreLane implements Operation.
 //
 // This corresponds to wasm.OpcodeVecV128Load8LaneName wasm.OpcodeVecV128Load16LaneName
-// 	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
+//
+//	wasm.OpcodeVecV128Load32LaneName wasm.OpcodeVecV128Load64LaneName.
 type OperationV128StoreLane struct {
 	// LaneIndex is >=0 && <(128/LaneSize).
 	LaneIndex byte
@@ -2111,9 +2121,10 @@ func (OperationV128StoreLane) Kind() OperationKind {
 // OperationV128ExtractLane implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16ExtractLaneSName wasm.OpcodeVecI8x16ExtractLaneUName
-// 	wasm.OpcodeVecI16x8ExtractLaneSName wasm.OpcodeVecI16x8ExtractLaneUName
-// 	wasm.OpcodeVecI32x4ExtractLaneName wasm.OpcodeVecI64x2ExtractLaneName
+//
+//	wasm.OpcodeVecI8x16ExtractLaneSName wasm.OpcodeVecI8x16ExtractLaneUName
+//	wasm.OpcodeVecI16x8ExtractLaneSName wasm.OpcodeVecI16x8ExtractLaneUName
+//	wasm.OpcodeVecI32x4ExtractLaneName wasm.OpcodeVecI64x2ExtractLaneName
 //	wasm.OpcodeVecF32x4ExtractLaneName wasm.OpcodeVecF64x2ExtractLaneName.
 type OperationV128ExtractLane struct {
 	// LaneIndex is >=0 && <M where shape = NxM.
@@ -2131,9 +2142,10 @@ func (OperationV128ExtractLane) Kind() OperationKind {
 // OperationV128ReplaceLane implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16ReplaceLaneName wasm.OpcodeVecI16x8ReplaceLaneName
+//
+//	wasm.OpcodeVecI8x16ReplaceLaneName wasm.OpcodeVecI16x8ReplaceLaneName
 //	wasm.OpcodeVecI32x4ReplaceLaneName wasm.OpcodeVecI64x2ReplaceLaneName
-// 	wasm.OpcodeVecF32x4ReplaceLaneName wasm.OpcodeVecF64x2ReplaceLaneName.
+//	wasm.OpcodeVecF32x4ReplaceLaneName wasm.OpcodeVecF64x2ReplaceLaneName.
 type OperationV128ReplaceLane struct {
 	// LaneIndex is >=0 && <M where shape = NxM.
 	LaneIndex byte
@@ -2148,9 +2160,10 @@ func (OperationV128ReplaceLane) Kind() OperationKind {
 // OperationV128Splat implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16SplatName wasm.OpcodeVecI16x8SplatName
-// 	wasm.OpcodeVecI32x4SplatName wasm.OpcodeVecI64x2SplatName
-// 	wasm.OpcodeVecF32x4SplatName wasm.OpcodeVecF64x2SplatName.
+//
+//	wasm.OpcodeVecI8x16SplatName wasm.OpcodeVecI16x8SplatName
+//	wasm.OpcodeVecI32x4SplatName wasm.OpcodeVecI64x2SplatName
+//	wasm.OpcodeVecF32x4SplatName wasm.OpcodeVecF64x2SplatName.
 type OperationV128Splat struct {
 	Shape Shape
 }
@@ -2195,7 +2208,8 @@ func (OperationV128AnyTrue) Kind() OperationKind {
 // OperationV128AllTrue implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16AllTrueName wasm.OpcodeVecI16x8AllTrueName
+//
+//	wasm.OpcodeVecI8x16AllTrueName wasm.OpcodeVecI16x8AllTrueName
 //	wasm.OpcodeVecI32x4AllTrueName wasm.OpcodeVecI64x2AllTrueName.
 type OperationV128AllTrue struct {
 	Shape Shape
@@ -2209,7 +2223,8 @@ func (OperationV128AllTrue) Kind() OperationKind {
 // OperationV128BitMask implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16BitMaskName wasm.OpcodeVecI16x8BitMaskName
+//
+//	wasm.OpcodeVecI8x16BitMaskName wasm.OpcodeVecI16x8BitMaskName
 //	wasm.OpcodeVecI32x4BitMaskName wasm.OpcodeVecI64x2BitMaskName.
 type OperationV128BitMask struct {
 	Shape Shape
@@ -2283,7 +2298,8 @@ func (OperationV128AndNot) Kind() OperationKind {
 // OperationV128Shl implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16ShlName wasm.OpcodeVecI16x8ShlName
+//
+//	wasm.OpcodeVecI8x16ShlName wasm.OpcodeVecI16x8ShlName
 //	wasm.OpcodeVecI32x4ShlName wasm.OpcodeVecI64x2ShlName
 type OperationV128Shl struct {
 	Shape Shape
@@ -2297,9 +2313,10 @@ func (OperationV128Shl) Kind() OperationKind {
 // OperationV128Shr implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16ShrSName wasm.OpcodeVecI8x16ShrUName wasm.OpcodeVecI16x8ShrSName
-// 	wasm.OpcodeVecI16x8ShrUName wasm.OpcodeVecI32x4ShrSName wasm.OpcodeVecI32x4ShrUName.
-// 	wasm.OpcodeVecI64x2ShrSName wasm.OpcodeVecI64x2ShrUName.
+//
+//	wasm.OpcodeVecI8x16ShrSName wasm.OpcodeVecI8x16ShrUName wasm.OpcodeVecI16x8ShrSName
+//	wasm.OpcodeVecI16x8ShrUName wasm.OpcodeVecI32x4ShrSName wasm.OpcodeVecI32x4ShrUName.
+//	wasm.OpcodeVecI64x2ShrSName wasm.OpcodeVecI64x2ShrUName.
 type OperationV128Shr struct {
 	Shape  Shape
 	Signed bool
@@ -2313,7 +2330,8 @@ func (OperationV128Shr) Kind() OperationKind {
 // OperationV128Cmp implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16EqName, wasm.OpcodeVecI8x16NeName, wasm.OpcodeVecI8x16LtSName, wasm.OpcodeVecI8x16LtUName, wasm.OpcodeVecI8x16GtSName,
+//
+//	wasm.OpcodeVecI8x16EqName, wasm.OpcodeVecI8x16NeName, wasm.OpcodeVecI8x16LtSName, wasm.OpcodeVecI8x16LtUName, wasm.OpcodeVecI8x16GtSName,
 //	wasm.OpcodeVecI8x16GtUName, wasm.OpcodeVecI8x16LeSName, wasm.OpcodeVecI8x16LeUName, wasm.OpcodeVecI8x16GeSName, wasm.OpcodeVecI8x16GeUName,
 //	wasm.OpcodeVecI16x8EqName, wasm.OpcodeVecI16x8NeName, wasm.OpcodeVecI16x8LtSName, wasm.OpcodeVecI16x8LtUName, wasm.OpcodeVecI16x8GtSName,
 //	wasm.OpcodeVecI16x8GtUName, wasm.OpcodeVecI16x8LeSName, wasm.OpcodeVecI16x8LeUName, wasm.OpcodeVecI16x8GeSName, wasm.OpcodeVecI16x8GeUName,
@@ -2437,7 +2455,8 @@ func (OperationV128Cmp) Kind() OperationKind {
 // OperationV128AddSat implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16AddSatUName wasm.OpcodeVecI8x16AddSatSName
-// 	wasm.OpcodeVecI16x8AddSatUName wasm.OpcodeVecI16x8AddSatSName
+//
+//	wasm.OpcodeVecI16x8AddSatUName wasm.OpcodeVecI16x8AddSatSName
 type OperationV128AddSat struct {
 	// Shape is either ShapeI8x16 or ShapeI16x8.
 	Shape  Shape
@@ -2452,7 +2471,8 @@ func (OperationV128AddSat) Kind() OperationKind {
 // OperationV128SubSat implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16SubSatUName wasm.OpcodeVecI8x16SubSatSName
-// 	wasm.OpcodeVecI16x8SubSatUName wasm.OpcodeVecI16x8SubSatSName
+//
+//	wasm.OpcodeVecI16x8SubSatUName wasm.OpcodeVecI16x8SubSatSName
 type OperationV128SubSat struct {
 	// Shape is either ShapeI8x16 or ShapeI16x8.
 	Shape  Shape
@@ -2467,7 +2487,8 @@ func (OperationV128SubSat) Kind() OperationKind {
 // OperationV128Mul implements Operation.
 //
 // This corresponds to wasm.OpcodeVecF32x4MulName wasm.OpcodeVecF64x2MulName
-// 	wasm.OpcodeVecI16x8MulName wasm.OpcodeVecI32x4MulName wasm.OpcodeVecI64x2MulName.
+//
+//	wasm.OpcodeVecI16x8MulName wasm.OpcodeVecI32x4MulName wasm.OpcodeVecI64x2MulName.
 type OperationV128Mul struct {
 	// Shape is either ShapeI16x8, ShapeI32x4, ShapeI64x2, ShapeF32x4 or ShapeF64x2.
 	Shape Shape
@@ -2494,7 +2515,8 @@ func (OperationV128Div) Kind() OperationKind {
 // OperationV128Neg implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16NegName wasm.OpcodeVecI16x8NegName wasm.OpcodeVecI32x4NegName
-// 	wasm.OpcodeVecI64x2NegName wasm.OpcodeVecF32x4NegName wasm.OpcodeVecF64x2NegName.
+//
+//	wasm.OpcodeVecI64x2NegName wasm.OpcodeVecF32x4NegName wasm.OpcodeVecF64x2NegName.
 type OperationV128Neg struct {
 	Shape Shape
 }
@@ -2520,7 +2542,8 @@ func (OperationV128Sqrt) Kind() OperationKind {
 // OperationV128Abs implements Operation.
 //
 // This corresponds to wasm.OpcodeVecI8x16AbsName wasm.OpcodeVecI16x8AbsName wasm.OpcodeVecI32x4AbsName
-// 	wasm.OpcodeVecI64x2AbsName wasm.OpcodeVecF32x4AbsName wasm.OpcodeVecF64x2AbsName.
+//
+//	wasm.OpcodeVecI64x2AbsName wasm.OpcodeVecF32x4AbsName wasm.OpcodeVecF64x2AbsName.
 type OperationV128Abs struct {
 	Shape Shape
 }
@@ -2545,7 +2568,8 @@ func (OperationV128Popcnt) Kind() OperationKind {
 // OperationV128Min implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16MinSName wasm.OpcodeVecI8x16MinUName　wasm.OpcodeVecI16x8MinSName wasm.OpcodeVecI16x8MinUName
+//
+//	wasm.OpcodeVecI8x16MinSName wasm.OpcodeVecI8x16MinUName　wasm.OpcodeVecI16x8MinSName wasm.OpcodeVecI16x8MinUName
 //	wasm.OpcodeVecI32x4MinSName wasm.OpcodeVecI32x4MinUName　wasm.OpcodeVecI16x8MinSName wasm.OpcodeVecI16x8MinUName
 //	wasm.OpcodeVecF32x4MinName wasm.OpcodeVecF64x2MinName
 type OperationV128Min struct {
@@ -2561,7 +2585,8 @@ func (OperationV128Min) Kind() OperationKind {
 // OperationV128Max implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16MaxSName wasm.OpcodeVecI8x16MaxUName　wasm.OpcodeVecI16x8MaxSName wasm.OpcodeVecI16x8MaxUName
+//
+//	wasm.OpcodeVecI8x16MaxSName wasm.OpcodeVecI8x16MaxUName　wasm.OpcodeVecI16x8MaxSName wasm.OpcodeVecI16x8MaxUName
 //	wasm.OpcodeVecI32x4MaxSName wasm.OpcodeVecI32x4MaxUName　wasm.OpcodeVecI16x8MaxSName wasm.OpcodeVecI16x8MaxUName
 //	wasm.OpcodeVecF32x4MaxName wasm.OpcodeVecF64x2MaxName.
 type OperationV128Max struct {
@@ -2649,12 +2674,13 @@ func (OperationV128Nearest) Kind() OperationKind {
 // OperationV128Extend implements Operation
 //
 // This corresponds to
-// 	wasm.OpcodeVecI16x8ExtendLowI8x16SName wasm.OpcodeVecI16x8ExtendHighI8x16SName
-// 	wasm.OpcodeVecI16x8ExtendLowI8x16UName wasm.OpcodeVecI16x8ExtendHighI8x16UName
-// 	wasm.OpcodeVecI32x4ExtendLowI16x8SName wasm.OpcodeVecI32x4ExtendHighI16x8SName
-// 	wasm.OpcodeVecI32x4ExtendLowI16x8UName wasm.OpcodeVecI32x4ExtendHighI16x8UName
-// 	wasm.OpcodeVecI64x2ExtendLowI32x4SName wasm.OpcodeVecI64x2ExtendHighI32x4SName
-// 	wasm.OpcodeVecI64x2ExtendLowI32x4UName wasm.OpcodeVecI64x2ExtendHighI32x4UName
+//
+//	wasm.OpcodeVecI16x8ExtendLowI8x16SName wasm.OpcodeVecI16x8ExtendHighI8x16SName
+//	wasm.OpcodeVecI16x8ExtendLowI8x16UName wasm.OpcodeVecI16x8ExtendHighI8x16UName
+//	wasm.OpcodeVecI32x4ExtendLowI16x8SName wasm.OpcodeVecI32x4ExtendHighI16x8SName
+//	wasm.OpcodeVecI32x4ExtendLowI16x8UName wasm.OpcodeVecI32x4ExtendHighI16x8UName
+//	wasm.OpcodeVecI64x2ExtendLowI32x4SName wasm.OpcodeVecI64x2ExtendHighI32x4SName
+//	wasm.OpcodeVecI64x2ExtendLowI32x4UName wasm.OpcodeVecI64x2ExtendHighI32x4UName
 type OperationV128Extend struct {
 	// OriginShape is the shape of the original lanes for extension which is
 	// either ShapeI8x16, ShapeI16x8, or ShapeI32x4.
@@ -2672,12 +2698,13 @@ func (OperationV128Extend) Kind() OperationKind {
 // OperationV128ExtMul implements Operation
 //
 // This corresponds to
-// 	wasm.OpcodeVecI16x8ExtMulLowI8x16SName wasm.OpcodeVecI16x8ExtMulLowI8x16UName
-// 	wasm.OpcodeVecI16x8ExtMulHighI8x16SName wasm.OpcodeVecI16x8ExtMulHighI8x16UName
-//  wasm.OpcodeVecI32x4ExtMulLowI16x8SName wasm.OpcodeVecI32x4ExtMulLowI16x8UName
-// 	wasm.OpcodeVecI32x4ExtMulHighI16x8SName wasm.OpcodeVecI32x4ExtMulHighI16x8UName
-//  wasm.OpcodeVecI64x2ExtMulLowI32x4SName wasm.OpcodeVecI64x2ExtMulLowI32x4UName
-// 	wasm.OpcodeVecI64x2ExtMulHighI32x4SName wasm.OpcodeVecI64x2ExtMulHighI32x4UName.
+//
+//		wasm.OpcodeVecI16x8ExtMulLowI8x16SName wasm.OpcodeVecI16x8ExtMulLowI8x16UName
+//		wasm.OpcodeVecI16x8ExtMulHighI8x16SName wasm.OpcodeVecI16x8ExtMulHighI8x16UName
+//	 wasm.OpcodeVecI32x4ExtMulLowI16x8SName wasm.OpcodeVecI32x4ExtMulLowI16x8UName
+//		wasm.OpcodeVecI32x4ExtMulHighI16x8SName wasm.OpcodeVecI32x4ExtMulHighI16x8UName
+//	 wasm.OpcodeVecI64x2ExtMulLowI32x4SName wasm.OpcodeVecI64x2ExtMulLowI32x4UName
+//		wasm.OpcodeVecI64x2ExtMulHighI32x4SName wasm.OpcodeVecI64x2ExtMulHighI32x4UName.
 type OperationV128ExtMul struct {
 	// OriginShape is the shape of the original lanes for extension which is
 	// either ShapeI8x16, ShapeI16x8, or ShapeI32x4.
@@ -2705,8 +2732,9 @@ func (OperationV128Q15mulrSatS) Kind() OperationKind {
 // OperationV128ExtAddPairwise implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI16x8ExtaddPairwiseI8x16SName wasm.OpcodeVecI16x8ExtaddPairwiseI8x16UName
-// 	wasm.OpcodeVecI32x4ExtaddPairwiseI16x8SName wasm.OpcodeVecI32x4ExtaddPairwiseI16x8UName.
+//
+//	wasm.OpcodeVecI16x8ExtaddPairwiseI8x16SName wasm.OpcodeVecI16x8ExtaddPairwiseI8x16UName
+//	wasm.OpcodeVecI32x4ExtaddPairwiseI16x8SName wasm.OpcodeVecI32x4ExtaddPairwiseI16x8UName.
 type OperationV128ExtAddPairwise struct {
 	// OriginShape is the shape of the original lanes for extension which is
 	// either ShapeI8x16, or ShapeI16x8.
@@ -2744,8 +2772,9 @@ func (OperationV128FloatDemote) Kind() OperationKind {
 // OperationV128FConvertFromI implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecF32x4ConvertI32x4SName wasm.OpcodeVecF32x4ConvertI32x4UName
-// 	wasm.OpcodeVecF64x2ConvertLowI32x4SName wasm.OpcodeVecF64x2ConvertLowI32x4UName.
+//
+//	wasm.OpcodeVecF32x4ConvertI32x4SName wasm.OpcodeVecF32x4ConvertI32x4UName
+//	wasm.OpcodeVecF64x2ConvertLowI32x4SName wasm.OpcodeVecF64x2ConvertLowI32x4UName.
 type OperationV128FConvertFromI struct {
 	// DestinationShape is the shape of the destination lanes for conversion which is
 	// either ShapeF32x4, or ShapeF64x2.
@@ -2771,8 +2800,9 @@ func (OperationV128Dot) Kind() OperationKind {
 // OperationV128Narrow implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI8x16NarrowI16x8SName wasm.OpcodeVecI8x16NarrowI16x8UName
-// 	wasm.OpcodeVecI16x8NarrowI32x4SName wasm.OpcodeVecI16x8NarrowI32x4UName.
+//
+//	wasm.OpcodeVecI8x16NarrowI16x8SName wasm.OpcodeVecI8x16NarrowI16x8UName
+//	wasm.OpcodeVecI16x8NarrowI32x4SName wasm.OpcodeVecI16x8NarrowI32x4UName.
 type OperationV128Narrow struct {
 	// OriginShape is the shape of the original lanes for narrowing which is
 	// either ShapeI16x8, or ShapeI32x4.
@@ -2788,8 +2818,9 @@ func (OperationV128Narrow) Kind() OperationKind {
 // OperationV128ITruncSatFromF implements Operation.
 //
 // This corresponds to
-// 	wasm.OpcodeVecI32x4TruncSatF64x2UZeroName wasm.OpcodeVecI32x4TruncSatF64x2SZeroName
-// 	wasm.OpcodeVecI32x4TruncSatF32x4UName wasm.OpcodeVecI32x4TruncSatF32x4SName.
+//
+//	wasm.OpcodeVecI32x4TruncSatF64x2UZeroName wasm.OpcodeVecI32x4TruncSatF64x2SZeroName
+//	wasm.OpcodeVecI32x4TruncSatF32x4UName wasm.OpcodeVecI32x4TruncSatF32x4SName.
 type OperationV128ITruncSatFromF struct {
 	// OriginShape is the shape of the original lanes for truncation which is
 	// either ShapeF32x4, or ShapeF64x2.

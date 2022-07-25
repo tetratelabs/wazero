@@ -15,18 +15,22 @@ import (
 )
 
 // catFS is an embedded filesystem limited to test.txt
+//
 //go:embed testdata/test.txt
 var catFS embed.FS
 
 // catWasmCargoWasi was compiled from testdata/cargo-wasi/cat.rs
+//
 //go:embed testdata/cargo-wasi/cat.wasm
 var catWasmCargoWasi []byte
 
 // catWasmTinyGo was compiled from testdata/tinygo/cat.go
+//
 //go:embed testdata/tinygo/cat.wasm
 var catWasmTinyGo []byte
 
 // catWasmZigCc was compiled from testdata/zig-cc/cat.c
+//
 //go:embed testdata/zig-cc/cat.wasm
 var catWasmZigCc []byte
 

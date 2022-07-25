@@ -61,7 +61,8 @@ func importAfterModuleDefined(section wasm.SectionID) error {
 // Ex. All of these fail because they result in two memories.
 // * `(module (memory 1) (memory 1))`
 // * `(module (memory 1) (import "" "" (memory 1)))`
-//   * Note the latter expands to the same as the former: `(import "" "" (memory 1))`
+//   - Note the latter expands to the same as the former: `(import "" "" (memory 1))`
+//
 // * `(module (import "" "" (memory 1)) (import "" "" (memory 1)))`
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tables%E2%91%A0

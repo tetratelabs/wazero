@@ -2,11 +2,13 @@
 // functions is less burden than copy/pasting the implementations, while still allowing test caching to operate.
 //
 // Ex. In simplest case, dispatch:
+//
 //	func TestModuleEngine_Call(t *testing.T) {
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
 //
 // Ex. Some tests using the Compiler Engine may need to guard as they use compiled features:
+//
 //	func TestModuleEngine_Call(t *testing.T) {
 //		requireSupportedOSArch(t)
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)

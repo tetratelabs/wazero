@@ -146,7 +146,8 @@ type unresolvedIndex struct {
 //
 // Failure cases are when a symbolic identifier points nowhere or a numeric index is out of range.
 // Ex. (start $t0) exists, but there's no import or module-defined function with that name.
-//  or (start 32) exists, but there are only 10 functions.
+//
+//	or (start 32) exists, but there are only 10 functions.
 func (i *indexNamespace) resolve(unresolved *unresolvedIndex) (wasm.Index, error) {
 	if unresolved.targetID == "" { // already bound to a numeric index, but we have to verify it is in range
 		if err := requireIndexInRange(unresolved.targetIdx, i.count); err != nil {

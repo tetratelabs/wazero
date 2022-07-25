@@ -19,8 +19,9 @@ type onFunc func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wa
 // funcParser parses any instructions and dispatches to onFunc.
 //
 // Ex.  `(module (func (nop)))`
-//        begin here --^    ^
-//  end calls onFunc here --+
+//
+//	      begin here --^    ^
+//	end calls onFunc here --+
 //
 // Note: funcParser is reusable. The caller resets via begin.
 type funcParser struct {
@@ -55,11 +56,13 @@ var codeEnd = &wasm.Code{Body: end}
 // This stage records the ID of the current function, if present, and resumes with onFunc.
 //
 // Ex. A func ID is present `(func $main nop)`
-//                  records main --^     ^
-//              parseFunc resumes here --+
+//
+//	    records main --^     ^
+//	parseFunc resumes here --+
 //
 // Ex. No func ID `(func nop)`
-//     calls parseFunc --^
+//
+//	calls parseFunc --^
 func (p *funcParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $main
 		if id, err := p.funcNamespace.setID(tokenBytes); err != nil {
@@ -77,16 +80,19 @@ func (p *funcParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (
 // are read. Finally, this finishes via endFunc.
 //
 // Ex. `(module (func $math.pi (result f32))`
-//                begin here --^           ^
-//                  endFunc resumes here --+
+//
+//	begin here --^           ^
+//	  endFunc resumes here --+
 //
 // Ex.    `(module (func $math.pi (result f32) (local i32) )`
-//                   begin here --^            ^           ^
-//      funcParser.afterTypeUse resumes here --+           |
-//                                  endFunc resumes here --+
+//
+//	             begin here --^            ^           ^
+//	funcParser.afterTypeUse resumes here --+           |
+//	                            endFunc resumes here --+
 //
 // Ex. If there is no signature `(func)`
-//              calls endFunc here ---^
+//
+//	calls endFunc here ---^
 func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. (func $main $main)
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
@@ -100,8 +106,9 @@ func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 // The onFunc field is invoked once any instructions are written into currentBody.
 //
 // Ex. Given the source `(module (func nop))`
-//          afterTypeUse starts here --^  ^
-//                    calls onFunc here --+
+//
+//	afterTypeUse starts here --^  ^
+//	          calls onFunc here --+
 func (p *funcParser) afterTypeUse(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch pos {
 	case callbackPositionEndField:

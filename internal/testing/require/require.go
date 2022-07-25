@@ -26,7 +26,7 @@ type TestingT interface {
 
 // Contains fails if `s` does not contain `substr` using strings.Contains.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Contains(t TestingT, s, substr string, formatWithArgs ...interface{}) {
 	if !strings.Contains(s, substr) {
 		fail(t, fmt.Sprintf("expected %q to contain %q", s, substr), "", formatWithArgs...)
@@ -35,7 +35,7 @@ func Contains(t TestingT, s, substr string, formatWithArgs ...interface{}) {
 
 // Equal fails if the actual value is not equal to the expected.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Equal(t TestingT, expected, actual interface{}, formatWithArgs ...interface{}) {
 	if equal(expected, actual) {
 		return
@@ -88,7 +88,7 @@ func equal(expected, actual interface{}) bool {
 
 // EqualError fails if the err is nil or its `Error()` value is not equal to the expected.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func EqualError(t TestingT, err error, expected string, formatWithArgs ...interface{}) {
 	if err == nil {
 		fail(t, "expected an error, but was nil", "", formatWithArgs...)
@@ -102,7 +102,7 @@ func EqualError(t TestingT, err error, expected string, formatWithArgs ...interf
 
 // Error fails if the err is nil.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Error(t TestingT, err error, formatWithArgs ...interface{}) {
 	if err == nil {
 		fail(t, "expected an error, but was nil", "", formatWithArgs...)
@@ -111,7 +111,7 @@ func Error(t TestingT, err error, formatWithArgs ...interface{}) {
 
 // ErrorIs fails if the err is nil or errors.Is fails against the expected.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func ErrorIs(t TestingT, err, target error, formatWithArgs ...interface{}) {
 	if err == nil {
 		fail(t, "expected an error, but was nil", "", formatWithArgs...)
@@ -124,7 +124,7 @@ func ErrorIs(t TestingT, err, target error, formatWithArgs ...interface{}) {
 
 // False fails if the actual value was true.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func False(t TestingT, actual bool, formatWithArgs ...interface{}) {
 	if actual {
 		fail(t, "expected false, but was true", "", formatWithArgs...)
@@ -133,7 +133,7 @@ func False(t TestingT, actual bool, formatWithArgs ...interface{}) {
 
 // Nil fails if the object is not nil.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Nil(t TestingT, object interface{}, formatWithArgs ...interface{}) {
 	if !isNil(object) {
 		fail(t, fmt.Sprintf("expected nil, but was %v", object), "", formatWithArgs...)
@@ -142,7 +142,7 @@ func Nil(t TestingT, object interface{}, formatWithArgs ...interface{}) {
 
 // NoError fails if the err is not nil.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func NoError(t TestingT, err error, formatWithArgs ...interface{}) {
 	if err != nil {
 		fail(t, fmt.Sprintf("expected no error, but was %v", err), "", formatWithArgs...)
@@ -151,7 +151,7 @@ func NoError(t TestingT, err error, formatWithArgs ...interface{}) {
 
 // NotEqual fails if the actual value is equal to the expected.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func NotEqual(t TestingT, expected, actual interface{}, formatWithArgs ...interface{}) {
 	if !equal(expected, actual) {
 		return
@@ -166,7 +166,7 @@ func NotEqual(t TestingT, expected, actual interface{}, formatWithArgs ...interf
 
 // NotNil fails if the object is nil.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func NotNil(t TestingT, object interface{}, formatWithArgs ...interface{}) {
 	if isNil(object) {
 		fail(t, "expected to not be nil", "", formatWithArgs...)
@@ -194,7 +194,7 @@ func isNil(object interface{}) (isNil bool) {
 
 // NotSame fails if the inputs point to the same object.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func NotSame(t TestingT, expected, actual interface{}, formatWithArgs ...interface{}) {
 	if equalsPointer(expected, actual) {
 		fail(t, fmt.Sprintf("expected %v to point to a different object", actual), "", formatWithArgs...)
@@ -219,7 +219,7 @@ func CapturePanic(panics func()) (err error) {
 
 // Same fails if the inputs don't point to the same object.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func Same(t TestingT, expected, actual interface{}, formatWithArgs ...interface{}) {
 	if !equalsPointer(expected, actual) {
 		fail(t, fmt.Sprintf("expected %v to point to the same object as %v", actual, expected), "", formatWithArgs...)
@@ -246,7 +246,7 @@ func equalsPointer(expected, actual interface{}) bool {
 
 // True fails if the actual value wasn't.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 func True(t TestingT, actual bool, formatWithArgs ...interface{}) {
 	if !actual {
 		fail(t, "expected true, but was false", "", formatWithArgs...)
@@ -255,7 +255,7 @@ func True(t TestingT, actual bool, formatWithArgs ...interface{}) {
 
 // Zero fails if the actual value wasn't.
 //
-//  * formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
+//   - formatWithArgs are optional. When the first is a string that contains '%', it is treated like fmt.Sprintf.
 //
 // Note: This isn't precise to numeric types, but we don't care as being more precise is more code and tests.
 func Zero(t TestingT, i interface{}, formatWithArgs ...interface{}) {

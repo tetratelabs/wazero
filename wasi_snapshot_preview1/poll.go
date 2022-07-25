@@ -26,24 +26,25 @@ const (
 //
 // Parameters
 //
-//	* in: pointer to the subscriptions (48 bytes each)
-//	* out: pointer to the resulting events (32 bytes each)
-//	* nsubscriptions: count of subscriptions, zero returns ErrnoInval.
-//	* resultNevents: count of events.
+//   - in: pointer to the subscriptions (48 bytes each)
+//   - out: pointer to the resulting events (32 bytes each)
+//   - nsubscriptions: count of subscriptions, zero returns ErrnoInval.
+//   - resultNevents: count of events.
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoInval: the parameters are invalid
-//	* ErrnoNotsup: a parameters is valid, but not yet supported.
-//	* ErrnoFault: there is not enough memory to read the subscriptions or
-//	  write results.
+//   - ErrnoInval: the parameters are invalid
+//   - ErrnoNotsup: a parameters is valid, but not yet supported.
+//   - ErrnoFault: there is not enough memory to read the subscriptions or
+//     write results.
 //
 // Notes
 //
-//	* Since the `out` pointer nests Errno, the result is always ErrnoSuccess.
-//	* importPollOneoff shows this signature in the WebAssembly 1.0 Text Format.
-//	* This is similar to `poll` in POSIX.
+//   - Since the `out` pointer nests Errno, the result is always ErrnoSuccess.
+//   - importPollOneoff shows this signature in the WebAssembly 1.0 Text Format.
+//   - This is similar to `poll` in POSIX.
+//
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
 var pollOneoff = wasm.NewGoFunc(

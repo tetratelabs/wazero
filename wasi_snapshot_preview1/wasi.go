@@ -5,6 +5,7 @@
 //
 // Ex. Call Instantiate before instantiating any wasm binary that imports
 // "wasi_snapshot_preview1", Otherwise, it will error due to missing imports.
+//
 //	ctx := context.Background()
 //	r := wazero.NewRuntime()
 //	defer r.Close(ctx) // This closes everything this Runtime created.
@@ -34,8 +35,8 @@ const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 //
 // Notes
 //
-//	* Closing the wazero.Runtime has the same effect as closing the result.
-//	* To instantiate into another wazero.Namespace, use NewBuilder instead.
+//   - Closing the wazero.Runtime has the same effect as closing the result.
+//   - To instantiate into another wazero.Namespace, use NewBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	return NewBuilder(r).Instantiate(ctx, r)
 }

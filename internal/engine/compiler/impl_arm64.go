@@ -1,7 +1,6 @@
 // This file implements the compiler for arm64 target.
 // Please refer to https://developer.arm.com/documentation/102374/latest/
 // if unfamiliar with arm64 instructions and semantics.
-//
 package compiler
 
 import (

@@ -21,6 +21,7 @@ import (
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 //
 // Ex. To explicitly limit to Wasm Core 1.0 features as opposed to relying on defaults:
+//
 //	rConfig = wazero.NewRuntimeConfig().WithWasmCore1()
 //
 // Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
@@ -369,6 +370,7 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 // multiple times.
 //
 // Ex.
+//
 //	// Initialize base configuration:
 //	config := wazero.NewModuleConfig().WithStdout(buf).WithSysNanotime()
 //

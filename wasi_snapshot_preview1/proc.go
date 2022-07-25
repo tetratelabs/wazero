@@ -19,7 +19,7 @@ const (
 //
 // Parameters
 //
-//	* exitCode: exit code.
+//   - exitCode: exit code.
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 var procExit = wasm.NewGoFunc(
