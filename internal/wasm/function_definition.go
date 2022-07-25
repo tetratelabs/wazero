@@ -1,6 +1,8 @@
 package wasm
 
 import (
+	"reflect"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
@@ -65,10 +67,11 @@ func (m *Module) BuildFunctionDefinitions() {
 	}
 
 	for codeIndex, typeIndex := range m.FunctionSection {
+		code := m.CodeSection[codeIndex]
 		m.FunctionDefinitionSection = append(m.FunctionDefinitionSection, &FunctionDefinition{
-			index:          Index(codeIndex) + importCount,
-			funcType:       m.TypeSection[typeIndex],
-			isHostFunction: m.CodeSection[codeIndex].GoFunc != nil,
+			index:    Index(codeIndex) + importCount,
+			funcType: m.TypeSection[typeIndex],
+			goFunc:   code.GoFunc,
 		})
 	}
 
@@ -103,15 +106,15 @@ func (m *Module) BuildFunctionDefinitions() {
 
 // FunctionDefinition implements api.FunctionDefinition
 type FunctionDefinition struct {
-	moduleName     string
-	index          Index
-	name           string
-	debugName      string
-	isHostFunction bool
-	funcType       *FunctionType
-	importDesc     *[2]string
-	exportNames    []string
-	paramNames     []string
+	moduleName  string
+	index       Index
+	name        string
+	debugName   string
+	goFunc      *reflect.Value
+	funcType    *FunctionType
+	importDesc  *[2]string
+	exportNames []string
+	paramNames  []string
 }
 
 // ModuleName implements the same method as documented on api.FunctionDefinition.
@@ -147,9 +150,9 @@ func (f *FunctionDefinition) ExportNames() []string {
 	return f.exportNames
 }
 
-// IsHostFunction implements the same method as documented on api.FunctionDefinition.
-func (f *FunctionDefinition) IsHostFunction() bool {
-	return f.isHostFunction
+// GoFunc implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionDefinition) GoFunc() *reflect.Value {
+	return f.goFunc
 }
 
 // ParamNames implements the same method as documented on api.FunctionDefinition.

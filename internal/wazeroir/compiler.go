@@ -177,12 +177,17 @@ func (c *compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
-	// GoFunc is present when the result is a host function.
-	// In this case, other fields can be ignored.
+	// IsHostFunction is the data returned by the same field documented on
+	// wasm.Code.
+	IsHostFunction bool
+
+	// GoFunc is the data returned by the same field documented on wasm.Code.
+	// In this case, IsHostFunction is true and other fields can be ignored.
 	GoFunc *reflect.Value
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
+
 	// LabelCallers maps Label.String() to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
@@ -209,6 +214,8 @@ type CompilationResult struct {
 	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
 	HasMemory bool
+	// UsesMemory is true if this function might use memory.
+	UsesMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
 	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
@@ -239,7 +246,13 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		sig := module.TypeSection[typeID]
 		code := module.CodeSection[funcIndex]
 		if code.GoFunc != nil {
-			ret = append(ret, &CompilationResult{GoFunc: code.GoFunc})
+			ret = append(ret, &CompilationResult{
+				IsHostFunction: true,
+				// Assume the function might use memory if it has a parameter for the api.Module
+				UsesMemory: code.Kind == wasm.FunctionKindGoModule || code.Kind == wasm.FunctionKindGoContextModule,
+				GoFunc:     code.GoFunc,
+				Signature:  sig,
+			})
 			continue
 		}
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
@@ -247,6 +260,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		}
+		r.IsHostFunction = code.IsHostFunction
 		r.Globals = globals
 		r.Functions = functions
 		r.Types = module.TypeSection
@@ -1045,11 +1059,13 @@ operatorSwitch:
 			&OperationStore32{Arg: imm},
 		)
 	case wasm.OpcodeMemorySize:
+		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemorySize{},
 		)
 	case wasm.OpcodeMemoryGrow:
+		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemoryGrow{},
@@ -1672,6 +1688,7 @@ operatorSwitch:
 				&OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
 			)
 		case wasm.OpcodeMiscMemoryInit:
+			c.result.UsesMemory = true
 			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
@@ -1690,11 +1707,13 @@ operatorSwitch:
 				&OperationDataDrop{DataIndex: dataIndex},
 			)
 		case wasm.OpcodeMiscMemoryCopy:
+			c.result.UsesMemory = true
 			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
 			c.emit(
 				&OperationMemoryCopy{},
 			)
 		case wasm.OpcodeMiscMemoryFill:
+			c.result.UsesMemory = true
 			c.pc += 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
 				&OperationMemoryFill{},
@@ -3072,6 +3091,7 @@ func (c *compiler) stackLenInUint64(ceil int) (ret int) {
 }
 
 func (c *compiler) readMemoryArg(tag string) (*MemoryArg, error) {
+	c.result.UsesMemory = true
 	r := bytes.NewReader(c.body[c.pc+1:])
 	alignment, num, err := leb128.DecodeUint32(r)
 	if err != nil {

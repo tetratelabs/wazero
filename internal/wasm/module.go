@@ -587,16 +587,13 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.Fu
 	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
 	for i := range mod.FunctionSection {
 		code := mod.CodeSection[i]
-		fnKind := FunctionKindWasm
-		if fn := code.GoFunc; fn != nil {
-			fnKind = kind(fn.Type())
-		}
 		fns = append(fns, &FunctionInstance{
-			Kind:       fnKind,
-			Body:       code.Body,
-			GoFunc:     code.GoFunc,
-			TypeID:     m.TypeIDs[mod.FunctionSection[i]],
-			LocalTypes: code.LocalTypes,
+			IsHostFunction: code.IsHostFunction,
+			Kind:           code.Kind,
+			LocalTypes:     code.LocalTypes,
+			Body:           code.Body,
+			GoFunc:         code.GoFunc,
+			TypeID:         m.TypeIDs[mod.FunctionSection[i]],
 		})
 	}
 
@@ -804,14 +801,17 @@ type Export struct {
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 type Code struct {
+	// IsHostFunction returns true if the function was implemented by the
+	// embedder (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	//
+	// Notably, host functions can use the caller's memory, which might be
+	// different from its defining module.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
+	IsHostFunction bool
 
-	// GoFunc is a host function defined in Go.
-	//
-	// When present, LocalTypes and Body must be nil.
-	//
-	// Note: This has no serialization format, so is not encodable.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	GoFunc *reflect.Value
+	// Kind describes how this function should be called.
+	Kind FunctionKind
 
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
@@ -820,6 +820,14 @@ type Code struct {
 	// Body is a sequence of expressions ending in OpcodeEnd
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
 	Body []byte
+
+	// GoFunc is a host function defined in Go.
+	//
+	// When present, LocalTypes and Body must be nil.
+	//
+	// Note: This has no serialization format, so is not encodable.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
+	GoFunc *reflect.Value
 }
 
 type DataSegment struct {

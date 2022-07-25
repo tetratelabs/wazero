@@ -809,10 +809,7 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
-	if len(ce.frames) > 0 {
-		// Use the caller's memory, which might be different from the defining module on an imported function.
-		callCtx = callCtx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
-	}
+	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if f.source.FunctionListener != nil {
 		ctx = f.source.FunctionListener.Before(ctx, params)
 	}
@@ -830,11 +827,19 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
-	memoryInst := moduleInst.Memory
+	functions := moduleInst.Engine.(*moduleEngine).functions
+	var memoryInst *wasm.MemoryInstance
+	if f.source.IsHostFunction {
+		if memoryInst = ce.callerMemory(); memoryInst == nil {
+			// If there was no caller, someone called a host function directly.
+			memoryInst = callCtx.Memory().(*wasm.MemoryInstance)
+		}
+	} else {
+		memoryInst = moduleInst.Memory
+	}
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
 	typeIDs := f.source.Module.TypeIDs
-	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
 	ce.pushFrame(frame)
@@ -4083,6 +4088,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		}
 	}
 	ce.popFrame()
+}
+
+// callerMemory returns the caller context memory or nil if the host function
+// was called directly.
+func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
+	if len(ce.frames) > 0 {
+		lastFrameSource := ce.frames[len(ce.frames)-1].f.source
+		if !lastFrameSource.IsHostFunction {
+			return lastFrameSource.Module.Memory
+		}
+	}
+	return nil
 }
 
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {

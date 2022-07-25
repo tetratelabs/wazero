@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -10,7 +9,7 @@ import (
 
 func TestModule_BuildFunctionDefinitions(t *testing.T) {
 	nopCode := &Code{Body: []byte{OpcodeEnd}}
-	fnV := reflect.ValueOf(func() {})
+	fn := func() {}
 	tests := []struct {
 		name            string
 		m               *Module
@@ -32,18 +31,18 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 			expectedExports: map[string]api.FunctionDefinition{},
 		},
 		{
-			name: "host func",
+			name: "host func go",
 			m: &Module{
 				TypeSection:     []*FunctionType{v_v},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{{GoFunc: &fnV}},
+				CodeSection:     []*Code{MustParseGoFuncCode(fn)},
 			},
 			expected: []*FunctionDefinition{
 				{
-					index:          0,
-					debugName:      ".$0",
-					isHostFunction: true,
-					funcType:       v_v,
+					index:     0,
+					debugName: ".$0",
+					goFunc:    MustParseGoFuncCode(fn).GoFunc,
+					funcType:  v_v,
 				},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},

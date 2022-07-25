@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -263,7 +262,7 @@ func Test_loggingListener(t *testing.T) {
 
 	var out bytes.Buffer
 	lf := experimental.NewLoggingListenerFactory(&out)
-	fnV := reflect.ValueOf(func() {})
+	fn := func() {}
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
@@ -284,7 +283,7 @@ func Test_loggingListener(t *testing.T) {
 			}
 
 			if tc.isHostFunc {
-				m.CodeSection = []*wasm.Code{{GoFunc: &fnV}}
+				m.CodeSection = []*wasm.Code{wasm.MustParseGoFuncCode(fn)}
 			} else {
 				m.CodeSection = []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}}
 			}
