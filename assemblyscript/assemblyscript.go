@@ -1,26 +1,26 @@
 // Package assemblyscript contains Go-defined special functions imported by
 // AssemblyScript under the module name "env".
 //
-// Special Functions
+// # Special Functions
 //
 // AssemblyScript code import the below special functions when not using WASI.
 // Note: Sometimes only "abort" is imported.
 //
-//	* "abort" - exits with 255 with an abort message written to
-//	  wazero.ModuleConfig WithStderr.
-//	* "trace" - no output unless.
-//	* "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed
-//	  values.
+//   - "abort" - exits with 255 with an abort message written to
+//     wazero.ModuleConfig WithStderr.
+//   - "trace" - no output unless.
+//   - "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed
+//     values.
 //
-// Relationship to WASI
+// # Relationship to WASI
 //
 // A program compiled to use WASI, via "import wasi" in any file, won't import
 // these functions.
 //
 // See wasi_snapshot_preview1.Instantiate and
-//	* https://www.assemblyscript.org/concepts.html#special-imports
-//	* https://www.assemblyscript.org/concepts.html#targeting-wasi
-//	* https://www.assemblyscript.org/compiler.html#compiler-options
+//   - https://www.assemblyscript.org/concepts.html#special-imports
+//   - https://www.assemblyscript.org/concepts.html#targeting-wasi
+//   - https://www.assemblyscript.org/compiler.html#compiler-options
 package assemblyscript
 
 import (
@@ -49,9 +49,9 @@ const (
 //
 // Notes
 //
-//	* Closing the wazero.Runtime has the same effect as closing the result.
-//	* To add more functions to the "env" module, use FunctionExporter.
-//	* To instantiate into another wazero.Namespace, use FunctionExporter.
+//   - Closing the wazero.Runtime has the same effect as closing the result.
+//   - To add more functions to the "env" module, use FunctionExporter.
+//   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	builder := r.NewModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
@@ -121,6 +121,7 @@ func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 //
 // Here's the import in a user's module that ends up using this, in WebAssembly
 // 1.0 (MVP) Text Format:
+//
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
@@ -183,10 +184,12 @@ var traceStderr = traceStdout.MustGoFunc(func(
 })
 
 // traceTo implements the function "trace" in AssemblyScript. Ex.
+//
 //	trace('Hello World!')
 //
 // Here's the import in a user's module that ends up using this, in WebAssembly
 // 1.0 (MVP) Text Format:
+//
 //	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
@@ -234,6 +237,7 @@ func formatFloat(f float64) string {
 //
 // Here's the import in a user's module that ends up using this, in WebAssembly
 // 1.0 (MVP) Text Format:
+//
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111

@@ -10,6 +10,7 @@ import (
 )
 
 // wasiArg was compiled from testdata/wasi_arg.wat
+//
 //go:embed testdata/wasi_arg.wasm
 var wasiArg []byte
 

@@ -13,6 +13,7 @@ import (
 )
 
 // asWasm compiled using `npm install && npm run build`
+//
 //go:embed testdata/assemblyscript.wasm
 var asWasm []byte
 

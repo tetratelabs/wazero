@@ -71,12 +71,12 @@ var fdAllocate = stubFunction(
 //
 // Parameters
 //
-//	* fd: file descriptor to close
+//   - fd: file descriptor to close
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: the fd was not open.
+//   - ErrnoBadf: the fd was not open.
 //
 // Note: This is similar to `close` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
@@ -109,33 +109,33 @@ var fdDatasync = stubFunction(
 //
 // Parameters
 //
-//	* fd: file descriptor to get the fdstat attributes data
-//	* resultFdstat: offset to write the result fdstat data
+//   - fd: file descriptor to get the fdstat attributes data
+//   - resultFdstat: offset to write the result fdstat data
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `resultFdstat` points to an offset out of memory
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `resultFdstat` points to an offset out of memory
 //
 // fdstat byte layout is 24-byte size, with the following fields:
-//	* fs_filetype 1 byte, to indicate the file type
-//	* fs_flags 2 bytes, to indicate the file descriptor flag
-//	* 5 pad bytes
-//	* fs_right_base 8 bytes, to indicate the current rights of the fd
-//	* fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
+//   - fs_filetype 1 byte, to indicate the file type
+//   - fs_flags 2 bytes, to indicate the file descriptor flag
+//   - 5 pad bytes
+//   - fs_right_base 8 bytes, to indicate the current rights of the fd
+//   - fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
 //
 // For example, with a file corresponding with `fd` was a directory (=3) opened
 // with `fd_read` right (=1) and no fs_flags (=0), parameter resultFdstat=1,
 // this function writes the below to api.Memory:
 //
-//                   uint16le   padding            uint64le                uint64le
-//          uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
-//                  |  |  |  |           |  |                    |  |                    |
-//        []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
-//   resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
-//                  |
-//                  +-- fs_filetype
+//	                uint16le   padding            uint64le                uint64le
+//	       uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
+//	               |  |  |  |           |  |                    |  |                    |
+//	     []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
+//	resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
+//	               |
+//	               +-- fs_filetype
 //
 // Note: fdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as
 // well as additional fields.
@@ -221,14 +221,14 @@ var fdPread = stubFunction(
 //
 // Parameters
 //
-//	* fd: file descriptor to get the prestat
-//	* resultPrestat: offset to write the result prestat data
+//   - fd: file descriptor to get the prestat
+//   - resultPrestat: offset to write the result prestat data
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid or the `fd` is not a pre-opened directory
-//	* ErrnoFault: `resultPrestat` points to an offset out of memory
+//   - ErrnoBadf: `fd` is invalid or the `fd` is not a pre-opened directory
+//   - ErrnoFault: `resultPrestat` points to an offset out of memory
 //
 // prestat byte layout is 8 bytes, beginning with an 8-bit tag and 3 pad bytes.
 // The only valid tag is `prestat_dir`, which is tag zero. This simplifies the
@@ -237,13 +237,13 @@ var fdPread = stubFunction(
 // For example, the directory name corresponding with `fd` was "/tmp" and
 // parameter resultPrestat=1, this function writes the below to api.Memory:
 //
-//                     padding   uint32le
-//          uint8 --+  +-----+  +--------+
-//                  |  |     |  |        |
-//        []byte{?, 0, 0, 0, 0, 4, 0, 0, 0, ?}
-//  resultPrestat --^           ^
-//            tag --+           |
-//                              +-- size in bytes of the string "/tmp"
+//	                   padding   uint32le
+//	        uint8 --+  +-----+  +--------+
+//	                |  |     |  |        |
+//	      []byte{?, 0, 0, 0, 0, 4, 0, 0, 0, ?}
+//	resultPrestat --^           ^
+//	          tag --+           |
+//	                            +-- size in bytes of the string "/tmp"
 //
 // See fdPrestatDirName and
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
@@ -275,28 +275,28 @@ var fdPrestatGet = wasm.NewGoFunc(
 //
 // Parameters
 //
-//	* fd: file descriptor to get the path of the pre-opened directory
-//	* path: offset in api.Memory to write the result path
-//	* pathLen: count of bytes to write to `path`
-//	  * This should match the uint32le fdPrestatGet writes to offset
-//	    `resultPrestat`+4
+//   - fd: file descriptor to get the path of the pre-opened directory
+//   - path: offset in api.Memory to write the result path
+//   - pathLen: count of bytes to write to `path`
+//   - This should match the uint32le fdPrestatGet writes to offset
+//     `resultPrestat`+4
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `path` points to an offset out of memory
-//	* ErrnoNametoolong: `pathLen` is longer than the actual length of the result
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `path` points to an offset out of memory
+//   - ErrnoNametoolong: `pathLen` is longer than the actual length of the result
 //
 // For example, the directory name corresponding with `fd` was "/tmp" and
 // parameters path=1 pathLen=4 (correct), this function will write the below to
 // api.Memory:
 //
-//                  pathLen
-//              +--------------+
-//              |              |
-//   []byte{?, '/', 't', 'm', 'p', ?}
-//       path --^
+//	               pathLen
+//	           +--------------+
+//	           |              |
+//	[]byte{?, '/', 't', 'm', 'p', ?}
+//	    path --^
 //
 // See fdPrestatGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
@@ -337,45 +337,45 @@ var fdPwrite = stubFunction(functionFdPwrite,
 //
 // Parameters
 //
-//	* fd: an opened file descriptor to read data from
-//	* iovs: offset in api.Memory to read offset, size pairs representing where
-//	  to write file data
-//	  * Both offset and length are encoded as uint32le
-//	* iovsCount: count of memory offset, size pairs to read sequentially
-//	  starting at iovs
-//	* resultSize: offset in api.Memory to write the number of bytes read
+//   - fd: an opened file descriptor to read data from
+//   - iovs: offset in api.Memory to read offset, size pairs representing where
+//     to write file data
+//   - Both offset and length are encoded as uint32le
+//   - iovsCount: count of memory offset, size pairs to read sequentially
+//     starting at iovs
+//   - resultSize: offset in api.Memory to write the number of bytes read
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
-//	* ErrnoIo: a file system error
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
+//   - ErrnoIo: a file system error
 //
 // For example, this function needs to first read `iovs` to determine where
 // to write contents. If parameters iovs=1 iovsCount=2, this function reads two
 // offset/length pairs from api.Memory:
 //
-//                      iovs[0]                  iovs[1]
-//              +---------------------+   +--------------------+
-//              | uint32le    uint32le|   |uint32le    uint32le|
-//              +---------+  +--------+   +--------+  +--------+
-//              |         |  |        |   |        |  |        |
-//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
-//       iovs --^            ^            ^           ^
-//              |            |            |           |
-//     offset --+   length --+   offset --+  length --+
+//	                  iovs[0]                  iovs[1]
+//	          +---------------------+   +--------------------+
+//	          | uint32le    uint32le|   |uint32le    uint32le|
+//	          +---------+  +--------+   +--------+  +--------+
+//	          |         |  |        |   |        |  |        |
+//	[]byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
+//	   iovs --^            ^            ^           ^
+//	          |            |            |           |
+//	 offset --+   length --+   offset --+  length --+
 //
 // If the contents of the `fd` parameter was "wazero" (6 bytes) and parameter
 // resultSize=26, this function writes the below to api.Memory:
 //
-//                       iovs[0].length        iovs[1].length
-//                      +--------------+       +----+       uint32le
-//                      |              |       |    |      +--------+
-//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
-//     iovs[0].offset --^                      ^           ^
-//                            iovs[1].offset --+           |
-//                                            resultSize --+
+//	                    iovs[0].length        iovs[1].length
+//	                   +--------------+       +----+       uint32le
+//	                   |              |       |    |      +--------+
+//	[]byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
+//	  iovs[0].offset --^                      ^           ^
+//	                         iovs[1].offset --+           |
+//	                                         resultSize --+
 //
 // Note: This is similar to `readv` in POSIX. https://linux.die.net/man/3/readv
 //
@@ -446,33 +446,33 @@ var fdRenumber = stubFunction(
 //
 // Parameters
 //
-//	* fd: file descriptor to move the offset of
-//	* offset: signed int64, which is encoded as uint64, input argument to
-//	  `whence`, which results in a new offset
-//	* whence: operator that creates the new offset, given `offset` bytes
-//	  * If io.SeekStart, new offset == `offset`.
-//	  * If io.SeekCurrent, new offset == existing offset + `offset`.
-//	  * If io.SeekEnd, new offset == file size of `fd` + `offset`.
-//	* resultNewoffset: offset in api.Memory to write the new offset to,
-//	  relative to start of the file
+//   - fd: file descriptor to move the offset of
+//   - offset: signed int64, which is encoded as uint64, input argument to
+//     `whence`, which results in a new offset
+//   - whence: operator that creates the new offset, given `offset` bytes
+//   - If io.SeekStart, new offset == `offset`.
+//   - If io.SeekCurrent, new offset == existing offset + `offset`.
+//   - If io.SeekEnd, new offset == file size of `fd` + `offset`.
+//   - resultNewoffset: offset in api.Memory to write the new offset to,
+//     relative to start of the file
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `resultNewoffset` points to an offset out of memory
-//	* ErrnoInval: `whence` is an invalid value
-//	* ErrnoIo: a file system error
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `resultNewoffset` points to an offset out of memory
+//   - ErrnoInval: `whence` is an invalid value
+//   - ErrnoIo: a file system error
 //
 // For example, if fd 3 is a file with offset 0, and parameters fd=3, offset=4,
 // whence=0 (=io.SeekStart), resultNewOffset=1, this function writes the below
 // to api.Memory:
 //
-//                           uint64le
-//                    +--------------------+
-//                    |                    |
-//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
-//  resultNewoffset --^
+//	                         uint64le
+//	                  +--------------------+
+//	                  |                    |
+//	        []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
+//	resultNewoffset --^
 //
 // Note: This is similar to `lseek` in POSIX. https://linux.die.net/man/3/lseek
 //
@@ -533,52 +533,52 @@ var fdTell = stubFunction(
 //
 // Parameters
 //
-//	* fd: an opened file descriptor to write data to
-//	* iovs: offset in api.Memory to read offset, size pairs representing the
-//	  data to write to `fd`
-//	  * Both offset and length are encoded as uint32le.
-//	* iovsCount: count of memory offset, size pairs to read sequentially
-//	  starting at iovs
-//	* resultSize: offset in api.Memory to write the number of bytes written
+//   - fd: an opened file descriptor to write data to
+//   - iovs: offset in api.Memory to read offset, size pairs representing the
+//     data to write to `fd`
+//   - Both offset and length are encoded as uint32le.
+//   - iovsCount: count of memory offset, size pairs to read sequentially
+//     starting at iovs
+//   - resultSize: offset in api.Memory to write the number of bytes written
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
-//	* ErrnoIo: a file system error
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
+//   - ErrnoIo: a file system error
 //
 // For example, this function needs to first read `iovs` to determine what to
 // write to `fd`. If parameters iovs=1 iovsCount=2, this function reads two
 // offset/length pairs from api.Memory:
 //
-//                      iovs[0]                  iovs[1]
-//              +---------------------+   +--------------------+
-//              | uint32le    uint32le|   |uint32le    uint32le|
-//              +---------+  +--------+   +--------+  +--------+
-//              |         |  |        |   |        |  |        |
-//    []byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
-//       iovs --^            ^            ^           ^
-//              |            |            |           |
-//     offset --+   length --+   offset --+  length --+
+//	                  iovs[0]                  iovs[1]
+//	          +---------------------+   +--------------------+
+//	          | uint32le    uint32le|   |uint32le    uint32le|
+//	          +---------+  +--------+   +--------+  +--------+
+//	          |         |  |        |   |        |  |        |
+//	[]byte{?, 18, 0, 0, 0, 4, 0, 0, 0, 23, 0, 0, 0, 2, 0, 0, 0, ?... }
+//	   iovs --^            ^            ^           ^
+//	          |            |            |           |
+//	 offset --+   length --+   offset --+  length --+
 //
 // This function reads those chunks api.Memory into the `fd` sequentially.
 //
-//                       iovs[0].length        iovs[1].length
-//                      +--------------+       +----+
-//                      |              |       |    |
-//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ? }
-//     iovs[0].offset --^                      ^
-//                            iovs[1].offset --+
+//	                    iovs[0].length        iovs[1].length
+//	                   +--------------+       +----+
+//	                   |              |       |    |
+//	[]byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ? }
+//	  iovs[0].offset --^                      ^
+//	                         iovs[1].offset --+
 //
 // Since "wazero" was written, if parameter resultSize=26, this function writes
 // the below to api.Memory:
 //
-//                      uint32le
-//                     +--------+
-//                     |        |
-//   []byte{ 0..24, ?, 6, 0, 0, 0', ? }
-//        resultSize --^
+//	                   uint32le
+//	                  +--------+
+//	                  |        |
+//	[]byte{ 0..24, ?, 6, 0, 0, 0', ? }
+//	     resultSize --^
 //
 // Note: This is similar to `writev` in POSIX. https://linux.die.net/man/3/writev
 //
@@ -670,53 +670,53 @@ var pathLink = stubFunction(
 //
 // Parameters
 //
-//	* fd: file descriptor of a directory that `path` is relative to
-//	* dirflags: flags to indicate how to resolve `path`
-//	* path: offset in api.Memory to read the path string from
-//	* pathLen: length of `path`
-//	* oFlags: open flags to indicate the method by which to open the file
-//	* fsRightsBase: rights of the newly created file descriptor for `path`
-//	* fsRightsInheriting: rights of the file descriptors derived from the newly
-//	  created file descriptor for `path`
-//	* fdFlags: file descriptor flags
-//	* resultOpenedFd: offset in api.Memory to write the newly created file
-//	  descriptor to.
-//     * The result FD value is guaranteed to be less than 2**31
+//   - fd: file descriptor of a directory that `path` is relative to
+//   - dirflags: flags to indicate how to resolve `path`
+//   - path: offset in api.Memory to read the path string from
+//   - pathLen: length of `path`
+//   - oFlags: open flags to indicate the method by which to open the file
+//   - fsRightsBase: rights of the newly created file descriptor for `path`
+//   - fsRightsInheriting: rights of the file descriptors derived from the newly
+//     created file descriptor for `path`
+//   - fdFlags: file descriptor flags
+//   - resultOpenedFd: offset in api.Memory to write the newly created file
+//     descriptor to.
+//   - The result FD value is guaranteed to be less than 2**31
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoBadf: `fd` is invalid
-//	* ErrnoFault: `resultOpenedFd` points to an offset out of memory
-//	* ErrnoNoent: `path` does not exist.
-//	* ErrnoExist: `path` exists, while `oFlags` requires that it must not.
-//	* ErrnoNotdir: `path` is not a directory, while `oFlags` requires it.
-//	* ErrnoIo: a file system error
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoFault: `resultOpenedFd` points to an offset out of memory
+//   - ErrnoNoent: `path` does not exist.
+//   - ErrnoExist: `path` exists, while `oFlags` requires that it must not.
+//   - ErrnoNotdir: `path` is not a directory, while `oFlags` requires it.
+//   - ErrnoIo: a file system error
 //
 // For example, this function needs to first read `path` to determine the file
 // to open. If parameters `path` = 1, `pathLen` = 6, and the path is "wazero",
 // pathOpen reads the path from api.Memory:
 //
-//                   pathLen
-//               +------------------------+
-//               |                        |
-//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
-//        path --^
+//	                pathLen
+//	            +------------------------+
+//	            |                        |
+//	[]byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
+//	     path --^
 //
 // Then, if parameters resultOpenedFd = 8, and this function opened a new file
 // descriptor 5 with the given flags, this function writes the below to
 // api.Memory:
 //
-//                          uint32le
-//                         +--------+
-//                         |        |
-//        []byte{ 0..6, ?, 5, 0, 0, 0, ?}
-//        resultOpenedFd --^
+//	                  uint32le
+//	                 +--------+
+//	                 |        |
+//	[]byte{ 0..6, ?, 5, 0, 0, 0, ?}
+//	resultOpenedFd --^
 //
 // Notes
-//	* This is similar to `openat` in POSIX. https://linux.die.net/man/3/openat
-//	* The returned file descriptor is not guaranteed to be the lowest-number
-//	* Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+//   - This is similar to `openat` in POSIX. https://linux.die.net/man/3/openat
+//   - The returned file descriptor is not guaranteed to be the lowest-number
+//   - Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 var pathOpen = wasm.NewGoFunc(

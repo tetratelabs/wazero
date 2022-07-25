@@ -14,6 +14,7 @@ import (
 // Runtime allows embedding of WebAssembly modules.
 //
 // Ex. The below is the basic initialization of wazero's WebAssembly Runtime.
+//
 //	ctx := context.Background()
 //	r := wazero.NewRuntime()
 //	defer r.Close(ctx) // This closes everything this Runtime created.

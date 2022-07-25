@@ -38,12 +38,12 @@ import (
 //
 // Notes
 //
-//	* ModuleBuilder is mutable: each method returns the same instance for
-//	  chaining.
-//	* methods do not return errors, to allow chaining. Any validation errors
-//	  are deferred until Compile.
-//	* Insertion order is not retained. Anything defined by this builder is
-//	  sorted lexicographically on Compile.
+//   - ModuleBuilder is mutable: each method returns the same instance for
+//     chaining.
+//   - methods do not return errors, to allow chaining. Any validation errors
+//     are deferred until Compile.
+//   - Insertion order is not retained. Anything defined by this builder is
+//     sorted lexicographically on Compile.
 type ModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 

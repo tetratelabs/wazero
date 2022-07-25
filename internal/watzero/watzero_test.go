@@ -13,6 +13,7 @@ import (
 var example = newExample()
 
 // exampleWat is different from exampleWat because the parser doesn't yet support all features.
+//
 //go:embed testdata/example.wat
 var exampleWat string
 

@@ -24,8 +24,9 @@ type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPos
 // typeUseParser parses an inlined type from a field such wasm.ExternTypeFuncName and calls onTypeUse.
 //
 // Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
-//                           starts here --^           ^
-//                            onTypeUse resumes here --+
+//
+//	starts here --^           ^
+//	 onTypeUse resumes here --+
 //
 // Note: Unlike normal parsers, this is not used for an entire field (enclosed by parens). Rather, this only handles
 // "type", "param" and "result" inner fields in the correct order.
@@ -96,13 +97,14 @@ type typeUseParser struct {
 // to ensure a valid empty type use is associated with the section index, if needed.
 //
 // Ex. Given the source `(module (import (func $main (param i32))))`
-//              beginTypeParamOrResult starts here --^          ^
-//                                     onTypeUse resumes here --+
+//
+//	beginTypeParamOrResult starts here --^          ^
+//	                       onTypeUse resumes here --+
 //
 // Ex. Given the source `(module (func $main (result i32) (local.get 0))`
-//      beginTypeParamOrResult starts here --^             ^
-//                                onTypeUse resumes here --+
 //
+//	beginTypeParamOrResult starts here --^             ^
+//	                          onTypeUse resumes here --+
 func (p *typeUseParser) begin(section wasm.SectionID, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	pos := callbackPositionUnhandledToken
 	p.pos = positionInitial // to ensure errorContext reports properly
@@ -266,11 +268,13 @@ func (p *typeUseParser) beginResult(tok tokenType, tokenBytes []byte, line, col 
 // parseParamID sets any ID if present and resumes with parseParam .
 //
 // Ex. A param ID is present `(param $x i32)`
-//                                      ^
-//            parseParam resumes here --+
+//
+//	                          ^
+//	parseParam resumes here --+
 //
 // Ex. No param ID `(param i32)`
-//      calls parseParam --^
+//
+//	calls parseParam --^
 func (p *typeUseParser) parseParamID(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $len
 		if err := p.setParamID(tokenBytes); err != nil {
@@ -307,13 +311,15 @@ func (p *typeUseParser) setParamID(idToken []byte) error {
 // this returns parseMoreParamsOrResult.
 //
 // Ex. One param type is present `(param i32)`
-//                         records i32 --^  ^
-//   parseMoreParamsOrResult resumes here --+
+//
+//	                      records i32 --^  ^
+//	parseMoreParamsOrResult resumes here --+
 //
 // Ex. Multiple param types are present `(param i32 i64)`
-//                                records i32 --^   ^  ^
-//                                    records i32 --+  |
-//              parseMoreParamsOrResult resumes here --+
+//
+//	                  records i32 --^   ^  ^
+//	                      records i32 --+  |
+//	parseMoreParamsOrResult resumes here --+
 func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenID: // Ex. $len
@@ -347,13 +353,15 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 // this returns parseMoreResults.
 //
 // Ex. One result type is present `(result i32)`
-//                           records i32 --^  ^
-//            parseMoreResults resumes here --+
+//
+//	               records i32 --^  ^
+//	parseMoreResults resumes here --+
 //
 // Ex. Multiple result types are present `(result i32 i64)`
-//                                  records i32 --^   ^  ^
-//                                      records i32 --+  |
-//                       parseMoreResults resumes here --+
+//
+//	           records i32 --^   ^  ^
+//	               records i32 --+  |
+//	parseMoreResults resumes here --+
 func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenID: // Ex. $len
@@ -496,7 +504,9 @@ func (p *typeUseParser) recordInlinedType(inlinedIdx wasm.Index) {
 }
 
 // requireInlinedMatchesReferencedType satisfies the following rule:
+//
 //	>> If inline declarations are given, then their types must match the referenced function type.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-uses%E2%91%A0
 func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index wasm.Index, params, results []wasm.ValueType) error {
 	if !typeSection[index].EqualsSignature(params, results) {

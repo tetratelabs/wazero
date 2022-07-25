@@ -1071,9 +1071,10 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // Here, we mean "the overflow info" by 65 bit or higher part of the result for 64 bit case.
 //
 // So, we have to ensure that
-// 1) Previously located value on DX must be saved to memory stack. That is because
-//    the existing value will be overridden after the mul execution.
-// 2) One of the operands (x1 or x2) must be on AX register.
+//  1. Previously located value on DX must be saved to memory stack. That is because
+//     the existing value will be overridden after the mul execution.
+//  2. One of the operands (x1 or x2) must be on AX register.
+//
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instruction) error {
 	const (
@@ -2007,7 +2008,9 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 // According to the Intel manual ([1],[2]), if the source float value is either +-Inf or NaN, or it exceeds representative ranges
 // of target signed integer, then the instruction returns "masked" response float32SignBitMask (or float64SignBitMask for 64 bit case).
 // [1] Chapter 11.5.2, SIMD Floating-Point Exception Conditions in "Vol 1, Intel® 64 and IA-32 Architectures Manual"
-//     https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
+//
+//	https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
+//
 // [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
 func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (err error) {
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {

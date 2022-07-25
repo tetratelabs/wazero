@@ -15,23 +15,23 @@ const functionRandomGet = "random_get"
 //
 // Parameters
 //
-//	* buf: api.Memory offset to write random values
-//	* bufLen: size of random data in bytes
+//   - buf: api.Memory offset to write random values
+//   - bufLen: size of random data in bytes
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
-//	* ErrnoFault: `buf` or `bufLen` point to an offset out of memory
-//	* ErrnoIo: a file system error
+//   - ErrnoFault: `buf` or `bufLen` point to an offset out of memory
+//   - ErrnoIo: a file system error
 //
 // For example, if underlying random source was seeded like
 // `rand.NewSource(42)`, we expect api.Memory to contain:
 //
-//                             bufLen (5)
-//                    +--------------------------+
-//                    |                        	 |
-//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
-//              buf --^
+//	                   bufLen (5)
+//	          +--------------------------+
+//	          |                        	 |
+//	[]byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
+//	    buf --^
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 var randomGet = wasm.NewGoFunc(

@@ -9,6 +9,7 @@ import (
 // ExitCode zero value means success, while any other value is an error.
 //
 // Here's an example of how to get the exit code:
+//
 //	main := module.ExportedFunction("main")
 //	if err := main(ctx); err != nil {
 //		if exitErr, ok := err.(*sys.ExitError); ok {

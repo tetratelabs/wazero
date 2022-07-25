@@ -14,6 +14,7 @@ import (
 )
 
 // growWasm was compiled from testdata/grow.cc
+//
 //go:embed testdata/grow.wasm
 var growWasm []byte
 

@@ -4,7 +4,7 @@
 // Emscripten has many imports which are triggered on build flags. Use
 // FunctionExporter, instead of Instantiate, to define more "env" functions.
 //
-// Relationship to WASI
+// # Relationship to WASI
 //
 // Emscripten typically requires wasi_snapshot_preview1 to implement exit.
 //
@@ -25,9 +25,9 @@ import (
 //
 // Notes
 //
-//	* Closing the wazero.Runtime has the same effect as closing the result.
-//	* To add more functions to the "env" module, use FunctionExporter.
-//	* To instantiate into another wazero.Namespace, use FunctionExporter.
+//   - Closing the wazero.Runtime has the same effect as closing the result.
+//   - To add more functions to the "env" module, use FunctionExporter.
+//   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 	builder := r.NewModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
@@ -64,6 +64,7 @@ func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
 //
 // Here's the import in a user's module that ends up using this, in WebAssembly
 // 1.0 (MVP) Text Format:
+//
 //	(import "env" "emscripten_notify_memory_growth"
 //	  (func $emscripten_notify_memory_growth (param $memory_index i32)))
 //
