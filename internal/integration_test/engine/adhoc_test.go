@@ -125,8 +125,9 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0) // params ignored by wasm
 	require.NoError(t, err)
 
-	require.Equal(t, 100, len(res))
-	for i := uint64(1); i <= 100; i++ {
+	const resultNumInUint64 = 180
+	require.Equal(t, resultNumInUint64, len(res))
+	for i := uint64(1); i <= resultNumInUint64; i++ {
 		require.Equal(t, i, res[i-1])
 	}
 }
