@@ -4096,6 +4096,10 @@ func (c *amd64Compiler) compileTableFill(o *wazeroir.OperationTableFill) error {
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
 func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
