@@ -244,7 +244,7 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte, checkFunc func()) {
+func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
 	f := j.newFunctionFrame(codeSegment)
 
 	b.StartTimer()
@@ -256,7 +256,6 @@ func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte, checkFunc func
 			uintptr(unsafe.Pointer(j.ce)),
 			uintptr(unsafe.Pointer(j.moduleInstance)),
 		)
-		checkFunc()
 	}
 	b.StopTimer()
 }

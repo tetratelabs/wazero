@@ -395,36 +395,55 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
 
-	rv := []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}}
-
-	currentRegisters := func() []asm.Register {
-		out := make([]asm.Register, len(rv))
-		for i := range rv {
-			out[i] = rv[i].register
-		}
-		return out
-	}
-
 	tests := []struct {
+		initial           []*runtimeValueLocation
 		desired, expected []asm.Register
-		swaps             []int
 	}{
-		{desired: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, swaps: []int{0, 2}},
-		{desired: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX}, expected: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX}, swaps: []int{0, 2, 1, 2}},
-		{desired: []asm.Register{amd64.RegR9, amd64.RegAX, amd64.RegR8}, expected: []asm.Register{amd64.RegCX, amd64.RegAX, amd64.RegDX}, swaps: []int{1, 0}},
-		{desired: []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10}, expected: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, swaps: []int{}},
-		{desired: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, expected: []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, swaps: []int{}},
-		{desired: []asm.Register{amd64.RegDX, amd64.RegR9, amd64.RegAX}, expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX}, swaps: []int{0, 2}},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}},
+			desired:  []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX},
+			expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}},
+			desired:  []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX},
+			expected: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegR8}, {register: amd64.RegR9}, {register: amd64.RegR10}},
+			desired:  []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+			expected: []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegBX}, {register: amd64.RegDX}, {register: amd64.RegCX}},
+			desired:  []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+			expected: []asm.Register{amd64.RegBX, amd64.RegDX, amd64.RegCX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegR8}, {register: amd64.RegR9}, {register: amd64.RegR10}},
+			desired:  []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegR9},
+			expected: []asm.Register{amd64.RegR8, amd64.RegR10, amd64.RegR9},
+		},
 	}
 
 	for _, tt := range tests {
-		swaps := compiler.compilePreventCrossedTargetRegisters(rv, tt.desired)
-		require.Equal(t, tt.swaps, swaps)
-		require.Equal(t, tt.expected, currentRegisters())
-		compiler.compileRestorePreventedCrossing(rv, swaps)
-		require.Equal(t, []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegDX}, currentRegisters())
+		initialRegisters := collectRegistersFromRuntimeValues(tt.initial)
+		restoreCrossing := compiler.compilePreventCrossedTargetRegisters(tt.initial, tt.desired)
+		// Required expected state after prevented crossing.
+		require.Equal(t, tt.expected, collectRegistersFromRuntimeValues(tt.initial))
+		restoreCrossing()
+		// Require initial state after restoring.
+		require.Equal(t, initialRegisters, collectRegistersFromRuntimeValues(tt.initial))
 	}
 
+}
+
+func collectRegistersFromRuntimeValues(locs []*runtimeValueLocation) []asm.Register {
+	out := make([]asm.Register, len(locs))
+	for i := range locs {
+		out[i] = locs[i].register
+	}
+	return out
 }
 
 // compile implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.

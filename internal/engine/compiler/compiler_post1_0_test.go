@@ -252,7 +252,7 @@ func requireBenchmarkNoError(b *testing.B, err error) {
 }
 
 func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
-	sizes := []uint32{8, 64, 128, 1000, 16000, 64000}
+	sizes := []uint32{5, 8, 17, 64, 128, 1000, 16000, 64000}
 
 	for _, size := range sizes {
 		for _, overlap := range []bool{false, true} {
@@ -290,12 +290,15 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 				code, _, err := compiler.compile()
 				requireBenchmarkNoError(b, err)
 
-				env.execBench(b, code, func() {
+				env.execBench(b, code)
+
+				for i := 0; i < b.N; i += 1 {
 					copy(testMem[destOffset:destOffset+size], testMem[sourceOffset:sourceOffset+size])
-					if !bytes.Equal(mem, testMem) {
-						b.FailNow()
-					}
-				})
+				}
+
+				if !bytes.Equal(mem, testMem) {
+					b.FailNow()
+				}
 			})
 		}
 	}

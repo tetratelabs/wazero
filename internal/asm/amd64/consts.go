@@ -217,9 +217,7 @@ const (
 	PSRLD
 	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
-	// REPMOVSB is a combination of REP MOVSB instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
-	REPMOVSB
-	// REPMOVSB is a combination of REP MOVSQ instructions. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	// REPMOVSQ is the REP MOVSQ instruction in 64-bit mode. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
 	REPMOVSQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
@@ -307,7 +305,7 @@ const (
 	XORPS
 	// XORQ is the XOR instruction in 64-bit mode. https://www.felixcloutier.com/x86/xor
 	XORQ
-	// XCHGQ is the XCHG instruction. https://www.felixcloutier.com/x86/xchg
+	// XCHGQ is the XCHG instruction in 64-bit mode. https://www.felixcloutier.com/x86/xchg
 	XCHGQ
 	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	RET
@@ -743,8 +741,6 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PSRLD"
 	case PSRLQ:
 		return "PSRLQ"
-	case REPMOVSB:
-		return "REP MOVSB"
 	case REPMOVSQ:
 		return "REP MOVSQ"
 	case ROLL:

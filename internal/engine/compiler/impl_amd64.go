@@ -3604,10 +3604,10 @@ func (c *amd64Compiler) compileCopyLoopImpl(destinationOffset, sourceOffset, cop
 	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
 	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
 
-	rvalues := []*runtimeValueLocation{destinationOffset, sourceOffset, copySize}
-
 	// Prepare registers for swaps. There will never be more than 3 XCHGs in total.
-	swaps := c.compilePreventCrossedTargetRegisters(rvalues, []asm.Register{amd64.RegDI, amd64.RegSI, amd64.RegCX})
+	restoreCrossing := c.compilePreventCrossedTargetRegisters(
+		[]*runtimeValueLocation{destinationOffset, sourceOffset, copySize},
+		[]asm.Register{amd64.RegDI, amd64.RegSI, amd64.RegCX})
 
 	// Prepare registers for REP MOVSQ: copy from rsi to rdi, rcx times.
 	c.compileMaybeSwapRegisters(destinationOffset.register, amd64.RegDI)
@@ -3633,7 +3633,7 @@ func (c *amd64Compiler) compileCopyLoopImpl(destinationOffset, sourceOffset, cop
 	c.compileMaybeSwapRegisters(destinationOffset.register, amd64.RegDI)
 	c.compileMaybeSwapRegisters(sourceOffset.register, amd64.RegSI)
 	c.compileMaybeSwapRegisters(copySize.register, amd64.RegCX)
-	c.compileRestorePreventedCrossing(rvalues, swaps)
+	restoreCrossing()
 
 	c.assembler.SetJumpTargetOnNext(emptyEightGroupsJump)
 	c.assembler.CompileStandAlone(amd64.NOP)
@@ -3655,6 +3655,7 @@ func (c *amd64Compiler) compileMemoryCopyLoopImpl(destinationOffset, sourceOffse
 	// sourceOffset += memory buffer's absolute address.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, sourceOffset.register)
 
+	// Copy copySize % 8 bytes in loop to allow copying in 8 byte groups.
 	beginLoop := c.assembler.CompileStandAlone(amd64.NOP)
 
 	// Check copySize % 8 == 0.
@@ -3674,9 +3675,9 @@ func (c *amd64Compiler) compileMemoryCopyLoopImpl(destinationOffset, sourceOffse
 
 	c.assembler.CompileNoneToRegister(amd64.DECQ, copySize.register)
 	c.assembler.CompileJump(amd64.JMP).AssignJumpTarget(beginLoop)
-
 	c.assembler.SetJumpTargetOnNext(breakLoop)
-	// copySize /= 8
+
+	// compileCopyLoopImpl counts in groups of 8 bytes, so we have to divide the copySize by 8.
 	c.assembler.CompileConstToRegister(amd64.SHRQ, 3, copySize.register)
 
 	c.compileCopyLoopImpl(destinationOffset, sourceOffset, copySize, backwards, 7)
@@ -5090,13 +5091,18 @@ func (c *amd64Compiler) compileMaybeSwapRegisters(reg1, reg2 asm.Register) {
 	}
 }
 
-// compilePreventCrossedTargetRegisters ensures that neither runtimeValueLocations target register
-// is present among the other runtimeValueLocations. To prevent this, it swaps misplaced registers.
+// compilePreventCrossedTargetRegisters swaps registers in such a way, that for neither runtimeValueLocation from locs its
+// corresponding register with the same index from targets is occupied by some other runtimeValueLocation from locs. It returns a
+// closure to restore the original register placement.
 //
 // This function makes it possible to safely exchange one set of registers with another, where a register might be in both sets.
-// Each register will correspond either to another register not present in its set or to itself
-func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValueLocation, targets []asm.Register) []int {
-	swaps := []int{}
+// Each register will correspond either to itself or another register not present in its own set.
+//
+// For example, if we have locs = [AX, BX, CX], targets = [BX, SI, AX], then it'll do two swaps
+// to make locs = [BX, CX, AX]
+func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValueLocation, targets []asm.Register) (restore func()) {
+	type Swap struct{ srcIndex, dstIndex int }
+	var swaps []Swap
 	for i := range locs {
 		targetLocation := -1 // -1 means not found.
 		for j := range locs {
@@ -5108,17 +5114,14 @@ func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValu
 		if targetLocation != -1 && targetLocation != i {
 			c.compileMaybeSwapRegisters(locs[i].register, locs[targetLocation].register)
 			locs[i].register, locs[targetLocation].register = locs[targetLocation].register, locs[i].register
-			swaps = append(swaps, i, targetLocation)
+			swaps = append(swaps, Swap{i, targetLocation})
 		}
 	}
-	return swaps
-}
-
-// compileRestorePreventedCrossing can be applied after compilePreventCrossedTargetRegisters to restore registers
-func (c *amd64Compiler) compileRestorePreventedCrossing(locs []*runtimeValueLocation, swaps []int) {
-	for i := len(swaps) - 2; i >= 0; i -= 2 {
-		r1, r2 := swaps[i], swaps[i+1]
-		c.compileMaybeSwapRegisters(locs[r1].register, locs[r2].register)
-		locs[r1].register, locs[r2].register = locs[r2].register, locs[r1].register
+	return func() {
+		for i := len(swaps) - 1; i >= 0; i -= 1 {
+			r1, r2 := swaps[i].srcIndex, swaps[i].dstIndex
+			c.compileMaybeSwapRegisters(locs[r1].register, locs[r2].register)
+			locs[r1].register, locs[r2].register = locs[r2].register, locs[r1].register
+		}
 	}
 }
