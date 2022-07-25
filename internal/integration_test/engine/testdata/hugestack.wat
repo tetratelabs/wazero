@@ -12,7 +12,7 @@
       v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 120
       v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 140
       v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 160
-      v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 ;; 180
+      v128 v128 v128 v128 v128 v128 v128 v128 v128 f64 f64 ;; 180
     )
     (v128.const i64x2 1 2)
     (f64.const 1.5e-323) ;; math.Float64frombits(3)
@@ -35,6 +35,8 @@
     (v128.const i64x2 141 142) (v128.const i64x2 143 144) (v128.const i64x2 145 146) (v128.const i64x2 147 148) (v128.const i64x2 149 150)
     (v128.const i64x2 151 152) (v128.const i64x2 153 154) (v128.const i64x2 155 156) (v128.const i64x2 157 158) (v128.const i64x2 159 160)
     (v128.const i64x2 161 162) (v128.const i64x2 163 164) (v128.const i64x2 165 166) (v128.const i64x2 167 168) (v128.const i64x2 169 170)
-    (v128.const i64x2 171 172) (v128.const i64x2 173 174) (v128.const i64x2 175 176) (v128.const i64x2 177 178) (v128.const i64x2 179 180)
+    (v128.const i64x2 171 172) (v128.const i64x2 173 174) (v128.const i64x2 175 176) (v128.const i64x2 177 178)
+    (f64.const 8.84e-322) ;; math.Float64frombits(179)
+    (f64.const 8.9e-322) ;; math.Float64frombits(180)
   )
 )
