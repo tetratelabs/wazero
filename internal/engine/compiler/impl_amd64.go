@@ -108,6 +108,11 @@ func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return c, nil
 }
 
+// runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
+	return c.locationStack
+}
+
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
@@ -118,15 +123,19 @@ func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	c.locationStack = newStack
 }
 
+// pushRuntimeValueLocationOnRegister implements compiler.pushRuntimeValueLocationOnRegister for amd64.
 func (c *amd64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation) {
 	ret = c.locationStack.pushRuntimeValueLocationOnRegister(reg, vt)
 	c.locationStack.markRegisterUsed(reg)
 	return
 }
-func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) {
-	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
+
+// pushVectorRuntimeValueLocationOnRegister implements compiler.pushVectorRuntimeValueLocationOnRegister for amd64.
+func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation) {
+	lowerBitsLocation = c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
 	c.locationStack.markRegisterUsed(reg)
+	return
 }
 
 type amd64LabelInfo struct {
@@ -480,7 +489,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
-	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
+	if err := compileDropRange(c, thenTarget.ToDrop); err != nil {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
@@ -515,7 +524,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
-		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
 			return err
 		}
 		return c.branchInto(o.Default.Target)
@@ -617,7 +626,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := c.emitDropRange(target.ToDrop); err != nil {
+		if err := compileDropRange(c, target.ToDrop); err != nil {
 			return err
 		}
 		if err := c.branchInto(target.Target); err != nil {
@@ -829,46 +838,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.emitDropRange(o.Depth)
-}
-
-func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
-	if r == nil {
-		return nil
-	} else if r.Start == 0 {
-		for i := 0; i <= r.End; i++ {
-			if loc := c.locationStack.pop(); loc.onRegister() {
-				c.locationStack.releaseRegister(loc)
-			}
-		}
-		return nil
-	}
-
-	var liveValues []*runtimeValueLocation
-	for i := 0; i < r.Start; i++ {
-		live := c.locationStack.pop()
-		liveValues = append(liveValues, live)
-	}
-	for i := 0; i < r.End-r.Start+1; i++ {
-		if loc := c.locationStack.pop(); loc.onRegister() {
-			c.locationStack.releaseRegister(loc)
-		}
-	}
-	for i := range liveValues {
-		live := liveValues[len(liveValues)-1-i]
-
-		// If the value is on a memory, we have to move it to a register,
-		// otherwise the memory location is overridden by other values
-		// after this drop instruction.
-		if err := c.compileEnsureOnRegister(live); err != nil {
-
-			return err
-		}
-
-		// Modify the location in the stack with new stack pointer.
-		c.locationStack.push(live)
-	}
-	return nil
+	return compileDropRange(c, o.Depth)
 }
 
 // compileSelectV128Impl implements compileSelect for vector values.
@@ -4221,6 +4191,7 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return nil
 }
 
+// compileLoadValueOnStackToRegister implements compiler.compileLoadValueOnStackToRegister for amd64.
 func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {
@@ -4316,10 +4287,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *runt
 	c.locationStack.markRegisterUsed(reg)
 }
 
-// allocateRegister returns an unused register of the given type. The register will be taken
-// either from the free register pool or by stealing an used register.
-// Note that resulting registers are NOT marked as used so the call site should
-// mark it used if necessary.
+// allocateRegister implements compiler.allocateRegister for amd64.
 func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
@@ -4579,7 +4547,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point: " + c.locationStack.String())
 	}
 	c.locationStack.markRegisterUsed(regs...)
 
@@ -4758,6 +4726,7 @@ func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	}
 }
 
+// compileReleaseRegisterToStack implements compiler.compileReleaseRegisterToStack for amd64.
 func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {

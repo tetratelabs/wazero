@@ -53,11 +53,11 @@ func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithWasmCore2())
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
@@ -122,8 +122,14 @@ func testHugeStack(t *testing.T, r wazero.Runtime) {
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
 
-	_, err = fn.Call(testCtx)
+	res, err := fn.Call(testCtx, 0, 0, 0, 0, 0, 0) // params ignored by wasm
 	require.NoError(t, err)
+
+	const resultNumInUint64 = 180
+	require.Equal(t, resultNumInUint64, len(res))
+	for i := uint64(1); i <= resultNumInUint64; i++ {
+		require.Equal(t, i, res[i-1])
+	}
 }
 
 // testOverflow ensures that adding one into the maximum integer results in the
