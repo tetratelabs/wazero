@@ -3696,6 +3696,10 @@ func (c *arm64Compiler) compileLoadElemInstanceAddress(elemIndex uint32, dst asm
 
 // compileRefFunc implements compiler.compileRefFunc for the arm64 architecture.
 func (c *arm64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
