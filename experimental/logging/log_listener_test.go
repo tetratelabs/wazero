@@ -1,17 +1,21 @@
-package experimental_test
+package logging_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
+
+// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
+var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func Test_loggingListener(t *testing.T) {
 	wasiFuncName := "random_get"
@@ -261,7 +265,7 @@ func Test_loggingListener(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	lf := experimental.NewLoggingListenerFactory(&out)
+	lf := logging.NewLoggingListenerFactory(&out)
 	fn := func() {}
 	for _, tt := range tests {
 		tc := tt
@@ -288,11 +292,12 @@ func Test_loggingListener(t *testing.T) {
 				m.CodeSection = []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}}
 			}
 			m.BuildFunctionDefinitions()
+			def := m.FunctionDefinitionSection[0]
 			l := lf.NewListener(m.FunctionDefinitionSection[0])
 
 			out.Reset()
-			ctx := l.Before(testCtx, tc.params)
-			l.After(ctx, tc.err, tc.results)
+			ctx := l.Before(testCtx, def, tc.params)
+			l.After(ctx, def, tc.err, tc.results)
 			require.Equal(t, tc.expected, out.String())
 		})
 	}
@@ -311,7 +316,7 @@ func toNameMap(names []string) wasm.NameMap {
 
 func Test_loggingListener_indentation(t *testing.T) {
 	out := bytes.NewBuffer(nil)
-	lf := experimental.NewLoggingListenerFactory(out)
+	lf := logging.NewLoggingListenerFactory(out)
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{}},
 		FunctionSection: []wasm.Index{0, 0},
@@ -322,13 +327,15 @@ func Test_loggingListener_indentation(t *testing.T) {
 		},
 	}
 	m.BuildFunctionDefinitions()
-	l1 := lf.NewListener(m.FunctionDefinitionSection[0])
-	l2 := lf.NewListener(m.FunctionDefinitionSection[1])
+	def1 := m.FunctionDefinitionSection[0]
+	l1 := lf.NewListener(def1)
+	def2 := m.FunctionDefinitionSection[1]
+	l2 := lf.NewListener(def2)
 
-	ctx := l1.Before(testCtx, []uint64{})
-	ctx1 := l2.Before(ctx, []uint64{})
-	l2.After(ctx1, nil, []uint64{})
-	l1.After(ctx, nil, []uint64{})
+	ctx := l1.Before(testCtx, def1, []uint64{})
+	ctx1 := l2.Before(ctx, def2, []uint64{})
+	l2.After(ctx1, def2, nil, []uint64{})
+	l1.After(ctx, def1, nil, []uint64{})
 	require.Equal(t, `--> test.fn1()
 	--> test.fn2()
 	<-- ()

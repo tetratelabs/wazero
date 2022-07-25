@@ -1,4 +1,4 @@
-package experimental_test
+package logging_test
 
 import (
 	"context"
@@ -7,7 +7,8 @@ import (
 	"os"
 
 	"github.com/tetratelabs/wazero"
-	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
@@ -21,7 +22,7 @@ var listenerWasm []byte
 // This is a very basic integration of listener. The main goal is to show how it is configured.
 func Example_newLoggingListenerFactory() {
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(context.Background(), FunctionListenerFactoryKey{}, NewLoggingListenerFactory(os.Stdout))
+	ctx := context.WithValue(context.Background(), experimental.FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(os.Stdout))
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.

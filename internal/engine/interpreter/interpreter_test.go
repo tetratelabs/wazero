@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -65,7 +66,7 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 // et is used for tests defined in the enginetest package.
 var et = &engineTester{}
 var functionLog bytes.Buffer
-var listenerFactory = experimental.NewLoggingListenerFactory(&functionLog)
+var listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
 
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}

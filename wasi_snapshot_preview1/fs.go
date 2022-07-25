@@ -69,7 +69,7 @@ var fdAllocate = stubFunction(
 // fdClose is the WASI function named functionFdClose which closes a file
 // descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor to close
 //
@@ -107,7 +107,7 @@ var fdDatasync = stubFunction(
 // fdFdstatGet is the WASI function named functionFdFdstatGet which returns the
 // attributes of a file descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor to get the fdstat attributes data
 //   - resultFdstat: offset to write the result fdstat data
@@ -219,7 +219,7 @@ var fdPread = stubFunction(
 // fdPrestatGet is the WASI function named functionFdPrestatGet which returns
 // the prestat data of a file descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor to get the prestat
 //   - resultPrestat: offset to write the result prestat data
@@ -273,7 +273,7 @@ var fdPrestatGet = wasm.NewGoFunc(
 // fdPrestatDirName is the WASI function named functionFdPrestatDirName which
 // returns the path of the pre-opened directory of a file descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor to get the path of the pre-opened directory
 //   - path: offset in api.Memory to write the result path
@@ -289,7 +289,7 @@ var fdPrestatGet = wasm.NewGoFunc(
 //   - ErrnoNametoolong: `pathLen` is longer than the actual length of the result
 //
 // For example, the directory name corresponding with `fd` was "/tmp" and
-// parameters path=1 pathLen=4 (correct), this function will write the below to
+// # Parameters path=1 pathLen=4 (correct), this function will write the below to
 // api.Memory:
 //
 //	               pathLen
@@ -335,7 +335,7 @@ var fdPwrite = stubFunction(functionFdPwrite,
 // fdRead is the WASI function named functionFdRead which reads from a file
 // descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: an opened file descriptor to read data from
 //   - iovs: offset in api.Memory to read offset, size pairs representing where
@@ -444,7 +444,7 @@ var fdRenumber = stubFunction(
 // fdSeek is the WASI function named functionFdSeek which moves the offset of a
 // file descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor to move the offset of
 //   - offset: signed int64, which is encoded as uint64, input argument to
@@ -531,7 +531,7 @@ var fdTell = stubFunction(
 // fdWrite is the WASI function named functionFdWrite which writes to a file
 // descriptor.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: an opened file descriptor to write data to
 //   - iovs: offset in api.Memory to read offset, size pairs representing the
@@ -668,7 +668,7 @@ var pathLink = stubFunction(
 // pathOpen is the WASI function named functionPathOpen which opens a file or
 // directory. This returns ErrnoBadf if the fd is invalid.
 //
-// Parameters
+// # Parameters
 //
 //   - fd: file descriptor of a directory that `path` is relative to
 //   - dirflags: flags to indicate how to resolve `path`
@@ -713,7 +713,7 @@ var pathLink = stubFunction(
 //	[]byte{ 0..6, ?, 5, 0, 0, 0, ?}
 //	resultOpenedFd --^
 //
-// Notes
+// # Notes
 //   - This is similar to `openat` in POSIX. https://linux.die.net/man/3/openat
 //   - The returned file descriptor is not guaranteed to be the lowest-number
 //   - Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844

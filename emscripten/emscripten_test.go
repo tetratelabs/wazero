@@ -8,6 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	. "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/sys"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
@@ -26,7 +27,7 @@ func TestGrow(t *testing.T) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
-	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, NewLoggingListenerFactory(&log))
+	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx)

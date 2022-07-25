@@ -1,4 +1,4 @@
-package experimental
+package logging
 
 import (
 	"context"
@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
 // NewLoggingListenerFactory implements FunctionListenerFactory to log all
 // functions that have a name to the writer.
-func NewLoggingListenerFactory(writer io.Writer) FunctionListenerFactory {
+func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
 	return &loggingListenerFactory{writer}
 }
 
@@ -21,7 +22,7 @@ type loggingListenerFactory struct{ writer io.Writer }
 
 // NewListener implements the same method as documented on
 // experimental.FunctionListener.
-func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) FunctionListener {
+func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
 	return &loggingListener{writer: f.writer, fnd: fnd, isWasi: fnd.ModuleName() == "wasi_snapshot_preview1"}
 }
 
@@ -39,7 +40,7 @@ type loggingListener struct {
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
 // indented based on the call nesting level.
-func (l *loggingListener) Before(ctx context.Context, vals []uint64) context.Context {
+func (l *loggingListener) Before(ctx context.Context, _ api.FunctionDefinition, vals []uint64) context.Context {
 	nestLevel, _ := ctx.Value(nestLevelKey{}).(int)
 
 	l.writeIndented(true, nil, vals, nestLevel+1)
@@ -50,7 +51,7 @@ func (l *loggingListener) Before(ctx context.Context, vals []uint64) context.Con
 
 // After logs to stdout the module and function name, prefixed with '<--' and
 // indented based on the call nesting level.
-func (l *loggingListener) After(ctx context.Context, err error, vals []uint64) {
+func (l *loggingListener) After(ctx context.Context, _ api.FunctionDefinition, err error, vals []uint64) {
 	// Note: We use the nest level directly even though it is the "next" nesting level.
 	// This works because our indent of zero nesting is one tab.
 	l.writeIndented(false, err, vals, ctx.Value(nestLevelKey{}).(int))

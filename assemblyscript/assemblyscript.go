@@ -47,7 +47,7 @@ const (
 // Instantiate instantiates the "env" module used by AssemblyScript into the
 // runtime default namespace.
 //
-// Notes
+// # Notes
 //
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To add more functions to the "env" module, use FunctionExporter.

@@ -38,10 +38,10 @@ type CallContext struct {
 	// Sys is exposed for use in special imports such as WASI, assemblyscript
 	// and wasm_exec.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* This is a part of CallContext so that scope and Close is coherent.
-	//	* This is not exposed outside this repository (as a host function
+	//   - This is a part of CallContext so that scope and Close is coherent.
+	//   - This is not exposed outside this repository (as a host function
 	//	  parameter) because we haven't thought through capabilities based
 	//	  security implications.
 	Sys *internalsys.Context
