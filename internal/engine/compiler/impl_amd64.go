@@ -4061,6 +4061,10 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 // compileTableSize implements compiler.compileTableSize for the amd64 architecture.
 func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
