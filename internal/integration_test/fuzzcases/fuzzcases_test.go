@@ -29,6 +29,8 @@ var (
 	case709 []byte
 	//go:embed testdata/715.wasm
 	case715 []byte
+	//go:embed testdata/716.wasm
+	case716 []byte
 )
 
 func runWithCompiler(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
@@ -152,6 +154,20 @@ func Test715(t *testing.T) {
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("select on conditional value after table.size")
+		require.NotNil(t, f)
+		res, err := f.Call(ctx)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), res[0])
+	})
+}
+
+func Test716(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, case716)
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("select on ref.func")
 		require.NotNil(t, f)
 		res, err := f.Call(ctx)
 		require.NoError(t, err)
