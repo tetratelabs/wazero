@@ -38,8 +38,9 @@ func Example_functionExporter() {
 		ExportFunction("get_int", func() uint32 { return 1 })
 
 	// Now, add AssemblyScript special function imports into it.
-	envBuilder.ExportFunctions(assemblyscript.NewFunctionExporter().
-		WithAbortMessageDisabled().ExportFunctions())
+	assemblyscript.NewFunctionExporter().
+		WithAbortMessageDisabled().
+		ExportFunctions(envBuilder)
 
 	// Output:
 }

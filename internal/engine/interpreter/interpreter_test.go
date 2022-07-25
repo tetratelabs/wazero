@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -8,6 +9,8 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -24,7 +27,7 @@ func TestInterpreter_peekValues(t *testing.T) {
 
 	ce.stack = []uint64{5, 4, 3, 2, 1}
 	require.Nil(t, ce.peekValues(0))
-	require.Equal(t, []uint64{1, 2}, ce.peekValues(2))
+	require.Equal(t, []uint64{2, 1}, ce.peekValues(2))
 }
 
 func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
@@ -62,9 +65,21 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 
 // et is used for tests defined in the enginetest package.
 var et = &engineTester{}
+var functionLog bytes.Buffer
+var listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
 
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
+
+// IsCompiler implements enginetest.EngineTester NewEngine.
+func (e engineTester) IsCompiler() bool {
+	return false
+}
+
+// ListenerFactory implements enginetest.EngineTester NewEngine.
+func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
+	return listenerFactory
+}
 
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
@@ -107,15 +122,81 @@ func TestInterpreter_Engine_NewModuleEngine_InitTable(t *testing.T) {
 }
 
 func TestInterpreter_ModuleEngine_Call(t *testing.T) {
+	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_Call(t, et)
+	require.Equal(t, `
+--> .$0(1,2)
+<-- (1,2)
+`, "\n"+functionLog.String())
 }
 
 func TestInterpreter_ModuleEngine_Call_HostFn(t *testing.T) {
+	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
+	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
+
+	// TODO: Currently, the listener doesn't get notified on errors as they are
+	// implemented with panic. This means the end hooks aren't make resulting
+	// in dangling logs like this:
+	//	==> host.host_div_by(4294967295)
+	// instead of seeing a return like
+	//	<== DivByZero
+	require.Equal(t, `
+==> host.div_by.go(1)
+<== (1)
+==> host.div_by.go(1)
+<== (1)
+--> imported.div_by.wasm(1)
+<-- (1)
+--> imported.div_by.wasm(1)
+<-- (1)
+--> imported.div_by.wasm(0)
+--> imported.div_by.wasm(1)
+<-- (1)
+==> host.div_by.go(4294967295)
+==> host.div_by.go(1)
+<== (1)
+==> host.div_by.go(0)
+==> host.div_by.go(1)
+<== (1)
+--> imported.call->div_by.go(4294967295)
+	==> host.div_by.go(4294967295)
+--> imported.call->div_by.go(1)
+	==> host.div_by.go(1)
+	<== (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(0)
+	--> imported.call->div_by.go(0)
+		==> host.div_by.go(0)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(4294967295)
+	--> imported.call->div_by.go(4294967295)
+		==> host.div_by.go(4294967295)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(0)
+	--> imported.call->div_by.go(0)
+		==> host.div_by.go(0)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+`, "\n"+functionLog.String())
 }
 
 func TestInterpreter_ModuleEngine_Memory(t *testing.T) {

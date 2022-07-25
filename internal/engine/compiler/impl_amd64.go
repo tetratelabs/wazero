@@ -108,6 +108,11 @@ func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
 	return c, nil
 }
 
+// runtimeValueLocationStack implements compilerImpl.runtimeValueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) runtimeValueLocationStack() *runtimeValueLocationStack {
+	return c.locationStack
+}
+
 // setLocationStack sets the given runtimeValueLocationStack to .locationStack field,
 // while allowing us to track runtimeValueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
@@ -118,15 +123,19 @@ func (c *amd64Compiler) setLocationStack(newStack *runtimeValueLocationStack) {
 	c.locationStack = newStack
 }
 
+// pushRuntimeValueLocationOnRegister implements compiler.pushRuntimeValueLocationOnRegister for amd64.
 func (c *amd64Compiler) pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation) {
 	ret = c.locationStack.pushRuntimeValueLocationOnRegister(reg, vt)
 	c.locationStack.markRegisterUsed(reg)
 	return
 }
-func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) {
-	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
+
+// pushVectorRuntimeValueLocationOnRegister implements compiler.pushVectorRuntimeValueLocationOnRegister for amd64.
+func (c *amd64Compiler) pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation) {
+	lowerBitsLocation = c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Lo)
 	c.locationStack.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeV128Hi)
 	c.locationStack.markRegisterUsed(reg)
+	return
 }
 
 type amd64LabelInfo struct {
@@ -480,7 +489,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Handle then branch.
 	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
-	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
+	if err := compileDropRange(c, thenTarget.ToDrop); err != nil {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
@@ -515,7 +524,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
-		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+		if err := compileDropRange(c, o.Default.ToDrop); err != nil {
 			return err
 		}
 		return c.branchInto(o.Default.Target)
@@ -617,7 +626,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved
 		}
 		c.setLocationStack(locationStack)
-		if err := c.emitDropRange(target.ToDrop); err != nil {
+		if err := compileDropRange(c, target.ToDrop); err != nil {
 			return err
 		}
 		if err := c.branchInto(target.Target); err != nil {
@@ -829,45 +838,39 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.emitDropRange(o.Depth)
+	return compileDropRange(c, o.Depth)
 }
 
-func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
-	if r == nil {
-		return nil
-	} else if r.Start == 0 {
-		for i := 0; i <= r.End; i++ {
-			if loc := c.locationStack.pop(); loc.onRegister() {
-				c.locationStack.releaseRegister(loc)
-			}
-		}
-		return nil
+// compileSelectV128Impl implements compileSelect for vector values.
+func (c *amd64Compiler) compileSelectV128Impl(selectorReg asm.Register) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x2); err != nil {
+		return err
 	}
 
-	var liveValues []*runtimeValueLocation
-	for i := 0; i < r.Start; i++ {
-		live := c.locationStack.pop()
-		liveValues = append(liveValues, live)
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x1); err != nil {
+		return err
 	}
-	for i := 0; i < r.End-r.Start+1; i++ {
-		if loc := c.locationStack.pop(); loc.onRegister() {
-			c.locationStack.releaseRegister(loc)
-		}
-	}
-	for i := range liveValues {
-		live := liveValues[len(liveValues)-1-i]
 
-		// If the value is on a memory, we have to move it to a register,
-		// otherwise the memory location is overridden by other values
-		// after this drop instruction.
-		if err := c.compileEnsureOnRegister(live); err != nil {
+	// Compare the conditional value with zero.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, selectorReg, 0)
 
-			return err
-		}
+	// Set the jump if the top value is not zero.
+	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
 
-		// Modify the location in the stack with new stack pointer.
-		c.locationStack.push(live)
-	}
+	// In this branch, we select the value of x2, so we move the value into x1.register so that
+	// we can have the result in x1.register regardless of the selection.
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQU, x2.register, x1.register)
+
+	// Else, we don't need to adjust value, just need to jump to the next instruction.
+	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
+
+	// As noted, the result exists in x1.register regardless of the selector.
+	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	// Plus, x2.register is no longer used.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(selectorReg)
 	return nil
 }
 
@@ -875,10 +878,14 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 //
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
-func (c *amd64Compiler) compileSelect() error {
+func (c *amd64Compiler) compileSelect(o *wazeroir.OperationSelect) error {
 	cv := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(cv); err != nil {
 		return err
+	}
+
+	if o.IsTargetVector {
+		return c.compileSelectV128Impl(cv.register)
 	}
 
 	x2 := c.locationStack.pop()
@@ -1064,9 +1071,10 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // Here, we mean "the overflow info" by 65 bit or higher part of the result for 64 bit case.
 //
 // So, we have to ensure that
-// 1) Previously located value on DX must be saved to memory stack. That is because
-//    the existing value will be overridden after the mul execution.
-// 2) One of the operands (x1 or x2) must be on AX register.
+//  1. Previously located value on DX must be saved to memory stack. That is because
+//     the existing value will be overridden after the mul execution.
+//  2. One of the operands (x1 or x2) must be on AX register.
+//
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instruction) error {
 	const (
@@ -2000,7 +2008,9 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 // According to the Intel manual ([1],[2]), if the source float value is either +-Inf or NaN, or it exceeds representative ranges
 // of target signed integer, then the instruction returns "masked" response float32SignBitMask (or float64SignBitMask for 64 bit case).
 // [1] Chapter 11.5.2, SIMD Floating-Point Exception Conditions in "Vol 1, Intel® 64 and IA-32 Architectures Manual"
-//     https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
+//
+//	https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
+//
 // [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
 func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (err error) {
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
@@ -4121,6 +4131,10 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 // compileTableSize implements compiler.compileTableSize for the amd64 architecture.
 func (c *amd64Compiler) compileTableSize(o *wazeroir.OperationTableSize) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	result, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -4152,6 +4166,10 @@ func (c *amd64Compiler) compileTableFill(o *wazeroir.OperationTableFill) error {
 
 // compileRefFunc implements compiler.compileRefFunc for the amd64 architecture.
 func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	ref, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
@@ -4254,6 +4272,7 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return nil
 }
 
+// compileLoadValueOnStackToRegister implements compiler.compileLoadValueOnStackToRegister for amd64.
 func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {
@@ -4349,10 +4368,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *runt
 	c.locationStack.markRegisterUsed(reg)
 }
 
-// allocateRegister returns an unused register of the given type. The register will be taken
-// either from the free register pool or by stealing an used register.
-// Note that resulting registers are NOT marked as used so the call site should
-// mark it used if necessary.
+// allocateRegister implements compiler.allocateRegister for amd64.
 func (c *amd64Compiler) allocateRegister(t registerType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
@@ -4612,7 +4628,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 3)
 	if !found {
-		return fmt.Errorf("BUG: all the registers should be free at this point")
+		panic("BUG: all the registers should be free at this point: " + c.locationStack.String())
 	}
 	c.locationStack.markRegisterUsed(regs...)
 
@@ -4791,6 +4807,7 @@ func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	}
 }
 
+// compileReleaseRegisterToStack implements compiler.compileReleaseRegisterToStack for amd64.
 func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
 	var inst asm.Instruction
 	switch loc.valueType {
@@ -5025,7 +5042,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update dataInstancesElement0Address.
-	if c.ir.NeedsAccessToDataInstances {
+	if c.ir.HasDataInstances {
 		// "tmpRegister = &moduleInstance.DataInstances[0]"
 		c.assembler.CompileMemoryToRegister(
 			amd64.MOVQ,
@@ -5041,7 +5058,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	}
 
 	// Update callEngine.moduleContext.elementInstancesElement0Address
-	if c.ir.NeedsAccessToElementInstances {
+	if c.ir.HasElementInstances {
 		// "tmpRegister = &moduleInstance.ElementInstnaces[0]"
 		c.assembler.CompileMemoryToRegister(
 			amd64.MOVQ,

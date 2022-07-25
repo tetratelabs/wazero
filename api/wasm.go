@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -53,11 +54,11 @@ func ExternTypeName(et ExternType) string {
 //
 // The following describes how to convert between Wasm and Golang types:
 //
-//	* ValueTypeI32 - uint64(uint32,int32)
-//	* ValueTypeI64 - uint64(int64)
-//	* ValueTypeF32 - EncodeF32 DecodeF32 from float32
-//	* ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//	* ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
+//   - ValueTypeI32 - uint64(uint32,int32)
+//   - ValueTypeI64 - uint64(int64)
+//   - ValueTypeF32 - EncodeF32 DecodeF32 from float32
+//   - ValueTypeF64 - EncodeF64 DecodeF64 from float64
+//   - ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
 //
 // Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
 //
@@ -83,12 +84,17 @@ const (
 	ValueTypeF32 ValueType = 0x7d
 	// ValueTypeF64 is a 64-bit floating point number.
 	ValueTypeF64 ValueType = 0x7c
+
 	// ValueTypeExternref is a externref type.
 	//
-	// Note: in wazero, externref type value are opaque raw 64-bit pointers, and the ValueTypeExternref type
-	// in the signature will be translated as uintptr in wazero's API level.
-	// For example, the import function `(func (import "env" "f") (param externref) (result externref))` can be defined in Go as:
+	// Note: in wazero, externref type value are opaque raw 64-bit pointers,
+	// and the ValueTypeExternref type in the signature will be translated as
+	// uintptr in wazero's API level.
 	//
+	// For example, given the import function:
+	//	(func (import "env" "f") (param externref) (result externref))
+	//
+	// This can be defined in Go as:
 	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
 	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
 	//  })
@@ -119,10 +125,10 @@ func ValueTypeName(t ValueType) string {
 
 // Module return functions exported in a module, post-instantiation.
 //
-// Notes
+// # Notes
 //
-//	* Closing the wazero.Runtime closes any Module it instantiated.
-//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//   - Closing the wazero.Runtime closes any Module it instantiated.
+//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {
@@ -222,6 +228,17 @@ type FunctionDefinition interface {
 	// is possible.
 	ExportNames() []string
 
+	// GoFunc is present when the function was implemented by the embedder
+	// (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	//
+	// This function can be non-deterministic or cause side effects. It also
+	// has special properties not defined in the WebAssembly Core
+	// specification. Notably, it uses the caller's memory, which might be
+	// different from its defining module.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
+	GoFunc() *reflect.Value
+
 	// ParamTypes are the possibly empty sequence of value types accepted by a
 	// function with this signature.
 	//
@@ -299,11 +316,11 @@ type MutableGlobal interface {
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
-// Notes
+// # Notes
 //
-//	* All functions accept a context.Context, which when nil, default to context.Background.
-//	* This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-//	* This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
+//   - All functions accept a context.Context, which when nil, default to context.Background.
+//   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
+//   - This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
@@ -317,11 +334,11 @@ type Memory interface {
 	// The return val is the previous memory size in pages, or false if the
 	// delta was ignored as it exceeds max memory.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* This is the same as the "memory.grow" instruction defined in the
+	//   - This is the same as the "memory.grow" instruction defined in the
 	//	  WebAssembly Core Specification, except returns false instead of -1.
-	//	* When this returns true, any shared views via Read must be refreshed.
+	//   - When this returns true, any shared views via Read must be refreshed.
 	//
 	// See MemorySizer Read and https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	Grow(ctx context.Context, deltaPages uint32) (previousPages uint32, ok bool)
@@ -472,6 +489,7 @@ func DecodeF64(input uint64) float64 {
 // This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
 //
 // Ex. Here's how to set the capacity to max instead of min, when set:
+//
 //	capIsMax := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
 //		if maxPages != nil {
 //			return minPages, *maxPages, *maxPages

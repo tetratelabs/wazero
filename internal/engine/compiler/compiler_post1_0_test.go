@@ -398,7 +398,7 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			copy(env.module().DataInstances, origins)
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				NeedsAccessToDataInstances: true, Signature: &wasm.FunctionType{}})
+				HasDataInstances: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -472,7 +472,7 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 			env.module().DataInstances = dataInstances
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				NeedsAccessToDataInstances: true, HasMemory: true,
+				HasDataInstances: true, HasMemory: true,
 				Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
@@ -537,7 +537,7 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			}
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				NeedsAccessToElementInstances: true, Signature: &wasm.FunctionType{}})
+				HasElementInstances: true, Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -699,7 +699,7 @@ func TestCompiler_compileTableInit(t *testing.T) {
 			env.module().ElementInstances = elementInstances
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				NeedsAccessToElementInstances: true, HasTable: true,
+				HasElementInstances: true, HasTable: true,
 				Signature: &wasm.FunctionType{}})
 
 			err := compiler.compilePreamble()

@@ -64,8 +64,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	declaredFunctionIndexes map[Index]struct{},
 ) error {
 	functionType := m.TypeSection[m.FunctionSection[idx]]
-	body := m.CodeSection[idx].Body
-	localTypes := m.CodeSection[idx].LocalTypes
+	code := m.CodeSection[idx]
+	body := code.Body
+	localTypes := code.LocalTypes
 	types := m.TypeSection
 
 	// We start with the outermost control block which is for function return if the code branches into it.
@@ -90,8 +91,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 		}
 
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
-			if memory == nil {
-				return fmt.Errorf("unknown memory access")
+			if memory == nil && !code.IsHostFunction {
+				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
 			align, _, read, err := readMemArg(pc, body)
@@ -272,8 +273,8 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 			}
 		} else if OpcodeMemorySize <= op && op <= OpcodeMemoryGrow {
-			if memory == nil {
-				return fmt.Errorf("unknown memory access")
+			if memory == nil && !code.IsHostFunction {
+				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
 			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
@@ -393,11 +394,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
-			targetResultType := target.blockType.Results
+			var targetResultType []ValueType
 			if target.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
-				targetResultType = []ValueType{}
+				targetResultType = target.blockType.Params
+			} else {
+				targetResultType = target.blockType.Results
 			}
 			if err = valueTypeStack.popResults(op, targetResultType, false); err != nil {
 				return err
@@ -411,7 +412,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for %s: index=%d with %d for the current lable stack length",
+					"invalid ln param given for %s: index=%d with %d for the current label stack length",
 					OpcodeBrIfName, index, len(controlBlockStack))
 			}
 			pc += num - 1
@@ -420,11 +421,11 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 			// Check type soundness.
 			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
-			targetResultType := target.blockType.Results
+			var targetResultType []ValueType
 			if target.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
-				targetResultType = []ValueType{}
+				targetResultType = target.blockType.Params
+			} else {
+				targetResultType = target.blockType.Results
 			}
 			if err := valueTypeStack.popResults(op, targetResultType, false); err != nil {
 				return err
@@ -455,7 +456,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("read immediate: %w", err)
 			} else if int(ln) >= len(controlBlockStack) {
 				return fmt.Errorf(
-					"invalid ln param given for %s: ln=%d with %d for the current lable stack length",
+					"invalid ln param given for %s: ln=%d with %d for the current label stack length",
 					OpcodeBrTableName, ln, len(controlBlockStack))
 			}
 			pc += n + num - 1
@@ -464,33 +465,39 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("cannot pop the required operand for %s", OpcodeBrTableName)
 			}
 			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
-			expTypes := lnLabel.blockType.Results
-			if lnLabel.op == OpcodeLoop {
-				// Loop operation doesn't require results since the continuation is
-				// the beginning of the loop.
-				expTypes = []ValueType{}
+			var defaultLabelType []ValueType
+			// Below, we might modify the slice in case of unreachable. Therefore,
+			// we have to copy the content of block result types, otherwise the original
+			// function type might result in invalid value types if the block is the outermost label
+			// which equals the function's type.
+			if lnLabel.op != OpcodeLoop { // Loop operation doesn't require results since the continuation is the beginning of the loop.
+				defaultLabelType = make([]ValueType, len(lnLabel.blockType.Results))
+				copy(defaultLabelType, lnLabel.blockType.Results)
+			} else {
+				defaultLabelType = make([]ValueType, len(lnLabel.blockType.Params))
+				copy(defaultLabelType, lnLabel.blockType.Params)
 			}
 
 			if enabledFeatures.Get(FeatureReferenceTypes) {
 				// As of reference-types proposal, br_table on unreachable state
 				// can choose unknown types for expected parameter types for each label.
 				// https://github.com/WebAssembly/reference-types/pull/116
-				for i := range expTypes {
-					index := len(expTypes) - 1 - i
-					exp := expTypes[index]
+				for i := range defaultLabelType {
+					index := len(defaultLabelType) - 1 - i
+					exp := defaultLabelType[index]
 					actual, err := valueTypeStack.pop()
 					if err != nil {
 						return err
 					}
 					if actual == valueTypeUnknown {
 						// Re-assign the expected type to unknown.
-						expTypes[index] = valueTypeUnknown
+						defaultLabelType[index] = valueTypeUnknown
 					} else if actual != exp {
 						return typeMismatchError(true, OpcodeBrTableName, actual, exp, i)
 					}
 				}
 			} else {
-				if err = valueTypeStack.popResults(op, expTypes, false); err != nil {
+				if err = valueTypeStack.popResults(op, defaultLabelType, false); err != nil {
 					return err
 				}
 			}
@@ -500,17 +507,17 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("invalid l param given for %s", OpcodeBrTableName)
 				}
 				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
-				expType2 := label.blockType.Results
-				if label.op == OpcodeLoop {
-					// Loop operation doesn't require results since the continuation is
-					// the beginning of the loop.
-					expType2 = []ValueType{}
+				var tableLabelType []ValueType
+				if label.op != OpcodeLoop {
+					tableLabelType = label.blockType.Results
+				} else {
+					tableLabelType = label.blockType.Params
 				}
-				if len(expTypes) != len(expType2) {
-					return fmt.Errorf("incosistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, expTypes, ln, expType2, l)
+				if len(defaultLabelType) != len(tableLabelType) {
+					return fmt.Errorf("inconsistent block type length for %s at %d; %v (ln=%d) != %v (l=%d)", OpcodeBrTableName, l, defaultLabelType, ln, tableLabelType, l)
 				}
-				for i := range expTypes {
-					if expTypes[i] != valueTypeUnknown && expTypes[i] != expType2[i] {
+				for i := range defaultLabelType {
+					if defaultLabelType[i] != valueTypeUnknown && defaultLabelType[i] != tableLabelType[i] {
 						return fmt.Errorf("incosistent block type for %s at %d", OpcodeBrTableName, l)
 					}
 				}
@@ -1094,7 +1101,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				OpcodeVecV128Load32x2s, OpcodeVecV128Load32x2u, OpcodeVecV128Load8Splat, OpcodeVecV128Load16Splat,
 				OpcodeVecV128Load32Splat, OpcodeVecV128Load64Splat,
 				OpcodeVecV128Load32zero, OpcodeVecV128Load64zero:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				pc++
@@ -1132,7 +1139,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				pc++
@@ -1151,7 +1158,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					return fmt.Errorf("cannot pop the operand for %s: %v", OpcodeVecV128StoreName, err)
 				}
 			case OpcodeVecV128Load8Lane, OpcodeVecV128Load16Lane, OpcodeVecV128Load32Lane, OpcodeVecV128Load64Lane:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				attr := vecLoadLanes[vecOpcode]
@@ -1179,7 +1186,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 				valueTypeStack.push(ValueTypeV128)
 			case OpcodeVecV128Store8Lane, OpcodeVecV128Store16Lane, OpcodeVecV128Store32Lane, OpcodeVecV128Store64Lane:
-				if memory == nil {
+				if memory == nil && !code.IsHostFunction {
 					return fmt.Errorf("memory must exist for %s", VectorInstructionName(vecOpcode))
 				}
 				attr := vecStoreLanes[vecOpcode]
@@ -1522,7 +1529,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				pc++
 				tp := body[pc]
 				if tp != ValueTypeI32 && tp != ValueTypeI64 && tp != ValueTypeF32 && tp != ValueTypeF64 &&
-					tp != api.ValueTypeExternref && tp != ValueTypeFuncref {
+					tp != api.ValueTypeExternref && tp != ValueTypeFuncref && tp != ValueTypeV128 {
 					return fmt.Errorf("invalid type %s for %s", ValueTypeName(tp), OpcodeTypedSelectName)
 				}
 			} else if isReferenceValueType(v1) || isReferenceValueType(v2) {

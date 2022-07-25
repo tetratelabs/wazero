@@ -3,7 +3,6 @@ package wasm
 import (
 	"context"
 	"math"
-	"reflect"
 	"testing"
 	"unsafe"
 
@@ -14,7 +13,7 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-func TestGetFunctionType(t *testing.T) {
+func Test_parseGoFunc(t *testing.T) {
 	var tests = []struct {
 		name         string
 		inputFunc    interface{}
@@ -25,31 +24,31 @@ func TestGetFunctionType(t *testing.T) {
 			name:         "nullary",
 			inputFunc:    func() {},
 			expectedKind: FunctionKindGoNoContext,
-			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+			expectedType: &FunctionType{},
 		},
 		{
 			name:         "wasm.Module void return",
 			inputFunc:    func(api.Module) {},
 			expectedKind: FunctionKindGoModule,
-			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+			expectedType: &FunctionType{},
 		},
 		{
 			name:         "context.Context void return",
 			inputFunc:    func(context.Context) {},
 			expectedKind: FunctionKindGoContext,
-			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+			expectedType: &FunctionType{},
 		},
 		{
 			name:         "context.Context and api.Module void return",
 			inputFunc:    func(context.Context, api.Module) {},
 			expectedKind: FunctionKindGoContextModule,
-			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+			expectedType: &FunctionType{},
 		},
 		{
 			name:         "all supported params and i32 result",
 			inputFunc:    func(uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoNoContext,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 		{
 			name: "all supported params and all supported results",
@@ -58,44 +57,42 @@ func TestGetFunctionType(t *testing.T) {
 			},
 			expectedKind: FunctionKindGoNoContext,
 			expectedType: &FunctionType{
-				Params:           []ValueType{i32, i64, f32, f64, externref},
-				Results:          []ValueType{i32, i64, f32, f64, externref},
-				ParamNumInUint64: 5, ResultNumInUint64: 5,
+				Params:  []ValueType{i32, i64, f32, f64, externref},
+				Results: []ValueType{i32, i64, f32, f64, externref},
 			},
 		},
 		{
 			name:         "all supported params and i32 result - wasm.Module",
 			inputFunc:    func(api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoModule,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 		{
 			name:         "all supported params and i32 result - context.Context",
 			inputFunc:    func(context.Context, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoContext,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 		{
 			name:         "all supported params and i32 result - context.Context and api.Module",
 			inputFunc:    func(context.Context, api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedKind: FunctionKindGoContextModule,
-			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}, ParamNumInUint64: 5, ResultNumInUint64: 1},
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 	}
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			rVal := reflect.ValueOf(tc.inputFunc)
-			fk, ft, err := getFunctionType(&rVal, Features20191205|FeatureMultiValue)
+			paramTypes, resultTypes, code, err := parseGoFunc(tc.inputFunc)
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedKind, fk)
-			require.Equal(t, tc.expectedType, ft)
+			require.Equal(t, tc.expectedKind, code.Kind)
+			require.Equal(t, tc.expectedType, &FunctionType{Params: paramTypes, Results: resultTypes})
 		})
 	}
 }
 
-func TestGetFunctionTypeErrors(t *testing.T) {
+func Test_parseGoFunc_Errors(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            interface{}
@@ -123,11 +120,6 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 			expectedErr: "result[0] is an error, which is unsupported",
 		},
 		{
-			name:        "multiple results - multi-value not enabled",
-			input:       func() (uint64, uint32) { return 0, 0 },
-			expectedErr: "multiple result types invalid as feature \"multi-value\" is disabled",
-		},
-		{
 			name:        "multiple context types",
 			input:       func(api.Module, context.Context) error { return nil },
 			expectedErr: "param[1] is a context.Context, which may be defined only once as param[0]",
@@ -148,8 +140,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			rVal := reflect.ValueOf(tc.input)
-			_, _, err := getFunctionType(&rVal, Features20191205)
+			_, _, _, err := parseGoFunc(tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -253,11 +244,10 @@ func TestPopGoFuncParams(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, Features20220419)
+			_, _, code, err := parseGoFunc(tc.inputFunc)
 			require.NoError(t, err)
 
-			vals := PopGoFuncParams(&FunctionInstance{Kind: fk, GoFunc: &goFunc}, (&stack{stackVals}).pop)
+			vals := PopGoFuncParams(&FunctionInstance{Kind: code.Kind, GoFunc: code.GoFunc}, (&stack{stackVals}).pop)
 			require.Equal(t, tc.expected, vals)
 		})
 	}
@@ -406,11 +396,20 @@ func TestCallGoFunc(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			goFunc := reflect.ValueOf(tc.inputFunc)
-			fk, _, err := getFunctionType(&goFunc, Features20220419)
+			paramTypes, resultTypes, code, err := parseGoFunc(tc.inputFunc)
 			require.NoError(t, err)
 
-			results := CallGoFunc(testCtx, callCtx, &FunctionInstance{Kind: fk, GoFunc: &goFunc}, tc.inputParams)
+			results := CallGoFunc(
+				testCtx,
+				callCtx,
+				&FunctionInstance{
+					IsHostFunction: code.IsHostFunction,
+					Kind:           code.Kind,
+					Type:           &FunctionType{Params: paramTypes, Results: resultTypes},
+					GoFunc:         code.GoFunc,
+				},
+				tc.inputParams,
+			)
 			require.Equal(t, tc.expectedResults, results)
 		})
 	}

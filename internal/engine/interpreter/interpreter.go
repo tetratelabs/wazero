@@ -111,18 +111,13 @@ func (ce *callEngine) popValue() (v uint64) {
 	return
 }
 
-// peekValues peeks api.ValueType values from the stack and returns them in reverse order.
+// peekValues peeks api.ValueType values from the stack and returns them.
 func (ce *callEngine) peekValues(count int) []uint64 {
 	if count == 0 {
 		return nil
 	}
 	stackLen := len(ce.stack)
-	peeked := ce.stack[stackLen-count : stackLen]
-	values := make([]uint64, 0, count)
-	for i := count - 1; i >= 0; i-- {
-		values = append(values, peeked[i])
-	}
-	return values
+	return ce.stack[stackLen-count : stackLen]
 }
 
 func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
@@ -220,24 +215,21 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	}
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
-	if module.IsHostModule() {
-		// If this is the host module, there's nothing to do as the runtime representation of
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	if err != nil {
+		return err
+	}
+	for i, ir := range irs {
+		// If this is the host function, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
-		for _, hf := range module.HostFunctionSection {
-			funcs = append(funcs, &code{hostFn: hf})
-		}
-	} else {
-		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
-		if err != nil {
-			return err
-		}
-		for i, ir := range irs {
-			compiled, err := e.lowerIR(ir)
-			if err != nil {
-				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
-				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
-			}
+		if ir.GoFunc != nil {
+			funcs = append(funcs, &code{hostFn: ir.GoFunc})
+			continue
+		} else if compiled, err := e.lowerIR(ir); err != nil {
+			def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
+			return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
+		} else {
 			funcs = append(funcs, compiled)
 		}
 	}
@@ -388,6 +380,7 @@ func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Depth
 		case *wazeroir.OperationSelect:
+			op.b3 = o.IsTargetVector
 		case *wazeroir.OperationPick:
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(o.Depth)
@@ -816,12 +809,9 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
-	if len(ce.frames) > 0 {
-		// Use the caller's memory, which might be different from the defining module on an imported function.
-		callCtx = callCtx.WithMemory(ce.frames[len(ce.frames)-1].f.source.Module.Memory)
-	}
+	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if f.source.FunctionListener != nil {
-		ctx = f.source.FunctionListener.Before(ctx, params)
+		ctx = f.source.FunctionListener.Before(ctx, f.source.Definition(), params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -829,7 +819,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	ce.popFrame()
 	if f.source.FunctionListener != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
-		f.source.FunctionListener.After(ctx, nil, results)
+		f.source.FunctionListener.After(ctx, f.source.Definition(), nil, results)
 	}
 	return
 }
@@ -837,11 +827,19 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	frame := &callFrame{f: f}
 	moduleInst := f.source.Module
-	memoryInst := moduleInst.Memory
+	functions := moduleInst.Engine.(*moduleEngine).functions
+	var memoryInst *wasm.MemoryInstance
+	if f.source.IsHostFunction {
+		if memoryInst = ce.callerMemory(); memoryInst == nil {
+			// If there was no caller, someone called a host function directly.
+			memoryInst = callCtx.Memory().(*wasm.MemoryInstance)
+		}
+	} else {
+		memoryInst = moduleInst.Memory
+	}
 	globals := moduleInst.Globals
 	tables := moduleInst.Tables
 	typeIDs := f.source.Module.TypeIDs
-	functions := f.source.Module.Engine.(*moduleEngine).functions
 	dataInstances := f.source.Module.DataInstances
 	elementInstances := f.source.Module.ElementInstances
 	ce.pushFrame(frame)
@@ -899,10 +897,19 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			frame.pc++
 		case wazeroir.OperationKindSelect:
 			c := ce.popValue()
-			v2 := ce.popValue()
-			if c == 0 {
-				_ = ce.popValue()
-				ce.pushValue(v2)
+			if op.b3 { // Target is vector.
+				x2Hi, x2Lo := ce.popValue(), ce.popValue()
+				if c == 0 {
+					_, _ = ce.popValue(), ce.popValue() // discard the x1's lo and hi bits.
+					ce.pushValue(x2Lo)
+					ce.pushValue(x2Hi)
+				}
+			} else {
+				v2 := ce.popValue()
+				if c == 0 {
+					_ = ce.popValue()
+					ce.pushValue(v2)
+				}
 			}
 			frame.pc++
 		case wazeroir.OperationKindPick:
@@ -1367,7 +1374,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			v1 := ce.popValue()
 			switch wazeroir.SignedInt(op.b1) {
 			case wazeroir.SignedInt32:
-				ce.pushValue(uint64(int32(v1) >> (uint32(v2) % 32)))
+				ce.pushValue(uint64(uint32(int32(v1) >> (uint32(v2) % 32))))
 			case wazeroir.SignedInt64:
 				ce.pushValue(uint64(int64(v1) >> (v2 % 64)))
 			case wazeroir.SignedUint32:
@@ -1775,11 +1782,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindSignExtend32From8:
-			v := int32(int8(ce.popValue()))
+			v := uint32(int8(ce.popValue()))
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindSignExtend32From16:
-			v := int32(int16(ce.popValue()))
+			v := uint32(int16(ce.popValue()))
 			ce.pushValue(uint64(v))
 			frame.pc++
 		case wazeroir.OperationKindSignExtend64From8:
@@ -2279,7 +2286,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 				if op.b3 {
 					// sign-extend.
-					v = uint64(int8(u8))
+					v = uint64(uint32(int8(u8)))
 				} else {
 					v = uint64(u8)
 				}
@@ -2292,7 +2299,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 				if op.b3 {
 					// sign-extend.
-					v = uint64(int16(u16))
+					v = uint64(uint32(int16(u16)))
 				} else {
 					v = uint64(u16)
 				}
@@ -2419,23 +2426,23 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 			case wazeroir.ShapeI16x8:
 				for i := 0; i < 4; i++ {
-					if int8(lo>>(i*16)) < 0 {
+					if int16(lo>>(i*16)) < 0 {
 						res |= 1 << i
 					}
 				}
 				for i := 0; i < 4; i++ {
-					if int8(hi>>(i*16)) < 0 {
+					if int16(hi>>(i*16)) < 0 {
 						res |= 1 << (i + 4)
 					}
 				}
 			case wazeroir.ShapeI32x4:
 				for i := 0; i < 2; i++ {
-					if int8(lo>>(i*32)) < 0 {
+					if int32(lo>>(i*32)) < 0 {
 						res |= 1 << i
 					}
 				}
 				for i := 0; i < 2; i++ {
-					if int8(hi>>(i*32)) < 0 {
+					if int32(hi>>(i*32)) < 0 {
 						res |= 1 << (i + 2)
 					}
 				}
@@ -3824,9 +3831,9 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(retHi)
 			frame.pc++
 		case wazeroir.OperationKindV128FloatPromote:
-			hi, lo := ce.popValue(), ce.popValue()
-			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(lo)))))
-			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(hi)))))
+			_, toPromote := ce.popValue(), ce.popValue()
+			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(toPromote)))))
+			ce.pushValue(math.Float64bits(float64(math.Float32frombits(uint32(toPromote >> 32)))))
 			frame.pc++
 		case wazeroir.OperationKindV128FloatDemote:
 			hi, lo := ce.popValue(), ce.popValue()
@@ -4083,6 +4090,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	ce.popFrame()
 }
 
+// callerMemory returns the caller context memory or nil if the host function
+// was called directly.
+func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
+	if len(ce.frames) > 0 {
+		lastFrameSource := ce.frames[len(ce.frames)-1].f.source
+		if !lastFrameSource.IsHostFunction {
+			return lastFrameSource.Module.Memory
+		}
+	}
+	return nil
+}
+
 func WasmCompatMax32bits(v1, v2 uint32) uint64 {
 	return uint64(math.Float32bits(moremath.WasmCompatMax32(
 		math.Float32frombits(v1),
@@ -4280,10 +4299,10 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, ce.peekValues(len(f.source.Type.Params)))
+	ctx = fnl.Before(ctx, f.source.Definition(), ce.peekValues(len(f.source.Type.Params)))
 	ce.callNativeFunc(ctx, callCtx, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, f.source.Definition(), nil, ce.peekValues(len(f.source.Type.Results)))
 	return ctx
 }
 

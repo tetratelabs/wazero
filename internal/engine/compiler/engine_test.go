@@ -7,6 +7,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -22,12 +23,22 @@ var et = &engineTester{}
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
 
-// NewEngine implements enginetest.EngineTester NewEngine.
+// IsCompiler implements the same method as documented on enginetest.EngineTester.
+func (e *engineTester) IsCompiler() bool {
+	return true
+}
+
+// ListenerFactory implements the same method as documented on enginetest.EngineTester.
+func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
+	return nil
+}
+
+// NewEngine implements the same method as documented on enginetest.EngineTester.
 func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
 	return newEngine(enabledFeatures)
 }
 
-// InitTables implements enginetest.EngineTester InitTables.
+// InitTables implements the same method as documented on enginetest.EngineTester.
 func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, tableInits []wasm.TableInitEntry) [][]wasm.Reference {
 	references := make([][]wasm.Reference, len(tableIndexToLen))
 	for tableIndex, l := range tableIndexToLen {
@@ -44,7 +55,7 @@ func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.
 	return references
 }
 
-// CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
+// CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
 	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
@@ -55,7 +66,7 @@ func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
-func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
+func TestCompiler_Engine_InitializeFuncrefGlobals(t *testing.T) {
 	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
 }
 
@@ -197,7 +208,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
-	}}, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
+	}}, nil, map[string]*wasm.Memory{}, map[string]*wasm.Global{}, enabledFeatures)
 	require.NoError(t, err)
 
 	err = s.Engine.CompileModule(testCtx, hm)

@@ -20,8 +20,9 @@ type onMemory func(*wasm.Memory) tokenParser
 // memoryParser parses an api.Memory from and dispatches to onMemory.
 //
 // Ex. `(module (memory 0 1024))`
-//        starts here --^     ^
-//    onMemory resumes here --+
+//
+//	    starts here --^     ^
+//	onMemory resumes here --+
 //
 // Note: memoryParser is reusable. The caller resets via begin.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
@@ -43,11 +44,13 @@ type memoryParser struct {
 // This stage records the ID of the current memory, if present, and resumes with beginMin.
 //
 // Ex. A memory ID is present `(memory $mem 0)`
-//                       records mem --^    ^
-//                  beginMin resumes here --+
+//
+//	     records mem --^    ^
+//	beginMin resumes here --+
 //
 // Ex. No memory ID `(memory 0)`
-//          calls beginMin --^
+//
+//	calls beginMin --^
 func (p *memoryParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	p.currentMemory = &wasm.Memory{}
 	if tok == tokenID { // Ex. $mem

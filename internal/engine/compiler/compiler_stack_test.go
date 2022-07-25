@@ -569,7 +569,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					}
 
 					// Now emit code for select.
-					err = compiler.compileSelect()
+					err = compiler.compileSelect(&wazeroir.OperationSelect{})
 					require.NoError(t, err)
 
 					// x1 should be top of the stack.

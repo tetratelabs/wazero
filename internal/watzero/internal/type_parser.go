@@ -16,8 +16,9 @@ type onType func(ft *wasm.FunctionType) tokenParser
 // typeParser parses a wasm.Type from and dispatches to onType.
 //
 // Ex. `(module (type (func (param i32) (result i64)))`
-//      starts here --^                             ^
-//                         onType resumes here --+
+//
+//	starts here --^                             ^
+//	                   onType resumes here --+
 //
 // Note: typeParser is reusable. The caller resets via begin.
 type typeParser struct {
@@ -58,11 +59,13 @@ type typeParser struct {
 // This stage records the ID of the current type, if present, and resumes with tryBeginFunc.
 //
 // Ex. A type ID is present `(type $t0 (func (result i32)))`
-//                    records t0 --^   ^
-//         tryBeginFunc resumes here --+
+//
+//	           records t0 --^   ^
+//	tryBeginFunc resumes here --+
 //
 // Ex. No type ID `(type (func (result i32)))`
-//  calls tryBeginFunc --^
+//
+//	calls tryBeginFunc --^
 func (p *typeParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	p.currentType = &wasm.FunctionType{}
 	if tok == tokenID { // Ex. $v_v
@@ -105,11 +108,13 @@ func (p *typeParser) beginFunc(tok tokenType, tokenBytes []byte, _, _ uint32) (t
 // parseFunc passes control to the typeParser until any signature is read, then returns parseFuncEnd.
 //
 // Ex. `(module (type $rf32 (func (result f32))))`
-//            starts here --^                 ^
-//                parseFuncEnd resumes here --+
+//
+//	starts here --^                 ^
+//	    parseFuncEnd resumes here --+
 //
 // Ex. If there is no signature `(module (type $rf32 ))`
-//                    calls parseFuncEnd here ---^
+//
+//	calls parseFuncEnd here ---^
 func (p *typeParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch tok {
 	case tokenLParen:
@@ -207,11 +212,13 @@ func (p *typeParser) beginResult(tok tokenType, tokenBytes []byte, _, _ uint32) 
 // parseParamID ignores any ID if present and resumes with parseParam .
 //
 // Ex. A param ID is present `(param $x i32)`
-//                                      ^
-//            parseParam resumes here --+
+//
+//	                          ^
+//	parseParam resumes here --+
 //
 // Ex. No param ID `(param i32)`
-//      calls parseParam --^
+//
+//	calls parseParam --^
 func (p *typeParser) parseParamID(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $len
 		p.parsedParamID = true
@@ -224,13 +231,15 @@ func (p *typeParser) parseParamID(tok tokenType, tokenBytes []byte, line, col ui
 // this returns parseMoreParamsOrResult.
 //
 // Ex. One param type is present `(param i32)`
-//                         records i32 --^  ^
-//   parseMoreParamsOrResult resumes here --+
+//
+//	                      records i32 --^  ^
+//	parseMoreParamsOrResult resumes here --+
 //
 // Ex. Multiple param types are present `(param i32 i64)`
-//                                records i32 --^   ^  ^
-//                                    records i32 --+  |
-//              parseMoreParamsOrResult resumes here --+
+//
+//	                  records i32 --^   ^  ^
+//	                      records i32 --+  |
+//	parseMoreParamsOrResult resumes here --+
 func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenID: // Ex. $len
@@ -260,13 +269,15 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) (
 // this returns parseMoreResults.
 //
 // Ex. One result type is present `(result i32)`
-//                           records i32 --^  ^
-//            parseMoreResults resumes here --+
+//
+//	               records i32 --^  ^
+//	parseMoreResults resumes here --+
 //
 // Ex. Multiple result types are present `(result i32 i64)`
-//                                  records i32 --^   ^  ^
-//                                      records i32 --+  |
-//                       parseMoreResults resumes here --+
+//
+//	           records i32 --^   ^  ^
+//	               records i32 --+  |
+//	parseMoreResults resumes here --+
 func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenID: // Ex. $len

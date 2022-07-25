@@ -74,7 +74,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 		{
 			name:                "mixed param abbreviation", // Verifies we can handle less param fields than param types
 			input:               "((param i32 i32) (param i32) (param i64) (param f32))",
-			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i64, f32}, ParamNumInUint64: 5},
+			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
 		},
 
 		// Below are changes to test/core/br.wast from the commit that added "multi-value" support.
@@ -83,73 +83,56 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 		{
 			name:                "multi-value - v_i64f32 abbreviated",
 			input:               "((result i64 f32))",
-			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}, ResultNumInUint64: 2},
+			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}},
 		},
 		{
-			name:  "multi-value - i32i64_f32f64 abbreviated",
-			input: "((param i32 i64) (result f32 f64))",
-			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64},
-				ParamNumInUint64:  2,
-				ResultNumInUint64: 2,
-			},
+			name:                "multi-value - i32i64_f32f64 abbreviated",
+			input:               "((param i32 i64) (result f32 f64))",
+			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
 		},
 		{
 			name:                "multi-value - v_i64f32",
 			input:               "((result i64) (result f32))",
-			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}, ResultNumInUint64: 2},
+			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, f32}},
 		},
 		{
-			name:  "multi-value - i32i64_f32f64",
-			input: "((param i32) (param i64) (result f32) (result f64))",
-			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64},
-				ParamNumInUint64:  2,
-				ResultNumInUint64: 2,
-			},
+			name:                "multi-value - i32i64_f32f64",
+			input:               "((param i32) (param i64) (result f32) (result f64))",
+			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
 		},
 		{
-			name:  "multi-value - i32i64_f32f64 named",
-			input: "((param $x i32) (param $y i64) (result f32) (result f64))",
-			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64},
-				ParamNumInUint64:  2,
-				ResultNumInUint64: 2,
-			},
-			expectedParamNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "x"}, &wasm.NameAssoc{Index: 1, Name: "y"}},
+			name:                "multi-value - i32i64_f32f64 named",
+			input:               "((param $x i32) (param $y i64) (result f32) (result f64))",
+			expectedInlinedType: &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{f32, f64}},
+			expectedParamNames:  wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "x"}, &wasm.NameAssoc{Index: 1, Name: "y"}},
 		},
 		{
-			name:  "multi-value - i64i64f32_f32i32 results abbreviated in groups",
-			input: "((result i64 i64 f32) (result f32 i32))",
-			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32, f32, i32},
-				ResultNumInUint64: 5,
-			},
+			name:                "multi-value - i64i64f32_f32i32 results abbreviated in groups",
+			input:               "((result i64 i64 f32) (result f32 i32))",
+			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32, f32, i32}},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 params and results abbreviated in groups",
 			input: "((param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32))",
 			expectedInlinedType: &wasm.FunctionType{
-				Params:            []wasm.ValueType{i32, i32, i64, i32},
-				Results:           []wasm.ValueType{f32, f64, f64, i32},
-				ParamNumInUint64:  4,
-				ResultNumInUint64: 4,
+				Params:  []wasm.ValueType{i32, i32, i64, i32},
+				Results: []wasm.ValueType{f32, f64, f64, i32},
 			},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 abbreviated in groups",
 			input: "((param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32))",
 			expectedInlinedType: &wasm.FunctionType{
-				Params:            []wasm.ValueType{i32, i32, i64, i32},
-				Results:           []wasm.ValueType{f32, f64, f64, i32},
-				ParamNumInUint64:  4,
-				ResultNumInUint64: 4,
+				Params:  []wasm.ValueType{i32, i32, i64, i32},
+				Results: []wasm.ValueType{f32, f64, f64, i32},
 			},
 		},
 		{
 			name:  "multi-value - i32i32i64i32_f32f64f64i32 abbreviated in groups",
 			input: "((param i32 i32) (param i64 i32) (result f32 f64) (result f64 i32))",
 			expectedInlinedType: &wasm.FunctionType{
-				Params:            []wasm.ValueType{i32, i32, i64, i32},
-				Results:           []wasm.ValueType{f32, f64, f64, i32},
-				ParamNumInUint64:  4,
-				ResultNumInUint64: 4,
+				Params:  []wasm.ValueType{i32, i32, i64, i32},
+				Results: []wasm.ValueType{f32, f64, f64, i32},
 			},
 		},
 		{
@@ -157,9 +140,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 			input: "((result) (result) (result i64 i64) (result) (result f32) (result))",
 			// Abbreviations have min length zero, which implies no-op results are ok.
 			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A2
-			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32},
-				ResultNumInUint64: 3,
-			},
+			expectedInlinedType: &wasm.FunctionType{Results: []wasm.ValueType{i64, i64, f32}},
 		},
 		{
 			name: "multi-value - empty abbreviated params and results",
@@ -170,10 +151,8 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 			// Abbreviations have min length zero, which implies no-op results are ok.
 			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A2
 			expectedInlinedType: &wasm.FunctionType{
-				Params:            []wasm.ValueType{i32, i32, i64, i32, i32},
-				Results:           []wasm.ValueType{f32, f64, f64, i32},
-				ParamNumInUint64:  5,
-				ResultNumInUint64: 4,
+				Params:  []wasm.ValueType{i32, i32, i64, i32, i32},
+				Results: []wasm.ValueType{f32, f64, f64, i32},
 			},
 			expectedParamNames: wasm.NameMap{&wasm.NameAssoc{Index: 4, Name: "x"}},
 		},
@@ -185,8 +164,6 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 		return tp, func(t *testing.T) {
 			// We should have inlined the type, and it is the first type use, which means the inlined index is zero
 			require.Zero(t, tp.inlinedTypeIndices[0].inlinedIdx)
-			exp := tp.inlinedTypes[0]
-			exp.CacheNumInUint64()
 			require.Equal(t, []*wasm.FunctionType{tc.expectedInlinedType}, tp.inlinedTypes)
 		}
 	})
@@ -225,9 +202,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 			if tc.expectedInlinedType == nil {
 				require.Zero(t, len(tp.inlinedTypes), "expected no inlinedTypes")
 			} else {
-				exp := tp.inlinedTypes[0]
-				exp.CacheNumInUint64()
-				require.Equal(t, tc.expectedInlinedType, exp)
+				require.Equal(t, tc.expectedInlinedType, tp.inlinedTypes[0])
 			}
 		}
 	})
@@ -372,9 +347,6 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 		require.NoError(t, parseTypeUse(tp, tc.input, ignoreTypeUse))
 
 		return tp, func(t *testing.T) {
-			for _, it := range tp.inlinedTypes {
-				it.CacheNumInUint64()
-			}
 			// verify it wasn't duplicated
 			require.Equal(t, []*wasm.FunctionType{i32i64_v, tc.expectedInlinedType}, tp.inlinedTypes)
 			// last two inlined types are the same
@@ -420,9 +392,6 @@ func TestTypeUseParser_BeginResets(t *testing.T) {
 		require.NoError(t, parseTypeUse(tp, tc.input, ignoreTypeUse))
 
 		return tp, func(t *testing.T) {
-			for _, it := range tp.inlinedTypes {
-				it.CacheNumInUint64()
-			}
 			// this is the second inlined type
 			require.Equal(t, []*wasm.FunctionType{i32i64_i32, tc.expectedInlinedType}, tp.inlinedTypes)
 		}

@@ -96,7 +96,5 @@ func decodeFunctionType(enabledFeatures wasm.Features, r *bytes.Reader) (*wasm.F
 		Params:  paramTypes,
 		Results: resultTypes,
 	}
-
-	ret.CacheNumInUint64()
 	return ret, nil
 }

@@ -76,7 +76,7 @@ func TestFuncParser(t *testing.T) {
 			name:   "i32.load",
 			source: "(func i32.const 8 i32.load)",
 			expected: &wasm.Code{Body: []byte{
-				wasm.OpcodeI32Const, 8, // dynamic memory offset to load
+				wasm.OpcodeI32Const, 8, // memory offset to load
 				wasm.OpcodeI32Load, 0x2, 0x0, // load alignment=2 (natural alignment) staticOffset=0
 				wasm.OpcodeEnd,
 			}},
@@ -100,7 +100,7 @@ func TestFuncParser(t *testing.T) {
 			name:   "i64.load",
 			source: "(func i32.const 8 i64.load)",
 			expected: &wasm.Code{Body: []byte{
-				wasm.OpcodeI32Const, 8, // dynamic memory offset to load
+				wasm.OpcodeI32Const, 8, // memory offset to load
 				wasm.OpcodeI64Load, 0x3, 0x0, // load alignment=3 (natural alignment) staticOffset=0
 				wasm.OpcodeEnd,
 			}},

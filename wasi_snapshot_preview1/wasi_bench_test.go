@@ -3,63 +3,64 @@ package wasi_snapshot_preview1
 import (
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/sys"
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-var testMem = &wasm.MemoryInstance{
-	Min: 1,
-	Buffer: []byte{
-		0,                // environBuf is after this
-		'a', '=', 'b', 0, // null terminated "a=b",
-		'b', '=', 'c', 'd', 0, // null terminated "b=cd"
-		0,          // environ is after this
-		1, 0, 0, 0, // little endian-encoded offset of "a=b"
-		5, 0, 0, 0, // little endian-encoded offset of "b=cd"
-		0,
-	},
+var testMem = []byte{
+	0,                // environBuf is after this
+	'a', '=', 'b', 0, // null terminated "a=b",
+	'b', '=', 'c', 'd', 0, // null terminated "b=cd"
+	0,          // environ is after this
+	1, 0, 0, 0, // little endian-encoded offset of "a=b"
+	5, 0, 0, 0, // little endian-encoded offset of "b=cd"
+	0,
 }
 
 func Test_Benchmark_EnvironGet(t *testing.T) {
-	sysCtx, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
-	require.NoError(t, err)
+	mod, r, log := requireModule(t, wazero.NewModuleConfig().
+		WithEnv("a", "b").WithEnv("b", "cd"))
+	defer r.Close(testCtx)
 
-	mod := newModule(make([]byte, 20), sysCtx)
-	environGet := (&wasi{}).EnvironGet
+	// Invoke environGet and check the memory side effects.
+	requireErrno(t, ErrnoSuccess, mod, functionEnvironGet, uint64(11), uint64(1))
+	require.Equal(t, `
+==> wasi_snapshot_preview1.environ_get(environ=11,environ_buf=1)
+<== ESUCCESS
+`, "\n"+log.String())
 
-	require.Equal(t, ErrnoSuccess, environGet(testCtx, mod, 11, 1))
-	require.Equal(t, mod.Memory(), testMem)
+	mem, ok := mod.Memory().Read(testCtx, 0, uint32(len(testMem)))
+	require.True(t, ok)
+	require.Equal(t, testMem, mem)
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	sysCtx, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
+	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+
+	compiled, err := r.NewModuleBuilder(b.Name()).
+		ExportMemoryWithMax("memory", 1, 1).
+		Compile(testCtx, wazero.NewCompileConfig())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	mod := newModule([]byte{
-		0,                // environBuf is after this
-		'a', '=', 'b', 0, // null terminated "a=b",
-		'b', '=', 'c', 'd', 0, // null terminated "b=cd"
-		0,          // environ is after this
-		1, 0, 0, 0, // little endian-encoded offset of "a=b"
-		5, 0, 0, 0, // little endian-encoded offset of "b=cd"
-		0,
-	}, sysCtx)
+	mod, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().
+		WithEnv("a", "bc").WithEnv("b", "cd"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer r.Close(testCtx)
 
-	environGet := (&wasi{}).EnvironGet
-	b.Run("EnvironGet", func(b *testing.B) {
+	b.Run("environGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			if environGet(testCtx, mod, 0, 4) != ErrnoSuccess {
-				b.Fatal()
+			results, err := mod.ExportedFunction(functionEnvironGet).Call(testCtx, uint64(0), uint64(4))
+			if err != nil {
+				b.Fatal(err)
+			}
+			errno := Errno(results[0])
+			if errno != ErrnoSuccess {
+				b.Fatal(ErrnoName(errno))
 			}
 		}
 	})
-}
-
-func newModule(buf []byte, sys *sys.Context) *wasm.CallContext {
-	return wasm.NewCallContext(nil, &wasm.ModuleInstance{
-		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
-	}, sys)
 }

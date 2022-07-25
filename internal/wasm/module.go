@@ -38,7 +38,7 @@ type EncodeModule func(m *Module) (bytes []byte)
 // Differences from the specification:
 // * NameSection is the only key ("name") decoded from the SectionIDCustom.
 // * ExportSection is represented as a map for lookup convenience.
-// * HostFunctionSection is a custom section that contains any go `func`s. It may be present when CodeSection is not.
+// * Code.GoFunc is contains any go `func`. It may be present when Code.Body is not.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
@@ -133,8 +133,10 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDElement.
 	ElementSection []*ElementSegment
 
-	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
-	// When present, the HostFunctionSection must be nil.
+	// CodeSection is index-correlated with FunctionSection and contains each
+	// function's locals and body.
+	//
+	// When present, the HostFunctionSection of the same index must be nil.
 	//
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
@@ -152,13 +154,6 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
-
-	// HostFunctionSection is index-correlated with FunctionSection and contains a host function defined in Go.
-	// When present, the CodeSection must be nil.
-	//
-	// Note: This section currently has no serialization format, so is not encodable.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	HostFunctionSection []*reflect.Value
 
 	// validatedActiveElementSegments are built on Validate when
 	// SectionIDElement is non-empty and all inputs are valid.
@@ -232,12 +227,12 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 }
 
 func (m *Module) Validate(enabledFeatures Features) error {
-	if err := m.validateStartSection(); err != nil {
-		return err
+	for _, tp := range m.TypeSection {
+		tp.CacheNumInUint64()
 	}
 
-	if m.SectionElementCount(SectionIDCode) > 0 && m.SectionElementCount(SectionIDHostFunction) > 0 {
-		return errors.New("cannot mix functions and host functions in the same module")
+	if err := m.validateStartSection(); err != nil {
+		return err
 	}
 
 	functions, globals, memory, tables, err := m.AllDeclarations()
@@ -334,7 +329,9 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 		if typeIndex >= typeCount {
 			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
-
+		if m.CodeSection[idx].GoFunc != nil {
+			continue
+		}
 		if err = m.validateFunction(enabledFeatures, Index(idx), functions, globals, memory, tables, declaredFuncIndexes); err != nil {
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
@@ -346,18 +343,18 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 //
 // The criteria for which function indexes can be available for that instruction is vague in the spec:
 //
-//  * "References: the list of function indices that occur in the module outside functions and can hence be used to form references inside them."
-//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/conventions.html#contexts
-//  * "Ref is the set funcidx(module with functions=ε, start=ε) , i.e., the set of function indices occurring in the module, except in its functions or start function."
-//   * https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/modules.html#valid-module
+//   - "References: the list of function indices that occur in the module outside functions and can hence be used to form references inside them."
+//   - https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/conventions.html#contexts
+//   - "Ref is the set funcidx(module with functions=ε, start=ε) , i.e., the set of function indices occurring in the module, except in its functions or start function."
+//   - https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/valid/modules.html#valid-module
 //
 // To clarify, we reverse-engineer logic required to pass the WebAssembly Core specification 2.0 test suite:
 // https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/ref_func.wast#L78-L115
 //
 // To summarize, the function indexes OpcodeRefFunc can refer include:
-//  * existing in an element section regardless of its mode (active, passive, declarative).
-//  * defined as globals whose value type is ValueRefFunc.
-//  * used as an exported function.
+//   - existing in an element section regardless of its mode (active, passive, declarative).
+//   - defined as globals whose value type is ValueRefFunc.
+//   - used as an exported function.
 //
 // See https://github.com/WebAssembly/reference-types/issues/31
 // See https://github.com/WebAssembly/reference-types/issues/76
@@ -582,30 +579,22 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 // BuildFunctions generates function instances for all host or wasm-defined
 // functions in this module.
 //
-// Notes
-//	* This relies on data generated by Module.BuildFunctionDefinitions.
-//	* This is exported for tests that don't call Instantiate, notably only
-//	  enginetest.go.
-func (m *ModuleInstance) BuildFunctions(mod *Module, fnlf experimental.FunctionListenerFactory) (fns []*FunctionInstance) {
+// # Notes
+//   - This relies on data generated by Module.BuildFunctionDefinitions.
+//   - This is exported for tests that don't call Instantiate, notably only
+//     enginetest.go.
+func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.FunctionListener) (fns []*FunctionInstance) {
 	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
-	if mod.IsHostModule() {
-		for i := range mod.HostFunctionSection {
-			fn := mod.HostFunctionSection[i]
-			fns = append(fns, &FunctionInstance{
-				Kind:   kind(fn.Type()),
-				GoFunc: fn,
-			})
-		}
-	} else {
-		for i := range mod.FunctionSection {
-			code := mod.CodeSection[i]
-			fns = append(fns, &FunctionInstance{
-				Kind:       FunctionKindWasm,
-				Body:       code.Body,
-				TypeID:     m.TypeIDs[mod.FunctionSection[i]],
-				LocalTypes: code.LocalTypes,
-			})
-		}
+	for i := range mod.FunctionSection {
+		code := mod.CodeSection[i]
+		fns = append(fns, &FunctionInstance{
+			IsHostFunction: code.IsHostFunction,
+			Kind:           code.Kind,
+			LocalTypes:     code.LocalTypes,
+			Body:           code.Body,
+			GoFunc:         code.GoFunc,
+			TypeID:         m.TypeIDs[mod.FunctionSection[i]],
+		})
 	}
 
 	importCount := mod.ImportFuncCount()
@@ -615,8 +604,8 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, fnlf experimental.FunctionL
 		f.Idx = d.index
 		f.Type = d.funcType
 		f.definition = d
-		if fnlf != nil {
-			f.FunctionListener = fnlf.NewListener(m.Name, d)
+		if listeners != nil {
+			f.FunctionListener = listeners[i]
 		}
 	}
 	return
@@ -681,17 +670,21 @@ type FunctionType struct {
 }
 
 func (f *FunctionType) CacheNumInUint64() {
-	for _, tp := range f.Params {
-		f.ParamNumInUint64++
-		if tp == ValueTypeV128 {
+	if f.ParamNumInUint64 == 0 {
+		for _, tp := range f.Params {
 			f.ParamNumInUint64++
+			if tp == ValueTypeV128 {
+				f.ParamNumInUint64++
+			}
 		}
 	}
 
-	for _, tp := range f.Results {
-		f.ResultNumInUint64++
-		if tp == ValueTypeV128 {
+	if f.ResultNumInUint64 == 0 {
+		for _, tp := range f.Results {
 			f.ResultNumInUint64++
+			if tp == ValueTypeV128 {
+				f.ResultNumInUint64++
+			}
 		}
 	}
 }
@@ -808,6 +801,18 @@ type Export struct {
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 type Code struct {
+	// IsHostFunction returns true if the function was implemented by the
+	// embedder (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	//
+	// Notably, host functions can use the caller's memory, which might be
+	// different from its defining module.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
+	IsHostFunction bool
+
+	// Kind describes how this function should be called.
+	Kind FunctionKind
+
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
@@ -815,6 +820,14 @@ type Code struct {
 	// Body is a sequence of expressions ending in OpcodeEnd
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
 	Body []byte
+
+	// GoFunc is a host function defined in Go.
+	//
+	// When present, LocalTypes and Body must be nil.
+	//
+	// Note: This has no serialization format, so is not encodable.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
+	GoFunc *reflect.Value
 }
 
 type DataSegment struct {
@@ -954,11 +967,6 @@ const (
 	SectionIDDataCount
 )
 
-// SectionIDHostFunction is a pseudo-section ID for host functions.
-//
-// Note: This is not defined in the WebAssembly 1.0 (20191205) Binary Format.
-const SectionIDHostFunction = SectionID(0xff)
-
 // SectionIDName returns the canonical name of a module section.
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func SectionIDName(sectionID SectionID) string {
@@ -987,8 +995,6 @@ func SectionIDName(sectionID SectionID) string {
 		return "code"
 	case SectionIDData:
 		return "data"
-	case SectionIDHostFunction:
-		return "host_function"
 	case SectionIDDataCount:
 		return "data_count"
 	}

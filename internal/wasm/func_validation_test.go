@@ -3348,3 +3348,194 @@ func TestDecodeBlockType(t *testing.T) {
 		}
 	})
 }
+
+// TestFuncValidation_UnreachableBrTable_NotModifyTypes ensures that we do not modify the
+// original function type during the function validation with the presence of unreachable br_table
+// targeting the function return label.
+func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
+	funcType := &FunctionType{Results: []ValueType{i32, i64}, Params: []ValueType{i32}}
+	copiedFuncType := &FunctionType{Params: make([]ValueType, len(funcType.Params)),
+		Results: make([]ValueType, len(funcType.Results))}
+
+	copy(copiedFuncType.Results, funcType.Results)
+	copy(copiedFuncType.Params, funcType.Params)
+
+	for _, tc := range []struct {
+		name string
+		m    *Module
+	}{
+		{
+			name: "on function return",
+			m: &Module{
+				TypeSection:     []*FunctionType{funcType},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{
+					{Body: []byte{
+						OpcodeUnreachable,
+						// Having br_table in unreachable state.
+						OpcodeI32Const, 1,
+						// Setting the destination as labels of index 0 which
+						// is the function return.
+						OpcodeBrTable, 2, 0, 0, 0,
+						OpcodeEnd,
+					}},
+				},
+			},
+		},
+		{
+			name: "on loop return",
+			m: &Module{
+				TypeSection:     []*FunctionType{funcType},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{
+					{Body: []byte{
+						OpcodeUnreachable,
+						OpcodeLoop, 0, // indicates that loop has funcType as its block type
+						OpcodeUnreachable,
+						// Having br_table in unreachable state.
+						OpcodeI32Const, 1,
+						// Setting the destination as labels of index 0 which
+						// is the loop return.
+						OpcodeBrTable, 2, 0, 0, 0,
+						OpcodeEnd, // End of loop
+						OpcodeEnd,
+					}},
+				},
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.m.validateFunction(Features20220419, 0, nil, nil, nil, nil, nil)
+			require.NoError(t, err)
+
+			// Ensures that funcType has remained intact.
+			require.Equal(t, copiedFuncType, funcType)
+		})
+	}
+}
+
+func TestModule_funcValidation_loopWithParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   []byte
+		expErr string
+	}{
+		{
+			name: "br",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeBr, 0,
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+		},
+		{
+			name: "br_if",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeI32Const, 1, // operand for br_if
+				OpcodeBrIf, 0,
+				OpcodeUnreachable,
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+		},
+		{
+			name: "br_table",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeI32Const, 4, // Operand for br_table.
+				OpcodeBrTable, 2, 0, 0, 0, 0, // Jump into the loop header anyway.
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+		},
+		{
+			name: "br_table - nested",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeI32Const, 4, // Operand for br_table.
+				OpcodeBrTable, 2, 0, 1, 0, // Jump into the loop header anyway.
+				OpcodeEnd,
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+		},
+		{
+			name: "br / mismatch",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				OpcodeDrop,
+				OpcodeBr, 0, // trying to jump the loop head after dropping the value which causes the type mismatch.
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+			expErr: `not enough results in br block
+	have ()
+	want (i32)`,
+		},
+		{
+			name: "br_if / mismatch",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				// Use up the param for the br_if, therefore at the time of jumping, we don't have any param to the header.
+				OpcodeBrIf, 0, // trying to jump the loop head after dropping the value which causes the type mismatch.
+				OpcodeUnreachable,
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+			expErr: `not enough results in br_if block
+	have ()
+	want (i32)`,
+		},
+		{
+			name: "br_table",
+			body: []byte{
+				OpcodeI32Const, 1,
+				OpcodeLoop, 1, // loop (param i32)
+				// Use up the param for the br_table, therefore at the time of jumping, we don't have any param to the header.
+				OpcodeBrTable, 2, 0, 0, 0, // Jump into the loop header anyway.
+				OpcodeEnd,
+				OpcodeUnreachable,
+				OpcodeEnd,
+			},
+			expErr: `not enough results in br_table block
+	have ()
+	want (i32)`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Module{
+				TypeSection: []*FunctionType{
+					v_i32,
+					i32_v,
+				},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{{Body: tc.body}},
+			}
+			err := m.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

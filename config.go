@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -20,6 +21,7 @@ import (
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 //
 // Ex. To explicitly limit to Wasm Core 1.0 features as opposed to relying on defaults:
+//
 //	rConfig = wazero.NewRuntimeConfig().WithWasmCore1()
 //
 // Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
@@ -29,10 +31,10 @@ type RuntimeConfig interface {
 	// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	//	* Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-	//	* Adds `table.init`, `table.copy` and `elem.drop` instructions.
-	//	* Introduces a "passive" form of element and data segments.
-	//	* Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+	//   - Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
+	//   - Adds `table.init`, `table.copy` and `elem.drop` instructions.
+	//   - Introduces a "passive" form of element and data segments.
+	//   - Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
 	//
 	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
@@ -47,8 +49,8 @@ type RuntimeConfig interface {
 	// finished in WebAssembly 1.0 (20191205).
 	//
 	// Here are the notable effects:
-	//	* Function (`func`) types allow more than one result
-	//	* Block types (`block`, `loop` and `if`) can be arbitrary function types
+	//   - Function (`func`) types allow more than one result
+	//   - Block types (`block`, `loop` and `if`) can be arbitrary function types
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	WithFeatureMultiValue(bool) RuntimeConfig
@@ -64,22 +66,22 @@ type RuntimeConfig interface {
 	// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0.
 	//
 	// The only effect of enabling is allowing the following instructions, which return 0 on NaN instead of panicking.
-	//	* `i32.trunc_sat_f32_s`
-	//	* `i32.trunc_sat_f32_u`
-	//	* `i32.trunc_sat_f64_s`
-	//	* `i32.trunc_sat_f64_u`
-	//	* `i64.trunc_sat_f32_s`
-	//	* `i64.trunc_sat_f32_u`
-	//	* `i64.trunc_sat_f64_s`
-	//	* `i64.trunc_sat_f64_u`
+	//   - `i32.trunc_sat_f32_s`
+	//   - `i32.trunc_sat_f32_u`
+	//   - `i32.trunc_sat_f64_s`
+	//   - `i32.trunc_sat_f64_u`
+	//   - `i64.trunc_sat_f32_s`
+	//   - `i64.trunc_sat_f32_u`
+	//   - `i64.trunc_sat_f64_s`
+	//   - `i64.trunc_sat_f64_u`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
 
 	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
 	//
-	//	* Introduction of new value types: `funcref` and `externref`.
-	//	* Support for the following new instructions:
+	//   - Introduction of new value types: `funcref` and `externref`.
+	//   - Support for the following new instructions:
 	//	 * `ref.null`
 	//	 * `ref.func`
 	//	 * `ref.is_null`
@@ -88,7 +90,7 @@ type RuntimeConfig interface {
 	//	 * `table.grow`
 	//	 * `table.set`
 	//	 * `table.size`
-	//	* Support for multiple tables per module:
+	//   - Support for multiple tables per module:
 	//	 * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
 	//	 * Element segments can take non-zero table index.
 	//
@@ -105,7 +107,7 @@ type RuntimeConfig interface {
 	// as the feature was not in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	//	* Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
+	//   - Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
@@ -148,6 +150,7 @@ func NewRuntimeConfig() RuntimeConfig {
 
 type runtimeConfig struct {
 	enabledFeatures wasm.Features
+	isInterpreter   bool
 	newEngine       func(wasm.Features) wasm.Engine
 }
 
@@ -179,6 +182,7 @@ func NewRuntimeConfigCompiler() RuntimeConfig {
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() RuntimeConfig {
 	ret := engineLessConfig.clone()
+	ret.isInterpreter = true
 	ret.newEngine = interpreter.NewEngine
 	return ret
 }
@@ -264,15 +268,24 @@ func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 //
 // Note: Closing the wazero.Runtime closes any CompiledModule it compiled.
 type CompiledModule interface {
-	// ImportedFunctions returns all the imported functions (api.FunctionDefinition) in this module.
+	// Name returns the module name encoded into the binary or empty if not.
+	Name() string
+
+	// ImportedFunctions returns all the imported functions
+	// (api.FunctionDefinition) in this module or nil if there are none.
+	//
+	// Note: Unlike ExportedFunctions, there is no unique constraint on
+	// imports.
 	ImportedFunctions() []api.FunctionDefinition
 
-	// ExportedFunctions returns all the exported functions (api.FunctionDefinition) in this module.
-	ExportedFunctions() []api.FunctionDefinition
+	// ExportedFunctions returns all the exported functions
+	// (api.FunctionDefinition) in this module keyed on export name.
+	ExportedFunctions() map[string]api.FunctionDefinition
 
 	// Close releases all the allocated resources for this CompiledModule.
 	//
-	// Note: It is safe to call Close while having outstanding calls from an api.Module instantiated from this.
+	// Note: It is safe to call Close while having outstanding calls from an
+	// api.Module instantiated from this.
 	Close(context.Context) error
 }
 
@@ -280,9 +293,18 @@ type compiledModule struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
-
+	// listeners are present if the code was compiled with a listener
+	listeners []experimental.FunctionListener
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
+}
+
+// Name implements CompiledModule.Name
+func (c *compiledModule) Name() (moduleName string) {
+	if ns := c.module.NameSection; ns != nil {
+		moduleName = ns.ModuleName
+	}
+	return
 }
 
 // Close implements CompiledModule.Close
@@ -300,7 +322,7 @@ func (c *compiledModule) ImportedFunctions() []api.FunctionDefinition {
 }
 
 // ExportedFunctions implements CompiledModule.ExportedFunctions
-func (c *compiledModule) ExportedFunctions() []api.FunctionDefinition {
+func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 	return c.module.ExportedFunctions()
 }
 
@@ -348,6 +370,7 @@ func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConf
 // multiple times.
 //
 // Ex.
+//
 //	// Initialize base configuration:
 //	config := wazero.NewModuleConfig().WithStdout(buf).WithSysNanotime()
 //
@@ -428,11 +451,11 @@ type ModuleConfig interface {
 	// WithStartFunctions configures the functions to call after the module is
 	// instantiated. Defaults to "_start".
 	//
-	// Notes
+	// # Notes
 	//
-	//	* If any function doesn't exist, it is skipped. However, all functions
+	//   - If any function doesn't exist, it is skipped. However, all functions
 	//	  that do exist are called in order.
-	//	* Some start functions may exit the module during instantiate with a
+	//   - Some start functions may exit the module during instantiate with a
 	//	  sys.ExitError (ex. emscripten), preventing use of exported functions.
 	WithStartFunctions(...string) ModuleConfig
 
@@ -441,10 +464,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stderr
 	WithStderr(io.Writer) ModuleConfig
@@ -454,10 +477,10 @@ type ModuleConfig interface {
 	// This reader is most commonly used by the functions like "fd_read" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stdin
 	WithStdin(io.Reader) ModuleConfig
@@ -467,10 +490,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stdout
 	WithStdout(io.Writer) ModuleConfig
@@ -505,11 +528,11 @@ type ModuleConfig interface {
 	//			return clock.nanotime()
 	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
 	//
-	// Notes:
-	//	* This does not default to time.Since as that violates sandboxing.
-	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
-	//	* If you set this, you should probably set WithNanosleep also.
-	//	* Use WithSysNanotime for a usable implementation.
+	// # Notes:
+	//   - This does not default to time.Since as that violates sandboxing.
+	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - If you set this, you should probably set WithNanosleep also.
+	//   - Use WithSysNanotime for a usable implementation.
 	WithNanotime(sys.Nanotime, sys.ClockResolution) ModuleConfig
 
 	// WithSysNanotime uses time.Now for sys.Nanotime with a resolution of 1us.
@@ -529,12 +552,12 @@ type ModuleConfig interface {
 	//				err := unix.ClockNanosleep(unix.CLOCK_MONOTONIC, 0, &rel, &remain)
 	//			--snip--
 	//
-	// Notes:
-	//	* This primarily supports `poll_oneoff` for relative clock events.
-	//	* This does not default to time.Sleep as that violates sandboxing.
-	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
-	//	* If you set this, you should probably set WithNanotime also.
-	//	* Use WithSysNanosleep for a usable implementation.
+	// # Notes:
+	//   - This primarily supports `poll_oneoff` for relative clock events.
+	//   - This does not default to time.Sleep as that violates sandboxing.
+	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - If you set this, you should probably set WithNanotime also.
+	//   - Use WithSysNanosleep for a usable implementation.
 	WithNanosleep(sys.Nanosleep) ModuleConfig
 
 	// WithSysNanosleep uses time.Sleep for sys.Nanosleep.

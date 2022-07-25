@@ -40,7 +40,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isVectorRegister(global.register))
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
-				require.True(t, isIntRegister(global.register))
+				require.True(t, isGeneralPurposeRegister(global.register))
 			}
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)

@@ -231,8 +231,8 @@ func (m *Module) validateTable(enabledFeatures Features, tables []*Table, maximu
 }
 
 // buildTable returns TableInstances if the module defines or imports a table.
-//  * importedTables: returned as `tables` unmodified.
-//  * importedGlobals: include all instantiated, imported globals.
+//   - importedTables: returned as `tables` unmodified.
+//   - importedGlobals: include all instantiated, imported globals.
 //
 // If the result `init` is non-nil, it is the `tableInit` parameter of Engine.NewModuleEngine.
 //

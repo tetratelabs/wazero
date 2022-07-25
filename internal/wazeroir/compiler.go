@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
@@ -158,7 +159,7 @@ type compiler struct {
 }
 
 // For debugging only.
-//nolint
+// nolint
 func (c *compiler) stackDump() string {
 	strs := make([]string, 0, len(c.stack))
 	for _, s := range c.stack {
@@ -176,8 +177,17 @@ func (c *compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
+	// IsHostFunction is the data returned by the same field documented on
+	// wasm.Code.
+	IsHostFunction bool
+
+	// GoFunc is the data returned by the same field documented on wasm.Code.
+	// In this case, IsHostFunction is true and other fields can be ignored.
+	GoFunc *reflect.Value
+
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
+
 	// LabelCallers maps Label.String() to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
@@ -204,12 +214,14 @@ type CompilationResult struct {
 	TableTypes []wasm.ValueType
 	// HasMemory is true if the module from which this function is compiled has memory declaration.
 	HasMemory bool
+	// UsesMemory is true if this function might use memory.
+	UsesMemory bool
 	// HasTable is true if the module from which this function is compiled has table declaration.
 	HasTable bool
-	// NeedsAccessToDataInstances is true if the function needs access to data instances via memory.init or data.drop instructions.
-	NeedsAccessToDataInstances bool
-	// NeedsAccessToDataInstances is true if the function needs access to element instances via table.init or elem.drop instructions.
-	NeedsAccessToElementInstances bool
+	// HasDataInstances is true if the module has data instances which might be used by memory.init or data.drop instructions.
+	HasDataInstances bool
+	// HasDataInstances is true if the module has element instances which might be used by table.init or elem.drop instructions.
+	HasElementInstances bool
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
@@ -220,7 +232,8 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		return nil, err
 	}
 
-	hasMemory, hasTable := mem != nil, len(tables) > 0
+	hasMemory, hasTable, hasDataInstances, hasElementInstances := mem != nil, len(tables) > 0,
+		len(module.DataSection) > 0, len(module.ElementSection) > 0
 
 	tableTypes := make([]wasm.ValueType, len(tables))
 	for i := range tableTypes {
@@ -232,16 +245,29 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 		typeID := module.FunctionSection[funcIndex]
 		sig := module.TypeSection[typeID]
 		code := module.CodeSection[funcIndex]
+		if code.GoFunc != nil {
+			ret = append(ret, &CompilationResult{
+				IsHostFunction: true,
+				// Assume the function might use memory if it has a parameter for the api.Module
+				UsesMemory: code.Kind == wasm.FunctionKindGoModule || code.Kind == wasm.FunctionKindGoContextModule,
+				GoFunc:     code.GoFunc,
+				Signature:  sig,
+			})
+			continue
+		}
 		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		}
+		r.IsHostFunction = code.IsHostFunction
 		r.Globals = globals
 		r.Functions = functions
 		r.Types = module.TypeSection
 		r.HasMemory = hasMemory
 		r.HasTable = hasTable
+		r.HasDataInstances = hasDataInstances
+		r.HasElementInstances = hasElementInstances
 		r.Signature = sig
 		r.TableTypes = tableTypes
 		ret = append(ret, r)
@@ -754,15 +780,23 @@ operatorSwitch:
 			&OperationDrop{Depth: r},
 		)
 	case wasm.OpcodeSelect:
+		// If it is on the unreachable state, ignore the instruction.
+		if c.unreachableState.on {
+			break operatorSwitch
+		}
 		c.emit(
-			&OperationSelect{},
+			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeTypedSelect:
 		// Skips two bytes: vector size fixed to 1, and the value type for select.
 		c.pc += 2
+		// If it is on the unreachable state, ignore the instruction.
+		if c.unreachableState.on {
+			break operatorSwitch
+		}
 		// Typed select is semantically equivalent to select at runtime.
 		c.emit(
-			&OperationSelect{},
+			&OperationSelect{IsTargetVector: c.stackPeek() == UnsignedTypeV128},
 		)
 	case wasm.OpcodeLocalGet:
 		if index == nil {
@@ -1025,11 +1059,13 @@ operatorSwitch:
 			&OperationStore32{Arg: imm},
 		)
 	case wasm.OpcodeMemorySize:
+		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemorySize{},
 		)
 	case wasm.OpcodeMemoryGrow:
+		c.result.UsesMemory = true
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemoryGrow{},
@@ -1652,6 +1688,7 @@ operatorSwitch:
 				&OperationITruncFromF{InputType: Float64, OutputType: SignedUint64, NonTrapping: true},
 			)
 		case wasm.OpcodeMiscMemoryInit:
+			c.result.UsesMemory = true
 			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
@@ -1660,7 +1697,6 @@ operatorSwitch:
 			c.emit(
 				&OperationMemoryInit{DataIndex: dataIndex},
 			)
-			c.result.NeedsAccessToDataInstances = true
 		case wasm.OpcodeMiscDataDrop:
 			dataIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
@@ -1670,13 +1706,14 @@ operatorSwitch:
 			c.emit(
 				&OperationDataDrop{DataIndex: dataIndex},
 			)
-			c.result.NeedsAccessToDataInstances = true
 		case wasm.OpcodeMiscMemoryCopy:
+			c.result.UsesMemory = true
 			c.pc += 2 // +2 to skip two memory indexes which are fixed to zero.
 			c.emit(
 				&OperationMemoryCopy{},
 			)
 		case wasm.OpcodeMiscMemoryFill:
+			c.result.UsesMemory = true
 			c.pc += 1 // +1 to skip the memory index which is fixed to zero.
 			c.emit(
 				&OperationMemoryFill{},
@@ -1696,7 +1733,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableInit{ElemIndex: elemIndex, TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscElemDrop:
 			elemIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
@@ -1706,7 +1742,6 @@ operatorSwitch:
 			c.emit(
 				&OperationElemDrop{ElemIndex: elemIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableCopy:
 			// Read the source table index.
 			dst, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1724,7 +1759,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableGrow:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1735,7 +1769,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableGrow{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableSize:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1746,7 +1779,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableSize{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		case wasm.OpcodeMiscTableFill:
 			// Read the source table index.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
@@ -1757,7 +1789,6 @@ operatorSwitch:
 			c.emit(
 				&OperationTableFill{TableIndex: tableIndex},
 			)
-			c.result.NeedsAccessToElementInstances = true
 		default:
 			return fmt.Errorf("unsupported misc instruction in wazeroir: 0x%x", op)
 		}
@@ -3060,6 +3091,7 @@ func (c *compiler) stackLenInUint64(ceil int) (ret int) {
 }
 
 func (c *compiler) readMemoryArg(tag string) (*MemoryArg, error) {
+	c.result.UsesMemory = true
 	r := bytes.NewReader(c.body[c.pc+1:])
 	alignment, num, err := leb128.DecodeUint32(r)
 	if err != nil {

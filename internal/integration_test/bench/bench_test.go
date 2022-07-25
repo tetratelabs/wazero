@@ -17,6 +17,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 // caseWasm was compiled from TinyGo testdata/case.go
+//
 //go:embed testdata/case.wasm
 var caseWasm []byte
 

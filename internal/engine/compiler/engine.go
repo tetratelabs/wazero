@@ -417,43 +417,32 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 
-	if module.IsHostModule() {
-		for funcIndex := range module.HostFunctionSection {
-			compiled, err := compileHostFunction(module.TypeSection[module.FunctionSection[funcIndex]])
-			if err != nil {
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	if err != nil {
+		return err
+	}
+	for funcIndex, ir := range irs {
+		var compiled *code
+		if ir.GoFunc != nil {
+			if compiled, err = compileHostFunction(ir); err != nil {
 				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
-				return fmt.Errorf("error compiling host func[%s]: %w", def.DebugName(), err)
+				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-
-			// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
-			// finalizer due to how moduleEngine.Close is implemented.
-			e.setFinalizer(compiled, releaseCode)
-
-			compiled.indexInModule = wasm.Index(funcIndex)
-			compiled.sourceModule = module
-			funcs = append(funcs, compiled)
-		}
-	} else {
-		irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
-		if err != nil {
-			return err
+		} else if ir.IsHostFunction && ir.UsesMemory {
+			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			return fmt.Errorf("error compiling host wasm func[%s]: memory access not yet supported", def.DebugName())
+		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
+			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 		}
 
-		for funcIndex := range module.FunctionSection {
-			compiled, err := compileWasmFunction(e.enabledFeatures, irs[funcIndex])
-			if err != nil {
-				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
-				return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
-			}
+		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
+		e.setFinalizer(compiled, releaseCode)
 
-			// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
-			e.setFinalizer(compiled, releaseCode)
+		compiled.indexInModule = wasm.Index(funcIndex)
+		compiled.sourceModule = module
 
-			compiled.indexInModule = wasm.Index(funcIndex)
-			compiled.sourceModule = module
-
-			funcs = append(funcs, compiled)
-		}
+		funcs = append(funcs, compiled)
 	}
 	e.addCodes(module, funcs)
 	return nil
@@ -643,10 +632,10 @@ func newEngine(enabledFeatures wasm.Features) *engine {
 //
 // On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/engine/compiler/...`.
 //
-//  [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
-//  [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
-//  [3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
-//  [4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
+//	[1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
+//	[2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
+//	[3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
+//	[4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
 var (
 	initialValueStackSize     = 64
 	initialCallFrameStackSize = 16
@@ -822,12 +811,13 @@ func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wa
 	ce.pushValue(uint64(res))
 }
 
-func compileHostFunction(sig *wasm.FunctionType) (*code, error) {
-	compiler, err := newCompiler(&wazeroir.CompilationResult{Signature: sig})
+func compileHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
+	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, err
 	}
 
+	// TODO: Consider when no memory is used (ex !ir.UsesMemory)
 	if err = compiler.compileHostFunction(); err != nil {
 		return nil, err
 	}
@@ -884,7 +874,7 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 		case *wazeroir.OperationDrop:
 			err = compiler.compileDrop(o)
 		case *wazeroir.OperationSelect:
-			err = compiler.compileSelect()
+			err = compiler.compileSelect(o)
 		case *wazeroir.OperationPick:
 			err = compiler.compilePick(o)
 		case *wazeroir.OperationSwap:

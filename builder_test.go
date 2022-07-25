@@ -2,7 +2,6 @@ package wazero
 
 import (
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -19,11 +18,9 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 	uint32_uint32 := func(uint32) uint32 {
 		return 0
 	}
-	fnUint32_uint32 := reflect.ValueOf(uint32_uint32)
 	uint64_uint32 := func(uint64) uint32 {
 		return 0
 	}
-	fnUint64_uint32 := reflect.ValueOf(uint64_uint32)
 
 	tests := []struct {
 		name     string
@@ -51,15 +48,35 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []wasm.Index{0},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+				},
+			},
+		},
+		{
+			name: "ExportFunction with names",
+			input: func(r Runtime) ModuleBuilder {
+				return r.NewModuleBuilder("").ExportFunction("1", uint32_uint32, "get", "x")
+			},
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+				},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
+					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
 				},
 			},
 		},
@@ -70,10 +87,10 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []wasm.Index{0},
-				HostFunctionSection: []*reflect.Value{&fnUint64_uint32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -90,11 +107,11 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -114,11 +131,11 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -139,11 +156,11 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection:     []wasm.Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnUint32_uint32, &fnUint64_uint32},
+				FunctionSection: []wasm.Index{0, 1},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -428,6 +445,9 @@ func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
 // requireHostModuleEquals is redefined from internal/wasm/host_test.go to avoid an import cycle extracting it.
 func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
+	for _, tp := range expected.TypeSection {
+		tp.CacheNumInUint64()
+	}
 	require.Equal(t, expected.TypeSection, actual.TypeSection)
 	require.Equal(t, expected.ImportSection, actual.ImportSection)
 	require.Equal(t, expected.FunctionSection, actual.FunctionSection)
@@ -437,13 +457,20 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
-	require.Zero(t, len(actual.CodeSection)) // Host functions are implemented in Go, not Wasm!
 	require.Equal(t, expected.DataSection, actual.DataSection)
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
-	require.Equal(t, len(expected.HostFunctionSection), len(actual.HostFunctionSection))
-	for i := range expected.HostFunctionSection {
-		require.Equal(t, (*expected.HostFunctionSection[i]).Type(), (*actual.HostFunctionSection[i]).Type())
+	// TODO: This is copy/paste with /internal/wasm/host_test.go
+	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
+	for i, c := range expected.CodeSection {
+		actualCode := actual.CodeSection[i]
+		require.True(t, actualCode.IsHostFunction)
+		require.Equal(t, c.Kind, actualCode.Kind)
+		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+
+		// Not wasm
+		require.Nil(t, actualCode.Body)
+		require.Nil(t, actualCode.LocalTypes)
 	}
 }

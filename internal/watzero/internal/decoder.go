@@ -143,10 +143,6 @@ func DecodeModule(
 	if names.ModuleName == "" && names.FunctionNames == nil && names.LocalNames == nil {
 		module.NameSection = nil
 	}
-
-	for _, tp := range module.TypeSection {
-		tp.CacheNumInUint64()
-	}
 	return
 }
 
@@ -235,10 +231,12 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 // parseModuleName records the wasm.NameSection ModuleName, if present, and resumes with parseModule.
 //
 // Ex. A module name is present `(module $math)`
-//                        records math --^
+//
+//	records math --^
 //
 // Ex. No module name `(module)`
-//   calls parseModule here --^
+//
+//	calls parseModule here --^
 func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $Math
 		p.module.NameSection.ModuleName = string(stripDollar(tokenBytes))
@@ -273,11 +271,13 @@ func (p *moduleParser) onTypeEnd(ft *wasm.FunctionType) tokenParser {
 // parseImportModule returns parseImportName after recording the import module name, or errs if it couldn't be read.
 //
 // Ex. Imported module name is present `(import "Math" "PI" (func (result f32)))`
-//                                records Math --^     ^
-//                      parseImportName resumes here --+
+//
+//	          records Math --^     ^
+//	parseImportName resumes here --+
 //
 // Ex. Imported module name is absent `(import (func (result f32)))`
-//                                 errs here --^
+//
+//	errs here --^
 func (p *moduleParser) parseImportModule(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenString: // Ex. "" or "Math"
@@ -294,12 +294,14 @@ func (p *moduleParser) parseImportModule(tok tokenType, tokenBytes []byte, _, _ 
 // parseImportName returns parseImport after recording the import name, or errs if it couldn't be read.
 //
 // Ex. Import name is present `(import "Math" "PI" (func (result f32)))`
-//                              starts here --^^   ^
-//                                records PI --+   |
-//                      parseImport resumes here --+
+//
+//	        starts here --^^   ^
+//	          records PI --+   |
+//	parseImport resumes here --+
 //
 // Ex. Imported function name is absent `(import "Math" (func (result f32)))`
-//                                          errs here --+
+//
+//	errs here --+
 func (p *moduleParser) parseImportName(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenString: // Ex. "" or "PI"
@@ -350,11 +352,13 @@ func (p *moduleParser) beginImportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 // parseImportFuncID records the ID of the current imported function, if present, and resumes with parseImportFunc.
 //
 // Ex. A function ID is present `(import "Math" "PI" (func $math.pi (result f32))`
-//                                  records math.pi here --^
-//                                   parseImportFunc resumes here --^
+//
+//	records math.pi here --^
+//	 parseImportFunc resumes here --^
 //
 // Ex. No function ID `(import "Math" "PI" (func (result f32))`
-//                  calls parseImportFunc here --^
+//
+//	calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncID(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $main
 		if name, err := p.funcNamespace.setID(tokenBytes); err != nil {
@@ -380,11 +384,13 @@ func (p *moduleParser) addFunctionName(name string) {
 // parseImportFunc passes control to the typeUseParser until any signature is read, then returns onImportFunc.
 //
 // Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
-//                           starts here --^           ^
-//                   onImportFunc resumes here --+
+//
+//	        starts here --^           ^
+//	onImportFunc resumes here --+
 //
 // Ex. If there is no signature `(import "" "main" (func))`
-//                     calls onImportFunc here ---^
+//
+//	calls onImportFunc here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. (func $main $main)
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
@@ -471,12 +477,14 @@ func (p *moduleParser) endMemory(mem *wasm.Memory) tokenParser {
 // parseExportName returns parseExport after recording the export name, or errs if it couldn't be read.
 //
 // Ex. Export name is present `(export "PI" (func 0))`
-//                       starts here --^    ^
-//                         records PI --^   |
-//               parseExport resumes here --+
+//
+//	        starts here --^    ^
+//	          records PI --^   |
+//	parseExport resumes here --+
 //
 // Ex. Export name is absent `(export (func 0))`
-//                        errs here --^
+//
+//	errs here --^
 func (p *moduleParser) parseExportName(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenString: // Ex. "" or "PI"

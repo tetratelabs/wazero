@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/tetratelabs/wazero/api"
+	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
@@ -13,6 +14,7 @@ import (
 // Runtime allows embedding of WebAssembly modules.
 //
 // Ex. The below is the basic initialization of wazero's WebAssembly Runtime.
+//
 //	ctx := context.Background()
 //	r := wazero.NewRuntime()
 //	defer r.Close(ctx) // This closes everything this Runtime created.
@@ -34,13 +36,13 @@ type Runtime interface {
 	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig or CompileConfig.
 	//
 	// There are two main reasons to use CompileModule instead of InstantiateModuleFromBinary:
-	//	* Improve performance when the same module is instantiated multiple times under different names
-	//	* Reduce the amount of errors that can occur during InstantiateModule.
+	//   - Improve performance when the same module is instantiated multiple times under different names
+	//   - Reduce the amount of errors that can occur during InstantiateModule.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The resulting module name defaults to what was binary from the custom name section.
-	//	* Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
+	//   - The resulting module name defaults to what was binary from the custom name section.
+	//   - Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(ctx context.Context, binary []byte, config CompileConfig) (CompiledModule, error)
@@ -55,11 +57,11 @@ type Runtime interface {
 	//
 	//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 	//
-	// Notes
+	// # Notes
 	//
-	//	* This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
+	//   - This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	//	source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
-	//	* To avoid using configuration defaults, use InstantiateModule instead.
+	//   - To avoid using configuration defaults, use InstantiateModule instead.
 	InstantiateModuleFromBinary(ctx context.Context, source []byte) (api.Module, error)
 
 	// Namespace is the default namespace of this runtime, and is embedded for convenience. Most users will only use the
@@ -92,11 +94,11 @@ type Runtime interface {
 	//	_ = b.WithTraceToStdout().InstantiateModule(ctx, ns2)
 	//	m2, _ := ns2.InstantiateModule(ctx, compiled, config)
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The returned namespace does not inherit any modules from the runtime default namespace.
-	//	* Closing the returned namespace closes any modules in it.
-	//	* Closing this runtime also closes the namespace returned from this function.
+	//   - The returned namespace does not inherit any modules from the runtime default namespace.
+	//   - Closing the returned namespace closes any modules in it.
+	//   - Closing this runtime also closes the namespace returned from this function.
 	NewNamespace(context.Context) Namespace
 
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
@@ -130,6 +132,7 @@ func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
 		store:           store,
 		ns:              &namespace{store: store, ns: ns},
 		enabledFeatures: config.enabledFeatures,
+		isInterpreter:   config.isInterpreter,
 	}
 }
 
@@ -138,15 +141,13 @@ type runtime struct {
 	store           *wasm.Store
 	ns              *namespace
 	enabledFeatures wasm.Features
+	isInterpreter   bool
 	compiledModules []*compiledModule
 }
 
 // NewNamespace implements Runtime.NewNamespace.
 func (r *runtime) NewNamespace(ctx context.Context) Namespace {
-	return &namespace{
-		store: r.store,
-		ns:    r.store.NewNamespace(ctx),
-	}
+	return &namespace{store: r.store, ns: r.store.NewNamespace(ctx)}
 }
 
 // Module implements Namespace.Module embedded by Runtime.
@@ -179,13 +180,39 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 	// Now that the module is validated, cache the function definitions.
 	internal.BuildFunctionDefinitions()
 
+	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
+
+	if c.listeners, err = buildListeners(ctx, r, internal); err != nil {
+		return nil, err
+	}
+
 	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
 		return nil, err
 	}
 
-	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 	r.compiledModules = append(r.compiledModules, c)
 	return c, nil
+}
+
+func buildListeners(ctx context.Context, r *runtime, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
+	if ctx == nil {
+		return nil, nil
+	}
+	// Test to see if internal code are using an experimental feature.
+	fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{})
+	if fnlf == nil {
+		return nil, nil
+	}
+	if !r.isInterpreter {
+		return nil, errors.New("context includes a FunctionListenerFactoryKey, which is only supported in the interpreter")
+	}
+	factory := fnlf.(experimentalapi.FunctionListenerFactory)
+	importCount := internal.ImportFuncCount()
+	listeners := make([]experimentalapi.FunctionListener, len(internal.FunctionSection))
+	for i := 0; i < len(listeners); i++ {
+		listeners[i] = factory.NewListener(internal.FunctionDefinitionSection[uint32(i)+importCount])
+	}
+	return listeners, nil
 }
 
 // InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary

@@ -692,9 +692,9 @@ const (
 	// VCNT is the CNT instruction. https://developer.arm.com/documentation/dui0802/a/A64-Advanced-SIMD-Vector-Instructions/CNT--vector-
 	VCNT
 	// VMOV has different semantics depending on the types of operands:
-	//	* LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
-	//	* LDR(literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
-	//	* STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
+	//   - LDR(SIMD&FP) if the src is memory and dst is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/LDR--immediate--SIMD-FP---Load-SIMD-FP-Register--immediate-offset--
+	//   - LDR(literal, SIMD&FP) if the src is static const and dst is a vector: https://developer.arm.com/documentation/dui0801/h/A64-Floating-point-Instructions/LDR--literal--SIMD-and-FP-
+	//   - STR(SIMD&FP) if the dst is memory and src is a vector: https://developer.arm.com/documentation/ddi0596/2020-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--
 	VMOV
 	// UMOV is the UMOV instruction https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/UMOV--Unsigned-Move-vector-element-to-general-purpose-register-?lang=en
 	UMOV

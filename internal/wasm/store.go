@@ -108,6 +108,10 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
+		// IsHostFunction is the data returned by the same field documented on
+		// wasm.Code.
+		IsHostFunction bool
+
 		// Kind describes how this function should be called.
 		Kind FunctionKind
 
@@ -305,7 +309,7 @@ func (s *Store) Instantiate(
 	module *Module,
 	name string,
 	sys *internalsys.Context,
-	functionListenerFactory experimentalapi.FunctionListenerFactory,
+	listeners []experimentalapi.FunctionListener,
 ) (*CallContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -329,7 +333,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the namespace so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, functionListenerFactory, importedModules); err != nil {
+	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, listeners, importedModules); err != nil {
 		ns.deleteModule(name)
 		return nil, err
 	} else {
@@ -346,7 +350,7 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	functionListenerFactory experimentalapi.FunctionListenerFactory,
+	listeners []experimentalapi.FunctionListener,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {
 	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
@@ -367,16 +371,8 @@ func (s *Store) instantiate(
 	}
 	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
-	// If there are no module-defined functions, assume this is a host module.
-	var funcSection SectionID
-	if module.HostFunctionSection == nil {
-		funcSection = SectionIDFunction
-	} else {
-		funcSection = SectionIDHostFunction
-	}
-
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module, functionListenerFactory)
+	functions := m.BuildFunctions(module, listeners)
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
@@ -420,7 +416,7 @@ func (s *Store) instantiate(
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {
-			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
+			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 	}
 

@@ -1,9 +1,9 @@
 package binary
 
 import (
-	"reflect"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -211,10 +211,13 @@ func TestModule_Encode(t *testing.T) {
 
 func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
 	// We don't currently have an approach to serialize reflect.Value pointers
-	fn := reflect.ValueOf(func(wasm.Module) {})
+	fn := func(api.Module) {}
 
 	captured := require.CapturePanic(func() {
-		EncodeModule(&wasm.Module{HostFunctionSection: []*reflect.Value{&fn}})
+		EncodeModule(&wasm.Module{
+			TypeSection: []*wasm.FunctionType{{}},
+			CodeSection: []*wasm.Code{wasm.MustParseGoFuncCode(fn)},
+		})
 	})
-	require.EqualError(t, captured, "BUG: HostFunctionSection is not encodable")
+	require.EqualError(t, captured, "BUG: GoFunc is not encodable")
 }

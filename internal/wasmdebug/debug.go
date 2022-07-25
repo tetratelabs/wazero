@@ -18,10 +18,10 @@ import (
 
 // FuncName returns the naming convention of "moduleName.funcName".
 //
-//	* moduleName is the possibly empty name the module was instantiated with.
-//	* funcName is the name in the Custom Name section.
-//	* funcIdx is the position in the function index namespace, prefixed with
-//	  imported functions.
+//   - moduleName is the possibly empty name the module was instantiated with.
+//   - funcName is the name in the Custom Name section.
+//   - funcIdx is the position in the function index namespace, prefixed with
+//     imported functions.
 //
 // Note: "moduleName.$funcIdx" is used when the funcName is empty, as commonly
 // the case in TinyGo.

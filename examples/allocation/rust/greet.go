@@ -12,6 +12,7 @@ import (
 )
 
 // greetWasm was compiled using `cargo build --release --target wasm32-unknown-unknown`
+//
 //go:embed testdata/greet.wasm
 var greetWasm []byte
 

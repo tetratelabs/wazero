@@ -2,19 +2,15 @@ package wasi_snapshot_preview1
 
 import (
 	_ "embed"
-	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// Test_ClockResGet only tests it is stubbed for GrainLang per #271
-func Test_ClockResGet(t *testing.T) {
-	mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
-	defer mod.Close(testCtx)
-
-	resultResolution := uint32(1) // arbitrary offset
+func Test_clockResGet(t *testing.T) {
+	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
 
 	expectedMemoryMicro := []byte{
 		'?',                                     // resultResolution is after this
@@ -30,56 +26,41 @@ func Test_ClockResGet(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		clockID        uint64
+		clockID        uint32
 		expectedMemory []byte
-		invocation     func(clockID uint64) Errno
+		expectedLog    string
 	}{
 		{
-			name:           "wasi.ClockResGet",
-			clockID:        0,
+			name:           "Realtime",
+			clockID:        clockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
-			invocation: func(clockID uint64) Errno {
-				return a.ClockResGet(testCtx, mod, uint32(clockID), resultResolution)
-			},
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=1)
+<== ESUCCESS
+`,
 		},
 		{
-			name:           "wasi.ClockResGet",
-			clockID:        1,
+			name:           "Monotonic",
+			clockID:        clockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
-			invocation: func(clockID uint64) Errno {
-				return a.ClockResGet(testCtx, mod, uint32(clockID), resultResolution)
-			},
-		},
-		{
-			name:           functionClockResGet,
-			clockID:        0,
-			expectedMemory: expectedMemoryMicro,
-			invocation: func(clockID uint64) Errno {
-				results, err := fn.Call(testCtx, clockID, uint64(resultResolution))
-				require.NoError(t, err)
-				return Errno(results[0]) // results[0] is the errno
-			},
-		},
-		{
-			name:           functionClockResGet,
-			clockID:        1,
-			expectedMemory: expectedMemoryNano,
-			invocation: func(clockID uint64) Errno {
-				results, err := fn.Call(testCtx, clockID, uint64(resultResolution))
-				require.NoError(t, err)
-				return Errno(results[0]) // results[0] is the errno
-			},
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=1)
+<== ESUCCESS
+`,
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
-		t.Run(fmt.Sprintf("%v/clockID=%v", tc.name, tc.clockID), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
 			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
-			errno := tc.invocation(tc.clockID)
-			require.Equal(t, ErrnoSuccess, errno, ErrnoName(errno))
+			resultResolution := uint32(1) // arbitrary offset
+			requireErrno(t, ErrnoSuccess, mod, functionClockResGet, uint64(tc.clockID), uint64(resultResolution))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
@@ -88,30 +69,42 @@ func Test_ClockResGet(t *testing.T) {
 	}
 }
 
-func Test_ClockResGet_Unsupported(t *testing.T) {
-	resultResolution := uint32(1) // arbitrary offset
-	mod, fn := instantiateModule(testCtx, t, functionClockResGet, importClockResGet, nil)
-	defer mod.Close(testCtx)
+func Test_clockResGet_Unsupported(t *testing.T) {
+	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
 
 	tests := []struct {
 		name          string
-		clockID       uint64
+		clockID       uint32
 		expectedErrno Errno
+		expectedLog   string
 	}{
 		{
 			name:          "process cputime",
 			clockID:       2,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "thread cputime",
 			clockID:       3,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "undefined",
 			clockID:       100,
 			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=1)
+<== EINVAL
+`,
 		},
 	}
 
@@ -119,115 +112,107 @@ func Test_ClockResGet_Unsupported(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := fn.Call(testCtx, tc.clockID, uint64(resultResolution))
-			require.NoError(t, err)
-			errno := Errno(results[0]) // results[0] is the errno
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
+			defer log.Reset()
+
+			resultResolution := uint32(1) // arbitrary offset
+			requireErrno(t, tc.expectedErrno, mod, functionClockResGet, uint64(tc.clockID), uint64(resultResolution))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
 
-func Test_ClockTimeGet(t *testing.T) {
-	resultTimestamp := uint32(1) // arbitrary offset
+func Test_clockTimeGet(t *testing.T) {
+	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
 
-	mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
-	defer mod.Close(testCtx)
-
-	clocks := []struct {
-		clock          string
-		id             uint32
+	tests := []struct {
+		name           string
+		clockID        uint32
 		expectedMemory []byte
+		expectedLog    string
 	}{
 		{
-			clock: "Realtime",
-			id:    clockIDRealtime,
+			name:    "Realtime",
+			clockID: clockIDRealtime,
 			expectedMemory: []byte{
 				'?',                                          // resultTimestamp is after this
 				0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
 				'?', // stopped after encoding
 			},
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=1)
+<== ESUCCESS
+`,
 		},
 		{
-			clock: "Monotonic",
-			id:    clockIDMonotonic,
+			name:    "Monotonic",
+			clockID: clockIDMonotonic,
 			expectedMemory: []byte{
 				'?',                                    // resultTimestamp is after this
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // fake nanotime starts at zero
 				'?', // stopped after encoding
 			},
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=1)
+<== ESUCCESS
+`,
 		},
 	}
 
-	for _, c := range clocks {
-		cc := c
-		t.Run(cc.clock, func(t *testing.T) {
-			tests := []struct {
-				name       string
-				invocation func() Errno
-			}{
-				{
-					name: "wasi.ClockTimeGet",
-					invocation: func() Errno {
-						return a.ClockTimeGet(testCtx, mod, cc.id, 0 /* TODO: precision */, resultTimestamp)
-					},
-				},
-				{
-					name: functionClockTimeGet,
-					invocation: func() Errno {
-						results, err := fn.Call(testCtx, uint64(cc.id), 0 /* TODO: precision */, uint64(resultTimestamp))
-						require.NoError(t, err)
-						errno := Errno(results[0]) // results[0] is the errno
-						return errno
-					},
-				},
-			}
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
 
-			for _, tt := range tests {
-				tc := tt
-				t.Run(tc.name, func(t *testing.T) {
-					// Reset the fake clock
-					sysCtx, err := newSysContext(nil, nil, nil)
-					require.NoError(t, err)
-					mod.(*wasm.CallContext).Sys = sysCtx
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
-					maskMemory(t, testCtx, mod, len(cc.expectedMemory))
+			resultTimestamp := uint32(1) // arbitrary offset
+			requireErrno(t, ErrnoSuccess, mod, functionClockTimeGet, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-					errno := tc.invocation()
-					require.Zero(t, errno, ErrnoName(errno))
-
-					actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(cc.expectedMemory)))
-					require.True(t, ok)
-					require.Equal(t, cc.expectedMemory, actual)
-				})
-			}
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
 		})
 	}
 }
 
-func Test_ClockTimeGet_Unsupported(t *testing.T) {
-	resultTimestamp := uint32(1) // arbitrary offset
-	mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
-	defer mod.Close(testCtx)
+func Test_clockTimeGet_Unsupported(t *testing.T) {
+	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
 
 	tests := []struct {
 		name          string
-		clockID       uint64
+		clockID       uint32
 		expectedErrno Errno
+		expectedLog   string
 	}{
 		{
 			name:          "process cputime",
 			clockID:       2,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "thread cputime",
 			clockID:       3,
 			expectedErrno: ErrnoNotsup,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
+<== ENOTSUP
+`,
 		},
 		{
 			name:          "undefined",
 			clockID:       100,
 			expectedErrno: ErrnoInval,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
+<== EINVAL
+`,
 		},
 	}
 
@@ -235,33 +220,42 @@ func Test_ClockTimeGet_Unsupported(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := fn.Call(testCtx, tc.clockID, 0 /* TODO: precision */, uint64(resultTimestamp))
-			require.NoError(t, err)
-			errno := Errno(results[0]) // results[0] is the errno
-			require.Equal(t, tc.expectedErrno, errno, ErrnoName(errno))
+			defer log.Reset()
+
+			resultTimestamp := uint32(1) // arbitrary offset
+
+			requireErrno(t, tc.expectedErrno, mod, functionClockTimeGet, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }
 
-func Test_ClockTimeGet_Errors(t *testing.T) {
-	mod, fn := instantiateModule(testCtx, t, functionClockTimeGet, importClockTimeGet, nil)
-	defer mod.Close(testCtx)
+func Test_clockTimeGet_Errors(t *testing.T) {
+	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
 
 	tests := []struct {
-		name            string
-		resultTimestamp uint32
-		argvBufSize     uint32
+		name                         string
+		resultTimestamp, argvBufSize uint32
+		expectedLog                  string
 	}{
 		{
 			name:            "resultTimestamp out-of-memory",
 			resultTimestamp: memorySize,
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+<== EFAULT
+`,
 		},
-
 		{
 			name:            "resultTimestamp exceeds the maximum valid address by 1",
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			expectedLog: `
+==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+<== EFAULT
+`,
 		},
 	}
 
@@ -269,10 +263,10 @@ func Test_ClockTimeGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := fn.Call(testCtx, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
-			require.NoError(t, err)
-			errno := Errno(results[0]) // results[0] is the errno
-			require.Equal(t, ErrnoFault, errno, ErrnoName(errno))
+			defer log.Reset()
+
+			requireErrno(t, ErrnoFault, mod, functionClockTimeGet, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
 }

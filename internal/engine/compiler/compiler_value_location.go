@@ -19,7 +19,7 @@ func isNilRegister(r asm.Register) bool {
 	return r == asm.NilRegister
 }
 
-func isIntRegister(r asm.Register) bool {
+func isGeneralPurposeRegister(r asm.Register) bool {
 	return unreservedGeneralPurposeRegisters[0] <= r && r <= unreservedGeneralPurposeRegisters[len(unreservedGeneralPurposeRegisters)-1]
 }
 
@@ -326,7 +326,7 @@ func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerT
 					return loc, true
 				}
 			case registerTypeGeneralPurpose:
-				if isIntRegister(loc.register) {
+				if isGeneralPurposeRegister(loc.register) {
 					return loc, true
 				}
 			}

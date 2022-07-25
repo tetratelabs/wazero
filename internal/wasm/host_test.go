@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -30,15 +29,10 @@ func swap(x, y uint32) (uint32, uint32) {
 }
 
 func TestNewHostModule(t *testing.T) {
-	i32 := ValueTypeI32
-
 	a := wasiAPI{}
 	functionArgsSizesGet := "args_sizes_get"
-	fnArgsSizesGet := reflect.ValueOf(a.ArgsSizesGet)
 	functionFdWrite := "fd_write"
-	fnFdWrite := reflect.ValueOf(a.FdWrite)
 	functionSwap := "swap"
-	fnSwap := reflect.ValueOf(swap)
 
 	tests := []struct {
 		name, moduleName string
@@ -65,11 +59,11 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
-					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
-				FunctionSection:     []Index{0, 1},
-				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet, &fnFdWrite},
+				FunctionSection: []Index{0, 1},
+				CodeSection:     []*Code{MustParseGoFuncCode(a.ArgsSizesGet), MustParseGoFuncCode(a.FdWrite)},
 				ExportSection: []*Export{
 					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
 					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
@@ -90,11 +84,11 @@ func TestNewHostModule(t *testing.T) {
 				functionSwap: swap,
 			},
 			expected: &Module{
-				TypeSection:         []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2}},
-				FunctionSection:     []Index{0},
-				HostFunctionSection: []*reflect.Value{&fnSwap},
-				ExportSection:       []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
-				NameSection:         &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
+				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{MustParseGoFuncCode(swap)},
+				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
+				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
 		},
 		{
@@ -151,10 +145,10 @@ func TestNewHostModule(t *testing.T) {
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
 				},
-				FunctionSection:     []Index{0},
-				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet},
+				FunctionSection: []Index{0},
+				CodeSection:     []*Code{MustParseGoFuncCode(a.ArgsSizesGet)},
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: i32},
@@ -181,13 +175,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(
-				tc.moduleName,
-				tc.nameToGoFunc,
-				tc.nameToMemory,
-				tc.nameToGlobal,
-				Features20191205|FeatureMultiValue,
-			)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205|FeatureMultiValue)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -205,14 +193,21 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 	require.Equal(t, expected.ExportSection, actual.ExportSection)
 	require.Equal(t, expected.StartSection, actual.StartSection)
 	require.Equal(t, expected.ElementSection, actual.ElementSection)
-	require.Nil(t, actual.CodeSection) // Host functions are implemented in Go, not Wasm!
 	require.Equal(t, expected.DataSection, actual.DataSection)
 	require.Equal(t, expected.NameSection, actual.NameSection)
 
 	// Special case because reflect.Value can't be compared with Equals
-	require.Equal(t, len(expected.HostFunctionSection), len(actual.HostFunctionSection))
-	for i := range expected.HostFunctionSection {
-		require.Equal(t, (*expected.HostFunctionSection[i]).Type(), (*actual.HostFunctionSection[i]).Type())
+	// TODO: This is copy/paste with /builder_test.go
+	require.Equal(t, len(expected.CodeSection), len(actual.CodeSection))
+	for i, c := range expected.CodeSection {
+		actualCode := actual.CodeSection[i]
+		require.True(t, actualCode.IsHostFunction)
+		require.Equal(t, c.Kind, actualCode.Kind)
+		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+
+		// Not wasm
+		require.Nil(t, actualCode.Body)
+		require.Nil(t, actualCode.LocalTypes)
 	}
 }
 
@@ -227,19 +222,19 @@ func TestNewHostModule_Errors(t *testing.T) {
 		{
 			name:         "not a function",
 			nameToGoFunc: map[string]interface{}{"fn": t},
-			expectedErr:  "func[fn] kind != func: ptr",
+			expectedErr:  "func[.fn] kind != func: ptr",
 		},
 		{
 			name:         "function has multiple results",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
 			nameToMemory: map[string]*Memory{"mem": {Min: 1, Max: 1}},
-			expectedErr:  "func[fn] multiple result types invalid as feature \"multi-value\" is disabled",
+			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 		{
 			name:         "func collides on memory name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToMemory: map[string]*Memory{"fn": {Min: 1, Max: 1}},
-			expectedErr:  "func[fn] exports the same name as a memory",
+			expectedErr:  "func[.fn] exports the same name as a memory",
 		},
 		{
 			name:         "multiple memories",
@@ -255,7 +250,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 			name:         "func collides on global name",
 			nameToGoFunc: map[string]interface{}{"fn": ArgsSizesGet},
 			nameToGlobal: map[string]*Global{"fn": {}},
-			expectedErr:  "func[fn] exports the same name as a global",
+			expectedErr:  "func[.fn] exports the same name as a global",
 		},
 	}
 
@@ -263,7 +258,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.nameToMemory, tc.nameToGlobal, Features20191205)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

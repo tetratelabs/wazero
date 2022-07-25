@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
@@ -23,9 +22,9 @@ type Namespace interface {
 	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
 	//
 	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
-	//	* The module name is already in use.
-	//	* The module has a table element initializer that resolves to an index outside the Table minimum size.
-	//	* The module has a start function, and it failed to execute.
+	//   - The module name is already in use.
+	//   - The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//   - The module has a start function, and it failed to execute.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
 	// CloseWithExitCode closes all modules initialized in this Namespace with the provided exit code.
@@ -80,15 +79,8 @@ func (ns *namespace) InstantiateModule(
 		name = code.module.NameSection.ModuleName
 	}
 
-	var functionListenerFactory experimentalapi.FunctionListenerFactory
-	if ctx != nil { // Test to see if internal code are using an experimental feature.
-		if fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{}); fnlf != nil {
-			functionListenerFactory = fnlf.(experimentalapi.FunctionListenerFactory)
-		}
-	}
-
 	// Instantiate the module in the appropriate namespace.
-	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx, functionListenerFactory)
+	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx, code.listeners)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {
