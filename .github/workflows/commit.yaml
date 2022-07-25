@@ -7,7 +7,7 @@ on:
       - 'site/**'
       - 'netlify.toml'
   push:
-    branches: [main]
+    branches: [try1.19]
     paths-ignore:  # ignore docs as they are built with Netlify.
       - '**/*.md'
       - 'site/**'
@@ -65,6 +65,7 @@ jobs:
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
         - "1.18"
+        - "1.19.0-rc.2"
 
     steps:
       - uses: actions/setup-go@v3
