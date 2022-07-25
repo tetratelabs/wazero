@@ -438,6 +438,7 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 
 }
 
+// collectRegistersFromRuntimeValues returns the registers occupied by locs.
 func collectRegistersFromRuntimeValues(locs []*runtimeValueLocation) []asm.Register {
 	out := make([]asm.Register, len(locs))
 	for i := range locs {
