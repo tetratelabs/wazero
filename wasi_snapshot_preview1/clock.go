@@ -28,7 +28,7 @@ const (
 // clockResGet is the WASI function named functionClockResGet that returns the
 // resolution of time values returned by clockTimeGet.
 //
-// Parameters
+// # Parameters
 //
 //   - id: clock ID to use
 //   - resultResolution: offset to write the resolution to api.Memory
@@ -83,7 +83,7 @@ var clockResGet = wasm.NewGoFunc(
 // clockTimeGet is the WASI function named functionClockTimeGet that returns
 // the time value of a name (time.Now).
 //
-// Parameters
+// # Parameters
 //
 //   - id: clock ID to use
 //   - precision: maximum lag (exclusive) that the returned time value may have,

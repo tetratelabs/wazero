@@ -15,7 +15,7 @@ const (
 // environGet is the WASI function named functionEnvironGet that reads
 // environment variables.
 //
-// Parameters
+// # Parameters
 //
 //   - environ: offset to begin writing environment offsets in uint32
 //     little-endian encoding to api.Memory
@@ -58,7 +58,7 @@ var environGet = wasm.NewGoFunc(
 // environSizesGet is the WASI function named functionEnvironSizesGet that
 // reads environment variable sizes.
 //
-// Parameters
+// # Parameters
 //
 //   - resultEnvironc: offset to write the count of environment variables to
 //     api.Memory

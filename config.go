@@ -31,10 +31,10 @@ type RuntimeConfig interface {
 	// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	//	* Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-	//	* Adds `table.init`, `table.copy` and `elem.drop` instructions.
-	//	* Introduces a "passive" form of element and data segments.
-	//	* Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+	//   - Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
+	//   - Adds `table.init`, `table.copy` and `elem.drop` instructions.
+	//   - Introduces a "passive" form of element and data segments.
+	//   - Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
 	//
 	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
 	// due to the WebAssembly Working Group merging them "mutually dependent".
@@ -49,8 +49,8 @@ type RuntimeConfig interface {
 	// finished in WebAssembly 1.0 (20191205).
 	//
 	// Here are the notable effects:
-	//	* Function (`func`) types allow more than one result
-	//	* Block types (`block`, `loop` and `if`) can be arbitrary function types
+	//   - Function (`func`) types allow more than one result
+	//   - Block types (`block`, `loop` and `if`) can be arbitrary function types
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
 	WithFeatureMultiValue(bool) RuntimeConfig
@@ -66,22 +66,22 @@ type RuntimeConfig interface {
 	// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0.
 	//
 	// The only effect of enabling is allowing the following instructions, which return 0 on NaN instead of panicking.
-	//	* `i32.trunc_sat_f32_s`
-	//	* `i32.trunc_sat_f32_u`
-	//	* `i32.trunc_sat_f64_s`
-	//	* `i32.trunc_sat_f64_u`
-	//	* `i64.trunc_sat_f32_s`
-	//	* `i64.trunc_sat_f32_u`
-	//	* `i64.trunc_sat_f64_s`
-	//	* `i64.trunc_sat_f64_u`
+	//   - `i32.trunc_sat_f32_s`
+	//   - `i32.trunc_sat_f32_u`
+	//   - `i32.trunc_sat_f64_s`
+	//   - `i32.trunc_sat_f64_u`
+	//   - `i64.trunc_sat_f32_s`
+	//   - `i64.trunc_sat_f32_u`
+	//   - `i64.trunc_sat_f64_s`
+	//   - `i64.trunc_sat_f64_u`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
 	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
 
 	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
 	//
-	//	* Introduction of new value types: `funcref` and `externref`.
-	//	* Support for the following new instructions:
+	//   - Introduction of new value types: `funcref` and `externref`.
+	//   - Support for the following new instructions:
 	//	 * `ref.null`
 	//	 * `ref.func`
 	//	 * `ref.is_null`
@@ -90,7 +90,7 @@ type RuntimeConfig interface {
 	//	 * `table.grow`
 	//	 * `table.set`
 	//	 * `table.size`
-	//	* Support for multiple tables per module:
+	//   - Support for multiple tables per module:
 	//	 * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
 	//	 * Element segments can take non-zero table index.
 	//
@@ -107,7 +107,7 @@ type RuntimeConfig interface {
 	// as the feature was not in WebAssembly 1.0.
 	//
 	// Here are the notable effects:
-	//	* Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
+	//   - Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
 	//
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
@@ -451,11 +451,11 @@ type ModuleConfig interface {
 	// WithStartFunctions configures the functions to call after the module is
 	// instantiated. Defaults to "_start".
 	//
-	// Notes
+	// # Notes
 	//
-	//	* If any function doesn't exist, it is skipped. However, all functions
+	//   - If any function doesn't exist, it is skipped. However, all functions
 	//	  that do exist are called in order.
-	//	* Some start functions may exit the module during instantiate with a
+	//   - Some start functions may exit the module during instantiate with a
 	//	  sys.ExitError (ex. emscripten), preventing use of exported functions.
 	WithStartFunctions(...string) ModuleConfig
 
@@ -464,10 +464,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stderr as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stderr
 	WithStderr(io.Writer) ModuleConfig
@@ -477,10 +477,10 @@ type ModuleConfig interface {
 	// This reader is most commonly used by the functions like "fd_read" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stdin as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stdin
 	WithStdin(io.Reader) ModuleConfig
@@ -490,10 +490,10 @@ type ModuleConfig interface {
 	// This writer is most commonly used by the functions like "fd_write" in "wasi_snapshot_preview1" although it could
 	// be used by functions imported from other modules.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
-	//	* This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
+	//   - The caller is responsible to close any io.Writer they supply: It is not closed on api.Module Close.
+	//   - This does not default to os.Stdout as that both violates sandboxing and prevents concurrent modules.
 	//
 	// See https://linux.die.net/man/3/stdout
 	WithStdout(io.Writer) ModuleConfig
@@ -528,11 +528,11 @@ type ModuleConfig interface {
 	//			return clock.nanotime()
 	//		}, sys.ClockResolution(time.Microsecond.Nanoseconds()))
 	//
-	// Notes:
-	//	* This does not default to time.Since as that violates sandboxing.
-	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
-	//	* If you set this, you should probably set WithNanosleep also.
-	//	* Use WithSysNanotime for a usable implementation.
+	// # Notes:
+	//   - This does not default to time.Since as that violates sandboxing.
+	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - If you set this, you should probably set WithNanosleep also.
+	//   - Use WithSysNanotime for a usable implementation.
 	WithNanotime(sys.Nanotime, sys.ClockResolution) ModuleConfig
 
 	// WithSysNanotime uses time.Now for sys.Nanotime with a resolution of 1us.
@@ -552,12 +552,12 @@ type ModuleConfig interface {
 	//				err := unix.ClockNanosleep(unix.CLOCK_MONOTONIC, 0, &rel, &remain)
 	//			--snip--
 	//
-	// Notes:
-	//	* This primarily supports `poll_oneoff` for relative clock events.
-	//	* This does not default to time.Sleep as that violates sandboxing.
-	//	* Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
-	//	* If you set this, you should probably set WithNanotime also.
-	//	* Use WithSysNanosleep for a usable implementation.
+	// # Notes:
+	//   - This primarily supports `poll_oneoff` for relative clock events.
+	//   - This does not default to time.Sleep as that violates sandboxing.
+	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - If you set this, you should probably set WithNanotime also.
+	//   - Use WithSysNanosleep for a usable implementation.
 	WithNanosleep(sys.Nanosleep) ModuleConfig
 
 	// WithSysNanosleep uses time.Sleep for sys.Nanosleep.

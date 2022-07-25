@@ -811,7 +811,7 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
 	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if f.source.FunctionListener != nil {
-		ctx = f.source.FunctionListener.Before(ctx, params)
+		ctx = f.source.FunctionListener.Before(ctx, f.source.Definition(), params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -819,7 +819,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	ce.popFrame()
 	if f.source.FunctionListener != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
-		f.source.FunctionListener.After(ctx, nil, results)
+		f.source.FunctionListener.After(ctx, f.source.Definition(), nil, results)
 	}
 	return
 }
@@ -4299,10 +4299,10 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, ce.peekValues(len(f.source.Type.Params)))
+	ctx = fnl.Before(ctx, f.source.Definition(), ce.peekValues(len(f.source.Type.Params)))
 	ce.callNativeFunc(ctx, callCtx, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, f.source.Definition(), nil, ce.peekValues(len(f.source.Type.Results)))
 	return ctx
 }
 

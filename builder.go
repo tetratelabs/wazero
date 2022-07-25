@@ -36,7 +36,7 @@ import (
 //
 //	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
 //
-// Notes
+// # Notes
 //
 //   - ModuleBuilder is mutable: each method returns the same instance for
 //     chaining.
@@ -50,11 +50,11 @@ type ModuleBuilder interface {
 	// ExportFunction adds a function written in Go, which a WebAssembly module can import.
 	// If a function is already exported with the same name, this overwrites it.
 	//
-	// Parameters
+	// # Parameters
 	//
-	//	* exportName - The name to export. Ex "random_get"
-	//	* goFunc - The `func` to export.
-	//	* names - If present, the first is the api.FunctionDefinition name.
+	//   - exportName - The name to export. Ex "random_get"
+	//   - goFunc - The `func` to export.
+	//   - names - If present, the first is the api.FunctionDefinition name.
 	//	  If any follow, they must match the count of goFunc's parameters.
 	//
 	// Ex.
@@ -116,19 +116,19 @@ type ModuleBuilder interface {
 	// ExportMemory adds linear memory, which a WebAssembly module can import and become available via api.Memory.
 	// If a memory is already exported with the same name, this overwrites it.
 	//
-	// Parameters
+	// # Parameters
 	//
-	//	* name - the name to export. Ex "memory" for wasi_snapshot_preview1.ModuleSnapshotPreview1
-	//	* minPages - the possibly zero initial size in pages (65536 bytes per page).
+	//   - name - the name to export. Ex "memory" for wasi_snapshot_preview1.ModuleSnapshotPreview1
+	//   - minPages - the possibly zero initial size in pages (65536 bytes per page).
 	//
 	// For example, the WebAssembly 1.0 Text Format below is the equivalent of this builder method:
 	//	// (memory (export "memory") 1)
 	//	builder.ExportMemory(1)
 	//
-	// Notes
+	// # Notes
 	//
-	//	* This is allowed to grow to (4GiB) limited by api.MemorySizer. To bound it, use ExportMemoryWithMax.
-	//	* Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
+	//   - This is allowed to grow to (4GiB) limited by api.MemorySizer. To bound it, use ExportMemoryWithMax.
+	//   - Version 1.0 (20191205) of the WebAssembly spec allows at most one memory per module.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
 	ExportMemory(name string, minPages uint32) ModuleBuilder
@@ -208,11 +208,11 @@ type ModuleBuilder interface {
 	//		ExportFunction("hello", hello).
 	//		Instantiate(ctx, r)
 	//
-	// Notes
+	// # Notes
 	//
-	//	* Closing the Namespace has the same effect as closing the result.
-	//	* Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
-	//	* To avoid using configuration defaults, use Compile instead.
+	//   - Closing the Namespace has the same effect as closing the result.
+	//   - Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
+	//   - To avoid using configuration defaults, use Compile instead.
 	Instantiate(context.Context, Namespace) (api.Module, error)
 }
 

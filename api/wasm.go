@@ -125,7 +125,7 @@ func ValueTypeName(t ValueType) string {
 
 // Module return functions exported in a module, post-instantiation.
 //
-// Notes
+// # Notes
 //
 //   - Closing the wazero.Runtime closes any Module it instantiated.
 //   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
@@ -316,7 +316,7 @@ type MutableGlobal interface {
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
-// Notes
+// # Notes
 //
 //   - All functions accept a context.Context, which when nil, default to context.Background.
 //   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
@@ -334,11 +334,11 @@ type Memory interface {
 	// The return val is the previous memory size in pages, or false if the
 	// delta was ignored as it exceeds max memory.
 	//
-	// Notes
+	// # Notes
 	//
-	//	* This is the same as the "memory.grow" instruction defined in the
+	//   - This is the same as the "memory.grow" instruction defined in the
 	//	  WebAssembly Core Specification, except returns false instead of -1.
-	//	* When this returns true, any shared views via Read must be refreshed.
+	//   - When this returns true, any shared views via Read must be refreshed.
 	//
 	// See MemorySizer Read and https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	Grow(ctx context.Context, deltaPages uint32) (previousPages uint32, ok bool)

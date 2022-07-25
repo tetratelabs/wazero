@@ -17,7 +17,7 @@ const (
 // execution of the module with an exit code. The only successful exit code is
 // zero.
 //
-// Parameters
+// # Parameters
 //
 //   - exitCode: exit code.
 //

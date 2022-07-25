@@ -27,21 +27,23 @@ type FunctionListener interface {
 	// Before is invoked before a function is called. The returned context will
 	// be used as the context of this function call.
 	//
-	// Params
+	// # Params
 	//
-	//	* ctx - the context of the caller function which must be the same
-	//	  instance or parent of the result.
-	//	* paramValues - api.ValueType encoded parameters.
-	Before(ctx context.Context, paramValues []uint64) context.Context
+	//   - ctx: the context of the caller function which must be the same
+	//	   instance or parent of the result.
+	//   - def: the function definition.
+	//   - paramValues:  api.ValueType encoded parameters.
+	Before(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context
 
 	// After is invoked after a function is called.
 	//
-	// Params
+	// # Params
 	//
-	//	* ctx - the context returned by Before.
-	//	* err - nil if the function didn't err
-	//	* resultValues - api.ValueType encoded results.
-	After(ctx context.Context, err error, resultValues []uint64)
+	//   - ctx: the context returned by Before.
+	//   - def: the function definition.
+	//   - err: nil if the function didn't err
+	//   - resultValues: api.ValueType encoded results.
+	After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64)
 }
 
 // TODO: We need to add tests to enginetest to ensure contexts nest. A good test can use a combination of call and call

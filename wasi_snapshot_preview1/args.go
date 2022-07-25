@@ -15,7 +15,7 @@ const (
 // argsGet is the WASI function named functionArgsGet that reads command-line
 // argument data.
 //
-// Parameters
+// # Parameters
 //
 //   - argv: offset to begin writing argument offsets in uint32 little-endian
 //     encoding to api.Memory
@@ -58,7 +58,7 @@ var argsGet = wasm.NewGoFunc(
 // argsSizesGet is the WASI function named functionArgsSizesGet that reads
 // command-line argument sizes.
 //
-// Parameters
+// # Parameters
 //
 //   - resultArgc: offset to write the argument count to api.Memory
 //   - resultArgvBufSize: offset to write the null-terminated argument length to

@@ -33,7 +33,7 @@ const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 // Instantiate instantiates the ModuleName module into the runtime default
 // namespace.
 //
-// Notes
+// # Notes
 //
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To instantiate into another wazero.Namespace, use NewBuilder instead.

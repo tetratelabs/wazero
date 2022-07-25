@@ -22,9 +22,9 @@ type Namespace interface {
 	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
 	//
 	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
-	//	* The module name is already in use.
-	//	* The module has a table element initializer that resolves to an index outside the Table minimum size.
-	//	* The module has a start function, and it failed to execute.
+	//   - The module name is already in use.
+	//   - The module has a table element initializer that resolves to an index outside the Table minimum size.
+	//   - The module has a start function, and it failed to execute.
 	InstantiateModule(ctx context.Context, compiled CompiledModule, config ModuleConfig) (api.Module, error)
 
 	// CloseWithExitCode closes all modules initialized in this Namespace with the provided exit code.

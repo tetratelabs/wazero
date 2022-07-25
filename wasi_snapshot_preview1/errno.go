@@ -6,7 +6,7 @@ import (
 
 // Errno are the error codes returned by WASI functions.
 //
-// Notes
+// # Notes
 //
 //   - This is not always an error, as ErrnoSuccess is a valid code.
 //   - Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.

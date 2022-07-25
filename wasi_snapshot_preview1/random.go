@@ -13,7 +13,7 @@ const functionRandomGet = "random_get"
 // randomGet is the WASI function named functionRandomGet which writes random
 // data to a buffer.
 //
-// Parameters
+// # Parameters
 //
 //   - buf: api.Memory offset to write random values
 //   - bufLen: size of random data in bytes

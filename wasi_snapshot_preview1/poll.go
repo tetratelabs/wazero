@@ -24,7 +24,7 @@ const (
 // pollOneoff is the WASI function named functionPollOneoff that concurrently
 // polls for the occurrence of a set of events.
 //
-// Parameters
+// # Parameters
 //
 //   - in: pointer to the subscriptions (48 bytes each)
 //   - out: pointer to the resulting events (32 bytes each)
@@ -39,7 +39,7 @@ const (
 //   - ErrnoFault: there is not enough memory to read the subscriptions or
 //     write results.
 //
-// Notes
+// # Notes
 //
 //   - Since the `out` pointer nests Errno, the result is always ErrnoSuccess.
 //   - importPollOneoff shows this signature in the WebAssembly 1.0 Text Format.
