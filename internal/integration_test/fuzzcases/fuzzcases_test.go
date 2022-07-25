@@ -250,7 +250,7 @@ func Test715(t *testing.T) {
 			res, err := f.Call(ctx)
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(10), res[0])
+			require.Equal(t, uint64(1), res[0])
 		})
 	}
 }
