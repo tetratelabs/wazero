@@ -24,6 +24,7 @@ func log(message string) {
 // byteCount) to the console.
 //
 // Note: In TinyGo "//export" on a func is actually an import!
+//
 //go:wasm-module env
 //export log
 func _log(ptr uint32, size uint32)
@@ -35,6 +36,7 @@ func greeting(name string) string {
 
 // _greet is a WebAssembly export that accepts a string pointer (linear memory
 // offset) and calls greet.
+//
 //export greet
 func _greet(ptr, size uint32) {
 	name := ptrToString(ptr, size)
@@ -46,6 +48,7 @@ func _greet(ptr, size uint32) {
 //
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
+//
 //export greeting
 func _greeting(ptr, size uint32) (ptrSize uint64) {
 	name := ptrToString(ptr, size)
