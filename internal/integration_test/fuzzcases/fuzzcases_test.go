@@ -27,6 +27,8 @@ var (
 	case708 []byte
 	//go:embed testdata/709.wasm
 	case709 []byte
+	//go:embed testdata/715.wasm
+	case715 []byte
 )
 
 func newRuntimeCompiler() wazero.Runtime {
@@ -221,6 +223,34 @@ func Test709(t *testing.T) {
 
 			require.NotEqual(t, uint64(0), res[0])
 			require.NotEqual(t, uint64(0), res[1])
+		})
+	}
+}
+
+func Test715(t *testing.T) {
+	if !platform.CompilerSupported() {
+		return
+	}
+
+	for _, tc := range []struct {
+		name string
+		r    wazero.Runtime
+	}{
+		{name: "compiler", r: newRuntimeCompiler()},
+		{name: "interpreter", r: newRuntimeInterpreter()},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.r.Close(ctx)
+			mod, err := tc.r.InstantiateModuleFromBinary(ctx, case715)
+			require.NoError(t, err)
+
+			f := mod.ExportedFunction("add")
+			require.NotNil(t, f)
+			res, err := f.Call(ctx)
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(10), res[0])
 		})
 	}
 }
