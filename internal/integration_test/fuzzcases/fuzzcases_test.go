@@ -245,7 +245,7 @@ func Test715(t *testing.T) {
 			mod, err := tc.r.InstantiateModuleFromBinary(ctx, case715)
 			require.NoError(t, err)
 
-			f := mod.ExportedFunction("add")
+			f := mod.ExportedFunction("select on conditional value after table.size")
 			require.NotNil(t, f)
 			res, err := f.Call(ctx)
 			require.NoError(t, err)

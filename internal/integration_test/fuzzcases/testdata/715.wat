@@ -1,5 +1,5 @@
 (module
-  (func (export "add") (result i32)
+  (func (export "select on conditional value after table.size") (result i32)
     table.size 0 ;; -> 10
     ref.null func
     ref.is_null
