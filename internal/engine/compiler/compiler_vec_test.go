@@ -415,6 +415,17 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			},
 		},
 		{
+			name: "32zero on ceil", loadType: wazeroir.V128LoadType32zero,
+			offset: wasm.MemoryPageSize - 4,
+			memSetupFn: func(buf []byte) {
+				copy(buf[wasm.MemoryPageSize-8:], []byte{
+					1, 0xff, 3, 0xff,
+					5, 6, 0xff, 8,
+				})
+			},
+			exp: [16]byte{5, 6, 0xff, 8},
+		},
+		{
 			name: "64zero offset=0", loadType: wazeroir.V128LoadType64zero, offset: 0,
 			memSetupFn: func(buf []byte) {
 				copy(buf, []byte{
@@ -439,6 +450,17 @@ func TestCompiler_compileV128Load(t *testing.T) {
 				3, 0xff, 5, 6, 7, 0xff, 9, 0xff,
 				0, 0, 0, 0, 0, 0, 0, 0,
 			},
+		},
+		{
+			name: "64zero on ceil", loadType: wazeroir.V128LoadType64zero,
+			offset: wasm.MemoryPageSize - 8,
+			memSetupFn: func(buf []byte) {
+				copy(buf[wasm.MemoryPageSize-16:], []byte{
+					1, 0xff, 3, 0xff, 5, 6, 7, 0xff,
+					9, 0xff, 11, 12, 13, 14, 15,
+				})
+			},
+			exp: [16]byte{9, 0xff, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0},
 		},
 		{
 			name: "8splat offset=0", loadType: wazeroir.V128LoadType8Splat, offset: 0,
@@ -547,6 +569,8 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			code, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
+
+			require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
 			require.Equal(t, uint64(2), env.stackPointer())
 			lo, hi := env.stackTopAsV128()
