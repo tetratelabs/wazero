@@ -97,8 +97,15 @@ func TestNodeImpl_String(t *testing.T) {
 		},
 		{
 			in: &nodeImpl{instruction: VMOV, types: operandTypesVectorRegisterToMemory,
-				dstReg: RegR1, srcReg: RegV29, vectorArrangement: VectorArrangementQ},
-			exp: "VMOV V29.Q, [R1]",
+				dstReg: RegR1, dstReg2: RegR6,
+				srcReg: RegV29, vectorArrangement: VectorArrangementQ},
+			exp: "VMOV V29.Q, [R1 + R6]",
+		},
+		{
+			in: &nodeImpl{instruction: VMOV, types: operandTypesVectorRegisterToMemory,
+				dstReg: RegR1, dstConst: 0x10,
+				srcReg: RegV29, vectorArrangement: VectorArrangementQ},
+			exp: "VMOV V29.Q, [R1 + 0x10]",
 		},
 		{
 			in: &nodeImpl{instruction: VMOV, types: operandTypesRegisterToVectorRegister,
@@ -689,15 +696,52 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 			exp: []byte{0x8b, 0xed, 0x1, 0xfd, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 		},
 		{
-			name: "str q1, [x30]",
+			name: "stur q1, [x30, #1]",
 			n: &nodeImpl{
 				instruction:       VMOV,
 				srcReg:            RegV1,
 				dstReg:            RegR30,
-				dstConst:          0,
+				dstConst:          1,
 				vectorArrangement: VectorArrangementQ,
 			},
-			exp: []byte{0xc1, 0x3, 0x80, 0x3d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			exp: []byte{0xc1, 0x13, 0x80, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "str q1, [x30, #0x100]",
+			n: &nodeImpl{
+				instruction:       VMOV,
+				srcReg:            RegV1,
+				dstReg:            RegR30,
+				dstConst:          0x100,
+				vectorArrangement: VectorArrangementQ,
+			},
+			exp: []byte{0xc1, 0x43, 0x80, 0x3d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: "stur q1, [x30, #0xfc]",
+			n: &nodeImpl{
+				instruction: VMOV,
+				srcReg:      RegV1,
+				dstReg:      RegR30,
+				// This offset is not a multiple of 16 bytes, but fits in 9-bit signed integer,
+				// therefore it can be encoded as one instruction of "unscaled immediate".
+				dstConst:          0xfc,
+				vectorArrangement: VectorArrangementQ,
+			},
+			exp: []byte{0xc1, 0xc3, 0x8f, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		},
+		{
+			name: `ldr w10, #0xc; str q11, [x12, x10]`,
+			n: &nodeImpl{
+				instruction: VMOV,
+				srcReg:      RegV11,
+				dstReg:      RegR12,
+				// This case offset is not a multiple of 16 bytes and doesn't fit in 9-bit signed integer,
+				// therefore, we encode the offset in a temporary register, then store it with the register offset variant.
+				dstConst:          0x108,
+				vectorArrangement: VectorArrangementQ,
+			},
+			exp: []byte{0x6a, 0x0, 0x0, 0x18, 0x8b, 0x69, 0xaa, 0x3c, 0x0, 0x0, 0x0, 0x14, 0x8, 0x1, 0x0, 0x0},
 		},
 	}
 
