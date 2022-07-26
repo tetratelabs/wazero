@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"testing"
@@ -242,65 +241,6 @@ func TestCompiler_compileMemoryCopy(t *testing.T) {
 				require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}
 		})
-	}
-}
-
-func requireBenchmarkNoError(b *testing.B, err error) {
-	if err != nil {
-		b.Fatal(err)
-	}
-}
-
-func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
-	sizes := []uint32{5, 8, 17, 64, 128, 1000, 16000, 64000}
-
-	for _, size := range sizes {
-		for _, overlap := range []bool{false, true} {
-			b.Run(fmt.Sprintf("%v-%v", size, overlap), func(b *testing.B) {
-				env := newCompilerEnvironment()
-
-				mem := env.memory()
-				testMem := make([]byte, len(mem))
-				for i := 0; i < len(mem); i++ {
-					mem[i] = byte(i)
-					testMem[i] = byte(i)
-				}
-
-				compiler, _ := newCompiler(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
-				err := compiler.compilePreamble()
-				requireBenchmarkNoError(b, err)
-
-				var destOffset, sourceOffset uint32
-				if !overlap {
-					destOffset, sourceOffset = 1, 777
-				} else {
-					destOffset, sourceOffset = 777, 1
-				}
-
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: destOffset})
-				requireBenchmarkNoError(b, err)
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: sourceOffset})
-				requireBenchmarkNoError(b, err)
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: size})
-				requireBenchmarkNoError(b, err)
-				err = compiler.compileMemoryCopy()
-				requireBenchmarkNoError(b, err)
-				err = compiler.(compilerImpl).compileReturnFunction()
-				requireBenchmarkNoError(b, err)
-				code, _, err := compiler.compile()
-				requireBenchmarkNoError(b, err)
-
-				env.execBench(b, code)
-
-				for i := 0; i < b.N; i += 1 {
-					copy(testMem[destOffset:destOffset+size], testMem[sourceOffset:sourceOffset+size])
-				}
-
-				if !bytes.Equal(mem, testMem) {
-					b.FailNow()
-				}
-			})
-		}
 	}
 }
 

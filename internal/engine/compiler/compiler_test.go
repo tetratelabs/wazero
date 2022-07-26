@@ -244,22 +244,6 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 	)
 }
 
-func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
-	f := j.newFunctionFrame(codeSegment)
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
-		j.ce.globalContext.callFrameStackPointer++
-		nativecall(
-			uintptr(unsafe.Pointer(&codeSegment[0])),
-			uintptr(unsafe.Pointer(j.ce)),
-			uintptr(unsafe.Pointer(j.moduleInstance)),
-		)
-	}
-	b.StopTimer()
-}
-
 // newTestCompiler allows us to test a different architecture than the current one.
 type newTestCompiler func(ir *wazeroir.CompilationResult) (compiler, error)
 
