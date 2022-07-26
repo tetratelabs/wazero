@@ -220,8 +220,8 @@ func (j *compilerEnv) callEngine() *callEngine {
 	return j.ce
 }
 
-func (j *compilerEnv) exec(codeSegment []byte) {
-	f := &function{
+func (j *compilerEnv) newFunctionFrame(codeSegment []byte) *function {
+	return &function{
 		parent:                &code{codeSegment: codeSegment},
 		codeInitialAddress:    uintptr(unsafe.Pointer(&codeSegment[0])),
 		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
@@ -231,8 +231,10 @@ func (j *compilerEnv) exec(codeSegment []byte) {
 			Module: j.moduleInstance,
 		},
 	}
+}
 
-	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
+func (j *compilerEnv) exec(codeSegment []byte) {
+	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: j.newFunctionFrame(codeSegment)}
 	j.ce.globalContext.callFrameStackPointer++
 
 	nativecall(

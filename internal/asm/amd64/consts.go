@@ -67,6 +67,8 @@ const (
 	BSRQ
 	// CDQ is the CDQ instruction. https://www.felixcloutier.com/x86/cwd:cdq:cqo
 	CDQ
+	// CLD is the CLD instruction. https://www.felixcloutier.com/x86/cld
+	CLD
 	// CMOVQCS is the CMOVC (move if carry) instruction in 64-bit mode. https://www.felixcloutier.com/x86/cmovcc
 	CMOVQCS
 	// CMPL is the CMP instruction in 32-bit mode. https://www.felixcloutier.com/x86/cmp
@@ -215,6 +217,8 @@ const (
 	PSRLD
 	// PSRLQ is the PSRLQ instruction. https://www.felixcloutier.com/x86/psrlw:psrld:psrlq
 	PSRLQ
+	// REPMOVSQ is the REP MOVSQ instruction in 64-bit mode. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REPMOVSQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
 	// ROLQ is the ROL instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
@@ -271,6 +275,8 @@ const (
 	SQRTSD
 	// SQRTSS is the SQRTSS instruction. https://www.felixcloutier.com/x86/sqrtss
 	SQRTSS
+	// STD is the STD instruction. https://www.felixcloutier.com/x86/std
+	STD
 	// SUBL is the SUB instruction in 32-bit mode. https://www.felixcloutier.com/x86/sub
 	SUBL
 	// SUBQ is the SUB instruction in 64-bit mode. https://www.felixcloutier.com/x86/sub
@@ -299,6 +305,8 @@ const (
 	XORPS
 	// XORQ is the XOR instruction in 64-bit mode. https://www.felixcloutier.com/x86/xor
 	XORQ
+	// XCHGQ is the XCHG instruction in 64-bit mode. https://www.felixcloutier.com/x86/xchg
+	XCHGQ
 	// RET is the RET instruction. https://www.felixcloutier.com/x86/ret
 	RET
 	// JMP is the JMP instruction. https://www.felixcloutier.com/x86/jmp
@@ -585,6 +593,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "BSRQ"
 	case CDQ:
 		return "CDQ"
+	case CLD:
+		return "CLD"
 	case CMOVQCS:
 		return "CMOVQCS"
 	case CMPL:
@@ -731,6 +741,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PSRLD"
 	case PSRLQ:
 		return "PSRLQ"
+	case REPMOVSQ:
+		return "REP MOVSQ"
 	case ROLL:
 		return "ROLL"
 	case ROLQ:
@@ -787,6 +799,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "SQRTSD"
 	case SQRTSS:
 		return "SQRTSS"
+	case STD:
+		return "STD"
 	case SUBL:
 		return "SUBL"
 	case SUBQ:
@@ -815,6 +829,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "XORPS"
 	case XORQ:
 		return "XORQ"
+	case XCHGQ:
+		return "XCHGQ"
 	case RET:
 		return "RET"
 	case JMP:

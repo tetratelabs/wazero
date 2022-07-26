@@ -391,6 +391,62 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
+	env := newCompilerEnvironment()
+	compiler := env.requireNewCompiler(t, newAmd64Compiler, nil).(*amd64Compiler)
+
+	tests := []struct {
+		initial           []*runtimeValueLocation
+		desired, expected []asm.Register
+	}{
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}},
+			desired:  []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX},
+			expected: []asm.Register{amd64.RegDX, amd64.RegCX, amd64.RegAX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegAX}, {register: amd64.RegCX}, {register: amd64.RegDX}},
+			desired:  []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX},
+			expected: []asm.Register{amd64.RegDX, amd64.RegAX, amd64.RegCX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegR8}, {register: amd64.RegR9}, {register: amd64.RegR10}},
+			desired:  []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+			expected: []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegBX}, {register: amd64.RegDX}, {register: amd64.RegCX}},
+			desired:  []asm.Register{amd64.RegR8, amd64.RegR9, amd64.RegR10},
+			expected: []asm.Register{amd64.RegBX, amd64.RegDX, amd64.RegCX},
+		},
+		{
+			initial:  []*runtimeValueLocation{{register: amd64.RegR8}, {register: amd64.RegR9}, {register: amd64.RegR10}},
+			desired:  []asm.Register{amd64.RegAX, amd64.RegCX, amd64.RegR9},
+			expected: []asm.Register{amd64.RegR8, amd64.RegR10, amd64.RegR9},
+		},
+	}
+
+	for _, tt := range tests {
+		initialRegisters := collectRegistersFromRuntimeValues(tt.initial)
+		restoreCrossing := compiler.compilePreventCrossedTargetRegisters(tt.initial, tt.desired)
+		// Required expected state after prevented crossing.
+		require.Equal(t, tt.expected, collectRegistersFromRuntimeValues(tt.initial))
+		restoreCrossing()
+		// Require initial state after restoring.
+		require.Equal(t, initialRegisters, collectRegistersFromRuntimeValues(tt.initial))
+	}
+
+}
+
+// collectRegistersFromRuntimeValues returns the registers occupied by locs.
+func collectRegistersFromRuntimeValues(locs []*runtimeValueLocation) []asm.Register {
+	out := make([]asm.Register, len(locs))
+	for i := range locs {
+		out[i] = locs[i].register
+	}
+	return out
+}
+
 // compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
 func (c *amd64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
 	return c.onStackPointerCeilDeterminedCallBack
