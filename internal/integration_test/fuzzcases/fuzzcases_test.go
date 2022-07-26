@@ -184,6 +184,18 @@ func Test717(t *testing.T) {
 	})
 }
 
+func Test718(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 718))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("v128.load_zero on the ceil")
+		require.NotNil(t, f)
+		_, err = f.Call(ctx)
+		require.NoError(t, err)
+	})
+}
+
 func Test719(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 719))
