@@ -103,7 +103,11 @@ func (n *nodeImpl) String() (ret string) {
 	case operandTypesVectorRegisterToRegister:
 		ret = fmt.Sprintf("%s %s.%s[%d], %s", instName, RegisterName(n.srcReg), n.vectorArrangement, n.srcVectorIndex, RegisterName(n.dstReg))
 	case operandTypesVectorRegisterToMemory:
-		ret = fmt.Sprintf("%s %s.%s, [%s]", instName, RegisterName(n.srcReg), n.vectorArrangement, RegisterName(n.dstReg))
+		if n.dstReg2 != asm.NilRegister {
+			ret = fmt.Sprintf("%s %s.%s, [%s + %s]", instName, RegisterName(n.srcReg), n.vectorArrangement, RegisterName(n.dstReg), RegisterName(n.dstReg2))
+		} else {
+			ret = fmt.Sprintf("%s %s.%s, [%s + 0x%x]", instName, RegisterName(n.srcReg), n.vectorArrangement, RegisterName(n.dstReg), n.dstConst)
+		}
 	case operandTypesMemoryToVectorRegister:
 		ret = fmt.Sprintf("%s [%s], %s.%s", instName, RegisterName(n.srcReg), RegisterName(n.dstReg), n.vectorArrangement)
 	case operandTypesVectorRegisterToVectorRegister:
@@ -1645,9 +1649,10 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 		}
 	}
 
-	// At this point we have the assumption that offset is positive and multiple of datasize.
-	if offset < (1<<12)<<datasizeLog2 {
-		// This case can be encoded as a single "unsigned immediate".
+	// At this point we have the assumption that offset is positive.
+	// Plus if it is a multiple of datasize, then it can be encoded as a single "unsigned immediate".
+	if offset%datasize == 0 &&
+		offset < (1<<12)<<datasizeLog2 {
 		m := offset / datasize
 		a.Buf.Write([]byte{
 			(baseRegBits << 5) | targetRegBits,
