@@ -3664,6 +3664,10 @@ func (c *arm64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 
 // compileElemDrop implements compiler.compileElemDrop for the arm64 architecture.
 func (c *arm64Compiler) compileElemDrop(o *wazeroir.OperationElemDrop) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
