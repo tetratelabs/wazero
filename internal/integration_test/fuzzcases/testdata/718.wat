@@ -6,7 +6,7 @@
     v128.load64_zero offset=65528
 
     i32.const 0
-    ;; The ceil of the load operation equals 65532 + 4(=this loads 64-bit = 8 bytes).
+    ;; The ceil of the load operation equals 65532 + 4(=this loads 32-bit = 4 bytes).
     ;; Therefore, this shouldn't result in out of bounds.
     v128.load32_zero offset=65532
 
