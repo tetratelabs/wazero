@@ -1,5 +1,6 @@
 (module
-  (func (result v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 i64 v128)
+  (func  (export "vectors")
+    (result v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 v128 i64 v128)
     v128.const i64x2 0 1
     v128.const i64x2 2 3
     v128.const i64x2 4 5
@@ -16,8 +17,10 @@
     v128.const i64x2 26 27
     v128.const i64x2 28 29
     v128.const i64x2 30 31
+    ;; This makes the following vector(33,34) is not 16-bites aligned in the stack.
+    ;; Also, the offset doesn't fit in 9-bit signed integer, therefore the store
+    ;; instruction must be correctly encoded as multiple instructions in arm64.
     i64.const 32
     v128.const i64x2 33 34
   )
-  (export "vectors" (func 0))
 )
