@@ -3445,6 +3445,9 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 		if err != nil {
 			return err
 		}
+	} else if n.instruction == CMEQZERO {
+		// CMEQZERO has RegRZR as the src, and we apply the instruction to the same register as the destination.
+		srcVectorRegBits, err = vectorRegisterBits(n.dstReg)
 	}
 
 	dstVectorRegBits, err := vectorRegisterBits(n.dstReg)
