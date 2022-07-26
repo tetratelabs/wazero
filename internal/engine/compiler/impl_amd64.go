@@ -5118,8 +5118,8 @@ func (c *amd64Compiler) compileMaybeSwapRegisters(reg1, reg2 asm.Register) {
 // For example, if we have locs = [AX, BX, CX], targets = [BX, SI, AX], then it'll do two swaps
 // to make locs = [BX, CX, AX].
 func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValueLocation, targets []asm.Register) (restore func()) {
-	type Swap struct{ srcIndex, dstIndex int }
-	var swaps []Swap
+	type swap struct{ srcIndex, dstIndex int }
+	var swaps []swap
 	for i := range locs {
 		targetLocation := -1 // -1 means not found.
 		for j := range locs {
@@ -5131,10 +5131,11 @@ func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValu
 		if targetLocation != -1 && targetLocation != i {
 			c.compileMaybeSwapRegisters(locs[i].register, locs[targetLocation].register)
 			locs[i].register, locs[targetLocation].register = locs[targetLocation].register, locs[i].register
-			swaps = append(swaps, Swap{i, targetLocation})
+			swaps = append(swaps, swap{i, targetLocation})
 		}
 	}
 	return func() {
+		// Restore in reverse order because a register can be moved multiple times.
 		for i := len(swaps) - 1; i >= 0; i -= 1 {
 			r1, r2 := swaps[i].srcIndex, swaps[i].dstIndex
 			c.compileMaybeSwapRegisters(locs[r1].register, locs[r2].register)
