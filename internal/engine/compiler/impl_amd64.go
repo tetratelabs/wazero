@@ -3417,7 +3417,6 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
 	c.compileReservedStackBasePointerInitialization()
 	c.compileReservedMemoryPointerInitialization()
-
 	return nil
 }
 
@@ -4130,6 +4129,7 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerInitialization()
+	c.compileReservedMemoryPointerInitialization()
 	return nil
 }
 
