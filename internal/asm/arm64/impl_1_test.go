@@ -1539,11 +1539,11 @@ func TestAssemblerImpl_EncodeVectorRegisterToVectorRegister(t *testing.T) {
 		},
 		{
 			x1:   RegRZR,
-			x2:   RegV30,
-			name: "cmeq v30.2d, v0.2d, #0",
+			x2:   RegV12,
+			name: "cmeq v12.2d, v12.2d, #0",
 			inst: CMEQZERO,
 			arr:  VectorArrangement2D,
-			exp:  []byte{0x1e, 0x98, 0xe0, 0x4e},
+			exp:  []byte{0x8c, 0x99, 0xe0, 0x4e},
 		},
 		{
 			name: "tbl v1.8b, {v0.16b}, v1.8b",

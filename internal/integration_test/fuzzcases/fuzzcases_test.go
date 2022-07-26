@@ -183,3 +183,16 @@ func Test717(t *testing.T) {
 		}
 	})
 }
+
+func Test719(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 719))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("require unreachable")
+		require.NotNil(t, f)
+		_, err = f.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "wasm error: unreachable\nwasm stack trace:")
+	})
+}
