@@ -723,7 +723,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 				instruction: VMOV,
 				srcReg:      RegV1,
 				dstReg:      RegR30,
-				// This offset is not a multiple of 8 bytes, but fits in 9-bit signed integer,
+				// This offset is not a multiple of 16 bytes, but fits in 9-bit signed integer,
 				// therefore it can be encoded as one instruction of "unscaled immediate".
 				dstConst:          0xfc,
 				vectorArrangement: VectorArrangementQ,
@@ -736,7 +736,7 @@ func TestAssemblerImpl_EncodeVectorRegisterToMemory(t *testing.T) {
 				instruction: VMOV,
 				srcReg:      RegV11,
 				dstReg:      RegR12,
-				// This case offset is not a multiple of 8 bytes and doesn't fit in 9-bit signed integer,
+				// This case offset is not a multiple of 16 bytes and doesn't fit in 9-bit signed integer,
 				// therefore, we encode the offset in a temporary register, then store it with the register offset variant.
 				dstConst:          0x108,
 				vectorArrangement: VectorArrangementQ,

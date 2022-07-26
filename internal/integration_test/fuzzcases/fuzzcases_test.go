@@ -2,7 +2,9 @@ package fuzzcases
 
 import (
 	"context"
+	"embed"
 	_ "embed"
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -12,26 +14,14 @@ import (
 
 var ctx = context.Background()
 
-var (
-	//go:embed testdata/695.wasm
-	case695 []byte
-	//go:embed testdata/696.wasm
-	case696 []byte
-	//go:embed testdata/699.wasm
-	case699 []byte
-	//go:embed testdata/701.wasm
-	case701 []byte
-	//go:embed testdata/704.wasm
-	case704 []byte
-	//go:embed testdata/708.wasm
-	case708 []byte
-	//go:embed testdata/709.wasm
-	case709 []byte
-	//go:embed testdata/715.wasm
-	case715 []byte
-	//go:embed testdata/716.wasm
-	case716 []byte
-)
+//go:embed testdata/*.wasm
+var testcases embed.FS
+
+func getWasmBinary(t *testing.T, number int) []byte {
+	ret, err := testcases.ReadFile(fmt.Sprintf("testdata/%d.wasm", number))
+	require.NoError(t, err)
+	return ret
+}
 
 func runWithCompiler(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	if !platform.CompilerSupported() {
@@ -60,7 +50,7 @@ func run(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 // Test695 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test695(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, case695)
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 695))
 		require.NoError(t, err)
 
 		_, err = module.ExportedFunction("i8x16s").Call(ctx)
@@ -82,7 +72,7 @@ func Test696(t *testing.T) {
 	}
 
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, case696)
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 696))
 		require.NoError(t, err)
 
 		for _, name := range functionNames {
@@ -97,7 +87,7 @@ func Test696(t *testing.T) {
 func Test699(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		defer r.Close(ctx)
-		_, err := r.InstantiateModuleFromBinary(ctx, case699)
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 699))
 		require.NoError(t, err)
 	})
 }
@@ -105,7 +95,7 @@ func Test699(t *testing.T) {
 // Test701 requires two functions to exit with "out of bounds memory access" consistently across the implementations.
 func Test701(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		module, err := r.InstantiateModuleFromBinary(ctx, case701)
+		module, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 701))
 		require.NoError(t, err)
 
 		_, err = module.ExportedFunction("i32.extend16_s").Call(ctx)
@@ -120,14 +110,14 @@ func Test701(t *testing.T) {
 
 func Test704(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, case704)
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 704))
 		require.NoError(t, err)
 	})
 }
 
 func Test708(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		_, err := r.InstantiateModuleFromBinary(ctx, case708)
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 708))
 		require.NotNil(t, err)
 		require.Contains(t, err.Error(), "out of bounds memory access")
 	})
@@ -135,7 +125,7 @@ func Test708(t *testing.T) {
 
 func Test709(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, case709)
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 709))
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("f64x2.promote_low_f32x4")
@@ -150,7 +140,7 @@ func Test709(t *testing.T) {
 
 func Test715(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, case715)
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 715))
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("select on conditional value after table.size")
@@ -164,7 +154,7 @@ func Test715(t *testing.T) {
 
 func Test716(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
-		mod, err := r.InstantiateModuleFromBinary(ctx, case716)
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 716))
 		require.NoError(t, err)
 
 		f := mod.ExportedFunction("select on ref.func")
@@ -173,5 +163,23 @@ func Test716(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, uint64(1), res[0])
+	})
+}
+
+func Test717(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 717))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("vectors")
+		require.NotNil(t, f)
+		res, err := f.Call(ctx)
+		require.NoError(t, err)
+
+		const expectedLen = 35
+		require.Equal(t, expectedLen, len(res))
+		for i := 0; i < expectedLen; i++ {
+			require.Equal(t, uint64(i), res[i])
+		}
 	})
 }
