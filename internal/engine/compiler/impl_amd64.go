@@ -3665,7 +3665,7 @@ func (c *amd64Compiler) compileMemoryCopyLoopImpl(destinationOffset, sourceOffse
 	// sourceOffset += memory buffer's absolute address.
 	c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, sourceOffset.register)
 
-	// Copy copySize % 8 bytes in loop to allow copying in 8 byte groups.
+	// Copy copySize % 8 bytes in loop to allow copying in 8 byte groups afterward.
 	beginLoop := c.assembler.CompileStandAlone(amd64.NOP)
 
 	// Check copySize % 8 == 0.
@@ -3695,7 +3695,7 @@ func (c *amd64Compiler) compileMemoryCopyLoopImpl(destinationOffset, sourceOffse
 
 // compileMemoryCopy implements compiler.compileMemoryCopy for the amd64 architecture.
 //
-// compileMemoryCopy uses efficient `REP MOVSQ` instructions to copy in quadword (8 bytes) batches. The remaining bytes
+// This uses efficient `REP MOVSQ` instructions to copy in quadword (8 bytes) batches. The remaining bytes
 // are copied with a simple `MOV` loop. It uses backward copying for overlapped segments.
 func (c *amd64Compiler) compileMemoryCopy() error {
 	copySize := c.locationStack.pop()
@@ -3746,7 +3746,7 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	c.assembler.CompileRegisterToRegister(amd64.CMPQ, destinationOffset.register, sourceOffset.register)
 	destLowerThanSourceJump := c.assembler.CompileJump(amd64.JLS)
 
-	// if source + size < dest, we can copy forwards
+	// If source + size < dest, we can copy forwards
 	c.assembler.CompileRegisterToRegister(amd64.MOVQ, destinationOffset.register, tmp)
 	c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, tmp)
 	c.assembler.CompileRegisterToRegister(amd64.CMPQ, sourceOffset.register, tmp)
@@ -3905,7 +3905,7 @@ func (c *amd64Compiler) compileTableCopyLoopImpl(o *wazeroir.OperationTableCopy,
 // compileTableCopy implements compiler.compileTableCopy for the amd64 architecture.
 //
 // It uses efficient `REP MOVSB` instructions for optimized copying. It uses backward copying for
-// overlapped segments
+// overlapped segments.
 func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 	copySize := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(copySize); err != nil {
@@ -3952,11 +3952,11 @@ func (c *amd64Compiler) compileTableCopy(o *wazeroir.OperationTableCopy) error {
 	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
-	// If dest < source, we can copy forwards
+	// If dest < source, we can copy forwards.
 	c.assembler.CompileRegisterToRegister(amd64.CMPQ, destinationOffset.register, sourceOffset.register)
 	destLowerThanSourceJump := c.assembler.CompileJump(amd64.JLS)
 
-	// if source + size < dest, we can copy forwards
+	// If source + size < dest, we can copy forwards.
 	c.assembler.CompileRegisterToRegister(amd64.MOVQ, destinationOffset.register, tmp)
 	c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, tmp)
 	c.assembler.CompileRegisterToRegister(amd64.CMPQ, sourceOffset.register, tmp)
@@ -5116,7 +5116,7 @@ func (c *amd64Compiler) compileMaybeSwapRegisters(reg1, reg2 asm.Register) {
 // Each register will correspond either to itself or another register not present in its own set.
 //
 // For example, if we have locs = [AX, BX, CX], targets = [BX, SI, AX], then it'll do two swaps
-// to make locs = [BX, CX, AX]
+// to make locs = [BX, CX, AX].
 func (c *amd64Compiler) compilePreventCrossedTargetRegisters(locs []*runtimeValueLocation, targets []asm.Register) (restore func()) {
 	type Swap struct{ srcIndex, dstIndex int }
 	var swaps []Swap
