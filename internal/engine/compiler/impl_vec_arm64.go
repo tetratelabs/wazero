@@ -234,7 +234,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 		c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForMemory, offset)
 		c.assembler.CompileMemoryToVectorRegister(arm64.LD1R, offset, 0, result, arm64.VectorArrangement2D)
 	case wazeroir.V128LoadType32zero:
-		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 16)
+		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 4)
 		if err != nil {
 			return err
 		}
@@ -242,7 +242,7 @@ func (c *arm64Compiler) compileV128Load(o *wazeroir.OperationV128Load) (err erro
 			arm64ReservedRegisterForMemory, offset, result, arm64.VectorArrangementS,
 		)
 	case wazeroir.V128LoadType64zero:
-		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 16)
+		offset, err := c.compileMemoryAccessOffsetSetup(o.Arg.Offset, 8)
 		if err != nil {
 			return err
 		}
