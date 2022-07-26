@@ -3628,7 +3628,7 @@ func (c *amd64Compiler) compileCopyLoopImpl(destinationOffset, sourceOffset, cop
 	if backwards {
 		c.assembler.CompileConstToRegister(amd64.ADDQ, -int64(bwOffset), amd64.RegDI)
 		c.assembler.CompileConstToRegister(amd64.ADDQ, -int64(bwOffset), amd64.RegSI)
-		// rep direction backwards
+		// Set REP prefix direction backwards.
 		c.assembler.CompileStandAlone(amd64.STD)
 	}
 
