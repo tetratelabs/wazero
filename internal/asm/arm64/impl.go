@@ -3442,12 +3442,13 @@ func (a *AssemblerImpl) encodeVectorRegisterToVectorRegister(n *nodeImpl) (err e
 	var srcVectorRegBits byte
 	if n.srcReg != RegRZR {
 		srcVectorRegBits, err = vectorRegisterBits(n.srcReg)
-		if err != nil {
-			return err
-		}
 	} else if n.instruction == CMEQZERO {
 		// CMEQZERO has RegRZR as the src, and we apply the instruction to the same register as the destination.
 		srcVectorRegBits, err = vectorRegisterBits(n.dstReg)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	dstVectorRegBits, err := vectorRegisterBits(n.dstReg)
