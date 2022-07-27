@@ -3580,6 +3580,10 @@ func (c *amd64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 
 // compileDataDrop implements compiler.compileDataDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDataDrop(o *wazeroir.OperationDataDrop) error {
+	if err := c.maybeCompileMoveTopConditionalToGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err
