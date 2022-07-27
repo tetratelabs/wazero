@@ -249,3 +249,19 @@ func Test722(t *testing.T) {
 		require.Equal(t, uint64(1), ret[0])
 	})
 }
+
+func Test725(t *testing.T) {
+	functions := []string{"i32.load8_s", "i32.load16_s"}
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 725))
+		require.NoError(t, err)
+
+		for _, fn := range functions {
+			f := mod.ExportedFunction(fn)
+			require.NotNil(t, f)
+			_, err := f.Call(ctx)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "out of bounds memory")
+		}
+	})
+}
