@@ -13,5 +13,5 @@
   (memory 10 10)
 
   ;; Setup the non trivial content on the i32.load
-  (data (i32.const 396028) "1111111111111")
+  (data (i32.const 396028) "\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff\ff")
 )

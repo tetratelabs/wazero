@@ -208,6 +208,7 @@ func Test719(t *testing.T) {
 		require.Contains(t, err.Error(), "wasm error: unreachable\nwasm stack trace:")
 	})
 }
+
 func Test720(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 720))
