@@ -209,6 +209,19 @@ func Test719(t *testing.T) {
 	})
 }
 
+func Test720(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 720))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("access memory after table.grow")
+		require.NotNil(t, f)
+		res, err := f.Call(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint32(0xffffffff), uint32(res[0]))
+	})
+}
+
 func Test721(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 721))
