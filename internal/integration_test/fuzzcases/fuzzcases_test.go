@@ -235,3 +235,17 @@ func Test721(t *testing.T) {
 		require.Equal(t, uint64(1), ret[0])
 	})
 }
+
+func Test722(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 722))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("conditional before data.drop")
+		require.NotNil(t, f)
+		ret, err := f.Call(ctx)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), ret[0])
+	})
+}
