@@ -967,20 +967,25 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 
 			switch wazeroir.SignedInt(op.b1) {
-			case wazeroir.SignedInt32, wazeroir.SignedInt64:
+			case wazeroir.SignedInt32:
+				ce.pushValue(uint64(uint32(int8(val))))
+			case wazeroir.SignedInt64:
 				ce.pushValue(uint64(int8(val)))
 			case wazeroir.SignedUint32, wazeroir.SignedUint64:
 				ce.pushValue(uint64(val))
 			}
 			frame.pc++
 		case wazeroir.OperationKindLoad16:
+
 			val, ok := memoryInst.ReadUint16Le(ctx, ce.popMemoryOffset(op))
 			if !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 
 			switch wazeroir.SignedInt(op.b1) {
-			case wazeroir.SignedInt32, wazeroir.SignedInt64:
+			case wazeroir.SignedInt32:
+				ce.pushValue(uint64(uint32(int16(val))))
+			case wazeroir.SignedInt64:
 				ce.pushValue(uint64(int16(val)))
 			case wazeroir.SignedUint32, wazeroir.SignedUint64:
 				ce.pushValue(uint64(val))

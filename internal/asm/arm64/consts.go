@@ -605,14 +605,18 @@ const (
 	LSR
 	// LSRW is the LSR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSR--register-
 	LSRW
-	// MOVB loads or stores a signed byte. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
-	MOVB
+	// MOVBD loads or stores a signed byte in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
+	MOVBD
+	// MOVBW loads or stores a signed byte in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
+	MOVBW
 	// MOVBU loads a byte. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRB--register-
 	MOVBU
 	// MOVD loads or stores a register, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDR--register-
 	MOVD
-	// MOVH loads or stores a signed halfword. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
-	MOVH
+	// MOVHD loads or stores a signed halfword in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
+	MOVHD
+	// MOVHW loads or stores a signed halfword in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
+	MOVHW
 	// MOVHU loads a halfword. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRH--register-
 	MOVHU
 	// MOVW loads or stores a signed word, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSW--register-
@@ -1144,14 +1148,18 @@ func InstructionName(i asm.Instruction) string {
 		return "LSR"
 	case LSRW:
 		return "LSRW"
-	case MOVB:
-		return "MOVB"
+	case MOVBD:
+		return "MOVBD"
+	case MOVBW:
+		return "MOVBW"
 	case MOVBU:
 		return "MOVBU"
 	case MOVD:
 		return "MOVD"
-	case MOVH:
-		return "MOVH"
+	case MOVHD:
+		return "MOVHD"
+	case MOVHW:
+		return "MOVHW"
 	case MOVHU:
 		return "MOVHU"
 	case MOVW:

@@ -1736,9 +1736,11 @@ var storeOrLoadInstructionTable = map[asm.Instruction]struct {
 	MOVD:  {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3},
 	MOVW:  {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2},
 	MOVWU: {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2},
-	MOVH:  {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
+	MOVHD: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
+	MOVHW: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
 	MOVHU: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
-	MOVB:  {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
+	MOVBD: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
+	MOVBW: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
 	MOVBU: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
 	FMOVD: {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true},
 	FMOVS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
@@ -1873,10 +1875,13 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return err
 	}
 
+	// TODO: move opcode as a field in storeOrLoadInstructionTable.
 	var opcode byte = 0b01 // opcode for load instructions.
-	if n.instruction == MOVW || n.instruction == MOVH || n.instruction == MOVB {
+	if n.instruction == MOVW || n.instruction == MOVHD || n.instruction == MOVBD {
 		// Sign-extend load (without "u" suffix except 64-bit MOVD) needs different opcode.
 		opcode = 0b10
+	} else if n.instruction == MOVBW || n.instruction == MOVHW {
+		opcode = 0b11
 	}
 	if n.srcReg2 != asm.NilRegister {
 		offsetRegBits, err := intRegisterBits(n.srcReg2)

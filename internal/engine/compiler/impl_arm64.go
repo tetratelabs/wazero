@@ -2642,11 +2642,10 @@ func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		// TODO used 32-bit variant.
-		loadInst = arm64.MOVB
+		loadInst = arm64.MOVBW
 		vt = runtimeValueTypeI32
 	case wazeroir.SignedInt64:
-		loadInst = arm64.MOVB
+		loadInst = arm64.MOVBD
 		vt = runtimeValueTypeI64
 	case wazeroir.SignedUint32:
 		loadInst = arm64.MOVBU
@@ -2664,11 +2663,10 @@ func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		// TODO used 32-bit variant.
-		loadInst = arm64.MOVH
+		loadInst = arm64.MOVHW
 		vt = runtimeValueTypeI32
 	case wazeroir.SignedInt64:
-		loadInst = arm64.MOVH
+		loadInst = arm64.MOVHD
 		vt = runtimeValueTypeI64
 	case wazeroir.SignedUint32:
 		loadInst = arm64.MOVHU
@@ -2742,12 +2740,12 @@ func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 
 // compileStore8 implements compiler.compileStore8 for the arm64 architecture.
 func (c *arm64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return c.compileStoreImpl(o.Arg.Offset, arm64.MOVB, 1)
+	return c.compileStoreImpl(o.Arg.Offset, arm64.MOVBD, 1)
 }
 
 // compileStore16 implements compiler.compileStore16 for the arm64 architecture.
 func (c *arm64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
-	return c.compileStoreImpl(o.Arg.Offset, arm64.MOVH, 16/8)
+	return c.compileStoreImpl(o.Arg.Offset, arm64.MOVHD, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the arm64 architecture.
