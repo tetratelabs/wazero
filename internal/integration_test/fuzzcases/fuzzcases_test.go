@@ -208,3 +208,17 @@ func Test719(t *testing.T) {
 		require.Contains(t, err.Error(), "wasm error: unreachable\nwasm stack trace:")
 	})
 }
+
+func Test721(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 721))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("conditional before elem.drop")
+		require.NotNil(t, f)
+		ret, err := f.Call(ctx)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), ret[0])
+	})
+}
