@@ -607,8 +607,8 @@ const (
 	LSRW
 	// FLDRD is the LDR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
 	FLDRD
-	// FLDRW is the LDR (SIMD&FP) instruction for single precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
-	FLDRW
+	// FLDRS is the LDR (SIMD&FP) instruction for single precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
+	FLDRS
 	// LDRD is the LDR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
 	LDRD
 	// LDRW is the LDR instruction in 32-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
@@ -629,8 +629,8 @@ const (
 	LDRSW
 	// FSTRD is the STR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--?lang=en
 	FSTRD
-	// FSTRW is the STR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--?lang=en
-	FSTRW
+	// FSTRS is the STR (SIMD&FP) instruction for single precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--?lang=en
+	FSTRS
 	// STRD is the STR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STR--register---Store-Register--register--?lang=en
 	STRD
 	// STRW is the STR instruction in 32-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STR--register---Store-Register--register--?lang=en
@@ -1448,16 +1448,16 @@ func InstructionName(i asm.Instruction) string {
 		return "FCVTN"
 	case FSTRD:
 		return "FSTRD"
-	case FSTRW:
-		return "FSTRW"
+	case FSTRS:
+		return "FSTRS"
 	case LDRD:
 		return "LDRD"
 	case LDRW:
 		return "LDRW"
 	case FLDRD:
 		return "FLDRD"
-	case FLDRW:
-		return "FLDRW"
+	case FLDRS:
+		return "FLDRS"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }

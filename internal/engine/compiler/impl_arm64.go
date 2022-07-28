@@ -523,7 +523,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 			if err != nil {
 				return err
 			}
-			ldr = arm64.FLDRW
+			ldr = arm64.FLDRS
 			vt = runtimeValueTypeF32
 		case wasm.ValueTypeF64:
 			result, err = c.allocateRegister(registerTypeVector)
@@ -578,7 +578,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
 			str = arm64.STRD
 		case wasm.ValueTypeF32:
-			str = arm64.FSTRW
+			str = arm64.FSTRS
 		case wasm.ValueTypeF64:
 			str = arm64.FSTRD
 		}
@@ -2126,7 +2126,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	var ldr asm.Instruction
 	var minValueOffsetInVM int64
 	if o.Type == wazeroir.Float32 {
-		ldr = arm64.FLDRW
+		ldr = arm64.FLDRS
 		minValueOffsetInVM = arm64CallEngineArchContextMinimum32BitSignedIntOffset
 	} else {
 		ldr = arm64.FLDRD
@@ -2622,7 +2622,7 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		targetSizeInBytes = 64 / 8
 		vt = runtimeValueTypeI64
 	case wazeroir.UnsignedTypeF32:
-		loadInst = arm64.FLDRW
+		loadInst = arm64.FLDRS
 		isFloat = true
 		targetSizeInBytes = 32 / 8
 		vt = runtimeValueTypeF32
@@ -2728,7 +2728,7 @@ func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 		movInst = arm64.STRD
 		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
-		movInst = arm64.FSTRW
+		movInst = arm64.FSTRS
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		movInst = arm64.FSTRD
@@ -4077,7 +4077,7 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 		c.assembler.CompileRegisterToMemory(arm64.STRD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF32:
 		// Use 64-bit mov as all the values are represented as uint64 in Go, so we have to clear out the higher bits.
-		c.assembler.CompileRegisterToMemory(arm64.FSTRW, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
+		c.assembler.CompileRegisterToMemory(arm64.FSTRS, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF64:
 		c.assembler.CompileRegisterToMemory(arm64.FSTRD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeV128Lo:

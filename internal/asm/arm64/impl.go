@@ -1739,7 +1739,7 @@ var storeInstructionTable = map[asm.Instruction]struct {
 	STRH:  {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
 	STRB:  {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
 	FSTRD: {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true},
-	FSTRW: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
+	FSTRS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
@@ -1854,14 +1854,14 @@ var loadInstructionTable = map[asm.Instruction]struct {
 	isTargetFloat          bool
 }{
 	FLDRD:  {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true, opcode: 0b01},
-	FLDRW:  {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true, opcode: 0b01},
+	FLDRS:  {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true, opcode: 0b01},
 	LDRD:   {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3, opcode: 0b01},
 	LDRW:   {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b01},
 	LDRSHD: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b10},
-	LDRSHW: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b11}, //
+	LDRSHW: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b11},
 	LDRH:   {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b01},
 	LDRSBD: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b10},
-	LDRSBW: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b11}, //
+	LDRSBW: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b11},
 	LDRB:   {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b01},
 	LDRSW:  {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b10},
 }
