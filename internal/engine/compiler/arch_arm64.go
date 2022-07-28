@@ -3,12 +3,14 @@ package compiler
 import (
 	"math"
 
+	"github.com/tetratelabs/wazero/internal/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // init initializes variables for the arm64 architecture
 func init() {
 	newArchContext = newArchContextImpl
+	registerNameFn = arm64.RegisterName
 	unreservedGeneralPurposeRegisters = arm64UnreservedGeneralPurposeRegisters
 	unreservedVectorRegisters = arm64UnreservedVectorRegisters
 }

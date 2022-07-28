@@ -44,6 +44,8 @@ func TestRuntimeValueLocationStack_basic(t *testing.T) {
 	// Clone.
 	cloned := s.clone()
 	require.Equal(t, s.usedRegisters, cloned.usedRegisters)
+	require.Equal(t, s.unreservedGeneralPurposeRegisters, cloned.unreservedGeneralPurposeRegisters)
+	require.Equal(t, s.unreservedVectorRegisters, cloned.unreservedVectorRegisters)
 	require.Equal(t, len(s.stack), len(cloned.stack))
 	require.Equal(t, s.sp, cloned.sp)
 	for i := 0; i < int(s.sp); i++ {

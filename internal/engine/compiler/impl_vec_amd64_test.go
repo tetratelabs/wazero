@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -90,6 +91,31 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 				loc.setRegister(newReg)
 				c.locationStack.markRegisterUnused(oldReg)
 				c.locationStack.markRegisterUsed(newReg)
+			},
+			verifyFn: func(t *testing.T, env *compilerEnv) {},
+		},
+		{
+			name: "RegR10/CX not in use and CX is next free register",
+			shiftAmountSetupFn: func(t *testing.T, c *amd64Compiler) {
+				// Move the shift amount to R10.
+				loc := c.locationStack.peek()
+				oldReg, newReg := loc.register, amd64.RegR10
+				c.assembler.CompileRegisterToRegister(amd64.MOVQ, oldReg, newReg)
+				loc.setRegister(newReg)
+				c.locationStack.markRegisterUnused(oldReg)
+				c.locationStack.markRegisterUsed(newReg)
+
+				// Ensures that the next free becomes CX.
+				newUnreservedRegs := make([]asm.Register, len(c.locationStack.unreservedVectorRegisters))
+				copy(newUnreservedRegs, c.locationStack.unreservedGeneralPurposeRegisters)
+				for i, r := range newUnreservedRegs {
+					// If CX register is found, we swap it with the first register in the list.
+					// This forces runtimeLocationStack to take CX as a first free register.
+					if r == amd64.RegCX {
+						newUnreservedRegs[0], newUnreservedRegs[i] = newUnreservedRegs[i], newUnreservedRegs[0]
+					}
+				}
+				c.locationStack.unreservedGeneralPurposeRegisters = newUnreservedRegs
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {},
 		},

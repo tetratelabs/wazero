@@ -104,13 +104,17 @@ func (v *runtimeValueLocation) String() string {
 	} else if v.onConditionalRegister() {
 		location = fmt.Sprintf("conditional(%d)", v.conditionalRegister)
 	} else if v.onRegister() {
-		location = fmt.Sprintf("register(%d)", v.register)
+		location = fmt.Sprintf("register(%s)", registerNameFn(v.register))
 	}
 	return fmt.Sprintf("{type=%s,location=%s}", v.valueType, location)
 }
 
 func newRuntimeValueLocationStack() *runtimeValueLocationStack {
-	return &runtimeValueLocationStack{usedRegisters: map[asm.Register]struct{}{}}
+	return &runtimeValueLocationStack{
+		usedRegisters:                     map[asm.Register]struct{}{},
+		unreservedVectorRegisters:         unreservedVectorRegisters,
+		unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
+	}
 }
 
 // runtimeValueLocationStack represents the wazeroir virtual stack
@@ -132,6 +136,9 @@ type runtimeValueLocationStack struct {
 	usedRegisters map[asm.Register]struct{}
 	// stackPointerCeil tracks max(.sp) across the lifespan of this struct.
 	stackPointerCeil uint64
+	// unreservedGeneralPurposeRegisters and unreservedVectorRegisters hold
+	// architecture dependent unreserved register list.
+	unreservedGeneralPurposeRegisters, unreservedVectorRegisters []asm.Register
 }
 
 func (v *runtimeValueLocationStack) String() string {
@@ -141,7 +148,7 @@ func (v *runtimeValueLocationStack) String() string {
 	}
 	var usedRegisters []string
 	for reg := range v.usedRegisters {
-		usedRegisters = append(usedRegisters, fmt.Sprintf("%d", reg))
+		usedRegisters = append(usedRegisters, registerNameFn(reg))
 	}
 	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
@@ -163,6 +170,8 @@ func (v *runtimeValueLocationStack) clone() *runtimeValueLocationStack {
 		}
 	}
 	ret.stackPointerCeil = v.stackPointerCeil
+	ret.unreservedGeneralPurposeRegisters = v.unreservedGeneralPurposeRegisters
+	ret.unreservedVectorRegisters = v.unreservedVectorRegisters
 	return ret
 }
 
@@ -275,9 +284,9 @@ func (v *runtimeValueLocationStack) takeFreeRegister(tp registerType) (reg asm.R
 	var targetRegs []asm.Register
 	switch tp {
 	case registerTypeVector:
-		targetRegs = unreservedVectorRegisters
+		targetRegs = v.unreservedVectorRegisters
 	case registerTypeGeneralPurpose:
-		targetRegs = unreservedGeneralPurposeRegisters
+		targetRegs = v.unreservedGeneralPurposeRegisters
 	}
 	for _, candidate := range targetRegs {
 		if _, ok := v.usedRegisters[candidate]; ok {
@@ -292,9 +301,9 @@ func (v *runtimeValueLocationStack) takeFreeRegisters(tp registerType, num int) 
 	var targetRegs []asm.Register
 	switch tp {
 	case registerTypeVector:
-		targetRegs = unreservedVectorRegisters
+		targetRegs = v.unreservedVectorRegisters
 	case registerTypeGeneralPurpose:
-		targetRegs = unreservedGeneralPurposeRegisters
+		targetRegs = v.unreservedGeneralPurposeRegisters
 	}
 
 	regs = make([]asm.Register, 0, num)
