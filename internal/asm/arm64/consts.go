@@ -639,9 +639,9 @@ const (
 	STRH
 	// STRB is the STRB instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STRB--register---Store-Register-Byte--register--?lang=en
 	STRB
-	// MOVD moves a double word. TODO:
+	// MOVD moves a double word from register to register, or const to register.
 	MOVD
-	// MOVW moves a word. TODO:
+	// MOVW moves a word from register to register, or const to register.
 	MOVW
 	// MRS is the MRS instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MRS
 	MRS
