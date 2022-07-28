@@ -33,11 +33,13 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
-			// Setup the location stack so that we push the const on the specified height.
+			// Set up the location stack so that we push the const on the specified height.
 			s := &runtimeValueLocationStack{
-				sp:            tc.stackPointer,
-				stack:         make([]*runtimeValueLocation, tc.stackPointer),
-				usedRegisters: map[asm.Register]struct{}{},
+				sp:                                tc.stackPointer,
+				stack:                             make([]*runtimeValueLocation, tc.stackPointer),
+				usedRegisters:                     map[asm.Register]struct{}{},
+				unreservedVectorRegisters:         unreservedVectorRegisters,
+				unreservedGeneralPurposeRegisters: unreservedGeneralPurposeRegisters,
 			}
 			// Peek must be non-nil. Otherwise, compileConst* would fail.
 			s.stack[s.sp-1] = &runtimeValueLocation{}
