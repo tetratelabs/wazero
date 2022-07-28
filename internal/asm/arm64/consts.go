@@ -605,24 +605,44 @@ const (
 	LSR
 	// LSRW is the LSR instruction, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/LSR--register-
 	LSRW
-	// MOVBD loads or stores a signed byte in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
-	MOVBD
-	// MOVBW loads or stores a signed byte in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
-	MOVBW
-	// MOVBU loads a byte. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRB--register-
-	MOVBU
-	// MOVD loads or stores a register, in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDR--register-
+	// FLDRD is the LDR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
+	FLDRD
+	// FLDRW is the LDR (SIMD&FP) instruction for single precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/LDR--register--SIMD-FP---Load-SIMD-FP-Register--register-offset--?lang=en
+	FLDRW
+	// LDRD is the LDR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
+	LDRD
+	// LDRW is the LDR instruction in 32-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/LDR--register---Load-Register--register--?lang=en
+	LDRW
+	// LDRSBD is the LDRSB instruction in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
+	LDRSBD
+	// LDRSBW is the LDRSB instruction in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSB--register-
+	LDRSBW
+	// LDRB is the LDRB instruction. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRB--register-
+	LDRB
+	// LDRSHD is the LDRSHW instruction in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
+	LDRSHD
+	// LDRSHW is the LDRSHW instruction in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
+	LDRSHW
+	// LDRH is the LDRH instruction. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRH--register-
+	LDRH
+	// LDRSW is the LDRSW instruction https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSW--register-
+	LDRSW
+	// FSTRD is the STR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--?lang=en
+	FSTRD
+	// FSTRW is the STR (SIMD&FP) instruction for double precisions. https://developer.arm.com/documentation/ddi0596/2021-12/SIMD-FP-Instructions/STR--immediate--SIMD-FP---Store-SIMD-FP-register--immediate-offset--?lang=en
+	FSTRW
+	// STRD is the STR instruction in 64-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STR--register---Store-Register--register--?lang=en
+	STRD
+	// STRW is the STR instruction in 32-bit mode. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STR--register---Store-Register--register--?lang=en
+	STRW
+	// STRH is the STRH instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STRH--register---Store-Register-Halfword--register--?lang=en
+	STRH
+	// STRB is the STRB instruction. https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/STRB--register---Store-Register-Byte--register--?lang=en
+	STRB
+	// MOVD moves a double word. TODO:
 	MOVD
-	// MOVHD loads or stores a signed halfword in 64-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
-	MOVHD
-	// MOVHW loads or stores a signed halfword in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSH--register-
-	MOVHW
-	// MOVHU loads a halfword. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRH--register-
-	MOVHU
-	// MOVW loads or stores a signed word, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDRSW--register-
+	// MOVW moves a word. TODO:
 	MOVW
-	// MOVWU loads a word, in 32-bit mode. https://developer.arm.com/documentation/dui0802/a/A64-Data-Transfer-Instructions/LDR--register-
-	MOVWU
 	// MRS is the MRS instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MRS
 	MRS
 	// MSR is the MSR instruction. https://developer.arm.com/documentation/dui0802/a/A64-General-Instructions/MSR--register-
@@ -1148,24 +1168,32 @@ func InstructionName(i asm.Instruction) string {
 		return "LSR"
 	case LSRW:
 		return "LSRW"
-	case MOVBD:
-		return "MOVBD"
-	case MOVBW:
-		return "MOVBW"
-	case MOVBU:
-		return "MOVBU"
+	case LDRSBD:
+		return "LDRSBD"
+	case LDRSBW:
+		return "LDRSBW"
+	case LDRB:
+		return "LDRB"
 	case MOVD:
 		return "MOVD"
-	case MOVHD:
-		return "MOVHD"
-	case MOVHW:
-		return "MOVHW"
-	case MOVHU:
-		return "MOVHU"
+	case LDRSHD:
+		return "LDRSHD"
+	case LDRSHW:
+		return "LDRSHW"
+	case LDRH:
+		return "LDRH"
+	case LDRSW:
+		return "LDRSW"
+	case STRD:
+		return "STRD"
+	case STRW:
+		return "STRW"
+	case STRH:
+		return "STRH"
+	case STRB:
+		return "STRB"
 	case MOVW:
 		return "MOVW"
-	case MOVWU:
-		return "MOVWU"
 	case MRS:
 		return "MRS"
 	case MSR:
@@ -1418,6 +1446,14 @@ func InstructionName(i asm.Instruction) string {
 		return "FCVTL"
 	case FCVTN:
 		return "FCVTN"
+	case FSTRD:
+		return "FSTRD"
+	case FSTRW:
+		return "FSTRW"
+	case LDRD:
+		return "LDRD"
+	case LDRW:
+		return "LDRW"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }
