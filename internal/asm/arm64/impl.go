@@ -1094,7 +1094,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			})
 		}
 
-	case MOVD, MOVWU:
+	case MOVD, MOVW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
 			return
 		}
@@ -1728,24 +1728,22 @@ func (a *AssemblerImpl) encodeLoadOrStoreWithConstOffset(
 	return
 }
 
-var storeOrLoadInstructionTable = map[asm.Instruction]struct {
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
+var storeInstructionTable = map[asm.Instruction]struct {
 	size, v                byte
 	datasize, datasizeLog2 int64
 	isTargetFloat          bool
 }{
-	MOVD:  {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3},
-	MOVW:  {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2},
-	MOVWU: {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2},
-	MOVH:  {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
-	MOVHU: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
-	MOVB:  {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
-	MOVBU: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
-	FMOVD: {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true},
-	FMOVS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
+	STRD:  {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3},
+	STRW:  {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2},
+	STRH:  {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1},
+	STRB:  {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0},
+	FSTRD: {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true},
+	FSTRS: {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true},
 }
 
 func (a *AssemblerImpl) encodeRegisterToMemory(n *nodeImpl) (err error) {
-	inst, ok := storeOrLoadInstructionTable[n.instruction]
+	inst, ok := storeInstructionTable[n.instruction]
 	if !ok {
 		return errorEncodingUnsupported(n)
 	}
@@ -1849,12 +1847,31 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 	return
 }
 
+// https://developer.arm.com/documentation/ddi0596/2021-12/Index-by-Encoding/Loads-and-Stores?lang=en#ldst_regoff
+var loadInstructionTable = map[asm.Instruction]struct {
+	size, v, opcode        byte
+	datasize, datasizeLog2 int64
+	isTargetFloat          bool
+}{
+	FLDRD:  {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true, opcode: 0b01},
+	FLDRS:  {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true, opcode: 0b01},
+	LDRD:   {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3, opcode: 0b01},
+	LDRW:   {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b01},
+	LDRSHD: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b10},
+	LDRSHW: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b11},
+	LDRH:   {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b01},
+	LDRSBD: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b10},
+	LDRSBW: {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b11},
+	LDRB:   {size: 0b00, v: 0x0, datasize: 1, datasizeLog2: 0, opcode: 0b01},
+	LDRSW:  {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b10},
+}
+
 func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 	if n.instruction == ADR {
 		return a.encodeADR(n)
 	}
 
-	inst, ok := storeOrLoadInstructionTable[n.instruction]
+	inst, ok := loadInstructionTable[n.instruction]
 	if !ok {
 		return errorEncodingUnsupported(n)
 	}
@@ -1873,19 +1890,16 @@ func (a *AssemblerImpl) encodeMemoryToRegister(n *nodeImpl) (err error) {
 		return err
 	}
 
-	var opcode byte = 0b01 // opcode for load instructions.
-	if n.instruction == MOVW || n.instruction == MOVH || n.instruction == MOVB {
-		// Sign-extend load (without "u" suffix except 64-bit MOVD) needs different opcode.
-		opcode = 0b10
-	}
 	if n.srcReg2 != asm.NilRegister {
 		offsetRegBits, err := intRegisterBits(n.srcReg2)
 		if err != nil {
 			return err
 		}
-		a.encodeLoadOrStoreWithRegisterOffset(baseRegBits, offsetRegBits, dstRegBits, opcode, inst.size, inst.v)
+		a.encodeLoadOrStoreWithRegisterOffset(baseRegBits, offsetRegBits, dstRegBits, inst.opcode,
+			inst.size, inst.v)
 	} else {
-		err = a.encodeLoadOrStoreWithConstOffset(baseRegBits, dstRegBits, n.srcConst, opcode, inst.size, inst.v, inst.datasize, inst.datasizeLog2)
+		err = a.encodeLoadOrStoreWithConstOffset(baseRegBits, dstRegBits, n.srcConst, inst.opcode,
+			inst.size, inst.v, inst.datasize, inst.datasizeLog2)
 	}
 	return
 }

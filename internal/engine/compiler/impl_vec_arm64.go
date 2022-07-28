@@ -273,15 +273,15 @@ func (c *arm64Compiler) compileV128LoadLane(o *wazeroir.OperationV128LoadLane) (
 	switch o.LaneSize {
 	case 8:
 		arr = arm64.VectorArrangementB
-		loadInst = arm64.MOVB
+		loadInst = arm64.LDRB
 	case 16:
 		arr = arm64.VectorArrangementH
-		loadInst = arm64.MOVH
+		loadInst = arm64.LDRH
 	case 32:
-		loadInst = arm64.MOVW
+		loadInst = arm64.LDRW
 		arr = arm64.VectorArrangementS
 	case 64:
-		loadInst = arm64.MOVD
+		loadInst = arm64.LDRD
 		arr = arm64.VectorArrangementD
 	}
 
@@ -319,16 +319,16 @@ func (c *arm64Compiler) compileV128StoreLane(o *wazeroir.OperationV128StoreLane)
 	var storeInst asm.Instruction
 	switch o.LaneSize {
 	case 8:
-		storeInst = arm64.MOVB
+		storeInst = arm64.STRB
 		arr = arm64.VectorArrangementB
 	case 16:
-		storeInst = arm64.MOVH
+		storeInst = arm64.STRH
 		arr = arm64.VectorArrangementH
 	case 32:
-		storeInst = arm64.MOVW
+		storeInst = arm64.STRW
 		arr = arm64.VectorArrangementS
 	case 64:
-		storeInst = arm64.MOVD
+		storeInst = arm64.STRD
 		arr = arm64.VectorArrangementD
 	}
 
