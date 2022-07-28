@@ -835,22 +835,25 @@ func (c *amd64Compiler) compileV128ShrImpl(o *wazeroir.OperationV128Shr) error {
 // PSRAQ instruction requires AVX, so we emulate it without AVX instructions. https://www.felixcloutier.com/x86/psraw:psrad:psraq
 func (c *amd64Compiler) compileV128ShrI64x2SignedImpl() error {
 	const shiftCountRegister = amd64.RegCX
-	// If another value lives on the CX register, we release it to the stack.
-	c.onValueReleaseRegisterToStack(shiftCountRegister)
 
 	s := c.locationStack.pop()
-	if s.onStack() {
-		s.setRegister(shiftCountRegister)
-		c.compileLoadValueOnStackToRegister(s)
-	} else if s.onConditionalRegister() {
-		c.compileMoveConditionalToGeneralPurposeRegister(s, shiftCountRegister)
-	} else { // already on register.
-		old := s.register
-		c.assembler.CompileRegisterToRegister(amd64.MOVL, old, shiftCountRegister)
-		s.setRegister(shiftCountRegister)
-		c.locationStack.markRegisterUnused(old)
+	if s.register != shiftCountRegister {
+		// If another value lives on the CX register, we release it to the stack.
+		c.onValueReleaseRegisterToStack(shiftCountRegister)
+		if s.onStack() {
+			s.setRegister(shiftCountRegister)
+			c.compileLoadValueOnStackToRegister(s)
+		} else if s.onConditionalRegister() {
+			c.compileMoveConditionalToGeneralPurposeRegister(s, shiftCountRegister)
+		} else { // already on register.
+			old := s.register
+			c.assembler.CompileRegisterToRegister(amd64.MOVL, old, shiftCountRegister)
+			s.setRegister(shiftCountRegister)
+			c.locationStack.markRegisterUnused(old)
+		}
 	}
-	c.locationStack.markRegisterUnused(shiftCountRegister)
+
+	c.locationStack.markRegisterUsed(shiftCountRegister)
 	tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
 	if err != nil {
 		return err

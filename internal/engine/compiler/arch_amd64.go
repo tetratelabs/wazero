@@ -1,12 +1,14 @@
 package compiler
 
 import (
+	"github.com/tetratelabs/wazero/internal/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 // init initializes variables for the amd64 architecture
 func init() {
 	newArchContext = newArchContextImpl
+	registerNameFn = amd64.RegisterName
 	unreservedGeneralPurposeRegisters = amd64UnreservedGeneralPurposeRegisters
 	unreservedVectorRegisters = amd64UnreservedVectorRegisters
 }

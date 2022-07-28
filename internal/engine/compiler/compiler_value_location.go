@@ -104,7 +104,7 @@ func (v *runtimeValueLocation) String() string {
 	} else if v.onConditionalRegister() {
 		location = fmt.Sprintf("conditional(%d)", v.conditionalRegister)
 	} else if v.onRegister() {
-		location = fmt.Sprintf("register(%d)", v.register)
+		location = fmt.Sprintf("register(%s)", registerNameFn(v.register))
 	}
 	return fmt.Sprintf("{type=%s,location=%s}", v.valueType, location)
 }
