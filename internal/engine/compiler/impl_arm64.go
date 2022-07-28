@@ -842,7 +842,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD, index.register, 2, tmpReg, index.register)
 
 	// "index.register = *index.register (== offsetData[offset])"
-	c.assembler.CompileMemoryToRegister(arm64.MOVW, index.register, 0, index.register)
+	c.assembler.CompileMemoryToRegister(arm64.LDRW, index.register, 0, index.register)
 
 	// Now we read the address of the beginning of the jump table.
 	// In the above example, this corresponds to reading the address of 0x123001.
@@ -2622,7 +2622,7 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		targetSizeInBytes = 32 / 8
 		vt = runtimeValueTypeI32
 	case wazeroir.UnsignedTypeI64:
-		loadInst = arm64.LDRW
+		loadInst = arm64.LDRD
 		targetSizeInBytes = 64 / 8
 		vt = runtimeValueTypeI64
 	case wazeroir.UnsignedTypeF32:

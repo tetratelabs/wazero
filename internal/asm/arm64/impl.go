@@ -1094,7 +1094,7 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 			})
 		}
 
-	case MOVD:
+	case MOVD, MOVW:
 		if err = checkRegisterToRegisterType(n.srcReg, n.dstReg, true, true); err != nil {
 			return
 		}
@@ -1855,8 +1855,8 @@ var loadInstructionTable = map[asm.Instruction]struct {
 }{
 	FLDRD:  {size: 0b11, v: 0x1, datasize: 8, datasizeLog2: 3, isTargetFloat: true, opcode: 0b01},
 	FLDRW:  {size: 0b10, v: 0x1, datasize: 4, datasizeLog2: 2, isTargetFloat: true, opcode: 0b01},
-	LDRD:   {size: 0b1, v: 0x0, datasize: 8, datasizeLog2: 3, opcode: 0b01},
-	LDRW:   {size: 0b01, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b11},
+	LDRD:   {size: 0b11, v: 0x0, datasize: 8, datasizeLog2: 3, opcode: 0b01},
+	LDRW:   {size: 0b10, v: 0x0, datasize: 4, datasizeLog2: 2, opcode: 0b01},
 	LDRSHD: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b10},
 	LDRSHW: {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b11},
 	LDRH:   {size: 0b01, v: 0x0, datasize: 2, datasizeLog2: 1, opcode: 0b01},

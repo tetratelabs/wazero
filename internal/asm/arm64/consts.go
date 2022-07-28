@@ -1454,6 +1454,10 @@ func InstructionName(i asm.Instruction) string {
 		return "LDRD"
 	case LDRW:
 		return "LDRW"
+	case FLDRD:
+		return "FLDRD"
+	case FLDRW:
+		return "FLDRW"
 	}
 	panic(fmt.Errorf("unknown instruction %d", i))
 }
