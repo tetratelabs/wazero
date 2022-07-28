@@ -489,8 +489,8 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	wasmValueType := c.ir.Globals[o.Index].ValType
 	isV128 := wasmValueType == wasm.ValueTypeV128
-	// Get the address of globals[index] into intReg.
-	intReg, err := c.compileReadGlobalAddress(o.Index)
+	// Get the address of globals[index] into globalAddressReg.
+	globalAddressReg, err := c.compileReadGlobalAddress(o.Index)
 	if err != nil {
 		return err
 	}
@@ -500,52 +500,48 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		if err != nil {
 			return err
 		}
-		c.assembler.CompileConstToRegister(arm64.ADD, globalInstanceValueOffset, intReg)
-		c.assembler.CompileMemoryToVectorRegister(arm64.VMOV, intReg, 0,
+		c.assembler.CompileConstToRegister(arm64.ADD, globalInstanceValueOffset, globalAddressReg)
+		c.assembler.CompileMemoryToVectorRegister(arm64.VMOV, globalAddressReg, 0,
 			resultReg, arm64.VectorArrangementQ)
 
 		c.pushVectorRuntimeValueLocationOnRegister(resultReg)
 	} else {
-
-		var intMov, floatMov = arm64.NOP, arm64.NOP
+		var ldr = arm64.NOP
+		var result asm.Register
 		var vt runtimeValueType
 		switch wasmValueType {
 		case wasm.ValueTypeI32:
-			intMov = arm64.LDRW
+			ldr = arm64.LDRW
 			vt = runtimeValueTypeI32
+			result = globalAddressReg
 		case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
-			intMov = arm64.LDRD
+			ldr = arm64.LDRD
 			vt = runtimeValueTypeI64
+			result = globalAddressReg
 		case wasm.ValueTypeF32:
-			intMov = arm64.LDRW
-			floatMov = arm64.FMOVS
-			vt = runtimeValueTypeF32
-		case wasm.ValueTypeF64:
-			intMov = arm64.LDRD
-			floatMov = arm64.FMOVD
-			vt = runtimeValueTypeF64
-		}
-
-		// "intReg = [intReg + globalInstanceValueOffset] (== globals[index].Val)"
-		c.assembler.CompileMemoryToRegister(
-			intMov,
-			intReg, globalInstanceValueOffset,
-			intReg,
-		)
-
-		// If the value type is float32 or float64, we have to move the value
-		// further into the float register.
-		// TODO: it seems possible to load from the memory directly via FLDRD or FLDRW. Investigate.
-		resultReg := intReg
-		if floatMov != arm64.NOP {
-			resultReg, err = c.allocateRegister(registerTypeVector)
+			result, err = c.allocateRegister(registerTypeVector)
 			if err != nil {
 				return err
 			}
-			c.assembler.CompileRegisterToRegister(floatMov, intReg, resultReg)
+			ldr = arm64.FLDRW
+			vt = runtimeValueTypeF32
+		case wasm.ValueTypeF64:
+			result, err = c.allocateRegister(registerTypeVector)
+			if err != nil {
+				return err
+			}
+			ldr = arm64.FLDRD
+			vt = runtimeValueTypeF64
 		}
 
-		c.pushRuntimeValueLocationOnRegister(resultReg, vt)
+		// "result = [globalAddressReg + globalInstanceValueOffset] (== globals[index].Val)"
+		c.assembler.CompileMemoryToRegister(
+			ldr,
+			globalAddressReg, globalInstanceValueOffset,
+			result,
+		)
+
+		c.pushRuntimeValueLocationOnRegister(result, vt)
 	}
 	return nil
 }
