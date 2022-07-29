@@ -13,8 +13,7 @@ import (
 func Test_main(t *testing.T) {
 	stdout, _ := maintester.TestMain(t, main, "multiple-results")
 	require.Equal(t, `result-offset/wasm: age=37
-result-offset/host: age=37
 multi-value/wasm: age=37
-multi-value/host: age=37
+multi-value/imported_host: age=37
 `, stdout)
 }

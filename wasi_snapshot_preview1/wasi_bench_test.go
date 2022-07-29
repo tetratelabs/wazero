@@ -18,15 +18,17 @@ var testMem = []byte{
 }
 
 func Test_Benchmark_EnvironGet(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
 		WithEnv("a", "b").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
 	// Invoke environGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, functionEnvironGet, uint64(11), uint64(1))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.environ_get(environ=11,environ_buf=1)
-<== ESUCCESS
+--> proxy.environ_get(environ=11,environ_buf=1)
+	==> wasi_snapshot_preview1.environ_get(environ=11,environ_buf=1)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	mem, ok := mod.Memory().Read(testCtx, 0, uint32(len(testMem)))

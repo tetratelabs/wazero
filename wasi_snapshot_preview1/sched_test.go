@@ -10,7 +10,9 @@ import (
 func Test_schedYield(t *testing.T) {
 	log := requireErrnoNosys(t, functionSchedYield)
 	require.Equal(t, `
---> wasi_snapshot_preview1.sched_yield()
-<-- ENOSYS
+--> proxy.sched_yield()
+	--> wasi_snapshot_preview1.sched_yield()
+	<-- ENOSYS
+<-- (52)
 `, log)
 }

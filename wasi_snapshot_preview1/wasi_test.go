@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -33,7 +34,7 @@ func maskMemory(t *testing.T, ctx context.Context, mod api.Module, size int) {
 	}
 }
 
-func requireModule(t *testing.T, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
+func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
@@ -41,13 +42,21 @@ func requireModule(t *testing.T, config wazero.ModuleConfig) (api.Module, api.Cl
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
-	compiled, err := (&builder{r}).moduleBuilder().
-		ExportMemoryWithMax("memory", 1, 1).
+	wasiModuleCompiled, err := (&builder{r}).moduleBuilder().
 		Compile(ctx, wazero.NewCompileConfig())
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateModule(ctx, compiled, config)
+	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config)
 	require.NoError(t, err)
+
+	proxyBin := proxy.GetProxyModuleBinary(ModuleName, wasiModuleCompiled)
+
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wazero.NewCompileConfig())
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(ctx, proxyCompiled, config)
+	require.NoError(t, err)
+
 	return mod, r, &log
 }
 
@@ -63,7 +72,20 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx)
 
-	mod, err := Instantiate(ctx, r)
+	// Instantiate the wasi module.
+	wasiModuleCompiled, err := (&builder{r}).moduleBuilder().
+		Compile(ctx, wazero.NewCompileConfig())
+	require.NoError(t, err)
+
+	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig())
+	require.NoError(t, err)
+
+	proxyBin := proxy.GetProxyModuleBinary(ModuleName, wasiModuleCompiled)
+
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wazero.NewCompileConfig())
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(ctx, proxyCompiled, wazero.NewModuleConfig())
 	require.NoError(t, err)
 
 	requireErrno(t, ErrnoNosys, mod, funcName, params...)

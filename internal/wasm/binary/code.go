@@ -75,7 +75,7 @@ func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 	// TODO: Is there a way to efficiently break if FeatureSignExtensionOps=false and
 	// OpcodeI32Extend8S <= op && op <= OpcodeI64Extend32S?
 
-	if body[len(body)-1] != wasm.OpcodeEnd {
+	if endIndex := len(body) - 1; endIndex < 0 || body[endIndex] != wasm.OpcodeEnd {
 		return nil, fmt.Errorf("expr not end with OpcodeEnd")
 	}
 

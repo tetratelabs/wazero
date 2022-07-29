@@ -162,6 +162,9 @@ func (f *importedFn) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on api.Function.
 func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if f.importedFn.IsHostFunction {
+		return nil, fmt.Errorf("directly calling host function is not supported")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -171,6 +174,9 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 
 // Call implements the same method as documented on api.Function.
 func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	if f.IsHostFunction {
+		return nil, fmt.Errorf("directly calling host function is not supported")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

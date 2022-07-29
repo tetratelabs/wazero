@@ -9,7 +9,7 @@ import (
 )
 
 func Test_procExit(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -21,14 +21,16 @@ func Test_procExit(t *testing.T) {
 			name:     "success (exitcode 0)",
 			exitCode: 0,
 			expectedLog: `
-==> wasi_snapshot_preview1.proc_exit(rval=0)
+--> proxy.proc_exit(rval=0)
+	==> wasi_snapshot_preview1.proc_exit(rval=0)
 `,
 		},
 		{
 			name:     "arbitrary non-zero exitcode",
 			exitCode: 42,
 			expectedLog: `
-==> wasi_snapshot_preview1.proc_exit(rval=42)
+--> proxy.proc_exit(rval=42)
+	==> wasi_snapshot_preview1.proc_exit(rval=42)
 `,
 		},
 	}
@@ -41,7 +43,10 @@ func Test_procExit(t *testing.T) {
 
 			// Since procExit panics, any opcodes afterwards cannot be reached.
 			_, err := mod.ExportedFunction(functionProcExit).Call(testCtx, uint64(tc.exitCode))
-			require.Equal(t, tc.exitCode, err.(*sys.ExitError).ExitCode())
+			require.Error(t, err)
+			sysErr, ok := err.(*sys.ExitError)
+			require.True(t, ok, err)
+			require.Equal(t, tc.exitCode, sysErr.ExitCode())
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -51,7 +56,9 @@ func Test_procExit(t *testing.T) {
 func Test_procRaise(t *testing.T) {
 	log := requireErrnoNosys(t, functionProcRaise, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.proc_raise(sig=0)
-<-- ENOSYS
+--> proxy.proc_raise(sig=0)
+	--> wasi_snapshot_preview1.proc_raise(sig=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }

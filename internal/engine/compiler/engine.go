@@ -585,15 +585,11 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 		}
 	}()
 
-	if f.Kind == wasm.FunctionKindWasm {
-		for _, v := range params {
-			ce.pushValue(v)
-		}
-		ce.execWasmFunction(ctx, callCtx, compiled)
-		results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
-	} else {
-		results = wasm.CallGoFunc(ctx, callCtx, compiled.source, params)
+	for _, v := range params {
+		ce.pushValue(v)
 	}
+	ce.execWasmFunction(ctx, callCtx, compiled)
+	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
 	return
 }
 

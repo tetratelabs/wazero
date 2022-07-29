@@ -20,8 +20,10 @@ import (
 func Test_fdAdvise(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdAdvise, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,result.advice=0)
-<-- ENOSYS
+--> proxy.fd_advise(fd=0,offset=0,len=0,result.advice=0)
+	--> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,result.advice=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -29,8 +31,10 @@ func Test_fdAdvise(t *testing.T) {
 func Test_fdAllocate(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdAllocate, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_allocate(fd=0,offset=0,len=0)
-<-- ENOSYS
+--> proxy.fd_allocate(fd=0,offset=0,len=0)
+	--> wasi_snapshot_preview1.fd_allocate(fd=0,offset=0,len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -39,7 +43,7 @@ func Test_fdClose(t *testing.T) {
 	path1, path2 := "a", "b"
 	testFS := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
 
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	// open both paths without using WASI
@@ -54,8 +58,10 @@ func Test_fdClose(t *testing.T) {
 	// Close
 	requireErrno(t, ErrnoSuccess, mod, functionFdClose, uint64(fdToClose))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_close(fd=4)
-<== ESUCCESS
+--> proxy.fd_close(fd=4)
+	==> wasi_snapshot_preview1.fd_close(fd=4)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	// Verify fdToClose is closed and removed from the opened FDs.
@@ -70,8 +76,10 @@ func Test_fdClose(t *testing.T) {
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
 		requireErrno(t, ErrnoBadf, mod, functionFdClose, uint64(42)) // 42 is an arbitrary invalid FD
 		require.Equal(t, `
-==> wasi_snapshot_preview1.fd_close(fd=42)
-<== EBADF
+--> proxy.fd_close(fd=42)
+	==> wasi_snapshot_preview1.fd_close(fd=42)
+	<== EBADF
+<-- (8)
 `, "\n"+log.String())
 	})
 }
@@ -80,8 +88,10 @@ func Test_fdClose(t *testing.T) {
 func Test_fdDatasync(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdDatasync, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_datasync(fd=0)
-<-- ENOSYS
+--> proxy.fd_datasync(fd=0)
+	--> wasi_snapshot_preview1.fd_datasync(fd=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -89,7 +99,7 @@ func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "a", "b"
 	testFS := fstest.MapFS{file: {Data: make([]byte, 0)}, dir: {Mode: fs.ModeDir}}
 
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 	memorySize := mod.Memory().Size(testCtx)
 
@@ -114,8 +124,10 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   fileFd,
 			// TODO: expectedMem for a file
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_fdstat_get(fd=4,result.stat=0)
-<== ESUCCESS
+--> proxy.fd_fdstat_get(fd=4,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=4,result.stat=0)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -123,8 +135,10 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:   dirFd,
 			// TODO: expectedMem for a dir
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=0)
-<== ESUCCESS
+--> proxy.fd_fdstat_get(fd=5,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=0)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -132,8 +146,10 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_fdstat_get(fd=4294967295,result.stat=0)
-<== EBADF
+--> proxy.fd_fdstat_get(fd=4294967295,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=4294967295,result.stat=0)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -142,8 +158,10 @@ func Test_fdFdstatGet(t *testing.T) {
 			resultStat: memorySize - 24 + 1,
 			// TODO: ErrnoFault
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=65513)
-<== ESUCCESS
+--> proxy.fd_fdstat_get(fd=5,result.stat=65513)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=65513)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 	}
@@ -164,8 +182,10 @@ func Test_fdFdstatGet(t *testing.T) {
 func Test_fdFdstatSetFlags(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdFdstatSetFlags, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=0,flags=0)
-<-- ENOSYS
+--> proxy.fd_fdstat_set_flags(fd=0,flags=0)
+	--> wasi_snapshot_preview1.fd_fdstat_set_flags(fd=0,flags=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -173,8 +193,10 @@ func Test_fdFdstatSetFlags(t *testing.T) {
 func Test_fdFdstatSetRights(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdFdstatSetRights, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=0,fs_rights_inheriting=0)
-<-- ENOSYS
+--> proxy.fd_fdstat_set_rights(fd=0,fs_rights_base=0,fs_rights_inheriting=0)
+	--> wasi_snapshot_preview1.fd_fdstat_set_rights(fd=0,fs_rights_base=0,fs_rights_inheriting=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -182,8 +204,10 @@ func Test_fdFdstatSetRights(t *testing.T) {
 func Test_fdFilestatGet(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdFilestatGet, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_filestat_get(fd=0,result.buf=0)
-<-- ENOSYS
+--> proxy.fd_filestat_get(fd=0,result.buf=0)
+	--> wasi_snapshot_preview1.fd_filestat_get(fd=0,result.buf=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -191,8 +215,10 @@ func Test_fdFilestatGet(t *testing.T) {
 func Test_fdFilestatSetSize(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdFilestatSetSize, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_filestat_set_size(fd=0,size=0)
-<-- ENOSYS
+--> proxy.fd_filestat_set_size(fd=0,size=0)
+	--> wasi_snapshot_preview1.fd_filestat_set_size(fd=0,size=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -200,8 +226,10 @@ func Test_fdFilestatSetSize(t *testing.T) {
 func Test_fdFilestatSetTimes(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdFilestatSetTimes, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_filestat_set_times(fd=0,atim=0,mtim=0,fst_flags=0)
-<-- ENOSYS
+--> proxy.fd_filestat_set_times(fd=0,atim=0,mtim=0,fst_flags=0)
+	--> wasi_snapshot_preview1.fd_filestat_set_times(fd=0,atim=0,mtim=0,fst_flags=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -209,8 +237,10 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 func Test_fdPread(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdPread, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_pread(fd=0,iovs=0,iovs_len=0,offset=0,result.nread=0)
-<-- ENOSYS
+--> proxy.fd_pread(fd=0,iovs=0,iovs_len=0,offset=0,result.nread=0)
+	--> wasi_snapshot_preview1.fd_pread(fd=0,iovs=0,iovs_len=0,offset=0,result.nread=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -233,8 +263,10 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, functionFdPrestatGet, uint64(fd), uint64(resultPrestat))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=1)
-<== ESUCCESS
+--> proxy.fd_prestat_get(fd=4,result.prestat=1)
+	==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=1)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -261,8 +293,10 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			resultPrestat: 0,  // valid offset
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_get(fd=42,result.prestat=0)
-<== EBADF
+--> proxy.fd_prestat_get(fd=42,result.prestat=0)
+	==> wasi_snapshot_preview1.fd_prestat_get(fd=42,result.prestat=0)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -271,8 +305,10 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			resultPrestat: memorySize,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
-<== EFAULT
+--> proxy.fd_prestat_get(fd=4,result.prestat=65536)
+	==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		// TODO: non pre-opened file == api.ErrnoBadf
@@ -307,8 +343,10 @@ func Test_fdPrestatDirName(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, functionFdPrestatDirName, uint64(fd), uint64(path), uint64(pathLen))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=1,path_len=3)
-<== ESUCCESS
+--> proxy.fd_prestat_dir_name(fd=4,path=1,path_len=3)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=1,path_len=3)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -340,8 +378,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
-<== EFAULT
+--> proxy.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -351,8 +391,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
-<== EFAULT
+--> proxy.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -362,8 +404,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen + 1,
 			expectedErrno: ErrnoNametoolong,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=0,path_len=5)
-<== ENAMETOOLONG
+--> proxy.fd_prestat_dir_name(fd=4,path=0,path_len=5)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=0,path_len=5)
+	<== ENAMETOOLONG
+<-- (37)
 `,
 		},
 		{
@@ -373,8 +417,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=4)
-<== EBADF
+--> proxy.fd_prestat_dir_name(fd=42,path=0,path_len=4)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=4)
+	<== EBADF
+<-- (8)
 `,
 		},
 		// TODO: non pre-opened file == ErrnoBadf
@@ -396,8 +442,10 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 func Test_fdPwrite(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdPwrite, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_pwrite(fd=0,iovs=0,iovs_len=0,offset=0,result.nwritten=0)
-<-- ENOSYS
+--> proxy.fd_pwrite(fd=0,iovs=0,iovs_len=0,offset=0,result.nwritten=0)
+	--> wasi_snapshot_preview1.fd_pwrite(fd=0,iovs=0,iovs_len=0,offset=0,result.nwritten=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -433,8 +481,10 @@ func Test_fdRead(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, functionFdRead, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.size=26)
-<== ESUCCESS
+--> proxy.fd_read(fd=4,iovs=1,iovs_len=2,result.size=26)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.size=26)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -458,8 +508,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
-<== EBADF
+--> proxy.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
+	==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -469,8 +521,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			memory:        []byte{'?'},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
-<== EFAULT
+--> proxy.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -483,8 +537,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
-<== EFAULT
+--> proxy.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -498,8 +554,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
-<== EFAULT
+--> proxy.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -514,8 +572,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
-<== EFAULT
+--> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -531,8 +591,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
-<== EFAULT
+--> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}
@@ -557,8 +619,10 @@ func Test_fdRead_Errors(t *testing.T) {
 func Test_fdReaddir(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdReaddir, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_readdir(fd=0,buf=0,buf_len=0,cookie=0,result.bufused=0)
-<-- ENOSYS
+--> proxy.fd_readdir(fd=0,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	--> wasi_snapshot_preview1.fd_readdir(fd=0,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -566,8 +630,10 @@ func Test_fdReaddir(t *testing.T) {
 func Test_fdRenumber(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdRenumber, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_renumber(fd=0,to=0)
-<-- ENOSYS
+--> proxy.fd_renumber(fd=0,to=0)
+	--> wasi_snapshot_preview1.fd_renumber(fd=0,to=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -596,8 +662,10 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
-<== ESUCCESS
+--> proxy.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -611,8 +679,10 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
-<== ESUCCESS
+--> proxy.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -626,8 +696,10 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=18446744073709551615,whence=2,result.newoffset=1)
-<== ESUCCESS
+--> proxy.fd_seek(fd=4,offset=18446744073709551615,whence=2,result.newoffset=1)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=18446744073709551615,whence=2,result.newoffset=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 	}
@@ -683,8 +755,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
-<== EBADF
+--> proxy.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
+	==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -693,8 +767,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
-<== EINVAL
+--> proxy.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
@@ -703,8 +779,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 			resultNewoffset: memorySize,
 			expectedErrno:   ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
-<== EFAULT
+--> proxy.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}
@@ -724,8 +802,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 func Test_fdSync(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdSync, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_sync(fd=0)
-<-- ENOSYS
+--> proxy.fd_sync(fd=0)
+	--> wasi_snapshot_preview1.fd_sync(fd=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -733,8 +813,10 @@ func Test_fdSync(t *testing.T) {
 func Test_fdTell(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdTell, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.fd_tell(fd=0,result.offset=0)
-<-- ENOSYS
+--> proxy.fd_tell(fd=0,result.offset=0)
+	--> wasi_snapshot_preview1.fd_tell(fd=0,result.offset=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -771,8 +853,10 @@ func Test_fdWrite(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, functionFdWrite, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.size=26)
-<== ESUCCESS
+--> proxy.fd_write(fd=4,iovs=1,iovs_len=2,result.size=26)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.size=26)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -812,8 +896,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.size=0)
-<== EBADF
+--> proxy.fd_write(fd=42,iovs=0,iovs_len=1,result.size=0)
+	==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.size=0)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -822,8 +908,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        []byte{},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -832,8 +920,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:4], // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mod.Memory()!
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -842,8 +932,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:8], // iovs[0].offset (where to read "hi") is outside memory.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -852,8 +944,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:9], // iovs[0].offset (where to read "hi") is in memory, but truncated.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -863,8 +957,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 			resultSize:    uint32(len(memory)), // read was ok, but there wasn't enough memory to write the result.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=10)
-<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=10)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=10)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}
@@ -887,8 +983,10 @@ func Test_fdWrite_Errors(t *testing.T) {
 func Test_pathCreateDirectory(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathCreateDirectory, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_create_directory(fd=0,path=0,path_len=0)
-<-- ENOSYS
+--> proxy.path_create_directory(fd=0,path=0,path_len=0)
+	--> wasi_snapshot_preview1.path_create_directory(fd=0,path=0,path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -896,8 +994,10 @@ func Test_pathCreateDirectory(t *testing.T) {
 func Test_pathFilestatGet(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathFilestatGet, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_filestat_get(fd=0,flags=0,path=0,path_len=0,result.buf=0)
-<-- ENOSYS
+--> proxy.path_filestat_get(fd=0,flags=0,path=0,path_len=0,result.buf=0)
+	--> wasi_snapshot_preview1.path_filestat_get(fd=0,flags=0,path=0,path_len=0,result.buf=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -905,8 +1005,10 @@ func Test_pathFilestatGet(t *testing.T) {
 func Test_pathFilestatSetTimes(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathFilestatSetTimes, 0, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_filestat_set_times(fd=0,flags=0,path=0,path_len=0,atim=0,mtim=0,fst_flags=0)
-<-- ENOSYS
+--> proxy.path_filestat_set_times(fd=0,flags=0,path=0,path_len=0,atim=0,mtim=0,fst_flags=0)
+	--> wasi_snapshot_preview1.path_filestat_set_times(fd=0,flags=0,path=0,path_len=0,atim=0,mtim=0,fst_flags=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -914,8 +1016,10 @@ func Test_pathFilestatSetTimes(t *testing.T) {
 func Test_pathLink(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathLink, 0, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_link(old_fd=0,old_flags=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
-<-- ENOSYS
+--> proxy.path_link(old_fd=0,old_flags=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
+	--> wasi_snapshot_preview1.path_link(old_fd=0,old_flags=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -944,7 +1048,7 @@ func Test_pathOpen(t *testing.T) {
 	resultOpenedFd := uint32(len(initialMemory) + 1)
 
 	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	maskMemory(t, testCtx, mod, len(expectedMemory))
@@ -954,8 +1058,10 @@ func Test_pathOpen(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, functionPathOpen, uint64(rootFD), uint64(dirflags), uint64(pathPtr),
 		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
-<== ESUCCESS
+--> proxy.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -973,7 +1079,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	pathName := "wazero"
 	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	validPath := uint32(0)    // arbitrary offset
@@ -991,8 +1097,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-<== EBADF
+--> proxy.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	==> wasi_snapshot_preview1.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	<== EBADF
+<-- (8)
 `,
 		},
 		{
@@ -1002,8 +1110,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathLen:       validPathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-<== EFAULT
+--> proxy.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -1013,8 +1123,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathLen:       mod.Memory().Size(testCtx) + 1, // path is in the valid memory range, but pathLen is out-of-memory for path
 			expectedErrno: ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-<== EFAULT
+--> proxy.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -1024,8 +1136,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
 			expectedErrno: ErrnoNoent,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-<== ENOENT
+--> proxy.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	<== ENOENT
+<-- (44)
 `,
 		},
 		{
@@ -1036,8 +1150,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			resultOpenedFd: mod.Memory().Size(testCtx), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
-<== EFAULT
+--> proxy.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}
@@ -1058,8 +1174,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 func Test_pathReadlink(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathReadlink, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_readlink(fd=0,path=0,path_len=0,buf=0,buf_len=0,result.bufused=0)
-<-- ENOSYS
+--> proxy.path_readlink(fd=0,path=0,path_len=0,buf=0,buf_len=0,result.bufused=0)
+	--> wasi_snapshot_preview1.path_readlink(fd=0,path=0,path_len=0,buf=0,buf_len=0,result.bufused=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -1067,8 +1185,10 @@ func Test_pathReadlink(t *testing.T) {
 func Test_pathRemoveDirectory(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathRemoveDirectory, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_remove_directory(fd=0,path=0,path_len=0)
-<-- ENOSYS
+--> proxy.path_remove_directory(fd=0,path=0,path_len=0)
+	--> wasi_snapshot_preview1.path_remove_directory(fd=0,path=0,path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -1076,8 +1196,10 @@ func Test_pathRemoveDirectory(t *testing.T) {
 func Test_pathRename(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathRename, 0, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_rename(fd=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
-<-- ENOSYS
+--> proxy.path_rename(fd=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
+	--> wasi_snapshot_preview1.path_rename(fd=0,old_path=0,old_path_len=0,new_fd=0,new_path=0,new_path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -1085,8 +1207,10 @@ func Test_pathRename(t *testing.T) {
 func Test_pathSymlink(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathSymlink, 0, 0, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_symlink(old_path=0,old_path_len=0,fd=0,new_path=0,new_path_len=0)
-<-- ENOSYS
+--> proxy.path_symlink(old_path=0,old_path_len=0,fd=0,new_path=0,new_path_len=0)
+	--> wasi_snapshot_preview1.path_symlink(old_path=0,old_path_len=0,fd=0,new_path=0,new_path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -1094,8 +1218,10 @@ func Test_pathSymlink(t *testing.T) {
 func Test_pathUnlinkFile(t *testing.T) {
 	log := requireErrnoNosys(t, functionPathUnlinkFile, 0, 0, 0)
 	require.Equal(t, `
---> wasi_snapshot_preview1.path_unlink_file(fd=0,path=0,path_len=0)
-<-- ENOSYS
+--> proxy.path_unlink_file(fd=0,path=0,path_len=0)
+	--> wasi_snapshot_preview1.path_unlink_file(fd=0,path=0,path_len=0)
+	<-- ENOSYS
+<-- (52)
 `, log)
 }
 
@@ -1105,7 +1231,7 @@ func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, ui
 		mapFile.Mode = os.ModeDir
 	}
 	testFS := fstest.MapFS{pathName[1:]: mapFile} // strip the leading slash
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
 	fd, err := fsc.OpenFile(testCtx, pathName)
 	require.NoError(t, err)
@@ -1115,7 +1241,7 @@ func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, ui
 // requireOpenWritableFile is temporary until we add the ability to open files for writing.
 func requireOpenWritableFile(t *testing.T, tmpDir string, pathName string) (api.Module, uint32, *bytes.Buffer, api.Closer) {
 	writeable, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
 	fd, err := fsc.OpenFile(testCtx, pathName)
 	require.NoError(t, err)
