@@ -398,8 +398,8 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	c.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 }
 
-// compileGoFunction implements compiler.compileHostFunction for the arm64 architecture.
-func (c *arm64Compiler) compileHostFunction() error {
+// compileGoHostFunction implements compiler.compileHostFunction for the arm64 architecture.
+func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 

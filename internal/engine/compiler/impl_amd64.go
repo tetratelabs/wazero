@@ -156,7 +156,7 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 	return c.labels[labelKey]
 }
 
-// compileGoFunction constructs the entire code to enter the host function implementation,
+// compileGoHostFunction constructs the entire code to enter the host function implementation,
 // and return back to the caller.
 func (c *amd64Compiler) compileHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.

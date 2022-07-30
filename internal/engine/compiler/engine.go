@@ -424,7 +424,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	for funcIndex, ir := range irs {
 		var compiled *code
 		if ir.GoFunc != nil {
-			if compiled, err = compileGoFunction(ir); err != nil {
+			if compiled, err = compileGoDefinedHostFunction(ir); err != nil {
 				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
@@ -804,13 +804,13 @@ func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wa
 	ce.pushValue(uint64(res))
 }
 
-func compileGoFunction(ir *wazeroir.CompilationResult) (*code, error) {
+func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
 	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = compiler.compileHostFunction(); err != nil {
+	if err = compiler.compileGoDefinedHostFunction(); err != nil {
 		return nil, err
 	}
 
