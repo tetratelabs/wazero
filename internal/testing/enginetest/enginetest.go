@@ -842,7 +842,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 				{Index: 3, Name: callImportCallReadMemName},
 			},
 		},
-		// Indicates that this module has memory so that compilers are able to assembly memory-related initialization.
+		// Indicates that this module has a memory so that compilers are able to assembe memory-related initialization.
 		MemorySection: &wasm.Memory{Min: 1},
 		ID:            wasm.ModuleID{1},
 	}

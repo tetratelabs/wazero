@@ -4936,7 +4936,7 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 func (c *amd64Compiler) compileModuleContextInitialization() error {
 	if c.ir.IsHostFunction {
 		// If this is the host function, our semantic is that host functions use the caller's context.
-		// Therefore, we can skip all the initialization step here as at this point, caller's memory, etc
+		// Therefore, we can skip all the initialization steps here as at this point, the caller's memory, etc
 		// are already set on the callEngine.
 		return nil
 	}
