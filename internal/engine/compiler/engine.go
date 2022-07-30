@@ -424,13 +424,10 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	for funcIndex, ir := range irs {
 		var compiled *code
 		if ir.GoFunc != nil {
-			if compiled, err = compileHostFunction(ir); err != nil {
+			if compiled, err = compileGoDefinedHostFunction(ir); err != nil {
 				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-		} else if ir.IsHostFunction && ir.UsesMemory {
-			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
-			return fmt.Errorf("error compiling host wasm func[%s]: memory access not yet supported", def.DebugName())
 		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
@@ -807,14 +804,13 @@ func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wa
 	ce.pushValue(uint64(res))
 }
 
-func compileHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
+func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
 	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Consider when no memory is used (ex !ir.UsesMemory)
-	if err = compiler.compileHostFunction(); err != nil {
+	if err = compiler.compileGoDefinedHostFunction(); err != nil {
 		return nil, err
 	}
 

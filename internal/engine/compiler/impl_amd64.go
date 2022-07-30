@@ -156,9 +156,9 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 	return c.labels[labelKey]
 }
 
-// compileHostFunction constructs the entire code to enter the host function implementation,
-// and return back to the caller.
-func (c *amd64Compiler) compileHostFunction() error {
+// compileGoDefinedHostFunction constructs the entire code to enter the host function implementation,
+// and return to the caller.
+func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
@@ -4934,6 +4934,13 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 // callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) compileModuleContextInitialization() error {
+	if c.ir.IsHostFunction {
+		// If this is the host function, our semantic is that host functions use the caller's context.
+		// Therefore, we can skip all the initialization steps here as at this point, the caller's memory, etc
+		// are already set on the callEngine.
+		return nil
+	}
+
 	// amd64CallingConventionModuleInstanceAddressRegister holds the module instance's address
 	// so mark it used so that it won't be used as a free register until the module context initialization finishes.
 	c.locationStack.markRegisterUsed(amd64CallingConventionModuleInstanceAddressRegister)

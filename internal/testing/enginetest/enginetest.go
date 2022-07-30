@@ -374,9 +374,7 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	t.Run("wasm", func(t *testing.T) {
 		runTestModuleEngine_Call_HostFn(t, et, hostDivByWasm)
-		if !et.IsCompiler() { // TODO: Support host wasm func that uses caller memory in compiler.
-			runTestModuleEngine_Call_HostFn_Mem(t, et, hostReadMemWasm)
-		}
+		runTestModuleEngine_Call_HostFn_Mem(t, et, hostReadMemWasm)
 	})
 	t.Run("go", func(t *testing.T) {
 		runTestModuleEngine_Call_HostFn(t, et, hostDivByGo)
@@ -844,7 +842,9 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 				{Index: 3, Name: callImportCallReadMemName},
 			},
 		},
-		ID: wasm.ModuleID{1},
+		// Indicates that this module has a memory so that compilers are able to assembe memory-related initialization.
+		MemorySection: &wasm.Memory{Min: 1},
+		ID:            wasm.ModuleID{1},
 	}
 	importingModule.BuildFunctionDefinitions()
 	err = e.CompileModule(testCtx, importingModule)

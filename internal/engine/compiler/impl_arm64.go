@@ -398,8 +398,8 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	c.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 }
 
-// compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
-func (c *arm64Compiler) compileHostFunction() error {
+// compileGoHostFunction implements compiler.compileHostFunction for the arm64 architecture.
+func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
@@ -4131,6 +4131,13 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // ce.moduleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
+	if c.ir.IsHostFunction {
+		// If this is the host function, our semantic is that host functions use the caller's context.
+		// Therefore, we can skip all the initialization steps here as at this point, the caller's memory, etc
+		// are already set on the callEngine.
+		return nil
+	}
+
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 

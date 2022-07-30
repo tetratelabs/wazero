@@ -14,7 +14,7 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newCompilerEnvironment()
 	compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-	err := compiler.compileHostFunction()
+	err := compiler.compileGoDefinedHostFunction()
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
