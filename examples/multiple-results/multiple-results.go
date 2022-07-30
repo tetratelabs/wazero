@@ -96,7 +96,7 @@ func resultOffsetWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Modul
 var multiValueWasm []byte
 
 // multiValueWasmFunctions are the WebAssembly equivalent of the Go-defined
-// multiValueHostFunctions. The source is in testdata/multi-value.wat
+// multiValueHostFunctions. The source is in testdata/multi_value.wat
 func multiValueWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	return r.InstantiateModuleFromBinary(ctx, multiValueWasm)
 }
@@ -108,13 +108,19 @@ func multiValueWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Module,
 //go:embed testdata/multi_value_imported.wasm
 var multiValueFromImportedHostWasm []byte
 
+// multiValueFromImportedHostWasmFunctions return the WebAssembly which imports the Go-defined "get_age" function.
+// The imported "get_age" function returns multiple results. The source is in testdata/multi_value_imported.wat
 func multiValueFromImportedHostWasmFunctions(ctx context.Context, r wazero.Runtime) (api.Module, error) {
-	r.NewModuleBuilder("multi-value/host").
+	// Instantiate the host module with the exported `get_age` function which returns multiple results.
+	if _, err := r.NewModuleBuilder("multi-value/host").
 		// Define a function that returns two results
 		ExportFunction("get_age", func() (age uint64, errno uint32) {
 			age = 37
 			errno = 0
 			return
-		}).Instantiate(ctx, r)
+		}).Instantiate(ctx, r); err != nil {
+		return nil, err
+	}
+	// Then, creates the module which imports the `get_age` function from the `multi-value/host` module above.
 	return r.InstantiateModuleFromBinary(ctx, multiValueFromImportedHostWasm)
 }
