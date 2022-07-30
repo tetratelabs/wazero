@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -47,7 +48,7 @@ func TestAbort(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			mod, r, log := requireModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr))
+			mod, r, log := requireProxyModule(t, tc.exporter, wazero.NewModuleConfig().WithStderr(&stderr))
 			defer r.Close(testCtx)
 
 			messageOff, filenameOff := writeAbortMessageAndFileName(t, mod.Memory(), encodeUTF16("message"), encodeUTF16("filename"))
@@ -55,9 +56,12 @@ func TestAbort(t *testing.T) {
 			_, err := mod.ExportedFunction(functionAbort).
 				Call(testCtx, uint64(messageOff), uint64(filenameOff), uint64(1), uint64(2))
 			require.Error(t, err)
-			require.Equal(t, uint32(255), err.(*sys.ExitError).ExitCode())
+			sysErr, ok := err.(*sys.ExitError)
+			require.True(t, ok, err)
+			require.Equal(t, uint32(255), sysErr.ExitCode())
 			require.Equal(t, `
-==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+--> proxy.abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+	==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
 `, "\n"+log.String())
 
 			require.Equal(t, tc.expected, stderr.String())
@@ -67,7 +71,7 @@ func TestAbort(t *testing.T) {
 
 func TestAbort_Error(t *testing.T) {
 	var stderr bytes.Buffer
-	mod, r, log := requireModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr))
+	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithStderr(&stderr))
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -81,7 +85,8 @@ func TestAbort_Error(t *testing.T) {
 			messageUTF16:  encodeUTF16("message")[:5],
 			fileNameUTF16: encodeUTF16("filename"),
 			expectedLog: `
-==> env.~lib/builtins/abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
+--> proxy.abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
+	==> env.~lib/builtins/abort(message=4,fileName=13,lineNumber=1,columnNumber=2)
 `,
 		},
 		{
@@ -89,7 +94,8 @@ func TestAbort_Error(t *testing.T) {
 			messageUTF16:  encodeUTF16("message"),
 			fileNameUTF16: encodeUTF16("filename")[:5],
 			expectedLog: `
-==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+--> proxy.abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
+	==> env.~lib/builtins/abort(message=4,fileName=22,lineNumber=1,columnNumber=2)
 `,
 		},
 	}
@@ -106,7 +112,9 @@ func TestAbort_Error(t *testing.T) {
 			_, err := mod.ExportedFunction(functionAbort).
 				Call(testCtx, uint64(messageOff), uint64(filenameOff), uint64(1), uint64(2))
 			require.Error(t, err)
-			require.Equal(t, uint32(255), err.(*sys.ExitError).ExitCode())
+			sysErr, ok := err.(*sys.ExitError)
+			require.True(t, ok, err)
+			require.Equal(t, uint32(255), sysErr.ExitCode())
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			require.Equal(t, "", stderr.String()) // nothing output if strings fail to read.
@@ -116,14 +124,16 @@ func TestAbort_Error(t *testing.T) {
 
 func TestSeed(t *testing.T) {
 	b := []byte{0, 1, 2, 3, 4, 5, 6, 7}
-	mod, r, log := requireModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(bytes.NewReader(b)))
+	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(bytes.NewReader(b)))
 	defer r.Close(testCtx)
 
 	ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, `
-==> env.~lib/builtins/seed()
-<== (7.949928895127363e-275)
+--> proxy.seed()
+	==> env.~lib/builtins/seed()
+	<== (7.949928895127363e-275)
+<-- (7.949928895127363e-275)
 `, "\n"+log.String())
 
 	require.Equal(t, b, u64.LeBytes(ret[0]))
@@ -140,14 +150,16 @@ func TestSeed_error(t *testing.T) {
 			source: bytes.NewReader([]byte{0, 1}),
 			expectedErr: `error reading random seed: unexpected EOF (recovered by wazero)
 wasm stack trace:
-	env.~lib/builtins/seed() f64`,
+	env.~lib/builtins/seed() f64
+	proxy.seed() f64`,
 		},
 		{
 			name:   "error reading",
 			source: iotest.ErrReader(errors.New("ice cream")),
 			expectedErr: `error reading random seed: ice cream (recovered by wazero)
 wasm stack trace:
-	env.~lib/builtins/seed() f64`,
+	env.~lib/builtins/seed() f64
+	proxy.seed() f64`,
 		},
 	}
 
@@ -155,13 +167,14 @@ wasm stack trace:
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mod, r, log := requireModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(tc.source))
+			mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(tc.source))
 			defer r.Close(testCtx)
 
 			_, err := mod.ExportedFunction(functionSeed).Call(testCtx)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Equal(t, `
-==> env.~lib/builtins/seed()
+--> proxy.seed()
+	==> env.~lib/builtins/seed()
 `, "\n"+log.String())
 		})
 	}
@@ -171,8 +184,10 @@ wasm stack trace:
 func TestFunctionExporter_Trace(t *testing.T) {
 	noArgs := []uint64{4, 0, 0, 0, 0, 0, 0}
 	noArgsLog := `
-==> env.~lib/builtins/trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
-<== ()
+--> proxy.trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
+	==> env.~lib/builtins/trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
+	<== ()
+<-- ()
 `
 
 	tests := []struct {
@@ -211,8 +226,10 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			params:   []uint64{4, 1, api.EncodeF64(1), 0, 0, 0, 0},
 			expected: "trace: hello 1\n",
 			expectedLog: `
-==> env.~lib/builtins/trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
-<== ()
+--> proxy.trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
+	==> env.~lib/builtins/trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
+	<== ()
+<-- ()
 `,
 		},
 		{
@@ -221,8 +238,10 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			params:   []uint64{4, 2, api.EncodeF64(1), api.EncodeF64(2), 0, 0, 0},
 			expected: "trace: hello 1,2\n",
 			expectedLog: `
-==> env.~lib/builtins/trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
-<== ()
+--> proxy.trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
+	==> env.~lib/builtins/trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
+	<== ()
+<-- ()
 `,
 		},
 		{
@@ -239,8 +258,10 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			},
 			expected: "trace: hello 1,2,3.3,4.4,5\n",
 			expectedLog: `
-==> env.~lib/builtins/trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
-<== ()
+--> proxy.trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
+	==> env.~lib/builtins/trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
+	<== ()
+<-- ()
 `,
 		},
 		{
@@ -275,7 +296,7 @@ func TestFunctionExporter_Trace(t *testing.T) {
 				config = config.WithStderr(&errWriter{err: errors.New("ice cream")})
 			}
 
-			mod, r, log := requireModule(t, tc.exporter, config)
+			mod, r, log := requireProxyModule(t, tc.exporter, config)
 			defer r.Close(testCtx)
 
 			message := tc.message
@@ -395,7 +416,7 @@ func (w *errWriter) Write([]byte) (int, error) {
 	return 0, w.err
 }
 
-func requireModule(t *testing.T, fns FunctionExporter, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
+func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.ModuleConfig) (api.Module, api.Closer, *bytes.Buffer) {
 	var log bytes.Buffer
 
 	// Set context to one that has an experimental listener
@@ -403,13 +424,21 @@ func requireModule(t *testing.T, fns FunctionExporter, config wazero.ModuleConfi
 
 	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 
-	builder := r.NewModuleBuilder("env").
-		ExportMemoryWithMax("memory", 1, 1)
+	builder := r.NewModuleBuilder("env")
 	fns.ExportFunctions(builder)
-	compiled, err := builder.Compile(ctx, wazero.NewCompileConfig())
+
+	envCompiled, err := builder.Compile(ctx, wazero.NewCompileConfig())
 	require.NoError(t, err)
 
-	mod, err := r.InstantiateModule(ctx, compiled, config)
+	_, err = r.InstantiateModule(ctx, envCompiled, config)
+	require.NoError(t, err)
+
+	proxyBin := proxy.GetProxyModuleBinary("env", envCompiled)
+
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wazero.NewCompileConfig())
+	require.NoError(t, err)
+
+	mod, err := r.InstantiateModule(ctx, proxyCompiled, config)
 	require.NoError(t, err)
 	return mod, r, &log
 }

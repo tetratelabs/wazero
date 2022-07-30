@@ -10,7 +10,7 @@ import (
 )
 
 func Test_pollOneoff(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	mem := []byte{
@@ -41,8 +41,10 @@ func Test_pollOneoff(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, functionPollOneoff, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
-<== ESUCCESS
+--> proxy.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
+	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	outMem, ok := mod.Memory().Read(testCtx, out, uint32(len(expectedMem)))
@@ -55,7 +57,7 @@ func Test_pollOneoff(t *testing.T) {
 }
 
 func Test_pollOneoff_Errors(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -74,8 +76,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			resultNevents:  512, //past out
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
-<== EFAULT
+--> proxy.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
+	==> wasi_snapshot_preview1.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -85,8 +89,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			nsubscriptions: 1,
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
-<== EFAULT
+--> proxy.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
+	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -95,8 +101,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			nsubscriptions: 1,
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
-<== EFAULT
+--> proxy.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
+	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -105,8 +113,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			resultNevents: 512, //past out
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
-<== EINVAL
+--> proxy.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
+	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
@@ -128,8 +138,10 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
-<== ESUCCESS
+--> proxy.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
+	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 	}

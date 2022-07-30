@@ -830,10 +830,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	functions := moduleInst.Engine.(*moduleEngine).functions
 	var memoryInst *wasm.MemoryInstance
 	if f.source.IsHostFunction {
-		if memoryInst = ce.callerMemory(); memoryInst == nil {
-			// If there was no caller, someone called a host function directly.
-			memoryInst = callCtx.Memory().(*wasm.MemoryInstance)
-		}
+		memoryInst = ce.callerMemory()
 	} else {
 		memoryInst = moduleInst.Memory
 	}
@@ -4095,13 +4092,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 	ce.popFrame()
 }
 
-// callerMemory returns the caller context memory or nil if the host function
-// was called directly.
+// callerMemory returns the caller context memory.
 func (ce *callEngine) callerMemory() *wasm.MemoryInstance {
-	if len(ce.frames) > 0 {
-		lastFrameSource := ce.frames[len(ce.frames)-1].f.source
-		if !lastFrameSource.IsHostFunction {
-			return lastFrameSource.Module.Memory
+	// Search through the call frame stack from the top until we find a non host function.
+	for i := len(ce.frames) - 1; i >= 0; i-- {
+		frame := ce.frames[i].f.source
+		if !frame.IsHostFunction {
+			return frame.Module.Memory
 		}
 	}
 	return nil

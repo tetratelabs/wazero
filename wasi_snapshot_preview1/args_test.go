@@ -8,7 +8,7 @@ import (
 )
 
 func Test_argsGet(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
 	argv := uint32(7)    // arbitrary offset
@@ -27,8 +27,10 @@ func Test_argsGet(t *testing.T) {
 	// Invoke argsGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, functionArgsGet, uint64(argv), uint64(argvBuf))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.args_get(argv=7,argv_buf=1)
-<== ESUCCESS
+--> proxy.args_get(argv=7,argv_buf=1)
+	==> wasi_snapshot_preview1.args_get(argv=7,argv_buf=1)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -37,7 +39,7 @@ func Test_argsGet(t *testing.T) {
 }
 
 func Test_argsGet_Errors(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -53,8 +55,10 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    memorySize,
 			argvBuf: validAddress,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
-<== EFAULT
+--> proxy.args_get(argv=65536,argv_buf=0)
+	==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -62,8 +66,10 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    validAddress,
 			argvBuf: memorySize,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
-<== EFAULT
+--> proxy.args_get(argv=0,argv_buf=65536)
+	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -72,8 +78,10 @@ func Test_argsGet_Errors(t *testing.T) {
 			argv:    memorySize - 4*2 + 1,
 			argvBuf: validAddress,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
-<== EFAULT
+--> proxy.args_get(argv=65529,argv_buf=0)
+	==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -82,8 +90,10 @@ func Test_argsGet_Errors(t *testing.T) {
 			// "a", "bc" size = size of "a0bc0" = 5
 			argvBuf: memorySize - 5 + 1,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
-<== EFAULT
+--> proxy.args_get(argv=0,argv_buf=65532)
+	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}
@@ -101,7 +111,7 @@ func Test_argsGet_Errors(t *testing.T) {
 }
 
 func Test_argsSizesGet(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
 	resultArgc := uint32(1)        // arbitrary offset
@@ -119,8 +129,10 @@ func Test_argsSizesGet(t *testing.T) {
 	// Invoke argsSizesGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, functionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
 	require.Equal(t, `
-==> wasi_snapshot_preview1.args_sizes_get(result.argc=1,result.argv_buf_size=6)
-<== ESUCCESS
+--> proxy.args_sizes_get(result.argc=1,result.argv_buf_size=6)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=1,result.argv_buf_size=6)
+	<== ESUCCESS
+<-- (0)
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -129,7 +141,7 @@ func Test_argsSizesGet(t *testing.T) {
 }
 
 func Test_argsSizesGet_Errors(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -145,8 +157,10 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:        memorySize,
 			argvBufSize: validAddress,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_buf_size=0)
-<== EFAULT
+--> proxy.args_sizes_get(result.argc=65536,result.argv_buf_size=0)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_buf_size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -154,8 +168,10 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:        validAddress,
 			argvBufSize: memorySize,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65536)
-<== EFAULT
+--> proxy.args_sizes_get(result.argc=0,result.argv_buf_size=65536)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -163,8 +179,10 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			argvBufSize: validAddress,
 			expectedLog: `
-==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_buf_size=0)
-<== EFAULT
+--> proxy.args_sizes_get(result.argc=65533,result.argv_buf_size=0)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_buf_size=0)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
@@ -172,8 +190,10 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 			argc:        validAddress,
 			argvBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
-==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65533)
-<== EFAULT
+--> proxy.args_sizes_get(result.argc=0,result.argv_buf_size=65533)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65533)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}

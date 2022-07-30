@@ -13,6 +13,5 @@ import (
 func Test_main(t *testing.T) {
 	stdout, _ := maintester.TestMain(t, main, "add", "7", "9")
 	require.Equal(t, `wasm/math: 7 + 9 = 16
-host/math: 7 + 9 = 16
 `, stdout)
 }

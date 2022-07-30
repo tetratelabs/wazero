@@ -37,7 +37,7 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"huge stack":                                        testHugeStack,
 	"unreachable":                                       testUnreachable,
 	"recursive entry":                                   testRecursiveEntry,
-	"imported-and-exported func":                        testImportedAndExportedFunc,
+	"host func memory":                                  testHostFuncMemory,
 	"host function with context parameter":              testHostFunctionContextParameter,
 	"host function with nested context":                 testNestedGoContext,
 	"host function with numeric parameter":              testHostFunctionNumericParameter,
@@ -204,14 +204,8 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 }
 
-func TestImportedAndExportedFunc(t *testing.T) {
-	r := wazero.NewRuntime()
-	testImportedAndExportedFunc(t, r)
-}
-
-// testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
-// Notably, this uses memory, which ensures api.Module is valid in both interpreter and Compiler engines.
-func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
+// testHostFuncMemory ensures that host functions can see the callers' memory
+func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(ctx context.Context, m api.Module, offset uint32, val uint64) uint32 {
 		if !m.Memory().WriteUint64Le(ctx, offset, val) {
@@ -231,8 +225,13 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
 		(export "memory" (memory $memory))
-		;; store_int is imported from the environment, but it's also exported back to the environment
-		(export "store_int" (func $store_int))
+		(func (param i32) (param i64) (result i32)
+			local.get 0
+			local.get 1
+			call 0
+		)
+		;; store_int is imported from the environment.
+		(export "store_int" (func 1))
 		)`))
 	require.NoError(t, err)
 	defer module.Close(testCtx)

@@ -9,7 +9,7 @@ import (
 )
 
 func Test_clockResGet(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	expectedMemoryMicro := []byte{
@@ -35,8 +35,10 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=1)
-<== ESUCCESS
+--> proxy.clock_res_get(id=0,result.resolution=1)
+	==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -44,8 +46,10 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=1)
-<== ESUCCESS
+--> proxy.clock_res_get(id=1,result.resolution=1)
+	==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 	}
@@ -70,7 +74,7 @@ func Test_clockResGet(t *testing.T) {
 }
 
 func Test_clockResGet_Unsupported(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -84,8 +88,10 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
-<== ENOTSUP
+--> proxy.clock_res_get(id=2,result.resolution=1)
+	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
+	<== ENOTSUP
+<-- (58)
 `,
 		},
 		{
@@ -93,8 +99,10 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
-<== ENOTSUP
+--> proxy.clock_res_get(id=3,result.resolution=1)
+	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
+	<== ENOTSUP
+<-- (58)
 `,
 		},
 		{
@@ -102,8 +110,10 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=1)
-<== EINVAL
+--> proxy.clock_res_get(id=100,result.resolution=1)
+	==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=1)
+	<== EINVAL
+<-- (28)
 `,
 		},
 	}
@@ -122,7 +132,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 }
 
 func Test_clockTimeGet(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -140,8 +150,10 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=1)
-<== ESUCCESS
+--> proxy.clock_time_get(id=0,precision=0,result.timestamp=1)
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 		{
@@ -153,8 +165,10 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=1)
-<== ESUCCESS
+--> proxy.clock_time_get(id=1,precision=0,result.timestamp=1)
+	==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=1)
+	<== ESUCCESS
+<-- (0)
 `,
 		},
 	}
@@ -178,7 +192,7 @@ func Test_clockTimeGet(t *testing.T) {
 }
 
 func Test_clockTimeGet_Unsupported(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	tests := []struct {
@@ -192,8 +206,10 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
-<== ENOTSUP
+--> proxy.clock_time_get(id=2,precision=0,result.timestamp=1)
+	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
+	<== ENOTSUP
+<-- (58)
 `,
 		},
 		{
@@ -201,8 +217,10 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoNotsup,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
-<== ENOTSUP
+--> proxy.clock_time_get(id=3,precision=0,result.timestamp=1)
+	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
+	<== ENOTSUP
+<-- (58)
 `,
 		},
 		{
@@ -210,8 +228,10 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
-<== EINVAL
+--> proxy.clock_time_get(id=100,precision=0,result.timestamp=1)
+	==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
+	<== EINVAL
+<-- (28)
 `,
 		},
 	}
@@ -231,7 +251,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 }
 
 func Test_clockTimeGet_Errors(t *testing.T) {
-	mod, r, log := requireModule(t, wazero.NewModuleConfig())
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)
@@ -245,16 +265,20 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			name:            "resultTimestamp out-of-memory",
 			resultTimestamp: memorySize,
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
-<== EFAULT
+--> proxy.clock_time_get(id=0,precision=0,result.timestamp=65536)
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+	<== EFAULT
+<-- (21)
 `,
 		},
 		{
 			name:            "resultTimestamp exceeds the maximum valid address by 1",
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			expectedLog: `
-==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
-<== EFAULT
+--> proxy.clock_time_get(id=0,precision=0,result.timestamp=65533)
+	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+	<== EFAULT
+<-- (21)
 `,
 		},
 	}

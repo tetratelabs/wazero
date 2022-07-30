@@ -146,10 +146,6 @@ func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
 	// instead of seeing a return like
 	//	<== DivByZero
 	require.Equal(t, `
-==> host.div_by.go(1)
-<== (1)
-==> host.div_by.go(1)
-<== (1)
 --> imported.div_by.wasm(1)
 <-- (1)
 --> imported.div_by.wasm(1)
@@ -157,12 +153,6 @@ func TestInterpreter_ModuleEngine_Call_Errors(t *testing.T) {
 --> imported.div_by.wasm(0)
 --> imported.div_by.wasm(1)
 <-- (1)
-==> host.div_by.go(4294967295)
-==> host.div_by.go(1)
-<== (1)
-==> host.div_by.go(0)
-==> host.div_by.go(1)
-<== (1)
 --> imported.call->div_by.go(4294967295)
 	==> host.div_by.go(4294967295)
 --> imported.call->div_by.go(1)

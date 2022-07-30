@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"math"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -12,7 +11,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/watzero"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -20,7 +18,6 @@ var (
 	binaryNamedZero = binaryformat.EncodeModule(&wasm.Module{NameSection: &wasm.NameSection{ModuleName: "0"}})
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-	zero    = wasm.Index(0)
 )
 
 func TestRuntime_CompileModule(t *testing.T) {
@@ -277,52 +274,6 @@ func TestModule_Global(t *testing.T) {
 	}
 }
 
-func TestModule_FunctionContext(t *testing.T) {
-	tests := []struct {
-		name     string
-		ctx      context.Context
-		expected context.Context
-	}{
-		{
-			name:     "nil defaults to context.Background",
-			ctx:      nil,
-			expected: context.Background(),
-		},
-		{
-			name:     "set context",
-			ctx:      testCtx,
-			expected: testCtx,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntime()
-			defer r.Close(testCtx)
-
-			// Define a host function so that we can catch the context propagated from a module function call
-			functionName := "fn"
-			expectedResult := uint64(math.MaxUint64)
-			hostFn := func(ctx context.Context) uint64 {
-				require.Equal(t, tc.expected, ctx)
-				return expectedResult
-			}
-			source := requireImportAndExportFunction(t, r, hostFn, functionName)
-
-			// Instantiate the module and get the export of the above hostFn
-			module, err := r.InstantiateModuleFromBinary(tc.ctx, source)
-			require.NoError(t, err)
-
-			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := module.ExportedFunction(functionName).Call(tc.ctx)
-			require.NoError(t, err)
-			require.Equal(t, expectedResult, results[0])
-		})
-	}
-}
-
 func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	r := NewRuntime()
 	defer r.Close(testCtx)
@@ -339,10 +290,15 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
+	one := uint32(1)
 	binary := binaryformat.EncodeModule(&wasm.Module{
-		TypeSection:   []*wasm.FunctionType{{}},
-		ImportSection: []*wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
-		StartSection:  &zero,
+		TypeSection:     []*wasm.FunctionType{{}},
+		ImportSection:   []*wasm.Import{{Module: "env", Name: "start", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
+		},
+		StartSection: &one,
 	})
 
 	code, err := r.CompileModule(testCtx, binary, NewCompileConfig())
@@ -373,38 +329,6 @@ func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
 	mod, err := r.InstantiateModuleFromBinary(testCtx, binary)
 	require.NoError(t, err)
 	require.NoError(t, mod.Close(testCtx))
-}
-
-func TestRuntime_InstantiateModuleFromBinary_UsesContext(t *testing.T) {
-	r := NewRuntime()
-	defer r.Close(testCtx)
-
-	// Define a function that will be re-exported as the WASI function: _start
-	var calledStart bool
-	start := func(ctx context.Context) {
-		calledStart = true
-		require.Equal(t, testCtx, ctx)
-	}
-
-	host, err := r.NewModuleBuilder("").
-		ExportFunction("start", start).
-		Instantiate(testCtx, r)
-	require.NoError(t, err)
-	defer host.Close(testCtx)
-
-	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	startWasm, err := watzero.Wat2Wasm(`(module $start
-	(import "" "start" (func $start))
-	(memory 1)
-	(export "_start" (func $start))
-	(export "memory" (memory 0))
-)`)
-	require.NoError(t, err)
-
-	_, err = r.InstantiateModuleFromBinary(testCtx, startWasm)
-	require.NoError(t, err)
-
-	require.True(t, calledStart)
 }
 
 func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
@@ -490,16 +414,38 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		require.NoError(t, m.CloseWithExitCode(ctx, 2))
 	}
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("_start", start).Instantiate(testCtx, r)
+	_, err := r.NewModuleBuilder("env").ExportFunction("exit", start).Instantiate(testCtx, r)
+	require.NoError(t, err)
+
+	one := uint32(1)
+	binary := binaryformat.EncodeModule(&wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{}},
+		ImportSection:   []*wasm.Import{{Module: "env", Name: "exit", Type: wasm.ExternTypeFunc, DescFunc: 0}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.start.
+		},
+		StartSection: &one,
+	})
+
+	code, err := r.CompileModule(testCtx, binary, NewCompileConfig())
+	require.NoError(t, err)
+
+	// Instantiate the module, which calls the start function.
+	_, err = r.InstantiateModule(testCtx, code, NewModuleConfig().WithName("call-exit"))
 
 	// Ensure the exit error propagated and didn't wrap.
-	require.Equal(t, err, sys.NewExitError("env", 2))
-
-	// The compiler cache of the importing module should be removed on error.
-	require.Zero(t, r.(*runtime).store.Engine.CompiledModuleCount())
+	require.Equal(t, err, sys.NewExitError("call-exit", 2))
 }
 
 func TestRuntime_CloseWithExitCode(t *testing.T) {
+	bin := binaryformat.EncodeModule(&wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{}},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+		ExportSection:   []*wasm.Export{{Type: wasm.ExternTypeFunc, Index: 0, Name: "func"}},
+	})
+
 	tests := []struct {
 		name     string
 		exitCode uint32
@@ -519,13 +465,17 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRuntime()
 
-			m1, err := r.NewModuleBuilder("mod1").ExportFunction("func1", func() {}).Instantiate(testCtx, r)
-			require.NoError(t, err)
-			m2, err := r.NewModuleBuilder("mod2").ExportFunction("func2", func() {}).Instantiate(testCtx, r)
+			code, err := r.CompileModule(testCtx, bin, NewCompileConfig())
 			require.NoError(t, err)
 
-			func1 := m1.ExportedFunction("func1")
-			func2 := m2.ExportedFunction("func2")
+			// Instantiate two modules.
+			m1, err := r.InstantiateModule(testCtx, code, NewModuleConfig().WithName("mod1"))
+			require.NoError(t, err)
+			m2, err := r.InstantiateModule(testCtx, code, NewModuleConfig().WithName("mod2"))
+			require.NoError(t, err)
+
+			func1 := m1.ExportedFunction("func")
+			func2 := m2.ExportedFunction("func")
 
 			// Modules not closed so calls succeed
 
@@ -571,18 +521,6 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 
 	// Closing the runtime should remove the compiler cache
 	require.Zero(t, engine.CompiledModuleCount())
-}
-
-// requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx context.Context) uint64, functionName string) []byte {
-	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate(testCtx, r)
-	require.NoError(t, err)
-
-	return binaryformat.EncodeModule(&wasm.Module{
-		TypeSection:   []*wasm.FunctionType{{Results: []wasm.ValueType{wasm.ValueTypeI64}}},
-		ImportSection: []*wasm.Import{{Module: "host", Name: functionName, Type: wasm.ExternTypeFunc, DescFunc: 0}},
-		ExportSection: []*wasm.Export{{Name: functionName, Type: wasm.ExternTypeFunc, Index: 0}},
-	})
 }
 
 type mockEngine struct {
