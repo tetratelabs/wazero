@@ -104,8 +104,8 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
-# Latest draft state as of May 11, 2022.
-spec_version_v2 := d39195773112a22b245ffbe864bab6d1182ccb06
+# Latest draft state as of Jul 30, 2022.
+spec_version_v2 := 27fc520a254060320ec9e709343093623ca97a54
 
 .PHONY: build.spectest
 build.spectest:

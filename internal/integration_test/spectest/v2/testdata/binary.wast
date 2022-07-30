@@ -1241,7 +1241,7 @@
   )                            ;; end
   "data count section required")
 
-;; passive element segment containing opcode other than ref.func or ref.null
+;; passive element segment containing illegal opcode
 (assert_malformed
   (module binary
     "\00asm" "\01\00\00\00"
@@ -1258,7 +1258,7 @@
     "\09\07\01"                ;; Element section with one segment
     "\05\70"                   ;; Passive, funcref
     "\01"                      ;; 1 element
-    "\d3\00\0b"                ;; bad opcode, index 0, end
+    "\f3\00\0b"                ;; bad opcode, index 0, end
 
     "\0a\04\01"                ;; Code section
 
