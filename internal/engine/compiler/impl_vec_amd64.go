@@ -1895,11 +1895,11 @@ func (c *amd64Compiler) compileV128MinOrMaxFloat(o wazeroir.Shape, isMin bool) e
 	// Denote the original x1r and x2r 's vector as v1 and v2 below.
 	//
 	// Execute MINPS/MINPD/MAXPS/MAXPD with destination = tmp (holding v1), and we have
-	//  tmp = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v1[i]} for i in 0..LANE_NUM]
+	//  tmp[i] = if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v1[i]}
 	c.assembler.CompileRegisterToRegister(minOrMaxInst, x2r, tmp)
 
 	// Execute MINPS/MINPD/MAXPS/MAXPD with destination = x2r (holding v2), and we have
-	//  x2r = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v2[i]} for i in 0..LANE_NUM]
+	//  x2r[i] = if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v2[i]}
 	c.assembler.CompileRegisterToRegister(minOrMaxInst, x1r, x2r)
 
 	// Copy the current tmp into x1r.
@@ -1907,24 +1907,24 @@ func (c *amd64Compiler) compileV128MinOrMaxFloat(o wazeroir.Shape, isMin bool) e
 
 	// Set all bits on the lane where either v1[i] or v2[i] is NaN by via CMPPS/CMPPD (arg=3).
 	// That means, we have:
-	//  x1r =  [ if (v1[i] != NaN && v2[i] != NaN) {0} else {^0} for i in 0..4]
+	//  x1r[i] = if (v1[i] != NaN && v2[i] != NaN) {0} else {^0}
 	//
 	// See https://www.felixcloutier.com/x86/cmpps.
 	c.assembler.CompileRegisterToRegisterWithArg(cmpInst, x2r, x1r, 3)
 
 	// Mask all the lanes where either v1[i] or v2[i] is NaN, meaning that we have
-	//  tmp = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {^0} for i in 0..LANE_NUM]
+	//  tmp[i] = if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {^0}
 	c.assembler.CompileRegisterToRegister(orInst, x1r, tmp)
 
 	// Put the inverse of NaN if either v1[i] or v2[i] is NaN on each lane, otherwise zero on x1r.
 	// That means, we have:
-	//  x1r =  [ if (v1[i] != NaN && v2[i] != NaN) {0} else {^NaN} for i in 0..LANE_NUM]
+	//  x1r[i] =  [ if (v1[i] != NaN && v2[i] != NaN) {0} else {^NaN}
 	//
 	c.assembler.CompileConstToRegister(logicalRightShiftInst, shiftNumToInverseNaN, x1r)
 
 	// Finally, we get the result but putting NaNs on each lane where either of v1[i] or v2[i] is NaN, otherwise min_max(v1[i], v2[i]).
 	// That means, we have:
-	//  x1r = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])}  else {NaN} for i in 0..LANE_NUM]
+	//  x1r[i] = if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])}  else {NaN}
 	c.assembler.CompileRegisterToRegister(andnInst, tmp, x1r)
 
 	c.locationStack.markRegisterUnused(x2r)

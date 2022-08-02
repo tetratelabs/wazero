@@ -266,25 +266,17 @@ func Test725(t *testing.T) {
 	})
 }
 
+// Test730 ensures that the vector min/max operations comply with the spec wrt sign bits of zeros:
+//
+//   - min(0, 0) = 0, min(-0, 0) = -0, min(0, -0) = -0, min(-0, -0) = -0
+//   - max(0, 0) = 0, max(-0, 0) =  0, max(0, -0) =  0, max(-0, -0) = -0
 func Test730(t *testing.T) {
 	tests := []struct {
 		name string
 		exp  [2]uint64
 	}{
-		{
-			name: "f32x4.max",
-			exp: [2]uint64{
-				0x80000000<<32 | 0x00000000,
-				0x00000000,
-			},
-		},
-		{
-			name: "f32x4.min",
-			exp: [2]uint64{
-				0x80000000,
-				0x80000000<<32 | 0x80000000,
-			},
-		},
+		{name: "f32x4.max", exp: [2]uint64{0x80000000<<32 | 0x00000000, 0x00000000}},
+		{name: "f32x4.min", exp: [2]uint64{0x80000000, 0x80000000<<32 | 0x80000000}},
 		{name: "f64x2.max", exp: [2]uint64{0, 0}},
 		{name: "f64x2.min", exp: [2]uint64{1 << 63, 1 << 63}},
 		{name: "f64x2.max/mix", exp: [2]uint64{0, 1 << 63}},
