@@ -805,7 +805,9 @@ func f32Equal(expected, actual float32) (matched bool) {
 	} else if math.IsNaN(float64(expected)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 		matched = math.IsNaN(float64(actual))
 	} else {
-		matched = expected == actual
+		// Compare the bit patterns directly, rather than == on float32 since in Go, -0 and 0 equals,
+		// but in the Wasm spec, they are treated as different.
+		matched = math.Float32bits(expected) == math.Float32bits(actual)
 	}
 	return
 }
@@ -820,7 +822,9 @@ func f64Equal(expected, actual float64) (matched bool) {
 	} else if math.IsNaN(expected) { // NaN cannot be compared with themselves, so we have to use IsNaN
 		matched = math.IsNaN(actual)
 	} else {
-		matched = expected == actual
+		// Compare the bit patterns directly, rather than == on float64 since in Go, -0 and 0 equals,
+		// but in the Wasm spec, they are treated as different.
+		matched = math.Float64bits(expected) == math.Float64bits(actual)
 	}
 	return
 }
