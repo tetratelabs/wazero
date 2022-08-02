@@ -1807,8 +1807,18 @@ func (c *amd64Compiler) compileV128Popcnt(*wazeroir.OperationV128Popcnt) error {
 
 // compileV128Min implements compiler.compileV128Min for amd64.
 func (c *amd64Compiler) compileV128Min(o *wazeroir.OperationV128Min) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x1); err != nil {
+		return err
+	}
+
 	if o.Shape >= wazeroir.ShapeF32x4 {
-		return c.compileV128MinOrMaxFloat(o.Shape, true)
+		return c.compileV128FloatMinImpl(o.Shape == wazeroir.ShapeF32x4, x1.register, x2.register)
 	}
 
 	var inst asm.Instruction
@@ -1833,16 +1843,6 @@ func (c *amd64Compiler) compileV128Min(o *wazeroir.OperationV128Min) error {
 		}
 	}
 
-	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
 	c.assembler.CompileRegisterToRegister(inst, x2.register, x1.register)
 
 	c.locationStack.markRegisterUnused(x2.register)
@@ -1850,82 +1850,53 @@ func (c *amd64Compiler) compileV128Min(o *wazeroir.OperationV128Min) error {
 	return nil
 }
 
-// compileV128MinOrMaxFloat implements compiler.compileV128Min and compiler.compileV128Max for float lanes.
-func (c *amd64Compiler) compileV128MinOrMaxFloat(o wazeroir.Shape, isMin bool) error {
-	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
-	x1r, x2r := x1.register, x2.register
-
+// compileV128FloatMinImpl implements compiler.compileV128Min for float lanes.
+func (c *amd64Compiler) compileV128FloatMinImpl(is32bit bool, x1r, x2r asm.Register) error {
 	tmp, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
 		return err
 	}
 
-	var minOrMaxInst, cmpInst, andnInst, orInst, logicalRightShiftInst asm.Instruction
+	var min, cmp, andn, or, srl /* shit right logical */ asm.Instruction
 	var shiftNumToInverseNaN asm.ConstantValue
-	if o == wazeroir.ShapeF32x4 {
-		cmpInst, andnInst, orInst, logicalRightShiftInst, shiftNumToInverseNaN =
-			amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.PSRLD, 0xa
-		if isMin {
-			minOrMaxInst = amd64.MINPS
-		} else {
-			minOrMaxInst = amd64.MAXPS
-		}
+	if is32bit {
+		min, cmp, andn, or, srl, shiftNumToInverseNaN =
+			amd64.MINPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.PSRLD, 0xa
 	} else {
-		cmpInst, andnInst, orInst, logicalRightShiftInst, shiftNumToInverseNaN =
-			amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.PSRLQ, 0xd
-		if isMin {
-			minOrMaxInst = amd64.MINPD
-		} else {
-			minOrMaxInst = amd64.MAXPD
-		}
+		min, cmp, andn, or, srl, shiftNumToInverseNaN =
+			amd64.MINPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.PSRLQ, 0xd
 	}
 
-	// Copy the value on x1 to tmp.
+	// Let v1 and v2 be the operand values on x1r and x2r at this point.
+
+	// Copy the value into tmp: tmp=v1
 	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, tmp)
+	// tmp=min(v1, v2)
+	c.assembler.CompileRegisterToRegister(min, x2r, tmp)
+	// x2r=min(v2, v1)
+	c.assembler.CompileRegisterToRegister(min, x1r, x2r)
+	// x1r=min(v2, v1)
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, x1r)
 
-	// Denote the original x1r and x2r 's vector as v1 and v2 below.
-	//
-	// Execute MINPS/MINPD/MAXPS/MAXPD with destination = tmp (holding v1), and we have
-	//  tmp = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v1[i]} for i in 0..LANE_NUM]
-	c.assembler.CompileRegisterToRegister(minOrMaxInst, x2r, tmp)
-
-	// Execute MINPS/MINPD/MAXPS/MAXPD with destination = x2r (holding v2), and we have
-	//  x2r = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {v2[i]} for i in 0..LANE_NUM]
-	c.assembler.CompileRegisterToRegister(minOrMaxInst, x1r, x2r)
-
-	// Copy the current tmp into x1r.
-	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, tmp, x1r)
-
-	// Set all bits on the lane where either v1[i] or v2[i] is NaN by via CMPPS/CMPPD (arg=3).
-	// That means, we have:
-	//  x1r =  [ if (v1[i] != NaN && v2[i] != NaN) {0} else {^0} for i in 0..4]
-	//
-	// See https://www.felixcloutier.com/x86/cmpps.
-	c.assembler.CompileRegisterToRegisterWithArg(cmpInst, x2r, x1r, 3)
-
-	// Mask all the lanes where either v1[i] or v2[i] is NaN, meaning that we have
-	//  tmp = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])} else {^0} for i in 0..LANE_NUM]
-	c.assembler.CompileRegisterToRegister(orInst, x1r, tmp)
-
-	// Put the inverse of NaN if either v1[i] or v2[i] is NaN on each lane, otherwise zero on x1r.
-	// That means, we have:
-	//  x1r =  [ if (v1[i] != NaN && v2[i] != NaN) {0} else {^NaN} for i in 0..LANE_NUM]
-	//
-	c.assembler.CompileConstToRegister(logicalRightShiftInst, shiftNumToInverseNaN, x1r)
-
-	// Finally, we get the result but putting NaNs on each lane where either of v1[i] or v2[i] is NaN, otherwise min_max(v1[i], v2[i]).
-	// That means, we have:
-	//  x1r = [ if (v1[i] != NaN && v2[i] != NaN) {min_max(v1[i], v2[i])}  else {NaN} for i in 0..LANE_NUM]
-	c.assembler.CompileRegisterToRegister(andnInst, tmp, x1r)
+	// x2r = -0          if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       NaN         if v1 == NaN || v2 == NaN
+	//       min(v1, v2) otherwise
+	c.assembler.CompileRegisterToRegister(or, tmp, x2r)
+	// x1r = 0^ (set all bits) if v1 == NaN || v2 == NaN
+	//       0 otherwise
+	c.assembler.CompileRegisterToRegisterWithArg(cmp, tmp, x1r, 3)
+	// x2r = -0          if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       ^0          if v1 == NaN || v2 == NaN
+	//       min(v1, v2) otherwise
+	c.assembler.CompileRegisterToRegister(or, x1r, x2r)
+	// x1r = set all bits on the mantissa bits
+	//       0 otherwise
+	c.assembler.CompileConstToRegister(srl, shiftNumToInverseNaN, x1r)
+	// x1r = x2r and !x1r
+	//     = -0                                                   if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       set all bits on exponential and sign bit (== NaN)    if v1 == NaN || v2 == NaN
+	//       min(v1, v2)                                          otherwise
+	c.assembler.CompileRegisterToRegister(andn, x2r, x1r)
 
 	c.locationStack.markRegisterUnused(x2r)
 	c.pushVectorRuntimeValueLocationOnRegister(x1r)
@@ -1934,8 +1905,18 @@ func (c *amd64Compiler) compileV128MinOrMaxFloat(o wazeroir.Shape, isMin bool) e
 
 // compileV128Max implements compiler.compileV128Max for amd64.
 func (c *amd64Compiler) compileV128Max(o *wazeroir.OperationV128Max) error {
+	x2 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.popV128()
+	if err := c.compileEnsureOnRegister(x1); err != nil {
+		return err
+	}
+
 	if o.Shape >= wazeroir.ShapeF32x4 {
-		return c.compileV128MinOrMaxFloat(o.Shape, false)
+		return c.compileV128FloatMaxImpl(o.Shape == wazeroir.ShapeF32x4, x1.register, x2.register)
 	}
 
 	var inst asm.Instruction
@@ -1960,20 +1941,71 @@ func (c *amd64Compiler) compileV128Max(o *wazeroir.OperationV128Max) error {
 		}
 	}
 
-	x2 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.popV128()
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-
 	c.assembler.CompileRegisterToRegister(inst, x2.register, x1.register)
 
 	c.locationStack.markRegisterUnused(x2.register)
 	c.pushVectorRuntimeValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileV128FloatMaxImpl implements compiler.compileV128Max for float lanes.
+func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Register) error {
+	tmp, err := c.allocateRegister(registerTypeVector)
+	if err != nil {
+		return err
+	}
+
+	var max, cmp, andn, or, xor, sub, srl /* shit right logical */ asm.Instruction
+	var shiftNumToInverseNaN asm.ConstantValue
+	if is32bit {
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN =
+			amd64.MAXPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.XORPS, amd64.SUBPS, amd64.PSRLD, 0xa
+	} else {
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN =
+			amd64.MAXPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.XORPD, amd64.SUBPD, amd64.PSRLQ, 0xd
+	}
+
+	// Let v1 and v2 be the operand values on x1r and x2r at this point.
+
+	// Copy the value into tmp: tmp=v2
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, tmp)
+	// tmp=max(v2, v1)
+	c.assembler.CompileRegisterToRegister(max, x1r, tmp)
+	// x1r=max(v1, v2)
+	c.assembler.CompileRegisterToRegister(max, x2r, x1r)
+	// x2r=max(v1, v2)
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, x2r)
+
+	// x2r = -0      if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0)
+	//       0       if (v1 == 0 && v2 ==  0)
+	//       -0       if (v1 == -0 && v2 == -0)
+	//       v1^v2   if v1 == NaN || v2 == NaN
+	//       0       otherwise
+	c.assembler.CompileRegisterToRegister(xor, tmp, x2r)
+	// x1r = -0           if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0)
+	//       0            if (v1 == 0 && v2 ==  0)
+	//       -0           if (v1 == -0 && v2 == -0)
+	//       NaN          if v1 == NaN || v2 == NaN
+	//       max(v1, v2)  otherwise
+	c.assembler.CompileRegisterToRegister(or, x2r, x1r)
+	// Copy x1r into tmp.
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, tmp)
+	// tmp = 0            if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0) || (v1 == 0 && v2 ==  0)
+	//       -0           if (v1 == -0 && v2 == -0)
+	//       NaN          if v1 == NaN || v2 == NaN
+	//       max(v1, v2)  otherwise
+	//
+	// Note: -0 - (-0) = 0 (!= -0) in floating point operation.
+	c.assembler.CompileRegisterToRegister(sub, x2r, tmp)
+	// x1r = 0^ if v1 == NaN || v2 == NaN
+	c.assembler.CompileRegisterToRegisterWithArg(cmp, x1r, x1r, 3)
+	// x1r = set all bits on the mantissa bits
+	//       0 otherwise
+	c.assembler.CompileConstToRegister(srl, shiftNumToInverseNaN, x1r)
+	c.assembler.CompileRegisterToRegister(andn, tmp, x1r)
+
+	c.locationStack.markRegisterUnused(x2r)
+	c.pushVectorRuntimeValueLocationOnRegister(x1r)
 	return nil
 }
 
