@@ -843,7 +843,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
-					require.Equal(t, exp, actual)
+					require.Equal(t, math.Float32bits(exp), math.Float32bits(actual))
 				}
 			},
 		},
@@ -860,7 +860,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
-					require.Equal(t, exp, actual)
+					require.Equal(t, math.Float64bits(exp), math.Float64bits(actual))
 				}
 			},
 		},
@@ -877,7 +877,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
-					require.Equal(t, exp, actual)
+					require.Equal(t, math.Float32bits(exp), math.Float32bits(actual))
 				}
 			},
 		},
@@ -894,7 +894,7 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
-					require.Equal(t, exp, actual)
+					require.Equal(t, math.Float64bits(exp), math.Float64bits(actual))
 				}
 			},
 		},
@@ -938,6 +938,10 @@ func TestCompiler_compile_Min_Max_Copysign(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			for _, vs := range [][2]float64{
+				{math.Copysign(0, 1), math.Copysign(0, 1)},
+				{math.Copysign(0, -1), math.Copysign(0, 1)},
+				{math.Copysign(0, 1), math.Copysign(0, -1)},
+				{math.Copysign(0, -1), math.Copysign(0, -1)},
 				{100, -1.1}, {100, 0}, {0, 0}, {1, 1},
 				{-1, 100}, {100, 200}, {100.01234124, 100.01234124},
 				{100.01234124, -100.01234124}, {200.12315, 100},
