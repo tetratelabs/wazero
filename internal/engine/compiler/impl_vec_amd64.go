@@ -1867,15 +1867,35 @@ func (c *amd64Compiler) compileV128FloatMinImpl(is32bit bool, x1r, x2r asm.Regis
 			amd64.MINPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.PSRLQ, 0xd
 	}
 
-	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, tmp) // tmp=v1
-	c.assembler.CompileRegisterToRegister(min, x2r, tmp)          // tmp=min(v1, v2)
-	c.assembler.CompileRegisterToRegister(min, x1r, x2r)          // x2r=min(v2, v1)
-	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, x1r) // x2r=min(v2, v1)
+	// Let v1 and v2 be the operand values on x1r and x2r at this point.
 
+	// Copy the value into tmp: tmp=v1
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, tmp)
+	// tmp=min(v1, v2)
+	c.assembler.CompileRegisterToRegister(min, x2r, tmp)
+	// x2r=min(v2, v1)
+	c.assembler.CompileRegisterToRegister(min, x1r, x2r)
+	// x1r=min(v2, v1)
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, x1r)
+
+	// x2r = -0          if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       NaN         if v1 == NaN || v2 == NaN
+	//       min(v1, v2) otherwise
 	c.assembler.CompileRegisterToRegister(or, tmp, x2r)
-	c.assembler.CompileRegisterToRegisterWithArg(cmp, x1r, x1r, 3)
+	// x1r = 0^ (set all bits) if v1 == NaN || v2 == NaN
+	//       0 otherwise
+	c.assembler.CompileRegisterToRegisterWithArg(cmp, tmp, x1r, 3)
+	// x2r = -0          if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       ^0          if v1 == NaN || v2 == NaN
+	//       min(v1, v2) otherwise
 	c.assembler.CompileRegisterToRegister(or, x1r, x2r)
+	// x1r = set all bits on the mantissa bits
+	//       0 otherwise
 	c.assembler.CompileConstToRegister(srl, shiftNumToInverseNaN, x1r)
+	// x1r = x2r and !x1r
+	//     = -0                                                   if (v1 == -0 || x2 == -0) && v1 != NaN && v2 !=NaN
+	//       set all bits on exponential and sign bit (== NaN)    if v1 == NaN || v2 == NaN
+	//       min(v1, v2)                                          otherwise
 	c.assembler.CompileRegisterToRegister(andn, x2r, x1r)
 
 	c.locationStack.markRegisterUnused(x2r)
@@ -1945,10 +1965,16 @@ func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Regis
 			amd64.MAXPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.XORPD, amd64.SUBPD, amd64.PSRLQ, 0xd
 	}
 
-	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, tmp) // tmp=v2
-	c.assembler.CompileRegisterToRegister(max, x1r, tmp)          // tmp=max(v2, v1)
-	c.assembler.CompileRegisterToRegister(max, x2r, x1r)          // x1r=max(v1, v2)
-	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, x2r) // x2r=max(v1, v2)
+	// Let v1 and v2 be the operand values on x1r and x2r at this point.
+
+	// Copy the value into tmp: tmp=v2
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x2r, tmp)
+	// tmp=max(v2, v1)
+	c.assembler.CompileRegisterToRegister(max, x1r, tmp)
+	// x1r=max(v1, v2)
+	c.assembler.CompileRegisterToRegister(max, x2r, x1r)
+	// x2r=max(v1, v2)
+	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, x2r)
 
 	c.assembler.CompileRegisterToRegister(xor, tmp, x2r)
 	c.assembler.CompileRegisterToRegister(or, x2r, x1r)
