@@ -265,3 +265,44 @@ func Test725(t *testing.T) {
 		}
 	})
 }
+
+func Test730(t *testing.T) {
+	tests := []struct {
+		name string
+		exp  [2]uint64
+	}{
+		{
+			name: "f32x4.max",
+			exp: [2]uint64{
+				0x80000000<<32 | 0x00000000,
+				0x00000000,
+			},
+		},
+		{
+			name: "f32x4.min",
+			exp: [2]uint64{
+				0x80000000,
+				0x80000000<<32 | 0x80000000,
+			},
+		},
+		{name: "f64x2.max", exp: [2]uint64{0, 0}},
+		{name: "f64x2.min", exp: [2]uint64{1 << 63, 1 << 63}},
+		{name: "f64x2.max/mix", exp: [2]uint64{0, 1 << 63}},
+		{name: "f64x2.min/mix", exp: [2]uint64{1 << 63, 0}},
+	}
+
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 730))
+		require.NoError(t, err)
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				f := mod.ExportedFunction(tc.name)
+				require.NotNil(t, f)
+				actual, err := f.Call(ctx)
+				require.NoError(t, err)
+				require.Equal(t, tc.exp[:], actual)
+			})
+		}
+	})
+}

@@ -3976,10 +3976,18 @@ func TestCompiler_compileV128Min(t *testing.T) {
 		{
 			name:  "f32x4",
 			shape: wazeroir.ShapeF32x4,
-			// If the sign of zeros are different, positive zeros must be returned according to the spec.
-			x1:  f32x4(0, 0b1<<31, 0, 0b1<<31),
-			x2:  f32x4(0b1<<31, 0b1<<31, 0b1<<31, 0b1<<31),
-			exp: f32x4(0, 0, 0, 0),
+			// If the sign of zeros are different, negative zeros must be returned according to the spec.
+			x1:  f32x4(0, math.Float32frombits(0b1<<31), 0, 0),
+			x2:  f32x4(math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), 0),
+			exp: f32x4(math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), 0),
+		},
+		{
+			name:  "f32x4",
+			shape: wazeroir.ShapeF32x4,
+			// If the sign of zeros are different, negative zeros must be returned according to the spec.
+			x1:  f32x4(math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), 0),
+			x2:  f32x4(0, math.Float32frombits(0b1<<31), 0, 0),
+			exp: f32x4(math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), math.Float32frombits(0b1<<31), 0),
 		},
 		{
 			name:  "f32x4",
@@ -4012,10 +4020,18 @@ func TestCompiler_compileV128Min(t *testing.T) {
 		{
 			name:  "f64x2",
 			shape: wazeroir.ShapeF64x2,
-			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			// If the sign of zeros are different, negative zeros must be returned according to the spec.
 			x1:  f64x2(math.Copysign(0, -1), math.Copysign(0, 1)),
-			x2:  f64x2(math.Copysign(0, 1), math.Copysign(0, -1)),
-			exp: f64x2(math.Copysign(0, 1), math.Copysign(0, 1)),
+			x2:  f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
+			exp: f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			// If the sign of zeros are different, negative zeros must be returned according to the spec.
+			x1:  f64x2(math.Copysign(0, -1), 0),
+			x2:  f64x2(0, math.Copysign(0, -1)),
+			exp: f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
 		},
 		{
 			name:  "f64x2",
@@ -4212,7 +4228,7 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			// If the sign of zeros are different, positive zeros must be returned according to the spec.
 			x1:  f32x4(0, 0, math.Float32frombits(1<<31), 0),
 			x2:  f32x4(math.Float32frombits(1<<31), math.Float32frombits(1<<31), math.Float32frombits(1<<31), math.Float32frombits(1<<31)),
-			exp: f32x4(0, 0, 0, 0),
+			exp: f32x4(0, 0, math.Float32frombits(1<<31), 0),
 		},
 		{
 			name:  "f64x2",
@@ -4260,9 +4276,17 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			name:  "f64x2",
 			shape: wazeroir.ShapeF64x2,
 			// If the sign of zeros are different, positive zeros must be returned according to the spec.
-			x1:  f64x2(math.Copysign(0, 1), math.Copysign(0, 1)),
+			x1:  f64x2(0, 0),
 			x2:  f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
 			exp: f64x2(0, 0),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			x1:  f64x2(math.Copysign(0, -1), math.Copysign(0, 1)),
+			x2:  f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
+			exp: f64x2(math.Copysign(0, -1), 0),
 		},
 	}
 
