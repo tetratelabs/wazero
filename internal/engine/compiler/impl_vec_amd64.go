@@ -1976,11 +1976,31 @@ func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Regis
 	// x2r=max(v1, v2)
 	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, x2r)
 
+	// x2r = -0      if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0)
+	//       0       if (v1 == 0 && v2 ==  0)
+	//       -0       if (v1 == -0 && v2 == -0)
+	//       v1^v2   if v1 == NaN || v2 == NaN
+	//       0       otherwise
 	c.assembler.CompileRegisterToRegister(xor, tmp, x2r)
+	// x1r = -0           if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0)
+	//       0            if (v1 == 0 && v2 ==  0)
+	//       -0           if (v1 == -0 && v2 == -0)
+	//       NaN          if v1 == NaN || v2 == NaN
+	//       max(v1, v2)  otherwise
 	c.assembler.CompileRegisterToRegister(or, x2r, x1r)
+	// Copy x1r into tmp.
 	c.assembler.CompileRegisterToRegister(amd64.MOVDQA, x1r, tmp)
+	// tmp = 0            if (v1 == -0 && v2 == 0) || (v1 == 0 && v2 == -0) || (v1 == 0 && v2 ==  0)
+	//       -0           if (v1 == -0 && v2 == -0)
+	//       NaN          if v1 == NaN || v2 == NaN
+	//       max(v1, v2)  otherwise
+	//
+	// Note: -0 - (-0) = 0 (!= -0) in floating point operation.
 	c.assembler.CompileRegisterToRegister(sub, x2r, tmp)
+	// x1r = 0^ if v1 == NaN || v2 == NaN
 	c.assembler.CompileRegisterToRegisterWithArg(cmp, x1r, x1r, 3)
+	// x1r = set all bits on the mantissa bits
+	//       0 otherwise
 	c.assembler.CompileConstToRegister(srl, shiftNumToInverseNaN, x1r)
 	c.assembler.CompileRegisterToRegister(andn, tmp, x1r)
 
