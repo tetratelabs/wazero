@@ -1822,9 +1822,9 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
-		return c.compileMinOrMax(is32Bit, amd64.MINSS)
+		return c.compileMinOrMax(is32Bit, true, amd64.MINSS)
 	} else {
-		return c.compileMinOrMax(is32Bit, amd64.MINSD)
+		return c.compileMinOrMax(is32Bit, true, amd64.MINSD)
 	}
 }
 
@@ -1832,9 +1832,9 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
-		return c.compileMinOrMax(is32Bit, amd64.MAXSS)
+		return c.compileMinOrMax(is32Bit, false, amd64.MAXSS)
 	} else {
-		return c.compileMinOrMax(is32Bit, amd64.MAXSD)
+		return c.compileMinOrMax(is32Bit, false, amd64.MAXSD)
 	}
 }
 
@@ -1850,7 +1850,7 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 // the native min/max, which is why we cannot simply emit a native min/max instruction here.
 //
 // For the semantics, see wazeroir.Min and wazeroir.Max for detail.
-func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.Instruction) error {
+func (c *amd64Compiler) compileMinOrMax(is32Bit, isMin bool, minOrMaxInstruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -1880,12 +1880,30 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.In
 
 	// Start handling 2) and 3).
 
-	// Jump if two values are equal and NaN-free by checking the parity flag (PF).
-	// Here we use JPC to do the conditional jump when the parity flag is NOT set,
-	// and that is of 2).
-	equalExitJmp := c.assembler.CompileJump(amd64.JPC)
+	// Jump if one of two values is NaN by checking the parity flag (PF).
+	includeNaNJmp := c.assembler.CompileJump(amd64.JPS)
+
+	// Start handling 2).
+
+	// Before we exit this case, we have to ensure that positive zero (or negative zero for min instruction) is
+	// returned if two values are positive and negative zeros.
+	var inst asm.Instruction
+	switch {
+	case is32Bit && isMin:
+		inst = amd64.ORPS
+	case !is32Bit && isMin:
+		inst = amd64.ORPD
+	case is32Bit && !isMin:
+		inst = amd64.ANDPS
+	case !is32Bit && !isMin:
+		inst = amd64.ANDPD
+	}
+	c.assembler.CompileRegisterToRegister(inst, x2.register, x1.register)
+
+	sameExitJmp := c.assembler.CompileJump(amd64.JMP)
 
 	// Start handling 3).
+	c.assembler.SetJumpTargetOnNext(includeNaNJmp)
 
 	// We emit the ADD instruction to produce the NaN in x1.
 	if is32Bit {
@@ -1904,7 +1922,7 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.In
 	c.assembler.CompileRegisterToRegister(minOrMaxInstruction, x2.register, x1.register)
 
 	// Set the jump target of 1) and 2) cases to the next instruction after 3) case.
-	c.assembler.SetJumpTargetOnNext(nanExitJmp, equalExitJmp)
+	c.assembler.SetJumpTargetOnNext(nanExitJmp, sameExitJmp)
 
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
