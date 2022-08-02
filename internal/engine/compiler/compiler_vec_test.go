@@ -3976,6 +3976,14 @@ func TestCompiler_compileV128Min(t *testing.T) {
 		{
 			name:  "f32x4",
 			shape: wazeroir.ShapeF32x4,
+			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			x1:  f32x4(0, 0b1<<31, 0, 0b1<<31),
+			x2:  f32x4(0b1<<31, 0b1<<31, 0b1<<31, 0b1<<31),
+			exp: f32x4(0, 0, 0, 0),
+		},
+		{
+			name:  "f32x4",
+			shape: wazeroir.ShapeF32x4,
 			x1:    f32x4(float32(math.NaN()), -123.12, 2.3, float32(math.Inf(1))),
 			x2:    f32x4(5.5, 123.12, 5.0, float32(math.Inf(-1))),
 			exp:   f32x4(float32(math.NaN()), -123.12, 2.3, float32(math.Inf(-1))),
@@ -4000,6 +4008,14 @@ func TestCompiler_compileV128Min(t *testing.T) {
 			x1:    f32x4(float32(math.NaN()), float32(math.NaN()), float32(math.NaN()), float32(math.NaN())),
 			x2:    f32x4(float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.Inf(-1)), float32(math.Inf(1))),
 			exp:   f32x4(float32(math.NaN()), float32(math.NaN()), float32(math.NaN()), float32(math.NaN())),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			x1:  f64x2(math.Copysign(0, -1), math.Copysign(0, 1)),
+			x2:  f64x2(math.Copysign(0, 1), math.Copysign(0, -1)),
+			exp: f64x2(math.Copysign(0, 1), math.Copysign(0, 1)),
 		},
 		{
 			name:  "f64x2",
@@ -4080,7 +4096,7 @@ func TestCompiler_compileV128Min(t *testing.T) {
 					if math.IsNaN(exp) {
 						require.True(t, math.IsNaN(actual))
 					} else {
-						require.Equal(t, exp, actual)
+						require.Equal(t, math.Float64bits(exp), math.Float64bits(actual))
 					}
 				}
 			case wazeroir.ShapeF32x4:
@@ -4094,7 +4110,7 @@ func TestCompiler_compileV128Min(t *testing.T) {
 					if math.IsNaN(float64(exp)) {
 						require.True(t, math.IsNaN(float64(actual)))
 					} else {
-						require.Equal(t, exp, actual)
+						require.Equal(t, math.Float32bits(exp), math.Float32bits(actual))
 					}
 				}
 			default:
@@ -4191,6 +4207,14 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			exp:   f32x4(float32(math.NaN()), float32(math.NaN()), float32(math.NaN()), float32(math.NaN())),
 		},
 		{
+			name:  "f32x4",
+			shape: wazeroir.ShapeF32x4,
+			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			x1:  f32x4(0, 0, math.Float32frombits(1<<31), 0),
+			x2:  f32x4(math.Float32frombits(1<<31), math.Float32frombits(1<<31), math.Float32frombits(1<<31), math.Float32frombits(1<<31)),
+			exp: f32x4(0, 0, 0, 0),
+		},
+		{
 			name:  "f64x2",
 			shape: wazeroir.ShapeF64x2,
 			x1:    f64x2(math.MinInt64, 0),
@@ -4231,6 +4255,14 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			x1:    f64x2(math.Inf(1), math.Inf(-1)),
 			x2:    f64x2(math.NaN(), math.NaN()),
 			exp:   f64x2(math.NaN(), math.NaN()),
+		},
+		{
+			name:  "f64x2",
+			shape: wazeroir.ShapeF64x2,
+			// If the sign of zeros are different, positive zeros must be returned according to the spec.
+			x1:  f64x2(math.Copysign(0, 1), math.Copysign(0, 1)),
+			x2:  f64x2(math.Copysign(0, -1), math.Copysign(0, -1)),
+			exp: f64x2(0, 0),
 		},
 	}
 
@@ -4283,7 +4315,7 @@ func TestCompiler_compileV128Max(t *testing.T) {
 					if math.IsNaN(exp) {
 						require.True(t, math.IsNaN(actual))
 					} else {
-						require.Equal(t, exp, actual)
+						require.Equal(t, math.Float64bits(exp), math.Float64bits(actual))
 					}
 				}
 			case wazeroir.ShapeF32x4:
@@ -4297,7 +4329,7 @@ func TestCompiler_compileV128Max(t *testing.T) {
 					if math.IsNaN(float64(exp)) {
 						require.True(t, math.IsNaN(float64(actual)))
 					} else {
-						require.Equal(t, exp, actual)
+						require.Equal(t, math.Float32bits(exp), math.Float32bits(actual))
 					}
 				}
 			default:
