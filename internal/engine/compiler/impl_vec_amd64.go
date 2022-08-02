@@ -1948,7 +1948,7 @@ func (c *amd64Compiler) compileV128Max(o *wazeroir.OperationV128Max) error {
 	return nil
 }
 
-// compileV128FloatMinImpl implements compiler.compileV128Min for float lanes.
+// compileV128FloatMaxImpl implements compiler.compileV128Max for float lanes.
 func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Register) error {
 	tmp, err := c.allocateRegister(registerTypeVector)
 	if err != nil {
