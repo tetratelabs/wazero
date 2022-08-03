@@ -25,8 +25,8 @@ jobs:
     strategy:
       matrix:  # use latest available versions and be consistent on all workflows!
         go-version:
-          - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          - "1.18"
+          - "1.18"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+          - "1.19"
 
     steps:
       - name: Checkout
