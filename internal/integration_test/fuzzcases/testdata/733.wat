@@ -14,7 +14,7 @@
     i32.const 0x100 ;; runtime offset
     i64.const 0xffffffffffffffff ;; store target value.
     ;; This stores at 0x80000100 which lies in the last page, and 0x80000100 is
-    ;; larget than math.MaxInt32, therefore in amd64 the offset calculation becomes two instructions.
+    ;; larger than math.MaxInt32, therefore in amd64 the offset calculation becomes two instructions.
     i64.store offset=0x80000000
   )
   (memory 1 32770) ;; allows 65536*32770 = 0x80020000 bytes.

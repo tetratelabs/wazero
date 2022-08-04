@@ -313,7 +313,7 @@ func Test733(t *testing.T) {
 			require.Contains(t, err.Error(), "out of bounds memory")
 		})
 
-		// Note: this case uses large memory space, so can be slow.
+		// Note: this case uses large memory space, so can be slow like 1 to 2 seconds.
 		name = "store higher offset"
 		t.Run(name, func(t *testing.T) {
 			f := mod.ExportedFunction(name)
