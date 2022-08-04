@@ -304,10 +304,29 @@ func Test733(t *testing.T) {
 		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 733))
 		require.NoError(t, err)
 
-		f := mod.ExportedFunction("out of bounds")
-		require.NotNil(t, f)
-		_, err = f.Call(ctx)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "out of bounds memory")
+		name := "out of bounds"
+		t.Run(name, func(t *testing.T) {
+			f := mod.ExportedFunction(name)
+			require.NotNil(t, f)
+			_, err = f.Call(ctx)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "out of bounds memory")
+		})
+
+		// Note: this case uses large memory space, so can be slow.
+		name = "store higher offset"
+		t.Run(name, func(t *testing.T) {
+			f := mod.ExportedFunction(name)
+			require.NotNil(t, f)
+			_, err = f.Call(ctx)
+			require.NoError(t, err)
+
+			mem := mod.Memory()
+			require.NotNil(t, mem)
+
+			v, ok := mem.ReadUint64Le(ctx, 0x80000100)
+			require.True(t, ok)
+			require.Equal(t, uint64(0xffffffffffffffff), v)
+		})
 	})
 }
