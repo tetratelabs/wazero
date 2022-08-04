@@ -3770,7 +3770,45 @@ func (c *amd64Compiler) compileMemoryCopy() error {
 	return nil
 }
 
+// compileFillLoopImpl implements a REP STOSQ fill loop.
+func (c *amd64Compiler) compileFillLoopImpl(destinationOffset, value, fillSize *runtimeValueLocation, tmp asm.Register, replicateByte bool) {
+	// Skip if nothing to fill.
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, fillSize.register, 0)
+	emptyEightGroupsJump := c.assembler.CompileJump(amd64.JEQ)
+
+	if replicateByte {
+		// Replicate single byte onto full 8-byte register.
+		c.assembler.CompileConstToRegister(amd64.MOVQ, 0x0101010101010101, tmp)
+		c.assembler.CompileRegisterToRegister(amd64.IMULQ, tmp, value.register)
+	}
+
+	// Prepare registers for swaps. There will never be more than 3 XCHGs in total.
+	restoreCrossing := c.compilePreventCrossedTargetRegisters(
+		[]*runtimeValueLocation{destinationOffset, value, fillSize},
+		[]asm.Register{amd64.RegDI, amd64.RegAX, amd64.RegCX})
+
+	// Prepare registers for REP STOSQ: fill at [rdi] with rax, rcx times.
+	c.compileMaybeSwapRegisters(destinationOffset.register, amd64.RegDI)
+	c.compileMaybeSwapRegisters(value.register, amd64.RegAX)
+	c.compileMaybeSwapRegisters(fillSize.register, amd64.RegCX)
+
+	c.assembler.CompileStandAlone(amd64.REPSTOSQ)
+
+	// Restore registers.
+	c.compileMaybeSwapRegisters(destinationOffset.register, amd64.RegDI)
+	c.compileMaybeSwapRegisters(value.register, amd64.RegAX)
+	c.compileMaybeSwapRegisters(fillSize.register, amd64.RegCX)
+	restoreCrossing()
+
+	c.assembler.SetJumpTargetOnNext(emptyEightGroupsJump)
+	c.assembler.CompileStandAlone(amd64.NOP)
+}
+
 // compileMemoryFill implements compiler.compileMemoryFill for the amd64 architecture.
+//
+// This function uses efficient `REP STOSQ` instructions to copy in quadword (8 bytes) batches
+// if the size if above 15 bytes. For smaller sizes, a simple MOVB copy loop is the best
+// option.
 //
 // TODO: the compiled code in this function should be reused and compile at once as
 // the code is independent of any module.
@@ -3833,35 +3871,36 @@ func (c *amd64Compiler) compileFillImpl(isTable bool, tableIndex uint32) error {
 	c.assembler.CompileRegisterToConst(amd64.CMPQ, copySize.register, 0)
 	skipJump := c.assembler.CompileJump(amd64.JEQ)
 
-	var scale int16
-	var movInst asm.Instruction
+	// destinationOffset -= size.
+	c.assembler.CompileRegisterToRegister(amd64.SUBQ, copySize.register, destinationOffset.register)
+
 	if isTable {
 		// Each element is of type uintptr; 2^3 = 1 << pointerSizeLog2.
 		c.assembler.CompileConstToRegister(amd64.SHLQ, pointerSizeLog2, destinationOffset.register)
 		// destinationOffset += table buffer's absolute address.
 		c.assembler.CompileMemoryToRegister(amd64.ADDQ, tmp, tableInstanceTableOffset, destinationOffset.register)
-		// For tables, we move 8 bytes at once.
-		scale, movInst = 8, amd64.MOVQ
+
 	} else {
 		// destinationOffset += memory buffer's absolute address.
 		c.assembler.CompileRegisterToRegister(amd64.ADDQ, amd64ReservedRegisterForMemory, destinationOffset.register)
-		scale, movInst = 1, amd64.MOVB
+
+		// Copy first %15 bytes with simple MOVB instruction.
+		beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
+		c.assembler.CompileConstToRegister(amd64.TESTQ, 15, copySize.register)
+		breakLoop := c.assembler.CompileJump(amd64.JEQ)
+
+		c.assembler.CompileRegisterToMemory(amd64.MOVB, value.register, destinationOffset.register, 0)
+
+		c.assembler.CompileNoneToRegister(amd64.INCQ, destinationOffset.register)
+		c.assembler.CompileNoneToRegister(amd64.DECQ, copySize.register)
+		c.assembler.CompileJump(amd64.JMP).AssignJumpTarget(beginCopyLoop)
+
+		c.assembler.SetJumpTargetOnNext(breakLoop)
+		// compileFillLoopImpl counts in groups of 8 bytes, so we have to divide the copySize by 8.
+		c.assembler.CompileConstToRegister(amd64.SHRQ, 3, copySize.register)
 	}
 
-	// Negate the counter.
-	c.assembler.CompileNoneToRegister(amd64.NEGQ, copySize.register)
-
-	beginCopyLoop := c.assembler.CompileStandAlone(amd64.NOP)
-
-	// [destinationOffset + (size.register)] = tmp.
-	c.assembler.CompileRegisterToMemoryWithIndex(movInst,
-		value.register,
-		destinationOffset.register, 0, copySize.register, scale,
-	)
-
-	// size += 1
-	c.assembler.CompileNoneToRegister(amd64.INCQ, copySize.register)
-	c.assembler.CompileJump(amd64.JMI).AssignJumpTarget(beginCopyLoop)
+	c.compileFillLoopImpl(destinationOffset, value, copySize, tmp, !isTable)
 
 	c.locationStack.markRegisterUnused(copySize.register, value.register,
 		destinationOffset.register, tmp)

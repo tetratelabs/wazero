@@ -788,6 +788,8 @@ func (a *AssemblerImpl) encodeNoneToNone(n *nodeImpl) (err error) {
 		_, err = a.buf.Write([]byte{0x0f, 0x0b})
 	case REPMOVSQ:
 		_, err = a.buf.Write([]byte{0xf3, RexPrefixW, 0xa5})
+	case REPSTOSQ:
+		_, err = a.buf.Write([]byte{0xf3, RexPrefixW, 0xab})
 	case STD:
 		_, err = a.buf.Write([]byte{0xfd})
 	case CLD:
@@ -1164,6 +1166,8 @@ var registerToRegisterOpcode = map[asm.Instruction]struct {
 	MOVWQSX: {opcode: []byte{0x0f, 0xbf}, rPrefix: RexPrefixW},
 	// https://www.felixcloutier.com/x86/movsx:movsxd
 	MOVWLSX: {opcode: []byte{0x0f, 0xbf}},
+	// https://www.felixcloutier.com/x86/imul
+	IMULQ: {opcode: []byte{0x0f, 0xaf}, rPrefix: RexPrefixW},
 	// https://www.felixcloutier.com/x86/mulss
 	MULSS: {mandatoryPrefix: 0xf3, opcode: []byte{0x0f, 0x59}, requireSrcFloat: true, requireDstFloat: true},
 	// https://www.felixcloutier.com/x86/mulsd
