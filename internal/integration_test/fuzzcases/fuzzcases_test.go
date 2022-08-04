@@ -298,3 +298,16 @@ func Test730(t *testing.T) {
 		}
 	})
 }
+
+func Test733(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		mod, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 733))
+		require.NoError(t, err)
+
+		f := mod.ExportedFunction("out of bounds")
+		require.NotNil(t, f)
+		_, err = f.Call(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "out of bounds memory")
+	})
+}

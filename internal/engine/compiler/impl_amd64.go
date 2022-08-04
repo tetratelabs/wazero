@@ -3337,17 +3337,30 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 // into a register, and returns the stored register. We call the result "ceil" because we access the memory
 // as memory.Buffer[ceil-targetSizeInBytes: ceil].
 //
-// Note: this also emits the instructions to check the out of bounds memory access.
+// Note: this also emits the instructions to check the out-of-bounds memory access.
 // In other words, if the ceil exceeds the memory size, the code exits with nativeCallStatusCodeMemoryOutOfBounds status.
 func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (asm.Register, error) {
 	base := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(base); err != nil {
-		return 0, err
+		return asm.NilRegister, err
 	}
 
 	result := base.register
-	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
+	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxInt32 {
 		c.assembler.CompileConstToRegister(amd64.ADDQ, offsetConst, result)
+	} else if offsetConst <= math.MaxUint32 {
+		// Note: in practice, this branch rarely happens as in this case, the wasm binary know that
+		// memory has more than 1 GBi or at least tries to access above 1 GBi memory region.
+		//
+		// This case, we cannot directly add the offset to a register by ADDQ(const) instruction.
+		// That is because the imm32 const is sign-extended to 64-bit in ADDQ(const), and we end up
+		// making offsetConst as the negative number, which is wrong.
+		tmp, err := c.allocateRegister(registerTypeGeneralPurpose)
+		if err != nil {
+			return asm.NilRegister, err
+		}
+		c.assembler.CompileConstToRegister(amd64.MOVL, int64(uint32(offsetConst)), tmp)
+		c.assembler.CompileRegisterToRegister(amd64.ADDQ, tmp, result)
 	} else {
 		// If the offset const is too large, we exit with nativeCallStatusCodeMemoryOutOfBounds.
 		c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
@@ -3361,7 +3374,7 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	// Jump if the value is within the memory length.
 	okJmp := c.assembler.CompileJump(amd64.JCC)
 
-	// Otherwise, we exit the function with out of bounds status code.
+	// Otherwise, we exit the function with out-of-bounds status code.
 	c.compileExitFromNativeCode(nativeCallStatusCodeMemoryOutOfBounds)
 
 	c.assembler.SetJumpTargetOnNext(okJmp)
