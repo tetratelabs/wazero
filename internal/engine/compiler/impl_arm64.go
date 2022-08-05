@@ -4117,7 +4117,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
-	if c.ir.HasMemory {
+	if c.ir.HasMemory || c.ir.UsesMemory {
 		// "arm64ReservedRegisterForMemory = ce.MemoryElement0Address"
 		c.assembler.CompileMemoryToRegister(
 			arm64.LDRD,
@@ -4131,12 +4131,6 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // ce.moduleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
-	if c.ir.IsHostFunction {
-		// If this is the host function, our semantic is that host functions use the caller's context.
-		// Therefore, we can skip all the initialization steps here as at this point, the caller's memory, etc
-		// are already set on the callEngine.
-		return nil
-	}
 
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
@@ -4198,7 +4192,11 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.ir.HasMemory {
+	if c.ir.HasMemory &&
+		// If this is the host function, our semantic is that host functions use the caller's memory.
+		// Therefore, we can skip the initialization step on memory here as at this point since it is
+		// already set on the callEngine.
+		!c.ir.IsHostFunction {
 		// "tmpX = moduleInstance.Memory"
 		c.assembler.CompileMemoryToRegister(
 			arm64.LDRD,

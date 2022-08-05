@@ -790,15 +790,22 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 
 	callReadMem := &wasm.Code{ // shows indirect calls still use the same memory
 		IsHostFunction: true,
-		Body:           []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd},
+		Body: []byte{
+			wasm.OpcodeCall, 1,
+			// On the return from the another host function,
+			// we should still be able to access the memory.
+			wasm.OpcodeI32Const, 0,
+			wasm.OpcodeI32Load, 0x2, 0x0,
+			wasm.OpcodeEnd,
+		},
 	}
 	hostModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
-		CodeSection:     []*wasm.Code{readMem, callReadMem},
+		CodeSection:     []*wasm.Code{callReadMem, readMem},
 		ExportSection: []*wasm.Export{
-			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 0},
-			{Name: callReadMemName, Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: callReadMemName, Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: readMemName, Type: wasm.ExternTypeFunc, Index: 1},
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName:    "host",
@@ -832,8 +839,8 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 			{Name: callImportCallReadMemName, Type: wasm.ExternTypeFunc, Index: 3},
 		},
 		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = readMemFn.
-			{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = callReadMemFn.
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = callReadMemFn.
+			{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = readMemFn.
 		},
 		NameSection: &wasm.NameSection{
 			ModuleName: "importing",
@@ -854,7 +861,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	importingFunctions := importing.BuildFunctions(importingModule, buildListeners(fnlf, importingModule))
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
-	importing.Functions = append([]*wasm.FunctionInstance{readMemFn, callReadMemFn}, importingFunctions...)
+	importing.Functions = append([]*wasm.FunctionInstance{callReadMemFn, readMemFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
