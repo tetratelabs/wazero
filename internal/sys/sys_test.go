@@ -3,7 +3,6 @@ package sys
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"io"
 	"testing"
 	"time"
@@ -55,7 +54,7 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Zero(t, sysCtx.Nanotime(testCtx)) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, &ns, sysCtx.nanosleep)
-	require.Equal(t, rand.Reader, sysCtx.RandSource())
+	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
 	require.Equal(t, NewFSContext(testfs.FS{}), sysCtx.FS(testCtx))
 }
 

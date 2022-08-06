@@ -12,8 +12,7 @@ import (
 )
 
 func Test_randomGet(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
-		WithRandSource(deterministicRandomSource()))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	expectedMemory := []byte{
@@ -42,8 +41,7 @@ func Test_randomGet(t *testing.T) {
 }
 
 func Test_randomGet_Errors(t *testing.T) {
-	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().
-		WithRandSource(deterministicRandomSource()))
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	memorySize := mod.Memory().Size(testCtx)

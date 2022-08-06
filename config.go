@@ -565,12 +565,15 @@ type ModuleConfig interface {
 	// See WithNanosleep
 	WithSysNanosleep() ModuleConfig
 
-	// WithRandSource configures a source of random bytes. Defaults to crypto/rand.Reader.
+	// WithRandSource configures a source of random bytes. Defaults to return a
+	// deterministic source. You might override this with crypto/rand.Reader
 	//
-	// This reader is most commonly used by the functions like "random_get" in "wasi_snapshot_preview1" or "seed" in
-	// AssemblyScript standard "env" although it could be used by functions imported from other modules.
+	// This reader is most commonly used by the functions like "random_get" in
+	// "wasi_snapshot_preview1", "seed" in AssemblyScript standard "env", and
+	// "getRandomData" when runtime.GOOS is "js".
 	//
-	// Note: The caller is responsible to close any io.Reader they supply: It is not closed on api.Module Close.
+	// Note: The caller is responsible to close any io.Reader they supply: It
+	// is not closed on api.Module Close.
 	WithRandSource(io.Reader) ModuleConfig
 }
 

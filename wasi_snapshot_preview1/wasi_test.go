@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"io"
-	"math/rand"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -15,12 +13,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
-
-const seed = int64(42) // fixed seed value
-
-var deterministicRandomSource = func() io.Reader {
-	return rand.New(rand.NewSource(seed))
-}
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
