@@ -36,7 +36,7 @@ type CallContext struct {
 	ns     *Namespace
 
 	// Sys is exposed for use in special imports such as WASI, assemblyscript
-	// and wasm_exec.
+	// and gojs.
 	//
 	// # Notes
 	//
@@ -190,6 +190,11 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 	}
 	mod := f.importingModule
 	return f.ce.Call(ctx, mod, params...)
+}
+
+// GlobalVal is an internal hack to get the lower 64 bits of a global.
+func (m *CallContext) GlobalVal(idx Index) uint64 {
+	return m.module.Globals[idx].Val
 }
 
 // ExportedGlobal implements the same method as documented on api.Module.

@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"path"
 	"sync/atomic"
 	"syscall"
 )
@@ -100,15 +101,16 @@ func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) 
 // Ex. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
 // See #390
 func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, perm int */) (uint32, error) {
-	// fs.ValidFile cannot start with '/'
+	// fs.ValidFile cannot be rooted (start with '/')
 	fsOpenPath := name
 	if name[0] == '/' {
 		fsOpenPath = name[1:]
 	}
+	fsOpenPath = path.Clean(fsOpenPath) // ex. "sub/." -> "sub"
 
 	f, err := c.fs.Open(fsOpenPath)
 	if err != nil {
-		return 0, err // Don't wrap the underlying error which is already a PathError!
+		return 0, err
 	}
 
 	newFD := c.nextFD()
@@ -144,7 +146,7 @@ func (c *FSContext) Close(_ context.Context) (err error) {
 		delete(c.openedFiles, fd)
 		if entry.File != nil { // File is nil for the root filesystem
 			if e := entry.File.Close(); e != nil {
-				err = e // This means the err returned == the last non-nil error.
+				err = e // This means err returned == the last non-nil error.
 			}
 		}
 	}
