@@ -2,6 +2,7 @@ package wazero
 
 import (
 	"context"
+	"crypto/rand"
 	"io"
 	"io/fs"
 	"math"
@@ -477,6 +478,23 @@ func TestModuleConfig_toSysContext(t *testing.T) {
 				&nt, 1, // nanotime, nanotimeResolution
 				nil,     // nanosleep
 				testFS2, // fs
+			),
+		},
+		{
+			name:  "WithRandSource",
+			input: base.WithRandSource(rand.Reader),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				rand.Reader,    // randSource
+				&wt, 1,         // walltime, walltimeResolution
+				&nt, 1, // nanotime, nanotimeResolution
+				nil, // nanosleep
+				nil, // fs
 			),
 		},
 	}

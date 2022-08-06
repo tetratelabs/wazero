@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"io"
 	"strings"
@@ -123,8 +124,7 @@ func TestAbort_Error(t *testing.T) {
 }
 
 func TestSeed(t *testing.T) {
-	b := []byte{0, 1, 2, 3, 4, 5, 6, 7}
-	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig().WithRandSource(bytes.NewReader(b)))
+	mod, r, log := requireProxyModule(t, NewFunctionExporter(), wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
 	ret, err := mod.ExportedFunction(functionSeed).Call(testCtx)
@@ -132,11 +132,11 @@ func TestSeed(t *testing.T) {
 	require.Equal(t, `
 --> proxy.seed()
 	==> env.~lib/builtins/seed()
-	<== (7.949928895127363e-275)
-<-- (7.949928895127363e-275)
+	<== (4.958153677776298e-175)
+<-- (4.958153677776298e-175)
 `, "\n"+log.String())
 
-	require.Equal(t, b, u64.LeBytes(ret[0]))
+	require.Equal(t, "538c7f96b164bf1b", hex.EncodeToString(u64.LeBytes(ret[0])))
 }
 
 func TestSeed_error(t *testing.T) {

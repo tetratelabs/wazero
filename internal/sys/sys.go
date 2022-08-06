@@ -2,7 +2,6 @@ package sys
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -118,7 +117,7 @@ func (c *Context) FS(ctx context.Context) *FSContext {
 	return c.fsc
 }
 
-// RandSource is a source of random bytes and defaults to crypto/rand.Reader.
+// RandSource is a source of random bytes and defaults to a deterministic source.
 // see wazero.ModuleConfig WithRandSource
 func (c *Context) RandSource() io.Reader {
 	return c.randSource
@@ -153,8 +152,10 @@ func NewContext(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 	randSource io.Reader,
-	walltime *sys.Walltime, walltimeResolution sys.ClockResolution,
-	nanotime *sys.Nanotime, nanotimeResolution sys.ClockResolution,
+	walltime *sys.Walltime,
+	walltimeResolution sys.ClockResolution,
+	nanotime *sys.Nanotime,
+	nanotimeResolution sys.ClockResolution,
 	nanosleep *sys.Nanosleep,
 	fs fs.FS,
 ) (sysCtx *Context, err error) {
@@ -187,7 +188,7 @@ func NewContext(
 	}
 
 	if randSource == nil {
-		sysCtx.randSource = rand.Reader
+		sysCtx.randSource = platform.NewFakeRandSource()
 	} else {
 		sysCtx.randSource = randSource
 	}
