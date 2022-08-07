@@ -4509,7 +4509,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 	// Since call frame stack pointer is the index for callEngine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting callFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
-	// multiplying withe the size of struct equals shifting by its most significant bit.
+	// multiplying with the size of struct equals shifting by its most significant bit.
 	c.assembler.CompileConstToRegister(amd64.SHLQ, int64(callFrameDataSizeMostSignificantSetBit), callFrameStackPointerRegister)
 
 	// At this point, callFrameStackPointerRegister holds the offset in call frame slice in bytes,
@@ -4637,6 +4637,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
+
 	// Due to the change to callEngine.valueStackContext.stackBasePointer.
 	c.compileReservedStackBasePointerInitialization()
 
@@ -4926,7 +4927,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 }
 
 func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
-	if c.ir.HasMemory {
+	if c.ir.HasMemory || c.ir.UsesMemory {
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			amd64ReservedRegisterForMemory,
@@ -4965,13 +4966,6 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 // callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) compileModuleContextInitialization() error {
-	if c.ir.IsHostFunction {
-		// If this is the host function, our semantic is that host functions use the caller's context.
-		// Therefore, we can skip all the initialization steps here as at this point, the caller's memory, etc
-		// are already set on the callEngine.
-		return nil
-	}
-
 	// amd64CallingConventionModuleInstanceAddressRegister holds the module instance's address
 	// so mark it used so that it won't be used as a free register until the module context initialization finishes.
 	c.locationStack.markRegisterUsed(amd64CallingConventionModuleInstanceAddressRegister)
@@ -5061,7 +5055,7 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset)
 
-		// Set elemnt zero address.
+		// Set element zero address.
 		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, memoryInstanceBufferOffset, tmpRegister2)
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			amd64ReservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset)
