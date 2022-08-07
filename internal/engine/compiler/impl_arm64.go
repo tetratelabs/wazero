@@ -4192,11 +4192,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.ir.HasMemory &&
-		// If this is the host function, our semantic is that host functions use the caller's memory.
-		// Therefore, we can skip the initialization step on memory here as at this point since it is
-		// already set on the callEngine.
-		!c.ir.IsHostFunction {
+	if c.ir.HasMemory {
 		// "tmpX = moduleInstance.Memory"
 		c.assembler.CompileMemoryToRegister(
 			arm64.LDRD,
