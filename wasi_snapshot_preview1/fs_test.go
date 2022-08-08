@@ -657,8 +657,8 @@ func Test_fdSeek(t *testing.T) {
 			whence:         io.SeekStart,
 			expectedOffset: 4, // = offset
 			expectedMemory: []byte{
-				'?',        // resultNewoffset is after this
-				4, 0, 0, 0, // = expectedOffset
+				'?',                    // resultNewoffset is after this
+				4, 0, 0, 0, 0, 0, 0, 0, // = expectedOffset
 				'?',
 			},
 			expectedLog: `
@@ -674,8 +674,8 @@ func Test_fdSeek(t *testing.T) {
 			whence:         io.SeekCurrent,
 			expectedOffset: 2, // = 1 (the initial offset of the test file) + 1 (offset)
 			expectedMemory: []byte{
-				'?',        // resultNewoffset is after this
-				2, 0, 0, 0, // = expectedOffset
+				'?',                    // resultNewoffset is after this
+				2, 0, 0, 0, 0, 0, 0, 0, // = expectedOffset
 				'?',
 			},
 			expectedLog: `
@@ -691,8 +691,8 @@ func Test_fdSeek(t *testing.T) {
 			whence:         io.SeekEnd,
 			expectedOffset: 5, // = 6 (the size of the test file with content "wazero") + -1 (offset)
 			expectedMemory: []byte{
-				'?',        // resultNewoffset is after this
-				5, 0, 0, 0, // = expectedOffset
+				'?',                    // resultNewoffset is after this
+				5, 0, 0, 0, 0, 0, 0, 0, // = expectedOffset
 				'?',
 			},
 			expectedLog: `
