@@ -722,7 +722,7 @@ func InstructionName(instruction asm.Instruction) string {
 	case MULQ:
 		return "MULQ"
 	case IMULQ:
-		return "IMUL"
+		return "IMULQ"
 	case MULSD:
 		return "MULSD"
 	case MULSS:

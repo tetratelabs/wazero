@@ -323,7 +323,6 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 				// Check the status code and the destination memory region.
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 				require.Equal(t, exp, mem[:checkCeil])
-
 			} else {
 				require.Equal(t, nativeCallStatusCodeMemoryOutOfBounds, env.compilerStatus())
 			}

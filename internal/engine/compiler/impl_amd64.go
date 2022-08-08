@@ -3801,7 +3801,6 @@ func (c *amd64Compiler) compileFillLoopImpl(destinationOffset, value, fillSize *
 	restoreCrossing()
 
 	c.assembler.SetJumpTargetOnNext(emptyEightGroupsJump)
-	c.assembler.CompileStandAlone(amd64.NOP)
 }
 
 // compileMemoryFill implements compiler.compileMemoryFill for the amd64 architecture.
