@@ -46,6 +46,13 @@ build.bench:
 build.examples.as:
 	@cd ./examples/assemblyscript/testdata && npm install && npm run build
 
+.PHONY: build.examples.zig
+build.examples.zig: examples/allocation/zig/testdata/greet.wasm
+
+%.wasm: %.zig
+	@(cd $(@D); zig build)
+	@mv $(@D)/zig-out/bin/$(@F) $(@D)
+
 tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go)
 .PHONY: build.examples.tinygo
 build.examples.tinygo: $(tinygo_sources)

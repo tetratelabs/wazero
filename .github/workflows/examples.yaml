@@ -90,6 +90,9 @@ jobs:
       - name: Build Rust examples
         run: make build.examples.rust
 
+      - name: Build Zig examples
+        run: make build.examples.zig
+
       - name: Build Emscripten examples
         run: |
           ./emsdk/emsdk activate ${{env.EMSDK_VERSION}}
