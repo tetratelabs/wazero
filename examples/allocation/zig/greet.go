@@ -89,7 +89,7 @@ func run() error {
 
 	// The pointer is a linear memory offset, which is where we write the name.
 	if !mod.Memory().Write(ctx, uint32(namePtr), []byte(name)) {
-		log.Panicf("Memory.Write(%d, %d) out of range of memory size %d",
+		return fmt.Errorf("Memory.Write(%d, %d) out of range of memory size %d",
 			namePtr, nameSize, mod.Memory().Size(ctx))
 	}
 
@@ -110,7 +110,7 @@ func run() error {
 	greetingSize := uint32(ptrSize[0])
 	// The pointer is a linear memory offset, which is where we write the name.
 	if bytes, ok := mod.Memory().Read(ctx, greetingPtr, greetingSize); !ok {
-		log.Panicf("Memory.Read(%d, %d) out of range of memory size %d",
+		return fmt.Errorf("Memory.Read(%d, %d) out of range of memory size %d",
 			greetingPtr, greetingSize, mod.Memory().Size(ctx))
 	} else {
 		fmt.Println("go >>", string(bytes))
