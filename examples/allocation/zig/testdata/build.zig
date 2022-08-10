@@ -20,11 +20,4 @@ pub fn build(b: *std.build.Builder) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
-
-    const exe_tests = b.addTest("greet.zig");
-    exe_tests.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .wasi });
-    exe_tests.setBuildMode(mode);
-
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&exe_tests.step);
 }
