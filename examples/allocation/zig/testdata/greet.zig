@@ -6,13 +6,11 @@ pub fn main() anyerror!void {
     return;
 }
 
-extern "env" fn log(ptr: u32, size: u32) void;
+extern "env" fn log(ptr: [*]const u8, size: u32) void;
 
 // _log prints a message to the console using log.
-pub fn _log(message: []u8) void {
-    const ptrSize = stringToPtr(message);
-    var p = ptrSize >> 32;
-    log(@truncate(u32, p), @truncate(u32, ptrSize));
+pub fn _log(message: []const u8) void {
+    log(message.ptr, message.len);
 }
 
 pub export fn malloc(length: usize) ?[*]u8 {
