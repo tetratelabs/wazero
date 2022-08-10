@@ -24,7 +24,7 @@ pub export fn free(buf: [*]u8, length: usize) void {
     allocator.free(buf[0..length]);
 }
 
-pub fn _greeting(name: []u8) ![]u8 {
+pub fn _greeting(name: []const u8) ![]u8 {
     return try std.fmt.allocPrint(
         allocator,
         "Hello, {s}!",
@@ -33,7 +33,7 @@ pub fn _greeting(name: []u8) ![]u8 {
 }
 
 // _greet prints a greeting to the console.
-pub fn _greet(name: []u8) void {
+pub fn _greet(name: []const u8) void {
     const g = _greeting(name);
     const s = std.fmt.allocPrint(
         allocator,
