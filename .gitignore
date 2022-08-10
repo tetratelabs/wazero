@@ -31,3 +31,6 @@ package-lock.json
 /coverage.txt
 
 .vagrant
+
+zig-cache/
+zig-out/
