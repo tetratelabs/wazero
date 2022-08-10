@@ -6,7 +6,7 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
-    const exe = b.addExecutable("greet", "src/main.zig");
+    const exe = b.addExecutable("greet", "greet.zig");
     exe.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .wasi });
     exe.setBuildMode(mode);
 
@@ -21,7 +21,7 @@ pub fn build(b: *std.build.Builder) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const exe_tests = b.addTest("src/main.zig");
+    const exe_tests = b.addTest("greet.zig");
     exe_tests.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .wasi });
     exe_tests.setBuildMode(mode);
 
