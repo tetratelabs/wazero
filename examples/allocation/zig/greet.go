@@ -85,7 +85,7 @@ func run() error {
 	}
 	namePtr := results[0]
 	// We have to free this pointer when finished.
-	defer free.Call(ctx, namePtr)
+	defer free.Call(ctx, namePtr, nameSize)
 
 	// The pointer is a linear memory offset, which is where we write the name.
 	if !mod.Memory().Write(ctx, uint32(namePtr), []byte(name)) {

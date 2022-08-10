@@ -15,15 +15,13 @@ pub fn _log(message: []u8) void {
     log(@truncate(u32, p), @truncate(u32, ptrSize));
 }
 
-pub export fn malloc(size: usize) usize {
-    var memory = allocator.alloc(u8, size) catch unreachable;
-    return @ptrToInt(memory.ptr);
+pub export fn malloc(length: usize) ?[*]u8 {
+    const buff = allocator.alloc(u8, length) catch return null;
+    return buff.ptr;
 }
 
-pub export fn free(ptr: usize) void {
-    var s: []u8 = undefined;
-    s.ptr = @intToPtr([*]u8, ptr);
-    allocator.free(s);
+pub export fn free(buf: [*]u8, length: usize) void {
+    allocator.free(buf[0..length]);
 }
 
 pub fn _greeting(name: []u8) ![]u8 {
