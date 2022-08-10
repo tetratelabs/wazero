@@ -500,7 +500,7 @@ var fdSeek = wasm.NewGoFunc(
 			return ErrnoIo
 		}
 
-		if !mod.Memory().WriteUint32Le(ctx, resultNewoffset, uint32(newOffset)) {
+		if !mod.Memory().WriteUint64Le(ctx, resultNewoffset, uint64(newOffset)) {
 			return ErrnoFault
 		}
 
