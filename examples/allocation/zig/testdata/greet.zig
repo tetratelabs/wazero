@@ -44,8 +44,8 @@ pub fn _greet(name: []u8) void {
 }
 
 // greet is a WebAssembly export that accepts a string pointer (linear memory offset) and calls greet.
-pub export fn greet(ptr: u32, size: u32) void {
-    const name = ptrToString(ptr, size);
+pub export fn greet(message: [*]u8, size: u32) void {
+    const name = _greeting(message[0..size]) catch unreachable;
     _greet(name);
 }
 
@@ -54,19 +54,9 @@ pub export fn greet(ptr: u32, size: u32) void {
 //
 // Note: This uses a uint64 instead of two result values for compatibility with
 // WebAssembly 1.0.
-pub export fn greeting(ptr: u32, size: u32) u64 {
-    const name = ptrToString(ptr, size);
-    const g = _greeting(name) catch unreachable;
+pub export fn greeting(message: [*]u8, size: u32) u64 {
+    const g = _greeting(message[0..size]) catch return 0;
     return stringToPtr(g);
-}
-
-// ptrToString returns a string from WebAssembly compatible numeric types
-// representing its pointer and length.
-pub fn ptrToString(ptr: u32, size: u32) []u8 {
-    var s: []u8 = undefined;
-    s.ptr = @intToPtr([*]u8, ptr);
-    s.len = size;
-    return s;
 }
 
 // stringToPtr returns a pointer and size pair for the given string in a way
