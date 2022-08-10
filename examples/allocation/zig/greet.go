@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -84,6 +85,9 @@ func run() error {
 		return err
 	}
 	namePtr := results[0]
+	if namePtr == 0 {
+		return errors.New("malloc failed")
+	}
 	// We have to free this pointer when finished.
 	defer free.Call(ctx, namePtr, nameSize)
 
