@@ -14,3 +14,7 @@ Under the covers, [greet.zig](testdata/greet.zig) does a few things of interest:
 * Uses `[*]u8` as an argument to take a pointer and slices it to build back a string
 
 The Zig code exports "malloc" and "free", which we use for that purpose.
+
+Note: This example uses `@panic()` rather than `unreachable` to handle errors
+since `unreachable` emits a call to panic only in `Debug` and `ReleaseSafe` mode.
+In `ReleaseFast` and `ReleaseSmall` mode, it would lead into undefined behavior.
