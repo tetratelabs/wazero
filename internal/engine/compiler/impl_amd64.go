@@ -2756,6 +2756,7 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	}
 
 	c.assembler.CompileRegisterToRegister(amd64.CVTSD2SS, target.register, target.register)
+	target.valueType = runtimeValueTypeF32
 	return nil
 }
 
@@ -2767,6 +2768,7 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	}
 
 	c.assembler.CompileRegisterToRegister(amd64.CVTSS2SD, target.register, target.register)
+	target.valueType = runtimeValueTypeF64
 	return nil
 }
 
@@ -2818,41 +2820,42 @@ func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	} else {
 		inst = amd64.MOVL
 	}
-	return c.compileExtendImpl(inst)
+	return c.compileExtendImpl(inst, runtimeValueTypeI64)
 }
 
 // compileSignExtend32From8 implements compiler.compileSignExtend32From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From8() error {
-	return c.compileExtendImpl(amd64.MOVBLSX)
+	return c.compileExtendImpl(amd64.MOVBLSX, runtimeValueTypeI32)
 }
 
 // compileSignExtend32From16 implements compiler.compileSignExtend32From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From16() error {
-	return c.compileExtendImpl(amd64.MOVWLSX)
+	return c.compileExtendImpl(amd64.MOVWLSX, runtimeValueTypeI32)
 }
 
 // compileSignExtend64From8 implements compiler.compileSignExtend64From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From8() error {
-	return c.compileExtendImpl(amd64.MOVBQSX)
+	return c.compileExtendImpl(amd64.MOVBQSX, runtimeValueTypeI64)
 }
 
 // compileSignExtend64From16 implements compiler.compileSignExtend64From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From16() error {
-	return c.compileExtendImpl(amd64.MOVWQSX)
+	return c.compileExtendImpl(amd64.MOVWQSX, runtimeValueTypeI64)
 }
 
 // compileSignExtend64From32 implements compiler.compileSignExtend64From32 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From32() error {
-	return c.compileExtendImpl(amd64.MOVLQSX)
+	return c.compileExtendImpl(amd64.MOVLQSX, runtimeValueTypeI64)
 }
 
-func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction) error {
+func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction, destinationType runtimeValueType) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
 	c.assembler.CompileRegisterToRegister(inst, target.register, target.register)
+	target.valueType = destinationType
 	return nil
 }
 
@@ -4335,7 +4338,7 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	if err != nil {
 		return err
 	}
-	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF32)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF64)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
