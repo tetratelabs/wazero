@@ -191,6 +191,8 @@ const (
 	MULL
 	// MULQ is the MUL instruction in 64-bit mode. https://www.felixcloutier.com/x86/mul
 	MULQ
+	// IMULQ is the IMUL instruction in 64-bit mode. https://www.felixcloutier.com/x86/imul
+	IMULQ
 	// MULSD is the MULSD instruction. https://www.felixcloutier.com/x86/mulsd
 	MULSD
 	// MULSS is the MULSS instruction. https://www.felixcloutier.com/x86/mulss
@@ -219,6 +221,8 @@ const (
 	PSRLQ
 	// REPMOVSQ is the REP MOVSQ instruction in 64-bit mode. https://www.felixcloutier.com/x86/movs:movsb:movsw:movsd:movsq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
 	REPMOVSQ
+	// REPSTOSQ is the REP STOSQ instruction in 64-bit mode. https://www.felixcloutier.com/x86/stos:stosb:stosw:stosd:stosq https://www.felixcloutier.com/x86/rep:repe:repz:repne:repnz
+	REPSTOSQ
 	// ROLL is the ROL instruction in 32-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
 	ROLL
 	// ROLQ is the ROL instruction in 64-bit mode. https://www.felixcloutier.com/x86/rcl:rcr:rol:ror
@@ -717,6 +721,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "MULL"
 	case MULQ:
 		return "MULQ"
+	case IMULQ:
+		return "IMULQ"
 	case MULSD:
 		return "MULSD"
 	case MULSS:
@@ -743,6 +749,8 @@ func InstructionName(instruction asm.Instruction) string {
 		return "PSRLQ"
 	case REPMOVSQ:
 		return "REP MOVSQ"
+	case REPSTOSQ:
+		return "REP STOSQ"
 	case ROLL:
 		return "ROLL"
 	case ROLQ:

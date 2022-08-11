@@ -252,10 +252,15 @@ func TestCompiler_compileMemoryFill(t *testing.T) {
 		size                    uint32
 		requireOutOfBoundsError bool
 	}{
-		{v: 0, destOffset: 10, size: 10},
+		{v: 0, destOffset: 0, size: 25},
+		{v: 0, destOffset: 10, size: 17},
+		{v: 0, destOffset: 10, size: 15},
 		{v: 0, destOffset: 10, size: 5},
 		{v: 0, destOffset: 10, size: 1},
 		{v: 0, destOffset: 10, size: 0},
+		{v: 5, destOffset: 10, size: 27},
+		{v: 5, destOffset: 10, size: 25},
+		{v: 5, destOffset: 10, size: 21},
 		{v: 5, destOffset: 10, size: 10},
 		{v: 5, destOffset: 10, size: 5},
 		{v: 5, destOffset: 10, size: 1},

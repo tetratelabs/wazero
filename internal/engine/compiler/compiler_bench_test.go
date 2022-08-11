@@ -63,6 +63,52 @@ func BenchmarkCompiler_compileMemoryCopy(b *testing.B) {
 	}
 }
 
+func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
+	sizes := []uint32{5, 17, 128, 10000, 64000}
+
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("%v", size), func(b *testing.B) {
+			env := newCompilerEnvironment()
+
+			mem := env.memory()
+			testMem := make([]byte, len(mem))
+			for i := 0; i < len(mem); i++ {
+				mem[i] = byte(i)
+				testMem[i] = byte(i)
+			}
+
+			compiler, _ := newCompiler(&wazeroir.CompilationResult{HasMemory: true, Signature: &wasm.FunctionType{}})
+			err := compiler.compilePreamble()
+			requireNoError(b, err)
+
+			var startOffset uint32 = 100
+			var value uint8 = 5
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: startOffset})
+			requireNoError(b, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(value)})
+			requireNoError(b, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: size})
+			requireNoError(b, err)
+			err = compiler.compileMemoryFill()
+			requireNoError(b, err)
+			err = compiler.(compilerImpl).compileReturnFunction()
+			requireNoError(b, err)
+			code, _, err := compiler.compile()
+			requireNoError(b, err)
+
+			env.execBench(b, code)
+
+			for i := startOffset; i < startOffset+size; i++ {
+				testMem[i] = value
+			}
+			if !bytes.Equal(mem, testMem) {
+				b.FailNow()
+			}
+		})
+	}
+}
+
 func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
 	f := j.newFunctionFrame(codeSegment)
 

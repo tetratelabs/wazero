@@ -445,6 +445,7 @@ func TestAssemblerImpl_encodeNoneToNone(t *testing.T) {
 		{inst: NOP, exp: nil},
 		{inst: RET, exp: []byte{0xc3}},
 		{inst: REPMOVSQ, exp: []byte{0xf3, RexPrefixW, 0xa5}},
+		{inst: REPSTOSQ, exp: []byte{0xf3, RexPrefixW, 0xab}},
 		{inst: STD, exp: []byte{0xfd}},
 		{inst: CLD, exp: []byte{0xfc}},
 	}
