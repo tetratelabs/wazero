@@ -411,12 +411,14 @@ var fdRead = wasm.NewGoFunc(
 			if errors.Is(err, io.EOF) {
 				break
 			} else if err != nil {
-				if n != 0 { // Let callers process the n > 0 bytes returned before considering the error err.
-					break
+				// See "Why ignore the error returned by io.Reader when n > 1?"
+				// in /RATIONALE.md
+				if n != 0 {
+					break // Allow the caller to process the bytes.
 				}
 				return ErrnoIo
-			} else if n < len(b) { // Partial read, don't read into the next buffer.
-				break
+			} else if n < len(b) {
+				break // Partial read, don't read into the next buffer.
 			}
 		}
 		if !mod.Memory().WriteUint32Le(ctx, resultSize, nread) {

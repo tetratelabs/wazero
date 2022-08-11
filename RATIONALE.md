@@ -441,6 +441,36 @@ See
 * https://github.com/golang/go/blob/go1.19rc2/src/syscall/fs_js.go#L324
 * https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
 
+### Why ignore the error returned by io.Reader when n > 1?
+
+Per https://pkg.go.dev/io#Reader, if we receive an error, any bytes read should
+be processed first. At the syscall abstraction (`fd_read`), the caller is the
+processor, so we can't process the bytes inline and also return the error (as
+`EIO`).
+
+Let's assume we want to return the bytes read on error to the caller. This
+implies we at least temporarily ignore the error alongside them. The choice
+remaining is whether to persist the error returned with the read until a
+possible next call, or ignore the error.
+
+If we persist an error returned, it would be coupled to a file descriptor, but
+effectively it is boolean as this case coerces to `EIO`. If we track a "last
+error" on a file descriptor, it could be complicated for a couple reasons
+including whether the error is transient or permanent, or if the error would
+apply to any FD operation, or just read. Finally, there may never be a
+subsequent error as perhaps the bytes leading up to the error are enough to
+satisfy the processor.
+
+This decision boils down to whether or not to track an error bit per file
+descriptor or not. If not, the assumption is that a subsequent operation would
+also error, this time without reading any bytes.
+
+The current opinion is to go with the simplest path, which is to return the
+bytes read and ignore the error the there were any. Assume a subsequent
+operation will err if it needs to. This helps reduce the complexity of the code
+in wazero and also accommodates the scenario where the bytes read are enough to
+satisfy its processor.
+
 ### FdPrestatDirName
 
 `FdPrestatDirName` is a WASI function to return the path of the pre-opened directory of a file descriptor.
