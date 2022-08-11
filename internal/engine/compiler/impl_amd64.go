@@ -4357,9 +4357,12 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 		inst = amd64.MOVDQU
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be be loaded to a register along with V128Lo")
-	default:
+	case runtimeValueTypeI32, runtimeValueTypeF32:
+		inst = amd64.MOVL
+	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
 	}
+
 	// Copy the value from the stack.
 	c.assembler.CompileMemoryToRegister(inst,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
@@ -4893,7 +4896,9 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 		inst = amd64.MOVDQU
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be released to the stack along with V128Lo")
-	default:
+	case runtimeValueTypeI32, runtimeValueTypeF32:
+		inst = amd64.MOVL
+	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
 	}
 
