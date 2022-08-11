@@ -527,6 +527,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					require.NoError(t, err)
 
 					x1 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+					x1.valueType = runtimeValueTypeI64
 					env.stack()[x1.stackPointer] = x1Value
 					if tc.x1OnRegister {
 						err = compiler.compileEnsureOnRegister(x1)
@@ -534,6 +535,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					}
 
 					x2 := compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
+					x2.valueType = runtimeValueTypeI64
 					env.stack()[x2.stackPointer] = x2Value
 					if tc.x2OnRegister {
 						err = compiler.compileEnsureOnRegister(x2)
