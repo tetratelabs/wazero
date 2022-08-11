@@ -26,19 +26,25 @@ pub fn _greeting(name: []const u8) ![]u8 {
 }
 
 // _greet prints a greeting to the console.
-pub fn _greet(name: []const u8) void {
-    const s = std.fmt.allocPrint(
+pub fn _greet(name: []const u8) !void {
+    const s = try std.fmt.allocPrint(
         allocator,
         "wasm >> {s}",
         .{name},
-    ) catch unreachable;
+    );
     _log(s);
 }
 
 // greet is a WebAssembly export that accepts a string pointer (linear memory offset) and calls greet.
 pub export fn greet(message: [*]const u8, size: u32) void {
-    const name = _greeting(message[0..size]) catch unreachable;
-    _greet(name);
+    const name = _greeting(message[0..size]) catch |err| @panic(switch (err) {
+        error.OutOfMemory => "out of memory",
+        else => "unexpected error",
+    });
+    _greet(name) catch |err| @panic(switch (err) {
+        error.OutOfMemory => "out of memory",
+        else => "unexpected error",
+    });
 }
 
 // greeting is a WebAssembly export that accepts a string pointer (linear memory
