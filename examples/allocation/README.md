@@ -14,11 +14,12 @@ for binary serialization.
 
 * [Rust](rust) - Calls Wasm built with `cargo build --release --target wasm32-unknown-unknown`
 * [TinyGo](tinygo) - Calls Wasm built with `tinygo build -o X.wasm -scheduler=none --no-debug -target=wasi X.go`
+* [Zig](zig) - Calls Wasm built with `zig build`
 
 Note: Each of the above languages differ in both terms of exports and runtime
 behavior around allocation, because there is no WebAssembly specification for
-it. For example, TinyGo exports allocation functions while Rust does not. Also,
-Rust eagerly collects memory before returning from a Wasm function while TinyGo
+it. For example, TinyGo exports allocation functions while Rust and Zig don't.
+Also, Rust eagerly collects memory before returning from a Wasm function while TinyGo
 does not.
 
 We still try to keep the examples as close to the same as possible, and
