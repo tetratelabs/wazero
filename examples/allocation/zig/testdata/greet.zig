@@ -1,11 +1,6 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 
-// main is required for Zig to compile to enable WASI.
-pub fn main() anyerror!void {
-    return;
-}
-
 extern "env" fn log(ptr: [*]const u8, size: u32) void;
 
 // _log prints a message to the console using log.
@@ -32,11 +27,10 @@ pub fn _greeting(name: []const u8) ![]u8 {
 
 // _greet prints a greeting to the console.
 pub fn _greet(name: []const u8) void {
-    const g = _greeting(name);
     const s = std.fmt.allocPrint(
         allocator,
         "wasm >> {s}",
-        .{g},
+        .{name},
     ) catch unreachable;
     _log(s);
 }

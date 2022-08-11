@@ -10,8 +10,6 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/sys"
-	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 // greetWasm was compiled using `zig build`
@@ -48,12 +46,6 @@ func run() error {
 		return err
 	}
 
-	// Note: testdata/greet.zig doesn't use WASI, but Zig needs it to
-	// implement functions such as panic.
-	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		return err
-	}
-
 	// Instantiate a WebAssembly module that imports the "log" function defined
 	// in "env" and exports "memory" and functions we'll use in this example.
 	compiled, err := r.CompileModule(ctx, greetWasm, wazero.NewCompileConfig())
@@ -62,7 +54,7 @@ func run() error {
 	}
 
 	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithStdout(os.Stdout).WithStderr(os.Stderr))
-	if err != nil && isFailureExit(err) {
+	if err != nil {
 		return err
 	}
 
@@ -81,7 +73,7 @@ func run() error {
 	// there is nothing string-specific in this allocation function. The same
 	// function could be used to pass binary serialized data to Wasm.
 	results, err := malloc.Call(ctx, nameSize)
-	if err != nil && isFailureExit(err) {
+	if err != nil {
 		return err
 	}
 	namePtr := results[0]
@@ -99,14 +91,14 @@ func run() error {
 
 	// Now, we can call "greet", which reads the string we wrote to memory!
 	_, err = greet.Call(ctx, namePtr, nameSize)
-	if err != nil && isFailureExit(err) {
+	if err != nil {
 		return err
 	}
 
 	// Finally, we get the greeting message "greet" printed. This shows how to
 	// read-back something allocated by Zig.
 	ptrSize, err := greeting.Call(ctx, namePtr, nameSize)
-	if err != nil && isFailureExit(err) {
+	if err != nil {
 		return err
 	}
 
@@ -121,16 +113,6 @@ func run() error {
 	}
 
 	return nil
-}
-
-// Looks like Zig exits the module after calling each exported function
-// regardless of whether there was an error. We need to handle exit code 0
-// so that the subsequent functions can be called.
-func isFailureExit(err error) bool {
-	if exitErr, ok := err.(*sys.ExitError); !ok || exitErr.ExitCode() != 0 {
-		return true
-	}
-	return false
 }
 
 func logString(ctx context.Context, m api.Module, offset, byteCount uint32) {

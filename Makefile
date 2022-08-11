@@ -51,7 +51,7 @@ build.examples.zig: examples/allocation/zig/testdata/greet.wasm
 
 %.wasm: %.zig
 	@(cd $(@D); zig build)
-	@mv $(@D)/zig-out/bin/$(@F) $(@D)
+	@mv $(@D)/zig-out/lib/$(@F) $(@D)
 
 tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go)
 .PHONY: build.examples.tinygo
