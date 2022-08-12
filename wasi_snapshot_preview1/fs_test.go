@@ -615,6 +615,91 @@ func Test_fdRead_Errors(t *testing.T) {
 	}
 }
 
+func Test_fdRead_shouldContinueRead(t *testing.T) {
+	tests := []struct {
+		name          string
+		n, l          uint32
+		err           error
+		expectedOk    bool
+		expectedErrno Errno
+	}{
+		{
+			name: "break when nothing to read",
+			n:    0,
+			l:    0,
+		},
+		{
+			name: "break when nothing read",
+			n:    0,
+			l:    4,
+		},
+		{
+			name: "break on partial read",
+			n:    3,
+			l:    4,
+		},
+		{
+			name:       "continue on full read",
+			n:          4,
+			l:          4,
+			expectedOk: true,
+		},
+		{
+			name: "break on EOF on nothing to read",
+			err:  io.EOF,
+		},
+		{
+			name: "break on EOF on nothing read",
+			l:    4,
+			err:  io.EOF,
+		},
+		{
+			name: "break on EOF on partial read",
+			n:    3,
+			l:    4,
+			err:  io.EOF,
+		},
+		{
+			name: "break on EOF on full read",
+			n:    4,
+			l:    4,
+			err:  io.EOF,
+		},
+		{
+			name:          "return ErrnoIo on error on nothing to read",
+			err:           io.ErrClosedPipe,
+			expectedErrno: ErrnoIo,
+		},
+		{
+			name:          "return ErrnoIo on error on nothing read",
+			l:             4,
+			err:           io.ErrClosedPipe,
+			expectedErrno: ErrnoIo,
+		},
+		{ // Special case, allows processing data before err
+			name: "break on error on partial read",
+			n:    3,
+			l:    4,
+			err:  io.ErrClosedPipe,
+		},
+		{ // Special case, allows processing data before err
+			name: "break on error on full read",
+			n:    4,
+			l:    4,
+			err:  io.ErrClosedPipe,
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ok, errno := fdRead_shouldContinueRead(tc.n, tc.l, tc.err)
+			require.Equal(t, tc.expectedOk, ok)
+			require.Equal(t, tc.expectedErrno, errno)
+		})
+	}
+}
+
 // Test_fdReaddir only tests it is stubbed for GrainLang per #271
 func Test_fdReaddir(t *testing.T) {
 	log := requireErrnoNosys(t, functionFdReaddir, 0, 0, 0, 0, 0)
