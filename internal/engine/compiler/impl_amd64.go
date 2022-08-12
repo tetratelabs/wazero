@@ -274,19 +274,23 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
 	var vt runtimeValueType
-	var inst = amd64.MOVQ
+	var inst asm.Instruction
 	switch c.ir.Globals[o.Index].ValType {
 	case wasm.ValueTypeI32:
+		inst = amd64.MOVL
 		vt = runtimeValueTypeI32
 	case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		inst = amd64.MOVQ
 		vt = runtimeValueTypeI64
 	case wasm.ValueTypeF32:
+		inst = amd64.MOVL
 		vt = runtimeValueTypeF32
 		valueReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
 	case wasm.ValueTypeF64:
+		inst = amd64.MOVQ
 		vt = runtimeValueTypeF64
 		valueReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
@@ -344,9 +348,13 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
 
 	// Now ready to write the value to the global instance location.
-	inst := amd64.MOVQ
+	var inst asm.Instruction
 	if isV128 {
 		inst = amd64.MOVDQU
+	} else if wasmValueType == wasm.ValueTypeI32 || wasmValueType == wasm.ValueTypeF32 {
+		inst = amd64.MOVL
+	} else {
+		inst = amd64.MOVQ
 	}
 	c.assembler.CompileRegisterToMemory(inst, val.register, intReg, globalInstanceValueOffset)
 
@@ -477,9 +485,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		amd64LabelInfo := c.label(elseLabelKey)
-		if amd64LabelInfo.initialStack == nil {
-			amd64LabelInfo.initialStack = c.locationStack
+		labelInfo := c.label(elseLabelKey)
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
@@ -507,9 +515,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		amd64LabelInfo := c.label(thenLabelKey)
-		if amd64LabelInfo.initialStack == nil {
-			amd64LabelInfo.initialStack = c.locationStack
+		labelInfo := c.label(thenLabelKey)
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
@@ -656,10 +664,10 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	labelKey := o.Label.String()
-	amd64LabelInfo := c.label(labelKey)
+	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if amd64LabelInfo.initialStack == nil {
+	if labelInfo.initialStack == nil {
 		skipLabel = true
 		c.currentLabel = ""
 		return
@@ -670,19 +678,19 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	amd64LabelInfo.initialInstruction = labelBegin
+	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.setLocationStack(amd64LabelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
-	for _, cb := range amd64LabelInfo.labelBeginningCallbacks {
+	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
 
 	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
-	amd64LabelInfo.labelBeginningCallbacks = nil
+	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
@@ -948,16 +956,22 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	}
 
 	if pickTarget.onRegister() {
+		var inst asm.Instruction
 		if o.IsTargetVector {
-			c.assembler.CompileRegisterToRegister(amd64.MOVDQU, pickTarget.register, reg)
+			inst = amd64.MOVDQU
+		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
+			inst = amd64.MOVL
 		} else {
-			c.assembler.CompileRegisterToRegister(amd64.MOVQ, pickTarget.register, reg)
+			inst = amd64.MOVQ
 		}
+		c.assembler.CompileRegisterToRegister(inst, pickTarget.register, reg)
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
 		var inst asm.Instruction
 		if o.IsTargetVector {
 			inst = amd64.MOVDQU
+		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
+			inst = amd64.MOVL
 		} else {
 			inst = amd64.MOVQ
 		}
@@ -1731,7 +1745,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
 func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnRegister(target); err != nil {
+	if err = c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -2017,6 +2031,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 		return err
 	}
 	c.assembler.CompileRegisterToRegister(amd64.MOVL, target.register, target.register)
+	target.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -4201,7 +4216,8 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 	}
 
 	// Then, the previous length was pushed as the result.
-	c.locationStack.pushRuntimeValueLocationOnStack()
+	loc := c.locationStack.pushRuntimeValueLocationOnStack()
+	loc.valueType = runtimeValueTypeI32
 
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerInitialization()
