@@ -1501,6 +1501,7 @@ var registerToRegisterMOVOpcodes = map[asm.Instruction]struct {
 		// https://www.felixcloutier.com/x86/movd:movq
 		i2f: registerToRegisterMOVOpcode{opcode: []byte{0x0f, 0x6e}, mandatoryPrefix: 0x66, srcOnModRMReg: false},
 		f2i: registerToRegisterMOVOpcode{opcode: []byte{0x0f, 0x7e}, mandatoryPrefix: 0x66, srcOnModRMReg: true},
+		f2f: registerToRegisterMOVOpcode{opcode: []byte{0x0f, 0x7e}, mandatoryPrefix: 0x66},
 	},
 	MOVQ: {
 		// https://www.felixcloutier.com/x86/mov
@@ -1521,9 +1522,6 @@ func (a *AssemblerImpl) encodeRegisterToRegister(n *nodeImpl) (err error) {
 		var opcode registerToRegisterMOVOpcode
 		srcIsFloat, dstIsFloat := IsVectorRegister(n.srcReg), IsVectorRegister(n.dstReg)
 		if srcIsFloat && dstIsFloat {
-			if inst == MOVL {
-				return errors.New("MOVL for float to float is undefined")
-			}
 			opcode = op.f2f
 		} else if srcIsFloat && !dstIsFloat {
 			opcode = op.f2i
