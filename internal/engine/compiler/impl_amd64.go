@@ -274,19 +274,23 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
 	var vt runtimeValueType
-	var inst = amd64.MOVQ
+	var inst asm.Instruction
 	switch c.ir.Globals[o.Index].ValType {
 	case wasm.ValueTypeI32:
+		inst = amd64.MOVL
 		vt = runtimeValueTypeI32
 	case wasm.ValueTypeI64, wasm.ValueTypeExternref, wasm.ValueTypeFuncref:
+		inst = amd64.MOVQ
 		vt = runtimeValueTypeI64
 	case wasm.ValueTypeF32:
+		inst = amd64.MOVL
 		vt = runtimeValueTypeF32
 		valueReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
 			return err
 		}
 	case wasm.ValueTypeF64:
+		inst = amd64.MOVQ
 		vt = runtimeValueTypeF64
 		valueReg, err = c.allocateRegister(registerTypeVector)
 		if err != nil {
@@ -299,6 +303,8 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		if err != nil {
 			return err
 		}
+	default:
+		panic("BUG: unknown runtime value type")
 	}
 
 	// Using the register holding the pointer to the target instance, move its value into a register.
@@ -344,9 +350,13 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
 
 	// Now ready to write the value to the global instance location.
-	inst := amd64.MOVQ
+	var inst asm.Instruction
 	if isV128 {
 		inst = amd64.MOVDQU
+	} else if wasmValueType == wasm.ValueTypeI32 || wasmValueType == wasm.ValueTypeF32 {
+		inst = amd64.MOVL
+	} else {
+		inst = amd64.MOVQ
 	}
 	c.assembler.CompileRegisterToMemory(inst, val.register, intReg, globalInstanceValueOffset)
 
@@ -477,9 +487,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		amd64LabelInfo := c.label(elseLabelKey)
-		if amd64LabelInfo.initialStack == nil {
-			amd64LabelInfo.initialStack = c.locationStack
+		labelInfo := c.label(elseLabelKey)
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
@@ -507,9 +517,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		amd64LabelInfo := c.label(thenLabelKey)
-		if amd64LabelInfo.initialStack == nil {
-			amd64LabelInfo.initialStack = c.locationStack
+		labelInfo := c.label(thenLabelKey)
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
@@ -656,10 +666,10 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	labelKey := o.Label.String()
-	amd64LabelInfo := c.label(labelKey)
+	labelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if amd64LabelInfo.initialStack == nil {
+	if labelInfo.initialStack == nil {
 		skipLabel = true
 		c.currentLabel = ""
 		return
@@ -670,19 +680,19 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	amd64LabelInfo.initialInstruction = labelBegin
+	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.setLocationStack(amd64LabelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
-	for _, cb := range amd64LabelInfo.labelBeginningCallbacks {
+	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
 
 	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
-	amd64LabelInfo.labelBeginningCallbacks = nil
+	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
@@ -948,16 +958,22 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	}
 
 	if pickTarget.onRegister() {
+		var inst asm.Instruction
 		if o.IsTargetVector {
-			c.assembler.CompileRegisterToRegister(amd64.MOVDQU, pickTarget.register, reg)
+			inst = amd64.MOVDQU
+		} else if pickTarget.valueType == runtimeValueTypeI32 { // amd64 cannot copy single-precisions between registers.
+			inst = amd64.MOVL
 		} else {
-			c.assembler.CompileRegisterToRegister(amd64.MOVQ, pickTarget.register, reg)
+			inst = amd64.MOVQ
 		}
+		c.assembler.CompileRegisterToRegister(inst, pickTarget.register, reg)
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
 		var inst asm.Instruction
 		if o.IsTargetVector {
 			inst = amd64.MOVDQU
+		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
+			inst = amd64.MOVL
 		} else {
 			inst = amd64.MOVQ
 		}
@@ -1731,7 +1747,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
 func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
-	if err := c.compileEnsureOnRegister(target); err != nil {
+	if err = c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
@@ -2017,6 +2033,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 		return err
 	}
 	c.assembler.CompileRegisterToRegister(amd64.MOVL, target.register, target.register)
+	target.valueType = runtimeValueTypeI32
 	return nil
 }
 
@@ -2756,6 +2773,7 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	}
 
 	c.assembler.CompileRegisterToRegister(amd64.CVTSD2SS, target.register, target.register)
+	target.valueType = runtimeValueTypeF32
 	return nil
 }
 
@@ -2767,6 +2785,7 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	}
 
 	c.assembler.CompileRegisterToRegister(amd64.CVTSS2SD, target.register, target.register)
+	target.valueType = runtimeValueTypeF64
 	return nil
 }
 
@@ -2818,41 +2837,42 @@ func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	} else {
 		inst = amd64.MOVL
 	}
-	return c.compileExtendImpl(inst)
+	return c.compileExtendImpl(inst, runtimeValueTypeI64)
 }
 
 // compileSignExtend32From8 implements compiler.compileSignExtend32From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From8() error {
-	return c.compileExtendImpl(amd64.MOVBLSX)
+	return c.compileExtendImpl(amd64.MOVBLSX, runtimeValueTypeI32)
 }
 
 // compileSignExtend32From16 implements compiler.compileSignExtend32From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From16() error {
-	return c.compileExtendImpl(amd64.MOVWLSX)
+	return c.compileExtendImpl(amd64.MOVWLSX, runtimeValueTypeI32)
 }
 
 // compileSignExtend64From8 implements compiler.compileSignExtend64From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From8() error {
-	return c.compileExtendImpl(amd64.MOVBQSX)
+	return c.compileExtendImpl(amd64.MOVBQSX, runtimeValueTypeI64)
 }
 
 // compileSignExtend64From16 implements compiler.compileSignExtend64From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From16() error {
-	return c.compileExtendImpl(amd64.MOVWQSX)
+	return c.compileExtendImpl(amd64.MOVWQSX, runtimeValueTypeI64)
 }
 
 // compileSignExtend64From32 implements compiler.compileSignExtend64From32 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From32() error {
-	return c.compileExtendImpl(amd64.MOVLQSX)
+	return c.compileExtendImpl(amd64.MOVLQSX, runtimeValueTypeI64)
 }
 
-func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction) error {
+func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction, destinationType runtimeValueType) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnRegister(target); err != nil {
 		return err
 	}
 
 	c.assembler.CompileRegisterToRegister(inst, target.register, target.register)
+	target.valueType = destinationType
 	return nil
 }
 
@@ -4198,7 +4218,8 @@ func (c *amd64Compiler) compileTableGrow(o *wazeroir.OperationTableGrow) error {
 	}
 
 	// Then, the previous length was pushed as the result.
-	c.locationStack.pushRuntimeValueLocationOnStack()
+	loc := c.locationStack.pushRuntimeValueLocationOnStack()
+	loc.valueType = runtimeValueTypeI32
 
 	// After return, we re-initialize reserved registers just like preamble of functions.
 	c.compileReservedStackBasePointerInitialization()
@@ -4335,7 +4356,7 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	if err != nil {
 		return err
 	}
-	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF32)
+	c.pushRuntimeValueLocationOnRegister(reg, runtimeValueTypeF64)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
@@ -4357,9 +4378,14 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 		inst = amd64.MOVDQU
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be be loaded to a register along with V128Lo")
-	default:
+	case runtimeValueTypeI32, runtimeValueTypeF32:
+		inst = amd64.MOVL
+	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
+	default:
+		panic("BUG: unknown runtime value type")
 	}
+
 	// Copy the value from the stack.
 	c.assembler.CompileMemoryToRegister(inst,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
@@ -4893,8 +4919,12 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 		inst = amd64.MOVDQU
 	case runtimeValueTypeV128Hi:
 		panic("BUG: V128Hi must be released to the stack along with V128Lo")
-	default:
+	case runtimeValueTypeI32, runtimeValueTypeF32:
+		inst = amd64.MOVL
+	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
+	default:
+		panic("BUG: unknown runtime value type")
 	}
 
 	c.assembler.CompileRegisterToMemory(inst, loc.register,
