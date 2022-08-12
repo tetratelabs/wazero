@@ -1362,12 +1362,11 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	if pickTarget.onRegister() { // Copy the value to the pickedRegister.
 		switch pickTarget.valueType {
 		case runtimeValueTypeI32:
-			c.assembler.CompileRegisterToRegister(arm64.MOVD, pickTarget.register, pickedRegister)
+			c.assembler.CompileRegisterToRegister(arm64.MOVW, pickTarget.register, pickedRegister)
 		case runtimeValueTypeI64:
 			c.assembler.CompileRegisterToRegister(arm64.MOVD, pickTarget.register, pickedRegister)
 		case runtimeValueTypeF32:
-			// TODO: use 32-bit mov.
-			c.assembler.CompileRegisterToRegister(arm64.FMOVD, pickTarget.register, pickedRegister)
+			c.assembler.CompileRegisterToRegister(arm64.FMOVS, pickTarget.register, pickedRegister)
 		case runtimeValueTypeF64:
 			c.assembler.CompileRegisterToRegister(arm64.FMOVD, pickTarget.register, pickedRegister)
 		case runtimeValueTypeV128Lo:
@@ -4003,15 +4002,13 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	switch loc.valueType {
 	case runtimeValueTypeI32:
-		// TODO: use 32-bit mov.
-		c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForStackBasePointerAddress,
+		c.assembler.CompileMemoryToRegister(arm64.LDRW, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeI64:
 		c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeF32:
-		// TODO: use 32-bit mov.
-		c.assembler.CompileMemoryToRegister(arm64.FLDRD, arm64ReservedRegisterForStackBasePointerAddress,
+		c.assembler.CompileMemoryToRegister(arm64.FLDRS, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeF64:
 		c.assembler.CompileMemoryToRegister(arm64.FLDRD, arm64ReservedRegisterForStackBasePointerAddress,
