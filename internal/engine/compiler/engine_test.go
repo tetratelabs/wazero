@@ -306,3 +306,22 @@ func TestEngine_Cachedcodes(t *testing.T) {
 	_, ok = e.getCodes(m)
 	require.False(t, ok)
 }
+
+func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
+	ce := &callEngine{
+		valueStack: []uint64{
+			0xff, // pseudo-ref
+			1,    // num
+			// Table Index = 0 (lower 32-bits), but the higher bits (32-63) are all sets,
+			// which happens if the previous value on that stack location was 64-bit wide.
+			0xffffffff << 32,
+		},
+		valueStackContext: valueStackContext{stackPointer: 3},
+	}
+
+	table := &wasm.TableInstance{References: []wasm.Reference{}, Min: 10}
+	ce.builtinFunctionTableGrow(context.Background(), []*wasm.TableInstance{table})
+
+	require.Equal(t, 1, len(table.References))
+	require.Equal(t, uintptr(0xff), table.References[0])
+}
