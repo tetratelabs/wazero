@@ -796,7 +796,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.M
 }
 
 func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wasm.TableInstance) {
-	tableIndex := ce.popValue()
+	tableIndex := uint32(ce.popValue())
 	table := tables[tableIndex] // verified not to be out of range by the func validation at compilation phase.
 	num := ce.popValue()
 	ref := ce.popValue()
