@@ -458,7 +458,7 @@ effectively it is boolean as this case coerces to `EIO`. If we track a "last
 error" on a file descriptor, it could be complicated for a couple reasons
 including whether the error is transient or permanent, or if the error would
 apply to any FD operation, or just read. Finally, there may never be a
-subsequent error as perhaps the bytes leading up to the error are enough to
+subsequent read as perhaps the bytes leading up to the error are enough to
 satisfy the processor.
 
 This decision boils down to whether or not to track an error bit per file

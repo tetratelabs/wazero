@@ -386,6 +386,7 @@ var fdRead = wasm.NewGoFunc(
 	[]string{"fd", "iovs", "iovs_len", "result.size"},
 	func(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) Errno {
 		sysCtx := mod.(*wasm.CallContext).Sys
+		mem := mod.Memory()
 		reader := internalsys.FdReader(ctx, sysCtx, fd)
 		if reader == nil {
 			return ErrnoBadf
@@ -394,39 +395,52 @@ var fdRead = wasm.NewGoFunc(
 		var nread uint32
 		for i := uint32(0); i < iovsCount; i++ {
 			iovPtr := iovs + i*8
-			offset, ok := mod.Memory().ReadUint32Le(ctx, iovPtr)
+			offset, ok := mem.ReadUint32Le(ctx, iovPtr)
 			if !ok {
 				return ErrnoFault
 			}
-			l, ok := mod.Memory().ReadUint32Le(ctx, iovPtr+4)
+			l, ok := mem.ReadUint32Le(ctx, iovPtr+4)
 			if !ok {
 				return ErrnoFault
 			}
-			b, ok := mod.Memory().Read(ctx, offset, l)
+			b, ok := mem.Read(ctx, offset, l)
 			if !ok {
 				return ErrnoFault
 			}
-			n, err := reader.Read(b) // Note: n <= l
+
+			n, err := reader.Read(b)
 			nread += uint32(n)
-			if errors.Is(err, io.EOF) {
+
+			shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
+			if errno != 0 {
+				return errno
+			} else if !shouldContinue {
 				break
-			} else if err != nil {
-				// See "Why ignore the error returned by io.Reader when n > 1?"
-				// in /RATIONALE.md
-				if n != 0 {
-					break // Allow the caller to process the bytes.
-				}
-				return ErrnoIo
-			} else if n < len(b) {
-				break // Partial read, don't read into the next buffer.
 			}
 		}
-		if !mod.Memory().WriteUint32Le(ctx, resultSize, nread) {
+		if !mem.WriteUint32Le(ctx, resultSize, nread) {
 			return ErrnoFault
 		}
 		return ErrnoSuccess
 	},
 )
+
+// fdRead_shouldContinueRead decides whether to continue reading the next iovec
+// based on the amount read (n/l) and a possible error returned from io.Reader.
+//
+// Note: When there are both bytes read (n) and an error, this continues.
+// See /RATIONALE.md "Why ignore the error returned by io.Reader when n > 1?"
+func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
+	if errors.Is(err, io.EOF) {
+		return false, 0 // EOF isn't an error, and we shouldn't continue.
+	} else if err != nil && n == 0 {
+		return false, ErrnoIo
+	} else if err != nil {
+		return false, 0 // Allow the caller to process n bytes.
+	}
+	// Continue reading, unless there's a partial read or nothing to read.
+	return n == l && n != 0, 0
+}
 
 // fdReaddir is the WASI function named functionFdReaddir which reads directory
 // entries from a directory.
