@@ -303,6 +303,8 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		if err != nil {
 			return err
 		}
+	default:
+		panic("BUG: unknown runtime value type")
 	}
 
 	// Using the register holding the pointer to the target instance, move its value into a register.
@@ -4380,6 +4382,8 @@ func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocat
 		inst = amd64.MOVL
 	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
+	default:
+		panic("BUG: unknown runtime value type")
 	}
 
 	// Copy the value from the stack.
@@ -4919,6 +4923,8 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 		inst = amd64.MOVL
 	case runtimeValueTypeI64, runtimeValueTypeF64:
 		inst = amd64.MOVQ
+	default:
+		panic("BUG: unknown runtime value type")
 	}
 
 	c.assembler.CompileRegisterToMemory(inst, loc.register,
