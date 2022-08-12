@@ -959,7 +959,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		var inst asm.Instruction
 		if o.IsTargetVector {
 			inst = amd64.MOVDQU
-		} else if pickTarget.valueType == runtimeValueTypeI32 {
+		} else if pickTarget.valueType == runtimeValueTypeI32 { // amd64 cannot copy single-precisions between registers.
 			inst = amd64.MOVL
 		} else {
 			inst = amd64.MOVQ
@@ -970,7 +970,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		var inst asm.Instruction
 		if o.IsTargetVector {
 			inst = amd64.MOVDQU
-		} else if pickTarget.valueType == runtimeValueTypeI32 {
+		} else if pickTarget.valueType == runtimeValueTypeI32 || pickTarget.valueType == runtimeValueTypeF32 {
 			inst = amd64.MOVL
 		} else {
 			inst = amd64.MOVQ
