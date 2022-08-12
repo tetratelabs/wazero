@@ -606,6 +606,10 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 				n:      &nodeImpl{instruction: ADDL, types: operandTypesRegisterToRegister, srcReg: RegAX},
 				expErr: "invalid register [nil]",
 			},
+			{
+				n:      &nodeImpl{instruction: MOVL, types: operandTypesRegisterToRegister, srcReg: RegX0, dstReg: RegX1},
+				expErr: "MOVL for float to float is undefined",
+			},
 		}
 
 		for _, tc := range tests {
