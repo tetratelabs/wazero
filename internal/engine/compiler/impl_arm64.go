@@ -1362,12 +1362,11 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	if pickTarget.onRegister() { // Copy the value to the pickedRegister.
 		switch pickTarget.valueType {
 		case runtimeValueTypeI32:
-			c.assembler.CompileRegisterToRegister(arm64.MOVD, pickTarget.register, pickedRegister)
+			c.assembler.CompileRegisterToRegister(arm64.MOVW, pickTarget.register, pickedRegister)
 		case runtimeValueTypeI64:
 			c.assembler.CompileRegisterToRegister(arm64.MOVD, pickTarget.register, pickedRegister)
 		case runtimeValueTypeF32:
-			// TODO: use 32-bit mov.
-			c.assembler.CompileRegisterToRegister(arm64.FMOVD, pickTarget.register, pickedRegister)
+			c.assembler.CompileRegisterToRegister(arm64.FMOVS, pickTarget.register, pickedRegister)
 		case runtimeValueTypeF64:
 			c.assembler.CompileRegisterToRegister(arm64.FMOVD, pickTarget.register, pickedRegister)
 		case runtimeValueTypeV128Lo:
@@ -4003,15 +4002,13 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *runtimeValueLocation) {
 	switch loc.valueType {
 	case runtimeValueTypeI32:
-		// TODO: use 32-bit mov.
-		c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForStackBasePointerAddress,
+		c.assembler.CompileMemoryToRegister(arm64.LDRW, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeI64:
 		c.assembler.CompileMemoryToRegister(arm64.LDRD, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeF32:
-		// TODO: use 32-bit mov.
-		c.assembler.CompileMemoryToRegister(arm64.FLDRD, arm64ReservedRegisterForStackBasePointerAddress,
+		c.assembler.CompileMemoryToRegister(arm64.FLDRS, arm64ReservedRegisterForStackBasePointerAddress,
 			int64(loc.stackPointer)*8, loc.register)
 	case runtimeValueTypeF64:
 		c.assembler.CompileMemoryToRegister(arm64.FLDRD, arm64ReservedRegisterForStackBasePointerAddress,
@@ -4071,12 +4068,10 @@ func (c *arm64Compiler) compileReleaseAllRegistersToStack() (err error) {
 func (c *arm64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation) {
 	switch loc.valueType {
 	case runtimeValueTypeI32:
-		// Use 64-bit mov as all the values are represented as uint64 in Go, so we have to clear out the higher bits.
-		c.assembler.CompileRegisterToMemory(arm64.STRD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
+		c.assembler.CompileRegisterToMemory(arm64.STRW, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeI64:
 		c.assembler.CompileRegisterToMemory(arm64.STRD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF32:
-		// Use 64-bit mov as all the values are represented as uint64 in Go, so we have to clear out the higher bits.
 		c.assembler.CompileRegisterToMemory(arm64.FSTRS, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 	case runtimeValueTypeF64:
 		c.assembler.CompileRegisterToMemory(arm64.FSTRD, loc.register, arm64ReservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
