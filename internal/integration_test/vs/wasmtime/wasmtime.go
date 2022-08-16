@@ -1,4 +1,4 @@
-//go:build amd64 && cgo
+//go:build cgo
 
 package wasmtime
 
