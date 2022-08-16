@@ -1,4 +1,4 @@
-//go:build amd64 && cgo && !windows
+//go:build cgo && !windows
 
 package wasmer
 
