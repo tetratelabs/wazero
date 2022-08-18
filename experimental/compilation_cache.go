@@ -9,10 +9,15 @@ import (
 // WithCompilationCacheDirName configures the destination directory of the compilation cache.
 // Regardless of the usage of this, the compiled functions are cached in memory, but its lifetime is
 // bound to the lifetime of wazero.Runtime or wazero.CompiledModule.
-// With the given non-empty directory, wazero persists the cache into the directory and that caches
+//
+// With the given non-empty directory, wazero persists the cache into the directory and that cache
 // will be used as long as the running wazero version match the version of compilation wazero.
 //
-// Note: this is an experimental, and currently no validation on cache is applied.
+// A cache is only valid for use in one wazero.Runtime at a time. Concurrent use
+// of a wazero.Runtime is supported, but multiple runtimes must not share the
+// same directory.
+//
+// Note: The embedder must safeguard this directory from external changes.
 //
 // Usage:
 //

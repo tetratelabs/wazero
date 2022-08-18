@@ -28,11 +28,13 @@ type Cache interface {
 	// their own validation phases. For example, sign the binary passed to Add, and
 	// verify the signature of the stored cache before returning it via Get, etc.
 	Get(key Key) (content io.ReadCloser, ok bool, err error)
+	//
 	// Add is called when the runtime is trying to add the new cache entry.
 	// The given `content` must be un-modified, and returned as-is in Get method.
 	//
 	// Note: the `content` is ensured to be safe through the validation phase applied on the Wasm binary.
 	Add(key Key, content io.Reader) (err error)
+	//
 	// Delete is called when the cache on the `key` returned by Get is no longer usable, and
 	// must be purged. Specifically, this is called happens when the wazero's version has been changed.
 	// For example, that is when there's a difference between the version of compiling wazero and the
