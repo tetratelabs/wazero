@@ -10,7 +10,8 @@ import (
 	"sync"
 )
 
-// FileCachePathKey is a context.Context Value key. It allows overriding fs.FS for WASI.
+// FileCachePathKey is a context.Context Value key. Its value is a string
+// representing the compilation cache directory.
 type FileCachePathKey struct{}
 
 // NewFileCache returns a new Cache implemented by fileCache.
@@ -25,7 +26,7 @@ func newFileCache(dir string) *fileCache {
 	return &fileCache{dirPath: dir}
 }
 
-// fileCache is an example implementation of Cache which writes/reads cache into/from the fileCache.dirPath.
+// fileCache persists compiled functions into dirPath.
 //
 // Note: this can be expanded to do binary signing/verification, set TTL on each entry, etc.
 type fileCache struct {
