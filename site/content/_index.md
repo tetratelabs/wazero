@@ -28,7 +28,7 @@ func main() {
 	}
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate the module and return its exported functions

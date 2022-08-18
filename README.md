@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate the module and return its exported functions
@@ -108,9 +108,9 @@ they may answer them for you!
 
 There are two runtime configurations supported in wazero: _Compiler_ is default:
 
-If you don't choose, ex `wazero.NewRuntime()`, Compiler is used if supported. You can also force the interpreter like so:
+If you don't choose, ex `wazero.NewRuntime(ctx)`, Compiler is used if supported. You can also force the interpreter like so:
 ```go
-r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 ```
 
 ### Interpreter
