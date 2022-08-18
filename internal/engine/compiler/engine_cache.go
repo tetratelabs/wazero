@@ -56,7 +56,7 @@ func (e *engine) addCodesToExternCache(module *wasm.Module, codes []*code) (err 
 	if e.externCache == nil {
 		return
 	}
-	err = e.externCache.Add(module.ID, serializeCodes(codes))
+	err = e.externCache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
 	return
 }
 
@@ -76,7 +76,7 @@ func (e *engine) getCodesFromExternCache(module *wasm.Module) (codes []*code, hi
 	// Otherwise, we hit the cache on external cache.
 	// We retrieve *code structures from `cached`.
 	var staleCache bool
-	codes, staleCache, err = deserializeCodes(cached)
+	codes, staleCache, err = deserializeCodes(e.wazeroVersion, cached)
 	if err != nil {
 		hit = false
 		return
@@ -94,18 +94,17 @@ func (e *engine) getCodesFromExternCache(module *wasm.Module) (codes []*code, hi
 var (
 	wazeroMagic = "WAZERO"
 	// version must be synced with the tag of the wazero library.
-	version         = "1.0.0-dev"
-	cacheHeaderSize = len(wazeroMagic) + 1 /* version size */ + len(version) + 4 /* number of functions */
+
 )
 
-func serializeCodes(codes []*code) io.Reader {
+func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	buf := bytes.NewBuffer(nil)
 	// First 6 byte: WAZERO header.
 	buf.WriteString(wazeroMagic)
 	// Next 1 byte: length of version:
-	buf.WriteByte(byte(len(version)))
+	buf.WriteByte(byte(len(wazeroVersion)))
 	// Version of wazero.
-	buf.WriteString(version)
+	buf.WriteString(wazeroVersion)
 	// Number of *code (== locally defined functions in the module): 4 bytes.
 	buf.Write(u32.LeBytes(uint32(len(codes))))
 	for _, c := range codes {
@@ -119,7 +118,9 @@ func serializeCodes(codes []*code) io.Reader {
 	return bytes.NewReader(buf.Bytes())
 }
 
-func deserializeCodes(reader io.Reader) (codes []*code, staleCache bool, err error) {
+func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, staleCache bool, err error) {
+	cacheHeaderSize := len(wazeroMagic) + 1 /* version size */ + len(wazeroVersion) + 4 /* number of functions */
+
 	// Read the header before the native code.
 	header := make([]byte, cacheHeaderSize)
 	n, err := reader.Read(header)
@@ -133,8 +134,12 @@ func deserializeCodes(reader io.Reader) (codes []*code, staleCache bool, err err
 
 	// Check the version compatibility.
 	versionSize := int(header[len(wazeroMagic)])
-	cachedVersion := string(header[len(wazeroMagic)+1 : len(wazeroMagic)+1+versionSize])
-	if cachedVersion != version {
+
+	cachedVersionBegin, cachedVersionEnd := len(wazeroMagic)+1, len(wazeroMagic)+1+versionSize
+	if cachedVersionEnd >= len(header) {
+		staleCache = true
+		return
+	} else if cachedVersion := string(header[cachedVersionBegin:cachedVersionEnd]); cachedVersion != wazeroVersion {
 		staleCache = true
 		return
 	}

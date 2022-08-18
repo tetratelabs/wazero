@@ -12,6 +12,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+var testVersion string
+
 func concat(ins ...[]byte) (ret []byte) {
 	for _, in := range ins {
 		ret = append(ret, in...)
@@ -28,8 +30,8 @@ func TestSerializeCodes(t *testing.T) {
 			in: []*code{{stackPointerCeil: 12345, codeSegment: []byte{1, 2, 3, 4, 5}}},
 			exp: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
@@ -43,8 +45,8 @@ func TestSerializeCodes(t *testing.T) {
 			},
 			exp: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -59,7 +61,7 @@ func TestSerializeCodes(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		actual, err := io.ReadAll(serializeCodes(tc.in))
+		actual, err := io.ReadAll(serializeCodes(testVersion, tc.in))
 		require.NoError(t, err, i)
 		require.Equal(t, tc.exp, actual, i)
 	}
@@ -91,11 +93,22 @@ func TestDeserializeCodes(t *testing.T) {
 			expStaleCache: true,
 		},
 		{
+
+			name: "version mismatch",
+			in: concat(
+				[]byte(wazeroMagic),
+				[]byte{byte(len("1"))},
+				[]byte("1"),
+				u32.LeBytes(1), // number of functions.
+			),
+			expStaleCache: true,
+		},
+		{
 			name: "one function",
 			in: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(1),        // number of functions.
 				u64.LeBytes(12345),    // stack pointer ceil.
 				u64.LeBytes(5),        // length of code.
@@ -111,8 +124,8 @@ func TestDeserializeCodes(t *testing.T) {
 			name: "two functions",
 			in: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -134,8 +147,8 @@ func TestDeserializeCodes(t *testing.T) {
 			name: "reading stack pointer",
 			in: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -149,8 +162,8 @@ func TestDeserializeCodes(t *testing.T) {
 			name: "reading native code size",
 			in: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -165,8 +178,8 @@ func TestDeserializeCodes(t *testing.T) {
 			name: "mmapping",
 			in: concat(
 				[]byte(wazeroMagic),
-				[]byte{byte(len(version))},
-				[]byte(version),
+				[]byte{byte(len(testVersion))},
+				[]byte(testVersion),
 				u32.LeBytes(2), // number of functions.
 				// Function index = 0.
 				u64.LeBytes(12345),    // stack pointer ceil.
@@ -184,7 +197,7 @@ func TestDeserializeCodes(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			codes, staleCache, err := deserializeCodes(bytes.NewReader(tc.in))
+			codes, staleCache, err := deserializeCodes(testVersion, bytes.NewReader(tc.in))
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
@@ -237,8 +250,8 @@ func TestEngine_getCodesFromExternCache(t *testing.T) {
 			ext: &testExternCache{caches: map[wasm.ModuleID][]byte{
 				{}: concat(
 					[]byte(wazeroMagic),
-					[]byte{byte(len(version))},
-					[]byte(version),
+					[]byte{byte(len(testVersion))},
+					[]byte(testVersion),
 					u32.LeBytes(2), // number of functions.
 					// Function index = 0.
 					u64.LeBytes(12345),    // stack pointer ceil.
@@ -306,8 +319,8 @@ func TestEngine_addCodesToExternCache(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, concat(
 			[]byte(wazeroMagic),
-			[]byte{byte(len(version))},
-			[]byte(version),
+			[]byte{byte(len(testVersion))},
+			[]byte(testVersion),
 			u32.LeBytes(1),   // number of functions.
 			u64.LeBytes(123), // stack pointer ceil.
 			u64.LeBytes(3),   // length of code.

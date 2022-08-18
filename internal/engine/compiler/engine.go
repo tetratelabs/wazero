@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -26,7 +27,8 @@ type (
 		externCache     compilationcache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
-		setFinalizer func(obj interface{}, finalizer interface{})
+		setFinalizer  func(obj interface{}, finalizer interface{})
+		wazeroVersion string
 	}
 
 	// moduleEngine implements wasm.ModuleEngine
@@ -581,11 +583,16 @@ func NewEngine(ctx context.Context, enabledFeatures wasm.Features) wasm.Engine {
 }
 
 func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
+	var wazeroVersion string
+	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
+		wazeroVersion = v.(string)
+	}
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
 		externCache:     compilationcache.NewFileCache(ctx),
+		wazeroVersion:   wazeroVersion,
 	}
 }
 
