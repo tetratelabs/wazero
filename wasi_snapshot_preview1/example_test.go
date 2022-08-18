@@ -26,7 +26,7 @@ func Example() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 
 	// Instantiate WASI, which implements system I/O such as console output.
 	wm, err := Instantiate(ctx, r)

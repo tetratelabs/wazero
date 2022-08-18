@@ -25,7 +25,7 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a Go-defined module named "env" that exports a function to

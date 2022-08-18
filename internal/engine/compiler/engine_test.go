@@ -35,7 +35,7 @@ func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
 func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
-	return newEngine(enabledFeatures)
+	return newEngine(context.Background(), enabledFeatures)
 }
 
 // InitTables implements the same method as documented on enginetest.EngineTester.
@@ -187,7 +187,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 // See comments on initialValueStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := wasm.Features20191205
-	e := newEngine(enabledFeatures)
+	e := newEngine(context.Background(), enabledFeatures)
 	s, ns := wasm.NewStore(enabledFeatures, e)
 
 	const hostModuleName = "env"
@@ -286,7 +286,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 
 // TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and compiler
 func TestEngine_Cachedcodes(t *testing.T) {
-	e := newEngine(wasm.Features20191205)
+	e := newEngine(context.Background(), wasm.Features20191205)
 	exp := []*code{
 		{codeSegment: []byte{0x0}},
 		{codeSegment: []byte{0x0}},

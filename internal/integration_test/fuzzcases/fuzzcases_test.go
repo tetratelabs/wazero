@@ -28,7 +28,7 @@ func runWithCompiler(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) 
 		return
 	}
 	t.Run("compiler", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler().WithWasmCore2())
+		r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler().WithWasmCore2())
 		defer r.Close(ctx)
 		runner(t, r)
 	})
@@ -36,7 +36,7 @@ func runWithCompiler(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) 
 
 func runWithInterpreter(t *testing.T, runner func(t *testing.T, r wazero.Runtime)) {
 	t.Run("interpreter", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
+		r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
 		defer r.Close(ctx)
 		runner(t, r)
 	})

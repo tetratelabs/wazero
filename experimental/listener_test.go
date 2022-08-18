@@ -51,7 +51,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 
 	if platform.CompilerSupported() {
 		t.Run("fails on compile if compiler", func(t *testing.T) {
-			r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler())
+			r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 			defer r.Close(testCtx) // This closes everything this Runtime created.
 			_, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
 			require.EqualError(t, err,
@@ -59,7 +59,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 		})
 	}
 
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	_, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())

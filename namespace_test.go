@@ -9,7 +9,7 @@ import (
 
 // TestRuntime_Namespace ensures namespaces are independent.
 func TestRuntime_Namespace(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	// Compile a module to add to the runtime

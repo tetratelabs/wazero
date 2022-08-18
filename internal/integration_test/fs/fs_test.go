@@ -149,7 +149,7 @@ func (f *wasiFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func TestReader(t *testing.T) {
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)

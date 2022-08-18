@@ -120,14 +120,14 @@ type Runtime interface {
 }
 
 // NewRuntime returns a runtime with a configuration assigned by NewRuntimeConfig.
-func NewRuntime() Runtime {
-	return NewRuntimeWithConfig(NewRuntimeConfig())
+func NewRuntime(ctx context.Context) Runtime {
+	return NewRuntimeWithConfig(ctx, NewRuntimeConfig())
 }
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
-func NewRuntimeWithConfig(rConfig RuntimeConfig) Runtime {
+func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
-	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures))
+	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(ctx, config.enabledFeatures))
 	return &runtime{
 		store:           store,
 		ns:              &namespace{store: store, ns: ns},

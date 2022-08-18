@@ -360,7 +360,7 @@ func TestNewModuleBuilder_Compile(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			b := tc.input(NewRuntime()).(*moduleBuilder)
+			b := tc.input(NewRuntime(testCtx)).(*moduleBuilder)
 			compiled, err := b.Compile(testCtx, NewCompileConfig())
 			require.NoError(t, err)
 			m := compiled.(*compiledModule)
@@ -412,7 +412,7 @@ func TestNewModuleBuilder_Compile_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := tc.input(NewRuntime()).Compile(testCtx, tc.config)
+			_, e := tc.input(NewRuntime(testCtx)).Compile(testCtx, tc.config)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}
@@ -420,7 +420,7 @@ func TestNewModuleBuilder_Compile_Errors(t *testing.T) {
 
 // TestNewModuleBuilder_Instantiate ensures Runtime.InstantiateModule is called on success.
 func TestNewModuleBuilder_Instantiate(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	m, err := r.NewModuleBuilder("env").Instantiate(testCtx, r)
 	require.NoError(t, err)
 
@@ -434,7 +434,7 @@ func TestNewModuleBuilder_Instantiate(t *testing.T) {
 
 // TestNewModuleBuilder_Instantiate_Errors ensures errors propagate from Runtime.InstantiateModule
 func TestNewModuleBuilder_Instantiate_Errors(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	_, err := r.NewModuleBuilder("env").Instantiate(testCtx, r)
 	require.NoError(t, err)
 

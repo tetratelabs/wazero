@@ -42,7 +42,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		},
 	}
 
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	for _, tt := range tests {
@@ -123,7 +123,7 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 		},
 	}
 
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	for _, tt := range tests {
@@ -168,7 +168,7 @@ func TestModule_Memory(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntime()
+			r := NewRuntime(testCtx)
 			defer r.Close(testCtx)
 
 			// Instantiate the module and get the export of the above memory
@@ -239,7 +239,7 @@ func TestModule_Global(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntime().(*runtime)
+			r := NewRuntime(testCtx).(*runtime)
 			defer r.Close(testCtx)
 
 			var m CompiledModule
@@ -275,7 +275,7 @@ func TestModule_Global(t *testing.T) {
 }
 
 func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	// Define a function that will be set as the start function
@@ -318,7 +318,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 // TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't
 // export "_start".
 func TestRuntime_InstantiateModuleFromBinary_DoesntEnforce_Start(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	binary := binaryformat.EncodeModule(&wasm.Module{
@@ -355,7 +355,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntime()
+			r := NewRuntime(testCtx)
 			defer r.Close(testCtx)
 
 			start := func(context.Context) {
@@ -383,7 +383,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 // TestRuntime_InstantiateModule_WithName tests that we can pre-validate (cache) a module and instantiate it under
 // different names. This pattern is used in wapc-go.
 func TestRuntime_InstantiateModule_WithName(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	base, err := r.CompileModule(testCtx, binaryNamedZero, NewCompileConfig())
@@ -407,7 +407,7 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 }
 
 func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
-	r := NewRuntime()
+	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
 	start := func(ctx context.Context, m api.Module) {
@@ -463,7 +463,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewRuntime()
+			r := NewRuntime(testCtx)
 
 			code, err := r.CompileModule(testCtx, bin, NewCompileConfig())
 			require.NoError(t, err)
@@ -505,10 +505,10 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 	conf := *engineLessConfig
-	conf.newEngine = func(wasm.Features) wasm.Engine {
+	conf.newEngine = func(context.Context, wasm.Features) wasm.Engine {
 		return engine
 	}
-	r := NewRuntimeWithConfig(&conf)
+	r := NewRuntimeWithConfig(testCtx, &conf)
 	defer r.Close(testCtx)
 
 	// Normally compiled modules are closed when instantiated but this is never instantiated.

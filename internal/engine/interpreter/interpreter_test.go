@@ -83,7 +83,7 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 
 // NewEngine implements enginetest.EngineTester NewEngine.
 func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
-	return NewEngine(enabledFeatures)
+	return NewEngine(context.Background(), enabledFeatures)
 }
 
 // InitTables implements enginetest.EngineTester InitTables.

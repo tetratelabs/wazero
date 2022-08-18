@@ -32,7 +32,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 
 	wasiModuleCompiled, err := (&builder{r}).moduleBuilder().
 		Compile(ctx, wazero.NewCompileConfig())
@@ -61,7 +61,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx)
 
 	// Instantiate the wasi module.

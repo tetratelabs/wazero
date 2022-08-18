@@ -79,7 +79,7 @@ func (r *wazeroRuntime) log(ctx context.Context, m api.Module, offset, byteCount
 }
 
 func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err error) {
-	r.runtime = wazero.NewRuntimeWithConfig(r.config)
+	r.runtime = wazero.NewRuntimeWithConfig(ctx, r.config)
 	if cfg.LogFn != nil {
 		r.logFn = cfg.LogFn
 		if r.env, err = r.runtime.NewModuleBuilder("env").
