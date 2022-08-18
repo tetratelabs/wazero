@@ -2,7 +2,6 @@ package experimental_test
 
 import (
 	"context"
-	_ "embed"
 	"log"
 	"os"
 
@@ -19,10 +18,6 @@ func Example_withCompilationCacheDirName() {
 
 	// Append the directory into the context for configuration.
 	ctx := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
-
-	// Create a first runtime and compile a binary.
-	r := wazero.NewRuntime(ctx)
-	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Repeat newRuntimeCompileDestroy with the same cache directory.
 	newRuntimeCompileDestroy(ctx)
