@@ -7,6 +7,7 @@ package compiler
 // e.g. MOVQ will be given as amd64.MOVQ.
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"runtime"
@@ -191,10 +192,7 @@ func (c *amd64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(code)
-	if err != nil {
-		return
-	}
+	code, err = platform.MmapCodeSegment(bytes.NewReader(code), len(code))
 	return
 }
 

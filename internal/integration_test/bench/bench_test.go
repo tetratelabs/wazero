@@ -4,12 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"math/rand"
 	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
@@ -50,11 +52,40 @@ func BenchmarkInitialization(b *testing.B) {
 	}
 }
 
-func runInitializationBench(b *testing.B, r wazero.Runtime) {
+func BenchmarkCompilation(b *testing.B) {
+	if !platform.CompilerSupported() {
+		b.Skip()
+	}
+
+	// Note: recreate runtime each time in the loop to ensure that
+	// recompilation happens if the extern cache is not used.
+	b.Run("with extern cache", func(b *testing.B) {
+		extCache := compilationcache.NewFileCache(b.TempDir())
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler().WithExternCache(extCache))
+			runCompilation(b, r)
+		}
+	})
+	b.Run("without extern cache", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigCompiler())
+			runCompilation(b, r)
+		}
+	})
+}
+
+func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
 	compiled, err := r.CompileModule(testCtx, caseWasm, wazero.NewCompileConfig())
 	if err != nil {
 		b.Fatal(err)
 	}
+	return compiled
+}
+
+func runInitializationBench(b *testing.B, r wazero.Runtime) {
+	compiled := runCompilation(b, r)
 	defer compiled.Close(testCtx)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

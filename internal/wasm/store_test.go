@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"math"
 	"strconv"
 	"testing"
@@ -364,6 +365,9 @@ func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 
 // DeleteCompiledModule implements the same method as documented on wasm.Engine.
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
+
+// DeleteCompiledModule implements the same method as documented on wasm.Engine.
+func (e *mockEngine) SetExternCache(cache compilationcache.Cache) {}
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ []*TableInstance, _ []TableInitEntry) (ModuleEngine, error) {

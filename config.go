@@ -3,6 +3,7 @@ package wazero
 import (
 	"context"
 	"errors"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"io"
 	"io/fs"
 	"math"
@@ -152,6 +153,10 @@ type runtimeConfig struct {
 	enabledFeatures wasm.Features
 	isInterpreter   bool
 	newEngine       func(context.Context, wasm.Features) wasm.Engine
+<<<<<<< HEAD
+=======
+	extCache        compilationcache.Cache
+>>>>>>> 1d97d288 (Externalizes compilation cache)
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
@@ -257,6 +262,13 @@ func (c *runtimeConfig) WithWasmCore1() RuntimeConfig {
 func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = wasm.Features20220419
+	return ret
+}
+
+// WithExternCache implements RuntimeConfig.WithExternCache
+func (c *runtimeConfig) WithExternCache(cache compilationcache.Cache) RuntimeConfig {
+	ret := c.clone()
+	ret.extCache = cache
 	return ret
 }
 

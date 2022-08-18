@@ -4,6 +4,7 @@ package platform
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"syscall"
 	"unsafe"
@@ -30,9 +31,8 @@ func munmapCodeSegment(code []byte) error {
 
 // allocateMemory commits the memory region via the "VirtualAlloc" function.
 // See https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
-func allocateMemory(code []byte, protect uintptr) (uintptr, error) {
+func allocateMemory(size uintptr, protect uintptr) (uintptr, error) {
 	address := uintptr(0) // TODO: document why zero
-	size := uintptr(len(code))
 	alloctype := windows_MEM_COMMIT
 	if r, _, err := procVirtualAlloc.Call(address, size, alloctype, protect); r == 0 {
 		return 0, fmt.Errorf("compiler: VirtualAlloc error: %w", ensureErr(err))
@@ -60,8 +60,8 @@ func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error
 	return nil
 }
 
-func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
-	p, err := allocateMemory(code, windows_PAGE_EXECUTE_READWRITE)
+func mmapCodeSegmentAMD64(code io.Reader, size int) ([]byte, error) {
+	p, err := allocateMemory(uintptr(size), windows_PAGE_EXECUTE_READWRITE)
 	if err != nil {
 		return nil, err
 	}
@@ -69,14 +69,16 @@ func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	var mem []byte
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&mem))
 	sh.Data = p
-	sh.Len = len(code)
-	sh.Cap = len(code)
-	copy(mem, code)
-	return mem, nil
+	sh.Len = size
+	sh.Cap = size
+
+	w := &bufWriter{underlying: mem}
+	_, err = io.CopyN(w, code, int64(size))
+	return mem, err
 }
 
-func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
-	p, err := allocateMemory(code, windows_PAGE_READWRITE)
+func mmapCodeSegmentARM64(code io.Reader, size int) ([]byte, error) {
+	p, err := allocateMemory(uintptr(size), windows_PAGE_READWRITE)
 	if err != nil {
 		return nil, err
 	}
@@ -84,12 +86,16 @@ func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	var mem []byte
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&mem))
 	sh.Data = p
-	sh.Len = len(code)
-	sh.Cap = len(code)
-	copy(mem, code)
+	sh.Len = size
+	sh.Cap = size
+	w := &bufWriter{underlying: mem}
+	_, err = io.CopyN(w, code, int64(size))
+	if err != nil {
+		return nil, err
+	}
 
 	old := uint32(windows_PAGE_READWRITE)
-	err = virtualProtect(p, uintptr(len(code)), windows_PAGE_EXECUTE_READ, &old)
+	err = virtualProtect(p, uintptr(size), windows_PAGE_EXECUTE_READ, &old)
 	if err != nil {
 		return nil, err
 	}

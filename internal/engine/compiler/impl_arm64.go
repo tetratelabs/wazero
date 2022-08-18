@@ -4,6 +4,7 @@
 package compiler
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -112,10 +113,7 @@ func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err err
 		return
 	}
 
-	code, err = platform.MmapCodeSegment(original)
-	if err != nil {
-		return
-	}
+	code, err = platform.MmapCodeSegment(bytes.NewReader(original), len(original))
 	return
 }
 

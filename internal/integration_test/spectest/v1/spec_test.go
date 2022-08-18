@@ -21,11 +21,11 @@ func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, nil, compiler.NewEngine, enabledFeatures)
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, nil, interpreter.NewEngine, enabledFeatures)
 }
 
 func TestBinaryEncoder(t *testing.T) {
