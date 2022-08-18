@@ -110,7 +110,7 @@ There are two runtime configurations supported in wazero: _Compiler_ is default:
 
 If you don't choose, ex `wazero.NewRuntime(ctx)`, Compiler is used if supported. You can also force the interpreter like so:
 ```go
-r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter(ctx))
+r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 ```
 
 ### Interpreter
