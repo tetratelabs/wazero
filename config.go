@@ -151,7 +151,7 @@ func NewRuntimeConfig() RuntimeConfig {
 type runtimeConfig struct {
 	enabledFeatures wasm.Features
 	isInterpreter   bool
-	newEngine       func(wasm.Features) wasm.Engine
+	newEngine       func(context.Context, wasm.Features) wasm.Engine
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.

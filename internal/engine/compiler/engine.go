@@ -590,11 +590,11 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 	return
 }
 
-func NewEngine(enabledFeatures wasm.Features) wasm.Engine {
-	return newEngine(enabledFeatures)
+func NewEngine(ctx context.Context, enabledFeatures wasm.Features) wasm.Engine {
+	return newEngine(ctx, enabledFeatures)
 }
 
-func newEngine(enabledFeatures wasm.Features) *engine {
+func newEngine(_ context.Context, enabledFeatures wasm.Features) *engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},

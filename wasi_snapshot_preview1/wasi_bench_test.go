@@ -37,7 +37,7 @@ func Test_Benchmark_EnvironGet(t *testing.T) {
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigInterpreter())
 
 	compiled, err := r.NewModuleBuilder(b.Name()).
 		ExportMemoryWithMax("memory", 1, 1).

@@ -28,7 +28,7 @@ const (
 func TestModGen(t *testing.T) {
 	tested := map[string]struct{}{}
 	rand := rand.New(rand.NewSource(0)) // use deterministic seed source for easy debugging.
-	runtime := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithWasmCore2())
+	runtime := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
 	for _, size := range []int{1, 2, 5, 10, 50, 100} {
 		for i := 0; i < 100; i++ {
 			seed := make([]byte, size)

@@ -29,7 +29,7 @@ func TestGrow(t *testing.T) {
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx)
 
 	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)

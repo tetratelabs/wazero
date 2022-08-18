@@ -13,7 +13,7 @@ import (
 func Example_instantiate() {
 	ctx := context.Background()
 
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// This adds the "env" module to the runtime, with AssemblyScript's special
@@ -30,7 +30,7 @@ func Example_instantiate() {
 func Example_functionExporter() {
 	ctx := context.Background()
 
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// First construct your own module builder for "env"

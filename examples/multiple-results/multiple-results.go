@@ -34,7 +34,7 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add a module that uses offset parameters for multiple results defined in WebAssembly.
@@ -45,7 +45,7 @@ func main() {
 
 	// wazero enables WebAssembly 1.0 by default. Opt-in to other features:
 	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
-		wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
+		ctx, wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
 		// ^^ Note: WebAssembly 2.0 (WithWasmCore2) includes "multi-value".
 	)
 

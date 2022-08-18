@@ -14,7 +14,7 @@ import (
 func Example_instantiate() {
 	ctx := context.Background()
 
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add WASI which is typically required when using Emscripten.
@@ -35,7 +35,7 @@ func Example_instantiate() {
 func Example_functionExporter() {
 	ctx := context.Background()
 
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add WASI which is typically required when using Emscripten.

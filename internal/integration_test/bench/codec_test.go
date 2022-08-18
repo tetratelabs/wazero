@@ -94,7 +94,7 @@ func TestExampleUpToDate(t *testing.T) {
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithWasmCore2())
+		r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
 
 		// Add WASI to satisfy import tests
 		wm, err := wasi_snapshot_preview1.Instantiate(testCtx, r)

@@ -417,7 +417,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
+func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -443,7 +443,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(wasm.Features) wasm.E
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			s, ns := wasm.NewStore(enabledFeatures, newEngine(enabledFeatures))
+			s, ns := wasm.NewStore(enabledFeatures, newEngine(testCtx, enabledFeatures))
 			addSpectestModule(t, s, ns)
 
 			var lastInstantiatedModuleName string

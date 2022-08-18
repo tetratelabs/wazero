@@ -31,7 +31,7 @@ func run() error {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		// Enable WebAssembly 2.0 support.
 		WithWasmCore2(),
 	)

@@ -15,7 +15,7 @@ import (
 var wasiArg []byte
 
 func TestInstantiateModule(t *testing.T) {
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(testCtx)
 
 	stdout := bytes.NewBuffer(nil)
 

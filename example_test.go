@@ -22,7 +22,7 @@ func Example() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := NewRuntime()
+	r := NewRuntime(ctx)
 
 	// Add a module to the runtime named "wasm/math" which exports one function
 	// "add", implemented in WebAssembly.

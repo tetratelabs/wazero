@@ -180,7 +180,7 @@ func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 		m.Memory().Write(ctx, offset, b)
 	}
 
-	r := wazero.NewRuntimeWithConfig(config)
+	r := wazero.NewRuntimeWithConfig(testCtx, config)
 
 	_, err := r.NewModuleBuilder("env").
 		ExportFunction("get_random_string", getRandomString).

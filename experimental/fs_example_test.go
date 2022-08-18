@@ -24,7 +24,7 @@ var fsWasm []byte
 func Example_withFS() {
 	ctx := context.Background()
 
-	r := wazero.NewRuntime()
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {

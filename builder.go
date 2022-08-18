@@ -15,7 +15,7 @@ import (
 // Ex. Below defines and instantiates a module named "env" with one function:
 //
 //	ctx := context.Background()
-//	r := wazero.NewRuntime()
+//	r := wazero.NewRuntime(ctx)
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	hello := func() {
@@ -198,7 +198,7 @@ type ModuleBuilder interface {
 	// Ex.
 	//
 	//	ctx := context.Background()
-	//	r := wazero.NewRuntime()
+	//	r := wazero.NewRuntime(ctx)
 	//	defer r.Close(ctx) // This closes everything this Runtime created.
 	//
 	//	hello := func() {
