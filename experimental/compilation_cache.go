@@ -16,7 +16,7 @@ import (
 //
 // Usage:
 //
-//  ctx := experimental.WithCompilationCacheDirName(context.Background(), "/home/me/.cache/wazero")
+//	ctx := experimental.WithCompilationCacheDirName(context.Background(), "/home/me/.cache/wazero")
 //	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 func WithCompilationCacheDirName(ctx context.Context, dirname string) context.Context {
 	if len(dirname) != 0 {
