@@ -46,15 +46,21 @@ func (fc *fileCache) path(key Key) string {
 func (fc *fileCache) Get(key Key) (content io.ReadCloser, ok bool, err error) {
 	// TODO: take lock per key for more efficiency vs the complexity of impl.
 	fc.mux.RLock()
+	unlock := fc.mux.RUnlock
+	defer func() {
+		if unlock != nil {
+			unlock()
+		}
+	}()
+
 	f, err := os.Open(fc.path(key))
 	if errors.Is(err, os.ErrNotExist) {
-		fc.mux.RUnlock()
 		return nil, false, nil
 	} else if err != nil {
-		fc.mux.RUnlock()
 		return nil, false, err
 	} else {
 		// Unlock is done inside the content.Close() at the call site.
+		unlock = nil
 		return &fileReadCloser{File: f, fc: fc}, true, nil
 	}
 }
