@@ -24,7 +24,7 @@ type (
 	engine struct {
 		enabledFeatures wasm.Features
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
-		externCache     compilationcache.Cache
+		Cache           compilationcache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
 		setFinalizer  func(obj interface{}, finalizer interface{})
@@ -591,7 +591,7 @@ func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
-		externCache:     compilationcache.NewFileCache(ctx),
+		Cache:           compilationcache.NewFileCache(ctx),
 		wazeroVersion:   wazeroVersion,
 	}
 }

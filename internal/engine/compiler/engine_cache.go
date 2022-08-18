@@ -17,13 +17,13 @@ func (e *engine) deleteCodes(module *wasm.Module) {
 	defer e.mux.Unlock()
 	delete(e.codes, module.ID)
 
-	// Note: we do not call e.externCache.Delete, as the lifetime of
-	// the content is up to the implementation of extencache.ExternCache interface.
+	// Note: we do not call e.Cache.Delete, as the lifetime of
+	// the content is up to the implementation of extencache.Cache interface.
 }
 
 func (e *engine) addCodes(module *wasm.Module, codes []*code) (err error) {
 	e.addCodesToMemory(module, codes)
-	err = e.addCodesToExternCache(module, codes)
+	err = e.addCodesToCache(module, codes)
 	return
 }
 
@@ -32,7 +32,7 @@ func (e *engine) getCodes(module *wasm.Module) (codes []*code, ok bool, err erro
 	if ok {
 		return
 	}
-	codes, ok, err = e.getCodesFromExternCache(module)
+	codes, ok, err = e.getCodesFromCache(module)
 	if ok {
 		e.addCodesToMemory(module, codes)
 	}
@@ -52,22 +52,22 @@ func (e *engine) getCodesFromMemory(module *wasm.Module) (codes []*code, ok bool
 	return
 }
 
-func (e *engine) addCodesToExternCache(module *wasm.Module, codes []*code) (err error) {
-	if e.externCache == nil {
+func (e *engine) addCodesToCache(module *wasm.Module, codes []*code) (err error) {
+	if e.Cache == nil {
 		return
 	}
-	err = e.externCache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
+	err = e.Cache.Add(module.ID, serializeCodes(e.wazeroVersion, codes))
 	return
 }
 
-func (e *engine) getCodesFromExternCache(module *wasm.Module) (codes []*code, hit bool, err error) {
-	if e.externCache == nil {
+func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool, err error) {
+	if e.Cache == nil {
 		return
 	}
 
 	// Check if the entries exist in the external cache.
 	var cached io.ReadCloser
-	cached, hit, err = e.externCache.Get(module.ID)
+	cached, hit, err = e.Cache.Get(module.ID)
 	if !hit || err != nil {
 		return
 	}
@@ -81,7 +81,7 @@ func (e *engine) getCodesFromExternCache(module *wasm.Module) (codes []*code, hi
 		hit = false
 		return
 	} else if staleCache {
-		return nil, false, e.externCache.Delete(module.ID)
+		return nil, false, e.Cache.Delete(module.ID)
 	}
 
 	for i, c := range codes {

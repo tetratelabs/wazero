@@ -210,10 +210,10 @@ func TestDeserializeCodes(t *testing.T) {
 	}
 }
 
-func TestEngine_getCodesFromExternCache(t *testing.T) {
+func TestEngine_getCodesFromCache(t *testing.T) {
 	tests := []struct {
 		name       string
-		ext        *testExternCache
+		ext        *testCache
 		key        wasm.ModuleID
 		expCodes   []*code
 		expHit     bool
@@ -223,21 +223,21 @@ func TestEngine_getCodesFromExternCache(t *testing.T) {
 		{name: "extern cache not given"},
 		{
 			name: "not hit",
-			ext:  &testExternCache{caches: map[wasm.ModuleID][]byte{}},
+			ext:  &testCache{caches: map[wasm.ModuleID][]byte{}},
 		},
 		{
-			name:   "error in externCache.Get",
-			ext:    &testExternCache{caches: map[wasm.ModuleID][]byte{{}: {}}},
+			name:   "error in Cache.Get",
+			ext:    &testCache{caches: map[wasm.ModuleID][]byte{{}: {}}},
 			expErr: "some error from extern cache",
 		},
 		{
 			name:   "error in deserialization",
-			ext:    &testExternCache{caches: map[wasm.ModuleID][]byte{{}: {1, 2, 3}}},
+			ext:    &testCache{caches: map[wasm.ModuleID][]byte{{}: {1, 2, 3}}},
 			expErr: "invalid header length: 3",
 		},
 		{
 			name: "stale cache",
-			ext: &testExternCache{caches: map[wasm.ModuleID][]byte{{}: concat(
+			ext: &testCache{caches: map[wasm.ModuleID][]byte{{}: concat(
 				[]byte(wazeroMagic),
 				[]byte{byte(len("1233123.1.1"))},
 				[]byte("1233123.1.1"),
@@ -247,7 +247,7 @@ func TestEngine_getCodesFromExternCache(t *testing.T) {
 		},
 		{
 			name: "hit",
-			ext: &testExternCache{caches: map[wasm.ModuleID][]byte{
+			ext: &testCache{caches: map[wasm.ModuleID][]byte{
 				{}: concat(
 					[]byte(wazeroMagic),
 					[]byte{byte(len(testVersion))},
@@ -281,10 +281,10 @@ func TestEngine_getCodesFromExternCache(t *testing.T) {
 
 			e := engine{}
 			if tc.ext != nil {
-				e.externCache = tc.ext
+				e.Cache = tc.ext
 			}
 
-			codes, hit, err := e.getCodesFromExternCache(m)
+			codes, hit, err := e.getCodesFromCache(m)
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {
@@ -301,18 +301,18 @@ func TestEngine_getCodesFromExternCache(t *testing.T) {
 	}
 }
 
-func TestEngine_addCodesToExternCache(t *testing.T) {
+func TestEngine_addCodesToCache(t *testing.T) {
 	t.Run("not defined", func(t *testing.T) {
 		e := engine{}
-		err := e.addCodesToExternCache(nil, nil)
+		err := e.addCodesToCache(nil, nil)
 		require.NoError(t, err)
 	})
 	t.Run("add", func(t *testing.T) {
-		ext := &testExternCache{caches: map[wasm.ModuleID][]byte{}}
-		e := engine{externCache: ext}
+		ext := &testCache{caches: map[wasm.ModuleID][]byte{}}
+		e := engine{Cache: ext}
 		m := &wasm.Module{}
 		codes := []*code{{stackPointerCeil: 123, codeSegment: []byte{1, 2, 3}}}
-		err := e.addCodesToExternCache(m, codes)
+		err := e.addCodesToCache(m, codes)
 		require.NoError(t, err)
 
 		content, ok := ext.caches[m.ID]
@@ -329,14 +329,14 @@ func TestEngine_addCodesToExternCache(t *testing.T) {
 	})
 }
 
-// testExternCache implements compilationcache.Cache
-type testExternCache struct {
+// testCache implements compilationcache.Cache
+type testCache struct {
 	caches  map[wasm.ModuleID][]byte
 	deleted wasm.ModuleID
 }
 
 // Get implements compilationcache.Cache Get
-func (tc *testExternCache) Get(key wasm.ModuleID) (content io.ReadCloser, ok bool, err error) {
+func (tc *testCache) Get(key wasm.ModuleID) (content io.ReadCloser, ok bool, err error) {
 	var raw []byte
 	raw, ok = tc.caches[key]
 	if !ok {
@@ -354,7 +354,7 @@ func (tc *testExternCache) Get(key wasm.ModuleID) (content io.ReadCloser, ok boo
 }
 
 // Add implements compilationcache.Cache Add
-func (tc *testExternCache) Add(key wasm.ModuleID, content io.Reader) (err error) {
+func (tc *testCache) Add(key wasm.ModuleID, content io.Reader) (err error) {
 	raw, err := io.ReadAll(content)
 	if err != nil {
 		return err
@@ -364,7 +364,7 @@ func (tc *testExternCache) Add(key wasm.ModuleID, content io.Reader) (err error)
 }
 
 // Delete implements compilationcache.Cache Delete
-func (tc *testExternCache) Delete(key wasm.ModuleID) (err error) {
+func (tc *testCache) Delete(key wasm.ModuleID) (err error) {
 	tc.deleted = key
 	return
 }

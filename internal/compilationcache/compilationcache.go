@@ -5,12 +5,13 @@ import (
 	"io"
 )
 
-// Cache is the interface for compilation caches. Internally, the cache
-// here means that the compiled binary cache by compilers. Regardless of the usage of
-// ExternCache, the compiled functions are cached in memory, but its lifetime is
-// bound to the lifetime of wazero.Runtime or wazero.CompiledModule.
-// Usually, the compilation of Wasm binary is time-consuming. Therefore, you might
-// want to cache the compilation result across the processes of wazero users.
+// Cache allows the compiler engine to skip compilation of wasm to machine code
+// where doing so is redundant for the same wasm binary and version of wazero.
+//
+// This augments the default in-memory cache of compiled functions, by
+// decoupling it from a wazero.Runtime instance. Concretely, a runtime loses
+// its cache once closed. This cache allows the runtime to rebuild its
+// in-memory cache quicker, significantly reducing first-hit penalty on a hit.
 //
 // See NewFileCache for the example implementation.
 type Cache interface {
@@ -24,7 +25,7 @@ type Cache interface {
 	//
 	// Note: the returned content won't go through the validation pass of Wasm binary
 	// which is applied when the binary is compiled from scratch without cache hit.
-	// Its implication is that the implementors of ExternCache might want to have
+	// Its implication is that the implementors of Cache might want to have
 	// their own validation phases. For example, sign the binary passed to Add, and
 	// verify the signature of the stored cache before returning it via Get, etc.
 	Get(key Key) (content io.ReadCloser, ok bool, err error)
@@ -42,5 +43,5 @@ type Cache interface {
 	Delete(key Key) (err error)
 }
 
-// Key represents the 256-bit unique identifier assigned to each cache content.
+// Key represents the 256-bit unique identifier assigned to each cache entry.
 type Key = [sha256.Size]byte
