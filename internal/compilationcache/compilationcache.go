@@ -25,9 +25,6 @@ type Cache interface {
 	//
 	// Note: the returned content won't go through the validation pass of Wasm binary
 	// which is applied when the binary is compiled from scratch without cache hit.
-	// Its implication is that the implementors of Cache might want to have
-	// their own validation phases. For example, sign the binary passed to Add, and
-	// verify the signature of the stored cache before returning it via Get, etc.
 	Get(key Key) (content io.ReadCloser, ok bool, err error)
 	//
 	// Add is called when the runtime is trying to add the new cache entry.
