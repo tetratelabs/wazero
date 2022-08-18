@@ -13,7 +13,10 @@ import (
 // The main goal is to show how it is configured.
 func Example_withCompilationCacheDirName() {
 	// Prepare a cache directory.
-	cacheDir := os.TempDir()
+	cacheDir, err := os.MkdirTemp("", "example")
+	if err != nil {
+		log.Panicln(err)
+	}
 	defer os.RemoveAll(cacheDir)
 
 	// Append the directory into the context for configuration.
