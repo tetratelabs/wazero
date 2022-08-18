@@ -548,5 +548,3 @@ func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _, _ []*wasm.FunctionInstance, _ []*wasm.TableInstance, _ []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
 	return nil, nil
 }
-
-func (e *mockEngine) SetExternCache(_ compilationcache.Cache) {}

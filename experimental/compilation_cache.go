@@ -2,6 +2,7 @@ package experimental
 
 import (
 	"context"
+
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 )
 

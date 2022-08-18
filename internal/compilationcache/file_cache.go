@@ -15,9 +15,13 @@ type FileCachePathKey struct{}
 // NewFileCache returns a new Cache implemented by fileCache.
 func NewFileCache(ctx context.Context) Cache {
 	if fsValue := ctx.Value(FileCachePathKey{}); fsValue != nil {
-		return &fileCache{dirPath: fsValue.(string)}
+		return newFileCache(fsValue.(string))
 	}
 	return nil
+}
+
+func newFileCache(dir string) *fileCache {
+	return &fileCache{dirPath: dir}
 }
 
 // fileCache is an example implementation of Cache which writes/reads cache into/from the fileCache.dirPath.

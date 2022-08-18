@@ -127,11 +127,7 @@ func NewRuntime(ctx context.Context) Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
-<<<<<<< HEAD
 	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(ctx, config.enabledFeatures))
-=======
-	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(config.enabledFeatures, config.extCache))
->>>>>>> 1d97d288 (Externalizes compilation cache)
 	return &runtime{
 		store:           store,
 		ns:              &namespace{store: store, ns: ns},

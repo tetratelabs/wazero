@@ -10,8 +10,7 @@ import (
 )
 
 func TestFileCache_Add(t *testing.T) {
-	fc, ok := NewFileCache(t.TempDir()).(*fileCache)
-	require.True(t, ok)
+	fc := newFileCache(t.TempDir())
 
 	t.Run("not exist", func(t *testing.T) {
 		content := []byte{1, 2, 3, 4, 5}
@@ -53,8 +52,7 @@ func TestFileCache_Add(t *testing.T) {
 }
 
 func TestFileCache_Delete(t *testing.T) {
-	fc, ok := NewFileCache(t.TempDir()).(*fileCache)
-	require.True(t, ok)
+	fc := newFileCache(t.TempDir())
 	t.Run("non-exist", func(t *testing.T) {
 		id := Key{0}
 		err := fc.Delete(id)
@@ -83,8 +81,7 @@ func TestFileCache_Delete(t *testing.T) {
 }
 
 func TestFileCache_Get(t *testing.T) {
-	fc, ok := NewFileCache(t.TempDir()).(*fileCache)
-	require.True(t, ok)
+	fc := newFileCache(t.TempDir())
 
 	t.Run("exist", func(t *testing.T) {
 		content := []byte{1, 2, 3, 4, 5}
