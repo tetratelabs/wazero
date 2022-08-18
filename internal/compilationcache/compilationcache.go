@@ -15,10 +15,9 @@ import (
 //
 // See NewFileCache for the example implementation.
 type Cache interface {
-	// Get is called when the runtime is trying to get the cached content.
-	// Implementations are supposed to return `content` which can be used to
-	// read the content passed by Add as-is. Returns ok=true if the
-	// content was found on the cache. That means the content is not empty
+	// Get is called when the runtime is trying to get the cached compiled functions.
+	// Implementations are supposed to return compiled function for the given key
+	// if the content was found on the cache. That means the content is not empty
 	// if and only if ok=true. In the case of not-found, this should return
 	// ok=false with err=nil. content.Close() is automatically called by
 	// the caller of this Get.
