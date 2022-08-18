@@ -7,7 +7,7 @@
 // "wasi_snapshot_preview1", Otherwise, it will error due to missing imports.
 //
 //	ctx := context.Background()
-//	r := wazero.NewRuntime()
+//	r := wazero.NewRuntime(ctx)
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	_, _ = Instantiate(ctx, r)

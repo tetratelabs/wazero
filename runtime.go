@@ -16,7 +16,7 @@ import (
 // Ex. The below is the basic initialization of wazero's WebAssembly Runtime.
 //
 //	ctx := context.Background()
-//	r := wazero.NewRuntime()
+//	r := wazero.NewRuntime(ctx)
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
@@ -52,7 +52,7 @@ type Runtime interface {
 	//
 	// Ex.
 	//	ctx := context.Background()
-	//	r := wazero.NewRuntime()
+	//	r := wazero.NewRuntime(ctx)
 	//	defer r.Close(ctx) // This closes everything this Runtime created.
 	//
 	//	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
@@ -107,7 +107,7 @@ type Runtime interface {
 	//
 	// Ex.
 	//	ctx := context.Background()
-	//	r := wazero.NewRuntime()
+	//	r := wazero.NewRuntime(ctx)
 	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.
 	//
 	//	// Everything below here can be closed, but will anyway due to above.
