@@ -12,8 +12,6 @@ import (
 // Usually, the compilation of Wasm binary is time-consuming. Therefore, you might
 // want to cache the compilation result across the processes of wazero users.
 //
-// Since these methods are concurrently accessed, the implementations must be Goroutine-safe.
-//
 // See NewFileCache for the example implementation.
 type Cache interface {
 	// Get is called when the runtime is trying to get the cached content.
