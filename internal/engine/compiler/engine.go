@@ -10,7 +10,9 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/buildoptions"
+	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
@@ -22,9 +24,11 @@ type (
 	engine struct {
 		enabledFeatures wasm.Features
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
+		Cache           compilationcache.Cache
 		mux             sync.RWMutex
 		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
-		setFinalizer func(obj interface{}, finalizer interface{})
+		setFinalizer  func(obj interface{}, finalizer interface{})
+		wazeroVersion string
 	}
 
 	// moduleEngine implements wasm.ModuleEngine
@@ -411,8 +415,10 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
-	if _, ok := e.getCodes(module); ok { // cache hit!
+	if _, ok, err := e.getCodes(module); ok { // cache hit!
 		return nil
+	} else if err != nil {
+		return err
 	}
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
@@ -441,8 +447,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 		funcs = append(funcs, compiled)
 	}
-	e.addCodes(module, funcs)
-	return nil
+	return e.addCodes(module, funcs)
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
@@ -459,9 +464,11 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		me.functions = append(me.functions, cf)
 	}
 
-	codes, ok := e.getCodes(module)
+	codes, ok, err := e.getCodes(module)
 	if !ok {
 		return nil, fmt.Errorf("source module for %s must be compiled before instantiation", name)
+	} else if err != nil {
+		return nil, err
 	}
 
 	for i, c := range codes {
@@ -483,25 +490,6 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		}
 	}
 	return me, nil
-}
-
-func (e *engine) deleteCodes(module *wasm.Module) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	delete(e.codes, module.ID)
-}
-
-func (e *engine) addCodes(module *wasm.Module, fs []*code) {
-	e.mux.Lock()
-	defer e.mux.Unlock()
-	e.codes[module.ID] = fs
-}
-
-func (e *engine) getCodes(module *wasm.Module) (fs []*code, ok bool) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
-	fs, ok = e.codes[module.ID]
-	return
 }
 
 // Name implements the same method as documented on wasm.ModuleEngine.
@@ -594,11 +582,17 @@ func NewEngine(ctx context.Context, enabledFeatures wasm.Features) wasm.Engine {
 	return newEngine(ctx, enabledFeatures)
 }
 
-func newEngine(_ context.Context, enabledFeatures wasm.Features) *engine {
+func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
+	var wazeroVersion string
+	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
+		wazeroVersion = v.(string)
+	}
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},
 		setFinalizer:    runtime.SetFinalizer,
+		Cache:           compilationcache.NewFileCache(ctx),
+		wazeroVersion:   wazeroVersion,
 	}
 }
 

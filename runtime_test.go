@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
@@ -19,6 +20,19 @@ var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 )
+
+func TestNewRuntimeWithConfig_version(t *testing.T) {
+	cfg := NewRuntimeConfig().(*runtimeConfig)
+	oldNewEngine := cfg.newEngine
+	cfg.newEngine = func(ctx context.Context, features wasm.Features) wasm.Engine {
+		// Ensures that wazeroVersion is propagated to the engine.
+		v := ctx.Value(version.WazeroVersionKey{})
+		require.NotNil(t, v)
+		require.Equal(t, wazeroVersion, v.(string))
+		return oldNewEngine(ctx, features)
+	}
+	_ = NewRuntimeWithConfig(testCtx, cfg)
+}
 
 func TestRuntime_CompileModule(t *testing.T) {
 	tests := []struct {

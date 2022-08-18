@@ -284,29 +284,6 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}
 }
 
-// TODO: move most of this logic to enginetest.go so that there is less drift between interpreter and compiler
-func TestEngine_Cachedcodes(t *testing.T) {
-	e := newEngine(context.Background(), wasm.Features20191205)
-	exp := []*code{
-		{codeSegment: []byte{0x0}},
-		{codeSegment: []byte{0x0}},
-	}
-	m := &wasm.Module{}
-
-	e.addCodes(m, exp)
-
-	actual, ok := e.getCodes(m)
-	require.True(t, ok)
-	require.Equal(t, len(exp), len(actual))
-	for i := range actual {
-		require.Equal(t, exp[i], actual[i])
-	}
-
-	e.deleteCodes(m)
-	_, ok = e.getCodes(m)
-	require.False(t, ok)
-}
-
 func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 	ce := &callEngine{
 		valueStack: []uint64{

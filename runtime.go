@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalapi "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/version"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
@@ -126,6 +127,9 @@ func NewRuntime(ctx context.Context) Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
+	if v := ctx.Value(version.WazeroVersionKey{}); v == nil {
+		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
+	}
 	config := rConfig.(*runtimeConfig)
 	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(ctx, config.enabledFeatures))
 	return &runtime{
