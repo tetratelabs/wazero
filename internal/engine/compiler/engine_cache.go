@@ -92,7 +92,8 @@ func (e *engine) getCodesFromExternCache(module *wasm.Module) (codes []*code, hi
 }
 
 var (
-	wazeroMagic     = "WAZERO"
+	wazeroMagic = "WAZERO"
+	// version must be synced with the tag of the wazero library.
 	version         = "1.0.0-dev"
 	cacheHeaderSize = len(wazeroMagic) + 1 /* version size */ + len(version) + 4 /* number of functions */
 )

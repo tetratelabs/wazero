@@ -14,6 +14,8 @@ import (
 //
 // Note: this is an experimental, and currently no validation on cache is applied.
 //
+// Usage:
+//
 //  ctx := experimental.WithCompilationCacheDirName(context.Background(), "/home/me/.cache/wazero")
 //	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 func WithCompilationCacheDirName(ctx context.Context, dirname string) context.Context {
