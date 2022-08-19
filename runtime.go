@@ -127,6 +127,9 @@ func NewRuntime(ctx context.Context) Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if v := ctx.Value(version.WazeroVersionKey{}); v == nil {
 		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
 	}

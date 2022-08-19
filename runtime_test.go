@@ -22,16 +22,35 @@ var (
 )
 
 func TestNewRuntimeWithConfig_version(t *testing.T) {
-	cfg := NewRuntimeConfig().(*runtimeConfig)
-	oldNewEngine := cfg.newEngine
-	cfg.newEngine = func(ctx context.Context, features wasm.Features) wasm.Engine {
-		// Ensures that wazeroVersion is propagated to the engine.
-		v := ctx.Value(version.WazeroVersionKey{})
-		require.NotNil(t, v)
-		require.Equal(t, wazeroVersion, v.(string))
-		return oldNewEngine(ctx, features)
+	// Make sure nil ctx doesn't panic
+	tests := []struct {
+		name string
+		ctx  context.Context
+	}{
+		{
+			name: "not nil",
+			ctx:  testCtx,
+		},
+		{
+			name: "nil",
+			ctx:  nil,
+		},
 	}
-	_ = NewRuntimeWithConfig(testCtx, cfg)
+	for _, tc := range tests {
+		tt := tc
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := NewRuntimeConfig().(*runtimeConfig)
+			oldNewEngine := cfg.newEngine
+			cfg.newEngine = func(ctx context.Context, features wasm.Features) wasm.Engine {
+				// Ensures that wazeroVersion is propagated to the engine.
+				v := ctx.Value(version.WazeroVersionKey{})
+				require.NotNil(t, v)
+				require.Equal(t, wazeroVersion, v.(string))
+				return oldNewEngine(ctx, features)
+			}
+			_ = NewRuntimeWithConfig(tt.ctx, cfg)
+		})
+	}
 }
 
 func TestRuntime_CompileModule(t *testing.T) {
