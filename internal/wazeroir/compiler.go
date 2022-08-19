@@ -158,8 +158,7 @@ type compiler struct {
 	globals []*wasm.GlobalType
 }
 
-// For debugging only.
-// nolint
+//lint:ignore U1000 for debugging only.
 func (c *compiler) stackDump() string {
 	strs := make([]string, 0, len(c.stack))
 	for _, s := range c.stack {
@@ -225,8 +224,6 @@ type CompilationResult struct {
 }
 
 func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err

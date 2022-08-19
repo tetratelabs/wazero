@@ -157,7 +157,7 @@ type Module interface {
 	ExportedGlobal(name string) Global
 
 	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
-	// failure to ExportedFunction callers. When the context is nil, it defaults to context.Background.
+	// failure to ExportedFunction callers.
 	//
 	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
 	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
@@ -175,7 +175,7 @@ type Module interface {
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type Closer interface {
-	// Close closes the resource. When the context is nil, it defaults to context.Background.
+	// Close closes the resource.
 	Close(context.Context) error
 }
 
@@ -267,7 +267,7 @@ type Function interface {
 
 	// Call invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
-	// including signature mismatch. When the context is nil, it defaults to context.Background.
+	// including signature mismatch.
 	//
 	// If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
@@ -298,7 +298,7 @@ type Global interface {
 	// Type describes the numeric type of the global.
 	Type() ValueType
 
-	// Get returns the last known value of this global. When the context is nil, it defaults to context.Background.
+	// Get returns the last known value of this global.
 	//
 	// See Type for how to encode this value from a Go type.
 	Get(context.Context) uint64
@@ -308,7 +308,7 @@ type Global interface {
 type MutableGlobal interface {
 	Global
 
-	// Set updates the value of this global. When the context is nil, it defaults to context.Background.
+	// Set updates the value of this global.
 	//
 	// See Global.Type for how to decode this value to a Go type.
 	Set(ctx context.Context, v uint64)
@@ -318,7 +318,6 @@ type MutableGlobal interface {
 //
 // # Notes
 //
-//   - All functions accept a context.Context, which when nil, default to context.Background.
 //   - This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //   - This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
 //

@@ -76,8 +76,7 @@ func main() {
 
 	// Call goodbye_world, which aborts with an error.
 	// assemblyscript.Instantiate was configured above to abort to stderr.
-	results, err = goodbyeWorld.Call(ctx)
-	if err == nil {
+	if _, err = goodbyeWorld.Call(ctx); err == nil {
 		log.Panicln("goodbye_world did not fail")
 	}
 }

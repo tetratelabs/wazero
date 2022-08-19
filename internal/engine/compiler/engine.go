@@ -96,8 +96,7 @@ type (
 	moduleContext struct {
 		// moduleInstanceAddress is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
-		// This is only used by Compiler code so mark this as nolint.
-		moduleInstanceAddress uintptr //nolint
+		moduleInstanceAddress uintptr //lint:ignore U1000 This is only used by Compiler code.
 
 		// globalElement0Address is the address of the first element in the global slice,
 		// i.e. &ModuleInstance.Globals[0] as uintptr.

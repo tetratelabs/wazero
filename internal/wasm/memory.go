@@ -62,15 +62,11 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 
 // Size implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Size(_ context.Context) uint32 {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.size()
 }
 
 // ReadByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadByte(_ context.Context, offset uint32) (byte, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if offset >= m.size() {
 		return 0, false
 	}
@@ -79,8 +75,6 @@ func (m *MemoryInstance) ReadByte(_ context.Context, offset uint32) (byte, bool)
 
 // ReadUint16Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadUint16Le(_ context.Context, offset uint32) (uint16, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if !m.hasSize(offset, 2) {
 		return 0, false
 	}
@@ -89,15 +83,11 @@ func (m *MemoryInstance) ReadUint16Le(_ context.Context, offset uint32) (uint16,
 
 // ReadUint32Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadUint32Le(_ context.Context, offset uint32) (uint32, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.readUint32Le(offset)
 }
 
 // ReadFloat32Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadFloat32Le(_ context.Context, offset uint32) (float32, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	v, ok := m.readUint32Le(offset)
 	if !ok {
 		return 0, false
@@ -107,15 +97,11 @@ func (m *MemoryInstance) ReadFloat32Le(_ context.Context, offset uint32) (float3
 
 // ReadUint64Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadUint64Le(_ context.Context, offset uint32) (uint64, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.readUint64Le(offset)
 }
 
 // ReadFloat64Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadFloat64Le(_ context.Context, offset uint32) (float64, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	v, ok := m.readUint64Le(offset)
 	if !ok {
 		return 0, false
@@ -125,8 +111,6 @@ func (m *MemoryInstance) ReadFloat64Le(_ context.Context, offset uint32) (float6
 
 // Read implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Read(_ context.Context, offset, byteCount uint32) ([]byte, bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if !m.hasSize(offset, byteCount) {
 		return nil, false
 	}
@@ -135,8 +119,6 @@ func (m *MemoryInstance) Read(_ context.Context, offset, byteCount uint32) ([]by
 
 // WriteByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteByte(_ context.Context, offset uint32, v byte) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if offset >= m.size() {
 		return false
 	}
@@ -146,8 +128,6 @@ func (m *MemoryInstance) WriteByte(_ context.Context, offset uint32, v byte) boo
 
 // WriteUint16Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteUint16Le(_ context.Context, offset uint32, v uint16) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if !m.hasSize(offset, 2) {
 		return false
 	}
@@ -157,36 +137,26 @@ func (m *MemoryInstance) WriteUint16Le(_ context.Context, offset uint32, v uint1
 
 // WriteUint32Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteUint32Le(_ context.Context, offset, v uint32) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.writeUint32Le(offset, v)
 }
 
 // WriteFloat32Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteFloat32Le(_ context.Context, offset uint32, v float32) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.writeUint32Le(offset, math.Float32bits(v))
 }
 
 // WriteUint64Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteUint64Le(_ context.Context, offset uint32, v uint64) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.writeUint64Le(offset, v)
 }
 
 // WriteFloat64Le implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteFloat64Le(_ context.Context, offset uint32, v float64) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return m.writeUint64Le(offset, math.Float64bits(v))
 }
 
 // Write implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Write(_ context.Context, offset uint32, val []byte) bool {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	if !m.hasSize(offset, uint32(len(val))) {
 		return false
 	}
@@ -201,8 +171,6 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32, ok bool) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	// We take write-lock here as the following might result in a new slice
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -229,8 +197,6 @@ func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32, o
 
 // PageSize returns the current memory buffer size in pages.
 func (m *MemoryInstance) PageSize(_ context.Context) (result uint32) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
 }
 

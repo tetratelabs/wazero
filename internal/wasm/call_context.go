@@ -109,8 +109,6 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) er
 //
 // Note: The caller is responsible for removing the module from the Namespace.
 func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err error) {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
 	if !atomic.CompareAndSwapUint64(m.closed, 0, closed) {
 		return false, nil
@@ -165,9 +163,6 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 	if f.importedFn.IsHostFunction {
 		return nil, fmt.Errorf("directly calling host function is not supported")
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	mod := f.importingModule
 	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
 }
@@ -176,9 +171,6 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
 	if f.IsHostFunction {
 		return nil, fmt.Errorf("directly calling host function is not supported")
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	mod := f.Module
 	ret, err = mod.Engine.Call(ctx, mod.CallCtx, f, params...)

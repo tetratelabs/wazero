@@ -309,8 +309,6 @@ func (c *compiledModule) Name() (moduleName string) {
 
 // Close implements CompiledModule.Close
 func (c *compiledModule) Close(_ context.Context) error {
-	// Note: If you use the context.Context param, don't forget to coerce nil to context.Background()!
-
 	c.compiledEngine.DeleteCompiledModule(c.module)
 	// It is possible the underlying may need to return an error later, but in any case this matches api.Module.Close.
 	return nil

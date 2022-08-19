@@ -16,7 +16,6 @@ type Namespace interface {
 	Module(moduleName string) api.Module
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
-	// When the context is nil, it defaults to context.Background.
 	//
 	// Ex.
 	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))

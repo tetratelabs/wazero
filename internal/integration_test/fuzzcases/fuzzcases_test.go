@@ -3,7 +3,6 @@ package fuzzcases
 import (
 	"context"
 	"embed"
-	_ "embed"
 	"fmt"
 	"testing"
 

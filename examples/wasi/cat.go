@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	_ "embed"
 	"fmt"
 	"io/fs"
 	"log"
