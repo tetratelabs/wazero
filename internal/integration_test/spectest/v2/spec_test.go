@@ -1,6 +1,7 @@
 package spectest
 
 import (
+	"context"
 	"embed"
 	"testing"
 
@@ -21,9 +22,9 @@ func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), compiler.NewEngine, enabledFeatures)
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, testcases, context.Background(), interpreter.NewEngine, enabledFeatures)
 }

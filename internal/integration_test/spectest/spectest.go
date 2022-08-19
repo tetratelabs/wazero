@@ -24,9 +24,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/watzero"
 )
 
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
-
 // TODO: complete porting this to wazero API
 type (
 	testbase struct {
@@ -323,7 +320,7 @@ func (c command) expectedError() (err error) {
 //
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
-func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
+func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace) {
 	w, err := watzero.Wat2Wasm(`(module $spectest
 (; TODO
   (global (export "global_i32") i32)
@@ -401,10 +398,10 @@ func addSpectestModule(t *testing.T, s *wasm.Store, ns *wasm.Namespace) {
 
 	maybeSetMemoryCap(mod)
 	mod.BuildFunctionDefinitions()
-	err = s.Engine.CompileModule(testCtx, mod)
+	err = s.Engine.CompileModule(ctx, mod)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil), nil)
+	_, err = s.Instantiate(ctx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil), nil)
 	require.NoError(t, err)
 }
 
@@ -417,7 +414,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
+func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(context.Context, wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -443,8 +440,8 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			s, ns := wasm.NewStore(enabledFeatures, newEngine(testCtx, enabledFeatures))
-			addSpectestModule(t, s, ns)
+			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures))
+			addSpectestModule(t, ctx, s, ns)
 
 			var lastInstantiatedModuleName string
 			for _, c := range base.Commands {
@@ -467,10 +464,10 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 
 						maybeSetMemoryCap(mod)
 						mod.BuildFunctionDefinitions()
-						err = s.Engine.CompileModule(testCtx, mod)
+						err = s.Engine.CompileModule(ctx, mod)
 						require.NoError(t, err, msg)
 
-						_, err = s.Instantiate(testCtx, ns, mod, moduleName, nil, nil)
+						_, err = s.Instantiate(ctx, ns, mod, moduleName, nil, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -492,7 +489,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := callFunction(ns, moduleName, c.Action.Field, args...)
+							vals, types, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
 							laneTypes := map[int]string{}
@@ -526,7 +523,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 								expType = wasm.ValueTypeF64
 							}
 							require.Equal(t, expType, global.Type(), msg)
-							require.Equal(t, exps[0], global.Get(testCtx), msg)
+							require.Equal(t, exps[0], global.Get(ctx), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -535,7 +532,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 							// We don't support direct loading of wast yet.
 							buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 							require.NoError(t, err, msg)
-							requireInstantiationError(t, s, ns, buf, msg)
+							requireInstantiationError(t, ctx, s, ns, buf, msg)
 						}
 					case "assert_trap":
 						moduleName := lastInstantiatedModuleName
@@ -549,7 +546,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(ns, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -561,7 +558,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 						}
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						requireInstantiationError(t, s, ns, buf, msg)
+						requireInstantiationError(t, ctx, s, ns, buf, msg)
 					case "assert_exhaustion":
 						moduleName := lastInstantiatedModuleName
 						switch c.Action.ActionType {
@@ -571,7 +568,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(ns, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, wasmruntime.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -583,7 +580,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 						}
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						requireInstantiationError(t, s, ns, buf, msg)
+						requireInstantiationError(t, ctx, s, ns, buf, msg)
 					case "assert_uninstantiable":
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
@@ -605,13 +602,13 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 
 							maybeSetMemoryCap(mod)
 							mod.BuildFunctionDefinitions()
-							err = s.Engine.CompileModule(testCtx, mod)
+							err = s.Engine.CompileModule(ctx, mod)
 							require.NoError(t, err, msg)
 
-							_, err = s.Instantiate(testCtx, ns, mod, t.Name(), nil, nil)
+							_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil, nil)
 							require.NoError(t, err, msg)
 						} else {
-							requireInstantiationError(t, s, ns, buf, msg)
+							requireInstantiationError(t, ctx, s, ns, buf, msg)
 						}
 
 					default:
@@ -623,7 +620,7 @@ func Run(t *testing.T, testDataFS embed.FS, newEngine func(context.Context, wasm
 	}
 }
 
-func requireInstantiationError(t *testing.T, s *wasm.Store, ns *wasm.Namespace, buf []byte, msg string) {
+func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, buf []byte, msg string) {
 	mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
 	if err != nil {
 		return
@@ -638,12 +635,12 @@ func requireInstantiationError(t *testing.T, s *wasm.Store, ns *wasm.Namespace, 
 
 	maybeSetMemoryCap(mod)
 	mod.BuildFunctionDefinitions()
-	err = s.Engine.CompileModule(testCtx, mod)
+	err = s.Engine.CompileModule(ctx, mod)
 	if err != nil {
 		return
 	}
 
-	_, err = s.Instantiate(testCtx, ns, mod, t.Name(), nil, nil)
+	_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil, nil)
 	require.Error(t, err, msg)
 }
 
@@ -831,9 +828,9 @@ func f64Equal(expected, actual float64) (matched bool) {
 
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
-func callFunction(ns *wasm.Namespace, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
+func callFunction(ns *wasm.Namespace, ctx context.Context, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
 	fn := ns.Module(moduleName).ExportedFunction(funcName)
-	results, err := fn.Call(testCtx, params...)
+	results, err := fn.Call(ctx, params...)
 	return results, fn.Definition().ResultTypes(), err
 }
 
