@@ -1,5 +1,10 @@
 package wazero
 
+import "github.com/tetratelabs/wazero/internal/version"
+
 // wazeroVersion holds the current version of wazero.
-// TODO: use debug.ReadBuildInfo automatically set wazeroVersion to the release tag.
-var wazeroVersion = "dev"
+var wazeroVersion string
+
+func init() {
+	wazeroVersion = version.GetWazeroVersion()
+}
