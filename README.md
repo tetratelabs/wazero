@@ -6,9 +6,10 @@ WebAssembly is a way to safely run code compiled in other languages. Runtimes
 execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm`
 extension.
 
-wazero is a WebAssembly Core Specification [1.0][1] and [2.0][2] compliant runtime written in Go. It has
-*zero dependencies*, and doesn't rely on CGO. This means you can run
-applications in other languages and still keep cross compilation.
+wazero is a WebAssembly Core Specification [1.0][1] and [2.0][2] compliant
+runtime written in Go. It has *zero dependencies*, and doesn't rely on CGO.
+This means you can run applications in other languages and still keep cross
+compilation.
 
 Import wazero and extend your Go application with code written in any language!
 
@@ -108,7 +109,8 @@ they may answer them for you!
 
 There are two runtime configurations supported in wazero: _Compiler_ is default:
 
-If you don't choose, ex `wazero.NewRuntime(ctx)`, Compiler is used if supported. You can also force the interpreter like so:
+By default, ex `wazero.NewRuntime(ctx)`, the Compiler is used if supported. You
+can also force the interpreter like so:
 ```go
 r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 ```
@@ -123,14 +125,14 @@ for Go (such as `riscv64`).
 Compiler compiles WebAssembly modules into machine code ahead of time (AOT),
 during `Runtime.CompileModule`. This means your WebAssembly functions execute
 natively at runtime. Compiler is faster than Interpreter, often by order of
-magnitude (10x) or more. This is done while still having no host-specific
-dependencies.
+magnitude (10x) or more. This is done without host-specific dependencies.
 
 If interested, check out the [RATIONALE.md][8] and help us optimize further!
 
 ### Conformance
 
-Both runtimes pass WebAssembly Core [1.0][7] and [2.0][14] specification tests on supported platforms:
+Both runtimes pass WebAssembly Core [1.0][7] and [2.0][14] specification tests
+on supported platforms:
 
 | Runtime     | Usage| amd64 | arm64 | others |
 |:---:|:---:|:---:|:---:|:---:|
@@ -146,8 +148,11 @@ wazero into their Go applications.
 
 wazero is an early project, so APIs are subject to change until version 1.0.
 
-We expect [wazero 1.0][9] to be at or before Q3 2022, so please practice the
-current APIs to ensure they work for you!
+Wazero 1.0 will have a floor Go version of 1.19. The first beta will be the
+end of August 2022, and the final release will be after Go 1.20 is released,
+in February 2023.
+
+Meanwhile, please practice the current APIs to ensure they work for you!
 
 ### Go
 

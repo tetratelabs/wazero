@@ -63,7 +63,8 @@ this:
 go get github.com/tetratelabs/wazero@main
 ```
 
-We expect [wazero 1.0][4] to be at or before Q3 2022, so please practice the
+wazero will release its first beta at the end of August 2022, and finalize
+1.0 once Go 1.20 is released in Feb 2023. Meanwhile, please practice the
 current APIs to ensure they work for you, and give us a [star][5] if you are
 enjoying it so far!
 
