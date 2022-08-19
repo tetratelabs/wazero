@@ -1,7 +1,6 @@
 package version
 
 import (
-	"fmt"
 	"runtime/debug"
 	"strings"
 )
@@ -23,7 +22,6 @@ func GetWazeroVersion() (ret string) {
 		for _, dep := range info.Deps {
 			// Note: here's the assumption that wazero is imported as github.com/tetratelabs/wazero.
 			if strings.Contains(dep.Path, "github.com/tetratelabs/wazero") {
-				fmt.Println(dep.Sum)
 				ret = dep.Version
 			}
 		}
