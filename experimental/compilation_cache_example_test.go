@@ -24,8 +24,8 @@ func Example_withCompilationCacheDirName() {
 
 	// Repeat newRuntimeCompileDestroy with the same cache directory.
 	newRuntimeCompileDestroy(ctx)
-	// After the second invocation, the actual compilation doesn't happen,
-	// and instead, the persisted file cache is re-used.
+	// Since the above stored compiled functions to dist, below won't compile.
+	// Instead, code stored in the file cache is re-used.
 	newRuntimeCompileDestroy(ctx)
 	newRuntimeCompileDestroy(ctx)
 
@@ -34,7 +34,7 @@ func Example_withCompilationCacheDirName() {
 }
 
 // newRuntimeCompileDestroy creates a new wazero.Runtime, compile a binary, and then delete the runtime.
-func newRuntimeCompileDestroy(ctx context.Context) {
+func newRuntimeCompileClose(ctx context.Context) {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created except the file system cache.
 
