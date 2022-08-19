@@ -1,4 +1,4 @@
-module github.com/tetratelabs/wazero/internal/version/test
+module github.com/tetratelabs/wazero/internal/version/testdata
 
 go 1.18
 

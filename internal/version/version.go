@@ -15,7 +15,7 @@ type WazeroVersionKey struct{}
 // For example, if the go.mod has "require github.com/tetratelabs/wazero 0.1.2-12314124-abcd",
 // then this returns "0.1.2-12314124-abcd".
 //
-// Note: this is tested in ./test/main_test.go with a separate go.mod to pretend as the wazero user.
+// Note: this is tested in ./testdata/main_test.go with a separate go.mod to pretend as the wazero user.
 func GetWazeroVersion() (ret string) {
 	ret = "dev"
 	info, ok := debug.ReadBuildInfo()
