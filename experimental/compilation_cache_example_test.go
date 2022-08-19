@@ -22,12 +22,12 @@ func Example_withCompilationCacheDirName() {
 	// Append the directory into the context for configuration.
 	ctx := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
 
-	// Repeat newRuntimeCompileDestroy with the same cache directory.
-	newRuntimeCompileDestroy(ctx)
+	// Repeat newRuntimeCompileClose with the same cache directory.
+	newRuntimeCompileClose(ctx)
 	// Since the above stored compiled functions to dist, below won't compile.
 	// Instead, code stored in the file cache is re-used.
-	newRuntimeCompileDestroy(ctx)
-	newRuntimeCompileDestroy(ctx)
+	newRuntimeCompileClose(ctx)
+	newRuntimeCompileClose(ctx)
 
 	// Output:
 	//
