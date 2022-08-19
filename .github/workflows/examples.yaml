@@ -43,7 +43,7 @@ jobs:
 
       - name: Install TinyGo
         run: |  # installing via curl so commands are similar on OS/x
-          tinygo_version=0.24.0
+          tinygo_version=0.25.0
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH

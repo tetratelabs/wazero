@@ -286,8 +286,6 @@ func NewStore(enabledFeatures Features, engine Engine) (*Store, *Namespace) {
 
 // NewNamespace implements the same method as documented on wazero.Runtime.
 func (s *Store) NewNamespace(_ context.Context) *Namespace {
-	// TODO: The above context isn't yet used. If it is, ensure it defaults to context.Background.
-
 	ns := newNamespace()
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -311,10 +309,6 @@ func (s *Store) Instantiate(
 	sys *internalsys.Context,
 	listeners []experimentalapi.FunctionListener,
 ) (*CallContext, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	// Collect any imported modules to avoid locking the namespace too long.
 	importedModuleNames := map[string]struct{}{}
 	for _, i := range module.ImportSection {

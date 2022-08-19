@@ -49,7 +49,6 @@ type Runtime interface {
 	CompileModule(ctx context.Context, binary []byte, config CompileConfig) (CompiledModule, error)
 
 	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
-	// When the context is nil, it defaults to context.Background.
 	//
 	// Ex.
 	//	ctx := context.Background()
@@ -74,7 +73,6 @@ type Runtime interface {
 
 	// NewNamespace creates an empty namespace which won't conflict with any other namespace including the default.
 	// This is more efficient than multiple runtimes, as namespaces share a compiler cache.
-	// When the context is nil, it defaults to context.Background.
 	//
 	// In simplest case, a namespace won't conflict if another has a module with the same name:
 	//	b := assemblyscript.NewBuilder(r)
@@ -103,7 +101,6 @@ type Runtime interface {
 	NewNamespace(context.Context) Namespace
 
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
-	// When the context is nil, it defaults to context.Background.
 	// An error is returned if any module returns an error when closed.
 	//
 	// Ex.
@@ -127,9 +124,6 @@ func NewRuntime(ctx context.Context) Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if v := ctx.Value(version.WazeroVersionKey{}); v == nil {
 		ctx = context.WithValue(ctx, version.WazeroVersionKey{}, wazeroVersion)
 	}
@@ -202,9 +196,6 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig Comp
 }
 
 func buildListeners(ctx context.Context, r *runtime, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
-	if ctx == nil {
-		return nil, nil
-	}
 	// Test to see if internal code are using an experimental feature.
 	fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{})
 	if fnlf == nil {
