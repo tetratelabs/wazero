@@ -1,33 +1,26 @@
-package spectest
+package v1
 
 import (
-	"embed"
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/integration_test/spectest"
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/wasm"
 )
-
-//go:embed testdata/*.wasm
-//go:embed testdata/*.json
-var testcases embed.FS
-
-const enabledFeatures = wasm.Features20191205
 
 func TestCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	spectest.Run(t, testcases, compiler.NewEngine, enabledFeatures)
+	spectest.Run(t, Testcases, context.Background(), compiler.NewEngine, EnabledFeatures)
 }
 
 func TestInterpreter(t *testing.T) {
-	spectest.Run(t, testcases, interpreter.NewEngine, enabledFeatures)
+	spectest.Run(t, Testcases, context.Background(), interpreter.NewEngine, EnabledFeatures)
 }
 
 func TestBinaryEncoder(t *testing.T) {
-	spectest.TestBinaryEncoder(t, testcases, enabledFeatures)
+	spectest.TestBinaryEncoder(t, Testcases, EnabledFeatures)
 }
