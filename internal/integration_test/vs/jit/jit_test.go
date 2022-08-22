@@ -23,3 +23,15 @@ func TestFactorial(t *testing.T) {
 func BenchmarkFactorial(b *testing.B) {
 	vs.RunBenchmarkFactorial(b, runtime)
 }
+
+func TestHostCall(t *testing.T) {
+	vs.RunTestHostCall(t, runtime)
+}
+
+func BenchmarkHostCall(b *testing.B) {
+	vs.RunBenchmarkHostCall(b, runtime)
+}
+
+func TestBenchmarkHostCall_CompilerFastest(t *testing.T) {
+	vs.RunTestBenchmarkHostCall_CompilerFastest(t, runtime())
+}

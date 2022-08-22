@@ -20,6 +20,9 @@ type RuntimeConfig struct {
 	// The implementation invoke this with a byte slice allocated from the offset, length pair.
 	// This function simulates a host function that logs a message.
 	LogFn func([]byte) error
+	// EnvFReturnValue is set to non-zero if we want the runtime to instantiate "env" module with the function "f"
+	// which accepts one i64 value and returns the EnvFReturnValue as i64. This is mutually exclusive to LogFn.
+	EnvFReturnValue uint64
 }
 
 type Runtime interface {
@@ -84,6 +87,16 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 		r.logFn = cfg.LogFn
 		if r.env, err = r.runtime.NewModuleBuilder("env").
 			ExportFunction("log", r.log).Compile(ctx, wazero.NewCompileConfig()); err != nil {
+			return err
+		}
+	} else if cfg.EnvFReturnValue != 0 {
+		if r.env, err = r.runtime.NewModuleBuilder("env").
+			ExportFunction("f",
+				// Note: accepting (context.Context, api.Module) is the slowest type of host function with wazero.
+				func(context.Context, api.Module, uint64) uint64 {
+					return cfg.EnvFReturnValue
+				},
+			).Compile(ctx, wazero.NewCompileConfig()); err != nil {
 			return err
 		}
 	}
