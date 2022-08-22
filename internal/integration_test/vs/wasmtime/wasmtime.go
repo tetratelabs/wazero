@@ -83,6 +83,22 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		)); err != nil {
 			return
 		}
+	} else if cfg.EnvFReturnValue != 0 {
+		ret := []wasmtime.Val{wasmtime.ValI64(int64(cfg.EnvFReturnValue))}
+		if err = linker.Define("env", "f", wasmtime.NewFunc(
+			wm.store,
+			wasmtime.NewFuncType(
+				[]*wasmtime.ValType{
+					wasmtime.NewValType(wasmtime.KindI64),
+				},
+				[]*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI64)},
+			),
+			func(_ *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
+				return ret, nil
+			},
+		)); err != nil {
+			return
+		}
 	}
 
 	// Set the module name.

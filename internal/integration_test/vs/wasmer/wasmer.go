@@ -89,6 +89,20 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (m
 				),
 			},
 		)
+	} else if cfg.EnvFReturnValue != 0 {
+		ret := []wasmer.Value{wasmer.NewValue(int64(cfg.EnvFReturnValue), wasmer.I64)}
+		importObject.Register(
+			"env",
+			map[string]wasmer.IntoExtern{
+				"f": wasmer.NewFunction(
+					wm.store,
+					wasmer.NewFunctionType(wasmer.NewValueTypes(wasmer.I64), wasmer.NewValueTypes(wasmer.I64)),
+					func(args []wasmer.Value) ([]wasmer.Value, error) {
+						return ret, nil
+					},
+				),
+			},
+		)
 	}
 
 	// TODO: wasmer_module_set_name is not exposed in wasmer-go
