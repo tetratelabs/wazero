@@ -34,7 +34,7 @@ func testHostCall(t *testing.T, m Module, instantiation, iteration int) {
 }
 
 func RunTestBenchmarkHostCall_CompilerFastest(t *testing.T, vsRuntime Runtime) {
-	runTestBenchmark_Call_CompilerFastest(t, hostCallConfig, "Host Call", hostCall, vsRuntime)
+	runTestBenchmark_Call_CompilerFastest(t, hostCallConfig, "HostCall_CrossBoundary", hostCall, vsRuntime)
 }
 
 func RunBenchmarkHostCall(b *testing.B, runtime func() Runtime) {

@@ -79,6 +79,15 @@ func (r *wasmedgeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		if err = m.vm.RegisterImport(m.env); err != nil {
 			return nil, err
 		}
+	} else if cfg.EnvFReturnValue != 0 {
+		m.env = wasmedge.NewImportObject("env")
+		fType := wasmedge.NewFunctionType([]wasmedge.ValType{wasmedge.ValType_I64}, []wasmedge.ValType{wasmedge.ValType_I64})
+		m.env.AddFunction("f", wasmedge.NewFunction(fType, func(data interface{}, mem *wasmedge.Memory, params []interface{}) ([]interface{}, wasmedge.Result) {
+			return []interface{}{int64(cfg.EnvFReturnValue)}, wasmedge.Result_Success
+		}, nil, 0))
+		if err = m.vm.RegisterImport(m.env); err != nil {
+			return nil, err
+		}
 	}
 
 	// Instantiate the module.
