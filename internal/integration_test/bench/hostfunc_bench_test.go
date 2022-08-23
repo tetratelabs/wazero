@@ -170,6 +170,10 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	err := eng.CompileModule(testCtx, hostModule)
 	requireNoError(err)
 
+	hostME, err := eng.NewModuleEngine(host.Name, hostModule, nil, host.Functions, nil, nil)
+	requireNoError(err)
+	linkModuleToEngine(host, hostME)
+
 	// Build the importing module.
 	importingModule := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{ft},
@@ -195,10 +199,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	importingModule.BuildFunctionDefinitions()
 	err = eng.CompileModule(testCtx, importingModule)
 	requireNoError(err)
-
-	hostME, err := eng.NewModuleEngine(host.Name, hostModule, nil, host.Functions, nil, nil)
-	requireNoError(err)
-	linkModuleToEngine(host, hostME)
 
 	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
 	importingFunctions := importing.BuildFunctions(importingModule, nil)
