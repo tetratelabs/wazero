@@ -4,13 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"encoding/binary"
+	"math"
+	"testing"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"math"
-	"testing"
 )
 
 const (
@@ -134,15 +135,6 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		TypeSection:     []*wasm.FunctionType{ft},
 		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
-			{
-				IsHostFunction: true,
-				Body: []byte{
-					wasm.OpcodeLocalGet, 0,
-					wasm.OpcodeI32Load, 0x2, 0x0, // offset = 0
-					wasm.OpcodeF32ReinterpretI32,
-					wasm.OpcodeEnd,
-				},
-			},
 			wasm.MustParseGoFuncCode(
 				func(ctx context.Context, m api.Module, pos uint32) float32 {
 					ret, ok := m.Memory().ReadUint32Le(ctx, pos)
@@ -152,10 +144,19 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 					return math.Float32frombits(ret)
 				},
 			),
+			{
+				IsHostFunction: true,
+				Body: []byte{
+					wasm.OpcodeLocalGet, 0,
+					wasm.OpcodeI32Load, 0x2, 0x0, // offset = 0
+					wasm.OpcodeF32ReinterpretI32,
+					wasm.OpcodeEnd,
+				},
+			},
 		},
 		ExportSection: []*wasm.Export{
-			{Name: "wasm", Type: wasm.ExternTypeFunc, Index: 0},
-			{Name: "go", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "go", Type: wasm.ExternTypeFunc, Index: 0},
+			{Name: "wasm", Type: wasm.ExternTypeFunc, Index: 1},
 		},
 		ID: wasm.ModuleID{1, 2, 3, 4, 5},
 	}
