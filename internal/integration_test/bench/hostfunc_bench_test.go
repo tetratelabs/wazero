@@ -165,7 +165,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	host := &wasm.ModuleInstance{Name: "host", TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	goFn, wasnFn := host.Exports["wasm"].Function, host.Exports["go"].Function
+	goFn, wasnFn := host.Exports["go"].Function, host.Exports["wasm"].Function
 
 	err := eng.CompileModule(testCtx, hostModule)
 	requireNoError(err)
@@ -191,7 +191,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = host.wasm.
 		},
-		// Indicates that this module has a memory so that compilers are able to assembe memory-related initialization.
+		// Indicates that this module has a memory so that compilers are able to assemble memory-related initialization.
 		MemorySection: &wasm.Memory{Min: 1},
 		ID:            wasm.ModuleID{1},
 	}
