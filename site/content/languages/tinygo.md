@@ -34,11 +34,10 @@ call it, regardless of if the host is written in Go or not.
 
 ## Disclaimer
 
-This document includes notes contributed by the wazero community on TinyGo and
-WebAssembly. While wazero includes TinyGo examples, and maintainers are
-contributors also contribute to TinyGo, this document isn't a TinyGo official
-document. For more help, consider the [TinyGo Using WebAssembly Guide][4] or
-joining the [#TinyGo channel on the Gophers Slack][5].
+This document includes notes contributed by the wazero community. While wazero
+includes TinyGo examples, and maintainers often contribute to TinyGo, this
+isn't a TinyGo official document. For more help, consider the [TinyGo Using
+WebAssembly Guide][4] or joining the [#TinyGo channel on the Gophers Slack][5].
 
 Meanwhile, please help us [maintain][6] this document and [star our GitHub
 repository][7], if it is helpful. Together, we can help make WebAssembly easier
