@@ -15,14 +15,4 @@ Under the covers, [greet.go](testdata/greet.go) does a few things of interest:
 * Uses `reflect.StringHeader` to build back a string from a pointer, len pair.
 * Relies on TinyGo not eagerly freeing pointers returned.
 
-Go does not export allocation functions, but when TinyGo generates WebAssembly,
-it exports "malloc" and "free", which we use for that purpose. These are not
-documented, so not necessarily a best practice. See the following issues for
-updates:
-* WebAssembly exports for allocation: https://github.com/tinygo-org/tinygo/issues/2788
-* Memory ownership of TinyGo allocated pointers: https://github.com/tinygo-org/tinygo/issues/2787
-
-Note: While folks here are familiar with TinyGo, wazero isn't a TinyGo project.
-We hope this gets you started. For next steps, consider reading the
-[TinyGo Using WebAssembly Guide](https://tinygo.org/docs/guides/webassembly/)
-or joining the [#TinyGo channel on the Gophers Slack](https://github.com/tinygo-org/tinygo#getting-help).
+See https://wazero.io/languages/tinygo/ for more tips.

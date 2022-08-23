@@ -46,3 +46,9 @@ googleAnalytics = "G-LG7LD9G4ZB"
           identifier = "specs"
           name = "Specifications"
           weight = 1
+        [[languages.en.menu.main]]
+          parent = "appendix"
+          url = "/languages/"
+          identifier = "languages"
+          name = "Languages"
+          weight = 1
