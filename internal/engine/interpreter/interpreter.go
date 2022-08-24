@@ -88,10 +88,13 @@ type callEngine struct {
 
 	// frames are the function call stack.
 	frames []*callFrame
+
+	source   *wasm.FunctionInstance
+	compiled *function
 }
 
-func (e *moduleEngine) newCallEngine() *callEngine {
-	return &callEngine{}
+func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
+	return &callEngine{source: source, compiled: compiled}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -750,25 +753,27 @@ func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) 
 	}
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := e.functions[f.Idx]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = m.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", e.name, f.Idx))
+		if err = callCtx.FailIfClosed(); err == nil {
+			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
 		}
 		return
 	}
+	return e.newCallEngine(f, compiled), nil
+}
 
-	paramSignature := f.Type.ParamNumInUint64
+// Call implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...uint64) (results []uint64, err error) {
+	paramSignature := ce.source.Type.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
 		return nil, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
 	}
 
-	ce := e.newCallEngine()
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
@@ -792,9 +797,9 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 		ce.pushValue(param)
 	}
 
-	ce.callFunction(ctx, m, compiled)
+	ce.callFunction(ctx, m, ce.compiled)
 
-	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
+	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
 	return
 }
 

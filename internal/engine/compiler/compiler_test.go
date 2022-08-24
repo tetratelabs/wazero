@@ -220,7 +220,7 @@ func (j *compilerEnv) callEngine() *callEngine {
 	return j.ce
 }
 
-func (j *compilerEnv) newFunctionFrame(codeSegment []byte) *function {
+func (j *compilerEnv) newFunction(codeSegment []byte) *function {
 	return &function{
 		parent:                &code{codeSegment: codeSegment},
 		codeInitialAddress:    uintptr(unsafe.Pointer(&codeSegment[0])),
@@ -234,8 +234,10 @@ func (j *compilerEnv) newFunctionFrame(codeSegment []byte) *function {
 }
 
 func (j *compilerEnv) exec(codeSegment []byte) {
-	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: j.newFunctionFrame(codeSegment)}
+	f := j.newFunction(codeSegment)
+	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
 	j.ce.globalContext.callFrameStackPointer++
+	j.ce.compiled = f
 
 	nativecall(
 		uintptr(unsafe.Pointer(&codeSegment[0])),
@@ -292,6 +294,6 @@ func newCompilerEnvironment() *compilerEnv {
 			Globals: []*wasm.GlobalInstance{},
 			Engine:  me,
 		},
-		ce: me.newCallEngine(),
+		ce: me.newCallEngine(nil, nil),
 	}
 }

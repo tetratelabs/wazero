@@ -399,14 +399,21 @@ func (s *Store) instantiate(
 	}
 
 	// Compile the default context for calls to this module.
-	m.CallCtx = NewCallContext(ns, m, sysCtx)
+	callCtx := NewCallContext(ns, m, sysCtx)
+	m.CallCtx = callCtx
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		_, err = f.Module.Engine.Call(ctx, m.CallCtx, f)
 
+		ce, err := f.Module.Engine.NewCallEngine(callCtx, f)
+		if err != nil {
+			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
+				module.funcDesc(SectionIDFunction, funcIdx), err)
+		}
+
+		_, err = ce.Call(ctx, callCtx)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {

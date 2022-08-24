@@ -67,6 +67,9 @@ type (
 		// The currently executed function call frame lives at callFrameStack[callFrameStackPointer-1]
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
+
+		compiled *function
+		source   *wasm.FunctionInstance
 	}
 
 	// globalContext holds the data which is constant across multiple function calls.
@@ -524,8 +527,7 @@ func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) 
 	}
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := e.functions[f.Idx]
@@ -535,13 +537,15 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 		}
 		return
 	}
+	return e.newCallEngine(f, compiled), nil
+}
 
+// Call implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params ...uint64) (results []uint64, err error) {
 	paramCount := len(params)
-	if f.Type.ParamNumInUint64 != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", f.Type.ParamNumInUint64, paramCount)
+	if ce.source.Type.ParamNumInUint64 != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", ce.source.Type.ParamNumInUint64, paramCount)
 	}
-
-	ce := e.newCallEngine()
 
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
@@ -558,7 +562,7 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 			builder := wasmdebug.NewErrorBuilder()
 			// Handle edge-case where the host function is called directly by Go.
 			if ce.globalContext.callFrameStackPointer == 0 {
-				def := compiled.source.Definition()
+				def := ce.compiled.source.Definition()
 				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
@@ -567,13 +571,18 @@ func (e *moduleEngine) Call(ctx context.Context, callCtx *wasm.CallContext, f *w
 			}
 			err = builder.FromRecovered(v)
 		}
+
+		if err != nil {
+			// Allows the reuse of CallEngine.
+			ce.stackPointer, ce.callFrameStackPointer = 0, 0
+		}
 	}()
 
 	for _, v := range params {
 		ce.pushValue(v)
 	}
-	ce.execWasmFunction(ctx, callCtx, compiled)
-	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
+	ce.execWasmFunction(ctx, callCtx)
+	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
 	return
 }
 
@@ -627,11 +636,13 @@ var (
 	initialCallFrameStackSize = 16
 )
 
-func (e *moduleEngine) newCallEngine() *callEngine {
+func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
 	ce := &callEngine{
 		valueStack:     make([]uint64, initialValueStackSize),
 		callFrameStack: make([]callFrame, initialCallFrameStackSize),
 		archContext:    newArchContext(),
+		source:         source,
+		compiled:       compiled,
 	}
 
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
@@ -679,9 +690,9 @@ const (
 	builtinFunctionIndexBreakPoint
 )
 
-func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
+func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext) {
 	// Push the initial callframe.
-	ce.callFrameStack[0] = callFrame{returnAddress: f.codeInitialAddress, function: f}
+	ce.callFrameStack[0] = callFrame{returnAddress: ce.compiled.codeInitialAddress, function: ce.compiled}
 	ce.globalContext.callFrameStackPointer++
 
 entry:
@@ -693,7 +704,7 @@ entry:
 		}
 
 		// Call into the native code.
-		nativecall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), f.moduleInstanceAddress)
+		nativecall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), frame.function.moduleInstanceAddress)
 
 		// Check the status code from Compiler code.
 		switch status := ce.exitContext.statusCode; status {

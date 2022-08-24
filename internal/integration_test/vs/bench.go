@@ -26,9 +26,6 @@ const compilerRuntime = "wazero-compiler"
 // runTestBenchmark_Call_CompilerFastest ensures that Compiler is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureCompilerFastest=true'.
 func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module) error, vsRuntime Runtime) {
-	if ensureCompilerFastest != "true" {
-		t.Skip()
-	}
 
 	type benchResult struct {
 		name string
@@ -72,6 +69,7 @@ func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module) error)
 }
 
 func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call func(Module) error) {
+	b.Helper()
 	rt := runtime()
 	b.Run("Compile", func(b *testing.B) {
 		benchmarkCompile(b, rt, rtCfg)
@@ -130,6 +128,25 @@ func benchmarkCall(b *testing.B, rt Runtime, rtCfg *RuntimeConfig, call func(Mod
 		b.Fatal(err)
 	}
 	defer mod.Close(testCtx)
+	//
+	//cpu, err := os.Create("cpu.out")
+	//if err != nil {
+	//	log.Fatal("could not create CPU profile: ", err)
+	//}
+	//if err := pprof.StartCPUProfile(cpu); err != nil {
+	//	log.Fatal("could not start CPU profile: ", err)
+	//}
+	//defer pprof.StopCPUProfile()
+	//
+	//traceOut, err := os.Create("trace.out")
+	//if err != nil {
+	//	log.Fatal("could not create Trace profile: ", err)
+	//}
+	//if err := trace.Start(traceOut); err != nil {
+	//	log.Fatal("could not start Trace profile: ", err)
+	//}
+	//defer trace.Stop()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if err := call(mod); err != nil {
