@@ -50,8 +50,8 @@ isn't a TinyGo official document. For more help, consider the [TinyGo Using
 WebAssembly Guide][4] or joining the [#TinyGo channel on the Gophers Slack][5].
 
 Meanwhile, please help us [maintain][6] this document and [star our GitHub
-repository][7], if it is helpful. Together, we can help make WebAssembly easier
-on the next person.
+repository][7], if it is helpful. Together, we can make WebAssembly easier on
+the next person.
 
 ## Constraints
 
@@ -167,11 +167,11 @@ Go code (compiled to %.wasm) can read this memory directly by first coercing it
 to a `reflect.SliceHeader`.
 ```go
 func ptrToString(ptr uintptr, size uint32) string {
-    return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
-        Data: ptr,
-        Len:  uintptr(size),
-        Cap:  uintptr(size),
-    }))
+	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: ptr,
+		Len:  uintptr(size),
+		Cap:  uintptr(size),
+	}))
 }
 ```
 
@@ -199,10 +199,10 @@ var alivePointers = map[uintptr][]byte{}
 //export my_malloc
 func my_malloc(size uint32) uintptr {
 	buf := make([]byte, size)
-    ptr := &buf[0]
-    unsafePtr := uintptr(unsafe.Pointer(ptr))
-    alivePointers[unsafePtr] = buf
-    return unsafePtr
+	ptr := &buf[0]
+	unsafePtr := uintptr(unsafe.Pointer(ptr))
+	alivePointers[unsafePtr] = buf
+	return unsafePtr
 }
 
 //export my_free
@@ -292,9 +292,9 @@ However, creating goroutines after main (`_start` in WASI) has undefined
 behavior. For example, if that same function was exported (`//export:notMain`),
 and called after main, the line that creates a goroutine panics at runtime.
 
-Given problems like this, some choose a compile-time failure instead, via the
+Given problems like this, some choose a compile-time failure instead, via
 `-scheduler=none`. Since code often needs to be custom in order to work with
-wasm anyway, there may be limited effect to removing goroutine support.
+wasm anyway, there may be limited impact to removing goroutine support.
 
 ## Optimizations
 
@@ -303,9 +303,9 @@ performance vs defaults. Note that sometimes one sacrifices the other.
 
 ### Binary size
 
-Those who aren't concerned about binary (`%.wasm` file) size should not
-interfere with TinyGo's defaults. However, the following flags are commonly
-used to reduce the binary size, sometimes to below 100KB.
+Those with size constraints can reduce the `%.wasm` binary size by changing
+`tinygo` flags. For example, a simple `cat` program can reduce from default of
+260KB to 60KB using both flags below.
 
 * `-scheduler=none`: Reduces size, but fails at compile time on goroutines.
 * `--no-debug`: Strips DWARF, but retains the WebAssembly name section.
