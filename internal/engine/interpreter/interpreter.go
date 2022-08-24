@@ -784,19 +784,7 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...u
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
-			builder := wasmdebug.NewErrorBuilder()
-			frameCount := len(ce.frames)
-			for i := 0; i < frameCount; i++ {
-				frame := ce.popFrame()
-				def := frame.f.source.Definition()
-				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
-			}
-			err = builder.FromRecovered(v)
-		}
-
-		if err != nil {
-			ce.stack = ce.stack[:0]
-			ce.frames = ce.frames[:0]
+			err = ce.recoverOnCall(v)
 		}
 	}()
 
@@ -808,6 +796,20 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...u
 
 	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
 	return
+}
+
+func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
+	builder := wasmdebug.NewErrorBuilder()
+	frameCount := len(ce.frames)
+	for i := 0; i < frameCount; i++ {
+		frame := ce.popFrame()
+		def := frame.f.source.Definition()
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+	}
+	err = builder.FromRecovered(v)
+
+	// Allows the reuse of CallEngine.
+	ce.stack, ce.frames = ce.stack[:0], ce.frames[:0]
 }
 
 func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {

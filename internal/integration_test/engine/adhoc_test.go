@@ -555,7 +555,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	require.Zero(t, results[0]) // should succeed and return the old size in pages.
 
-	// Any offset larger than the current size should be out of of bounds error even when it is less than memory capacity.
+	// Any offset larger than the current size should be out of bounds error even when it is less than memory capacity.
 	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
 	require.Error(t, err) // Out of bounds error.
 

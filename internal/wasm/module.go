@@ -80,7 +80,7 @@ type Module struct {
 	// For example, if there are two imported tables and one defined in this module, the table Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one table definition per module, so the
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one table FunctionDefinition per module, so the
 	// length of the TableSection can be zero or one, and can only be one if there is no imported table.
 	//
 	// Note: In the Binary Format, this is SectionIDTable.
@@ -94,7 +94,7 @@ type Module struct {
 	// For example, if there are two imported memories and one defined in this module, the memory Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory definition per module, so the
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory FunctionDefinition per module, so the
 	// length of the MemorySection can be zero or one, and can only be one if there is no imported memory.
 	//
 	// Note: In the Binary Format, this is SectionIDMemory.
@@ -603,7 +603,7 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.Fu
 		f.Module = m
 		f.Idx = d.index
 		f.Type = d.funcType
-		f.definition = d
+		f.FunctionDefinition = d
 		if listeners != nil {
 			f.FunctionListener = listeners[i]
 		}
@@ -790,10 +790,10 @@ type ConstantExpression struct {
 type Export struct {
 	Type ExternType
 
-	// Name is what the host refers to this definition as.
+	// Name is what the host refers to this FunctionDefinition as.
 	Name string
 
-	// Index is the index of the definition to export, the index namespace is by Type
+	// Index is the index of the FunctionDefinition to export, the index namespace is by Type
 	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
 	Index Index
 }

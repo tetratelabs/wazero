@@ -140,8 +140,8 @@ type (
 		// Idx holds the index of this function instance in the function index namespace (beginning with imports).
 		Idx Index
 
-		// definition is known at compile time.
-		definition api.FunctionDefinition
+		// FunctionDefinition is known at compile time.
+		FunctionDefinition api.FunctionDefinition
 
 		// FunctionListener holds a listener to notify when this function is called.
 		FunctionListener experimentalapi.FunctionListener
@@ -166,7 +166,7 @@ type (
 
 // Definition implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionInstance) Definition() api.FunctionDefinition {
-	return f.definition
+	return f.FunctionDefinition
 }
 
 // The wazero specific limitations described at RATIONALE.md.

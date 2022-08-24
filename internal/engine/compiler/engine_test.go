@@ -2,11 +2,13 @@ package compiler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
@@ -301,4 +303,61 @@ func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 
 	require.Equal(t, 1, len(table.References))
 	require.Equal(t, uintptr(0xff), table.References[0])
+}
+
+func TestCallEngine_recoverOnCall(t *testing.T) {
+	ce := &callEngine{
+		valueStack:        make([]uint64, 100),
+		valueStackContext: valueStackContext{stackPointer: 3},
+		globalContext:     globalContext{callFrameStackPointer: 5},
+		callFrameStack: []callFrame{
+			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("1")}}},
+			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("2")}}},
+			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("3")}}},
+			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("4")}}},
+			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("5")}}},
+		},
+	}
+
+	beforeRecoverValueStack, beforeRecoverCallFrameStack := ce.valueStack, ce.callFrameStack
+
+	err := ce.recoverOnCall(errors.New("some error"))
+	require.EqualError(t, err, `some error (recovered by wazero)
+wasm stack trace:
+	5()
+	4()
+	3()
+	2()
+	1()`)
+
+	// After recover, the stack pointers must be reset, but the underlying slices must be intact
+	// for the subsequent calls.
+	require.Equal(t, uint64(0), ce.stackPointer)
+	require.Equal(t, uint64(0), ce.callFrameStackPointer)
+	require.Equal(t, beforeRecoverValueStack, ce.valueStack)
+	require.Equal(t, beforeRecoverCallFrameStack, ce.callFrameStack)
+}
+
+func newMockFunctionDefinition(name string) api.FunctionDefinition {
+	return &mockFunctionDefinition{debugName: name, FunctionDefinition: &wasm.FunctionDefinition{}}
+}
+
+type mockFunctionDefinition struct {
+	debugName string
+	*wasm.FunctionDefinition
+}
+
+// DebugName implements the same method as documented on api.FunctionDefinition.
+func (f *mockFunctionDefinition) DebugName() string {
+	return f.debugName
+}
+
+// ParamTypes implements api.FunctionDefinition ParamTypes.
+func (f *mockFunctionDefinition) ParamTypes() []wasm.ValueType {
+	return []wasm.ValueType{}
+}
+
+// ResultTypes implements api.FunctionDefinition ResultTypes.
+func (f *mockFunctionDefinition) ResultTypes() []wasm.ValueType {
+	return []wasm.ValueType{}
 }

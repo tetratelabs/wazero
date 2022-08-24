@@ -150,7 +150,7 @@ func newModuleVal(m api.Module) reflect.Value {
 
 // MustParseGoFuncCode parses Code from the go function or panics.
 //
-// Exposing this simplifies definition of host functions in built-in host
+// Exposing this simplifies FunctionDefinition of host functions in built-in host
 // modules and tests.
 func MustParseGoFuncCode(fn interface{}) *Code {
 	_, _, code, err := parseGoFunc(fn)

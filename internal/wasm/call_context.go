@@ -174,7 +174,7 @@ type importedFn struct {
 
 // Definition implements the same method as documented on api.Function.
 func (f *importedFn) Definition() api.FunctionDefinition {
-	return f.importedFn.definition
+	return f.importedFn.FunctionDefinition
 }
 
 // Call implements the same method as documented on api.Function.

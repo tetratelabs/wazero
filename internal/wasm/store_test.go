@@ -617,9 +617,9 @@ func Test_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			f := &FunctionInstance{
-				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
 			g := &FunctionInstance{
-				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
+				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{
@@ -651,7 +651,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]*ExportInstance{name: {
-					Function: &FunctionInstance{definition: &FunctionDefinition{funcType: &FunctionType{}}},
+					Function: &FunctionInstance{FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{}}},
 				}}, Name: moduleName},
 			}
 			m := &Module{
