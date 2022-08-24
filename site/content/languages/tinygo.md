@@ -14,14 +14,14 @@ This document is maintained by wazero, which is a WebAssembly runtime that
 embeds in Golang applications. Hence, all notes below will be about TinyGo's
 `wasi` target.
 
+## Overview
+
 When TinyGo compiles a `%.go` file with its `wasi` target, the output `%.wasm`
 depends on a subset of features in the [WebAssembly 2.0 Core specification][2],
 as well [WASI][3] host imports.
 
 Unlike some compilers, TinyGo also supports importing custom host functions and
 exporting functions back to the host.
-
-## Example
 
 Here's a basic example of source in TinyGo:
 
@@ -34,7 +34,7 @@ func add(x, y uint32) uint32 {
 }
 ```
 
-The following flags will result in the most compact (smallest) wasm file.
+The following is the minimal command to build a wasm file.
 ```bash
 tinygo build -o main.wasm -target=wasi main.go
 ```
@@ -116,14 +116,14 @@ is also a much more efficient means to communicate bugs vs ad-hoc reports.
 
 When TinyGo compiles go into wasm, it configures the WebAssembly linear memory
 to an initial size of 2 pages (16KB), and marks a position in that memory as
-the heap base. All memory beyond that is used for the Go heap, which can
-[grow][20] until `memory.grow` on the host returns -1.
+the heap base. All memory beyond that is used for the Go heap.
 
 Allocations within Go (compiled to `%.wasm`) are managed as one would expect.
-Sometimes a host function needs to allocate memory directly. For example, to
-write JSON of a given length before invoking an exported function to parse it.
+The allocator can [grow][20] until `memory.grow` on the host returns -1.
 
 ### Host Allocations
+Sometimes a host function needs to allocate memory directly. For example, to
+write JSON of a given length before invoking an exported function to parse it.
 
 The below snippet is a realistic example of a function exported to the host,
 who needs to allocate memory first.
@@ -220,11 +220,11 @@ approach later.
 
 WebAssembly is a stack-based virtual machine specification, so operates at a
 lower level than an operating system. For functionality the operating system
-would otherwise provide, TinyGo imports host functions, specifically ones
-defined in [WASI][3], described in [Specifications]({{< ref "/specs" >}}).
+would otherwise provide, TinyGo imports host functions defined in [WASI][3],
+described in [Specifications]({{< ref "/specs" >}}).
 
-Notably, if you compile and run below program with the target `wasi`, you'll
-see that the effective `GOARCH=wasm` and `GOOS=linux`.
+For example, if you compile and run below program with the target `wasi`,
+you'll see the effective `GOARCH=wasm` and `GOOS=linux`.
 
 ```go
 package main
@@ -238,6 +238,9 @@ func main() {
 	fmt.Println(runtime.GOARCH, runtime.GOOS)
 }
 ```
+
+Note: wazero includes an [example WASI project][21] including [source code][22]
+that implements `cat` without any WebAssembly-specific code.
 
 ### WASI Internals
 
@@ -344,7 +347,7 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 
 [1]: https://tinygo.org/
 [2]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-[3]: https://github.com/WebAssembly/WASI
+[3]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [4]: https://tinygo.org/docs/guides/webassembly/
 [5]: https://github.com/tinygo-org/tinygo#getting-help
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/tinygo.md
@@ -362,3 +365,5 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [18]: https://github.com/tinygo-org/tinygo/issues/447
 [19]: https://github.com/tinygo-org/tinygo/issues/3068
 [20]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/arch_tinygowasm.go#L47-L62
+[21]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
+[22]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/tinygo
