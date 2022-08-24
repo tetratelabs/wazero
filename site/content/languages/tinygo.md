@@ -50,7 +50,55 @@ These constraints affect the library design and dependency choices in your Go
 source.
 
 The first constraint people notice is that `encoding/json` usage compiles, but
-panics at runtime. This is due to limited support for reflection.
+panics at runtime.
+```go
+package main
+
+import "encoding/json"
+
+type response struct {
+	Ok bool `json:"ok"`
+}
+
+func main() {
+	var res response
+	if err := json.Unmarshal([]byte(`{"ok": true}`), &res); err != nil {
+		println(err)
+	}
+}
+```
+This is due to limited support for reflection, and effects other [serialization
+tools][18] also. See [Frequently Asked Questions](#frequently-asked-questions)
+for some workarounds.
+
+
+You may also notice some other features not yet work. For example, the below
+will compile, but print "readdir unimplemented : errno 54" at runtime.
+
+```go
+package main
+
+import "os"
+
+func main() {
+	if _, err := os.ReadDir("."); err != nil {
+		println(err)
+	}
+}
+```
+
+The underlying error is often, but not always `syscall.ENOSYS` which is the
+standard way to stub a syscall until it is implemented. If you are interested
+in more, see the [System Calls heading below](#system-calls).
+
+Realities like this are not unique to TinyGo as they will happen compiling any
+language not written specifically with WebAssembly in mind. Knowing the same
+code compiled to wasm may return errors or worse panic, the main mitigation
+approach is testing.
+
+Unit test the critical paths of your code, including errors, on your target
+WebAssembly runtime, such as wazero. This not only gives higher confidence, but
+is also a much more efficient means to communicate bugs vs ad-hoc reports.
 
 ## Memory
 
@@ -75,11 +123,53 @@ clarifications:
 * [WebAssembly exports for allocation][9]
 * [Memory ownership of TinyGo allocated pointers][10]
 
+## System Calls
+
+WebAssembly is a stack-based virtual machine specification, so operates at a
+lower level than an operating system. For functionality the operating system
+would otherwise provide, TinyGo imports host functions, specifically ones
+defined in [WASI][3], described in [Specifications]({{< ref "/specs" >}}).
+
+Notably, if you compile and run below program with the target `wasi`, you'll
+see that the effective `GOARCH=wasm` and `GOOS=linux`.
+
+```go
+package main
+
+import (
+	"fmt"
+	"runtime"
+)
+
+func main() {
+	fmt.Println(runtime.GOARCH, runtime.GOOS)
+}
+```
+
+### WASI Internals
+
+While developing WASI in TinyGo is outside the scope of this document, the
+below pointers will help you understand the underlying architecture of the
+`wasi` target. Ideally, these notes can help you frame support or feature
+requests with the TinyGo team.
+
+A close look at the [wasi target][11] reveals how things work. Underneath,
+TinyGo leverages the `wasm32-unknown-wasi` LLVM target for the system call
+layer (libc), which is eventually implemented by the [wasi-libc][12] library.
+
+Similar to normal code, TinyGo decides which abstraction to use with GOOS and
+GOARCH specific suffixes and build flags.
+
+For example, `os.Args` is implemented directly using WebAssembly host functions
+in [runtime_wasm_wasi.go][13]. `syscall.Chdir` is implemented with the same
+[syscall_libc.go][14] used for other architectures, while `syscall.ReadDirent`
+is stubbed (returns `syscall.ENOSYS`), in [syscall_libc_wasi.go][15].
+
 ## Frequently Asked Questions
 
 ### How do I use json?
-TinyGo doesn't yet implement [reflection APIs][11] needed by `encoding/json`.
-Meanwhile, most users resort to non-reflective parsers, such as [gjson][12].
+TinyGo doesn't yet implement [reflection APIs][16] needed by `encoding/json`.
+Meanwhile, most users resort to non-reflective parsers, such as [gjson][17].
 
 ### Why does my wasm import WASI functions even when I don't use it?
 TinyGo does not have a standalone wasm target, rather only `wasi`. Some users
@@ -103,5 +193,11 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [8]: https://github.com/tetratelabs/wazero/tree/main/examples/allocation/tinygo
 [9]: https://github.com/tinygo-org/tinygo/issues/2788
 [10]: https://github.com/tinygo-org/tinygo/issues/2787
-[11]: https://github.com/tinygo-org/tinygo/issues/2660
-[12]: https://github.com/tidwall/gjson
+[11]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/targets/wasi.json
+[12]: https://github.com/WebAssembly/wasi-libc
+[13]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/runtime_wasm_wasi.go#L34-L62
+[14]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/syscall/syscall_libc.go#L85-L92
+[15]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/syscall/syscall_libc_wasi.go#L263-L265
+[16]: https://github.com/tinygo-org/tinygo/issues/2660
+[17]: https://github.com/tidwall/gjson
+[18]: https://github.com/tinygo-org/tinygo/issues/447

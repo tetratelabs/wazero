@@ -15,7 +15,7 @@ Ex. If your source is in Go, you might compile it with TinyGo.
   '-----+-----'      '----------------------'    '-----------'
 ```
 
-Below are a list of languages notes wazero contributed so far.
+Below are notes wazero contributed so far, in alphabetical order by language:
 
 * [TinyGo](tinygo) Ex. `tinygo build -o X.wasm -scheduler=none --no-debug -target=wasi X.go`
 
