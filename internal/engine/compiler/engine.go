@@ -68,8 +68,10 @@ type (
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
 
+		// compiled is the initial function for this call engine.
 		compiled *function
-		source   *wasm.FunctionInstance
+		// source is the FunctionInstance from which compiled is created from.
+		source *wasm.FunctionInstance
 	}
 
 	// globalContext holds the data which is constant across multiple function calls.
@@ -560,11 +562,6 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 
 		if v := recover(); v != nil {
 			builder := wasmdebug.NewErrorBuilder()
-			// Handle edge-case where the host function is called directly by Go.
-			if ce.globalContext.callFrameStackPointer == 0 {
-				def := ce.compiled.source.Definition()
-				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
-			}
 			for i := uint64(0); i < ce.globalContext.callFrameStackPointer; i++ {
 				def := ce.callFrameStack[ce.globalContext.callFrameStackPointer-1-i].function.source.Definition()
 				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())

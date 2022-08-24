@@ -89,8 +89,10 @@ type callEngine struct {
 	// frames are the function call stack.
 	frames []*callFrame
 
-	source   *wasm.FunctionInstance
+	// compiled is the initial function for this call engine.
 	compiled *function
+	// source is the FunctionInstance from which compiled is created from.
+	source *wasm.FunctionInstance
 }
 
 func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
@@ -790,6 +792,11 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...u
 				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 			}
 			err = builder.FromRecovered(v)
+		}
+
+		if err != nil {
+			ce.stack = ce.stack[:0]
+			ce.frames = ce.frames[:0]
 		}
 	}()
 

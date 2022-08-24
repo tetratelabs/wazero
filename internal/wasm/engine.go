@@ -55,7 +55,7 @@ type ModuleEngine interface {
 	InitializeFuncrefGlobals(globals []*GlobalInstance)
 }
 
-// CallEngine
+// CallEngine implements function calls for a FunctionInstance.
 type CallEngine interface {
 	// Call invokes a function instance f with given parameters.
 	Call(ctx context.Context, m *CallContext, params ...uint64) (results []uint64, err error)

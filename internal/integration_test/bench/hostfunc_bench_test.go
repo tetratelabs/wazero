@@ -126,13 +126,13 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 }
 
 func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
-	callGoHost := m.Exports[name].Function
-	if callGoHost == nil {
+	f := m.Exports[name].Function
+	if f == nil {
 		err = fmt.Errorf("%s not found", name)
 		return
 	}
 
-	ce, err = m.Engine.NewCallEngine(m.CallCtx, callGoHost)
+	ce, err = m.Engine.NewCallEngine(m.CallCtx, f)
 	return
 }
 
