@@ -603,7 +603,7 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.Fu
 		f.Module = m
 		f.Idx = d.index
 		f.Type = d.funcType
-		f.definition = d
+		f.FunctionDefinition = d
 		if listeners != nil {
 			f.FunctionListener = listeners[i]
 		}

@@ -88,10 +88,15 @@ type callEngine struct {
 
 	// frames are the function call stack.
 	frames []*callFrame
+
+	// compiled is the initial function for this call engine.
+	compiled *function
+	// source is the FunctionInstance from which compiled is created from.
+	source *wasm.FunctionInstance
 }
 
-func (e *moduleEngine) newCallEngine() *callEngine {
-	return &callEngine{}
+func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
+	return &callEngine{source: source, compiled: compiled}
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -750,25 +755,27 @@ func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) 
 	}
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
 	compiled := e.functions[f.Idx]
 	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = m.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.codes[%d] was nil before close", e.name, f.Idx))
+		if err = callCtx.FailIfClosed(); err == nil {
+			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
 		}
 		return
 	}
+	return e.newCallEngine(f, compiled), nil
+}
 
-	paramSignature := f.Type.ParamNumInUint64
+// Call implements the same method as documented on wasm.ModuleEngine.
+func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...uint64) (results []uint64, err error) {
+	paramSignature := ce.source.Type.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
 		return nil, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
 	}
 
-	ce := e.newCallEngine()
 	defer func() {
 		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 		if err == nil {
@@ -777,14 +784,7 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 		// TODO: ^^ Will not fail if the function was imported from a closed module.
 
 		if v := recover(); v != nil {
-			builder := wasmdebug.NewErrorBuilder()
-			frameCount := len(ce.frames)
-			for i := 0; i < frameCount; i++ {
-				frame := ce.popFrame()
-				def := frame.f.source.Definition()
-				builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
-			}
-			err = builder.FromRecovered(v)
+			err = ce.recoverOnCall(v)
 		}
 	}()
 
@@ -792,9 +792,27 @@ func (e *moduleEngine) Call(ctx context.Context, m *wasm.CallContext, f *wasm.Fu
 		ce.pushValue(param)
 	}
 
-	ce.callFunction(ctx, m, compiled)
+	ce.callFunction(ctx, m, ce.compiled)
 
-	results = wasm.PopValues(f.Type.ResultNumInUint64, ce.popValue)
+	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
+	return
+}
+
+// recoverOnCall takes the recovered value `recoverOnCall`, and wraps it
+// with the call frame stack traces. Also, reset the state of callEngine
+// so that it can be used for the subsequent calls.
+func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
+	builder := wasmdebug.NewErrorBuilder()
+	frameCount := len(ce.frames)
+	for i := 0; i < frameCount; i++ {
+		frame := ce.popFrame()
+		def := frame.f.source.FunctionDefinition
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+	}
+	err = builder.FromRecovered(v)
+
+	// Allows the reuse of CallEngine.
+	ce.stack, ce.frames = ce.stack[:0], ce.frames[:0]
 	return
 }
 
@@ -811,7 +829,7 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
 	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if f.source.FunctionListener != nil {
-		ctx = f.source.FunctionListener.Before(ctx, f.source.Definition(), params)
+		ctx = f.source.FunctionListener.Before(ctx, f.source.FunctionDefinition, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -819,7 +837,7 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	ce.popFrame()
 	if f.source.FunctionListener != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
-		f.source.FunctionListener.After(ctx, f.source.Definition(), nil, results)
+		f.source.FunctionListener.After(ctx, f.source.FunctionDefinition, nil, results)
 	}
 	return
 }
@@ -4301,10 +4319,10 @@ func i32Abs(v uint32) uint32 {
 }
 
 func (ce *callEngine) callNativeFuncWithListener(ctx context.Context, callCtx *wasm.CallContext, f *function, fnl experimental.FunctionListener) context.Context {
-	ctx = fnl.Before(ctx, f.source.Definition(), ce.peekValues(len(f.source.Type.Params)))
+	ctx = fnl.Before(ctx, f.source.FunctionDefinition, ce.peekValues(len(f.source.Type.Params)))
 	ce.callNativeFunc(ctx, callCtx, f)
 	// TODO: This doesn't get the error due to use of panic to propagate them.
-	fnl.After(ctx, f.source.Definition(), nil, ce.peekValues(len(f.source.Type.Results)))
+	fnl.After(ctx, f.source.FunctionDefinition, nil, ce.peekValues(len(f.source.Type.Results)))
 	return ctx
 }
 

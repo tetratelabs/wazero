@@ -154,17 +154,27 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
 	fn := module.Functions[0]
-	results, err := me.Call(testCtx, module.CallCtx, fn, 1, 2)
+
+	ce, err := me.NewCallEngine(module.CallCtx, fn)
+	require.NoError(t, err)
+
+	results, err := ce.Call(testCtx, module.CallCtx, 1, 2)
 	require.NoError(t, err)
 	require.Equal(t, []uint64{1, 2}, results)
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := me.Call(testCtx, module.CallCtx, fn)
+		ce, err := me.NewCallEngine(module.CallCtx, fn)
+		require.NoError(t, err)
+
+		_, err = ce.Call(testCtx, module.CallCtx)
 		require.EqualError(t, err, "expected 2 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := me.Call(testCtx, module.CallCtx, fn, 1, 2, 3)
+		ce, err := me.NewCallEngine(module.CallCtx, fn)
+		require.NoError(t, err)
+
+		_, err = ce.Call(testCtx, module.CallCtx, 1, 2, 3)
 		require.EqualError(t, err, "expected 2 params, but passed 3")
 	})
 }
@@ -364,7 +374,10 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := tc.fn.Module.Engine.Call(testCtx, importing.CallCtx, tc.fn)
+			ce, err := tc.fn.Module.Engine.NewCallEngine(tc.fn.Module.CallCtx, tc.fn)
+			require.NoError(t, err)
+
+			results, err := ce.Call(testCtx, importing.CallCtx)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, results[0])
 		})
@@ -416,7 +429,11 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 		t.Run(tc.name, func(t *testing.T) {
 			m := tc.module
 			f := tc.fn
-			results, err := f.Module.Engine.Call(testCtx, m, f, 1)
+
+			ce, err := f.Module.Engine.NewCallEngine(m, f)
+			require.NoError(t, err)
+
+			results, err := ce.Call(testCtx, m, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -508,11 +525,15 @@ wasm stack trace:
 		t.Run(tc.name, func(t *testing.T) {
 			m := tc.module
 			f := tc.fn
-			_, err := f.Module.Engine.Call(testCtx, m, f, tc.input...)
+
+			ce, err := f.Module.Engine.NewCallEngine(m, f)
+			require.NoError(t, err)
+
+			_, err = ce.Call(testCtx, m, tc.input...)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Ensure the module still works
-			results, err := f.Module.Engine.Call(testCtx, m, f, 1)
+			results, err := ce.Call(testCtx, m, 1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -594,7 +615,9 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, make([]byte, wasmPhraseSize), buf)
 
 	// Initialize the memory using Wasm. This copies the test phrase.
-	_, err = me.Call(testCtx, module.CallCtx, init)
+	initCallEngine, err := me.NewCallEngine(module.CallCtx, init)
+	require.NoError(t, err)
+	_, err = initCallEngine.Call(testCtx, module.CallCtx)
 	require.NoError(t, err)
 
 	// We expect the same []byte read earlier to now include the phrase in wasm.
@@ -624,14 +647,18 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
-	_, err = me.Call(testCtx, module.CallCtx, grow, 1)
+	growCallEngine, err := me.NewCallEngine(module.CallCtx, grow)
+	require.NoError(t, err)
+	_, err = growCallEngine.Call(testCtx, module.CallCtx, 1)
 	require.NoError(t, err)
 
 	// The host buffer should still contain the same bytes as before grow
 	require.Equal(t, hostPhraseTruncated, string(buf2))
 
 	// Re-initialize the memory in wasm, which overwrites the region.
-	_, err = me.Call(testCtx, module.CallCtx, init)
+	initCallEngine2, err := me.NewCallEngine(module.CallCtx, init)
+	require.NoError(t, err)
+	_, err = initCallEngine2.Call(testCtx, module.CallCtx)
 	require.NoError(t, err)
 
 	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.

@@ -44,8 +44,8 @@ type ModuleEngine interface {
 	// Name returns the name of the module this engine was compiled for.
 	Name() string
 
-	// Call invokes a function instance f with given parameters.
-	Call(ctx context.Context, m *CallContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
+	// NewCallEngine returns a CallEngine for the given FunctionInstance.
+	NewCallEngine(callCtx *CallContext, f *FunctionInstance) (CallEngine, error)
 
 	// CreateFuncElementInstance creates an ElementInstance whose references are engine-specific function pointers
 	// corresponding to the given `indexes`.
@@ -53,6 +53,13 @@ type ModuleEngine interface {
 
 	// InitializeFuncrefGlobals initializes the globals of Funcref type as the opaque pointer values of engine specific compiled functions.
 	InitializeFuncrefGlobals(globals []*GlobalInstance)
+}
+
+// CallEngine implements function calls for a FunctionInstance. It manages its own call frame stack and value stack,
+// internally, and shouldn't be used concurrently.
+type CallEngine interface {
+	// Call invokes a function instance f with given parameters.
+	Call(ctx context.Context, m *CallContext, params ...uint64) (results []uint64, err error)
 }
 
 // TableInitEntry is normalized element segment used for initializing tables by engines.

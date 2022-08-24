@@ -47,7 +47,7 @@ func TestSpecTestCompilerCache(t *testing.T) {
 			cmd.Stdout = buf
 			cmd.Stderr = buf
 			err = cmd.Run()
-			require.NoError(t, err)
+			require.NoError(t, err, buf.String())
 			exp = append(exp, "PASS\n")
 		}
 

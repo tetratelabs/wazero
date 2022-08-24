@@ -337,7 +337,7 @@ func TestCallContext_ExportedFunction(t *testing.T) {
 		fn := importing.ExportedFunction("host.fn")
 		require.NotNil(t, fn)
 
-		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn"))
+		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn").(*function).fi)
 		require.Equal(t, fn.(*importedFn).importingModule, importing)
 	})
 }
@@ -349,6 +349,11 @@ type mockEngine struct {
 
 type mockModuleEngine struct {
 	name          string
+	callFailIndex int
+}
+
+type mockCallEngine struct {
+	f             *FunctionInstance
 	callFailIndex int
 }
 
@@ -373,8 +378,12 @@ func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstan
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
+func (e *mockModuleEngine) NewCallEngine(callCtx *CallContext, f *FunctionInstance) (CallEngine, error) {
+	return &mockCallEngine{f: f, callFailIndex: e.callFailIndex}, nil
+}
+
 // CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
-func (me *mockModuleEngine) CreateFuncElementInstance([]*Index) *ElementInstance {
+func (e *mockModuleEngine) CreateFuncElementInstance([]*Index) *ElementInstance {
 	return nil
 }
 
@@ -386,17 +395,17 @@ func (e *mockModuleEngine) Name() string {
 	return e.name
 }
 
+// Close implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) Close(_ context.Context) {
+}
+
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) Call(ctx context.Context, callCtx *CallContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
-	if e.callFailIndex >= 0 && f.Definition().Index() == Index(e.callFailIndex) {
+func (ce *mockCallEngine) Call(ctx context.Context, callCtx *CallContext, _ ...uint64) (results []uint64, err error) {
+	if ce.callFailIndex >= 0 && ce.f.FunctionDefinition.Index() == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
 	return
-}
-
-// Close implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) Close(_ context.Context) {
 }
 
 func TestStore_getFunctionTypeID(t *testing.T) {
@@ -608,9 +617,9 @@ func Test_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			f := &FunctionInstance{
-				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
 			g := &FunctionInstance{
-				definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
+				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{
@@ -642,7 +651,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]*ExportInstance{name: {
-					Function: &FunctionInstance{definition: &FunctionDefinition{funcType: &FunctionType{}}},
+					Function: &FunctionInstance{FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{}}},
 				}}, Name: moduleName},
 			}
 			m := &Module{

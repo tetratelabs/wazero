@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"testing"
 
@@ -40,14 +41,14 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 	binary.LittleEndian.PutUint32(m.Memory.Buffer[offset:], math.Float32bits(val))
 
 	b.Run(callGoHostName, func(b *testing.B) {
-		callGoHost := m.Exports[callGoHostName].Function
-		if callGoHost == nil {
-			b.Fatal()
+		ce, err := getCallEngine(m, callGoHostName)
+		if err != nil {
+			b.Fatal(err)
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			res, err := callGoHost.Call(testCtx, offset)
+			res, err := ce.Call(testCtx, m.CallCtx, offset)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -58,14 +59,14 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 	})
 
 	b.Run(callWasmHostName, func(b *testing.B) {
-		callWasmHost := m.Exports[callWasmHostName].Function
-		if callWasmHost == nil {
-			b.Fatal()
+		ce, err := getCallEngine(m, callWasmHostName)
+		if err != nil {
+			b.Fatal(err)
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			res, err := callWasmHost.Call(testCtx, offset)
+			res, err := ce.Call(testCtx, m.CallCtx, offset)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -85,8 +86,11 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	callWasmHost := m.Exports[callWasmHostName].Function
-	callGoHost := m.Exports[callGoHostName].Function
+	callWasmHost, err := getCallEngine(m, callWasmHostName)
+	require.NoError(t, err)
+
+	callGoHost, err := getCallEngine(m, callGoHostName)
+	require.NoError(t, err)
 
 	require.NotNil(t, callWasmHost)
 	require.NotNil(t, callGoHost)
@@ -104,21 +108,32 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 
 	for _, f := range []struct {
 		name string
-		f    *wasm.FunctionInstance
+		ce   wasm.CallEngine
 	}{
-		{name: "go", f: callGoHost},
-		{name: "wasm", f: callWasmHost},
+		{name: "go", ce: callGoHost},
+		{name: "wasm", ce: callWasmHost},
 	} {
 		f := f
 		t.Run(f.name, func(t *testing.T) {
 			for _, tc := range tests {
 				binary.LittleEndian.PutUint32(mem[tc.offset:], math.Float32bits(tc.val))
-				res, err := f.f.Call(context.Background(), uint64(tc.offset))
+				res, err := f.ce.Call(context.Background(), m.CallCtx, uint64(tc.offset))
 				require.NoError(t, err)
 				require.Equal(t, math.Float32bits(tc.val), uint32(res[0]))
 			}
 		})
 	}
+}
+
+func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
+	f := m.Exports[name].Function
+	if f == nil {
+		err = fmt.Errorf("%s not found", name)
+		return
+	}
+
+	ce, err = m.Engine.NewCallEngine(m.CallCtx, f)
+	return
 }
 
 func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {

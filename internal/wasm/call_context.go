@@ -140,22 +140,47 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 	if err != nil {
 		return nil
 	}
-	if exp.Function.Module == m.module {
-		return exp.Function
-	} else {
-		return &importedFn{importingModule: m, importedFn: exp.Function}
+
+	fi := exp.Function
+	ce, err := exp.Function.Module.Engine.NewCallEngine(m, fi)
+	if err != nil {
+		return nil
 	}
+
+	if exp.Function.Module == m.module {
+		return &function{fi: fi, ce: ce}
+	} else {
+		return &importedFn{importingModule: m, importedFn: fi, ce: ce}
+	}
+}
+
+// function implements api.Function. This couples FunctionInstance with CallEngine so that
+// it can be used to make function calls originating from the FunctionInstance.
+type function struct {
+	fi *FunctionInstance
+	ce CallEngine
+}
+
+// Definition implements the same method as documented on api.FunctionDefinition.
+func (f *function) Definition() api.FunctionDefinition {
+	return f.fi.FunctionDefinition
+}
+
+// Call implements the same method as documented on api.Function.
+func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	return f.ce.Call(ctx, f.fi.Module.CallCtx, params...)
 }
 
 // importedFn implements api.Function and ensures the call context of an imported function is the importing module.
 type importedFn struct {
+	ce              CallEngine
 	importingModule *CallContext
 	importedFn      *FunctionInstance
 }
 
 // Definition implements the same method as documented on api.Function.
 func (f *importedFn) Definition() api.FunctionDefinition {
-	return f.importedFn.definition
+	return f.importedFn.FunctionDefinition
 }
 
 // Call implements the same method as documented on api.Function.
@@ -164,17 +189,7 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 		return nil, fmt.Errorf("directly calling host function is not supported")
 	}
 	mod := f.importingModule
-	return f.importedFn.Module.Engine.Call(ctx, mod, f.importedFn, params...)
-}
-
-// Call implements the same method as documented on api.Function.
-func (f *FunctionInstance) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	if f.IsHostFunction {
-		return nil, fmt.Errorf("directly calling host function is not supported")
-	}
-	mod := f.Module
-	ret, err = mod.Engine.Call(ctx, mod.CallCtx, f, params...)
-	return
+	return f.ce.Call(ctx, mod, params...)
 }
 
 // ExportedGlobal implements the same method as documented on api.Module.

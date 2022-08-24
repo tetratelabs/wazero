@@ -272,6 +272,9 @@ type Function interface {
 	// If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
 	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
 	// function that exits.
+	//
+	// Call is not goroutine-safe, therefore it is recommended to create another Function if you want to invoke
+	// the same function concurrently. On the other hand, sequential invocations of Call is allowed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 

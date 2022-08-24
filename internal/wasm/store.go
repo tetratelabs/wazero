@@ -140,8 +140,8 @@ type (
 		// Idx holds the index of this function instance in the function index namespace (beginning with imports).
 		Idx Index
 
-		// definition is known at compile time.
-		definition api.FunctionDefinition
+		// FunctionDefinition is known at compile time.
+		FunctionDefinition api.FunctionDefinition
 
 		// FunctionListener holds a listener to notify when this function is called.
 		FunctionListener experimentalapi.FunctionListener
@@ -163,11 +163,6 @@ type (
 	// and used at runtime to do type-checks on indirect function calls.
 	FunctionTypeID uint32
 )
-
-// Definition implements the same method as documented on api.FunctionDefinition.
-func (f *FunctionInstance) Definition() api.FunctionDefinition {
-	return f.definition
-}
 
 // The wazero specific limitations described at RATIONALE.md.
 const maximumFunctionTypes = 1 << 27
@@ -399,14 +394,21 @@ func (s *Store) instantiate(
 	}
 
 	// Compile the default context for calls to this module.
-	m.CallCtx = NewCallContext(ns, m, sysCtx)
+	callCtx := NewCallContext(ns, m, sysCtx)
+	m.CallCtx = callCtx
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		_, err = f.Module.Engine.Call(ctx, m.CallCtx, f)
 
+		ce, err := f.Module.Engine.NewCallEngine(callCtx, f)
+		if err != nil {
+			return nil, fmt.Errorf("create call engine for start function[%s]: %v",
+				module.funcDesc(SectionIDFunction, funcIdx), err)
+		}
+
+		_, err = ce.Call(ctx, callCtx)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {
@@ -448,7 +450,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			expectedType := module.TypeSection[i.DescFunc]
 			importedFunction := imported.Function
 
-			d := importedFunction.Definition()
+			d := importedFunction.FunctionDefinition
 			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
 				actualType := &FunctionType{Params: d.ParamTypes(), Results: d.ResultTypes()}
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
