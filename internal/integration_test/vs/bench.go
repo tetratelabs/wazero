@@ -29,6 +29,7 @@ func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, n
 	if ensureCompilerFastest != "true" {
 		t.Skip()
 	}
+
 	type benchResult struct {
 		name string
 		nsOp float64

@@ -164,11 +164,6 @@ type (
 	FunctionTypeID uint32
 )
 
-// Definition implements the same method as documented on api.FunctionDefinition.
-func (f *FunctionInstance) Definition() api.FunctionDefinition {
-	return f.FunctionDefinition
-}
-
 // The wazero specific limitations described at RATIONALE.md.
 const maximumFunctionTypes = 1 << 27
 

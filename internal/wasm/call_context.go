@@ -148,21 +148,26 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 	}
 
 	if exp.Function.Module == m.module {
-		return &apiFunctionImpl{FunctionInstance: fi, ce: ce}
+		return &function{fi: fi, ce: ce}
 	} else {
 		return &importedFn{importingModule: m, importedFn: fi, ce: ce}
 	}
 }
 
-// apiFunctionImpl implements api.Function.
-type apiFunctionImpl struct {
-	*FunctionInstance
+// function implements api.Function.
+type function struct {
+	fi *FunctionInstance
 	ce CallEngine
 }
 
+// Definition implements the same method as documented on api.FunctionDefinition.
+func (f *function) Definition() api.FunctionDefinition {
+	return f.fi.FunctionDefinition
+}
+
 // Call implements the same method as documented on api.Function.
-func (f *apiFunctionImpl) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	return f.ce.Call(ctx, f.Module.CallCtx, params...)
+func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
+	return f.ce.Call(ctx, f.fi.Module.CallCtx, params...)
 }
 
 // importedFn implements api.Function and ensures the call context of an imported function is the importing module.

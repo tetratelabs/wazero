@@ -274,7 +274,7 @@ type Function interface {
 	// function that exits.
 	//
 	// Call is not goroutine-safe, therefore it is recommended to create another Function if you want to invoke
-	// the same function concurrently.
+	// the same function concurrently. On the other hand, sequential invocations of Call is allowed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 

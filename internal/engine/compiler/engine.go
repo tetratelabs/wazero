@@ -573,6 +573,9 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	return
 }
 
+// recoverOnCall takes the recovered value `recoverOnCall`, and wraps it
+// with the call frame stack traces. Also, reset the state of callEngine
+// so that it can be used for the subsequent calls.
 func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	builder := wasmdebug.NewErrorBuilder()
 	for i := uint64(0); i < ce.callFrameStackPointer; i++ {
