@@ -810,6 +810,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 
 	// Allows the reuse of CallEngine.
 	ce.stack, ce.frames = ce.stack[:0], ce.frames[:0]
+	return
 }
 
 func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
