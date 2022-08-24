@@ -39,7 +39,3 @@ func TestHostCall(t *testing.T) {
 func BenchmarkHostCall(b *testing.B) {
 	vs.RunBenchmarkHostCall(b, runtime)
 }
-
-func TestBenchmarkHostCall_CompilerFastest(t *testing.T) {
-	vs.RunTestBenchmarkHostCall_CompilerFastest(t, runtime())
-}
