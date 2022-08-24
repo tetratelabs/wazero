@@ -154,7 +154,8 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 	}
 }
 
-// function implements api.Function.
+// function implements api.Function. This couples FunctionInstance with CallEngine so that
+// it can be used to make function calls originating from the FunctionInstance.
 type function struct {
 	fi *FunctionInstance
 	ce CallEngine
