@@ -15,13 +15,17 @@ Ex. If your source is in Go, you might compile it with TinyGo.
   '-----+-----'      '----------------------'    '-----------'
 ```
 
-Below are notes wazero contributed so far, in alphabetical order by language:
+Below are notes wazero contributed so far, in alphabetical order by language.
 
-* [TinyGo](tinygo) Ex. `tinygo build -o X.wasm -scheduler=none --no-debug -target=wasi X.go`
+* [TinyGo](tinygo) Ex. `tinygo build -o X.wasm -target=wasi X.go`
 
-Note: These are not official documentation, and may be out of date. Please help
-us [maintain][1] these and [star our GitHub repository][2] if they are helpful.
-Together, we can help make WebAssembly easier on the next person.
+wazero is a runtime that embeds in Golang applications, not a web browser. As
+such, these notes bias towards backend use of WebAssembly, not browser use.
+
+Disclaimer: These are not official documentation, nor represent the teams who
+maintain language compilers. If you see any errors, please help [maintain][1]
+these and [star our GitHub repository][2] if they are helpful. Together, we can
+make WebAssembly easier on the next person.
 
 [1]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages
 [2]: https://github.com/tetratelabs/wazero/stargazers
