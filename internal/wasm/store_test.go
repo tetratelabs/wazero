@@ -337,7 +337,7 @@ func TestCallContext_ExportedFunction(t *testing.T) {
 		fn := importing.ExportedFunction("host.fn")
 		require.NotNil(t, fn)
 
-		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn").(*apiFunctionImpl).FunctionInstance)
+		require.Equal(t, fn.(*importedFn).importedFn, imported.ExportedFunction("host_fn").(*function).fi)
 		require.Equal(t, fn.(*importedFn).importingModule, importing)
 	})
 }
@@ -401,7 +401,7 @@ func (e *mockModuleEngine) Close(_ context.Context) {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *mockCallEngine) Call(ctx context.Context, callCtx *CallContext, _ ...uint64) (results []uint64, err error) {
-	if ce.callFailIndex >= 0 && ce.f.Definition().Index() == Index(ce.callFailIndex) {
+	if ce.callFailIndex >= 0 && ce.f.FunctionDefinition.Index() == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}

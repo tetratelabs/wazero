@@ -385,7 +385,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.function.source.Definition().DebugName(), c.returnAddress, c.returnStackBasePointer,
+		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointer,
 	)
 }
 
@@ -579,7 +579,7 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	builder := wasmdebug.NewErrorBuilder()
 	for i := uint64(0); i < ce.callFrameStackPointer; i++ {
-		def := ce.callFrameStack[ce.callFrameStackPointer-1-i].function.source.Definition()
+		def := ce.callFrameStack[ce.callFrameStackPointer-1-i].function.source.FunctionDefinition
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 	}
 	err = builder.FromRecovered(v)

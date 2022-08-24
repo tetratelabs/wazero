@@ -450,7 +450,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			expectedType := module.TypeSection[i.DescFunc]
 			importedFunction := imported.Function
 
-			d := importedFunction.Definition()
+			d := importedFunction.FunctionDefinition
 			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
 				actualType := &FunctionType{Params: d.ParamTypes(), Results: d.ResultTypes()}
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
