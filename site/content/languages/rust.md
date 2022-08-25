@@ -199,7 +199,8 @@ Those with runtime performance constraints can change their source or set
 `rustc` flags to improve it.
 
 [`rustc` flags][13]:
-* `-C opt-level=3`: Bloats binary size to increase performance.
+* `-C opt-level=2`: Enable additional optimizations, frequently at the expense
+  of binary size.
 
 ## Frequently Asked Questions
 

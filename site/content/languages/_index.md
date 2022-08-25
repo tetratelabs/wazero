@@ -30,9 +30,9 @@ make WebAssembly easier on the next person.
 
 ## Concurrency
 
-WebAssembly's virtual machine has no concept of processor or core. Similarly,
-it lacks instructions for atomics, wait/notify or barriers commonly used to
-implement parallel processing.
+WebAssembly does not yet support true parallelism; it lacks support for
+multiple threads, atomics, and memory barriers. (It may someday; See
+the [threads proposal][5].)
 
 For example, a compiler targeting [WASI][3], generates a `_start` function
 corresponding to `main` in the original source code. When the WebAssembly
@@ -62,13 +62,17 @@ This impacts how programming language primitives translate to Wasm:
 * Locks and barriers fail compilation or are implemented unsafely.
 * Async functions including I/O execute sequentially.
 
+Language compilers often used shared infrastructure, such as [LLVM][6] and
+[Binaryen][7]. One tool that helps in translation is Binaryen's [Asyncify][8],
+which lets a language support synchronous operations in an async manner.
+
 ### Concurrency via Orchestration
 
 To work around lack of concurrency at the WebAssembly Core abstraction, tools
 often orchestrate pools of workers, and ensure a module in that pool is only
 used sequentially.
 
-For example, [waPC][6] provides a WASM module pool, so host callbacks can be
+For example, [waPC][9] provides a WASM module pool, so host callbacks can be
 invoked in parallel, despite not being able to share memory.
 
 [1]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages
@@ -76,4 +80,7 @@ invoked in parallel, despite not being able to share memory.
 [3]: https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 [4]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
 [5]: https://github.com/WebAssembly/threads
-[6]: https://github.com/wapc/wapc-go
+[6]: https://llvm.org
+[7]: https://github.com/WebAssembly/binaryen
+[8]: https://github.com/WebAssembly/binaryen/blob/main/src/passes/Asyncify.cpp
+[9]: https://github.com/wapc/wapc-go

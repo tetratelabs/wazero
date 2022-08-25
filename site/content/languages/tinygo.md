@@ -275,12 +275,13 @@ Please read our overview of WebAssembly and
 WebAssembly specification does not support parallel processing.
 
 Tinygo uses only one core/thread regardless of target. This happens to be a
-good match for wasm's current lack of support for (multiple) threads. Tinygo's
-goroutine scheduler on wasm currently uses asyncify, a wasm postprocessor also
-used by other languages targeting wasm to provide similar concurrency.
+good match for Wasm's current lack of support for (multiple) threads. Tinygo's
+goroutine scheduler on Wasm currently uses Binaryen's [Asyncify][23], a Wasm
+postprocessor also used by other languages targeting Wasm to provide similar
+concurrency.
 
 In summary, TinyGo supports goroutines by default and acts like `GOMAXPROCS=1`.
-Since [goroutines are not threads][23], the following code will run with the
+Since [goroutines are not threads][24], the following code will run with the
 expected output, despite goroutines defined in opposite dependency order.
 ```go
 package main
@@ -305,7 +306,7 @@ func main() {
 
 There are some glitches to this. For example, if that same function was
 exported (`//export notMain`), and called while main wasn't running, the line
-that creates a goroutine currently [panics at runtime][24].
+that creates a goroutine currently [panics at runtime][25].
 
 Given problems like this, some choose a compile-time failure instead, via
 `-scheduler=none`. Since code often needs to be custom in order to work with
@@ -331,7 +332,8 @@ Those with runtime performance constraints can set `tinygo` flags to improve
 it.
 
 * `-gc=leaking`: Avoids GC which improves performance for short-lived programs.
-* `-opt=2`: Bloats binary size to increase performance.
+* `-opt=2`: Enable additional optimizations, frequently at the expense of binary
+  size.
 
 ## Frequently Asked Questions
 
@@ -382,5 +384,6 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [20]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/arch_tinygowasm.go#L47-L62
 [21]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
 [22]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/tinygo
-[23]: http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/
-[24]: https://github.com/tinygo-org/tinygo/issues/3095
+[23]: https://github.com/WebAssembly/binaryen/blob/main/src/passes/Asyncify.cpp
+[24]: http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/
+[25]: https://github.com/tinygo-org/tinygo/issues/3095
