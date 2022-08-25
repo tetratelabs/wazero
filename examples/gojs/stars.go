@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/gojs"
@@ -39,8 +41,8 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Grant the compiled wasm access to the default HTTP Transport.
-	ctx = gojs.WithRoundTripper(ctx, http.DefaultTransport)
+	// Instead of making real HTTP calls, return fake data.
+	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
 
 	// Execute the "run" function, which corresponds to "main" in cat/main.go.
 	err = gojs.Run(ctx, r, compiled, config)
@@ -49,6 +51,21 @@ func main() {
 	} else if !ok {
 		log.Panicln(err)
 	}
+}
+
+// compile-time check to ensure fakeGitHub implements http.RoundTripper
+var _ http.RoundTripper = &fakeGitHub{}
+
+type fakeGitHub struct{}
+
+func (f *fakeGitHub) RoundTrip(*http.Request) (*http.Response, error) {
+	fakeResponse := `{"stargazers_count": 9999999}`
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		Status:        http.StatusText(http.StatusOK),
+		Body:          io.NopCloser(strings.NewReader(fakeResponse)),
+		ContentLength: int64(len(fakeResponse)),
+	}, nil
 }
 
 // compileWasm compiles "stars/main.go" on demand as the binary generated is

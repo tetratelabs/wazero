@@ -91,9 +91,11 @@ func callFromSP(expectSP bool, proxied *wasm.HostFunc) (*wasm.ProxyFunc, error) 
 	if debugMode {
 		fmt.Printf("\n%s 0\n", wasm.OpcodeCallName)
 	}
+
+	// Call index zero is a placeholder as it is replaced later.
 	code = append(code, wasm.OpcodeCall, 0)
 
-	// The stack may now have results. Iterate backwards
+	// The stack may now have results. Iterate backwards.
 	i := len(results) - 1
 	if expectSP {
 		if debugMode {

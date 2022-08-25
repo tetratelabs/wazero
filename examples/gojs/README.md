@@ -5,7 +5,7 @@ this shows an interesting feature this supports, HTTP client requests.
 
 ```bash
 $ go run stars.go
-wazero has 99999999 stars. Does that include you?
+wazero has 9999999 stars. Does that include you?
 ```
 
 Internally, this uses [gojs](../../experimental/gojs/gojs.go), which implements
