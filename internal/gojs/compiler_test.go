@@ -52,11 +52,18 @@ var testFS = fstest.MapFS{
 }
 
 func TestMain(m *testing.M) {
+	// For some reason, windows and freebsd fail to compile with exit status 1.
+	if o := runtime.GOOS; o != "darwin" && o != "linux" {
+		log.Println("skipping due to not yet supported OS:", o)
+		os.Exit(0)
+	}
+
 	goBin, err := findGoBin()
 	if err != nil {
 		log.Println("skipping due missing Go binary:", err)
 		os.Exit(0)
 	}
+
 	if err = compileJsWasm(goBin); err != nil {
 		log.Panicln(err)
 	}
@@ -74,11 +81,6 @@ func TestMain(m *testing.M) {
 // to test the user's current version of Go, as opposed to a specific one.
 // For example, this allows testing both Go 1.18 and 1.19 in CI.
 func compileJsWasm(goBin string) error {
-	// For some reason, windows and freebsd fail to compile with exit status 1.
-	if os := runtime.GOOS; os != "darwin" && os != "linux" {
-		return fmt.Errorf("not yet supported OS: %s", os)
-	}
-
 	// Prepare the working directory.
 	workDir, err := os.MkdirTemp("", "example")
 	if err != nil {
