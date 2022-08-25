@@ -44,7 +44,7 @@ func main() {
 	// Instead of making real HTTP calls, return fake data.
 	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
 
-	// Execute the "run" function, which corresponds to "main" in cat/main.go.
+	// Execute the "run" function, which corresponds to "main" in stars/main.go.
 	err = gojs.Run(ctx, r, compiled, config)
 	if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
 		log.Panicln(err)
