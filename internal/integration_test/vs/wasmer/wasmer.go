@@ -113,10 +113,8 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (m
 	}
 
 	// Wasmer does not allow a host function parameter for memory, so you have to manually propagate it.
-	if cfg.LogFn != nil {
-		if wm.mem, err = wm.instance.Exports.GetMemory("memory"); err != nil {
-			return
-		}
+	if wm.mem, err = wm.instance.Exports.GetMemory("memory"); err != nil {
+		return
 	}
 
 	// If WASI is needed, we have to go back and invoke the _start function.
@@ -147,6 +145,12 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (m
 func (r *wasmerRuntime) Close(_ context.Context) error {
 	r.engine = nil
 	return nil
+}
+
+func (m *wasmerModule) CallV_V(_ context.Context, funcName string) (err error) {
+	fn := m.funcs[funcName]
+	_, err = fn.Call()
+	return
 }
 
 func (m *wasmerModule) CallI32_I32(_ context.Context, funcName string, param uint32) (uint32, error) {
@@ -183,6 +187,10 @@ func (m *wasmerModule) WriteMemory(_ context.Context, offset uint32, bytes []byt
 	unsafeSlice := m.mem.Data()
 	copy(unsafeSlice[offset:], bytes)
 	return nil
+}
+
+func (m *wasmerModule) Memory() []byte {
+	return m.mem.Data()
 }
 
 func (m *wasmerModule) Close(_ context.Context) error {
