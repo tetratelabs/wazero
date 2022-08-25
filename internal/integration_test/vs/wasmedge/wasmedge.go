@@ -131,6 +131,15 @@ func (r *wasmedgeRuntime) Close(_ context.Context) error {
 	return nil
 }
 
+func (m *wasmedgeModule) Memory() []byte {
+	mem := m.store.FindMemory("memory")
+	d, err := mem.GetData(0, mem.GetPageSize()*65536)
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
 func (m *wasmedgeModule) CallI32_I32(_ context.Context, funcName string, param uint32) (uint32, error) {
 	if result, err := m.vm.Execute(funcName, int32(param)); err != nil {
 		return 0, err
@@ -141,6 +150,10 @@ func (m *wasmedgeModule) CallI32_I32(_ context.Context, funcName string, param u
 
 func (m *wasmedgeModule) CallI32I32_V(_ context.Context, funcName string, x, y uint32) (err error) {
 	_, err = m.vm.Execute(funcName, int32(x), int32(y))
+	return
+}
+func (m *wasmedgeModule) CallV_V(_ context.Context, funcName string) (err error) {
+	_, err = m.vm.Execute(funcName)
 	return
 }
 

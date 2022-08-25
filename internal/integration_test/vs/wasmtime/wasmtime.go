@@ -112,10 +112,12 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		return
 	}
 
-	// Wasmtime does not allow a host function parameter for memory, so you have to manually propagate it.
-	if wm.mem = instance.GetExport(wm.store, "memory").Memory(); wm.mem == nil {
-		err = fmt.Errorf(`"memory" not exported`)
-		return
+	if cfg.LogFn != nil || cfg.NeedsMemoryExport {
+		// Wasmtime does not allow a host function parameter for memory, so you have to manually propagate it.
+		if wm.mem = instance.GetExport(wm.store, "memory").Memory(); wm.mem == nil {
+			err = fmt.Errorf(`"memory" not exported`)
+			return
+		}
 	}
 
 	// If WASI is needed, we have to go back and invoke the _start function.

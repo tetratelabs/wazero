@@ -12,11 +12,12 @@ import (
 )
 
 type RuntimeConfig struct {
-	Name       string
-	ModuleName string
-	ModuleWasm []byte
-	FuncNames  []string
-	NeedsWASI  bool
+	Name              string
+	ModuleName        string
+	ModuleWasm        []byte
+	FuncNames         []string
+	NeedsWASI         bool
+	NeedsMemoryExport bool
 	// LogFn requires the implementation to export a function "env.log" which accepts i32i32_v.
 	// The implementation invoke this with a byte slice allocated from the offset, length pair.
 	// This function simulates a host function that logs a message.

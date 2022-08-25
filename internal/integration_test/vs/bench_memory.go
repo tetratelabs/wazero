@@ -17,9 +17,10 @@ var (
 
 func init() {
 	memoryConfig = &RuntimeConfig{
-		ModuleName: "memory",
-		ModuleWasm: memoryWasm,
-		FuncNames:  memoryFunctions,
+		ModuleName:        "memory",
+		ModuleWasm:        memoryWasm,
+		FuncNames:         memoryFunctions,
+		NeedsMemoryExport: true,
 	}
 }
 

@@ -112,9 +112,11 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (m
 		return
 	}
 
-	// Wasmer does not allow a host function parameter for memory, so you have to manually propagate it.
-	if wm.mem, err = wm.instance.Exports.GetMemory("memory"); err != nil {
-		return
+	if cfg.LogFn != nil || cfg.NeedsMemoryExport {
+		// Wasmer does not allow a host function parameter for memory, so you have to manually propagate it.
+		if wm.mem, err = wm.instance.Exports.GetMemory("memory"); err != nil {
+			return
+		}
 	}
 
 	// If WASI is needed, we have to go back and invoke the _start function.
