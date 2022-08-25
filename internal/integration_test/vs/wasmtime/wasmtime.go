@@ -112,8 +112,8 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 		return
 	}
 
-	// Wasmtime does not allow a host function parameter for memory, so you have to manually propagate it.
-	if cfg.LogFn != nil {
+	if cfg.LogFn != nil || cfg.NeedsMemoryExport {
+		// Wasmtime does not allow a host function parameter for memory, so you have to manually propagate it.
 		if wm.mem = instance.GetExport(wm.store, "memory").Memory(); wm.mem == nil {
 			err = fmt.Errorf(`"memory" not exported`)
 			return
@@ -147,6 +147,10 @@ func (r *wasmtimeRuntime) Close(_ context.Context) error {
 	return nil // wasmtime only closes via finalizer
 }
 
+func (m *wasmtimeModule) Memory() []byte {
+	return m.mem.UnsafeData(m.store)
+}
+
 func (m *wasmtimeModule) CallI32_I32(_ context.Context, funcName string, param uint32) (uint32, error) {
 	fn := m.funcs[funcName]
 	if result, err := fn.Call(m.store, int32(param)); err != nil {
@@ -159,6 +163,12 @@ func (m *wasmtimeModule) CallI32_I32(_ context.Context, funcName string, param u
 func (m *wasmtimeModule) CallI32I32_V(_ context.Context, funcName string, x, y uint32) (err error) {
 	fn := m.funcs[funcName]
 	_, err = fn.Call(m.store, int32(x), int32(y))
+	return
+}
+
+func (m *wasmtimeModule) CallV_V(_ context.Context, funcName string) (err error) {
+	fn := m.funcs[funcName]
+	_, err = fn.Call(m.store)
 	return
 }
 

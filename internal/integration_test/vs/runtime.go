@@ -7,15 +7,17 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 
 type RuntimeConfig struct {
-	Name       string
-	ModuleName string
-	ModuleWasm []byte
-	FuncNames  []string
-	NeedsWASI  bool
+	Name              string
+	ModuleName        string
+	ModuleWasm        []byte
+	FuncNames         []string
+	NeedsWASI         bool
+	NeedsMemoryExport bool
 	// LogFn requires the implementation to export a function "env.log" which accepts i32i32_v.
 	// The implementation invoke this with a byte slice allocated from the offset, length pair.
 	// This function simulates a host function that logs a message.
@@ -36,8 +38,10 @@ type Module interface {
 	CallI32_I32(ctx context.Context, funcName string, param uint32) (uint32, error)
 	CallI32I32_V(ctx context.Context, funcName string, x, y uint32) error
 	CallI32_V(ctx context.Context, funcName string, param uint32) error
+	CallV_V(ctx context.Context, funcName string) error
 	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
 	WriteMemory(ctx context.Context, offset uint32, bytes []byte) error
+	Memory() []byte
 	Close(context.Context) error
 }
 
@@ -69,6 +73,10 @@ type wazeroModule struct {
 
 func (r *wazeroRuntime) Name() string {
 	return r.name
+}
+
+func (m *wazeroModule) Memory() []byte {
+	return m.mod.Memory().(*wasm.MemoryInstance).Buffer
 }
 
 func (r *wazeroRuntime) log(ctx context.Context, m api.Module, offset, byteCount uint32) {
@@ -148,6 +156,11 @@ func (r *wazeroRuntime) Close(ctx context.Context) (err error) {
 		err = env.Close(ctx)
 	}
 	r.env = nil
+	return
+}
+
+func (m *wazeroModule) CallV_V(ctx context.Context, funcName string) (err error) {
+	_, err = m.funcs[funcName].Call(ctx)
 	return
 }
 

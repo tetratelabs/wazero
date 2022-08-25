@@ -42,7 +42,7 @@ func RunBenchmarkHostCall(b *testing.B, runtime func() Runtime) {
 	benchmark(b, runtime, hostCallConfig, hostCall)
 }
 
-func hostCall(m Module) error {
+func hostCall(m Module, _ int) error {
 	_, err := m.CallI64_I64(testCtx, hostCallFunction, hostCallParam)
 	return err
 }

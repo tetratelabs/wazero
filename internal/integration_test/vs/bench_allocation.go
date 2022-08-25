@@ -35,7 +35,7 @@ func init() {
 	}
 }
 
-func allocationCall(m Module) error {
+func allocationCall(m Module, _ int) error {
 	nameSize := uint32(len(allocationParam))
 	// Instead of an arbitrary memory offset, use Rust's allocator. Notice
 	// there is nothing string-specific in this allocation function. The same
@@ -65,7 +65,7 @@ func RunTestAllocation(t *testing.T, runtime func() Runtime) {
 }
 
 func testAllocationCall(t *testing.T, m Module, instantiation, iteration int) {
-	err := allocationCall(m)
+	err := allocationCall(m, iteration)
 	require.NoError(t, err, "instantiation[%d] iteration[%d] failed: %v", instantiation, iteration, err)
 }
 

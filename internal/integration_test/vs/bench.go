@@ -25,7 +25,7 @@ const compilerRuntime = "wazero-compiler"
 
 // runTestBenchmark_Call_CompilerFastest ensures that Compiler is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureCompilerFastest=true'.
-func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module) error, vsRuntime Runtime) {
+func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module, int) error, vsRuntime Runtime) {
 	if ensureCompilerFastest != "true" {
 		t.Skip()
 	}
@@ -62,7 +62,7 @@ func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, n
 		results[0].name, compilerRuntime)
 }
 
-func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module) error) float64 {
+func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module, int) error) float64 {
 	result := testing.Benchmark(func(b *testing.B) {
 		benchmarkCall(b, rt, rtCfg, call)
 	})
@@ -71,7 +71,7 @@ func runCallBenchmark(rt Runtime, rtCfg *RuntimeConfig, call func(Module) error)
 	return nsOp
 }
 
-func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call func(Module) error) {
+func benchmark(b *testing.B, runtime func() Runtime, rtCfg *RuntimeConfig, call func(Module, int) error) {
 	rt := runtime()
 	b.Run("Compile", func(b *testing.B) {
 		benchmarkCompile(b, rt, rtCfg)
@@ -119,7 +119,7 @@ func benchmarkInstantiate(b *testing.B, rt Runtime, rtCfg *RuntimeConfig) {
 	}
 }
 
-func benchmarkCall(b *testing.B, rt Runtime, rtCfg *RuntimeConfig, call func(Module) error) {
+func benchmarkCall(b *testing.B, rt Runtime, rtCfg *RuntimeConfig, call func(Module, int) error) {
 	// Initialize outside the benchmark loop
 	if err := rt.Compile(testCtx, rtCfg); err != nil {
 		b.Fatal(err)
@@ -132,7 +132,7 @@ func benchmarkCall(b *testing.B, rt Runtime, rtCfg *RuntimeConfig, call func(Mod
 	defer mod.Close(testCtx)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := call(mod); err != nil {
+		if err := call(mod, i); err != nil {
 			b.Fatal(err)
 		}
 	}

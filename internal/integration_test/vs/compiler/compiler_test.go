@@ -31,3 +31,11 @@ func TestHostCall(t *testing.T) {
 func BenchmarkHostCall(b *testing.B) {
 	vs.RunBenchmarkHostCall(b, runtime)
 }
+
+func TestMemory(t *testing.T) {
+	vs.RunTestMemory(t, runtime)
+}
+
+func BenchmarkMemory(b *testing.B) {
+	vs.RunBenchmarkMemory(b, runtime)
+}

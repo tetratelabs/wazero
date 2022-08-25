@@ -47,3 +47,15 @@ func BenchmarkHostCall(b *testing.B) {
 func TestBenchmarkHostCall_CompilerFastest(t *testing.T) {
 	vs.RunTestBenchmarkHostCall_CompilerFastest(t, runtime())
 }
+
+func TestMemory(t *testing.T) {
+	vs.RunTestMemory(t, runtime)
+}
+
+func BenchmarkMemory(b *testing.B) {
+	vs.RunBenchmarkMemory(b, runtime)
+}
+
+func TestBenchmarkMemory_CompilerFastest(t *testing.T) {
+	vs.RunTestBenchmarkMemory_CompilerFastest(t, runtime())
+}
