@@ -1,4 +1,4 @@
-package main
+package fs
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"testing/fstest"
 )
 
-func main() {
+func Main() {
 	testFS()
 	testAdHoc()
 }

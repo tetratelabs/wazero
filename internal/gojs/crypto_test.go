@@ -1,18 +1,16 @@
 package gojs_test
 
 import (
-	_ "embed"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-//go:embed testdata/crypto/main.go
-var cryptoGo string
-
 func Test_crypto(t *testing.T) {
-	stdout, stderr, err := compileAndRunJsWasm(testCtx, t, cryptoGo, wazero.NewModuleConfig())
+	t.Parallel()
+
+	stdout, stderr, err := compileAndRun(testCtx, "crypto", wazero.NewModuleConfig())
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)

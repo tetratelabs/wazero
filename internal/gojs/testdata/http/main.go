@@ -1,4 +1,4 @@
-package main
+package http
 
 import (
 	"fmt"
@@ -9,14 +9,15 @@ import (
 	"strings"
 )
 
-func main() {
-	res, err := http.Get(os.Args[0] + "/error")
+func Main() {
+	url := os.Getenv("BASE_URL")
+	res, err := http.Get(url + "/error")
 	if err == nil {
 		log.Panicln(err)
 	}
 	fmt.Println(err)
 
-	res, err = http.Post(os.Args[0], "text/plain", io.NopCloser(strings.NewReader("ice cream")))
+	res, err = http.Post(url, "text/plain", io.NopCloser(strings.NewReader("ice cream")))
 	if err != nil {
 		log.Panicln(err)
 	}

@@ -1,4 +1,4 @@
-package main
+package crypto
 
 import (
 	"crypto/rand"
@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func main() {
+func Main() {
 	b := make([]byte, 5)
 	if n, err := rand.Read(b); err != nil {
 		log.Panicln(err)

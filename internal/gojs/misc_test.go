@@ -1,7 +1,6 @@
 package gojs_test
 
 import (
-	_ "embed"
 	"strings"
 	"testing"
 
@@ -9,11 +8,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-//go:embed testdata/goroutine/main.go
-var goroutineGo string
-
 func Test_goroutine(t *testing.T) {
-	stdout, stderr, err := compileAndRunJsWasm(testCtx, t, goroutineGo, wazero.NewModuleConfig())
+	t.Parallel()
+
+	stdout, stderr, err := compileAndRun(testCtx, "goroutine", wazero.NewModuleConfig())
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)
@@ -22,22 +20,20 @@ consumer
 `, stdout)
 }
 
-//go:embed testdata/mem/main.go
-var memGo string
-
 func Test_mem(t *testing.T) {
-	stdout, stderr, err := compileAndRunJsWasm(testCtx, t, memGo, wazero.NewModuleConfig())
+	t.Parallel()
+
+	stdout, stderr, err := compileAndRun(testCtx, "mem", wazero.NewModuleConfig())
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)
 	require.Zero(t, stdout)
 }
 
-//go:embed testdata/stdio/main.go
-var stdioGo string
-
 func Test_stdio(t *testing.T) {
-	stdout, stderr, err := compileAndRunJsWasm(testCtx, t, stdioGo, wazero.NewModuleConfig().
+	t.Parallel()
+
+	stdout, stderr, err := compileAndRun(testCtx, "stdio", wazero.NewModuleConfig().
 		WithStdin(strings.NewReader("stdin\n")))
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)

@@ -1,4 +1,4 @@
-package main
+package syscall
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-func main() {
+func Main() {
 	fmt.Printf("syscall.Getpid()=%d\n", syscall.Getpid())
 	fmt.Printf("syscall.Getppid()=%d\n", syscall.Getppid())
 	fmt.Printf("syscall.Getuid()=%d\n", syscall.Getuid())

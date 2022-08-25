@@ -26,7 +26,7 @@ func Test_main(t *testing.T) {
 }
 
 // compileWasm compiles "stars/main.go" on demand as the binary generated is
-// too big (>1MB) to check into the source tree.
+// too big (>7MB) to check into the source tree.
 func compileWasm() error {
 	cmd := exec.Command("go", "build", "-o", "main.wasm", ".")
 	cmd.Dir = path.Join("stars")

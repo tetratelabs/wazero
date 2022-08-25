@@ -1,8 +1,8 @@
-package main
+package goroutine
 
 import "fmt"
 
-func main() {
+func Main() {
 	msg := make(chan int)
 	finished := make(chan int)
 	go func() {

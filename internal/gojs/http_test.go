@@ -1,7 +1,6 @@
 package gojs_test
 
 import (
-	_ "embed"
 	"errors"
 	"io"
 	"net/http"
@@ -13,9 +12,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-//go:embed testdata/http/main.go
-var httpGo string
-
 type roundTripperFunc func(r *http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -23,6 +19,8 @@ func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func Test_http(t *testing.T) {
+	t.Parallel()
+
 	ctx := gojs.WithRoundTripper(testCtx, roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Path == "/error" {
 			return nil, errors.New("error")
@@ -42,7 +40,8 @@ func Test_http(t *testing.T) {
 		}, nil
 	}))
 
-	stdout, stderr, err := compileAndRunJsWasm(ctx, t, httpGo, wazero.NewModuleConfig().WithArgs("http://host"))
+	stdout, stderr, err := compileAndRun(ctx, "http", wazero.NewModuleConfig().
+		WithEnv("BASE_URL", "http://host"))
 
 	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)

@@ -1,11 +1,11 @@
-package main
+package stdio
 
 import (
 	"bufio"
 	"os"
 )
 
-func main() {
+func Main() {
 	reader := bufio.NewReader(os.Stdin)
 	input, _, err := reader.ReadLine()
 	if err != nil {
