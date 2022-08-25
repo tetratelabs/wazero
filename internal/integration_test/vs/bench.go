@@ -19,7 +19,7 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 // ensureCompilerFastest is overridable via ldflags. Ex.
 //
 //	-ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
-var ensureCompilerFastest = "true"
+var ensureCompilerFastest = "false"
 
 const compilerRuntime = "wazero-compiler"
 
