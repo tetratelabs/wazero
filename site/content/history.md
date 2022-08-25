@@ -24,7 +24,7 @@ to allow users to extend the proxy via [Proxy-Wasm ABI][3]. Maybe you are
 writing server-side rendering applications via Wasm, or [OpenPolicyAgent][4]
 is using Wasm for plugin system.
 
-However, experienced Golang developers often avoid using CGO because it
+However, experienced Go developers often avoid using CGO because it
 introduces complexity. For example, CGO projects are larger and complicated to
 consume due to their libc + shared library dependency. Debugging is more
 difficult for Go developers when most of a library is written in Rustlang.

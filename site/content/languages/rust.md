@@ -22,7 +22,7 @@ brevity.
 
 When Rust compiles a `%.rs` file with a `wasm32-*` target, the output `%.wasm`
 depends on a subset of features in the [WebAssembly 1.0 Core specification][2].
-The `wasm32-wasi` target depends on [WASI][3] host imports as well.
+The `wasm32-wasi` target depends on [WASI][3] host functions as well.
 
 Unlike some compilers, Rust also supports importing custom host functions and
 exporting functions back to the host.
@@ -36,12 +36,12 @@ pub extern "C" fn add(x: i32, y: i32) -> i32 {
 }
 ```
 
-The following is the minimal command to build a wasm file.
+The following is the minimal command to build a Wasm file.
 ```bash
 rustc -o lib.wasm --target wasm32-unknown-unknown --crate-type cdylib lib.rs
 ```
 
-The resulting wasm exports the `add` function so that the embedding host can
+The resulting Wasm exports the `add` function so that the embedding host can
 call it, regardless of if the host is written in Rust or not.
 
 ### Digging Deeper
@@ -59,15 +59,25 @@ compiles the source as a library, ex. without a `main` function.
 
 This document includes notes contributed by the wazero community. While wazero
 includes Rust examples, the community is less familiar with Rust. For more
-help, consider the [Rust and WebAssembly book][5]
+help, consider the [Rust and WebAssembly book][5].
 
 Meanwhile, please help us [maintain][6] this document and [star our GitHub
-repository][9], if it is helpful. Together, we can make WebAssembly easier on
+repository][7], if it is helpful. Together, we can make WebAssembly easier on
 the next person.
+
+## Constraints
+
+Like other compilers that can target wasm, there are constraints using Rust.
+These constraints affect the library design and dependency choices in your
+source.
+
+The most common constraint is which crates you can depend on. Please refer to
+the [Which Crates Will Work Off-the-Shelf with WebAssembly?][8] page in the
+[Rust and WebAssembly book][5] for more on this.
 
 ## Memory
 
-When Rust compiles rust into wasm, it configures the WebAssembly linear memory
+When Rust compiles rust into Wasm, it configures the WebAssembly linear memory
 to an initial size of 17 pages (1.1MB), and marks a position in that memory as
 the heap base. All memory beyond that is used for the Rust heap.
 
@@ -93,11 +103,11 @@ Note: WebAssembly uses 32-bit memory addressing, so a `uintptr` is 32-bits.
 The general flow is that the host allocates memory by calling an allocation
 function with the size needed. Then, it writes data, in this case JSON, to the
 memory offset (`ptr`). At that point, it can call a host function, ex
-`configure`, passing the `ptr` and `size` allocated. The guest wasm (compiled
+`configure`, passing the `ptr` and `size` allocated. The guest Wasm (compiled
 from Rust) will be able to read the data. To ensure no memory leaks, the host
 calls a free function, with the same `ptr`, afterwards and unconditionally.
 
-Note: wazero includes an [example project][8] that shows this.
+Note: wazero includes an [example project][9] that shows this.
 
 To allow the host to allocate memory, you need to define your own `malloc` and
 `free` functions:
@@ -141,18 +151,24 @@ from your business logic as much as possible.
 WebAssembly is a stack-based virtual machine specification, so operates at a
 lower level than an operating system. For functionality the operating system
 would otherwise provide, you must use the `wasm32-wasi` target. This imports
-host defined in [WASI][2], described in [Specifications]({{< ref "/specs" >}}).
+host functions defined in [WASI][3], described in [Specifications]({{< ref "/specs" >}}).
 
 For example, `rustc -o hello.wasm --target wasm32-wasi hello.rs` compiles the
-below into wasm that exports a `_start` WASI function corresponding to `main`.
+below `main` function into a WASI function exported as `_start`.
 ```rust
 fn main() {
   println!("Hello World!");
 }
 ```
 
-Note: wazero includes an [example WASI project][XXXX] including [source code][XXXX]
+Note: wazero includes an [example WASI project][10] including [source code][11]
 that implements `cat` without any WebAssembly-specific code.
+
+## Concurrency
+
+Please read our overview of WebAssembly and
+[concurrency]({{< ref "_index.md#concurrency" >}}). In short, the current
+WebAssembly specification does not support parallel processing.
 
 ## Optimizations
 
@@ -161,25 +177,33 @@ performance vs defaults. Note that sometimes one sacrifices the other.
 
 ### Binary size
 
-Those with size constraints can reduce the `%.wasm` binary size by changing
-the source or flags to `rustc`.
+Those with `%.wasm` binary size constraints can change their source or set
+`rustc` flags to reduce it.
 
 Source changes:
-* [wee_alloc][10]: Smaller, WebAssembly-tuned memory allocator.
+* [wee_alloc][12]: Smaller, WebAssembly-tuned memory allocator.
 
-[`rustc` flags][11]:
+[`rustc` flags][13]:
 * `-C debuginfo=0`: Strips DWARF, but retains the WebAssembly name section.
-* `-C opt-level=3`: includes all optimizations.
+* `-C opt-level=3`: Includes all size optimizations.
 
 Those using cargo should also use the `--release` flag, which corresponds to
 `rustc -C debuginfo=0 -C opt-level=3`.
 
-Those using the `wasm32-wasi` target should consider the [cargo-wasi][12] crate
-as it dramatically reduces wasm size.
+Those using the `wasm32-wasi` target should consider the [cargo-wasi][14] crate
+as it dramatically reduces Wasm size.
+
+### Performance
+
+Those with runtime performance constraints can change their source or set
+`rustc` flags to improve it.
+
+[`rustc` flags][13]:
+* `-C opt-level=3`: Bloats binary size to increase performance.
 
 ## Frequently Asked Questions
 
-### Why is my wasm so big?
+### Why is my `%.wasm` binary so big?
 Rust defaults can be overridden for those who can sacrifice features or
 performance for a [smaller binary](#binary-size). After that, tuning your
 source code may reduce binary size further.
@@ -191,8 +215,10 @@ source code may reduce binary size further.
 [5]: https://rustwasm.github.io/docs/book
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/rust.md
 [7]: https://github.com/tetratelabs/wazero/stargazers
-[8]: https://github.com/tetratelabs/wazero/tree/main/examples/allocation/rust
-[9]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/cargo-wasi
-[10]: https://github.com/rustwasm/wee_alloc
-[11]: https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings
-[12]: https://github.com/bytecodealliance/cargo-wasi
+[8]: https://rustwasm.github.io/docs/book/reference/which-crates-work-with-wasm.html
+[9]: https://github.com/tetratelabs/wazero/tree/main/examples/allocation/rust
+[10]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
+[11]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/cargo-wasi
+[12]: https://github.com/rustwasm/wee_alloc
+[13]: https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings
+[14]: https://github.com/bytecodealliance/cargo-wasi
