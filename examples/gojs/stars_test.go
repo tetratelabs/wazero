@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -15,14 +16,22 @@ import (
 //
 //	go run stars.go
 func Test_main(t *testing.T) {
-	// Notably our scratch containers don't have go, so don't fail tests.
-	if err := compileWasm(); err != nil {
-		t.Skip("Skipping tests due to:", err)
-	}
-
 	stdout, stderr := maintester.TestMain(t, main, "stars")
 	require.Equal(t, "", stderr)
 	require.Equal(t, "wazero has 9999999 stars. Does that include you?\n", stdout)
+}
+
+// TestMain compiles the wasm on-demand, which uses the runner's Go as opposed
+// to a binary checked in, which would be pinned to one version. This is
+// separate from Test_main to show that compilation doesn't dominate the
+// execution time.
+func TestMain(m *testing.M) {
+	// Notably our scratch containers don't have go, so don't fail tests.
+	if err := compileWasm(); err != nil {
+		log.Println("Skipping tests due to:", err)
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
 }
 
 // compileWasm compiles "stars/main.go" on demand as the binary generated is
