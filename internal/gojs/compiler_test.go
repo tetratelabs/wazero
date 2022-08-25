@@ -86,7 +86,7 @@ func compileJsWasm(goBin string) error {
 	}
 	defer os.RemoveAll(workDir)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	bin := path.Join(workDir, "out.wasm")
