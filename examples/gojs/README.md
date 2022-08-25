@@ -4,6 +4,9 @@ This shows how to use Wasm built by go using `GOARCH=wasm GOOS=js`. Notably,
 this shows an interesting feature this supports, HTTP client requests.
 
 ```bash
+$ cd stars
+$ GOARCH=wasm GOOS=js go build -o main.wasm .
+$ cd ..
 $ go run stars.go
 wazero has 9999999 stars. Does that include you?
 ```

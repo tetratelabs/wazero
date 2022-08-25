@@ -6,9 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
-	"runtime"
 	"strings"
 
 	"github.com/tetratelabs/wazero"
@@ -35,8 +33,13 @@ func main() {
 		// By default, I/O streams are discarded, so you won't see output.
 		WithStdout(os.Stdout).WithStderr(os.Stderr)
 
+	bin, err := os.ReadFile(path.Join("stars", "main.wasm"))
+	if err != nil {
+		log.Panicln(err)
+	}
+
 	// Compile the WebAssembly module using the default configuration.
-	compiled, err := r.CompileModule(ctx, compileWasm(), wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -66,26 +69,4 @@ func (f *fakeGitHub) RoundTrip(*http.Request) (*http.Response, error) {
 		Body:          io.NopCloser(strings.NewReader(fakeResponse)),
 		ContentLength: int64(len(fakeResponse)),
 	}, nil
-}
-
-// compileWasm compiles "stars/main.go" on demand as the binary generated is
-// too big (>1MB) to check into the source tree.
-func compileWasm() []byte {
-	cmd := exec.Command("go", "build", "-o", "main.wasm", ".")
-
-	_, thisFile, _, ok := runtime.Caller(1)
-	if !ok {
-		panic("couldn't read path to current file")
-	}
-	cmd.Dir = path.Join(path.Dir(thisFile), "stars")
-
-	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Panicf("go build: %v\n%s", err, out)
-	}
-	bin, err := os.ReadFile(path.Join(cmd.Dir, "main.wasm"))
-	if err != nil {
-		panic(err)
-	}
-	return bin
 }
