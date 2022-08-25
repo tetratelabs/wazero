@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/wasm"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
 )
 

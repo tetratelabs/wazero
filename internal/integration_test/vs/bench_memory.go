@@ -3,8 +3,9 @@ package vs
 import (
 	_ "embed"
 	"encoding/binary"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"testing"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 var (
