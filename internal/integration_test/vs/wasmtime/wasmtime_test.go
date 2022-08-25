@@ -54,6 +54,6 @@ func BenchmarkMemory(b *testing.B) {
 	vs.RunBenchmarkMemory(b, runtime)
 }
 
-func TestBenchmarMemory_CompilerFastest(t *testing.T) {
+func TestBenchmarkMemory_CompilerFastest(t *testing.T) {
 	vs.RunTestBenchmarkMemory_CompilerFastest(t, runtime())
 }

@@ -3,6 +3,7 @@ package vs
 import (
 	_ "embed"
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -48,7 +49,7 @@ func RunTestBenchmarkMemory_CompilerFastest(t *testing.T, vsRuntime Runtime) {
 	for _, fn := range memoryFunctions {
 		fn := fn
 		t.Run(fn, func(t *testing.T) {
-			runTestBenchmark_Call_CompilerFastest(t, memoryConfig, fn+".memory", func(m Module) (err error) {
+			runTestBenchmark_Call_CompilerFastest(t, memoryConfig, fmt.Sprintf("/memory.%s", fn), func(m Module) (err error) {
 				err = m.CallV_V(testCtx, fn)
 				return
 			}, vsRuntime)

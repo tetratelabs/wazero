@@ -26,6 +26,9 @@ const compilerRuntime = "wazero-compiler"
 // runTestBenchmark_Call_CompilerFastest ensures that Compiler is the fastest engine for function invocations.
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureCompilerFastest=true'.
 func runTestBenchmark_Call_CompilerFastest(t *testing.T, rtCfg *RuntimeConfig, name string, call func(Module) error, vsRuntime Runtime) {
+	if ensureCompilerFastest != "true" {
+		t.Skip()
+	}
 
 	type benchResult struct {
 		name string
