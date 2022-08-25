@@ -11,17 +11,17 @@ title = "TinyGo"
 * `wasi`: for use outside the browser.
 
 This document is maintained by wazero, which is a WebAssembly runtime that
-embeds in Golang applications. Hence, all notes below will be about TinyGo's
+embeds in Go applications. Hence, all notes below will be about TinyGo's
 `wasi` target.
+
+## Overview
 
 When TinyGo compiles a `%.go` file with its `wasi` target, the output `%.wasm`
 depends on a subset of features in the [WebAssembly 2.0 Core specification][2],
-as well [WASI][3] host imports.
+as well [WASI][3] host functions.
 
 Unlike some compilers, TinyGo also supports importing custom host functions and
 exporting functions back to the host.
-
-## Example
 
 Here's a basic example of source in TinyGo:
 
@@ -34,7 +34,7 @@ func add(x, y uint32) uint32 {
 }
 ```
 
-The following flags will result in the most compact (smallest) wasm file.
+The following is the minimal command to build a `%.wasm` binary.
 ```bash
 tinygo build -o main.wasm -target=wasi main.go
 ```
@@ -60,6 +60,7 @@ These constraints affect the library design and dependency choices in your Go
 source.
 
 ### Partial Reflection Support
+
 The first constraint people notice is that `encoding/json` usage compiles, but
 panics at runtime.
 ```go
@@ -83,6 +84,7 @@ tools][18] also. See [Frequently Asked Questions](#frequently-asked-questions)
 for some workarounds.
 
 ### Unimplemented System Calls
+
 You may also notice some other features not yet work. For example, the below
 will compile, but print "readdir unimplemented : errno 54" at runtime.
 
@@ -103,6 +105,7 @@ standard way to stub a syscall until it is implemented. If you are interested
 in more, see [System Calls](#system-calls).
 
 ### Mitigating Constraints
+
 Realities like this are not unique to TinyGo as they will happen compiling any
 language not written specifically with WebAssembly in mind. Knowing the same
 code compiled to wasm may return errors or worse panic, the main mitigation
@@ -116,14 +119,15 @@ is also a much more efficient means to communicate bugs vs ad-hoc reports.
 
 When TinyGo compiles go into wasm, it configures the WebAssembly linear memory
 to an initial size of 2 pages (16KB), and marks a position in that memory as
-the heap base. All memory beyond that is used for the Go heap, which can
-[grow][20] until `memory.grow` on the host returns -1.
+the heap base. All memory beyond that is used for the Go heap.
 
 Allocations within Go (compiled to `%.wasm`) are managed as one would expect.
-Sometimes a host function needs to allocate memory directly. For example, to
-write JSON of a given length before invoking an exported function to parse it.
+The allocator can [grow][20] until `memory.grow` on the host returns -1.
 
 ### Host Allocations
+
+Sometimes a host function needs to allocate memory directly. For example, to
+write JSON of a given length before invoking an exported function to parse it.
 
 The below snippet is a realistic example of a function exported to the host,
 who needs to allocate memory first.
@@ -220,11 +224,14 @@ approach later.
 
 WebAssembly is a stack-based virtual machine specification, so operates at a
 lower level than an operating system. For functionality the operating system
-would otherwise provide, TinyGo imports host functions, specifically ones
-defined in [WASI][3], described in [Specifications]({{< ref "/specs" >}}).
+would otherwise provide, TinyGo imports host functions defined in [WASI][3],
+described in [Specifications]({{< ref "/specs" >}}).
 
-Notably, if you compile and run below program with the target `wasi`, you'll
-see that the effective `GOARCH=wasm` and `GOOS=linux`.
+For example, `tinygo build -o main.wasm -target=wasi main.go` compiles the
+below `main` function into a WASI function exported as `_start`.
+
+When the WebAssembly runtime calls `_start`, you'll see the effective
+`GOARCH=wasm` and `GOOS=linux`.
 
 ```go
 package main
@@ -238,6 +245,9 @@ func main() {
 	fmt.Println(runtime.GOARCH, runtime.GOOS)
 }
 ```
+
+Note: wazero includes an [example WASI project][21] including [source code][22]
+that implements `cat` without any WebAssembly-specific code.
 
 ### WASI Internals
 
@@ -260,13 +270,19 @@ is stubbed (returns `syscall.ENOSYS`), in [syscall_libc_wasi.go][15].
 
 ## Concurrency
 
-Current versions of the WebAssembly specification do not support parallelism,
-such as threads or atomics needed to safely work in parallel.
+Please read our overview of WebAssembly and
+[concurrency]({{< ref "_index.md#concurrency" >}}). In short, the current
+WebAssembly specification does not support parallel processing.
 
-TinyGo, however, supports goroutines by default and acts like `GOMAXPROCS=1`.
+Tinygo uses only one core/thread regardless of target. This happens to be a
+good match for Wasm's current lack of support for (multiple) threads. Tinygo's
+goroutine scheduler on Wasm currently uses Binaryen's [Asyncify][23], a Wasm
+postprocessor also used by other languages targeting Wasm to provide similar
+concurrency.
 
-For example, the following code will run with the expected output, even if
-the goroutines are defined in opposite dependency order.
+In summary, TinyGo supports goroutines by default and acts like `GOMAXPROCS=1`.
+Since [goroutines are not threads][24], the following code will run with the
+expected output, despite goroutines defined in opposite dependency order.
 ```go
 package main
 
@@ -288,9 +304,9 @@ func main() {
 }
 ```
 
-However, creating goroutines after main (`_start` in WASI) has undefined
-behavior. For example, if that same function was exported (`//export:notMain`),
-and called after main, the line that creates a goroutine panics at runtime.
+There are some glitches to this. For example, if that same function was
+exported (`//export notMain`), and called while main wasn't running, the line
+that creates a goroutine currently [panics at runtime][25].
 
 Given problems like this, some choose a compile-time failure instead, via
 `-scheduler=none`. Since code often needs to be custom in order to work with
@@ -303,17 +319,21 @@ performance vs defaults. Note that sometimes one sacrifices the other.
 
 ### Binary size
 
-Those with size constraints can reduce the `%.wasm` binary size by changing
-`tinygo` flags. For example, a simple `cat` program can reduce from default of
-260KB to 60KB using both flags below.
+Those with `%.wasm` binary size constraints can set `tinygo` flags to reduce
+it. For example, a simple `cat` program can reduce from default of 260KB to
+60KB using both flags below.
 
 * `-scheduler=none`: Reduces size, but fails at compile time on goroutines.
 * `--no-debug`: Strips DWARF, but retains the WebAssembly name section.
 
 ### Performance
 
+Those with runtime performance constraints can set `tinygo` flags to improve
+it.
+
 * `-gc=leaking`: Avoids GC which improves performance for short-lived programs.
-* `-opt=2`: Can also improve performance.
+* `-opt=2`: Enable additional optimizations, frequently at the expense of binary
+  size.
 
 ## Frequently Asked Questions
 
@@ -332,7 +352,7 @@ when their neither has a main function nor uses memory. At least implementing
 A bare or standalone WebAssembly target doesn't yet exist, but if interested,
 you can follow [this issue][19].
 
-### Why is my wasm so big?
+### Why is my `%.wasm` binary so big?
 TinyGo defaults can be overridden for those who can sacrifice features or
 performance for a [smaller binary](#binary-size). After that, tuning your
 source code may reduce binary size further.
@@ -344,7 +364,7 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 
 [1]: https://tinygo.org/
 [2]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-[3]: https://github.com/WebAssembly/WASI
+[3]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [4]: https://tinygo.org/docs/guides/webassembly/
 [5]: https://github.com/tinygo-org/tinygo#getting-help
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/tinygo.md
@@ -362,3 +382,8 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [18]: https://github.com/tinygo-org/tinygo/issues/447
 [19]: https://github.com/tinygo-org/tinygo/issues/3068
 [20]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/arch_tinygowasm.go#L47-L62
+[21]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
+[22]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/tinygo
+[23]: https://github.com/WebAssembly/binaryen/blob/main/src/passes/Asyncify.cpp
+[24]: http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/
+[25]: https://github.com/tinygo-org/tinygo/issues/3095
