@@ -24,7 +24,7 @@ func init() {
 	}
 }
 
-func factorialCall(m Module) error {
+func factorialCall(m Module, _ int) error {
 	_, err := m.CallI64_I64(testCtx, "fac-ssa", factorialParam)
 	return err
 }
