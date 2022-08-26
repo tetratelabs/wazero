@@ -22,13 +22,13 @@ import (
 //
 // This shows how to integrate an HTTP client with wasm using gojs.
 func main() {
-	// Choose the context to use for function calls.
-	ctx := context.Background()
-
 	// The Wasm binary (stars/main.wasm) is very large (>7.5MB). Use wazero's
 	// compilation cache to reduce performance penalty of multiple runs.
 	compilationCacheDir := ".build"
-	ctx = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+	ctx, err := experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+	if err != nil {
+		log.Panicln(err)
+	}
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().

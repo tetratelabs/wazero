@@ -76,7 +76,10 @@ func TestMain(m *testing.M) {
 		log.Panicln(err)
 	}
 	defer os.RemoveAll(compilationCacheDir)
-	testCtx = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+	testCtx, err = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+	if err != nil {
+		log.Panicln(err)
+	}
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.

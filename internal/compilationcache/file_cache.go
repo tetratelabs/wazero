@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -32,7 +31,6 @@ func newFileCache(dir string) *fileCache {
 // Note: this can be expanded to do binary signing/verification, set TTL on each entry, etc.
 type fileCache struct {
 	dirPath string
-	dirOk   bool
 	mux     sync.RWMutex
 }
 
@@ -79,10 +77,6 @@ func (fc *fileCache) Add(key Key, content io.Reader) (err error) {
 	fc.mux.Lock()
 	defer fc.mux.Unlock()
 
-	if err = fc.requireDir(); err != nil {
-		return err
-	}
-
 	file, err := os.Create(fc.path(key))
 	if err != nil {
 		return
@@ -102,24 +96,4 @@ func (fc *fileCache) Delete(key Key) (err error) {
 		err = nil
 	}
 	return
-}
-
-// requireDir ensures the configured directory exists, notably before adding
-// entries to it. This should be called under lock during Add.
-func (fc *fileCache) requireDir() error {
-	if fc.dirOk {
-		return nil
-	}
-
-	// Attempt to create a directory ignoring failures if it already exists.
-	_ = os.MkdirAll(fc.dirPath, 0o700)
-
-	// Now, double-check the directory exists.
-	if s, err := os.Stat(fc.dirPath); err != nil {
-		return fmt.Errorf("fileCache: couldn't open dir %s: %w", fc.dirPath, err)
-	} else if !s.IsDir() {
-		return fmt.Errorf("fileCache: expected dir at %s", fc.dirPath)
-	}
-	fc.dirOk = true
-	return nil
 }
