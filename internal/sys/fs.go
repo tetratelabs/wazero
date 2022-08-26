@@ -73,7 +73,9 @@ func NewFSContext(fs fs.FS) *FSContext {
 	return &FSContext{
 		fs: fs,
 		openedFiles: map[uint32]*FileEntry{
-			3: {Path: "/"}, // after STDERR
+			// after STDERR. wasi-libc always searches for preopened files starting with the value 3
+			// https://github.com/WebAssembly/wasi-libc/blob/2057ce9262f76f7ef5a2002fa16da219e2176896/libc-bottom-half/sources/preopens.c#L228
+			3: {Path: "/"},
 		},
 		lastFD: 3,
 	}
