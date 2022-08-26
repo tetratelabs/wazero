@@ -20,7 +20,10 @@ func Example_withCompilationCacheDirName() {
 	defer os.RemoveAll(cacheDir)
 
 	// Append the directory into the context for configuration.
-	ctx := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
+	ctx, err := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
+	if err != nil {
+		log.Panicln(err)
+	}
 
 	// Repeat newRuntimeCompileClose with the same cache directory.
 	newRuntimeCompileClose(ctx)
