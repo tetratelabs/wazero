@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -131,5 +132,46 @@ func TestFileCache_Get(t *testing.T) {
 		// Non-exist should not be error.
 		require.NoError(t, err)
 		require.False(t, ok)
+	})
+}
+
+func TestFileCache_dirPath(t *testing.T) {
+	tmp := t.TempDir()
+	fc := newFileCache(path.Join(tmp, "test"))
+
+	id := Key{1, 2, 3}
+
+	t.Run("Get and Delete ok when not exist", func(t *testing.T) {
+		// Get doesn't eagerly create the directory
+		content, ok, err := fc.Get(id)
+		require.Nil(t, content)
+		require.False(t, ok)
+		require.NoError(t, err)
+		_, err = os.Open(fc.dirPath)
+		require.ErrorIs(t, err, os.ErrNotExist)
+
+		// Delete doesn't err when the directory doesn't exist
+		err = fc.Delete(id)
+		require.NoError(t, err)
+		_, err = os.Open(fc.dirPath)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+
+	content := []byte{1, 2, 3, 4, 5}
+
+	t.Run("Add fails when not a dir", func(t *testing.T) {
+		_, err := os.Create(fc.dirPath)
+		require.NoError(t, err)
+		defer os.Remove(fc.dirPath)
+
+		err = fc.Add(id, bytes.NewReader(content))
+		require.Contains(t, err.Error(), "fileCache: expected dir")
+	})
+
+	t.Run("Add creates dir", func(t *testing.T) {
+		err := fc.Add(id, bytes.NewReader(content))
+		require.NoError(t, err)
+		_, err = os.Open(fc.path(id))
+		require.NoError(t, err)
 	})
 }

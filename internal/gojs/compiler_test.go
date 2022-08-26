@@ -17,11 +17,9 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 )
-
-// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
-var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -42,8 +40,11 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 	return
 }
 
+// testBin is not checked in as it is >7.5MB
 var testBin []byte
 
+// testCtx is configured in TestMain to re-use wazero's compilation cache.
+var testCtx context.Context
 var testFS = fstest.MapFS{
 	"empty.txt":    {},
 	"test.txt":     {Data: []byte("animals")},
@@ -54,26 +55,66 @@ var testFS = fstest.MapFS{
 func TestMain(m *testing.M) {
 	// For some reason, windows and freebsd fail to compile with exit status 1.
 	if o := runtime.GOOS; o != "darwin" && o != "linux" {
-		log.Println("skipping due to not yet supported OS:", o)
+		log.Println("gojs: skipping due to not yet supported OS:", o)
 		os.Exit(0)
 	}
 
+	// Find the go binary (if present), and compile the Wasm binary.
 	goBin, err := findGoBin()
 	if err != nil {
-		log.Println("skipping due missing Go binary:", err)
+		log.Println("gojs: skipping due missing Go binary:", err)
 		os.Exit(0)
 	}
-
+	start := time.Now()
 	if err = compileJsWasm(goBin); err != nil {
 		log.Panicln(err)
 	}
+	compilationTime := time.Since(start).Milliseconds()
+	log.Printf("gojs: compileFromGo took %dms and produced %dKB wasm", compilationTime, len(testBin)/1024)
 
+	// Define a compilation cache so that tests run faster. This works because
+	// all tests use the same binary.
+	compilationCacheDir, err := os.MkdirTemp("", "gojs")
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer os.RemoveAll(compilationCacheDir)
+	testCtx = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
+
+	// Seed wazero's compilation cache to see any error up-front and to prevent
+	// one test from a cache-miss performance penalty.
+	start = time.Now()
+	rt := wazero.NewRuntime(testCtx)
+	defer rt.Close(testCtx)
+	_, err = rt.CompileModule(testCtx, testBin, wazero.NewCompileConfig())
+	if err != nil {
+		log.Panicln(err)
+	}
+	rt.Close(testCtx)
+	compilationTime = time.Since(start).Milliseconds()
+	log.Printf("gojs: compileFromWasm took %dms and produced %dKB cache", compilationTime, dirSize(compilationCacheDir)/1024)
+
+	// Configure fs test data
 	if d, err := fs.Sub(testFS, "sub"); err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	} else if err = fstest.TestFS(d, "test.txt"); err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	os.Exit(m.Run())
+}
+
+func dirSize(dir string) int64 {
+	var size int64
+	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Panicln(err)
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
 }
 
 // compileJsWasm allows us to generate a binary with runtime.GOOS=js and

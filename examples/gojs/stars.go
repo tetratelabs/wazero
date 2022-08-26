@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/gojs"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -21,6 +22,10 @@ import (
 func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
+
+	// The Wasm binary (stars/main.wasm) is very large (>7.5MB). Use wazero's
+	// compilation cache to reduce performance penalty of multiple runs.
+	ctx = experimental.WithCompilationCacheDirName(context.Background(), ".build")
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
