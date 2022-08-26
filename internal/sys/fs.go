@@ -68,9 +68,9 @@ var emptyFSContext = &FSContext{
 // NewFSContext returns a mutable context if the fs is not EmptyFS. The file
 // descriptor used in the case of non-empty is 3.
 //
-// 
+//
 // Why file descriptor 3?
-// 
+//
 // While not specified, the most common WASI implementation, wasi-libc, expects
 // POSIX style file descriptor allocation, where the lowest available number is
 // used to open the next file. Since 1 and 2 are taken by stdout and stderr
