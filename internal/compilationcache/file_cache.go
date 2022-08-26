@@ -115,7 +115,7 @@ func (fc *fileCache) requireDir() error {
 	_ = os.MkdirAll(fc.dirPath, 0o700)
 
 	// Now, double-check the directory exists.
-	if s, err := os.Stat(fc.dirPath); errors.Is(err, os.ErrNotExist) {
+	if s, err := os.Stat(fc.dirPath); err != nil {
 		return fmt.Errorf("fileCache: couldn't open dir %s: %w", fc.dirPath, err)
 	} else if !s.IsDir() {
 		return fmt.Errorf("fileCache: expected dir at %s", fc.dirPath)

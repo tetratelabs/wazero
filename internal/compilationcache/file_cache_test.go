@@ -137,11 +137,12 @@ func TestFileCache_Get(t *testing.T) {
 
 func TestFileCache_dirPath(t *testing.T) {
 	tmp := t.TempDir()
-	fc := newFileCache(path.Join(tmp, "test"))
-
+	cacheDir := path.Join(tmp, "test")
 	id := Key{1, 2, 3}
 
 	t.Run("Get and Delete ok when not exist", func(t *testing.T) {
+		fc := newFileCache(cacheDir)
+
 		// Get doesn't eagerly create the directory
 		content, ok, err := fc.Get(id)
 		require.Nil(t, content)
@@ -160,21 +161,28 @@ func TestFileCache_dirPath(t *testing.T) {
 	content := []byte{1, 2, 3, 4, 5}
 
 	t.Run("Add fails when not a dir", func(t *testing.T) {
-		f, err := os.Create(fc.dirPath)
+		fc := newFileCache(cacheDir)
+
+		f, err := os.Create(cacheDir) // file not dir
 		require.NoError(t, err)
-		defer f.Close()
-		defer os.Remove(fc.dirPath)
 
 		err = fc.Add(id, bytes.NewReader(content))
 		require.Contains(t, err.Error(), "fileCache: expected dir")
+
+		// Ensure cleanup
+		require.NoError(t, f.Close())
+		require.NoError(t, os.Remove(cacheDir))
 	})
 
 	t.Run("Add creates dir", func(t *testing.T) {
+		fc := newFileCache(cacheDir)
+
 		err := fc.Add(id, bytes.NewReader(content))
 		require.NoError(t, err)
 
+		// Ensure we can read the cached entry
 		f, err := os.Open(fc.path(id))
 		require.NoError(t, err)
-		f.Close()
+		require.NoError(t, f.Close())
 	})
 }
