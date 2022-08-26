@@ -11,7 +11,7 @@ hugo          := github.com/gohugoio/hugo@v0.101.0
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
-all_testdata  := $(wildcard testdata/* */testdata/* */*/testdata/* */*/*/testdata/*)
+all_testdata  := $(wildcard testdata/* */testdata/* */*/testdata/* */*/testdata/*/* */*/*/testdata/*)
 all_testing   := $(wildcard internal/testing/* internal/testing/*/* internal/testing/*/*/*)
 all_examples  := $(wildcard examples/* examples/*/* examples/*/*/*)
 all_it        := $(wildcard internal/integration_test/* internal/integration_test/*/* internal/integration_test/*/*/*)
@@ -53,7 +53,16 @@ build.examples.zig: examples/allocation/zig/testdata/greet.wasm
 	@(cd $(@D); zig build)
 	@mv $(@D)/zig-out/lib/$(@F) $(@D)
 
-tinygo_sources := $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go)
+go_sources := examples/wasm_exec/testdata/cat.go
+.PHONY: build.examples.go
+build.examples.go: $(go_sources)
+	@for f in $^; do \
+	    cd $$(dirname $$f); \
+	    GOARCH=wasm GOOS=js go build -o $$(basename $$f | sed -e 's/\.go/\.wasm/') .; \
+	    cd -; \
+	done
+
+tinygo_sources := $(filter-out $(go_sources), $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go))
 .PHONY: build.examples.tinygo
 build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \

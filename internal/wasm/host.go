@@ -1,12 +1,31 @@
 package wasm
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
+
+// ProxyFunc is a function defined both in wasm and go. This is used to
+// optimize the Go signature or obviate calls based on what can be done
+// mechanically in wasm.
+type ProxyFunc struct {
+	// Proxy must be a wasm func
+	Proxy *HostFunc
+	// Proxied should be a go func.
+	Proxied *HostFunc
+
+	// CallBodyPos is the position in Code.Body of the caller to replace the
+	// real funcIdx of the proxied.
+	CallBodyPos int
+}
+
+func (p *ProxyFunc) Name() string {
+	return p.Proxied.Name
+}
 
 // HostFunc is a function with an inlined type, used for NewHostModule.
 // Any corresponding FunctionType will be reused or added to the Module.
@@ -131,6 +150,14 @@ func NewHostModule(
 	return
 }
 
+// maxProxiedFuncIdx is the maximum index where leb128 encoding matches the bit
+// of an unsigned literal byte. Using this simplifies host function index
+// substitution.
+//
+// Note: this is 127, not 255 because when the MSB is set, leb128 encoding
+// doesn't match the literal byte.
+const maxProxiedFuncIdx = 127
+
 func addFuncs(
 	m *Module,
 	nameToGoFunc map[string]interface{},
@@ -156,6 +183,29 @@ func addFuncs(
 		if hf, ok := v.(*HostFunc); ok {
 			nameToFunc[hf.Name] = hf
 			funcNames = append(funcNames, hf.Name)
+		} else if pf, ok := v.(*ProxyFunc); ok {
+			// First, add the proxied function which also gives us the real
+			// position in the function index namespace, We will need this
+			// later. We've kept code simpler by limiting the max index to
+			// what is encodable in a single byte. This is ok as we don't have
+			// any current use cases for hundreds of proxy functions.
+			proxiedIdx := len(funcNames)
+			if proxiedIdx > maxProxiedFuncIdx {
+				return errors.New("TODO: proxied funcidx larger than one byte")
+			}
+			nameToFunc[pf.Proxied.Name] = pf.Proxied
+			funcNames = append(funcNames, pf.Proxied.Name)
+
+			// Now that we have the real index of the proxied function,
+			// substitute that for the zero placeholder in the proxy's code
+			// body. This placeholder is at index CallBodyPos in the slice.
+			proxyBody := make([]byte, len(pf.Proxy.Code.Body))
+			copy(proxyBody, pf.Proxy.Code.Body)
+			proxyBody[pf.CallBodyPos] = byte(proxiedIdx)
+			proxy := pf.Proxy.WithWasm(proxyBody)
+
+			nameToFunc[proxy.Name] = proxy
+			funcNames = append(funcNames, proxy.Name)
 		} else {
 			params, results, code, ftErr := parseGoFunc(v)
 			if ftErr != nil {
