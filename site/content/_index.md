@@ -13,16 +13,34 @@ wazero is the only zero dependency WebAssembly runtime written in Go.
 
 The best way to learn wazero is by trying one of our [examples][1]
 
-For the impatient, here's how invoking a factorial function looks in wazero:
+For the impatient, here's a peek of a general flow with wazero:
 
+First, you need to compile your code into the WebAssembly Binary Format (Wasm).
+
+Here's source in [TinyGo]({{< ref "/languages/tinygo" >}}), which exports an
+"add" function:
+```go
+package main
+
+//export add
+func add(x, y uint32) uint32 {
+	return x + y
+}
+```
+
+Here's the minimal command to build a `%.wasm` binary.
+```bash
+tinygo build -o add.wasm -target=wasi add.go
+```
+
+Finally, you can run that inside your Go application.
 ```go
 func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	// Read a WebAssembly binary containing an exported "fac" function.
-	// * Ex. (func (export "fac") (param i64) (result i64) ...
-	wasm, err := os.ReadFile("./path/to/fac.wasm")
+	// Read a WebAssembly binary containing an exported "add" function.
+	wasm, err := os.ReadFile("./path/to/add.wasm")
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -37,14 +55,17 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Discover 7! is 5040
-	fmt.Println(module.ExportedFunction("fac").Call(ctx, 7))
+	// Discover 1+2=3
+	fmt.Println(module.ExportedFunction("add").Call(ctx, 1, 2))
 }
 ```
 
-Note: `fac.wasm` was compiled from [fac.wat][2], in the [WebAssembly 1.0][3]
-Text Format, it could have been written in another language that compiles to
-(targets) WebAssembly, such as AssemblyScript, C, C++, Rust, TinyGo or Zig.
+Notes:
+
+* The Wasm binary is often called the "guest" in WebAssembly.
+* The embedding application is often called the "host" in WebAssembly.
+* Many languages compile to (target) Wasm including AssemblyScript, C, C++,
+  Rust, TinyGo and Zig!
 
 ## Why zero?
 
@@ -65,11 +86,8 @@ go get github.com/tetratelabs/wazero@main
 
 wazero will release its first beta at the end of August 2022, and finalize
 1.0 once Go 1.20 is released in Feb 2023. Meanwhile, please practice the
-current APIs to ensure they work for you, and give us a [star][5] if you are
+current APIs to ensure they work for you, and give us a [star][2] if you are
 enjoying it so far!
 
 [1]: https://github.com/tetratelabs/wazero/blob/main/examples
-[2]: https://github.com/tetratelabs/wazero/blob/main/internal/integration_test/post1_0/multi-value/testdata/fac.wat
-[3]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
-[4]: https://github.com/tetratelabs/wazero/issues/506
-[5]: https://github.com/tetratelabs/wazero/stargazers
+[2]: https://github.com/tetratelabs/wazero/stargazers

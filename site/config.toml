@@ -37,18 +37,17 @@ googleAnalytics = "G-LG7LD9G4ZB"
           name = "History"
           weight = 2
       [[languages.en.menu.main]]
+        url = "/languages/"
+        identifier = "languages"
+        name = "Languages"
+        weight = 4
+      [[languages.en.menu.main]]
         identifier = "appendix"
         name = "Appendix"
-        weight = 4
+        weight = 5
         [[languages.en.menu.main]]
           parent = "appendix"
           url = "/specs/"
           identifier = "specs"
           name = "Specifications"
-          weight = 1
-        [[languages.en.menu.main]]
-          parent = "appendix"
-          url = "/languages/"
-          identifier = "languages"
-          name = "Languages"
           weight = 1
