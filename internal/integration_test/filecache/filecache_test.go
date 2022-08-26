@@ -60,7 +60,8 @@ func TestSpecTestCompilerCache(t *testing.T) {
 		require.True(t, len(files) > 0)
 	} else {
 		// Run the spectest with the file cache.
-		ctx := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
+		ctx, err := experimental.WithCompilationCacheDirName(context.Background(), cacheDir)
+		require.NoError(t, err)
 		spectest.Run(t, v1.Testcases, ctx, compiler.NewEngine, v1.EnabledFeatures)
 	}
 }
