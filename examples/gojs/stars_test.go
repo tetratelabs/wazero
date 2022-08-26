@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/internal/testing/maintester"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -27,22 +28,31 @@ func Test_main(t *testing.T) {
 // execution time.
 func TestMain(m *testing.M) {
 	// Notably our scratch containers don't have go, so don't fail tests.
-	if err := compileWasm(); err != nil {
+	if err := compileFromGo(); err != nil {
 		log.Println("Skipping tests due to:", err)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
 
-// compileWasm compiles "stars/main.go" on demand as the binary generated is
+// compileFromGo compiles "stars/main.go" on demand as the binary generated is
 // too big (>7MB) to check into the source tree.
-func compileWasm() error {
+func compileFromGo() error {
 	cmd := exec.Command("go", "build", "-o", "main.wasm", ".")
-	cmd.Dir = path.Join("stars")
+	cmd.Dir = "stars"
 
 	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js")
+	start := time.Now()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("go build: %v\n%s", err, out)
+	}
+	compilationTime := time.Since(start).Milliseconds()
+
+	wasm := path.Join("stars", "main.wasm")
+	if s, err := os.Stat(wasm); err != nil {
+		return fmt.Errorf("couldn't build %s: %v", wasm, err)
+	} else {
+		log.Printf("go build took %dms and produced %dKB wasm", compilationTime, s.Size()/1024)
 	}
 	return nil
 }

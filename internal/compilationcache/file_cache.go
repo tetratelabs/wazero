@@ -110,11 +110,12 @@ func (fc *fileCache) requireDir() error {
 	if fc.dirOk {
 		return nil
 	}
+
+	// Attempt to create a directory ignoring failures if it already exists.
+	_ = os.MkdirAll(fc.dirPath, 0o700)
+
+	// Now, double-check the directory exists.
 	if s, err := os.Stat(fc.dirPath); errors.Is(err, os.ErrNotExist) {
-		if err = os.Mkdir(fc.dirPath, 0o700); err != nil {
-			return fmt.Errorf("fileCache: couldn't create dir %s: %w", fc.dirPath, err)
-		}
-	} else if err != nil {
 		return fmt.Errorf("fileCache: couldn't open dir %s: %w", fc.dirPath, err)
 	} else if !s.IsDir() {
 		return fmt.Errorf("fileCache: expected dir at %s", fc.dirPath)

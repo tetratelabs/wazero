@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
@@ -25,7 +27,8 @@ func main() {
 
 	// The Wasm binary (stars/main.wasm) is very large (>7.5MB). Use wazero's
 	// compilation cache to reduce performance penalty of multiple runs.
-	ctx = experimental.WithCompilationCacheDirName(context.Background(), ".build")
+	compilationCacheDir := ".build"
+	ctx = experimental.WithCompilationCacheDirName(context.Background(), compilationCacheDir)
 
 	// Create a new WebAssembly Runtime.
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
@@ -44,16 +47,22 @@ func main() {
 	}
 
 	// Compile the WebAssembly module using the default configuration.
+	start := time.Now()
 	compiled, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
 	if err != nil {
 		log.Panicln(err)
 	}
+	compilationTime := time.Since(start).Milliseconds()
+	log.Printf("CompileModule took %dms with %dKB cache", compilationTime, dirSize(compilationCacheDir)/1024)
 
 	// Instead of making real HTTP calls, return fake data.
 	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
 
 	// Execute the "run" function, which corresponds to "main" in stars/main.go.
+	start = time.Now()
 	err = gojs.Run(ctx, r, compiled, config)
+	runTime := time.Since(start).Milliseconds()
+	log.Printf("gojs.Run took %dms", runTime)
 	if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
 		log.Panicln(err)
 	} else if !ok {
@@ -74,4 +83,18 @@ func (f *fakeGitHub) RoundTrip(*http.Request) (*http.Response, error) {
 		Body:          io.NopCloser(strings.NewReader(fakeResponse)),
 		ContentLength: int64(len(fakeResponse)),
 	}, nil
+}
+
+func dirSize(dir string) int64 {
+	var size int64
+	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Panicln(err)
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
 }
