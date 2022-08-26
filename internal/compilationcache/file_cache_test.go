@@ -160,8 +160,9 @@ func TestFileCache_dirPath(t *testing.T) {
 	content := []byte{1, 2, 3, 4, 5}
 
 	t.Run("Add fails when not a dir", func(t *testing.T) {
-		_, err := os.Create(fc.dirPath)
+		f, err := os.Create(fc.dirPath)
 		require.NoError(t, err)
+		defer f.Close()
 		defer os.Remove(fc.dirPath)
 
 		err = fc.Add(id, bytes.NewReader(content))
@@ -171,7 +172,9 @@ func TestFileCache_dirPath(t *testing.T) {
 	t.Run("Add creates dir", func(t *testing.T) {
 		err := fc.Add(id, bytes.NewReader(content))
 		require.NoError(t, err)
-		_, err = os.Open(fc.path(id))
+
+		f, err := os.Open(fc.path(id))
 		require.NoError(t, err)
+		f.Close()
 	})
 }
