@@ -68,7 +68,6 @@ var emptyFSContext = &FSContext{
 // NewFSContext returns a mutable context if the fs is not EmptyFS. The file
 // descriptor used in the case of non-empty is 3.
 //
-//
 // Why file descriptor 3?
 //
 // While not specified, the most common WASI implementation, wasi-libc, expects
