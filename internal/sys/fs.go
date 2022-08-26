@@ -65,7 +65,19 @@ var emptyFSContext = &FSContext{
 	lastFD:      2,
 }
 
-// NewFSContext returns a mutable context if the fs is not EmptyFS.
+// NewFSContext returns a mutable context if the fs is not EmptyFS. The file
+// descriptor used in the case of non-empty is 3.
+//
+// 
+// Why file descriptor 3?
+// 
+// While not specified, the most common WASI implementation, wasi-libc, expects
+// POSIX style file descriptor allocation, where the lowest available number is
+// used to open the next file. Since 1 and 2 are taken by stdout and stderr
+// respectively, this means the `fs` parameter will be 3.
+//   - https://github.com/WebAssembly/WASI/issues/122
+//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
+//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
 func NewFSContext(fs fs.FS) *FSContext {
 	if fs == EmptyFS {
 		return emptyFSContext
@@ -73,8 +85,6 @@ func NewFSContext(fs fs.FS) *FSContext {
 	return &FSContext{
 		fs: fs,
 		openedFiles: map[uint32]*FileEntry{
-			// after STDERR. wasi-libc always searches for preopened files starting with the value 3
-			// https://github.com/WebAssembly/wasi-libc/blob/2057ce9262f76f7ef5a2002fa16da219e2176896/libc-bottom-half/sources/preopens.c#L228
 			3: {Path: "/"},
 		},
 		lastFD: 3,
