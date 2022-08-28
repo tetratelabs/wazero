@@ -65,15 +65,28 @@ var emptyFSContext = &FSContext{
 	lastFD:      2,
 }
 
-// NewFSContext returns a mutable context if the fs is not EmptyFS.
-func NewFSContext(fs fs.FS) *FSContext {
-	if fs == EmptyFS {
+// NewFSContext creates a FSContext, using the `root` parameter for any paths
+// beginning at "/". If the input is EmptyFS, there is no root filesystem.
+// Otherwise, `root` is assigned file descriptor 3 and the returned context
+// can open files in that file system.
+//
+// Why file descriptor 3?
+//
+// While not specified, the most common WASI implementation, wasi-libc, expects
+// POSIX style file descriptor allocation, where the lowest available number is
+// used to open the next file. Since 1 and 2 are taken by stdout and stderr,
+// `root` is assigned 3.
+//   - https://github.com/WebAssembly/WASI/issues/122
+//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
+//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
+func NewFSContext(root fs.FS) *FSContext {
+	if root == EmptyFS {
 		return emptyFSContext
 	}
 	return &FSContext{
-		fs: fs,
+		fs: root,
 		openedFiles: map[uint32]*FileEntry{
-			3: {Path: "/"}, // after STDERR
+			3: {Path: "/"},
 		},
 		lastFD: 3,
 	}
