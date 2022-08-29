@@ -876,8 +876,8 @@ func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code
 			err = compiler.compileSelect(o)
 		case *wazeroir.OperationPick:
 			err = compiler.compilePick(o)
-		case *wazeroir.OperationSwap:
-			err = compiler.compileSwap(o)
+		case *wazeroir.OperationSet:
+			err = compiler.compileSet(o)
 		case *wazeroir.OperationGlobalGet:
 			err = compiler.compileGlobalGet(o)
 		case *wazeroir.OperationGlobalSet:

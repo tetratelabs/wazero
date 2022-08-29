@@ -160,7 +160,7 @@ func (o OperationKind) String() (ret string) {
 		ret = "Select"
 	case OperationKindPick:
 		ret = "Pick"
-	case OperationKindSwap:
+	case OperationKindSet:
 		ret = "Swap"
 	case OperationKindGlobalGet:
 		ret = "GlobalGet"
@@ -443,8 +443,8 @@ const (
 	OperationKindSelect
 	// OperationKindPick is the kind for OperationPick.
 	OperationKindPick
-	// OperationKindSwap is the kind for OperationSwap.
-	OperationKindSwap
+	// OperationKindSet is the kind for OperationSet.
+	OperationKindSet
 	// OperationKindGlobalGet is the kind for OperationGlobalGet.
 	OperationKindGlobalGet
 	// OperationKindGlobalSet is the kind for OperationGlobalSet.
@@ -957,20 +957,20 @@ func (*OperationPick) Kind() OperationKind {
 	return OperationKindPick
 }
 
-// OperationSwap implements Operation.
+// OperationSet implements Operation.
 //
-// The engines are expected to swap the top value of the stack and the one specified by
-// OperationSwap.Depth.
-type OperationSwap struct {
-	// Depth is the location of the pick target in the uint64 value stack at runtime.
+// The engines are expected to set the top value of the stack to the location specified by
+// OperationSet.Depth.
+type OperationSet struct {
+	// Depth is the location of the set target in the uint64 value stack at runtime.
 	// If IsTargetVector=true, this points the location of the lower 64-bits of the vector.
 	Depth          int
 	IsTargetVector bool
 }
 
 // Kind implements Operation.Kind
-func (*OperationSwap) Kind() OperationKind {
-	return OperationKindSwap
+func (*OperationSet) Kind() OperationKind {
+	return OperationKindSet
 }
 
 // OperationGlobalGet implements Operation.

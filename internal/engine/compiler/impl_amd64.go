@@ -224,27 +224,29 @@ func (c *amd64Compiler) compileUnreachable() error {
 	return nil
 }
 
-// compileSwap implements compiler.compileSwap for the amd64 architecture.
-func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
+// compileSet implements compiler.compileSet for the amd64 architecture.
+func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
+	if o.IsTargetVector {
+		_ = c.locationStack.pop() // ignore the higher 64-bits.
+	}
+	v := c.locationStack.pop()
+
+	if err := c.compileEnsureOnRegister(v); err != nil {
+		return err
+	}
+
+	reg := v.register
+
 	index := int(c.locationStack.sp) - 1 - o.Depth
-	var x1, x2 *runtimeValueLocation
-	if o.IsTargetVector {
-		x1, x2 = c.locationStack.stack[c.locationStack.sp-2], c.locationStack.stack[index]
-	} else {
-		x1, x2 = c.locationStack.peek(), c.locationStack.stack[index]
+	targetLocation := c.locationStack.stack[index]
+	if targetLocation.onRegister() {
+		// We no longer need the register previously used by the target location.
+		c.locationStack.markRegisterUnused(targetLocation.register)
 	}
 
-	if err := c.compileEnsureOnRegister(x1); err != nil {
-		return err
-	}
-	if err := c.compileEnsureOnRegister(x2); err != nil {
-		return err
-	}
-
-	x1.register, x2.register = x2.register, x1.register
+	targetLocation.setRegister(reg)
 	if o.IsTargetVector {
-		x1, x2 = c.locationStack.peek(), c.locationStack.stack[index+1]
-		x1.register, x2.register = x2.register, x1.register
+		c.locationStack.stack[index+1].setRegister(reg)
 	}
 	return nil
 }
