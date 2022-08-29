@@ -14,7 +14,7 @@ import (
 
 // asWasm compiled using `npm install && npm run build`
 //
-//go:embed testdata/assemblyscript.wasm
+//go:embed testdata/index.wasm
 var asWasm []byte
 
 // main shows how to interact with a WebAssembly function that was compiled
