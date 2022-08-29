@@ -13,5 +13,5 @@ import (
 func Test_main(t *testing.T) {
 	stdout, stderr := maintester.TestMain(t, main, "assemblyscript", "7")
 	require.Equal(t, "hello_world returned: 10", stdout)
-	require.Equal(t, "sad sad world at assemblyscript.ts:7:3\n", stderr)
+	require.Equal(t, "sad sad world at index.ts:7:3\n", stderr)
 }

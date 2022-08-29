@@ -2,9 +2,9 @@
   "name": "hello-assemblyscript",
   "version": "0.0.1",
   "scripts": {
-    "build": "asc assemblyscript.ts --debug -b none -o assemblyscript.wasm"
+    "build": "asc index.ts --debug -b none -o index.wasm"
   },
   "devDependencies": {
-    "assemblyscript": "^0.20.6"
+    "assemblyscript": "^0.21.2"
   }
 }

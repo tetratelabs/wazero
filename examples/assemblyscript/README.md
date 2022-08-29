@@ -13,5 +13,13 @@ Ex.
 ```bash
 $ go run assemblyscript.go 7
 hello_world returned: 10
-sad sad world at assemblyscript.ts:7:3
+sad sad world at index.ts:7:3
 ```
+
+Note: [index.ts](testdata/index.ts) avoids use of JavaScript functions that use
+I/O, such as [console.log][1]. If your code uses these, compile your code with
+the [wasi-shim][2] and configure in wazero using
+`wasi_snapshot_preview1.Instantiate`.
+
+[1]: https://github.com/AssemblyScript/assemblyscript/blob/v0.21.2/std/assembly/bindings/dom.ts#L143
+[2]: https://github.com/AssemblyScript/wasi-shim#usage

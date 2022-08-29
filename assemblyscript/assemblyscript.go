@@ -12,15 +12,16 @@
 //   - "seed" - uses wazero.ModuleConfig WithRandSource as the source of seed
 //     values.
 //
+// See https://www.assemblyscript.org/concepts.html#special-imports
+//
 // # Relationship to WASI
 //
-// A program compiled to use WASI, via "import wasi" in any file, won't import
-// these functions.
+// AssemblyScript supports compiling JavaScript functions that use I/O, such
+// as `console.log("hello")`. However, WASI is not built-in to AssemblyScript.
+// Use the `wasi-shim` to compile if you get import errors.
 //
-// See wasi_snapshot_preview1.Instantiate and
-//   - https://www.assemblyscript.org/concepts.html#special-imports
-//   - https://www.assemblyscript.org/concepts.html#targeting-wasi
-//   - https://www.assemblyscript.org/compiler.html#compiler-options
+// See https://github.com/AssemblyScript/wasi-shim#usage and
+// wasi_snapshot_preview1.Instantiate for more.
 package assemblyscript
 
 import (
