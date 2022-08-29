@@ -455,26 +455,26 @@ func (c *arm64Compiler) compileUnreachable() error {
 
 // compileSet implements compiler.compileSet for the arm64 architecture.
 func (c *arm64Compiler) compileSet(o *wazeroir.OperationSet) error {
-	index := int(c.locationStack.sp) - 1 - o.Depth
+	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
+
 	if o.IsTargetVector {
 		_ = c.locationStack.pop()
 	}
-
 	v := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
-	reg := v.register
-	targetLocation := c.locationStack.stack[index]
+	targetLocation := c.locationStack.stack[setTargetIndex]
 	if targetLocation.onRegister() {
 		// We no longer need the register previously used by the target location.
 		c.markRegisterUnused(targetLocation.register)
 	}
 
+	reg := v.register
 	targetLocation.setRegister(reg)
 	if o.IsTargetVector {
-		c.locationStack.stack[index+1].setRegister(reg)
+		c.locationStack.stack[setTargetIndex+1].setRegister(reg)
 	}
 	return nil
 }

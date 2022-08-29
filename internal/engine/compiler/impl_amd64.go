@@ -226,27 +226,26 @@ func (c *amd64Compiler) compileUnreachable() error {
 
 // compileSet implements compiler.compileSet for the amd64 architecture.
 func (c *amd64Compiler) compileSet(o *wazeroir.OperationSet) error {
+	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
+
 	if o.IsTargetVector {
 		_ = c.locationStack.pop() // ignore the higher 64-bits.
 	}
 	v := c.locationStack.pop()
-
 	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
-	reg := v.register
-
-	index := int(c.locationStack.sp) - 1 - o.Depth
-	targetLocation := c.locationStack.stack[index]
+	targetLocation := c.locationStack.stack[setTargetIndex]
 	if targetLocation.onRegister() {
 		// We no longer need the register previously used by the target location.
 		c.locationStack.markRegisterUnused(targetLocation.register)
 	}
 
+	reg := v.register
 	targetLocation.setRegister(reg)
 	if o.IsTargetVector {
-		c.locationStack.stack[index+1].setRegister(reg)
+		c.locationStack.stack[setTargetIndex+1].setRegister(reg)
 	}
 	return nil
 }
