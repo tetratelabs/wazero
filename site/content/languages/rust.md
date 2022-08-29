@@ -21,8 +21,9 @@ brevity.
 ## Overview
 
 When Rust compiles a `%.rs` file with a `wasm32-*` target, the output `%.wasm`
-depends on a subset of features in the [WebAssembly 1.0 Core specification][2].
-The `wasm32-wasi` target depends on [WASI][3] host functions as well.
+depends on a subset of features in the [WebAssembly 1.0 Core specification]
+({{< ref "/specs#core" >}}). The `wasm32-wasi` target depends on [WASI]
+({{< ref "/specs#wasi" >}}) host functions as well.
 
 Unlike some compilers, Rust also supports importing custom host functions and
 exporting functions back to the host.
@@ -67,9 +68,10 @@ the next person.
 
 ## Constraints
 
-Like other compilers that can target wasm, there are constraints using Rust.
-These constraints affect the library design and dependency choices in your
-source.
+Please read our overview of WebAssembly and
+[constraints]({{< ref "_index.md#constraints" >}}). In short, expect
+limitations in both language features and library choices when developing your
+software.
 
 The most common constraint is which crates you can depend on. Please refer to
 the [Which Crates Will Work Off-the-Shelf with WebAssembly?][8] page in the
@@ -148,10 +150,14 @@ from your business logic as much as possible.
 
 ## System Calls
 
-WebAssembly is a stack-based virtual machine specification, so operates at a
-lower level than an operating system. For functionality the operating system
-would otherwise provide, you must use the `wasm32-wasi` target. This imports
-host functions defined in [WASI][3], described in [Specifications]({{< ref "/specs" >}}).
+Please read our overview of WebAssembly and
+[System Calls]({{< ref "_index.md#system-calls" >}}). In short, WebAssembly is
+a stack-based virtual machine specification, so operates at a lower level than
+an operating system.
+
+For functionality the operating system would otherwise provide, you must use
+the `wasm32-wasi` target. This imports host functions in
+[WASI]({{< ref "/specs#wasi" >}}).
 
 For example, `rustc -o hello.wasm --target wasm32-wasi hello.rs` compiles the
 below `main` function into a WASI function exported as `_start`.
@@ -210,8 +216,6 @@ performance for a [smaller binary](#binary-size). After that, tuning your
 source code may reduce binary size further.
 
 [1]: https://www.rust-lang.org/tools/install
-[2]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
-[3]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [4]: https://docs.rust-embedded.org/book/interoperability/rust-with-c.html#no_mangle
 [5]: https://rustwasm.github.io/docs/book
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/rust.md

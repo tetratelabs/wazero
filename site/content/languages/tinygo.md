@@ -17,8 +17,9 @@ embeds in Go applications. Hence, all notes below will be about TinyGo's
 ## Overview
 
 When TinyGo compiles a `%.go` file with its `wasi` target, the output `%.wasm`
-depends on a subset of features in the [WebAssembly 2.0 Core specification][2],
-as well [WASI][3] host functions.
+depends on a subset of features in the [WebAssembly 2.0 Core specification]
+({{< ref "/specs#core" >}}) and [WASI]({{< ref "/specs#wasi" >}}) host
+functions.
 
 Unlike some compilers, TinyGo also supports importing custom host functions and
 exporting functions back to the host.
@@ -55,11 +56,15 @@ the next person.
 
 ## Constraints
 
-Like other compilers that can target wasm, there are constraints using TinyGo.
-These constraints affect the library design and dependency choices in your Go
-source.
+Please read our overview of WebAssembly and
+[constraints]({{< ref "_index.md#constraints" >}}). In short, expect
+limitations in both language features and library choices when developing your
+software.
 
-### Partial Reflection Support
+### Unsupported standard libraries
+
+TinyGo does not completely implement the Go standard library when targeting
+`wasi`. What is missing is documented [here][26].
 
 The first constraint people notice is that `encoding/json` usage compiles, but
 panics at runtime.
@@ -83,7 +88,7 @@ This is due to limited support for reflection, and effects other [serialization
 tools][18] also. See [Frequently Asked Questions](#frequently-asked-questions)
 for some workarounds.
 
-### Unimplemented System Calls
+### Unsupported System Calls
 
 You may also notice some other features not yet work. For example, the below
 will compile, but print "readdir unimplemented : errno 54" at runtime.
@@ -103,17 +108,6 @@ func main() {
 The underlying error is often, but not always `syscall.ENOSYS` which is the
 standard way to stub a syscall until it is implemented. If you are interested
 in more, see [System Calls](#system-calls).
-
-### Mitigating Constraints
-
-Realities like this are not unique to TinyGo as they will happen compiling any
-language not written specifically with WebAssembly in mind. Knowing the same
-code compiled to wasm may return errors or worse panic, the main mitigation
-approach is testing.
-
-Unit test the critical paths of your code, including errors, on your target
-WebAssembly runtime, such as wazero. This not only gives higher confidence, but
-is also a much more efficient means to communicate bugs vs ad-hoc reports.
 
 ## Memory
 
@@ -222,10 +216,13 @@ approach later.
 
 ## System Calls
 
-WebAssembly is a stack-based virtual machine specification, so operates at a
-lower level than an operating system. For functionality the operating system
-would otherwise provide, TinyGo imports host functions defined in [WASI][3],
-described in [Specifications]({{< ref "/specs" >}}).
+Please read our overview of WebAssembly and
+[System Calls]({{< ref "_index.md#system-calls" >}}). In short, WebAssembly is
+a stack-based virtual machine specification, so operates at a lower level than
+an operating system.
+
+For functionality the operating system would otherwise provide, TinyGo imports
+host functions defined in [WASI]({{< ref "/specs#wasi" >}}).
 
 For example, `tinygo build -o main.wasm -target=wasi main.go` compiles the
 below `main` function into a WASI function exported as `_start`.
@@ -343,7 +340,8 @@ Meanwhile, most users resort to non-reflective parsers, such as [gjson][17].
 
 ### Why does my wasm import WASI functions even when I don't use it?
 TinyGo has a `wasm` target (for browsers) and a `wasi` target for runtimes that
-support [WASI][3]. This document is written only about the `wasi` target.
+support [WASI]({{< ref "/specs#wasi" >}}). This document is written only about
+the `wasi` target.
 
 Some users are surprised to see imports from WASI (`wasi_snapshot_preview1`),
 when their neither has a main function nor uses memory. At least implementing
@@ -363,8 +361,6 @@ surprising to users are APIs that seem simple, but require a lot of supporting
 functions, such as `fmt.Println`, which can require 100KB of wasm.
 
 [1]: https://tinygo.org/
-[2]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-[3]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [4]: https://tinygo.org/docs/guides/webassembly/
 [5]: https://github.com/tinygo-org/tinygo#getting-help
 [6]: https://github.com/tetratelabs/wazero/tree/main/site/content/languages/tinygo.md
@@ -387,3 +383,4 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [23]: https://github.com/WebAssembly/binaryen/blob/main/src/passes/Asyncify.cpp
 [24]: http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/
 [25]: https://github.com/tinygo-org/tinygo/issues/3095
+[26]: https://tinygo.org/docs/reference/lang-support/stdlib/

@@ -31,7 +31,7 @@ such as AssemblyScript.
 In summary, we hope this section can guide you in terms of what wazero supports
 as well as how to classify a request for a feature we don't yet support.
 
-### WebAssembly Core
+### WebAssembly Core {#core}
 wazero conforms with tests defined alongside WebAssembly Core
 Specification [1.0][1] and [2.0][14].
 
@@ -56,7 +56,7 @@ Features not yet assigned to a W3C release are not reliable. Encourage the
 [WebAssembly community][12] to formalize features you rely on, so that they
 become assigned to a release, and reach the W3C recommendation (REC) phase.
 
-### WebAssembly System Interface (WASI)
+### WebAssembly System Interface (WASI) {#wasi}
 
 Many compilers implement system calls using the WebAssembly System Interface,
 [WASI][5]. WASI is a WebAssembly community [subgroup][3], but has not published
