@@ -263,11 +263,8 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// First, move the pointer to the global slice into the allocated register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
-	// Then, get the memory location of the target global instance's pointer.
-	c.assembler.CompileConstToRegister(amd64.ADDQ, 8*int64(o.Index), intReg)
-
 	// Now, move the location of the global instance into the register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(o.Index), intReg)
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
@@ -341,11 +338,8 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	// First, move the pointer to the global slice into the allocated register.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
-	// Then, get the memory location of the target global instance's pointer.
-	c.assembler.CompileConstToRegister(amd64.ADDQ, 8*int64(o.Index), intReg)
-
 	// Now, move the location of the global instance into the register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 8*int64(o.Index), intReg)
 
 	// Now ready to write the value to the global instance location.
 	var inst asm.Instruction
