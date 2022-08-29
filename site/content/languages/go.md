@@ -36,6 +36,11 @@ features.
 
 ## Constraints
 
+Please read our overview of WebAssembly and
+[constraints]({{< ref "_index.md#constraints" >}}). In short, expect
+limitations in both language features and library choices when developing your
+software.
+
 `GOARCH=wasm GOOS=js` has a custom ABI which supports a subset of features in
 the Go standard library. Notably, the host can implement time, crypto, file
 system and HTTP client functions. Even where implemented, certain operations
@@ -43,15 +48,8 @@ will have no effect for reasons like ignoring HTTP request properties or fake
 values returned (such as the pid). When not supported, many functions return
 `syscall.ENOSYS` errors, or the string form: "not implemented on js".
 
-The impact of this is that end users should expect that compilation is not
-enough to ensure a program works in wasm. Use of fake properties or
-unimplemented API usage can result in invalid behavior or errors at runtime.
-For this reason, all code compiled to wasm should be unit tested with the same
-runtime configuration expected in production.
-
 Here are the more notable parts of Go which will not work when compiled via
 `GOARCH=wasm GOOS=js`, resulting in `syscall.ENOSYS` errors:
-* Goroutines. Ex. `go func(){}()`
 * Raw network access. Ex. `net.Bind`
 * File descriptor control (`fnctl`). Ex. `syscall.Pipe`
 * Arbitrary syscalls. Ex `syscall.Syscall`
@@ -68,9 +66,14 @@ begins at [ld.wasmMinDataAddr][12], offset 12288.
 
 ## System Calls
 
-"syscall/js.*" are host functions for managing the JavaScript object graph,
-including functions to make and finalize objects, arrays and numbers
-(`js.Value`).
+Please read our overview of WebAssembly and
+[System Calls]({{< ref "_index.md#system-calls" >}}). In short, WebAssembly is
+a stack-based virtual machine specification, so operates at a lower level than
+an operating system.
+
+"syscall/js.*" are host functions for features the operating system would
+otherwise provide. These also manage the JavaScript object graph, including
+functions to make and finalize objects, arrays and numbers (`js.Value`).
 
 Each `js.Value` has a `js.ref`, which is either a numeric literal or an object
 reference depending on its 64-bit bit pattern. When an object, the first 31
