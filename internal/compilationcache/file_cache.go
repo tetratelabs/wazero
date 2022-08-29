@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"runtime"
 	"sync"
 )
 
@@ -40,7 +41,7 @@ type fileReadCloser struct {
 }
 
 func (fc *fileCache) path(key Key) string {
-	return path.Join(fc.dirPath, hex.EncodeToString(key[:]))
+	return path.Join(fc.dirPath, runtime.GOARCH+"-"+runtime.GOOS+"-"+hex.EncodeToString(key[:]))
 }
 
 func (fc *fileCache) Get(key Key) (content io.ReadCloser, ok bool, err error) {

@@ -2,8 +2,11 @@ package compilationcache
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -132,4 +135,12 @@ func TestFileCache_Get(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, ok)
 	})
+}
+
+func TestFileCache_path(t *testing.T) {
+	fc := &fileCache{dirPath: "/tmp/.wazero"}
+	actual := fc.path(Key{1, 2, 3, 4, 5})
+	require.Contains(t, actual, fmt.Sprintf("%s-%s-", runtime.GOARCH, runtime.GOOS))
+	require.True(t, strings.HasPrefix(actual, fc.dirPath))
+	require.True(t, strings.HasSuffix(actual, "0102030405000000000000000000000000000000000000000000000000000000"))
 }
