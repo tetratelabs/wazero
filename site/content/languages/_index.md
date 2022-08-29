@@ -41,9 +41,9 @@ features the operating system would otherwise provide. Certain capabilities,
 such as forking a process, will not work. Support of common I/O features, such
 as writing to the console, vary. See [System Calls](#system-calls) for more.
 
-Software is more than technical constraints. Being remains a relatively niche
-target, WebAssembly often has limited maintenance and development. This means
-that certain features may not work, yet, even if they could technically.
+Software is more than technical constraints. WebAssembly remains a relatively
+niche target, with limited maintenance and development. This means that certain
+features may not work, yet, even if they could technically.
 
 In general, developing with WebAssembly is difficult, and fewer problems can
 be discovered at compilation time vs more supported targets. This results in
