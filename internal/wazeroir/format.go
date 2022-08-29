@@ -49,7 +49,7 @@ func formatOperation(w io.StringWriter, b Operation) {
 		str = "select"
 	case *OperationPick:
 		str = fmt.Sprintf("pick %d (is_vector=%v)", o.Depth, o.IsTargetVector)
-	case *OperationSwap:
+	case *OperationSet:
 		str = fmt.Sprintf("swap %d (is_vector=%v)", o.Depth, o.IsTargetVector)
 	case *OperationGlobalGet:
 		str = fmt.Sprintf("global.get %d", o.Index)

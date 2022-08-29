@@ -648,7 +648,7 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			}
 
 			// Swap x1 and x2.
-			err = compiler.compileSwap(&wazeroir.OperationSwap{Depth: 4, IsTargetVector: true})
+			err = compiler.compileSet(&wazeroir.OperationSet{Depth: 4, IsTargetVector: true})
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())
@@ -661,18 +661,16 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, uint64(5), env.stackPointer())
+			require.Equal(t, uint64(3), env.stackPointer())
 
 			st := env.stack()
 			require.Equal(t, x2Lo, st[0])
 			require.Equal(t, x2Hi, st[1])
-			require.Equal(t, x1Lo, st[3])
-			require.Equal(t, x1Hi, st[4])
 		})
 	}
 }
 
-func TestCompiler_compileSwap(t *testing.T) {
+func TestCompiler_compileSet(t *testing.T) {
 	var x1Value, x2Value int64 = 100, 200
 	tests := []struct {
 		x1OnConditionalRegister, x1OnRegister, x2OnRegister bool
@@ -721,7 +719,7 @@ func TestCompiler_compileSwap(t *testing.T) {
 			}
 
 			// Swap x1 and x2.
-			err = compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
+			err = compiler.compileSet(&wazeroir.OperationSet{Depth: 2})
 			require.NoError(t, err)
 
 			require.NoError(t, compiler.compileReturnFunction())
@@ -733,10 +731,9 @@ func TestCompiler_compileSwap(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, uint64(3), env.stackPointer())
-			// Check values are swapped.
+			require.Equal(t, uint64(2), env.stackPointer())
+			// Check the value was set.
 			require.Equal(t, uint64(x1Value), env.stack()[0])
-			require.Equal(t, uint64(x2Value), env.stack()[2])
 		})
 	}
 }

@@ -1078,10 +1078,8 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationV128Const{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
-				&OperationSwap{Depth: 3, IsTargetVector: true},
-				// [0x01, 0x02, p[0].lo, p[1].hi] -> [0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
+				&OperationSet{Depth: 3, IsTargetVector: true},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
@@ -1099,8 +1097,7 @@ func TestCompile_Locals(t *testing.T) {
 			},
 			expected: []Operation{
 				&OperationConstI32{Value: 0x1},
-				&OperationSwap{Depth: 1, IsTargetVector: false},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSet{Depth: 1, IsTargetVector: false},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
@@ -1125,10 +1122,8 @@ func TestCompile_Locals(t *testing.T) {
 				&OperationV128Const{Lo: 0, Hi: 0},
 				// [p[0].lo, p[1].hi] -> [p[0].lo, p[1].hi, 0x01, 0x02]
 				&OperationV128Const{Lo: 0x01, Hi: 0x02},
-				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02, p[0].lo, p[1].hi]
-				&OperationSwap{Depth: 3, IsTargetVector: true},
-				// [p[0].lo, 0x02, 0x01, p[1].hi] -> [0x02, 0x01]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [0x01, 0x02]
+				&OperationSet{Depth: 3, IsTargetVector: true},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
@@ -1151,10 +1146,8 @@ func TestCompile_Locals(t *testing.T) {
 				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
 				&OperationPick{Depth: 1, IsTargetVector: true},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]
-				&OperationSwap{Depth: 5, IsTargetVector: true},
-				// [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi] ->  [0x01, 0x02, 0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02] -> [0x01, 0x02, 0x01, 0x02]
+				&OperationSet{Depth: 5, IsTargetVector: true},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
@@ -1173,8 +1166,7 @@ func TestCompile_Locals(t *testing.T) {
 			expected: []Operation{
 				&OperationConstF32{math.Float32frombits(1)},
 				&OperationPick{Depth: 0, IsTargetVector: false},
-				&OperationSwap{Depth: 2, IsTargetVector: false},
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 0}},
+				&OperationSet{Depth: 2, IsTargetVector: false},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},
@@ -1201,10 +1193,8 @@ func TestCompile_Locals(t *testing.T) {
 				&OperationV128Const{Lo: 0x01, Hi: 0x02},
 				// [p[0].lo, p[1].hi, 0x01, 0x02] -> [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x02]
 				&OperationPick{Depth: 1, IsTargetVector: true},
-				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi]
-				&OperationSwap{Depth: 5, IsTargetVector: true},
-				// [0x01, 0x02, 0x01, 0x02, p[0].lo, p[1].hi] ->  [0x01, 0x02, 0x01, 0x02]
-				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 1}},
+				// [p[0].lo, p[1].hi, 0x01, 0x02, 0x01, 0x2] -> [0x01, 0x02, 0x01, 0x02]
+				&OperationSet{Depth: 5, IsTargetVector: true},
 				&OperationDrop{Depth: &InclusiveRange{Start: 0, End: 3}},
 				&OperationBr{Target: &BranchTarget{}}, // return!
 			},

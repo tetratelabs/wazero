@@ -25,8 +25,8 @@ type compiler interface {
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	// compileUnreachable adds instruction to perform wazeroir.OperationUnreachable.
 	compileUnreachable() error
-	// compileSwap adds instruction to perform wazeroir.OperationSwap.
-	compileSwap(o *wazeroir.OperationSwap) error
+	// compileSet adds instruction to perform wazeroir.OperationSet.
+	compileSet(o *wazeroir.OperationSet) error
 	// compileGlobalGet adds instructions to perform wazeroir.OperationGlobalGet.
 	compileGlobalGet(o *wazeroir.OperationGlobalGet) error
 	// compileGlobalSet adds instructions to perform wazeroir.OperationGlobalSet.

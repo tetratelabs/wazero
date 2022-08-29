@@ -453,28 +453,28 @@ func (c *arm64Compiler) compileUnreachable() error {
 	return nil
 }
 
-// compileSwap implements compiler.compileSwap for the arm64 architecture.
-func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
-	yIndex := int(c.locationStack.sp) - 1 - o.Depth
-	var x, y *runtimeValueLocation
-	if o.IsTargetVector {
-		x, y = c.locationStack.stack[c.locationStack.sp-2], c.locationStack.stack[yIndex]
-	} else {
-		x, y = c.locationStack.peek(), c.locationStack.stack[yIndex]
-	}
+// compileSet implements compiler.compileSet for the arm64 architecture.
+func (c *arm64Compiler) compileSet(o *wazeroir.OperationSet) error {
+	setTargetIndex := int(c.locationStack.sp) - 1 - o.Depth
 
-	if err := c.compileEnsureOnRegister(x); err != nil {
+	if o.IsTargetVector {
+		_ = c.locationStack.pop()
+	}
+	v := c.locationStack.pop()
+	if err := c.compileEnsureOnRegister(v); err != nil {
 		return err
 	}
 
-	if err := c.compileEnsureOnRegister(y); err != nil {
-		return err
+	targetLocation := c.locationStack.stack[setTargetIndex]
+	if targetLocation.onRegister() {
+		// We no longer need the register previously used by the target location.
+		c.markRegisterUnused(targetLocation.register)
 	}
 
-	x.register, y.register = y.register, x.register
+	reg := v.register
+	targetLocation.setRegister(reg)
 	if o.IsTargetVector {
-		x, y = c.locationStack.peek(), c.locationStack.stack[yIndex+1]
-		x.register, y.register = y.register, x.register
+		c.locationStack.stack[setTargetIndex+1].setRegister(reg)
 	}
 	return nil
 }
