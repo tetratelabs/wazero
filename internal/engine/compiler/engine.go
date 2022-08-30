@@ -164,14 +164,14 @@ type (
 	// callFrame holds the information to which the caller function can return.
 	// callFrame is created for currently executed function frame as well,
 	// so some fields are not yet set when native code is currently executing it.
-	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
+	// That is, callFrameTop().returnAddress or returnStackBasePointerInBytes are not set
 	// until it makes a function call.
 	callFrame struct {
 		// Set when making function call from this function frame, or for the initial function frame to call from
 		// callEngine.execWasmFunction.
 		returnAddress uintptr
 		// Set when making function call from this function frame.
-		returnStackBasePointer uint64
+		returnStackBasePointerInBytes uint64
 		// Set when making function call to this function frame.
 		function *function
 		// _ is a necessary padding to make the size of callFrame struct a power of 2.
@@ -255,11 +255,11 @@ const (
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
-	callFrameDataSize                      = 32
-	callFrameDataSizeMostSignificantSetBit = 5
-	callFrameReturnAddressOffset           = 0
-	callFrameReturnStackBasePointerOffset  = 8
-	callFrameFunctionOffset                = 16
+	callFrameDataSize                            = 32
+	callFrameDataSizeMostSignificantSetBit       = 5
+	callFrameReturnAddressOffset                 = 0
+	callFrameReturnStackBasePointerInBytesOffset = 8
+	callFrameFunctionOffset                      = 16
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
@@ -385,7 +385,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointer,
+		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointerInBytes>>3,
 	)
 }
 
@@ -652,7 +652,7 @@ func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *fu
 	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.callFrameStack))
 	ce.globalContext = globalContext{
 		valueStackElement0Address:        valueStackHeader.Data,
-		valueStackLenInBytes:             uint64(valueStackHeader.Len) * 8,
+		valueStackLenInBytes:             uint64(valueStackHeader.Len) << 3,
 		callFrameStackElementZeroAddress: callFrameStackHeader.Data,
 		callFrameStackLen:                uint64(callFrameStackHeader.Len),
 		callFrameStackPointer:            0,
@@ -668,7 +668,7 @@ func (ce *callEngine) popValue() (ret uint64) {
 
 func (ce *callEngine) pushValue(v uint64) {
 	ce.valueStack[ce.valueStackTopIndex()] = v
-	ce.valueStackContext.stackBasePointerInBytes += 8
+	ce.valueStackContext.stackPointerInBytes += 8
 }
 
 func (ce *callEngine) callFrameTop() *callFrame {
@@ -766,7 +766,7 @@ func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	ce.valueStack = newStack
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
 	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLenInBytes = uint64(valueStackHeader.Len) << 3
+	ce.globalContext.valueStackLenInBytes = newLen << 3
 }
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)

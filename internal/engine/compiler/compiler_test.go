@@ -68,7 +68,7 @@ func init() {
 	requireEqual(0, callFrameDataSize&(callFrameDataSize-1), "callFrameDataSize&(callFrameDataSize-1)")
 	requireEqual(math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit, "callFrameDataSizeMostSignificantSetBit")
 	requireEqual(int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset, "callFrameReturnAddressOffset")
-	requireEqual(int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset, "callFrameReturnStackBasePointerOffset")
+	requireEqual(int(unsafe.Offsetof(frame.returnStackBasePointerInBytes)), callFrameReturnStackBasePointerInBytesOffset, "callFrameReturnStackBasePointerInBytesOffset")
 	requireEqual(int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset, "callFrameFunctionOffset")
 
 	// Offsets for code.

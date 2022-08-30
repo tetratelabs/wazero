@@ -965,12 +965,12 @@ func TestCompiler_returnFunction(t *testing.T) {
 				// Set the return address to the beginning of the function so that we can execute the constI32 above.
 				returnAddress: f.codeInitialAddress,
 				// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
-				returnStackBasePointer: uint64(funcIndex) * 5,
-				function:               f,
+				returnStackBasePointerInBytes: (uint64(funcIndex) * 5) << 3,
+				function:                      f,
 			}
 			ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
 			ce.globalContext.callFrameStackPointer++
-			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
+			stackPointerToExpectedValue[frame.returnStackBasePointerInBytes>>3] = expValue
 		}
 
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())

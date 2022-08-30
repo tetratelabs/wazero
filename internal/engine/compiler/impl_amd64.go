@@ -4608,7 +4608,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister,
 			// "rb.1" is BELOW the top address. See the above example for detail.
-			callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+			callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset),
 		)
 	}
 
@@ -4617,7 +4617,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in callEngine.pushCallFrame which does exactly the same calculation in Go.
-		c.assembler.CompileConstToRegister(amd64.ADDQ, offset*8, tmpRegister)
+		c.assembler.CompileConstToRegister(amd64.ADDQ, offset<<3, tmpRegister)
 
 		// Write the calculated value to callEngine.valueStackContext.stackBasePointer.
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset)
@@ -4791,7 +4791,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// 1) Set callEngine.valueStackContext.stackBasePointer to the value on "rb.caller"
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		// "rb.caller" is BELOW the top address. See the above example for detail.
-		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset),
 		tmpRegister,
 	)
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
