@@ -37,7 +37,7 @@ func init() {
 	var ce callEngine
 	// Offsets for callEngine.globalContext.
 	requireEqual(int(unsafe.Offsetof(ce.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset, "callEngineGlobalContextValueStackElement0AddressOffset")
-	requireEqual(int(unsafe.Offsetof(ce.valueStackLen)), callEngineGlobalContextValueStackLenOffset, "callEngineGlobalContextValueStackLenOffset")
+	requireEqual(int(unsafe.Offsetof(ce.valueStackLenInBytes)), callEngineGlobalContextValueStackLenInBytesOffset, "callEngineGlobalContextValueStackLenInBytesOffset")
 	requireEqual(int(unsafe.Offsetof(ce.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset, "callEngineGlobalContextCallFrameStackElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset, "callEngineGlobalContextCallFrameStackLenOffset")
 	requireEqual(int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset, "callEngineGlobalContextCallFrameStackPointerOffset")
@@ -55,7 +55,7 @@ func init() {
 
 	// Offsets for callEngine.valueStackContext
 	requireEqual(int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset, "callEngineValueStackContextStackPointerOffset")
-	requireEqual(int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset, "callEngineValueStackContextStackBasePointerOffset")
+	requireEqual(int(unsafe.Offsetof(ce.stackBasePointerInBytes)), callEngineValueStackContextStackBasePointerInBytesOffset, "callEngineValueStackContextStackBasePointerInBytesOffset")
 
 	// Offsets for callEngine.exitContext.
 	requireEqual(int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset, "callEngineExitContextNativeCallStatusCodeOffset")
@@ -68,7 +68,7 @@ func init() {
 	requireEqual(0, callFrameDataSize&(callFrameDataSize-1), "callFrameDataSize&(callFrameDataSize-1)")
 	requireEqual(math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit, "callFrameDataSizeMostSignificantSetBit")
 	requireEqual(int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset, "callFrameReturnAddressOffset")
-	requireEqual(int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset, "callFrameReturnStackBasePointerOffset")
+	requireEqual(int(unsafe.Offsetof(frame.returnStackBasePointerInBytes)), callFrameReturnStackBasePointerInBytesOffset, "callFrameReturnStackBasePointerInBytesOffset")
 	requireEqual(int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset, "callFrameFunctionOffset")
 
 	// Offsets for code.
@@ -173,7 +173,7 @@ func (j *compilerEnv) stackPointer() uint64 {
 }
 
 func (j *compilerEnv) stackBasePointer() uint64 {
-	return j.ce.valueStackContext.stackBasePointer
+	return j.ce.valueStackContext.stackBasePointerInBytes >> 3
 }
 
 func (j *compilerEnv) setStackPointer(sp uint64) {
@@ -201,7 +201,7 @@ func (j *compilerEnv) callFrameStackPointer() uint64 {
 }
 
 func (j *compilerEnv) setValueStackBasePointer(sp uint64) {
-	j.ce.valueStackContext.stackBasePointer = sp
+	j.ce.valueStackContext.stackBasePointerInBytes = sp << 3
 }
 
 func (j *compilerEnv) setCallFrameStackPointerLen(l uint64) {

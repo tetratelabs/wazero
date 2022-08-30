@@ -332,7 +332,7 @@ wasm stack trace:
 
 	// After recover, the stack pointers must be reset, but the underlying slices must be intact
 	// for the subsequent calls.
-	require.Equal(t, uint64(0), ce.stackPointer)
+	require.Equal(t, uint64(0), ce.stackBasePointerInBytes)
 	require.Equal(t, uint64(0), ce.callFrameStackPointer)
 	require.Equal(t, beforeRecoverValueStack, ce.valueStack)
 	require.Equal(t, beforeRecoverCallFrameStack, ce.callFrameStack)

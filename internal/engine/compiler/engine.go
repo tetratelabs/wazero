@@ -79,9 +79,9 @@ type (
 		// valueStackElement0Address is &engine.valueStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
 		valueStackElement0Address uintptr
-		// valueStackLen is len(engine.valueStack[0]).
+		// valueStackLenInBytes is len(engine.valueStack[0]) * 8 (bytes).
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
-		valueStackLen uint64
+		valueStackLenInBytes uint64
 
 		// callFrameStackElementZeroAddress is &engine.callFrameStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
@@ -130,14 +130,14 @@ type (
 
 	// valueStackContext stores the data to access engine.valueStack.
 	valueStackContext struct {
-		// stackPointer on .valueStack field which is accessed by [stackBasePointer] + [stackPointer].
+		// stackPointer on .valueStack field which is accessed by valueStack[stackBasePointer+stackBasePointerInBytes*8].
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
 		// each variable in the value stack from the info from compilation.
 		// Therefore, only updated when native code exit from the Compiler world and go back to the Go function.
 		stackPointer uint64
 
-		// stackBasePointer is updated whenever we make function calls.
+		// stackBasePointerInBytes is updated whenever we make function calls.
 		// Background: Functions might be compiled as if they use the stack from the bottom.
 		// However, in reality, they have to use it from the middle of the stack depending on
 		// when these function calls are made. So instead of accessing stack via stackPointer alone,
@@ -148,7 +148,7 @@ type (
 		// Note: This is saved on callFrameTop().returnStackBasePointer whenever making function call.
 		// Also, this is changed whenever we make function call or return from functions where we execute jump instruction.
 		// In either case, the caller of "jmp" instruction must set this field properly.
-		stackBasePointer uint64
+		stackBasePointerInBytes uint64
 	}
 
 	// exitContext will be manipulated whenever compiled native code returns into the Go function.
@@ -164,14 +164,14 @@ type (
 	// callFrame holds the information to which the caller function can return.
 	// callFrame is created for currently executed function frame as well,
 	// so some fields are not yet set when native code is currently executing it.
-	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
+	// That is, callFrameTop().returnAddress or returnStackBasePointerInBytes are not set
 	// until it makes a function call.
 	callFrame struct {
 		// Set when making function call from this function frame, or for the initial function frame to call from
 		// callEngine.execWasmFunction.
 		returnAddress uintptr
 		// Set when making function call from this function frame.
-		returnStackBasePointer uint64
+		returnStackBasePointerInBytes uint64
 		// Set when making function call to this function frame.
 		function *function
 		// _ is a necessary padding to make the size of callFrame struct a power of 2.
@@ -230,7 +230,7 @@ const (
 
 	// Offsets for callEngine globalContext.
 	callEngineGlobalContextValueStackElement0AddressOffset     = 0
-	callEngineGlobalContextValueStackLenOffset                 = 8
+	callEngineGlobalContextValueStackLenInBytesOffset          = 8
 	callEngineGlobalContextCallFrameStackElement0AddressOffset = 16
 	callEngineGlobalContextCallFrameStackLenOffset             = 24
 	callEngineGlobalContextCallFrameStackPointerOffset         = 32
@@ -247,19 +247,19 @@ const (
 	callEngineModuleContextElementInstancesElement0AddressOffset = 104
 
 	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset     = 112
-	callEngineValueStackContextStackBasePointerOffset = 120
+	callEngineValueStackContextStackPointerOffset            = 112
+	callEngineValueStackContextStackBasePointerInBytesOffset = 120
 
 	// Offsets for callEngine exitContext.
 	callEngineExitContextNativeCallStatusCodeOffset       = 128
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
 
 	// Offsets for callFrame.
-	callFrameDataSize                      = 32
-	callFrameDataSizeMostSignificantSetBit = 5
-	callFrameReturnAddressOffset           = 0
-	callFrameReturnStackBasePointerOffset  = 8
-	callFrameFunctionOffset                = 16
+	callFrameDataSize                            = 32
+	callFrameDataSizeMostSignificantSetBit       = 5
+	callFrameReturnAddressOffset                 = 0
+	callFrameReturnStackBasePointerInBytesOffset = 8
+	callFrameFunctionOffset                      = 16
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
@@ -385,7 +385,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointer,
+		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointerInBytes>>3,
 	)
 }
 
@@ -652,7 +652,7 @@ func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *fu
 	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.callFrameStack))
 	ce.globalContext = globalContext{
 		valueStackElement0Address:        valueStackHeader.Data,
-		valueStackLen:                    uint64(valueStackHeader.Len),
+		valueStackLenInBytes:             uint64(valueStackHeader.Len) << 3,
 		callFrameStackElementZeroAddress: callFrameStackHeader.Data,
 		callFrameStackLen:                uint64(callFrameStackHeader.Len),
 		callFrameStackPointer:            0,
@@ -681,7 +681,7 @@ func (ce *callEngine) callFrameAt(depth uint64) *callFrame {
 }
 
 func (ce *callEngine) valueStackTopIndex() uint64 {
-	return ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer
+	return ce.valueStackContext.stackPointer + (ce.valueStackContext.stackBasePointerInBytes >> 3)
 }
 
 const (
@@ -703,7 +703,7 @@ entry:
 		frame := ce.callFrameTop()
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
-				frame.String(), ce.valueStackContext.stackBasePointer, ce.valueStackContext.stackPointer)
+				frame.String(), ce.valueStackContext.stackBasePointerInBytes>>3, ce.valueStackContext.stackPointer)
 		}
 
 		// Call into the native code.
@@ -758,14 +758,15 @@ entry:
 
 func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	// Extends the valueStack's length to currentLen*2+stackPointerCeil.
-	newLen := ce.globalContext.valueStackLen*2 + (stackPointerCeil)
+	newLen := uint64(len(ce.valueStack))<<1 + (stackPointerCeil)
 	newStack := make([]uint64, newLen)
-	top := ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer
+	ce.valueStackTopIndex()
+	top := ce.valueStackTopIndex()
 	copy(newStack[:top], ce.valueStack[:top])
 	ce.valueStack = newStack
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
 	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
+	ce.globalContext.valueStackLenInBytes = newLen << 3
 }
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)

@@ -4604,11 +4604,11 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 	{
 		// We must save the current stack base pointer (which lives on callEngine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
-		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset, tmpRegister)
 
 		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister,
 			// "rb.1" is BELOW the top address. See the above example for detail.
-			callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+			callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset),
 		)
 	}
 
@@ -4617,10 +4617,10 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, functionAddres
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in callEngine.pushCallFrame which does exactly the same calculation in Go.
-		c.assembler.CompileConstToRegister(amd64.ADDQ, offset, tmpRegister)
+		c.assembler.CompileConstToRegister(amd64.ADDQ, offset<<3, tmpRegister)
 
 		// Write the calculated value to callEngine.valueStackContext.stackBasePointer.
-		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset)
 	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
@@ -4791,11 +4791,11 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// 1) Set callEngine.valueStackContext.stackBasePointer to the value on "rb.caller"
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		// "rb.caller" is BELOW the top address. See the above example for detail.
-		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset),
 		tmpRegister,
 	)
 	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
-		tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
+		tmpRegister, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset)
 
 	// 2) Load rc.caller.moduleInstanceAddress into amd64CallingConventionModuleInstanceAddressRegister
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
@@ -4935,10 +4935,12 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *runtimeValueLocation)
 }
 
 func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
-	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), amd64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status),
+		amd64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
 
 	// Write back the cached SP to the actual eng.stackPointer.
-	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp), amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp),
+		amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)
 
 	c.assembler.CompileStandAlone(amd64.RET)
 }
@@ -4970,19 +4972,9 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 		amd64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackElement0AddressOffset,
 		amd64ReservedRegisterForStackBasePointerAddress)
 
-	// Since initializeReservedRegisters is called at the beginning of function
-	// calls (or right after they return), we have free registers at this point.
-	tmpReg, _ := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
-
 	// next we move the base pointer (callEngine.stackBasePointer) to the tmp register.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
-		amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
-		tmpReg,
-	)
-
-	c.assembler.CompileMemoryWithIndexToRegister(
-		amd64.LEAQ,
-		amd64ReservedRegisterForStackBasePointerAddress, 0, tmpReg, 8,
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ,
+		amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset,
 		amd64ReservedRegisterForStackBasePointerAddress,
 	)
 }
@@ -5002,13 +4994,13 @@ func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
 func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 	tmpRegister, _ := c.allocateRegister(registerTypeGeneralPurpose)
 
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset, tmpRegister)
-	c.assembler.CompileMemoryToRegister(amd64.SUBQ, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackLenInBytesOffset, tmpRegister)
+	c.assembler.CompileMemoryToRegister(amd64.SUBQ, amd64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset, tmpRegister)
 
 	// If stack base pointer + max stack pointer > valueStackLen, we need to grow the stack.
 	cmpWithStackPointerCeil := c.assembler.CompileRegisterToConst(amd64.CMPQ, tmpRegister, 0)
 	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
-		cmpWithStackPointerCeil.AssignDestinationConstant(int64(stackPointerCeil))
+		cmpWithStackPointerCeil.AssignDestinationConstant(int64(stackPointerCeil) << 3)
 	}
 
 	// Jump if we have no need to grow.

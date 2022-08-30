@@ -230,14 +230,14 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	// "tmpX = len(ce.valueStack)"
 	c.assembler.CompileMemoryToRegister(
 		arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset,
+		arm64ReservedRegisterForCallEngine, callEngineGlobalContextValueStackLenInBytesOffset,
 		tmpX,
 	)
 
 	// "tmpY = ce.stackBasePointer"
 	c.assembler.CompileMemoryToRegister(
 		arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
+		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset,
 		tmpY,
 	)
 
@@ -256,7 +256,9 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	)
 	// At this point of compilation, we don't know the value of stack point ceil,
 	// so we lazily resolve the value later.
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.AssignSourceConstant(int64(stackPointerCeil)) }
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
+		loadStackPointerCeil.AssignSourceConstant(int64(stackPointerCeil) << 3)
+	}
 
 	// Compare tmpX (len(ce.valueStack) - ce.stackBasePointer) and tmpY (ce.stackPointerCeil)
 	c.assembler.CompileTwoRegistersToNone(arm64.CMP, tmpX, tmpY)
@@ -347,11 +349,11 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	// 1) Set ce.valueStackContext.stackBasePointer to the value on "rb.caller".
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		// "rb.caller" is below the top address.
-		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset),
 		tmpReg)
 	c.assembler.CompileRegisterToMemory(arm64.STRD,
 		tmpReg,
-		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
+		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset)
 
 	// 2) Load rc.caller.moduleInstanceAddress into arm64CallingConventionModuleInstanceAddressRegister.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
@@ -982,12 +984,12 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, targetFunctionAddressR
 
 	// 1) Set rb.current so that we can return back to this function properly.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
+		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset,
 		oldStackBasePointer)
 	c.assembler.CompileRegisterToMemory(arm64.STRD,
 		oldStackBasePointer,
 		// "rb.current" is BELOW the top address. See the above example for detail.
-		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset))
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerInBytesOffset))
 
 	// 2) Set ce.valueStackContext.stackBasePointer for the next function.
 	//
@@ -995,10 +997,10 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, targetFunctionAddressR
 	// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 	// See the comments in ce.pushCallFrame which does exactly the same calculation in Go.
 	if offset := int64(c.locationStack.sp) - int64(functype.ParamNumInUint64); offset > 0 {
-		c.assembler.CompileConstToRegister(arm64.ADD, offset, oldStackBasePointer)
+		c.assembler.CompileConstToRegister(arm64.ADD, offset<<3, oldStackBasePointer)
 		c.assembler.CompileRegisterToMemory(arm64.STRD,
 			oldStackBasePointer,
-			arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
+			arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset)
 	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame.
@@ -4098,15 +4100,11 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 
 	// next we move the base pointer (ce.stackBasePointer) to arm64ReservedRegisterForTemporary.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
+		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset,
 		arm64ReservedRegisterForTemporary)
 
-	// Finally, we calculate "arm64ReservedRegisterForStackBasePointerAddress + arm64ReservedRegisterForTemporary << 3"
-	// where we shift tmpReg by 3 because stack pointer is an index in the []uint64
-	// so we must multiply the value by the size of uint64 = 8 bytes.
-	c.assembler.CompileLeftShiftedRegisterToRegister(arm64.ADD,
-		arm64ReservedRegisterForTemporary, 3, arm64ReservedRegisterForStackBasePointerAddress,
-		arm64ReservedRegisterForStackBasePointerAddress)
+	// Finally, we calculate "callEngineValueStackContextStackBasePointerInBytesOffset + arm64ReservedRegisterForTemporary"
+	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForStackBasePointerAddress)
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
