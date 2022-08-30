@@ -130,14 +130,14 @@ type (
 
 	// valueStackContext stores the data to access engine.valueStack.
 	valueStackContext struct {
-		// stackPointer on .valueStack field which is accessed by [stackBasePointer] + [stackPointer].
+		// stackPointer on .valueStack field which is accessed by valueStack[stackBasePointer+stackBasePointerInBytes*8].
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
 		// each variable in the value stack from the info from compilation.
 		// Therefore, only updated when native code exit from the Compiler world and go back to the Go function.
 		stackPointer uint64
 
-		// stackBasePointer is updated whenever we make function calls.
+		// stackBasePointerInBytes is updated whenever we make function calls.
 		// Background: Functions might be compiled as if they use the stack from the bottom.
 		// However, in reality, they have to use it from the middle of the stack depending on
 		// when these function calls are made. So instead of accessing stack via stackPointer alone,

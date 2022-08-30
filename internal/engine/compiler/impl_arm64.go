@@ -4103,7 +4103,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 		arm64ReservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerInBytesOffset,
 		arm64ReservedRegisterForTemporary)
 
-	// Finally, we calculate "callEngineValueStackContextStackBasePointerInBytesOffset + arm64ReservedRegisterForTemporary << 3"
+	// Finally, we calculate "callEngineValueStackContextStackBasePointerInBytesOffset + arm64ReservedRegisterForTemporary"
 	c.assembler.CompileRegisterToRegister(arm64.ADD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForStackBasePointerAddress)
 }
 
