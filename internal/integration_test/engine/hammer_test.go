@@ -35,7 +35,7 @@ func closeImportingModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, importing.Close(testCtx))
 
 		// Prove a module can be redefined even with in-flight calls.
-		binary := callReturnImportWasm(imported.Name(), importing.Name())
+		binary := callReturnImportWasm(t, imported.Name(), importing.Name(), i32)
 		importing, err := r.InstantiateModuleFromBinary(testCtx, binary)
 		require.NoError(t, err)
 		return imported, importing
@@ -55,7 +55,7 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, err)
 
 		// Redefine the importing module, which should link to the redefined host module.
-		binary := callReturnImportWasm(imported.Name(), importing.Name())
+		binary := callReturnImportWasm(t, imported.Name(), importing.Name(), i32)
 		importing, err = r.InstantiateModuleFromBinary(testCtx, binary)
 		require.NoError(t, err)
 
@@ -84,7 +84,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	defer imported.Close(testCtx)
 
 	// Import that module.
-	binary := callReturnImportWasm(imported.Name(), t.Name()+"-importing")
+	binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
 	importing, err := r.InstantiateModuleFromBinary(testCtx, binary)
 	require.NoError(t, err)
 	defer importing.Close(testCtx)
@@ -93,7 +93,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	i := importing // pin the module used inside goroutines
 	hammer.NewHammer(t, P, 1).Run(func(name string) {
 		// In all cases, the importing module is closed, so the error should have that as its module name.
-		requireFunctionCallExits(t, i.Name(), i.ExportedFunction("call_return_import"))
+		requireFunctionCallExits(t, i.Name(), i.ExportedFunction("call_return_input"))
 	}, func() { // When all functions are in-flight, re-assign the modules.
 		imported, importing = closeFn(imported, importing)
 		// Unblock all the calls
@@ -107,7 +107,7 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	}
 
 	// If unloading worked properly, a new function call should route to the newly instantiated module.
-	requireFunctionCall(t, importing.ExportedFunction("call_return_import"))
+	requireFunctionCall(t, importing.ExportedFunction("call_return_input"))
 }
 
 func requireFunctionCall(t *testing.T, fn api.Function) {

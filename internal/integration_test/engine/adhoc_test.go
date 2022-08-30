@@ -3,7 +3,6 @@ package adhoc
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -14,12 +13,16 @@ import (
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/watzero"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
+
+const (
+	i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+)
 
 var memoryCapacityPages = uint32(2)
 
@@ -77,8 +80,12 @@ var (
 	unreachableWasm []byte
 	//go:embed testdata/recursive.wasm
 	recursiveWasm []byte
+	//go:embed testdata/host_memory.wasm
+	hostMemoryWasm []byte
 	//go:embed testdata/hugestack.wasm
 	hugestackWasm []byte
+	//go:embed testdata/memory.wasm
+	memoryWasm []byte
 	//go:embed testdata/reftype_imports.wasm
 	reftypeImportsWasm []byte
 	//go:embed testdata/overflow.wasm
@@ -220,19 +227,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
-	module, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(`(module $test
-		(import "" "store_int"
-			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
-		(memory $memory 1 1)
-		(export "memory" (memory $memory))
-		(func (param i32) (param i64) (result i32)
-			local.get 0
-			local.get 1
-			call 0
-		)
-		;; store_int is imported from the environment.
-		(export "store_int" (func 1))
-		)`))
+	module, err := r.InstantiateModuleFromBinary(testCtx, hostMemoryWasm)
 	require.NoError(t, err)
 	defer module.Close(testCtx)
 
@@ -273,14 +268,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 	defer imported.Close(testCtx)
 
 	// Instantiate a module that uses Wasm code to call the host function.
-	importing, err = r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
-	(import "%[2]s" "outer" (func $outer (param i32) (result i32)))
-	(import "%[2]s" "inner" (func $inner (param i32) (result i32)))
-	(func $call_outer (param i32) (result i32) local.get 0 call $outer)
-	(export "call->outer" (func $call_outer))
-	(func $call_inner (param i32) (result i32) local.get 0 call $inner)
-	(export "inner" (func $call_inner))
-)`, importingName, importedName)))
+	importing, err = r.InstantiateModuleFromBinary(testCtx, callOuterInnerWasm(t, importedName, importingName))
 	require.NoError(t, err)
 	defer importing.Close(testCtx)
 
@@ -310,22 +298,21 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 		},
 	}
 
-	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx, r)
-	require.NoError(t, err)
-	defer imported.Close(testCtx)
-
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
+			imported, err := r.NewModuleBuilder(importedName).
+				ExportFunction("return_input", fns[test]).
+				Instantiate(testCtx, r)
+			require.NoError(t, err)
+			defer imported.Close(testCtx)
+
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err = r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
-	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
-	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
-	(export "call->%[3]s" (func $call_%[3]s))
-)`, importingName, importedName, test)))
+			importing, err = r.InstantiateModuleFromBinary(testCtx,
+				callReturnImportWasm(t, importedName, importingName, i32))
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
 
-			results, err := importing.ExportedFunction("call->"+test).Call(testCtx, math.MaxUint32-1)
+			results, err := importing.ExportedFunction("call_return_input").Call(testCtx, math.MaxUint32-1)
 			require.NoError(t, err)
 			require.Equal(t, uint64(math.MaxUint32), results[0])
 		})
@@ -352,67 +339,121 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		},
 	}
 
-	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx, r)
-	require.NoError(t, err)
-	defer imported.Close(testCtx)
-
 	for _, test := range []struct {
 		name            string
+		vt              wasm.ValueType
 		input, expected uint64
 	}{
 		{
 			name:     "i32",
+			vt:       i32,
 			input:    math.MaxUint32 - 1,
 			expected: math.MaxUint32,
 		},
 		{
 			name:     "i64",
+			vt:       i64,
 			input:    math.MaxUint64 - 1,
 			expected: math.MaxUint64,
 		},
 		{
 			name:     "f32",
+			vt:       wasm.ValueTypeF32,
 			input:    api.EncodeF32(math.MaxFloat32 - 1),
 			expected: api.EncodeF32(math.MaxFloat32),
 		},
 		{
 			name:     "f64",
+			vt:       wasm.ValueTypeF64,
 			input:    api.EncodeF64(math.MaxFloat64 - 1),
 			expected: api.EncodeF64(math.MaxFloat64),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			imported, err := r.NewModuleBuilder(importedName).
+				ExportFunction("return_input", fns[test.name]).
+				Instantiate(testCtx, r)
+			require.NoError(t, err)
+			defer imported.Close(testCtx)
+
 			// Instantiate a module that uses Wasm code to call the host function.
-			importing, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(fmt.Sprintf(`(module $%[1]s
-	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
-	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
-	(export "call->%[3]s" (func $call_%[3]s))
-)`, importingName, importedName, test.name)))
+			importing, err := r.InstantiateModuleFromBinary(testCtx,
+				callReturnImportWasm(t, importedName, importingName, test.vt))
 			require.NoError(t, err)
 			defer importing.Close(testCtx)
 
-			results, err := importing.ExportedFunction("call->"+test.name).Call(testCtx, test.input)
+			results, err := importing.ExportedFunction("call_return_input").Call(testCtx, test.input)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, results[0])
 		})
 	}
 }
 
-func callReturnImportWasm(importedModule, importingModule string) []byte {
-	return wat2wasm(fmt.Sprintf(`(module $%[1]s
-	;; test an imported function by re-exporting it
-	(import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
-	(export "return_input" (func $return_input))
-
-	;; test wasm, by calling an imported function
-	(func $call_return_import (param i32) (result i32) local.get 0 call $return_input)
-	(export "call_return_import" (func $call_return_import))
-)`, importingModule, importedModule))
+func callReturnImportWasm(t *testing.T, importedModule, importingModule string, vt wasm.ValueType) []byte {
+	// test an imported function by re-exporting it
+	module := &wasm.Module{
+		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{vt}, Results: []wasm.ValueType{vt}}},
+		// (import "%[2]s" "return_input" (func $return_input (param i32) (result i32)))
+		ImportSection: []*wasm.Import{
+			{Module: importedModule, Name: "return_input", Type: wasm.ExternTypeFunc, DescFunc: 0},
+		},
+		FunctionSection: []wasm.Index{0},
+		ExportSection: []*wasm.Export{
+			// (export "return_input" (func $return_input))
+			{Name: "return_input", Type: wasm.ExternTypeFunc, Index: 0},
+			// (export "call_return_input" (func $call_return_input))
+			{Name: "call_return_input", Type: wasm.ExternTypeFunc, Index: 1},
+		},
+		// (func $call_return_input (param i32) (result i32) local.get 0 call $return_input)
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName: importingModule,
+			FunctionNames: wasm.NameMap{
+				{Index: 0, Name: "return_input"},
+				{Index: 1, Name: "call_return_input"},
+			},
+		},
+	}
+	require.NoError(t, module.Validate(wasm.Features20220419))
+	return binary.EncodeModule(module)
 }
 
-func wat2wasm(wat string) []byte {
-	wasm, _ := watzero.Wat2Wasm(wat)
-	return wasm
+func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []byte {
+	module := &wasm.Module{
+		TypeSection: []*wasm.FunctionType{{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}}},
+		// (import "%[2]s" "outer" (func $outer (param i32) (result i32)))
+		// (import "%[2]s" "inner" (func $inner (param i32) (result i32)))
+		ImportSection: []*wasm.Import{
+			{Module: importedModule, Name: "outer", Type: wasm.ExternTypeFunc, DescFunc: 0},
+			{Module: importedModule, Name: "inner", Type: wasm.ExternTypeFunc, DescFunc: 0},
+		},
+		FunctionSection: []wasm.Index{0, 0},
+		ExportSection: []*wasm.Export{
+			// (export "call->outer" (func $call_outer))
+			{Name: "call->outer", Type: wasm.ExternTypeFunc, Index: 2},
+			// 	(export "inner" (func $call_inner))
+			{Name: "inner", Type: wasm.ExternTypeFunc, Index: 3},
+		},
+		CodeSection: []*wasm.Code{
+			// (func $call_outer (param i32) (result i32) local.get 0 call $outer)
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
+			// (func $call_inner (param i32) (result i32) local.get 0 call $inner)
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}},
+		},
+		NameSection: &wasm.NameSection{
+			ModuleName: importingModule,
+			FunctionNames: wasm.NameMap{
+				{Index: 0, Name: "outer"},
+				{Index: 1, Name: "inner"},
+				{Index: 2, Name: "call_outer"},
+				{Index: 3, Name: "call_inner"},
+			},
+		},
+	}
+	require.NoError(t, module.Validate(wasm.Features20220419))
+	return binary.EncodeModule(module)
 }
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
@@ -423,25 +464,25 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 	}{
 		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
 			name:           "importing",
-			function:       "call_return_import",
+			function:       "call_return_input",
 			closeImporting: 1,
 		},
 		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
 		{ // Ex. A function that stops the runtime.
 			name:           "both",
-			function:       "call_return_import",
+			function:       "call_return_input",
 			closeImporting: 1,
 			closeImported:  2,
 		},
 		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
 			name:              "importing",
-			function:          "call_return_import",
+			function:          "call_return_input",
 			closeImporting:    1,
 			closeImportedCode: true,
 		},
 		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
 			name:               "importing",
-			function:           "call_return_import",
+			function:           "call_return_input",
 			closeImporting:     1,
 			closeImportedCode:  true,
 			closeImportingCode: true,
@@ -449,7 +490,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
 		{ // Ex. A function that stops the runtime.
 			name:               "both",
-			function:           "call_return_import",
+			function:           "call_return_input",
 			closeImporting:     1,
 			closeImported:      2,
 			closeImportingCode: true,
@@ -488,7 +529,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			defer imported.Close(testCtx)
 
 			// Import that module.
-			binary := callReturnImportWasm(imported.Name(), t.Name()+"-importing")
+			binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
 			importingCode, err = r.CompileModule(testCtx, binary, compileConfig)
 			require.NoError(t, err)
 
@@ -517,23 +558,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Instantiate a module that manages its memory
-	memory, err := r.InstantiateModuleFromBinary(testCtx, wat2wasm(`(module $memory
-  (func $grow (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
-  (func $size (result (;size;) i32) memory.size)
-
-  (memory 0)
-
-  (export "size" (func $size))
-  (export "grow" (func $grow))
-  (export "memory" (memory 0))
-
-  (func $store (param $offset i32)
-	local.get 0    ;; memory offset
-	i64.const 1
-	i64.store
-  )
-  (export "store" (func $store))
-)`))
+	memory, err := r.InstantiateModuleFromBinary(testCtx, memoryWasm)
 	require.NoError(t, err)
 	defer memory.Close(testCtx)
 
@@ -581,15 +606,21 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 }
 
 func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
-	compiled, err := r.CompileModule(testCtx, wat2wasm(`(module $test
-		(memory 1)
-		(func $store
-          i32.const 1    ;; memory offset
-		  i64.const 1000 ;; expected value
-		  i64.store
-		)
-		(export "store" (func $store))
-	  )`), compileConfig)
+	bin := binary.EncodeModule(&wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{}},
+		FunctionSection: []wasm.Index{0},
+		MemorySection:   &wasm.Memory{Min: 1, Cap: 1, Max: 1, IsMaxEncoded: true},
+		CodeSection: []*wasm.Code{{
+			Body: []byte{
+				wasm.OpcodeI32Const, 1, // i32.const 1    ;; memory offset
+				wasm.OpcodeI64Const, 0xe8, 0x7, // i64.const 1000 ;; expected value
+				wasm.OpcodeI64Store, 0x3, 0x0, // i64.store
+				wasm.OpcodeEnd,
+			},
+		}},
+		ExportSection: []*wasm.Export{{Name: "store"}},
+	})
+	compiled, err := r.CompileModule(testCtx, bin, compileConfig)
 	require.NoError(t, err)
 	defer compiled.Close(testCtx)
 

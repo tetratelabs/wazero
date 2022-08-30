@@ -4,9 +4,9 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/watzero/binary"
+	"github.com/tetratelabs/watzero/wasm"
 )
 
 // example holds the latest supported features as described in the comments of exampleWat
@@ -22,12 +22,12 @@ func newExample() *wasm.Module {
 	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
-			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 2, ResultNumInUint64: 1},
+			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 			{},
-			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 4, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1},
-			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}, ParamNumInUint64: 2, ResultNumInUint64: 2},
+			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
+			{Params: []wasm.ValueType{f32}, Results: []wasm.ValueType{i32}},
+			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32, i32}},
 		},
 		ImportSection: []*wasm.Import{
 			{
@@ -53,7 +53,7 @@ func newExample() *wasm.Module {
 			}},
 			{Body: []byte{wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}},
 		},
-		MemorySection: &wasm.Memory{Min: 1, Cap: 1, Max: three, IsMaxEncoded: true},
+		MemorySection: &wasm.Memory{Min: 1, Max: three, IsMaxEncoded: true},
 		ExportSection: []*wasm.Export{
 			{Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
 			{Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
@@ -96,7 +96,7 @@ func BenchmarkWat2Wasm(b *testing.B) {
 }
 
 func TestWat2Wasm(t *testing.T) {
-	wasm, err := Wat2Wasm(exampleWat)
+	bin, err := Wat2Wasm(exampleWat)
 	require.NoError(t, err)
-	require.Equal(t, binary.EncodeModule(example), wasm)
+	require.Equal(t, binary.EncodeModule(example), bin)
 }
