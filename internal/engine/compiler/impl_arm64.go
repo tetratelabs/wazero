@@ -378,9 +378,9 @@ func (c *arm64Compiler) compileReturnFunction() error {
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
 func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	// Write the current stack pointer to the ce.stackPointer.
-	c.assembler.CompileConstToRegister(arm64.MOVD, int64(c.locationStack.sp)<<3, arm64ReservedRegisterForTemporary)
+	c.assembler.CompileConstToRegister(arm64.MOVD, int64(c.locationStack.sp), arm64ReservedRegisterForTemporary)
 	c.assembler.CompileRegisterToMemory(arm64.STRD, arm64ReservedRegisterForTemporary, arm64ReservedRegisterForCallEngine,
-		callEngineValueStackContextStackPointerInBytesOffset)
+		callEngineValueStackContextStackPointerOffset)
 
 	if status != 0 {
 		c.assembler.CompileConstToRegister(arm64.MOVW, int64(status), arm64ReservedRegisterForTemporary)

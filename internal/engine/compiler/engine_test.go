@@ -295,7 +295,7 @@ func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 			// which happens if the previous value on that stack location was 64-bit wide.
 			0xffffffff << 32,
 		},
-		valueStackContext: valueStackContext{stackPointerInBytes: 3 * 8},
+		valueStackContext: valueStackContext{stackPointer: 3},
 	}
 
 	table := &wasm.TableInstance{References: []wasm.Reference{}, Min: 10}
@@ -308,7 +308,7 @@ func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 func TestCallEngine_recoverOnCall(t *testing.T) {
 	ce := &callEngine{
 		valueStack:        make([]uint64, 100),
-		valueStackContext: valueStackContext{stackPointerInBytes: 3 * 8},
+		valueStackContext: valueStackContext{stackPointer: 3},
 		globalContext:     globalContext{callFrameStackPointer: 5},
 		callFrameStack: []callFrame{
 			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("1")}}},

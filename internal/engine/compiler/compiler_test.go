@@ -54,7 +54,7 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(ce.elementInstancesElement0Address)), callEngineModuleContextElementInstancesElement0AddressOffset, "callEngineModuleContextElementInstancesElement0AddressOffset")
 
 	// Offsets for callEngine.valueStackContext
-	requireEqual(int(unsafe.Offsetof(ce.stackPointerInBytes)), callEngineValueStackContextStackPointerInBytesOffset, "callEngineValueStackContextStackPointerInBytesOffset")
+	requireEqual(int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset, "callEngineValueStackContextStackPointerOffset")
 	requireEqual(int(unsafe.Offsetof(ce.stackBasePointerInBytes)), callEngineValueStackContextStackBasePointerInBytesOffset, "callEngineValueStackContextStackBasePointerInBytesOffset")
 
 	// Offsets for callEngine.exitContext.
@@ -169,7 +169,7 @@ func (j *compilerEnv) builtinFunctionCallAddress() wasm.Index {
 }
 
 func (j *compilerEnv) stackPointer() uint64 {
-	return j.ce.valueStackContext.stackPointerInBytes >> 3
+	return j.ce.valueStackContext.stackPointer
 }
 
 func (j *compilerEnv) stackBasePointer() uint64 {
@@ -177,7 +177,7 @@ func (j *compilerEnv) stackBasePointer() uint64 {
 }
 
 func (j *compilerEnv) setStackPointer(sp uint64) {
-	j.ce.valueStackContext.stackPointerInBytes = sp << 3
+	j.ce.valueStackContext.stackPointer = sp
 }
 
 func (j *compilerEnv) addGlobals(g ...*wasm.GlobalInstance) {
@@ -201,7 +201,7 @@ func (j *compilerEnv) callFrameStackPointer() uint64 {
 }
 
 func (j *compilerEnv) setValueStackBasePointer(sp uint64) {
-	j.ce.valueStackContext.stackBasePointerInBytes = sp * 8
+	j.ce.valueStackContext.stackBasePointerInBytes = sp << 3
 }
 
 func (j *compilerEnv) setCallFrameStackPointerLen(l uint64) {
