@@ -585,7 +585,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	err = builder.FromRecovered(v)
 
 	// Allows the reuse of CallEngine.
-	ce.valueStackLenInBytes, ce.callFrameStackPointer = 0, 0
+	ce.stackPointerInBytes, ce.callFrameStackPointer = 0, 0
 	return
 }
 
@@ -703,7 +703,7 @@ entry:
 		frame := ce.callFrameTop()
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
-				frame.String(), ce.valueStackContext.stackBasePointerInBytes>>2, ce.valueStackContext.stackPointerInBytes>>2)
+				frame.String(), ce.valueStackContext.stackBasePointerInBytes>>3, ce.valueStackContext.stackPointerInBytes>>3)
 		}
 
 		// Call into the native code.
@@ -758,7 +758,7 @@ entry:
 
 func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	// Extends the valueStack's length to currentLen*2+stackPointerCeil.
-	newLen := uint64(len(ce.valueStack)) + (stackPointerCeil)
+	newLen := uint64(len(ce.valueStack))<<1 + (stackPointerCeil)
 	newStack := make([]uint64, newLen)
 	ce.valueStackTopIndex()
 	top := ce.valueStackTopIndex()
@@ -766,7 +766,7 @@ func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	ce.valueStack = newStack
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
 	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLenInBytes = uint64(valueStackHeader.Len) * 8
+	ce.globalContext.valueStackLenInBytes = uint64(valueStackHeader.Len) << 3
 }
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
