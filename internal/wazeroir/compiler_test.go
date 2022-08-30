@@ -10,8 +10,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/watzero"
 )
 
 // ctx is an arbitrary, non-default context.
@@ -43,8 +41,12 @@ func TestCompile(t *testing.T) {
 		enabledFeatures wasm.Features
 	}{
 		{
-			name:   "nullary",
-			module: requireModuleText(t, `(module (func))`),
+			name: "nullary",
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					&OperationBr{Target: &BranchTarget{}}, // return!
@@ -104,9 +106,11 @@ func TestCompile(t *testing.T) {
 		},
 		{
 			name: "identity",
-			module: requireModuleText(t, `(module
-  (func (param $x i32) (result i32) local.get 0)
-)`),
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{i32_i32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
+			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x]
 					&OperationPick{Depth: 0},                                 // [$x, $x]
@@ -185,9 +189,13 @@ func TestCompile(t *testing.T) {
 		},
 		{
 			name: "memory.grow", // Ex to expose ops to grow memory
-			module: requireModuleText(t, `(module
-  (func (param $delta i32) (result (;previous_size;) i32) local.get 0 memory.grow)
-)`),
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{i32_i32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					wasm.OpcodeLocalGet, 0, wasm.OpcodeMemoryGrow, 0, wasm.OpcodeEnd,
+				}}},
+			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$delta]
 					&OperationPick{Depth: 0},                                 // [$delta, $delta]
@@ -390,10 +398,14 @@ func TestCompile_MultiValue(t *testing.T) {
 	}{
 		{
 			name: "swap",
-			module: requireModuleText(t, `(module
-  (func (param $x i32) (param $y i32) (result i32 i32) local.get 1 local.get 0)
-)`),
-
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{i32i32_i32i32},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					// (func (param $x i32) (param $y i32) (result i32 i32) local.get 1 local.get 0)
+					wasm.OpcodeLocalGet, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd,
+				}}},
+			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: [$x, $y]
 					&OperationPick{Depth: 0},                                 // [$x, $y, $y]
@@ -455,10 +467,14 @@ func TestCompile_MultiValue(t *testing.T) {
 		},
 		{
 			name: "call.wast - $const-i32-i64",
-			module: requireModuleText(t, `(module
-  (func $const-i32-i64 (result i32 i64) i32.const 306 i64.const 356)
-)`),
-
+			module: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{_i32i64},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{{Body: []byte{
+					//  (func $const-i32-i64 (result i32 i64) i32.const 306 i64.const 356)
+					wasm.OpcodeI32Const, 0xb2, 0x2, wasm.OpcodeI64Const, 0xe4, 0x2, wasm.OpcodeEnd,
+				}}},
+			},
 			expected: &CompilationResult{
 				Operations: []Operation{ // begin with params: []
 					&OperationConstI32{Value: 306},        // [306]
@@ -661,9 +677,14 @@ func TestCompile_MultiValue(t *testing.T) {
 
 // TestCompile_NonTrappingFloatToIntConversion picks an arbitrary operator from "nontrapping-float-to-int-conversion".
 func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
-	module := requireModuleText(t, `(module
-  (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
-)`)
+	module := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{f32_i32},
+		FunctionSection: []wasm.Index{0},
+		// (func (param f32) (result i32) local.get 0 i32.trunc_sat_f32_s)
+		CodeSection: []*wasm.Code{{Body: []byte{
+			wasm.OpcodeLocalGet, 0, wasm.OpcodeMiscPrefix, wasm.OpcodeMiscI32TruncSatF32S, wasm.OpcodeEnd,
+		}}},
+	}
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
@@ -692,9 +713,13 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 
 // TestCompile_SignExtensionOps picks an arbitrary operator from "sign-extension-ops".
 func TestCompile_SignExtensionOps(t *testing.T) {
-	module := requireModuleText(t, `(module
-  (func (param i32) (result i32) local.get 0 i32.extend8_s)
-)`)
+	module := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{i32_i32},
+		FunctionSection: []wasm.Index{0},
+		CodeSection: []*wasm.Code{{Body: []byte{
+			wasm.OpcodeLocalGet, 0, wasm.OpcodeI32Extend8S, wasm.OpcodeEnd,
+		}}},
+	}
 
 	expected := &CompilationResult{
 		Operations: []Operation{ // begin with params: [$0]
@@ -724,14 +749,6 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	res, err := CompileFunctions(ctx, enabledFeatures, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
-}
-
-func requireModuleText(t *testing.T, wat string) *wasm.Module {
-	binary, err := watzero.Wat2Wasm(wat)
-	require.NoError(t, err)
-	m, err := binaryformat.DecodeModule(binary, wasm.Features20220419, wasm.MemorySizer)
-	require.NoError(t, err)
-	return m
 }
 
 func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
