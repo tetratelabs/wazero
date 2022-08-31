@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/gojs"
+	gojs "github.com/tetratelabs/wazero/imports/go"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 

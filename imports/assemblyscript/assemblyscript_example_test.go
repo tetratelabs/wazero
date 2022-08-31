@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/assemblyscript"
+	"github.com/tetratelabs/wazero/imports/assemblyscript"
 )
 
 // This shows how to instantiate AssemblyScript's special imports.

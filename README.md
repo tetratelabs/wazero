@@ -66,8 +66,9 @@ func main() {
 
 Notes:
 
-* The Wasm binary is often called the "guest" in WebAssembly.
 * The embedding application is often called the "host" in WebAssembly.
+* The Wasm binary is often called the "guest" in WebAssembly. Sometimes they
+  need [imports][imports] to implement features such as console output.
 * Many languages compile to (target) Wasm including AssemblyScript, C, C++,
   Rust, TinyGo and Zig!
 
@@ -83,7 +84,8 @@ it has no scope to specify how system resources like files are accessed.
 Instead, WebAssembly defines "host functions" and the signatures they can use.
 In wazero, "host functions" are written in Go, and let you do anything
 including access files. The main constraint is that WebAssembly only allows
-numeric types.
+numeric types. wazero includes [imports][imports] for common languages and
+compiler toolchains.
 
 For example, you can grant WebAssembly code access to your console by exporting
 a function written in Go. The below function can be imported into standard
