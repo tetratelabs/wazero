@@ -66,7 +66,7 @@ c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
 	@for f in $^; do \
-	    zig cc --target=wasm32-wasi -O3 -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
+	    zig cc --target=wasm32-wasi -Oz -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
 	done
 
 # Here are the emcc args we use:
