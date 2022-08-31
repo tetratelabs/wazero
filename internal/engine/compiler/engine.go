@@ -557,13 +557,12 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
-		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
-		if err == nil {
-			err = callCtx.FailIfClosed()
-		}
-		// TODO: ^^ Will not fail if the function was imported from a closed module.
-
 		err = ce.deferredOnCall(recover())
+		if err == nil {
+			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
+			err = callCtx.FailIfClosed()
+			// TODO: ^^ Will not fail if the function was imported from a closed module.
+		}
 	}()
 
 	for _, v := range params {
@@ -575,7 +574,7 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 }
 
 // deferredOnCall takes the recovered value `recovered`, and wraps it
-// with the call frame stack traces if v != nil. Also, reset
+// with the call frame stack traces when not nil. This also resets
 // the state of callEngine so that it can be used for the subsequent calls.
 //
 // This is defined for testability.
