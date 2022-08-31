@@ -52,7 +52,7 @@ build.examples.as:
 
 .PHONY: build.examples.zig
 build.examples.zig:
-	@cd examples/allocation/zig/testdata/ && zig build && mv zig-out/lib/greet.wasm .
+	@cd examples/allocation/zig/testdata/ && zig build -Drelease-small=true && mv zig-out/lib/greet.wasm .
 
 tinygo_sources := examples/allocation/tinygo/testdata/greet.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
