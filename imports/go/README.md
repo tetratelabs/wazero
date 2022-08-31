@@ -1,22 +1,15 @@
 # Overview
 
+When `GOOS=js` and `GOARCH=wasm`, Go's compiler targets WebAssembly Binary
+format (%.wasm).
+
 Wazero's "github.com/tetratelabs/wazero/imports/go" package allows you to run
-a `%.wasm` file compiled by Go. See https://wazero.io/languages/go/ for more.
+a `%.wasm` file compiled by Go.  This is similar to what is implemented in
+[wasm_exec.js][1]. See https://wazero.io/languages/go/ for more.
 
-## Usage
+## Example
 
-When `GOOS=js` and `GOARCH=wasm`, Go's compiler targets WebAssembly 1.0
-Binary format (%.wasm).
-
-Ex.
-```bash
-GOOS=js GOARCH=wasm go build -o cat.wasm .
-```
-
-After compiling `cat.wasm` with wazero.Runtime's `CompileModule`, Run it.
-
-Under the scenes, the compiled Wasm calls host functions that support the
-runtime.GOOS. This is similar to what is implemented in [wasm_exec.js][1].
+wazero includes an [example](example) that makes HTTP client requests.
 
 ## Experimental
 

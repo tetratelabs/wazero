@@ -4,8 +4,8 @@ title = "Go"
 
 ## Introduction
 
-When `GOARCH=wasm GOOS=js`, Go's compiler targets WebAssembly 1.0 Binary
-format (%.wasm).
+When `GOARCH=wasm GOOS=js`, Go's compiler targets WebAssembly Binary format
+(%.wasm).
 
 Ex.
 ```bash
@@ -33,6 +33,18 @@ production.
 Due to lack of adoption, support and relatively high implementation overhead,
 most choose [TinyGo](tinygo) to compile source code, even if it supports less
 features.
+
+## WebAssembly Features
+
+`GOARCH=wasm GOOS=js` uses instructions in [WebAssembly Core Specification 1.0]
+[15] unless `GOWASM` includes features added afterwards.
+
+Here are the valid [GOWASM values][16]:
+* `satconv` - [Non-trapping Float-to-int Conversions][17]
+* `signext` - [Sign-extension operators][18]
+
+Note that both the above features are included [working draft][19] of
+WebAssembly Core Specification 2.0.
 
 ## Constraints
 
@@ -243,3 +255,8 @@ the Go stack.
 [12]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/ld/data.go#L2457
 [13]: https://github.com/golang/go/blob/go1.19/src/syscall/tables_js.go#L371-L494
 [14]: https://github.com/tetratelabs/wazero/tree/main/imports/go/example
+[15]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
+[16]: https://github.com/golang/go/blob/go1.19/src/internal/buildcfg/cfg.go#L133-L147
+[17]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
+[18]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
+[19]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/

@@ -5,14 +5,17 @@ this shows an interesting feature this supports, HTTP client requests.
 
 ```bash
 $ cd stars
-$ GOARCH=wasm GOOS=js go build -o main.wasm .
+$ GOARCH=wasm GOOS=js GOWASM=satconv,signext go build -o main.wasm .
 $ cd ..
 $ go run stars.go
 wazero has 9999999 stars. Does that include you?
 ```
 
-Internally, this uses [gojs](../../experimental/gojs/gojs.go), which implements
-the custom host functions required by Go.
+Internally, this uses [gojs](../gojs.go), which implements the custom host
+functions required by Go.
 
-Note: `GOARCH=wasm GOOS=js` is experimental as is wazero's support of it. For
-details, see https://wazero.io/languages/go/.
+Notes:
+* `GOARCH=wasm GOOS=js` is experimental as is wazero's support of it. For
+  details, see https://wazero.io/languages/go/.
+* `GOWASM=satconv,signext` enables features in WebAssembly Core Specification
+  2.0.

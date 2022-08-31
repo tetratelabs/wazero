@@ -40,8 +40,8 @@ type RuntimeConfig interface {
 	// due to the WebAssembly Working Group merging them "mutually dependent".
 	// Therefore, enabling this feature results in enabling WithFeatureReferenceTypes, and vice-versa.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-	// https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md and
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/bulk-memory-operations/Overview.md
+	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md and
 	// https://github.com/WebAssembly/spec/pull/1287
 	WithFeatureBulkMemoryOperations(bool) RuntimeConfig
 
@@ -52,7 +52,7 @@ type RuntimeConfig interface {
 	//   - Function (`func`) types allow more than one result
 	//   - Block types (`block`, `loop` and `if`) can be arbitrary function types
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
 	WithFeatureMultiValue(bool) RuntimeConfig
 
 	// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
@@ -75,7 +75,7 @@ type RuntimeConfig interface {
 	//   - `i64.trunc_sat_f64_s`
 	//   - `i64.trunc_sat_f64_u`
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
 	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
 
 	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
@@ -98,8 +98,8 @@ type RuntimeConfig interface {
 	// due to the WebAssembly Working Group merging them "mutually dependent".
 	// Therefore, enabling this feature results in enabling WithFeatureBulkMemoryOperations, and vice-versa.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
-	// https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md and
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/bulk-memory-operations/Overview.md
+	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md and
 	// https://github.com/WebAssembly/spec/pull/1287
 	WithFeatureReferenceTypes(enabled bool) RuntimeConfig
 
@@ -109,13 +109,13 @@ type RuntimeConfig interface {
 	// Here are the notable effects:
 	//   - Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 	WithFeatureSignExtensionOps(bool) RuntimeConfig
 
 	// WithFeatureSIMD enables the vector value type and vector instructions (aka SIMD). This defaults to false
 	// as the feature was not in WebAssembly 1.0.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md
 	WithFeatureSIMD(bool) RuntimeConfig
 
 	// WithWasmCore1 enables features included in the WebAssembly Core Specification 1.0. Selecting this

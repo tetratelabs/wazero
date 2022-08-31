@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt := wazero.NewRuntime(testCtx)
+	rt := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
 	defer rt.Close(testCtx)
 	_, err = rt.CompileModule(testCtx, testBin, wazero.NewCompileConfig())
 	if err != nil {
@@ -117,7 +117,7 @@ func compileJsWasm(goBin string) error {
 
 	bin := path.Join(workDir, "out.wasm")
 	cmd := exec.CommandContext(ctx, goBin, "build", "-o", bin, ".") //nolint:gosec
-	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
+	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm", "GOWASM=satconv,signext")
 	cmd.Dir = "testdata"
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -2430,7 +2430,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindV128BitMask:
-			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitmask-extraction
+			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#bitmask-extraction
 			hi, lo := ce.popValue(), ce.popValue()
 			var res uint64
 			switch op.b1 {
@@ -2501,7 +2501,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			ce.pushValue(x1Hi ^ x2Hi)
 			frame.pc++
 		case wazeroir.OperationKindV128Bitselect:
-			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitwise-select
+			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#bitwise-select
 			cHi, cLo := ce.popValue(), ce.popValue()
 			x2Hi, x2Lo := ce.popValue(), ce.popValue()
 			x1Hi, x1Lo := ce.popValue(), ce.popValue()
@@ -3017,7 +3017,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			var retLo, retHi uint64
 
 			// Lane-wise addition while saturating the overflowing values.
-			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#saturating-integer-addition
+			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#saturating-integer-addition
 			switch op.b1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
@@ -3099,7 +3099,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			var retLo, retHi uint64
 
 			// Lane-wise subtraction while saturating the overflowing values.
-			// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#saturating-integer-subtraction
+			// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#saturating-integer-subtraction
 			switch op.b1 {
 			case wazeroir.ShapeI8x16:
 				for i := 0; i < 16; i++ {
@@ -3777,7 +3777,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				}
 
 				var uv uint64
-				// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#saturating-integer-q-format-rounding-multiplication
+				// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#saturating-integer-q-format-rounding-multiplication
 				if calc := ((int32(v) * int32(w)) + 0x4000) >> 15; calc < math.MinInt16 {
 					uv = uint64(uint16(0x8000))
 				} else if calc > math.MaxInt16 {
@@ -4190,12 +4190,12 @@ func flt64(z1, z2 float64) bool {
 }
 
 func i8RoundingAverage(v1, v2 byte) byte {
-	// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#lane-wise-integer-rounding-average
+	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#lane-wise-integer-rounding-average
 	return byte((uint16(v1) + uint16(v2) + uint16(1)) / 2)
 }
 
 func i16RoundingAverage(v1, v2 uint16) uint16 {
-	// https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#lane-wise-integer-rounding-average
+	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#lane-wise-integer-rounding-average
 	return uint16((uint32(v1) + uint32(v2) + 1) / 2)
 }
 
