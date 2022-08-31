@@ -1,21 +1,6 @@
 // Package gojs allows you to run wasm binaries compiled by Go when `GOOS=js`
 // and `GOARCH=wasm`. See https://wazero.io/languages/go/ for more.
 //
-// # Usage
-//
-// When `GOOS=js` and `GOARCH=wasm`, Go's compiler targets WebAssembly Binary
-// format (%.wasm).
-//
-// Ex.
-//
-//	GOOS=js GOARCH=wasm go build -o cat.wasm .
-//
-// After compiling `cat.wasm` with wazero.Runtime's `CompileModule`, Run it.
-//
-// Under the scenes, the compiled Wasm calls host functions that support the
-// runtime.GOOS. This is similar to what is implemented in wasm_exec.js. See
-// https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
-//
 // # Experimental
 //
 // Go defines js "EXPERIMENTAL... exempt from the Go compatibility promise."

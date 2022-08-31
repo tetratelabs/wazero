@@ -41,7 +41,7 @@ func compileFromGo() error {
 	cmd := exec.Command("go", "build", "-o", "main.wasm", ".")
 	cmd.Dir = "stars"
 
-	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js")
+	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
 	start := time.Now()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("go build: %v\n%s", err, out)

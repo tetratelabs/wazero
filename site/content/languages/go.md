@@ -257,6 +257,6 @@ the Go stack.
 [14]: https://github.com/tetratelabs/wazero/tree/main/imports/go/example
 [15]: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 [16]: https://github.com/golang/go/blob/go1.19/src/internal/buildcfg/cfg.go#L133-L147
-[17]: https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
-[18]: https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+[17]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
+[18]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 [19]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/

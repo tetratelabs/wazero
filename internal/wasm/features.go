@@ -47,7 +47,7 @@ const (
 	// * FunctionType.Results length greater than one.
 	// * `block`, `loop` and `if` can be arbitrary function types.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
 	FeatureMultiValue
 
 	// FeatureMutableGlobal decides if global vars are allowed to be imported or exported (ExternTypeGlobal)
@@ -65,7 +65,7 @@ const (
 	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64S]
 	// * [ OpcodeMiscPrefix, OpcodeMiscI64TruncSatF64U]
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
 	FeatureNonTrappingFloatToIntConversion
 
 	// FeatureReferenceTypes enables various features related to reference types and tables.
@@ -83,7 +83,7 @@ const (
 	// 	* OpcodeCallIndirect, OpcodeTableInit, and OpcodeElemDrop can take non-zero table indexes.
 	// 	* Element segments can take non-zero table index.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md
 	FeatureReferenceTypes
 
 	// FeatureSignExtensionOps decides if parsing should succeed on the following instructions:
@@ -94,12 +94,12 @@ const (
 	// * OpcodeI64Extend16S
 	// * OpcodeI64Extend32S
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 	FeatureSignExtensionOps
 
 	// FeatureSIMD enables the vector value type and vector instructions.
 	//
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md
 	FeatureSIMD
 )
 
@@ -147,22 +147,22 @@ func featureName(f Features) string {
 		// match https://github.com/WebAssembly/mutable-global
 		return "mutable-global"
 	case FeatureSignExtensionOps:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 		return "sign-extension-ops"
 	case FeatureMultiValue:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
 		return "multi-value"
 	case FeatureNonTrappingFloatToIntConversion:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
 		return "nontrapping-float-to-int-conversion"
 	case FeatureBulkMemoryOperations:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/bulk-memory-operations/Overview.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/bulk-memory-operations/Overview.md
 		return "bulk-memory-operations"
 	case FeatureReferenceTypes:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/reference-types/Overview.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md
 		return "reference-types"
 	case FeatureSIMD:
-		// match https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md
+		// match https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md
 		return "simd"
 	}
 	return ""

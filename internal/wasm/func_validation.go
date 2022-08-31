@@ -1847,7 +1847,7 @@ type controlBlock struct {
 // FeatureMultiValue and include an index in the Module.TypeSection.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-blocktype
-// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
 func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures Features) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {

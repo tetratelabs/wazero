@@ -741,7 +741,7 @@ func (c *amd64Compiler) compileV128Bitselect(*wazeroir.OperationV128Bitselect) e
 	}
 
 	// The following logic is equivalent to v128.or(v128.and(v1, selector), v128.and(v2, v128.not(selector)))
-	// See https://github.com/WebAssembly/spec/blob/main/proposals/simd/SIMD.md#bitwise-select
+	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md#bitwise-select
 	c.assembler.CompileRegisterToRegister(amd64.PAND, selector.register, x1.register)
 	c.assembler.CompileRegisterToRegister(amd64.PANDN, x2.register, selector.register)
 	c.assembler.CompileRegisterToRegister(amd64.POR, selector.register, x1.register)

@@ -28,7 +28,7 @@ import (
 //   - multiValueWasmFunctions
 //   - multiValueHostFunctions
 //
-// See https://github.com/WebAssembly/spec/blob/main/proposals/multi-value/Overview.md
+// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
 func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
