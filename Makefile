@@ -13,7 +13,7 @@ hugo          := github.com/gohugoio/hugo@v0.101.0
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
 all_testdata  := $(wildcard testdata/* */testdata/* */*/testdata/* */*/testdata/*/* */*/*/testdata/*)
 all_testing   := $(wildcard internal/testing/* internal/testing/*/* internal/testing/*/*/*)
-all_examples  := $(wildcard examples/* examples/*/* examples/*/*/*)
+all_examples  := $(wildcard examples/* examples/*/* examples/*/*/* */*/example/* */*/example/*/* */*/example/*/*/*)
 all_it        := $(wildcard internal/integration_test/* internal/integration_test/*/* internal/integration_test/*/*/*)
 # main_sources exclude any test or example related code
 main_sources  := $(wildcard $(filter-out %_test.go $(all_testdata) $(all_testing) $(all_examples) $(all_it), $(all_sources)))
@@ -42,27 +42,19 @@ bench_testdata_dir := internal/integration_test/bench/testdata
 build.bench:
 	@tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none --no-debug -target=wasi $(bench_testdata_dir)/case.go
 
+.PHONY: test.examples
+test.examples:
+	@go test ./examples/... ./imports/assemblyscript/example/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
+
 .PHONY: build.examples.as
 build.examples.as:
-	@cd ./examples/assemblyscript/testdata && npm install && npm run build
+	@cd ./imports/assemblyscript/example/testdata && npm install && npm run build
 
 .PHONY: build.examples.zig
-build.examples.zig: examples/allocation/zig/testdata/greet.wasm
+build.examples.zig:
+	@cd examples/allocation/zig/testdata/ && zig build -Drelease-small=true && mv zig-out/lib/greet.wasm .
 
-%.wasm: %.zig
-	@(cd $(@D); zig build)
-	@mv $(@D)/zig-out/lib/$(@F) $(@D)
-
-go_sources := examples/wasm_exec/testdata/cat.go
-.PHONY: build.examples.go
-build.examples.go: $(go_sources)
-	@for f in $^; do \
-	    cd $$(dirname $$f); \
-	    GOARCH=wasm GOOS=js go build -o $$(basename $$f | sed -e 's/\.go/\.wasm/') .; \
-	    cd -; \
-	done
-
-tinygo_sources := $(filter-out $(go_sources), $(wildcard examples/*/testdata/*.go examples/*/*/testdata/*.go examples/*/testdata/*/*.go))
+tinygo_sources := examples/allocation/tinygo/testdata/greet.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
 build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
@@ -70,11 +62,11 @@ build.examples.tinygo: $(tinygo_sources)
 	done
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
-c_sources := $(wildcard examples/*/testdata/*.c examples/*/*/testdata/*.c examples/*/testdata/*/*.c)
+c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
 	@for f in $^; do \
-	    zig cc --target=wasm32-wasi -O3 -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
+	    zig cc --target=wasm32-wasi -Oz -o $$(echo $$f | sed -e 's/\.c/\.wasm/') $$f; \
 	done
 
 # Here are the emcc args we use:
@@ -90,7 +82,7 @@ build.examples.zig-cc: $(c_sources)
 #   to one page (64KB). To do this, we have to reduce the stack size.
 # * `-s ALLOW_MEMORY_GROWTH` - allows "memory.grow" instructions to succeed, but
 #   requires a function import "emscripten_notify_memory_growth".
-emscripten_sources := $(wildcard emscripten/testdata/*.cc)
+emscripten_sources := $(wildcard imports/emscripten/testdata/*.cc)
 .PHONY: build.examples.emscripten
 build.examples.emscripten: $(emscripten_sources)
 	@for f in $^; do \
@@ -107,7 +99,7 @@ build.examples.emscripten: $(emscripten_sources)
 %/cat.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm examples/wasi/testdata/cargo-wasi/cat.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs

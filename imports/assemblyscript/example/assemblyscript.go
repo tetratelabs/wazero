@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/assemblyscript"
+	"github.com/tetratelabs/wazero/imports/assemblyscript"
 )
 
 // asWasm compiled using `npm install && npm run build`

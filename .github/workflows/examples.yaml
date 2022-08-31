@@ -5,12 +5,14 @@ on:
     paths:
       - '.github/workflows/examples.yaml'
       - 'examples/**'
+      - 'imports/**/example/**'
       - 'Makefile'
   push:
     branches: [main]
     paths:
       - '.github/workflows/examples.yaml'
       - 'examples/**'
+      - 'imports/**/example/**'
       - 'Makefile'
 
 env:
@@ -103,5 +105,4 @@ jobs:
         run: make build.bench
 
       - name: Run example tests
-        # Also runs emscripten as its source is outside the examples directory.
-        run: go test ./examples/... ./emscripten/...
+        run: make test.examples

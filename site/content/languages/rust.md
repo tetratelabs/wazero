@@ -222,8 +222,8 @@ source code may reduce binary size further.
 [7]: https://github.com/tetratelabs/wazero/stargazers
 [8]: https://rustwasm.github.io/docs/book/reference/which-crates-work-with-wasm.html
 [9]: https://github.com/tetratelabs/wazero/tree/main/examples/allocation/rust
-[10]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
-[11]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/cargo-wasi
+[10]: https://github.com/tetratelabs/wazero/tree/main/imports/wasi_snapshot_preview1/example
+[11]: https://github.com/tetratelabs/wazero/tree/main/imports/wasi_snapshot_preview1/example/testdata/cargo-wasi
 [12]: https://github.com/rustwasm/wee_alloc
 [13]: https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings
 [14]: https://github.com/bytecodealliance/cargo-wasi

@@ -242,4 +242,4 @@ the Go stack.
 [11]: https://github.com/WebAssembly/proposals
 [12]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/ld/data.go#L2457
 [13]: https://github.com/golang/go/blob/go1.19/src/syscall/tables_js.go#L371-L494
-[14]: https://github.com/tetratelabs/wazero/tree/main/examples/gojs
+[14]: https://github.com/tetratelabs/wazero/tree/main/imports/go/example

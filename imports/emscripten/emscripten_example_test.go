@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/emscripten"
-	"github.com/tetratelabs/wazero/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/imports/emscripten"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
 // This shows how to instantiate Emscripten function imports.

@@ -378,8 +378,8 @@ functions, such as `fmt.Println`, which can require 100KB of wasm.
 [18]: https://github.com/tinygo-org/tinygo/issues/447
 [19]: https://github.com/tinygo-org/tinygo/issues/3068
 [20]: https://github.com/tinygo-org/tinygo/blob/v0.25.0/src/runtime/arch_tinygowasm.go#L47-L62
-[21]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi
-[22]: https://github.com/tetratelabs/wazero/tree/main/examples/wasi/testdata/tinygo
+[21]: https://github.com/tetratelabs/wazero/tree/main/imports/wasi_snapshot_preview1/example
+[22]: https://github.com/tetratelabs/wazero/tree/main/imports/wasi_snapshot_preview1/example/testdata/tinygo
 [23]: https://github.com/WebAssembly/binaryen/blob/main/src/passes/Asyncify.cpp
 [24]: http://tleyden.github.io/blog/2014/10/30/goroutines-vs-threads/
 [25]: https://github.com/tinygo-org/tinygo/issues/3095
