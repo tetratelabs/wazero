@@ -46,8 +46,15 @@ func main() {
 	}
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime(ctx)
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		// WebAssembly 2.0 allows use of any version of TinyGo, including 0.24+.
+		WithWasmCore2())
 	defer r.Close(ctx) // This closes everything this Runtime created.
+
+	// Instantiate WASI, which implements system I/O such as console output.
+	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
+		log.Panicln(err)
+	}
 
 	// Instantiate the module and return its exported functions
 	module, err := r.InstantiateModuleFromBinary(ctx, wasm)

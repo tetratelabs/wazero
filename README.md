@@ -50,8 +50,15 @@ func main() {
 	}
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntime(ctx)
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		// WebAssembly 2.0 allows use of any version of TinyGo, including 0.24+.
+		WithWasmCore2())
 	defer r.Close(ctx) // This closes everything this Runtime created.
+
+	// Instantiate WASI, which implements system I/O such as console output.
+	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
+		log.Panicln(err)
+	}
 
 	// Instantiate the module and return its exported functions
 	module, err := r.InstantiateModuleFromBinary(ctx, wasm)
@@ -97,7 +104,7 @@ _, err := r.NewModuleBuilder("env").
 	}).
 	Instantiate(ctx, r)
 if err != nil {
-    log.Panicln(err)
+	log.Panicln(err)
 }
 ```
 
@@ -113,12 +120,12 @@ For example, here's how you can allow WebAssembly modules to read
 ```go
 _, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 if err != nil {
-    log.Panicln(err)
+	log.Panicln(err)
 }
 
 config := wazero.NewModuleConfig().
 	WithFS(os.DirFS("/work/home")). // instead of no file system
-    WithSysWalltime().WithSysNanotime() // instead of fake time
+	WithSysWalltime().WithSysNanotime() // instead of fake time
 
 module, err := r.InstantiateModule(ctx, compiled, config)
 ...
@@ -157,7 +164,7 @@ If interested, check out the [RATIONALE.md][8] and help us optimize further!
 Both runtimes pass WebAssembly Core [1.0][7] and [2.0][14] specification tests
 on supported platforms:
 
-| Runtime     | Usage| amd64 | arm64 | others |
+| Runtime | Usage| amd64 | arm64 | others |
 |:---:|:---:|:---:|:---:|:---:|
 | Interpreter|`wazero.NewRuntimeConfigInterpreter()`|✅ |✅|✅|
 | Compiler |`wazero.NewRuntimeConfigCompiler()`|✅|✅ |❌|
