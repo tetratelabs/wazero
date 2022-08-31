@@ -26,6 +26,10 @@ Here's source in [TinyGo](https://wazero.io/languages/tinygo), which exports an
 ```go
 package main
 
+// main function is required to run a TinyGo wasi binary.
+// If omitted, you will receive a "module[env] not instantiated" error.
+func main() {}
+
 //export add
 func add(x, y uint32) uint32 {
 	return x + y
