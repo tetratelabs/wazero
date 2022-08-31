@@ -101,6 +101,9 @@ type (
 	moduleContext struct {
 		// moduleInstanceAddress is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
+		//
+		// On the entry to the native code, this must be initialized to zero to let native code preamble know
+		// that this is the initial function call (which leads to moduleContext initialization pass).
 		moduleInstanceAddress uintptr //lint:ignore U1000 This is only used by Compiler code.
 
 		// globalElement0Address is the address of the first element in the global slice,
@@ -554,14 +557,11 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
-		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
+		err = ce.deferredOnCall(recover())
 		if err == nil {
+			// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
 			err = callCtx.FailIfClosed()
-		}
-		// TODO: ^^ Will not fail if the function was imported from a closed module.
-
-		if v := recover(); v != nil {
-			err = ce.recoverOnCall(v)
+			// TODO: ^^ Will not fail if the function was imported from a closed module.
 		}
 	}()
 
@@ -573,19 +573,23 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	return
 }
 
-// recoverOnCall takes the recovered value `recoverOnCall`, and wraps it
-// with the call frame stack traces. Also, reset the state of callEngine
-// so that it can be used for the subsequent calls.
-func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
-	builder := wasmdebug.NewErrorBuilder()
-	for i := uint64(0); i < ce.callFrameStackPointer; i++ {
-		def := ce.callFrameStack[ce.callFrameStackPointer-1-i].function.source.FunctionDefinition
-		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+// deferredOnCall takes the recovered value `recovered`, and wraps it
+// with the call frame stack traces when not nil. This also resets
+// the state of callEngine so that it can be used for the subsequent calls.
+//
+// This is defined for testability.
+func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
+	if recovered != nil {
+		builder := wasmdebug.NewErrorBuilder()
+		for i := uint64(0); i < ce.callFrameStackPointer; i++ {
+			def := ce.callFrameStack[ce.callFrameStackPointer-1-i].function.source.FunctionDefinition
+			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+		}
+		err = builder.FromRecovered(recovered)
 	}
-	err = builder.FromRecovered(v)
 
 	// Allows the reuse of CallEngine.
-	ce.stackPointer, ce.callFrameStackPointer = 0, 0
+	ce.stackBasePointerInBytes, ce.stackPointer, ce.callFrameStackPointer, ce.moduleInstanceAddress = 0, 0, 0, 0
 	return
 }
 

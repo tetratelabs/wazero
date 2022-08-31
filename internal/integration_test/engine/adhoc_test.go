@@ -558,50 +558,53 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Instantiate a module that manages its memory
-	memory, err := r.InstantiateModuleFromBinary(testCtx, memoryWasm)
+	mod, err := r.InstantiateModuleFromBinary(testCtx, memoryWasm)
 	require.NoError(t, err)
-	defer memory.Close(testCtx)
+	defer mod.Close(testCtx)
 
 	// Check the export worked
-	require.Equal(t, memory.Memory(), memory.ExportedMemory("memory"))
+	require.Equal(t, mod.Memory(), mod.ExportedMemory("memory"))
+	memory := mod.Memory()
+
+	sizeFn, storeFn, growFn := mod.ExportedFunction("size"), mod.ExportedFunction("store"), mod.ExportedFunction("grow")
 
 	// Check the size command worked
-	results, err := memory.ExportedFunction("size").Call(testCtx)
+	results, err := sizeFn.Call(testCtx)
 	require.NoError(t, err)
 	require.Zero(t, results[0])
-	require.Zero(t, memory.ExportedMemory("memory").Size(testCtx))
+	require.Zero(t, memory.Size(testCtx))
 
 	// Any offset should be out of bounds error even when it is less than memory capacity(=memoryCapacityPages).
-	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
+	_, err = storeFn.Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
 	require.Error(t, err) // Out of bounds error.
 
 	// Try to grow the memory by one page
-	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
+	results, err = growFn.Call(testCtx, 1)
 	require.NoError(t, err)
 	require.Zero(t, results[0]) // should succeed and return the old size in pages.
 
 	// Any offset larger than the current size should be out of bounds error even when it is less than memory capacity.
-	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
+	_, err = storeFn.Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
 	require.Error(t, err) // Out of bounds error.
 
 	// Check the size command works!
-	results, err = memory.ExportedFunction("size").Call(testCtx)
+	results, err = sizeFn.Call(testCtx)
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), results[0])                        // 1 page
-	require.Equal(t, uint32(65536), memory.Memory().Size(testCtx)) // 64KB
+	require.Equal(t, uint64(1), results[0])               // 1 page
+	require.Equal(t, uint32(65536), memory.Size(testCtx)) // 64KB
 
 	// Grow again so that the memory size matches memory capacity.
-	results, err = memory.ExportedFunction("grow").Call(testCtx, 1)
+	results, err = growFn.Call(testCtx, 1)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), results[0])
 
 	// Verify the size matches cap.
-	results, err = memory.ExportedFunction("size").Call(testCtx)
+	results, err = sizeFn.Call(testCtx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(memoryCapacityPages), results[0])
 
 	// Now the store instruction at the memory capcity bound should succeed.
-	_, err = memory.ExportedFunction("store").Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8) // i64.store needs 8 bytes from offset.
+	_, err = storeFn.Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8) // i64.store needs 8 bytes from offset.
 	require.NoError(t, err)
 }
 
