@@ -19,7 +19,11 @@ import (
 //go:embed testdata/add.wasm
 var addWasm []byte
 
-// main is an application with an addition function defined in WebAssembly.
+// main is an example of how to extend a Go application with an addition
+// function defined in WebAssembly.
+//
+// Since addWasm was compiled with TinyGo's `wasi` target, we need to configure
+// WASI host imports.
 func main() {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
@@ -36,9 +40,9 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// Add a module to the runtime named "wasm/math" which exports one function
-	// "add", implemented in WebAssembly.
-	wasm, err := r.InstantiateModuleFromBinary(ctx, addWasm)
+	// Instantiate the guest Wasm into the same runtime. It exports the `add`
+	// function, implemented in WebAssembly.
+	mod, err := r.InstantiateModuleFromBinary(ctx, addWasm)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -47,7 +51,7 @@ func main() {
 	x, y := readTwoArgs()
 
 	// Call the `add` function and print the results to the console.
-	add := wasm.ExportedFunction("add")
+	add := mod.ExportedFunction("add")
 	results, err := add.Call(ctx, x, y)
 	if err != nil {
 		log.Panicln(err)
