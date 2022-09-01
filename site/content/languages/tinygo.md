@@ -33,6 +33,9 @@ package main
 func add(x, y uint32) uint32 {
 	return x + y
 }
+
+// main is required for the `wasi` target, even if it isn't used.
+func main() {}
 ```
 
 The following is the minimal command to build a `%.wasm` binary.
@@ -333,6 +336,17 @@ it.
   size.
 
 ## Frequently Asked Questions
+
+### Why do I have to define main?
+
+If you are using TinyGo's `wasi` target, you should define at least a no-op
+`func main() {}` in your source.
+
+If you don't, instantiation of the WebAssembly will fail unless you've exported
+the following from the host:
+```webassembly
+(func (import "env" "main.main") (param i32) (result i32))
+```
 
 ### How do I use json?
 TinyGo doesn't yet implement [reflection APIs][16] needed by `encoding/json`.

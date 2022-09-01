@@ -11,68 +11,9 @@ wazero is the only zero dependency WebAssembly runtime written in Go.
 
 ## Example
 
-The best way to learn wazero is by trying one of our [examples][1]
-
-For the impatient, here's a peek of a general flow with wazero:
-
-First, you need to compile your code into the WebAssembly Binary Format (Wasm).
-
-Here's source in [TinyGo]({{< ref "/languages/tinygo" >}}), which exports an
-"add" function:
-```go
-package main
-
-//export add
-func add(x, y uint32) uint32 {
-	return x + y
-}
-```
-
-Here's the minimal command to build a `%.wasm` binary.
-```bash
-tinygo build -o add.wasm -target=wasi add.go
-```
-
-Finally, you can run that inside your Go application.
-```go
-func main() {
-	// Choose the context to use for function calls.
-	ctx := context.Background()
-
-	// Read a WebAssembly binary containing an exported "add" function.
-	wasm, err := os.ReadFile("./path/to/add.wasm")
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// WebAssembly 2.0 allows use of any version of TinyGo, including 0.24+.
-		WithWasmCore2())
-	defer r.Close(ctx) // This closes everything this Runtime created.
-
-	// Instantiate WASI, which implements system I/O such as console output.
-	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
-
-	// Instantiate the module and return its exported functions
-	module, err := r.InstantiateModuleFromBinary(ctx, wasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	// Discover 1+2=3
-	fmt.Println(module.ExportedFunction("add").Call(ctx, 1, 2))
-}
-```
-
-Notes:
-
-* The Wasm binary is often called the "guest" in WebAssembly.
-* The embedding application is often called the "host" in WebAssembly.
-* Many languages compile to (target) Wasm including AssemblyScript, C, C++,
-  Rust, TinyGo and Zig!
+The best way to learn wazero is by trying one of our [examples][1]. The
+most [basic example][2] extends a Go application with an addition function
+defined in WebAssembly.
 
 ## Why zero?
 
@@ -93,8 +34,9 @@ go get github.com/tetratelabs/wazero@main
 
 wazero will release its first beta at the end of August 2022, and finalize
 1.0 once Go 1.20 is released in Feb 2023. Meanwhile, please practice the
-current APIs to ensure they work for you, and give us a [star][2] if you are
+current APIs to ensure they work for you, and give us a [star][3] if you are
 enjoying it so far!
 
 [1]: https://github.com/tetratelabs/wazero/blob/main/examples
-[2]: https://github.com/tetratelabs/wazero/stargazers
+[2]: https://github.com/tetratelabs/wazero/blob/main/examples/basic
+[3]: https://github.com/tetratelabs/wazero/stargazers
