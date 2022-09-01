@@ -15,69 +15,9 @@ Import wazero and extend your Go application with code written in any language!
 
 ## Example
 
-The best way to learn wazero is by trying one of our [examples](examples).
-
-For the impatient, here's a peek of a general flow with wazero:
-
-First, you need to compile your code into the WebAssembly Binary Format (Wasm).
-
-Here's source in [TinyGo](https://wazero.io/languages/tinygo), which exports an
-"add" function:
-```go
-package main
-
-//export add
-func add(x, y uint32) uint32 {
-	return x + y
-}
-```
-
-Here's the minimal command to build a `%.wasm` binary.
-```bash
-tinygo build -o add.wasm -target=wasi add.go
-```
-
-Finally, you can run that inside your Go application.
-```go
-func main() {
-	// Choose the context to use for function calls.
-	ctx := context.Background()
-
-	// Read a WebAssembly binary containing an exported "add" function.
-	wasm, err := os.ReadFile("./path/to/add.wasm")
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// WebAssembly 2.0 allows use of any version of TinyGo, including 0.24+.
-		WithWasmCore2())
-	defer r.Close(ctx) // This closes everything this Runtime created.
-
-	// Instantiate WASI, which implements system I/O such as console output.
-	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
-
-	// Instantiate the module and return its exported functions
-	module, err := r.InstantiateModuleFromBinary(ctx, wasm)
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	// Discover 1+2=3
-	fmt.Println(module.ExportedFunction("add").Call(ctx, 1, 2))
-}
-```
-
-Notes:
-
-* The embedding application is often called the "host" in WebAssembly.
-* The Wasm binary is often called the "guest" in WebAssembly. Sometimes they
-  need [imports][imports] to implement features such as console output.
-* Many languages compile to (target) Wasm including AssemblyScript, C, C++,
-  Rust, TinyGo and Zig!
+The best way to learn wazero is by trying one of our [examples](examples). The
+most [basic example](examples/basic) extends a Go application with an addition
+function defined in WebAssembly.
 
 ## Deeper dive
 
