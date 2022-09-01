@@ -31,7 +31,7 @@ portability from release to release, or that the code will work well in
 production.
 
 Due to lack of adoption, support and relatively high implementation overhead,
-most choose [TinyGo](tinygo) to compile source code, even if it supports less
+most choose [TinyGo]({{< relref "/tinygo.md" >}}) to compile source code, even if it supports less
 features.
 
 ## WebAssembly Features
