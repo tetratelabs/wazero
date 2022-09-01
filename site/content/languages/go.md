@@ -244,7 +244,7 @@ the Go stack.
 [1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
 [2]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go
 [3]: https://github.com/WebAssembly/wabt
-[4]: https://github.com/golang/proposal/blob/go1.19/design/42372-wasmexport.md
+[4]: https://github.com/golang/proposal/blob/master/design/42372-wasmexport.md
 [5]: https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go
 [6]: https://github.com/golang/go/blob/go1.19/src/cmd/internal/obj/wasm/wasmobj.go#L794-L812
 [7]: https://github.com/golang/go/blob/go1.19/src/runtime/rt0_js_wasm.s#L17-L21
