@@ -104,10 +104,10 @@ If interested, check out the [RATIONALE.md][8] and help us optimize further!
 Both runtimes pass WebAssembly Core [1.0][7] and [2.0][14] specification tests
 on supported platforms:
 
-| Runtime | Usage| amd64 | arm64 | others |
-|:---:|:---:|:---:|:---:|:---:|
-| Interpreter|`wazero.NewRuntimeConfigInterpreter()`|✅ |✅|✅|
-| Compiler |`wazero.NewRuntimeConfigCompiler()`|✅|✅ |❌|
+|   Runtime   |                 Usage                  | amd64 | arm64 | others |
+|:-----------:|:--------------------------------------:|:-----:|:-----:|:------:|
+| Interpreter | `wazero.NewRuntimeConfigInterpreter()` |   ✅   |   ✅   |   ✅    |
+|  Compiler   |  `wazero.NewRuntimeConfigCompiler()`   |   ✅   |   ✅   |   ❌    |
 
 ## Support Policy
 
@@ -117,12 +117,17 @@ wazero into their Go applications.
 ### wazero
 
 wazero is an early project, so APIs are subject to change until version 1.0.
+To use wazero meanwhile, you need to use the latest pre-release like this:
 
-Wazero 1.0 will have a floor Go version of 1.19. The first beta will be the
-end of August 2022, and the final release will be after Go 1.20 is released,
-in February 2023.
+```bash
+go get github.com/tetratelabs/wazero@latest
+```
 
-Meanwhile, please practice the current APIs to ensure they work for you!
+wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
+scheduled for Feb 2023, following the release of Go 1.20.
+
+Meanwhile, please practice the current APIs to ensure they work for you, and
+give us a [star][15] if you are enjoying it so far!
 
 ### Go
 
@@ -175,3 +180,4 @@ wazero is a registered trademark of Tetrate.io, Inc. in the United States and/or
 [12]: https://docs.docker.com/develop/develop-images/baseimages/#create-a-simple-parent-image-using-scratch
 [13]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
+[15]: https://github.com/tetratelabs/wazero/stargazers

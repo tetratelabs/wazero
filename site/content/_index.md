@@ -25,17 +25,17 @@ features you expect in Go, such as safe concurrency and context propagation.
 ### When can I use this?
 
 wazero is an early project, so APIs are subject to change until version 1.0.
-To use wazero meanwhile, you need to add its main branch to your project like
-this:
+To use wazero meanwhile, you need to use the latest pre-release like this:
 
 ```bash
-go get github.com/tetratelabs/wazero@main
+go get github.com/tetratelabs/wazero@latest
 ```
 
-wazero will release its first beta at the end of August 2022, and finalize
-1.0 once Go 1.20 is released in Feb 2023. Meanwhile, please practice the
-current APIs to ensure they work for you, and give us a [star][3] if you are
-enjoying it so far!
+wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
+scheduled for Feb 2023, following the release of Go 1.20.
+
+Meanwhile, please practice the current APIs to ensure they work for you, and
+give us a [star][3] if you are enjoying it so far!
 
 [1]: https://github.com/tetratelabs/wazero/blob/main/examples
 [2]: https://github.com/tetratelabs/wazero/blob/main/examples/basic
