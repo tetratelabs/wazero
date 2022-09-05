@@ -834,7 +834,6 @@ func (ce *callEngine) builtinFunctionGrowStack(stackPointerCeil uint64) {
 	// Extends the stack's length to oldLen*2+stackPointerCeil.
 	newLen := oldLen<<1 + (stackPointerCeil)
 	newStack := make([]uint64, newLen)
-	ce.stackTopIndex()
 	top := ce.stackTopIndex()
 	copy(newStack[:top], ce.stack[:top])
 	ce.stack = newStack
