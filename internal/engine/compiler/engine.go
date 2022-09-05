@@ -823,7 +823,7 @@ entry:
 // The default value should suffice for most use cases. Those wishing to change this can via `go build -ldflags`.
 //
 // TODO: allows to configure this via context?
-var callStackCeiling = uint64(10000000) // in uint64 (8 bytes) == 80000000 bytes in total == 80mb.
+var callStackCeiling = uint64(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
 
 func (ce *callEngine) builtinFunctionGrowStack(stackPointerCeil uint64) {
 	oldLen := uint64(len(ce.stack))
