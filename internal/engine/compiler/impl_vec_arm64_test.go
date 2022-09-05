@@ -122,7 +122,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			},
 			verifyFnc: func(t *testing.T, env *compilerEnv) {
 				// Previous value on the V3 register must be saved onto the stack.
-				lo, hi := env.stack()[0], env.stack()[1]
+				lo, hi := env.stack()[callFrameDataSizeInUint64], env.stack()[callFrameDataSizeInUint64+1]
 				require.Equal(t, uint64(1234), lo)
 				require.Equal(t, uint64(5678), hi)
 			},
@@ -143,7 +143,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			},
 			verifyFnc: func(t *testing.T, env *compilerEnv) {
 				// Previous value on the V3 register must be saved onto the stack.
-				lo, hi := env.stack()[0], env.stack()[1]
+				lo, hi := env.stack()[callFrameDataSizeInUint64], env.stack()[callFrameDataSizeInUint64+1]
 				require.Equal(t, uint64(1234), lo)
 				require.Equal(t, uint64(5678), hi)
 			},
@@ -195,7 +195,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: lanes})
 			require.NoError(t, err)
 
-			require.Equal(t, tc.expStackPointerAfterShuffle, compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, tc.expStackPointerAfterShuffle+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()

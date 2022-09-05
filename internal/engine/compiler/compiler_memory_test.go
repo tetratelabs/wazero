@@ -40,7 +40,8 @@ func TestCompiler_compileMemoryGrow(t *testing.T) {
 
 	// Reenter from the return address.
 	nativecall(
-		env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())),
+		env.ce.returnAddress,
+		uintptr(unsafe.Pointer(env.callEngine())),
 		uintptr(unsafe.Pointer(env.module())),
 	)
 
@@ -60,7 +61,7 @@ func TestCompiler_compileMemorySize(t *testing.T) {
 	err = compiler.compileMemorySize()
 	require.NoError(t, err)
 	// At this point, the size of memory should be pushed onto the stack.
-	require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+	require.Equal(t, uint64(1)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
 
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
@@ -249,7 +250,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			tc.operationSetupFn(t, compiler)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
-			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 			loadedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
@@ -267,7 +268,7 @@ func TestCompiler_compileLoad(t *testing.T) {
 			env.exec(code)
 
 			// Verify the loaded value.
-			require.Equal(t, uint64(1), env.stackPointer())
+			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
 			tc.loadedValueVerifyFn(t, env.stackTopAsUint64())
 		})
 	}
@@ -391,7 +392,7 @@ func TestCompiler_compileStore(t *testing.T) {
 
 			// At this point, no registers must be in use, and no values on the stack since we consumed two values.
 			require.Zero(t, len(compiler.runtimeValueLocationStack().usedRegisters))
-			require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
+			require.Equal(t, uint64(0)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
 
 			// Generate the code under test.
 			err = compiler.compileReturnFunction()

@@ -4,9 +4,9 @@
 package wasmruntime
 
 var (
-	// ErrRuntimeCallStackOverflow indicates that there are too many function calls,
+	// ErrRuntimeStackOverflow indicates that there are too many function calls,
 	// and the Engine terminated the execution.
-	ErrRuntimeCallStackOverflow = New("callstack overflow")
+	ErrRuntimeStackOverflow = New("stack overflow")
 	// ErrRuntimeInvalidConversionToInteger indicates the Wasm function tries to
 	// convert NaN floating point value to integers during trunc variant instructions.
 	ErrRuntimeInvalidConversionToInteger = New("invalid conversion to integer")

@@ -35,46 +35,37 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(me.functions)), moduleEngineFunctionsOffset, "moduleEngineFunctionsOffset")
 
 	var ce callEngine
-	// Offsets for callEngine.globalContext.
-	requireEqual(int(unsafe.Offsetof(ce.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset, "callEngineGlobalContextValueStackElement0AddressOffset")
-	requireEqual(int(unsafe.Offsetof(ce.valueStackLenInBytes)), callEngineGlobalContextValueStackLenInBytesOffset, "callEngineGlobalContextValueStackLenInBytesOffset")
-	requireEqual(int(unsafe.Offsetof(ce.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset, "callEngineGlobalContextCallFrameStackElement0AddressOffset")
-	requireEqual(int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset, "callEngineGlobalContextCallFrameStackLenOffset")
-	requireEqual(int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset, "callEngineGlobalContextCallFrameStackPointerOffset")
-
 	// Offsets for callEngine.moduleContext.
+	requireEqual(int(unsafe.Offsetof(ce.fn)), callEngineModuleContextFnOffset, "callEngineModuleContextFnOffset")
 	requireEqual(int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset, "callEngineModuleContextModuleInstanceAddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset, "callEngineModuleContextGlobalElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset, "callEngineModuleContextMemoryElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset, "callEngineModuleContextMemorySliceLenOffset")
+	requireEqual(int(unsafe.Offsetof(ce.memoryInstance)), callEngineModuleContextMemoryInstanceOffset, "callEngineModuleContextMemoryInstanceOffset")
 	requireEqual(int(unsafe.Offsetof(ce.tablesElement0Address)), callEngineModuleContextTablesElement0AddressOffset, "callEngineModuleContextTablesElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.functionsElement0Address)), callEngineModuleContextFunctionsElement0AddressOffset, "callEngineModuleContextFunctionsElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.typeIDsElement0Address)), callEngineModuleContextTypeIDsElement0AddressOffset, "callEngineModuleContextTypeIDsElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.dataInstancesElement0Address)), callEngineModuleContextDataInstancesElement0AddressOffset, "callEngineModuleContextDataInstancesElement0AddressOffset")
 	requireEqual(int(unsafe.Offsetof(ce.elementInstancesElement0Address)), callEngineModuleContextElementInstancesElement0AddressOffset, "callEngineModuleContextElementInstancesElement0AddressOffset")
 
-	// Offsets for callEngine.valueStackContext
-	requireEqual(int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset, "callEngineValueStackContextStackPointerOffset")
-	requireEqual(int(unsafe.Offsetof(ce.stackBasePointerInBytes)), callEngineValueStackContextStackBasePointerInBytesOffset, "callEngineValueStackContextStackBasePointerInBytesOffset")
+	// Offsets for callEngine.stackContext
+	requireEqual(int(unsafe.Offsetof(ce.stackPointer)), callEngineStackContextStackPointerOffset, "callEngineStackContextStackPointerOffset")
+	requireEqual(int(unsafe.Offsetof(ce.stackBasePointerInBytes)), callEngineStackContextStackBasePointerInBytesOffset, "callEngineStackContextStackBasePointerInBytesOffset")
+	requireEqual(int(unsafe.Offsetof(ce.stackElement0Address)), callEngineStackContextStackElement0AddressOffset, "callEngineStackContextStackElement0AddressOffset")
+	requireEqual(int(unsafe.Offsetof(ce.stackLenInBytes)), callEngineStackContextStackLenInBytesOffset, "callEngineStackContextStackLenInBytesOffset")
 
 	// Offsets for callEngine.exitContext.
 	requireEqual(int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextNativeCallStatusCodeOffset, "callEngineExitContextNativeCallStatusCodeOffset")
-	requireEqual(int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset, "callEngineExitContextBuiltinFunctionCallAddressOffset")
+	requireEqual(int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallIndexOffset, "callEngineExitContextBuiltinFunctionCallIndexOffset")
+	requireEqual(int(unsafe.Offsetof(ce.returnAddress)), callEngineExitContextReturnAddressOffset, "callEngineExitContextReturnAddressOffset")
 
 	// Size and offsets for callFrame.
 	var frame callFrame
-	requireEqual(int(unsafe.Sizeof(frame)), callFrameDataSize, "callFrameDataSize")
-	// Sizeof call-frame must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
-	requireEqual(0, callFrameDataSize&(callFrameDataSize-1), "callFrameDataSize&(callFrameDataSize-1)")
-	requireEqual(math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit, "callFrameDataSizeMostSignificantSetBit")
-	requireEqual(int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset, "callFrameReturnAddressOffset")
-	requireEqual(int(unsafe.Offsetof(frame.returnStackBasePointerInBytes)), callFrameReturnStackBasePointerInBytesOffset, "callFrameReturnStackBasePointerInBytesOffset")
-	requireEqual(int(unsafe.Offsetof(frame.function)), callFrameFunctionOffset, "callFrameFunctionOffset")
+	requireEqual(int(unsafe.Sizeof(frame))/8, callFrameDataSizeInUint64, "callFrameDataSize")
 
 	// Offsets for code.
 	var compiledFunc function
 	requireEqual(int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset, "functionCodeInitialAddressOffset")
-	requireEqual(int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), functionStackPointerCeilOffset, "functionStackPointerCeilOffset")
 	requireEqual(int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset, "functionSourceOffset")
 	requireEqual(int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset, "functionModuleInstanceAddressOffset")
 
@@ -157,7 +148,7 @@ func (j *compilerEnv) memory() []byte {
 }
 
 func (j *compilerEnv) stack() []uint64 {
-	return j.ce.valueStack
+	return j.ce.stack
 }
 
 func (j *compilerEnv) compilerStatus() nativeCallStatusCode {
@@ -169,15 +160,15 @@ func (j *compilerEnv) builtinFunctionCallAddress() wasm.Index {
 }
 
 func (j *compilerEnv) stackPointer() uint64 {
-	return j.ce.valueStackContext.stackPointer
+	return j.ce.stackContext.stackPointer
 }
 
 func (j *compilerEnv) stackBasePointer() uint64 {
-	return j.ce.valueStackContext.stackBasePointerInBytes >> 3
+	return j.ce.stackContext.stackBasePointerInBytes >> 3
 }
 
 func (j *compilerEnv) setStackPointer(sp uint64) {
-	j.ce.valueStackContext.stackPointer = sp
+	j.ce.stackContext.stackPointer = sp
 }
 
 func (j *compilerEnv) addGlobals(g ...*wasm.GlobalInstance) {
@@ -192,20 +183,8 @@ func (j *compilerEnv) addTable(table *wasm.TableInstance) {
 	j.moduleInstance.Tables = append(j.moduleInstance.Tables, table)
 }
 
-func (j *compilerEnv) callFrameStackPeek() *callFrame {
-	return &j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer-1]
-}
-
-func (j *compilerEnv) callFrameStackPointer() uint64 {
-	return j.ce.globalContext.callFrameStackPointer
-}
-
-func (j *compilerEnv) setValueStackBasePointer(sp uint64) {
-	j.ce.valueStackContext.stackBasePointerInBytes = sp << 3
-}
-
-func (j *compilerEnv) setCallFrameStackPointerLen(l uint64) {
-	j.ce.callFrameStackLen = l
+func (j *compilerEnv) setStackBasePointer(sp uint64) {
+	j.ce.stackContext.stackBasePointerInBytes = sp << 3
 }
 
 func (j *compilerEnv) module() *wasm.ModuleInstance {
@@ -235,9 +214,8 @@ func (j *compilerEnv) newFunction(codeSegment []byte) *function {
 
 func (j *compilerEnv) exec(codeSegment []byte) {
 	f := j.newFunction(codeSegment)
-	j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
-	j.ce.globalContext.callFrameStackPointer++
-	j.ce.compiled = f
+	j.ce.initialFn = f
+	j.ce.fn = f
 
 	nativecall(
 		uintptr(unsafe.Pointer(&codeSegment[0])),
@@ -272,7 +250,7 @@ func (j *compilerEnv) requireNewCompiler(t *testing.T, fn newTestCompiler, ir *w
 type compilerImpl interface {
 	compiler
 	compileExitFromNativeCode(nativeCallStatusCode)
-	compileMaybeGrowValueStack() error
+	compileMaybeGrowStack() error
 	compileReturnFunction() error
 	getOnStackPointerCeilDeterminedCallBack() func(uint64)
 	setStackPointerCeil(uint64)
@@ -294,6 +272,6 @@ func newCompilerEnvironment() *compilerEnv {
 			Globals: []*wasm.GlobalInstance{},
 			Engine:  me,
 		},
-		ce: me.newCallEngine(nil, nil),
+		ce: me.newCallEngine(initialStackSize, nil),
 	}
 }

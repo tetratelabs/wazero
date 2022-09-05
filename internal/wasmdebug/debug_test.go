@@ -118,13 +118,13 @@ wasm stack trace:
 			build: func(builder ErrorBuilder) error {
 				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32})
 				builder.AddFrame("x.y", nil, nil)
-				return builder.FromRecovered(wasmruntime.ErrRuntimeCallStackOverflow)
+				return builder.FromRecovered(wasmruntime.ErrRuntimeStackOverflow)
 			},
-			expectedErr: `wasm error: callstack overflow
+			expectedErr: `wasm error: stack overflow
 wasm stack trace:
 	wasi_snapshot_preview1.fd_write(i32,i32,i32,i32) i32
 	x.y()`,
-			expectUnwrap: wasmruntime.ErrRuntimeCallStackOverflow,
+			expectUnwrap: wasmruntime.ErrRuntimeStackOverflow,
 		},
 	}
 

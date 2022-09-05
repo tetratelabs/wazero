@@ -106,8 +106,7 @@ func (c *controlFrames) push(frame *controlFrame) {
 	c.frames = append(c.frames, frame)
 }
 
-// localIndexToStackHeight initializes localIndexToStackHeight field. See the comment on localIndexToStackHeight.
-func (c *compiler) calcLocalIndexToStackHeight() {
+func (c *compiler) initializeStack() {
 	c.localIndexToStackHeightInUint64 = make(map[uint32]int, len(c.sig.Params)+len(c.localTypes))
 	var current int
 	for index, lt := range c.sig.Params {
@@ -118,6 +117,16 @@ func (c *compiler) calcLocalIndexToStackHeight() {
 		current++
 	}
 
+	if c.callFrameStackSizeInUint64 > 0 {
+		// We reserve the stack slots for result values below the return call frame slots.
+		if diff := c.sig.ResultNumInUint64 - c.sig.ParamNumInUint64; diff > 0 {
+			current += diff
+		}
+	}
+
+	// Non-func param locals start after the return call frame.
+	current += c.callFrameStackSizeInUint64
+
 	for index, lt := range c.localTypes {
 		index += len(c.sig.Params)
 		c.localIndexToStackHeightInUint64[wasm.Index(index)] = current
@@ -126,14 +135,32 @@ func (c *compiler) calcLocalIndexToStackHeight() {
 		}
 		current++
 	}
+
+	// Push function arguments.
+	for _, t := range c.sig.Params {
+		c.stackPush(wasmValueTypeToUnsignedType(t)...)
+	}
+
+	if c.callFrameStackSizeInUint64 > 0 {
+		// Reserve the stack slots for results.
+		for i := 0; i < c.sig.ResultNumInUint64-c.sig.ParamNumInUint64; i++ {
+			c.stackPush(UnsignedTypeI64)
+		}
+
+		// Reserve the stack slots for call frame.
+		for i := 0; i < c.callFrameStackSizeInUint64; i++ {
+			c.stackPush(UnsignedTypeI64)
+		}
+	}
 }
 
 type compiler struct {
-	enabledFeatures  wasm.Features
-	stack            []UnsignedType
-	currentID        uint32
-	controlFrames    *controlFrames
-	unreachableState struct {
+	enabledFeatures            wasm.Features
+	callFrameStackSizeInUint64 int
+	stack                      []UnsignedType
+	currentID                  uint32
+	controlFrames              *controlFrames
+	unreachableState           struct {
 		on    bool
 		depth int
 	}
@@ -223,7 +250,7 @@ type CompilationResult struct {
 	HasElementInstances bool
 }
 
-func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *wasm.Module) ([]*CompilationResult, error) {
+func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, callFrameStackSizeInUint64 int, module *wasm.Module) ([]*CompilationResult, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
@@ -250,9 +277,15 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 				GoFunc:     code.GoFunc,
 				Signature:  sig,
 			})
+
+			if len(sig.Params) > 0 && sig.ParamNumInUint64 == 0 {
+				panic("a")
+			} else if len(sig.Results) > 0 && sig.ResultNumInUint64 == 0 {
+				panic("if len(sig.Results) > 0 && sig.ResultNumInUint64 == 0")
+			}
 			continue
 		}
-		r, err := compile(enabledFeatures, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
+		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
@@ -276,6 +309,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, module *
 // so that the resulting operations can be consumed by the interpreter
 // or the Compiler compilation engine.
 func compile(enabledFeatures wasm.Features,
+	callFrameStackSizeInUint64 int,
 	sig *wasm.FunctionType,
 	body []byte,
 	localTypes []wasm.ValueType,
@@ -283,23 +317,20 @@ func compile(enabledFeatures wasm.Features,
 	functions []uint32, globals []*wasm.GlobalType,
 ) (*CompilationResult, error) {
 	c := compiler{
-		enabledFeatures: enabledFeatures,
-		controlFrames:   &controlFrames{},
-		result:          CompilationResult{LabelCallers: map[string]uint32{}},
-		body:            body,
-		localTypes:      localTypes,
-		sig:             sig,
-		globals:         globals,
-		funcs:           functions,
-		types:           types,
+		enabledFeatures:            enabledFeatures,
+		controlFrames:              &controlFrames{},
+		callFrameStackSizeInUint64: callFrameStackSizeInUint64,
+		result:                     CompilationResult{LabelCallers: map[string]uint32{}},
+		body:                       body,
+		localTypes:                 localTypes,
+		sig:                        sig,
+		globals:                    globals,
+		funcs:                      functions,
+		types:                      types,
 	}
 
-	c.calcLocalIndexToStackHeight()
+	c.initializeStack()
 
-	// Push function arguments.
-	for _, t := range sig.Params {
-		c.stackPush(wasmValueTypeToUnsignedType(t)...)
-	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
 	// into account, meaning that callers must push

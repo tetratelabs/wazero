@@ -146,6 +146,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
 				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
+				require.Equal(t, tc.moduleInstance.Memory, ce.moduleContext.memoryInstance)
 			}
 
 			if len(tc.moduleInstance.Tables) > 0 {
@@ -172,7 +173,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 	}
 }
 
-func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
+func TestCompiler_compileMaybeGrowStack(t *testing.T) {
 	t.Run("not grow", func(t *testing.T) {
 		const stackPointerCeil = 5
 		for _, baseOffset := range []uint64{5, 10, 20} {
@@ -180,14 +181,15 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-				err := compiler.compileMaybeGrowValueStack()
+				err := compiler.compilePreamble()
 				require.NoError(t, err)
+
 				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
 
-				valueStackLen := uint64(len(env.stack()))
-				stackBasePointer := valueStackLen - baseOffset // Ceil <= valueStackLen - stackBasePointer = no need to grow!
+				stackLen := uint64(len(env.stack()))
+				stackBasePointer := stackLen - baseOffset // Ceil <= stackLen - stackBasePointer = no need to grow!
 				compiler.getOnStackPointerCeilDeterminedCallBack()(stackPointerCeil)
-				env.setValueStackBasePointer(stackBasePointer)
+				env.setStackBasePointer(stackBasePointer)
 
 				compiler.compileExitFromNativeCode(nativeCallStatusCodeReturned)
 
@@ -202,7 +204,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		}
 	})
 
-	var defaultValueStackLen = uint64(initialValueStackSize)
+	var defaultStackLen = uint64(initialStackSize)
 	t.Run("grow", func(t *testing.T) {
 		tests := []struct {
 			name             string
@@ -212,7 +214,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 			{
 				name:             "ceil=6/sbp=len-5",
 				stackPointerCeil: 6,
-				stackBasePointer: defaultValueStackLen - 5,
+				stackBasePointer: defaultStackLen - 5,
 			},
 			{
 				name:             "ceil=10000/sbp=0",
@@ -227,7 +229,7 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env := newCompilerEnvironment()
 				compiler := env.requireNewCompiler(t, newCompiler, nil)
 
-				err := compiler.compileMaybeGrowValueStack()
+				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
 				// On the return from grow value stack, we simply return.
@@ -240,14 +242,14 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				require.NoError(t, err)
 
 				// And run the code with the specified stackBasePointer.
-				env.setValueStackBasePointer(tc.stackBasePointer)
+				env.setStackBasePointer(tc.stackBasePointer)
 				env.exec(code)
 
 				// Check if the call exits with builtin function call status.
 				require.Equal(t, nativeCallStatusCodeCallBuiltInFunction, env.compilerStatus())
 
 				// Reenter from the return address.
-				returnAddress := env.callFrameStackPeek().returnAddress
+				returnAddress := env.ce.returnAddress
 				require.True(t, returnAddress != 0, "returnAddress was zero %d", returnAddress)
 				nativecall(
 					returnAddress, uintptr(unsafe.Pointer(env.callEngine())),

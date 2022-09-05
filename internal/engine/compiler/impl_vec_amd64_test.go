@@ -142,7 +142,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {
 				// at the bottom of stack, the previous value on the CX register must be saved.
-				actual := env.stack()[0]
+				actual := env.stack()[callFrameDataSizeInUint64]
 				require.Equal(t, uint64(100), actual)
 			},
 		},
@@ -175,7 +175,7 @@ func TestAmd64Compiler_compileV128ShrI64x2SignedImpl(t *testing.T) {
 			},
 			verifyFn: func(t *testing.T, env *compilerEnv) {
 				// at the bottom of stack, the previous value on the CX register must be saved.
-				actual := env.stack()[0]
+				actual := env.stack()[callFrameDataSizeInUint64]
 				require.Equal(t, uint64(100), actual)
 			},
 		},

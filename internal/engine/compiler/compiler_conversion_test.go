@@ -125,7 +125,7 @@ func TestCompiler_compileExtend(t *testing.T) {
 					require.NoError(t, err)
 					env.exec(code)
 
-					require.Equal(t, uint64(1), env.stackPointer())
+					require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
 					if signed {
 						expected := int64(int32(v))
 						require.Equal(t, expected, env.stackTopAsInt64())
@@ -419,7 +419,7 @@ func TestCompiler_compileFConvertFromI(t *testing.T) {
 					env.exec(code)
 
 					// Check the result.
-					require.Equal(t, uint64(1), env.stackPointer())
+					require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
 					actualBits := env.stackTopAsUint64()
 					if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt32 {
 						exp := float32(int32(v))
@@ -490,7 +490,7 @@ func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
 			env.exec(code)
 
 			// Check the result.
-			require.Equal(t, uint64(1), env.stackPointer())
+			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
 			if math.IsNaN(float64(v)) {
 				require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 			} else {
@@ -536,7 +536,7 @@ func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
 			env.exec(code)
 
 			// Check the result.
-			require.Equal(t, uint64(1), env.stackPointer())
+			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
 			if math.IsNaN(v) {
 				require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 			} else {

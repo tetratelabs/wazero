@@ -11,7 +11,6 @@ import (
 
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -45,7 +44,8 @@ func TestInterpreter_CallEngine_PushFrame(t *testing.T) {
 }
 
 func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
-	defer func() { callStackCeiling = buildoptions.CallStackCeiling }()
+	saved := callStackCeiling
+	defer func() { callStackCeiling = saved }()
 
 	callStackCeiling = 3
 
@@ -60,7 +60,7 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 	vm.pushFrame(f3)
 
 	captured := require.CapturePanic(func() { vm.pushFrame(f4) })
-	require.EqualError(t, captured, "callstack overflow")
+	require.EqualError(t, captured, "stack overflow")
 }
 
 // et is used for tests defined in the enginetest package.
