@@ -161,7 +161,7 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 // and return to the caller.
 func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
-	c.locationStack.setupInitialStack(c.ir.Signature)
+	c.locationStack.init(c.ir.Signature)
 
 	if err := c.compileCallGoHostFunction(); err != nil {
 		return err
@@ -4557,6 +4557,8 @@ func (c *amd64Compiler) compileCallFunctionImpl(functionAddressRegister asm.Regi
 			loc.valueType = runtimeValueTypeV128Lo
 			hi := c.locationStack.pushRuntimeValueLocationOnStack()
 			hi.valueType = runtimeValueTypeV128Hi
+		default:
+			panic("BUG: invalid type: " + wasm.ValueTypeName(t))
 		}
 	}
 	return nil
@@ -4725,7 +4727,7 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 func (c *amd64Compiler) compilePreamble() (err error) {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
-	c.locationStack.setupInitialStack(c.ir.Signature)
+	c.locationStack.init(c.ir.Signature)
 
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err

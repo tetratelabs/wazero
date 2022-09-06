@@ -185,7 +185,7 @@ func TestRuntimeValueLocationStack_setupInitialStack(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			s := newRuntimeValueLocationStack()
-			s.setupInitialStack(tc.sig)
+			s.init(tc.sig)
 			require.Equal(t, tc.expectedSP, s.sp)
 
 			callFrameLocations := s.stack[s.sp-callFrameDataSizeInUint64 : s.sp]

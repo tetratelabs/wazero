@@ -341,11 +341,11 @@ func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerT
 	return nil, false
 }
 
-// setupInitialStack set up the runtimeValueLocationStack which reflects the state of
+// init sets up the runtimeValueLocationStack which reflects the state of
 // the stack at the beginning of the function.
 //
 // See the diagram in callEngine.stack.
-func (v *runtimeValueLocationStack) setupInitialStack(sig *wasm.FunctionType) {
+func (v *runtimeValueLocationStack) init(sig *wasm.FunctionType) {
 	for _, t := range sig.Params {
 		loc := v.pushRuntimeValueLocationOnStack()
 		switch t {
