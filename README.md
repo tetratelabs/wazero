@@ -31,7 +31,7 @@ it has no scope to specify how system resources like files are accessed.
 Instead, WebAssembly defines "host functions" and the signatures they can use.
 In wazero, "host functions" are written in Go, and let you do anything
 including access files. The main constraint is that WebAssembly only allows
-numeric types. wazero includes [imports][imports] for common languages and
+numeric types. wazero includes [imports](imports) for common languages and
 compiler toolchains.
 
 For example, you can grant WebAssembly code access to your console by exporting
