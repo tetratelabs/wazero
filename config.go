@@ -140,6 +140,10 @@ type RuntimeConfig interface {
 	//
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
 	WithWasmCore2() RuntimeConfig
+
+	// clone returns a copy of the current RuntimeConfig. Private method to prevent non-wazero implementations of
+	// this interface.
+	clone() *runtimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
