@@ -639,7 +639,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			Results:           []wasm.ValueType{wasm.ValueTypeI32},
 			ResultNumInUint64: 1,
 		}
-		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
+		targetTypeID := wasm.FunctionTypeID(10)
 		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 
 		table := make([]wasm.Reference, 10)
@@ -654,8 +654,8 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 		me := env.moduleEngine()
 		for i := 0; i < len(table); i++ {
-			// First we create the call target function with function address = i,
-			// and it returns one value.
+			// First, we create the call target function for the table element i.
+			// To match its function type, it must return one value.
 			expectedReturnValue := uint32(i * 1000)
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
@@ -675,6 +675,8 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			c, _, err := compiler.compile()
 			require.NoError(t, err)
 
+			// Now that we've generated the code for this function,
+			// add it to the module engine and assign its pointer to the table index.
 			f := &function{
 				parent:                &code{codeSegment: c},
 				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
@@ -687,6 +689,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			table[i] = uintptr(unsafe.Pointer(f))
 		}
 
+		// Test to ensure that we can call all the functions stored in the table.
 		for i := 1; i < len(table); i++ {
 			expectedReturnValue := uint32(i * 1000)
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {

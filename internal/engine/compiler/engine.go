@@ -290,9 +290,6 @@ const (
 	callEngineExitContextBuiltinFunctionCallIndexOffset = 124
 	callEngineExitContextReturnAddressOffset            = 128
 
-	// Offsets for callFrame.
-	callFrameDataSizeInUint64 = 24 / 8
-
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
 	functionSourceOffset                = 16
@@ -334,6 +331,9 @@ const (
 
 	// pointerSizeLog2 satisfies: 1 << pointerSizeLog2 = sizeOf(uintptr)
 	pointerSizeLog2 = 3
+
+	// callFrameDataSizeInUint64 is the size of callFrame struct per 8 bytes (= size of uint64).
+	callFrameDataSizeInUint64 = 24 / 8
 )
 
 // nativeCallStatusCode represents the result of `nativecall`.
