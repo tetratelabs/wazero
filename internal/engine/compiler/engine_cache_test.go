@@ -2,9 +2,13 @@ package compiler
 
 import (
 	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"testing"
+	"testing/iotest"
 
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u32"
@@ -79,7 +83,7 @@ func TestDeserializeCodes(t *testing.T) {
 
 			name:   "invalid header",
 			in:     []byte{1},
-			expErr: "invalid header length: 1",
+			expErr: "compilationcache: invalid header length: 1",
 		},
 		{
 
@@ -156,7 +160,7 @@ func TestDeserializeCodes(t *testing.T) {
 				[]byte{1, 2, 3, 4, 5}, // code.
 				// Function index = 1.
 			),
-			expErr: "reading stack pointer ceil: EOF",
+			expErr: "compilationcache: error reading func[1] stack pointer ceil: EOF",
 		},
 		{
 			name: "reading native code size",
@@ -172,7 +176,7 @@ func TestDeserializeCodes(t *testing.T) {
 				// Function index = 1.
 				u64.LeBytes(12345), // stack pointer ceil.
 			),
-			expErr: "reading native code size: EOF",
+			expErr: "compilationcache: error reading func[1] reading native code size: EOF",
 		},
 		{
 			name: "mmapping",
@@ -190,7 +194,7 @@ func TestDeserializeCodes(t *testing.T) {
 				u64.LeBytes(5),     // length of code.
 				// Lack of code here.
 			),
-			expErr: "mmaping function: EOF",
+			expErr: "compilationcache: error mmapping func[1] code (len=5): EOF",
 		},
 	}
 
@@ -233,7 +237,7 @@ func TestEngine_getCodesFromCache(t *testing.T) {
 		{
 			name:   "error in deserialization",
 			ext:    &testCache{caches: map[wasm.ModuleID][]byte{{}: {1, 2, 3}}},
-			expErr: "invalid header length: 3",
+			expErr: "compilationcache: invalid header length: 3",
 		},
 		{
 			name: "stale cache",
@@ -327,6 +331,78 @@ func TestEngine_addCodesToCache(t *testing.T) {
 			[]byte{1, 2, 3},  // code.
 		), content)
 	})
+}
+
+func Test_readUint64(t *testing.T) {
+	tests := []struct {
+		name  string
+		input uint64
+	}{
+		{
+			name:  "zero",
+			input: 0,
+		},
+		{
+			name:  "half",
+			input: math.MaxUint32,
+		},
+		{
+			name:  "max",
+			input: math.MaxUint64,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			input := make([]byte, 8)
+			binary.LittleEndian.PutUint64(input, tc.input)
+
+			var b [8]byte
+			n, err := readUint64(bytes.NewReader(input), &b)
+			require.NoError(t, err)
+			require.Equal(t, tc.input, n)
+
+			// ensure the buffer was cleared
+			var expectedB [8]byte
+			require.Equal(t, expectedB, b)
+		})
+	}
+}
+
+func Test_readUint64_errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       io.Reader
+		expectedErr string
+	}{
+		{
+			name:        "zero",
+			input:       bytes.NewReader([]byte{}),
+			expectedErr: "EOF",
+		},
+		{
+			name:        "not enough",
+			input:       bytes.NewReader([]byte{1, 2}),
+			expectedErr: "EOF",
+		},
+		{
+			name:        "error reading",
+			input:       iotest.ErrReader(errors.New("ice cream")),
+			expectedErr: "ice cream",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			var b [8]byte
+			_, err := readUint64(tc.input, &b)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
 }
 
 // testCache implements compilationcache.Cache
