@@ -34,3 +34,5 @@ package-lock.json
 
 zig-cache/
 zig-out/
+
+.DS_Store
