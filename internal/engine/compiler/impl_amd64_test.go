@@ -12,7 +12,7 @@ import (
 )
 
 // TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg is the regression test for #526.
-// In short, the offset register for call_indirect might be the same as amd64CallingConventionModuleInstanceAddressRegister
+// In short, the offset register for call_indirect might be the same as amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister
 // and that must not be a failure.
 func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	env := newCompilerEnvironment()
@@ -54,7 +54,7 @@ func TestAmd64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	require.NoError(t, err)
 
 	// Place the offset into the calling-convention reserved register.
-	offsetLoc := compiler.pushRuntimeValueLocationOnRegister(amd64CallingConventionModuleInstanceAddressRegister,
+	offsetLoc := compiler.pushRuntimeValueLocationOnRegister(amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister,
 		runtimeValueTypeI32)
 	compiler.assembler.CompileConstToRegister(amd64.MOVQ, 0, offsetLoc.register)
 
@@ -170,7 +170,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
-						require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())
@@ -296,7 +296,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
-						require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())

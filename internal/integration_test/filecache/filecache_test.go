@@ -41,7 +41,7 @@ func TestSpecTestCompilerCache(t *testing.T) {
 		// the subsequent execution of this test will enter the following "else" block.
 		var exp []string
 		buf := bytes.NewBuffer(nil)
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 2; i++ {
 			cmd := exec.Command(testExecutable)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", cachePathKey, cacheDir))
 			cmd.Stdout = buf
@@ -51,7 +51,7 @@ func TestSpecTestCompilerCache(t *testing.T) {
 			exp = append(exp, "PASS\n")
 		}
 
-		// Ensures that the tests actually run 5 times.
+		// Ensures that the tests actually run 2 times.
 		require.Equal(t, strings.Join(exp, ""), buf.String())
 
 		// Check the number of cache files is greater than zero.

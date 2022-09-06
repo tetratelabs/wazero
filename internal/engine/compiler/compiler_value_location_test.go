@@ -6,6 +6,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func Test_isIntRegister(t *testing.T) {
@@ -118,4 +119,104 @@ func TestRuntimeValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T)
 	target, ok = s.takeStealTargetFromUsedRegister(registerTypeGeneralPurpose)
 	require.False(t, ok)
 	require.Nil(t, target)
+}
+
+func TestRuntimeValueLocationStack_setupInitialStack(t *testing.T) {
+	const f32 = wasm.ValueTypeF32
+	tests := []struct {
+		name       string
+		sig        *wasm.FunctionType
+		expectedSP uint64
+	}{
+		{
+			name:       "no params / no results",
+			sig:        &wasm.FunctionType{},
+			expectedSP: callFrameDataSizeInUint64,
+		},
+		{
+			name: "no results",
+			sig: &wasm.FunctionType{
+				Params:           []wasm.ValueType{f32, f32},
+				ParamNumInUint64: 2,
+			},
+			expectedSP: callFrameDataSizeInUint64 + 2,
+		},
+		{
+			name: "no params",
+			sig: &wasm.FunctionType{
+				Results:           []wasm.ValueType{f32, f32},
+				ResultNumInUint64: 2,
+			},
+			expectedSP: callFrameDataSizeInUint64 + 2,
+		},
+		{
+			name: "params == results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{f32, f32},
+				ParamNumInUint64:  2,
+				Results:           []wasm.ValueType{f32, f32},
+				ResultNumInUint64: 2,
+			},
+			expectedSP: callFrameDataSizeInUint64 + 2,
+		},
+		{
+			name: "params > results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{f32, f32, f32},
+				ParamNumInUint64:  3,
+				Results:           []wasm.ValueType{f32, f32},
+				ResultNumInUint64: 2,
+			},
+			expectedSP: callFrameDataSizeInUint64 + 3,
+		},
+		{
+			name: "params <  results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{f32},
+				ParamNumInUint64:  1,
+				Results:           []wasm.ValueType{f32, f32, f32},
+				ResultNumInUint64: 3,
+			},
+			expectedSP: callFrameDataSizeInUint64 + 3,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			s := newRuntimeValueLocationStack()
+			s.init(tc.sig)
+			require.Equal(t, tc.expectedSP, s.sp)
+
+			callFrameLocations := s.stack[s.sp-callFrameDataSizeInUint64 : s.sp]
+			for _, loc := range callFrameLocations {
+				require.Equal(t, runtimeValueTypeI64, loc.valueType)
+			}
+		})
+	}
+}
+
+func TestRuntimeValueLocation_pushCallFrame(t *testing.T) {
+	for _, sig := range []*wasm.FunctionType{
+		{ParamNumInUint64: 0, ResultNumInUint64: 1},
+		{ParamNumInUint64: 1, ResultNumInUint64: 0},
+		{ParamNumInUint64: 1, ResultNumInUint64: 1},
+		{ParamNumInUint64: 0, ResultNumInUint64: 2},
+		{ParamNumInUint64: 2, ResultNumInUint64: 0},
+		{ParamNumInUint64: 2, ResultNumInUint64: 3},
+	} {
+		sig := sig
+		t.Run(sig.String(), func(t *testing.T) {
+			s := newRuntimeValueLocationStack()
+			// pushCallFrame assumes that the parameters are already pushed.
+			s.sp += uint64(sig.ParamNumInUint64)
+
+			retAddr, stackBasePointer, fn := s.pushCallFrame(sig)
+
+			expOffset := uint64(callFrameOffset(sig))
+			require.Equal(t, expOffset, retAddr.stackPointer)
+			require.Equal(t, expOffset+1, stackBasePointer.stackPointer)
+			require.Equal(t, expOffset+2, fn.stackPointer)
+		})
+	}
 }

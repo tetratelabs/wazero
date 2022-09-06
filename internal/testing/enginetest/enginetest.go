@@ -587,7 +587,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		},
 	}
 	m.BuildFunctionDefinitions()
-	// Compile the Wasm into wazeroir
+
 	err := e.CompileModule(testCtx, m)
 	require.NoError(t, err)
 

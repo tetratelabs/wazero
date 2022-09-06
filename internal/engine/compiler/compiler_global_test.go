@@ -53,7 +53,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			env.exec(code)
 
 			// Since we call global.get, the top of the stack must be the global value.
-			require.Equal(t, globalValue, env.stack()[0])
+			require.Equal(t, globalValue, env.stackTopAsUint64())
 			// Plus as we push the value, the stack pointer must be incremented.
 			require.Equal(t, uint64(1), env.stackPointer())
 		})
@@ -99,8 +99,10 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 
 	// Since we call global.get, the top of the stack must be the global value.
 	actual := globals[1]
-	require.Equal(t, actual.Val, env.stack()[0])
-	require.Equal(t, actual.ValHi, env.stack()[1])
+	sp := env.ce.stackContext.stackPointer
+	stack := env.stack()
+	require.Equal(t, actual.Val, stack[sp-2])
+	require.Equal(t, actual.ValHi, stack[sp-1])
 }
 
 func TestCompiler_compileGlobalSet(t *testing.T) {
@@ -140,7 +142,8 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 
 			op := &wazeroir.OperationGlobalSet{Index: 1}
 			err = compiler.compileGlobalSet(op)
-			require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
+
 			require.NoError(t, err)
 
 			err = compiler.compileReturnFunction()
@@ -186,7 +189,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 
 	op := &wazeroir.OperationGlobalSet{Index: 1}
 	err = compiler.compileGlobalSet(op)
-	require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
+	requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 	require.NoError(t, err)
 
 	err = compiler.compileReturnFunction()

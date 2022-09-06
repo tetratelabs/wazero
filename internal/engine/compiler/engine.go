@@ -51,54 +51,81 @@ type (
 		// These contexts are read and written by compiled code.
 		// Note: structs are embedded to reduce the costs to access fields inside them. Also, this eases field offset
 		// calculation.
-		globalContext
 		moduleContext
-		valueStackContext
+		stackContext
 		exitContext
 		archContext
 
 		// The following fields are not accessed by compiled code directly.
 
-		// valueStack is the go-allocated stack for holding Wasm values.
+		// stack is the go-allocated stack for holding values and call frames.
 		// Note: We never edit len or cap in compiled code, so we won't get screwed when GC comes in.
-		valueStack []uint64
+		//
+		// At any point of execution, say currently executing function F2 which was called by F1, then
+		// the stack should look like like:
+		//
+		// 	[..., arg0, arg1, ..., argN, _, _, _, v1, v2, v3, ....
+		//	      ^                     {       }
+		//	      |                F1's callFrame
+		//	      |
+		//  stackBasePointer
+		//
+		// where
+		//  - callFrame is the F1's callFrame which called F2. It contains F1's return address, F1's base pointer, and F1's *function.
+		//  - stackBasePointer is the stack base pointer stored at (callEngine stackContext.stackBasePointerInBytes)
+		//  - arg0, ..., argN are the function parameters, and v1, v2, v3,... are the local variables
+		//    including the non-function param locals as well as the temporary variable produced by instructions (e.g i32.const).
+		//
+		// If the F2 makes a function call to F3 which takes two arguments, then the stack will become:
+		//
+		// 	[..., arg0, arg1, ..., argN, _, _, _, v1, v2, v3, _, _, _
+		//	                            {       }     ^      {       }
+		//	                       F1's callFrame     | F2's callFrame
+		//	                                          |
+		//                                     stackBasePointer
+		// where
+		// 	- F2's callFrame is pushed above the v2 and v3 (arguments for F3).
+		//  - The previous stackBasePointer (pointed at arg0) was saved inside the F2's callFrame.
+		//
+		// Then, if F3 returns one result, say w1, then the result will look like:
+		//
+		// 	[..., arg0, arg1, ..., argN, _, _, _, v1, w1, ...
+		//	      ^                     {       }
+		//	      |                F1's callFrame
+		//	      |
+		//  stackBasePointer
+		//
+		// where
+		// 	- stackBasePointer was reverted to the position at arg0
+		//  - The result from F3 was pushed above v1
+		//
+		// If the number of parameters is smaller than that of return values, then the empty slots are reserved
+		// below the callFrame to store the results on teh return.
+		// For example, if F3 takes no parameter but returns N(>0) results, then the stack
+		// after making a call against F3 will look like:
+		//
+		// 	[..., arg0, arg1, ..., argN, _, _, _, v1, v2, v3, res_1, _, res_N, _, _, _
+		//	                            {       }            ^                {       }
+		//	                       F1's callFrame            |           F2's callFrame
+		//	                                                 |
+		//                                            stackBasePointer
+		// where res_1, ..., res_N are the reserved slots below the call frame. In general,
+		// the number of reserved slots equals max(0, len(results)-len(params).
+		//
+		// This reserved slots are necessary to save the result values onto the stack while not destroying
+		// the callFrame value on function returns.
+		stack []uint64
 
-		// callFrameStack is initially callFrameStack[callFrameStackPointer].
-		// The currently executed function call frame lives at callFrameStack[callFrameStackPointer-1]
-		// and that is equivalent to  engine.callFrameTop().
-		callFrameStack []callFrame
-
-		// compiled is the initial function for this call engine.
-		compiled *function
-		// source is the FunctionInstance from which compiled is created from.
-		source *wasm.FunctionInstance
-	}
-
-	// globalContext holds the data which is constant across multiple function calls.
-	globalContext struct {
-		// valueStackElement0Address is &engine.valueStack[0] as uintptr.
-		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
-		valueStackElement0Address uintptr
-		// valueStackLenInBytes is len(engine.valueStack[0]) * 8 (bytes).
-		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
-		valueStackLenInBytes uint64
-
-		// callFrameStackElementZeroAddress is &engine.callFrameStack[0] as uintptr.
-		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
-		callFrameStackElementZeroAddress uintptr
-		// callFrameStackLen is len(engine.callFrameStack).
-		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
-		callFrameStackLen uint64
-		// callFrameStackPointer points at the next empty slot on the call frame stack.
-		// For example, for the next function call, we push the new callFrame onto
-		// callFrameStack[callFrameStackPointer]. This value is incremented/decremented in assembly
-		// when making function calls or returning from them.
-		callFrameStackPointer uint64
+		// initialFn is the initial function for this call engine.
+		initialFn *function
 	}
 
 	// moduleContext holds the per-function call specific module information.
 	// This is subject to be manipulated from compiled native code whenever we make function calls.
 	moduleContext struct {
+		// fn holds the currently executed *function.
+		fn *function
+
 		// moduleInstanceAddress is the address of module instance from which we initialize
 		// the following fields. This is set whenever we enter a function or return from function calls.
 		//
@@ -114,6 +141,8 @@ type (
 		memoryElement0Address uintptr
 		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
 		memorySliceLen uint64
+		// memoryInstance holds the memory instance for this module instance.
+		memoryInstance *wasm.MemoryInstance
 		// tableElement0Address is the address of the first item in the tables slice,
 		// i.e. &ModuleInstance.Tables[0] as uintptr.
 		tablesElement0Address uintptr
@@ -131,9 +160,9 @@ type (
 		elementInstancesElement0Address uintptr
 	}
 
-	// valueStackContext stores the data to access engine.valueStack.
-	valueStackContext struct {
-		// stackPointer on .valueStack field which is accessed by valueStack[stackBasePointer+stackBasePointerInBytes*8].
+	// stackContext stores the data to access engine.stack.
+	stackContext struct {
+		// stackPointer on .stack field which is accessed by stack[stackBasePointer+stackBasePointerInBytes*8].
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
 		// each variable in the value stack from the info from compilation.
@@ -147,11 +176,15 @@ type (
 		// functions are compiled, so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
 		// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's params].
 		// This way, compiled functions can be independent of the timing of functions calls made against them.
-		//
-		// Note: This is saved on callFrameTop().returnStackBasePointer whenever making function call.
-		// Also, this is changed whenever we make function call or return from functions where we execute jump instruction.
-		// In either case, the caller of "jmp" instruction must set this field properly.
 		stackBasePointerInBytes uint64
+
+		// stackElement0Address is &engine.stack[0] as uintptr.
+		// Note: this is updated when growing the stack in builtinFunctionGrowStack.
+		stackElement0Address uintptr
+
+		// stackLenInBytes is len(engine.stack[0]) * 8 (bytes).
+		// Note: this is updated when growing the stack in builtinFunctionGrowStack.
+		stackLenInBytes uint64
 	}
 
 	// exitContext will be manipulated whenever compiled native code returns into the Go function.
@@ -162,23 +195,25 @@ type (
 		// Set when statusCode == compilerStatusCallBuiltInFunction
 		// Indicating the function call index.
 		builtinFunctionCallIndex wasm.Index
+
+		// returnAddress is the return address which the engine jumps into
+		// after executing a builtin function or host function.
+		returnAddress uintptr
 	}
 
 	// callFrame holds the information to which the caller function can return.
-	// callFrame is created for currently executed function frame as well,
-	// so some fields are not yet set when native code is currently executing it.
-	// That is, callFrameTop().returnAddress or returnStackBasePointerInBytes are not set
-	// until it makes a function call.
+	// This is mixed in callEngine.stack with other Wasm values just like any other
+	// native program (where the stack is the system stack though), and we retrieve the struct
+	// with unsafe pointer casts.
 	callFrame struct {
-		// Set when making function call from this function frame, or for the initial function frame to call from
-		// callEngine.execWasmFunction.
+		// returnAddress is the return address to which the engine jumps when the callee function returns.
 		returnAddress uintptr
-		// Set when making function call from this function frame.
+		// returnStackBasePointerInBytes is the stack base pointer to set on stackContext.stackBasePointerInBytes
+		// when the callee function returns.
 		returnStackBasePointerInBytes uint64
-		// Set when making function call to this function frame.
+		// function is the caller *function, and is used to retrieve the stack trace.
+		// Note: should be possible to revive *function from returnAddress, but might be costly.
 		function *function
-		// _ is a necessary padding to make the size of callFrame struct a power of 2.
-		_ [8]byte
 	}
 
 	// Function corresponds to function instance in Wasm, and is created from `code`.
@@ -188,7 +223,7 @@ type (
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
+		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 		stackPointerCeil uint64
 		// source is the source function instance from which this is compiled.
 		source *wasm.FunctionInstance
@@ -204,7 +239,7 @@ type (
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for codeStaticData type.
-		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
+		// stackPointerCeil is the max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 		stackPointerCeil uint64
 
 		// indexInModule is the index of this function in the module. For logging purpose.
@@ -231,42 +266,32 @@ const (
 	// Offsets for moduleEngine.functions
 	moduleEngineFunctionsOffset = 16
 
-	// Offsets for callEngine globalContext.
-	callEngineGlobalContextValueStackElement0AddressOffset     = 0
-	callEngineGlobalContextValueStackLenInBytesOffset          = 8
-	callEngineGlobalContextCallFrameStackElement0AddressOffset = 16
-	callEngineGlobalContextCallFrameStackLenOffset             = 24
-	callEngineGlobalContextCallFrameStackPointerOffset         = 32
-
 	// Offsets for callEngine moduleContext.
-	callEngineModuleContextModuleInstanceAddressOffset           = 40
-	callEngineModuleContextGlobalElement0AddressOffset           = 48
-	callEngineModuleContextMemoryElement0AddressOffset           = 56
-	callEngineModuleContextMemorySliceLenOffset                  = 64
-	callEngineModuleContextTablesElement0AddressOffset           = 72
-	callEngineModuleContextFunctionsElement0AddressOffset        = 80
-	callEngineModuleContextTypeIDsElement0AddressOffset          = 88
-	callEngineModuleContextDataInstancesElement0AddressOffset    = 96
-	callEngineModuleContextElementInstancesElement0AddressOffset = 104
+	callEngineModuleContextFnOffset                              = 0
+	callEngineModuleContextModuleInstanceAddressOffset           = 8
+	callEngineModuleContextGlobalElement0AddressOffset           = 16
+	callEngineModuleContextMemoryElement0AddressOffset           = 24
+	callEngineModuleContextMemorySliceLenOffset                  = 32
+	callEngineModuleContextMemoryInstanceOffset                  = 40
+	callEngineModuleContextTablesElement0AddressOffset           = 48
+	callEngineModuleContextFunctionsElement0AddressOffset        = 56
+	callEngineModuleContextTypeIDsElement0AddressOffset          = 64
+	callEngineModuleContextDataInstancesElement0AddressOffset    = 72
+	callEngineModuleContextElementInstancesElement0AddressOffset = 80
 
-	// Offsets for callEngine valueStackContext.
-	callEngineValueStackContextStackPointerOffset            = 112
-	callEngineValueStackContextStackBasePointerInBytesOffset = 120
+	// Offsets for callEngine stackContext.
+	callEngineStackContextStackPointerOffset            = 88
+	callEngineStackContextStackBasePointerInBytesOffset = 96
+	callEngineStackContextStackElement0AddressOffset    = 104
+	callEngineStackContextStackLenInBytesOffset         = 112
 
 	// Offsets for callEngine exitContext.
-	callEngineExitContextNativeCallStatusCodeOffset       = 128
-	callEngineExitContextBuiltinFunctionCallAddressOffset = 132
-
-	// Offsets for callFrame.
-	callFrameDataSize                            = 32
-	callFrameDataSizeMostSignificantSetBit       = 5
-	callFrameReturnAddressOffset                 = 0
-	callFrameReturnStackBasePointerInBytesOffset = 8
-	callFrameFunctionOffset                      = 16
+	callEngineExitContextNativeCallStatusCodeOffset     = 120
+	callEngineExitContextBuiltinFunctionCallIndexOffset = 124
+	callEngineExitContextReturnAddressOffset            = 128
 
 	// Offsets for function.
 	functionCodeInitialAddressOffset    = 0
-	functionStackPointerCeilOffset      = 8
 	functionSourceOffset                = 16
 	functionModuleInstanceAddressOffset = 24
 
@@ -306,6 +331,9 @@ const (
 
 	// pointerSizeLog2 satisfies: 1 << pointerSizeLog2 = sizeOf(uintptr)
 	pointerSizeLog2 = 3
+
+	// callFrameDataSizeInUint64 is the size of callFrame struct per 8 bytes (= size of uint64).
+	callFrameDataSizeInUint64 = 24 / 8
 )
 
 // nativeCallStatusCode represents the result of `nativecall`.
@@ -315,8 +343,8 @@ type nativeCallStatusCode uint32
 const (
 	// nativeCallStatusCodeReturned means the nativecall reaches the end of function, and returns successfully.
 	nativeCallStatusCodeReturned nativeCallStatusCode = iota
-	// nativeCallStatusCodeCallHostFunction means the nativecall returns to make a host function call.
-	nativeCallStatusCodeCallHostFunction
+	// nativeCallStatusCodeCallGoHostFunction means the nativecall returns to make a host function call.
+	nativeCallStatusCodeCallGoHostFunction
 	// nativeCallStatusCodeCallBuiltInFunction means the nativecall returns to make a builtin function call.
 	nativeCallStatusCodeCallBuiltInFunction
 	// nativeCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
@@ -360,7 +388,7 @@ func (s nativeCallStatusCode) String() (ret string) {
 	switch s {
 	case nativeCallStatusCodeReturned:
 		ret = "returned"
-	case nativeCallStatusCodeCallHostFunction:
+	case nativeCallStatusCodeCallGoHostFunction:
 		ret = "call_host_function"
 	case nativeCallStatusCodeCallBuiltInFunction:
 		ret = "call_builtin_function"
@@ -382,14 +410,6 @@ func (s nativeCallStatusCode) String() (ret string) {
 		panic("BUG")
 	}
 	return
-}
-
-// String implements fmt.Stringer
-func (c *callFrame) String() string {
-	return fmt.Sprintf(
-		"[%s: return address=0x%x, return stack base pointer=%d]",
-		c.function.source.FunctionDefinition.DebugName(), c.returnAddress, c.returnStackBasePointerInBytes>>3,
-	)
 }
 
 // releaseCode is a runtime.SetFinalizer function that munmaps the code.codeSegment.
@@ -430,7 +450,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
 
-	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameDataSizeInUint64, module)
 	if err != nil {
 		return err
 	}
@@ -542,14 +562,21 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 		}
 		return
 	}
-	return e.newCallEngine(f, compiled), nil
+
+	initStackSize := initialStackSize
+	if initialStackSize < compiled.stackPointerCeil {
+		initStackSize = compiled.stackPointerCeil * 2
+	}
+	return e.newCallEngine(initStackSize, compiled), nil
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params ...uint64) (results []uint64, err error) {
+	tp := ce.initialFn.source.Type
+
 	paramCount := len(params)
-	if ce.source.Type.ParamNumInUint64 != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", ce.source.Type.ParamNumInUint64, paramCount)
+	if tp.ParamNumInUint64 != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", ce.initialFn.source.Type.ParamNumInUint64, paramCount)
 	}
 
 	// We ensure that this Call method never panics as
@@ -565,11 +592,58 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 		}
 	}()
 
-	for _, v := range params {
+	ce.initializeStack(tp, params)
+	ce.execWasmFunction(ctx, callCtx)
+
+	results = ce.stack[:tp.ResultNumInUint64]
+	return
+}
+
+// initializeStack initializes callEngine.stack before entering native code.
+//
+// The stack must look like, if len(params) < len(results):
+//
+//	[arg0, arg1, ..., argN, 0, 0, 0, ...
+//	                       {       } ^
+//	                       callFrame |
+//	                                 |
+//	                            stackPointer
+//
+// else:
+//
+//	[arg0, arg1, ..., argN, _, _, _,  0, 0, 0, ...
+//	                      |        | {       }  ^
+//	                      |reserved| callFrame  |
+//	                      |        |            |
+//	                      |-------->       stackPointer
+//	                 len(results)-len(params)
+//
+//		 where we reserve the slots below the callframe with the length len(results)-len(params).
+//
+// Note: callFrame {  } is zeroed to indicate that the initial "caller" is this callEngine, not the Wasm function.
+//
+// See callEngine.stack as well.
+func (ce *callEngine) initializeStack(tp *wasm.FunctionType, args []uint64) {
+	for _, v := range args {
 		ce.pushValue(v)
 	}
-	ce.execWasmFunction(ctx, callCtx)
-	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
+
+	ce.stackPointer = uint64(callFrameOffset(tp))
+
+	for i := 0; i < callFrameDataSizeInUint64; i++ {
+		ce.stack[ce.stackPointer] = 0
+		ce.stackPointer++
+	}
+}
+
+// callFrameOffset returns the offset of the call frame from the stack base pointer.
+//
+// See the diagram in callEngine.stack.
+func callFrameOffset(funcType *wasm.FunctionType) (ret int) {
+	ret = funcType.ResultNumInUint64
+	if ret < funcType.ParamNumInUint64 {
+		ret = funcType.ParamNumInUint64
+	}
 	return
 }
 
@@ -581,15 +655,30 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 	if recovered != nil {
 		builder := wasmdebug.NewErrorBuilder()
-		for i := uint64(0); i < ce.callFrameStackPointer; i++ {
-			def := ce.callFrameStack[ce.callFrameStackPointer-1-i].function.source.FunctionDefinition
+
+		// Unwinds call frames from the values stack, starting from the
+		// current function `ce.fn`, and the current stack base pointer `ce.stackBasePointerInBytes`.
+		fn := ce.fn
+		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
+		for {
+			def := fn.source.FunctionDefinition
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+
+			callFrameOffset := callFrameOffset(fn.source.Type)
+			if stackBasePointer != 0 {
+				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
+				fn = frame.function
+				stackBasePointer = int(frame.returnStackBasePointerInBytes >> 3)
+			} else { // base == 0 means that this was the last call frame stacked.
+				break
+			}
 		}
 		err = builder.FromRecovered(recovered)
 	}
 
 	// Allows the reuse of CallEngine.
-	ce.stackBasePointerInBytes, ce.stackPointer, ce.callFrameStackPointer, ce.moduleInstanceAddress = 0, 0, 0, 0
+	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstanceAddress = 0, 0, 0
+	ce.moduleContext.fn = ce.initialFn
 	return
 }
 
@@ -611,7 +700,7 @@ func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
 	}
 }
 
-// Do not make these variables as constants, otherwise there would be
+// Do not make this variable as constant, otherwise there would be
 // dangerous memory access from native code.
 //
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
@@ -638,114 +727,80 @@ func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
 //	[2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
 //	[3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
 //	[4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
-var (
-	initialValueStackSize     = 64
-	initialCallFrameStackSize = 16
-)
+var initialStackSize uint64 = 512
 
-func (e *moduleEngine) newCallEngine(source *wasm.FunctionInstance, compiled *function) *callEngine {
+func (e *moduleEngine) newCallEngine(stackSize uint64, fn *function) *callEngine {
 	ce := &callEngine{
-		valueStack:     make([]uint64, initialValueStackSize),
-		callFrameStack: make([]callFrame, initialCallFrameStackSize),
-		archContext:    newArchContext(),
-		source:         source,
-		compiled:       compiled,
+		stack:         make([]uint64, stackSize),
+		archContext:   newArchContext(),
+		initialFn:     fn,
+		moduleContext: moduleContext{fn: fn},
 	}
 
-	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
-	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.callFrameStack))
-	ce.globalContext = globalContext{
-		valueStackElement0Address:        valueStackHeader.Data,
-		valueStackLenInBytes:             uint64(valueStackHeader.Len) << 3,
-		callFrameStackElementZeroAddress: callFrameStackHeader.Data,
-		callFrameStackLen:                uint64(callFrameStackHeader.Len),
-		callFrameStackPointer:            0,
+	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
+	ce.stackContext = stackContext{
+		stackElement0Address: stackHeader.Data,
+		stackLenInBytes:      uint64(stackHeader.Len) << 3,
 	}
 	return ce
 }
 
 func (ce *callEngine) popValue() (ret uint64) {
-	ce.valueStackContext.stackPointer--
-	ret = ce.valueStack[ce.valueStackTopIndex()]
+	ce.stackContext.stackPointer--
+	ret = ce.stack[ce.stackTopIndex()]
 	return
 }
 
 func (ce *callEngine) pushValue(v uint64) {
-	ce.valueStack[ce.valueStackTopIndex()] = v
-	ce.valueStackContext.stackPointer++
+	ce.stack[ce.stackTopIndex()] = v
+	ce.stackContext.stackPointer++
 }
 
-func (ce *callEngine) callFrameTop() *callFrame {
-	return &ce.callFrameStack[ce.globalContext.callFrameStackPointer-1]
-}
-
-func (ce *callEngine) callFrameAt(depth uint64) *callFrame {
-	idx := ce.globalContext.callFrameStackPointer - 1 - depth
-	return &ce.callFrameStack[idx]
-}
-
-func (ce *callEngine) valueStackTopIndex() uint64 {
-	return ce.valueStackContext.stackPointer + (ce.valueStackContext.stackBasePointerInBytes >> 3)
+func (ce *callEngine) stackTopIndex() uint64 {
+	return ce.stackContext.stackPointer + (ce.stackContext.stackBasePointerInBytes >> 3)
 }
 
 const (
 	builtinFunctionIndexMemoryGrow wasm.Index = iota
-	builtinFunctionIndexGrowValueStack
-	builtinFunctionIndexGrowCallFrameStack
+	builtinFunctionIndexGrowStack
 	builtinFunctionIndexTableGrow
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
 
 func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext) {
-	// Push the initial callframe.
-	ce.callFrameStack[0] = callFrame{returnAddress: ce.compiled.codeInitialAddress, function: ce.compiled}
-	ce.globalContext.callFrameStackPointer++
+	codeAddr := ce.initialFn.codeInitialAddress
+	modAddr := ce.initialFn.moduleInstanceAddress
 
 entry:
 	{
-		frame := ce.callFrameTop()
-		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
-				frame.String(), ce.valueStackContext.stackBasePointerInBytes>>3, ce.valueStackContext.stackPointer)
-		}
-
 		// Call into the native code.
-		nativecall(frame.returnAddress, uintptr(unsafe.Pointer(ce)), frame.function.moduleInstanceAddress)
+		nativecall(codeAddr, uintptr(unsafe.Pointer(ce)), modAddr)
 
 		// Check the status code from Compiler code.
 		switch status := ce.exitContext.statusCode; status {
 		case nativeCallStatusCodeReturned:
-			// Meaning that all the function frames above the previous call frame stack pointer are executed.
-		case nativeCallStatusCodeCallHostFunction:
-			calleeHostFunction := ce.callFrameTop().function
-			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
-			// but when making host function calls, we need to pass the memory instance of host function caller.
-			callerFunction := ce.callFrameAt(1).function
-			params := wasm.PopGoFuncParams(calleeHostFunction.source, ce.popValue)
+		case nativeCallStatusCodeCallGoHostFunction:
+			calleeHostFunction := ce.moduleContext.fn
+			base := int(ce.stackBasePointerInBytes >> 3)
+			params := ce.stack[base : base+len(calleeHostFunction.source.Type.Params)]
 			results := wasm.CallGoFunc(
 				ctx,
-				// Use the caller's memory, which might be different from the defining module on an imported function.
-				callCtx.WithMemory(callerFunction.source.Module.Memory),
+				callCtx.WithMemory(ce.memoryInstance),
 				calleeHostFunction.source,
 				params,
 			)
-			for _, v := range results {
-				ce.pushValue(v)
-			}
+			copy(ce.stack[base:], results)
+			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
 			goto entry
 		case nativeCallStatusCodeCallBuiltInFunction:
+			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				callerFunction := ce.callFrameTop().function
-				ce.builtinFunctionMemoryGrow(ctx, callerFunction.source.Module.Memory)
-			case builtinFunctionIndexGrowValueStack:
-				callerFunction := ce.callFrameTop().function
-				ce.builtinFunctionGrowValueStack(callerFunction.stackPointerCeil)
-			case builtinFunctionIndexGrowCallFrameStack:
-				ce.builtinFunctionGrowCallFrameStack()
+				ce.builtinFunctionMemoryGrow(ctx, caller.source.Module.Memory)
+			case builtinFunctionIndexGrowStack:
+				ce.builtinFunctionGrowStack(caller.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
-				caller := ce.callFrameTop().function
 				ce.builtinFunctionTableGrow(ctx, caller.source.Module.Tables)
 			}
 			if buildoptions.IsDebugMode {
@@ -753,6 +808,8 @@ entry:
 					runtime.Breakpoint()
 				}
 			}
+
+			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
 			goto entry
 		default:
 			status.causePanic()
@@ -760,36 +817,29 @@ entry:
 	}
 }
 
-func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
-	// Extends the valueStack's length to currentLen*2+stackPointerCeil.
-	newLen := uint64(len(ce.valueStack))<<1 + (stackPointerCeil)
-	newStack := make([]uint64, newLen)
-	ce.valueStackTopIndex()
-	top := ce.valueStackTopIndex()
-	copy(newStack[:top], ce.valueStack[:top])
-	ce.valueStack = newStack
-	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
-	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLenInBytes = newLen << 3
-}
+// callStackCeiling is the maximum WebAssembly call frame stack height. This allows wazero to raise
+// wasm.ErrCallStackOverflow instead of overflowing the Go runtime.
+//
+// The default value should suffice for most use cases. Those wishing to change this can via `go build -ldflags`.
+//
+// TODO: allows to configure this via context?
+var callStackCeiling = uint64(5000000) // in uint64 (8 bytes) == 40000000 bytes in total == 40mb.
 
-var callStackCeiling = uint64(buildoptions.CallStackCeiling)
-
-func (ce *callEngine) builtinFunctionGrowCallFrameStack() {
-	if callStackCeiling < uint64(len(ce.callFrameStack)+1) {
-		panic(wasmruntime.ErrRuntimeCallStackOverflow)
+func (ce *callEngine) builtinFunctionGrowStack(stackPointerCeil uint64) {
+	oldLen := uint64(len(ce.stack))
+	if callStackCeiling < oldLen {
+		panic(wasmruntime.ErrRuntimeStackOverflow)
 	}
 
-	// Double the callstack slice length.
-	newLen := uint64(ce.globalContext.callFrameStackLen) * 2
-	newStack := make([]callFrame, newLen)
-	copy(newStack, ce.callFrameStack)
-	ce.callFrameStack = newStack
-
-	// Update the globalContext's fields as they become stale after the update ^^.
-	stackSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&newStack))
-	ce.globalContext.callFrameStackLen = uint64(stackSliceHeader.Len)
-	ce.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
+	// Extends the stack's length to oldLen*2+stackPointerCeil.
+	newLen := oldLen<<1 + (stackPointerCeil)
+	newStack := make([]uint64, newLen)
+	top := ce.stackTopIndex()
+	copy(newStack[:top], ce.stack[:top])
+	ce.stack = newStack
+	stackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.stack))
+	ce.stackContext.stackElement0Address = stackHeader.Data
+	ce.stackContext.stackLenInBytes = newLen << 3
 }
 
 func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.MemoryInstance) {

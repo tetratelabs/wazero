@@ -110,12 +110,8 @@ func BenchmarkCompiler_compileMemoryFill(b *testing.B) {
 }
 
 func (j *compilerEnv) execBench(b *testing.B, codeSegment []byte) {
-	f := j.newFunction(codeSegment)
-
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer] = callFrame{function: f}
-		j.ce.globalContext.callFrameStackPointer++
 		nativecall(
 			uintptr(unsafe.Pointer(&codeSegment[0])),
 			uintptr(unsafe.Pointer(j.ce)),

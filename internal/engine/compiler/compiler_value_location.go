@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/asm"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var (
@@ -14,10 +15,6 @@ var (
 	// unreservedVectorRegisters contains unreserved vector registers.
 	unreservedVectorRegisters []asm.Register
 )
-
-func isNilRegister(r asm.Register) bool {
-	return r == asm.NilRegister
-}
 
 func isGeneralPurposeRegister(r asm.Register) bool {
 	return unreservedGeneralPurposeRegisters[0] <= r && r <= unreservedGeneralPurposeRegisters[len(unreservedGeneralPurposeRegisters)-1]
@@ -212,7 +209,7 @@ func (v *runtimeValueLocationStack) push(loc *runtimeValueLocation) {
 	}
 	v.sp++
 	// stackPointerCeil must be set after sp is incremented since
-	// we skip the stack grow if len(valueStack) >= basePointer+stackPointerCeil.
+	// we skip the stack grow if len(stack) >= basePointer+stackPointerCeil.
 	if v.sp > v.stackPointerCeil {
 		v.stackPointerCeil = v.sp
 	}
@@ -342,4 +339,79 @@ func (v *runtimeValueLocationStack) takeStealTargetFromUsedRegister(tp registerT
 		}
 	}
 	return nil, false
+}
+
+// init sets up the runtimeValueLocationStack which reflects the state of
+// the stack at the beginning of the function.
+//
+// See the diagram in callEngine.stack.
+func (v *runtimeValueLocationStack) init(sig *wasm.FunctionType) {
+	for _, t := range sig.Params {
+		loc := v.pushRuntimeValueLocationOnStack()
+		switch t {
+		case wasm.ValueTypeI32:
+			loc.valueType = runtimeValueTypeI32
+		case wasm.ValueTypeI64, wasm.ValueTypeFuncref, wasm.ValueTypeExternref:
+			loc.valueType = runtimeValueTypeI64
+		case wasm.ValueTypeF32:
+			loc.valueType = runtimeValueTypeF32
+		case wasm.ValueTypeF64:
+			loc.valueType = runtimeValueTypeF64
+		case wasm.ValueTypeV128:
+			loc.valueType = runtimeValueTypeV128Lo
+			hi := v.pushRuntimeValueLocationOnStack()
+			hi.valueType = runtimeValueTypeV128Hi
+		default:
+			panic("BUG")
+		}
+	}
+
+	// If the len(results) > len(args), the slots for all results are reserved after
+	// arguments, so we reflect that into the location stack.
+	for i := 0; i < sig.ResultNumInUint64-sig.ParamNumInUint64; i++ {
+		_ = v.pushRuntimeValueLocationOnStack()
+	}
+
+	// Then push the control frame fields.
+	for i := 0; i < callFrameDataSizeInUint64; i++ {
+		loc := v.pushRuntimeValueLocationOnStack()
+		loc.valueType = runtimeValueTypeI64
+	}
+}
+
+// getCallFrameLocations returns each field of callFrame's runtime location.
+//
+// See the diagram in callEngine.stack.
+func (v *runtimeValueLocationStack) getCallFrameLocations(sig *wasm.FunctionType) (
+	returnAddress, callerStackBasePointerInBytes, callerFunction *runtimeValueLocation) {
+	offset := callFrameOffset(sig)
+	return v.stack[offset], v.stack[offset+1], v.stack[offset+2]
+}
+
+// pushCallFrame pushes a call frame's runtime locations onto the stack assuming that
+// the function call parameters are already pushed there.
+//
+// See the diagram in callEngine.stack.
+func (v *runtimeValueLocationStack) pushCallFrame(callTargetFunctionType *wasm.FunctionType) (
+	returnAddress, callerStackBasePointerInBytes, callerFunction *runtimeValueLocation,
+) {
+	// If len(results) > len(args), we reserve the slots for the results below the call frame.
+	reservedSlotsBeforeCallFrame := callTargetFunctionType.ResultNumInUint64 - callTargetFunctionType.ParamNumInUint64
+	for i := 0; i < reservedSlotsBeforeCallFrame; i++ {
+		v.pushRuntimeValueLocationOnStack()
+	}
+
+	// Push the runtime location for each field of callFrame struct. Note that each of them has
+	// uint64 type, and therefore must be treated as runtimeValueTypeI64.
+
+	// callFrame.returnAddress
+	returnAddress = v.pushRuntimeValueLocationOnStack()
+	returnAddress.valueType = runtimeValueTypeI64
+	// callFrame.returnStackBasePointerInBytes
+	callerStackBasePointerInBytes = v.pushRuntimeValueLocationOnStack()
+	callerStackBasePointerInBytes.valueType = runtimeValueTypeI64
+	// callFrame.function
+	callerFunction = v.pushRuntimeValueLocationOnStack()
+	callerFunction.valueType = runtimeValueTypeI64
+	return
 }

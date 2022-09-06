@@ -86,7 +86,7 @@ func TestCompiler_compileV128Add(t *testing.T) {
 			err = compiler.compileV128Add(&wazeroir.OperationV128Add{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -184,7 +184,7 @@ func TestCompiler_compileV128Sub(t *testing.T) {
 			err = compiler.compileV128Sub(&wazeroir.OperationV128Sub{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -557,7 +557,7 @@ func TestCompiler_compileV128Load(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 			loadedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
@@ -765,7 +765,7 @@ func TestCompiler_compileV128LoadLane(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 			loadedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, loadedLocation.onRegister())
@@ -819,7 +819,7 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			err = compiler.compileV128Store(&wazeroir.OperationV128Store{Arg: &wazeroir.MemoryArg{}})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
 			require.Equal(t, 0, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -961,7 +961,7 @@ func TestCompiler_compileV128StoreLane(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(0), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(0), compiler)
 			require.Equal(t, 0, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -1132,7 +1132,7 @@ func TestCompiler_compileV128ExtractLane(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			vt := compiler.runtimeValueLocationStack().peek().valueType
@@ -1381,7 +1381,7 @@ func TestCompiler_compileV128ReplaceLane(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -1479,7 +1479,7 @@ func TestCompiler_compileV128Splat(t *testing.T) {
 			err = compiler.compileV128Splat(&wazeroir.OperationV128Splat{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -1527,7 +1527,7 @@ func TestCompiler_compileV128AnyTrue(t *testing.T) {
 			err = compiler.compileV128AnyTrue(&wazeroir.OperationV128AnyTrue{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -1790,7 +1790,7 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 			err = compiler.compileV128Swizzle(&wazeroir.OperationV128Swizzle{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -1900,7 +1900,7 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 			err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: tc.lanes})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -2036,7 +2036,7 @@ func TestCompiler_compileV128Bitmask(t *testing.T) {
 			err = compiler.compileV128BitMask(&wazeroir.OperationV128BitMask{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(1), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -2073,7 +2073,7 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 	err = compiler.compileV128Not(&wazeroir.OperationV128Not{})
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+	requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 	require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 	err = compiler.compileReturnFunction()
@@ -2301,7 +2301,7 @@ func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -2395,7 +2395,7 @@ func TestCompiler_compileV128Bitselect(t *testing.T) {
 			err = compiler.compileV128Bitselect(nil)
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -2680,7 +2680,7 @@ func TestCompiler_compileV128Shl(t *testing.T) {
 			err = compiler.compileV128Shl(&wazeroir.OperationV128Shl{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -2956,7 +2956,7 @@ func TestCompiler_compileV128Shr(t *testing.T) {
 			err = compiler.compileV128Shr(&wazeroir.OperationV128Shr{Shape: tc.shape, Signed: tc.signed})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3387,7 +3387,7 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 			err = compiler.compileV128Cmp(&wazeroir.OperationV128Cmp{Type: tc.cmpType})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3468,7 +3468,7 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 			err = compiler.compileV128AvgrU(&wazeroir.OperationV128AvgrU{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3535,7 +3535,7 @@ func TestCompiler_compileV128Sqrt(t *testing.T) {
 			err = compiler.compileV128Sqrt(&wazeroir.OperationV128Sqrt{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3625,7 +3625,7 @@ func TestCompiler_compileV128Mul(t *testing.T) {
 			err = compiler.compileV128Mul(&wazeroir.OperationV128Mul{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3722,7 +3722,7 @@ func TestCompiler_compileV128Neg(t *testing.T) {
 			err = compiler.compileV128Neg(&wazeroir.OperationV128Neg{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3819,7 +3819,7 @@ func TestCompiler_compileV128Abs(t *testing.T) {
 			err = compiler.compileV128Abs(&wazeroir.OperationV128Abs{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -3895,7 +3895,7 @@ func TestCompiler_compileV128Div(t *testing.T) {
 			err = compiler.compileV128Div(&wazeroir.OperationV128Div{Shape: tc.shape})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4088,7 +4088,7 @@ func TestCompiler_compileV128Min(t *testing.T) {
 			err = compiler.compileV128Min(&wazeroir.OperationV128Min{Shape: tc.shape, Signed: tc.signed})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4315,7 +4315,7 @@ func TestCompiler_compileV128Max(t *testing.T) {
 			err = compiler.compileV128Max(&wazeroir.OperationV128Max{Shape: tc.shape, Signed: tc.signed})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4456,7 +4456,7 @@ func TestCompiler_compileV128AddSat(t *testing.T) {
 			err = compiler.compileV128AddSat(&wazeroir.OperationV128AddSat{Shape: tc.shape, Signed: tc.signed})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4568,7 +4568,7 @@ func TestCompiler_compileV128SubSat(t *testing.T) {
 			err = compiler.compileV128SubSat(&wazeroir.OperationV128SubSat{Shape: tc.shape, Signed: tc.signed})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4638,7 +4638,7 @@ func TestCompiler_compileV128Popcnt(t *testing.T) {
 			err = compiler.compileV128Popcnt(&wazeroir.OperationV128Popcnt{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -4818,7 +4818,7 @@ func TestCompiler_compileV128Round(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -5111,7 +5111,7 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -5805,7 +5805,7 @@ func TestCompiler_compileV128ExtMul(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6278,7 +6278,7 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6363,7 +6363,7 @@ func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
 			err = compiler.compileV128Q15mulrSatS(&wazeroir.OperationV128Q15mulrSatS{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6436,7 +6436,7 @@ func TestCompiler_compileFloatPromote(t *testing.T) {
 			err = compiler.compileV128FloatPromote(&wazeroir.OperationV128FloatPromote{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6520,7 +6520,7 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 			err = compiler.compileV128FloatDemote(&wazeroir.OperationV128FloatDemote{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6730,7 +6730,7 @@ func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -6978,7 +6978,7 @@ func TestCompiler_compileV128Narrow(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -7115,7 +7115,7 @@ func TestCompiler_compileV128FConvertFromI(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -7187,7 +7187,7 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 			err = compiler.compileV128Dot(&wazeroir.OperationV128Dot{})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -7339,7 +7339,7 @@ func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -7392,7 +7392,7 @@ func TestCompiler_compileSelect_v128(t *testing.T) {
 		err = compiler.compileSelect(&wazeroir.OperationSelect{IsTargetVector: true})
 		require.NoError(t, err)
 
-		require.Equal(t, uint64(2), compiler.runtimeValueLocationStack().sp)
+		requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 		require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 		err = compiler.compileReturnFunction()

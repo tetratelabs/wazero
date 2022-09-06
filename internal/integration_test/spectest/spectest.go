@@ -326,7 +326,7 @@ var spectestWasm []byte
 //
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
-func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace) {
+func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures wasm.Features) {
 	mod, err := binaryformat.DecodeModule(spectestWasm, wasm.Features20220419, wasm.MemorySizer)
 	require.NoError(t, err)
 
@@ -365,6 +365,10 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *was
 
 	maybeSetMemoryCap(mod)
 	mod.BuildFunctionDefinitions()
+
+	err = mod.Validate(enabledFeatures)
+	require.NoError(t, err)
+
 	err = s.Engine.CompileModule(ctx, mod)
 	require.NoError(t, err)
 
@@ -408,7 +412,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 
 		t.Run(wastName, func(t *testing.T) {
 			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures))
-			addSpectestModule(t, ctx, s, ns)
+			addSpectestModule(t, ctx, s, ns, enabledFeatures)
 
 			var lastInstantiatedModuleName string
 			for _, c := range base.Commands {
@@ -536,7 +540,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := callFunction(ns, ctx, moduleName, c.Action.Field, args...)
-							require.ErrorIs(t, err, wasmruntime.ErrRuntimeCallStackOverflow, msg)
+							require.ErrorIs(t, err, wasmruntime.ErrRuntimeStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

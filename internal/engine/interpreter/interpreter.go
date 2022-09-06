@@ -12,7 +12,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -20,7 +19,11 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-var callStackCeiling = buildoptions.CallStackCeiling
+// callStackCeiling is the maximum WebAssembly call frame stack height. This allows wazero to raise
+// wasm.ErrCallStackOverflow instead of overflowing the Go runtime.
+//
+// The default value should suffice for most use cases. Those wishing to change this can via `go build -ldflags`.
+var callStackCeiling = 2000
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
@@ -145,7 +148,7 @@ func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
 
 func (ce *callEngine) pushFrame(frame *callFrame) {
 	if callStackCeiling <= len(ce.frames) {
-		panic(wasmruntime.ErrRuntimeCallStackOverflow)
+		panic(wasmruntime.ErrRuntimeStackOverflow)
 	}
 	ce.frames = append(ce.frames, frame)
 }
@@ -213,6 +216,9 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
+// interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.
+const callFrameStackSize = 0
+
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
@@ -220,7 +226,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 	}
 
 	funcs := make([]*code, 0, len(module.FunctionSection))
-	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, module)
+	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameStackSize, module)
 	if err != nil {
 		return err
 	}

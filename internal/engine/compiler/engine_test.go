@@ -186,7 +186,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 
 // Ensures that value stack and call-frame stack are allocated on heap which
 // allows us to safely access to their data region from native code.
-// See comments on initialValueStackSize and initialCallFrameStackSize.
+// See comments on initialStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	enabledFeatures := wasm.Features20191205
 	e := newEngine(context.Background(), enabledFeatures)
@@ -219,7 +219,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil, nil)
 	require.NoError(t, err)
 
-	const valueStackCorruption = "value_stack_corruption"
+	const stackCorruption = "value_stack_corruption"
 	const callStackCorruption = "call_stack_corruption"
 	const expectedReturnValue = 0x1
 	m := &wasm.Module{
@@ -262,7 +262,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		},
 		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 1}},
 		ExportSection: []*wasm.Export{
-			{Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
+			{Type: wasm.ExternTypeFunc, Index: 1, Name: stackCorruption},
 			{Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
 		},
 		ID: wasm.ModuleID{1},
@@ -275,7 +275,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil, nil)
 	require.NoError(t, err)
 
-	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
+	for _, fnName := range []string{stackCorruption, callStackCorruption} {
 		fnName := fnName
 		t.Run(fnName, func(t *testing.T) {
 			ret, err := mi.ExportedFunction(fnName).Call(testCtx)
@@ -288,14 +288,14 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 
 func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 	ce := &callEngine{
-		valueStack: []uint64{
+		stack: []uint64{
 			0xff, // pseudo-ref
 			1,    // num
 			// Table Index = 0 (lower 32-bits), but the higher bits (32-63) are all sets,
 			// which happens if the previous value on that stack location was 64-bit wide.
 			0xffffffff << 32,
 		},
-		valueStackContext: valueStackContext{stackPointer: 3},
+		stackContext: stackContext{stackPointer: 3},
 	}
 
 	table := &wasm.TableInstance{References: []wasm.Reference{}, Min: 10}
@@ -305,28 +305,52 @@ func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 	require.Equal(t, uintptr(0xff), table.References[0])
 }
 
+func ptrAsUint64(f *function) uint64 {
+	return uint64(uintptr(unsafe.Pointer(f)))
+}
+
 func TestCallEngine_deferredOnCall(t *testing.T) {
+	f1 := &function{source: &wasm.FunctionInstance{
+		FunctionDefinition: newMockFunctionDefinition("1"),
+		Type:               &wasm.FunctionType{ParamNumInUint64: 2},
+	}}
+	f2 := &function{source: &wasm.FunctionInstance{
+		FunctionDefinition: newMockFunctionDefinition("2"),
+		Type:               &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
+	}}
+	f3 := &function{source: &wasm.FunctionInstance{
+		FunctionDefinition: newMockFunctionDefinition("3"),
+		Type:               &wasm.FunctionType{ResultNumInUint64: 1},
+	}}
+
 	ce := &callEngine{
-		valueStack:        make([]uint64, 100),
-		valueStackContext: valueStackContext{stackPointer: 3},
-		globalContext:     globalContext{callFrameStackPointer: 5},
-		callFrameStack: []callFrame{
-			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("1")}}},
-			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("2")}}},
-			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("3")}}},
-			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("4")}}},
-			{function: &function{source: &wasm.FunctionInstance{FunctionDefinition: newMockFunctionDefinition("5")}}},
+		stack: []uint64{
+			0xff, 0xff, // dummy argument for f1
+			0, 0, 0, 0,
+			0xcc, 0xcc, // local variable for f1.
+			// <----- stack base point of f2 (top) == index 8.
+			0xaa, 0xaa, 0xdeadbeaf, // dummy argument for f2 (0xaa, 0xaa) and the reserved slot for result 0xdeadbeaf)
+			0, 0, ptrAsUint64(f1), 0, // callFrame
+			0xcc, 0xcc, 0xcc, // local variable for f2.
+			// <----- stack base point of f3 (top) == index 18
+			0xdeadbeaf,                    // the reserved slot for result 0xdeadbeaf) from f3.
+			0, 8 << 3, ptrAsUint64(f2), 0, // callFrame
 		},
-		moduleContext: moduleContext{moduleInstanceAddress: 0xdeafbeaf},
+		stackContext: stackContext{
+			stackBasePointerInBytes: 18 << 3, // currently executed function (f3)'s base pointer.
+			stackPointer:            0xff,    // dummy supposed to be reset to zero.
+		},
+		moduleContext: moduleContext{
+			fn:                    f3, // currently executed function (f3)!
+			moduleInstanceAddress: 0xdeafbeaf,
+		},
 	}
 
-	beforeRecoverValueStack, beforeRecoverCallFrameStack := ce.valueStack, ce.callFrameStack
+	beforeRecoverStack := ce.stack
 
 	err := ce.deferredOnCall(errors.New("some error"))
 	require.EqualError(t, err, `some error (recovered by wazero)
 wasm stack trace:
-	5()
-	4()
 	3()
 	2()
 	1()`)
@@ -335,10 +359,14 @@ wasm stack trace:
 	// for the subsequent calls to avoid additional allocations on each call.
 	require.Equal(t, uint64(0), ce.stackBasePointerInBytes)
 	require.Equal(t, uint64(0), ce.stackPointer)
-	require.Equal(t, uint64(0), ce.callFrameStackPointer)
 	require.Equal(t, uintptr(0), ce.moduleInstanceAddress)
-	require.Equal(t, beforeRecoverValueStack, ce.valueStack)
-	require.Equal(t, beforeRecoverCallFrameStack, ce.callFrameStack)
+	require.Equal(t, beforeRecoverStack, ce.stack)
+
+	// Keep f1, f2, and f3 alive until we reach here, as we access these functions from the uint64 raw pointers in the stack.
+	// In practice, they are guaranteed to be alive as they are held by moduleContext.
+	runtime.KeepAlive(f1)
+	runtime.KeepAlive(f2)
+	runtime.KeepAlive(f3)
 }
 
 func newMockFunctionDefinition(name string) api.FunctionDefinition {
@@ -363,4 +391,126 @@ func (f *mockFunctionDefinition) ParamTypes() []wasm.ValueType {
 // ResultTypes implements api.FunctionDefinition ResultTypes.
 func (f *mockFunctionDefinition) ResultTypes() []wasm.ValueType {
 	return []wasm.ValueType{}
+}
+
+func TestCallEngine_initializeStack(t *testing.T) {
+	const i32 = wasm.ValueTypeI32
+	const stackSize = 10
+	const initialVal = ^uint64(0)
+	tests := []struct {
+		name            string
+		funcType        *wasm.FunctionType
+		args            []uint64
+		expStackPointer uint64
+		expStack        [stackSize]uint64
+	}{
+		{
+			name:            "no param/result",
+			funcType:        &wasm.FunctionType{},
+			expStackPointer: callFrameDataSizeInUint64,
+			expStack: [stackSize]uint64{
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal, initialVal, initialVal, initialVal, initialVal, initialVal,
+			},
+		},
+		{
+			name: "no result",
+			funcType: &wasm.FunctionType{
+				Params:           []wasm.ValueType{i32, i32},
+				ParamNumInUint64: 2,
+			},
+			args:            []uint64{0xdeadbeaf, 0xdeadbeaf},
+			expStackPointer: callFrameDataSizeInUint64 + 2,
+			expStack: [stackSize]uint64{
+				0xdeadbeaf, 0xdeadbeaf, // arguments
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal, initialVal, initialVal, initialVal,
+			},
+		},
+		{
+			name: "no param",
+			funcType: &wasm.FunctionType{
+				Results:           []wasm.ValueType{i32, i32, i32},
+				ResultNumInUint64: 3,
+			},
+			expStackPointer: callFrameDataSizeInUint64 + 3,
+			expStack: [stackSize]uint64{
+				initialVal, initialVal, initialVal, // reserved slots for results
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal, initialVal, initialVal,
+			},
+		},
+		{
+			name: "params > results",
+			funcType: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, i32, i32, i32, i32},
+				ParamNumInUint64:  5,
+				Results:           []wasm.ValueType{i32, i32, i32},
+				ResultNumInUint64: 3,
+			},
+			args:            []uint64{0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf},
+			expStackPointer: callFrameDataSizeInUint64 + 5,
+			expStack: [stackSize]uint64{
+				0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf,
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal,
+			},
+		},
+		{
+			name: "params == results",
+			funcType: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, i32, i32, i32, i32},
+				ParamNumInUint64:  5,
+				Results:           []wasm.ValueType{i32, i32, i32, i32, i32},
+				ResultNumInUint64: 5,
+			},
+			args:            []uint64{0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf},
+			expStackPointer: callFrameDataSizeInUint64 + 5,
+			expStack: [stackSize]uint64{
+				0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf,
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal,
+			},
+		},
+		{
+			name: "params < results",
+			funcType: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, i32, i32},
+				ParamNumInUint64:  3,
+				Results:           []wasm.ValueType{i32, i32, i32, i32, i32},
+				ResultNumInUint64: 5,
+			},
+			args:            []uint64{0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf},
+			expStackPointer: callFrameDataSizeInUint64 + 5,
+			expStack: [stackSize]uint64{
+				0xdeafbeaf, 0xdeafbeaf, 0xdeafbeaf,
+				initialVal, initialVal, // reserved for results
+				0, 0, 0, // zeroed call frame
+				initialVal, initialVal,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			initialStack := make([]uint64, stackSize)
+			for i := range initialStack {
+				initialStack[i] = initialVal
+			}
+			ce := &callEngine{stack: initialStack}
+			ce.initializeStack(tc.funcType, tc.args)
+			require.Equal(t, tc.expStackPointer, ce.stackPointer)
+			require.Equal(t, tc.expStack[:], ce.stack)
+		})
+	}
+}
+
+func Test_callFrameOffset(t *testing.T) {
+	require.Equal(t, 1, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 0, ResultNumInUint64: 1}))
+	require.Equal(t, 10, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 5, ResultNumInUint64: 10}))
+	require.Equal(t, 100, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 50, ResultNumInUint64: 100}))
+	require.Equal(t, 1, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 1, ResultNumInUint64: 0}))
+	require.Equal(t, 10, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 10, ResultNumInUint64: 5}))
+	require.Equal(t, 100, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 100, ResultNumInUint64: 50}))
 }

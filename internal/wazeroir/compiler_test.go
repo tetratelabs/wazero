@@ -232,7 +232,7 @@ func TestCompile(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
+			res, err := CompileFunctions(ctx, enabledFeatures, 0, tc.module)
 			require.NoError(t, err)
 
 			fn := res[0]
@@ -372,7 +372,7 @@ func TestCompile_BulkMemoryOperations(t *testing.T) {
 		TableTypes:       []wasm.RefType{},
 	}
 
-	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
+	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, 0, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -668,7 +668,7 @@ func TestCompile_MultiValue(t *testing.T) {
 			for _, tp := range tc.module.TypeSection {
 				tp.CacheNumInUint64()
 			}
-			res, err := CompileFunctions(ctx, enabledFeatures, tc.module)
+			res, err := CompileFunctions(ctx, enabledFeatures, 0, tc.module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0])
 		})
@@ -706,7 +706,7 @@ func TestCompile_NonTrappingFloatToIntConversion(t *testing.T) {
 	for _, tp := range module.TypeSection {
 		tp.CacheNumInUint64()
 	}
-	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, module)
+	res, err := CompileFunctions(ctx, wasm.FeatureNonTrappingFloatToIntConversion, 0, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -737,7 +737,7 @@ func TestCompile_SignExtensionOps(t *testing.T) {
 	for _, tp := range module.TypeSection {
 		tp.CacheNumInUint64()
 	}
-	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, module)
+	res, err := CompileFunctions(ctx, wasm.FeatureSignExtensionOps, 0, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -746,7 +746,7 @@ func requireCompilationResult(t *testing.T, enabledFeatures wasm.Features, expec
 	if enabledFeatures == 0 {
 		enabledFeatures = wasm.Features20220419
 	}
-	res, err := CompileFunctions(ctx, enabledFeatures, module)
+	res, err := CompileFunctions(ctx, enabledFeatures, 0, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -785,7 +785,7 @@ func TestCompile_CallIndirectNonZeroTableIndex(t *testing.T) {
 		Types: []*wasm.FunctionType{v_v, v_v, v_v},
 	}
 
-	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, module)
+	res, err := CompileFunctions(ctx, wasm.FeatureBulkMemoryOperations, 0, module)
 	require.NoError(t, err)
 	require.Equal(t, expected, res[0])
 }
@@ -875,7 +875,7 @@ func TestCompile_Refs(t *testing.T) {
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -944,7 +944,7 @@ func TestCompile_TableGetOrSet(t *testing.T) {
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
 			}
-			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -1013,7 +1013,7 @@ func TestCompile_TableGrowFillSize(t *testing.T) {
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 				TableSection:    []*wasm.Table{{}},
 			}
-			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, module)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 			require.True(t, res[0].HasTable)
@@ -1221,7 +1221,7 @@ func TestCompile_Locals(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, tc.mod)
 			require.NoError(t, err)
 			msg := fmt.Sprintf("\nhave:\n\t%s\nwant:\n\t%s", Format(res[0].Operations), Format(tc.expected))
 			require.Equal(t, tc.expected, res[0].Operations, msg)
@@ -2567,7 +2567,7 @@ func TestCompile_Vec(t *testing.T) {
 				MemorySection:   &wasm.Memory{},
 				CodeSection:     []*wasm.Code{{Body: tc.body}},
 			}
-			res, err := CompileFunctions(ctx, wasm.Features20220419, module)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, module)
 			require.NoError(t, err)
 
 			var actual Operation
@@ -2644,7 +2644,7 @@ func TestCompile_unreachable_Br_BrIf_BrTable(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, tc.mod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -2684,7 +2684,7 @@ func TestCompile_drop_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, tc.mod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
@@ -2754,9 +2754,179 @@ func TestCompile_select_vectors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := CompileFunctions(ctx, wasm.Features20220419, tc.mod)
+			res, err := CompileFunctions(ctx, wasm.Features20220419, 0, tc.mod)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, res[0].Operations)
 		})
+	}
+}
+
+func TestCompiler_initializeStack(t *testing.T) {
+	const v128 = wasm.ValueTypeV128
+	tests := []struct {
+		name                               string
+		sig                                *wasm.FunctionType
+		functionLocalTypes                 []wasm.ValueType
+		callFrameStackSizeInUint64         int
+		expLocalIndexToStackHeightInUint64 map[uint32]int
+	}{
+		{
+			name: "no function local, args>results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, f32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  2,
+				ResultNumInUint64: 1,
+			},
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 1,
+			},
+		},
+		{
+			name: "no function local, args=results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  1,
+				ResultNumInUint64: 1,
+			},
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+			},
+		},
+		{
+			name: "no function local, args>results, with vector",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, v128, f32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  4,
+				ResultNumInUint64: 1,
+			},
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 1,
+				2: 3,
+			},
+		},
+		{
+			name: "no function local, args<results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  0,
+				ResultNumInUint64: 1,
+			},
+			callFrameStackSizeInUint64:         4,
+			expLocalIndexToStackHeightInUint64: map[uint32]int{},
+		},
+		{
+			name: "no function local, args<results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32},
+				Results:           []wasm.ValueType{i32, f32},
+				ParamNumInUint64:  1,
+				ResultNumInUint64: 2,
+			},
+			callFrameStackSizeInUint64:         4,
+			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+		},
+		{
+			name: "no function local, args<results, with vector",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32},
+				Results:           []wasm.ValueType{i32, v128, f32},
+				ParamNumInUint64:  1,
+				ResultNumInUint64: 4,
+			},
+			callFrameStackSizeInUint64:         4,
+			expLocalIndexToStackHeightInUint64: map[uint32]int{0: 0},
+		},
+
+		// With function locals
+		{
+			name: "function locals, args>results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, f32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  2,
+				ResultNumInUint64: 1,
+			},
+			functionLocalTypes:         []wasm.ValueType{f64},
+			callFrameStackSizeInUint64: 4,
+			// [i32, f32, callframe.0, callframe.1, callframe.2, callframe.3, f64]
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 1,
+				// Function local comes after call frame.
+				2: 6,
+			},
+		},
+		{
+			name: "function locals, args>results, with vector",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32, v128, f32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  4,
+				ResultNumInUint64: 1,
+			},
+			functionLocalTypes:         []wasm.ValueType{v128, v128},
+			callFrameStackSizeInUint64: 4,
+			// [i32, v128.lo, v128.hi, f32, callframe.0, callframe.1, callframe.2, callframe.3, v128.lo, v128.hi, v128.lo, v128.hi]
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 1,
+				2: 3,
+				// Function local comes after call frame.
+				3: 8,
+				4: 10,
+			},
+		},
+		{
+			name: "function locals, args<results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32},
+				Results:           []wasm.ValueType{i32, i32, i32, i32},
+				ParamNumInUint64:  1,
+				ResultNumInUint64: 4,
+			},
+			functionLocalTypes:         []wasm.ValueType{f64},
+			callFrameStackSizeInUint64: 4,
+			// [i32, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 8,
+			},
+		},
+		{
+			name: "function locals, args<results with vector",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{v128, f64},
+				Results:           []wasm.ValueType{v128, i32, i32, v128},
+				ParamNumInUint64:  3,
+				ResultNumInUint64: 6,
+			},
+			functionLocalTypes:         []wasm.ValueType{f64},
+			callFrameStackSizeInUint64: 4,
+			// [v128.lo, v128.hi, f64, _, _, _, callframe.0, callframe.1, callframe.2, callframe.3, f64]
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+				1: 2,
+				2: 10,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			c := &compiler{sig: tc.sig, localTypes: tc.functionLocalTypes,
+				callFrameStackSizeInUint64: tc.callFrameStackSizeInUint64,
+			}
+
+			c.initializeStack()
+			require.Equal(t, tc.expLocalIndexToStackHeightInUint64, c.localIndexToStackHeightInUint64)
+		})
+
 	}
 }
