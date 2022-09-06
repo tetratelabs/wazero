@@ -125,11 +125,11 @@ func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, st
 	header := make([]byte, cacheHeaderSize)
 	n, err := reader.Read(header)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("compilationcache: error reading header: %v", err)
 	}
 
 	if n != cacheHeaderSize {
-		return nil, false, fmt.Errorf("invalid header length: %d", n)
+		return nil, false, fmt.Errorf("compilationcache: invalid header length: %d", n)
 	}
 
 	// Check the version compatibility.
@@ -148,30 +148,27 @@ func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, st
 	codes = make([]*code, 0, functionsNum)
 
 	var eightBytes [8]byte
+	var nativeCodeLen uint64
 	for i := uint32(0); i < functionsNum; i++ {
 		c := &code{}
 
 		// Read the stack pointer ceil.
-		_, err = reader.Read(eightBytes[:])
-		if err != nil {
-			err = fmt.Errorf("reading stack pointer ceil: %v", err)
+		if c.stackPointerCeil, err = readUint64(reader, &eightBytes); err != nil {
+			err = fmt.Errorf("compilationcache: error reading func[%d] stack pointer ceil: %v", i, err)
 			break
 		}
-
-		c.stackPointerCeil = binary.LittleEndian.Uint64(eightBytes[:])
 
 		// Read (and mmap) the native code.
-		_, err = reader.Read(eightBytes[:])
-		if err != nil {
-			err = fmt.Errorf("reading native code size: %v", err)
+		if nativeCodeLen, err = readUint64(reader, &eightBytes); err != nil {
+			err = fmt.Errorf("compilationcache: error reading func[%d] reading native code size: %v", i, err)
 			break
 		}
 
-		c.codeSegment, err = platform.MmapCodeSegment(reader, int(binary.LittleEndian.Uint64(eightBytes[:])))
-		if err != nil {
-			err = fmt.Errorf("mmaping function: %v", err)
+		if c.codeSegment, err = platform.MmapCodeSegment(reader, int(nativeCodeLen)); err != nil {
+			err = fmt.Errorf("compilationcache: error mmapping func[%d] code (len=%d): %v", i, nativeCodeLen, err)
 			break
 		}
+
 		codes = append(codes, c)
 	}
 
@@ -185,4 +182,25 @@ func deserializeCodes(wazeroVersion string, reader io.Reader) (codes []*code, st
 		codes = nil
 	}
 	return
+}
+
+// readUint64 strictly reads a uint64 in little-endian byte order, using the
+// given array as a buffer. This returns io.EOF if less than 8 bytes were read.
+func readUint64(reader io.Reader, b *[8]byte) (uint64, error) {
+	s := b[0:8]
+	n, err := reader.Read(s)
+	if err != nil {
+		return 0, err
+	} else if n < 8 { // more strict than reader.Read
+		return 0, io.EOF
+	}
+
+	// read the u64 from the underlying buffer
+	ret := binary.LittleEndian.Uint64(s)
+
+	// clear the underlying array
+	for i := 0; i < 8; i++ {
+		b[i] = 0
+	}
+	return ret, nil
 }
