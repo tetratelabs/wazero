@@ -189,7 +189,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 
 	op := &wazeroir.OperationGlobalSet{Index: 1}
 	err = compiler.compileGlobalSet(op)
-	require.Equal(t, uint64(callFrameDataSizeInUint64), compiler.runtimeValueLocationStack().sp)
+	requireRuntimeLocationStackPointerEqual(t, 0, compiler)
 	require.NoError(t, err)
 
 	err = compiler.compileReturnFunction()

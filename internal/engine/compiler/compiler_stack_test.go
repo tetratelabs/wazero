@@ -724,7 +724,7 @@ func TestCompiler_compileSet(t *testing.T) {
 				x1Value = 1
 			}
 
-			// Swap x1 and x2.
+			// Set x2 into the x1.
 			err = compiler.compileSet(&wazeroir.OperationSet{Depth: 2})
 			require.NoError(t, err)
 
@@ -738,7 +738,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			env.exec(code)
 
 			require.Equal(t, uint64(2), env.stackPointer())
-			// Check the value was set.
+			// Check the value was set. Note that it is placed above the call frame.
 			require.Equal(t, uint64(x1Value), env.stack()[callFrameDataSizeInUint64])
 		})
 	}
