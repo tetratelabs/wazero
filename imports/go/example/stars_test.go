@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"testing"
-	"time"
 
+	"github.com/tetratelabs/wazero"
+	gojs "github.com/tetratelabs/wazero/imports/go"
+	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/maintester"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 // Test_main ensures the following will work:
@@ -40,19 +44,52 @@ func TestMain(m *testing.M) {
 func compileFromGo() error {
 	cmd := exec.Command("go", "build", "-o", "main.wasm", ".")
 	cmd.Dir = "stars"
-
 	cmd.Env = append(os.Environ(), "GOARCH=wasm", "GOOS=js", "GOWASM=satconv,signext")
-	start := time.Now()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("go build: %v\n%s", err, out)
 	}
-	compilationTime := time.Since(start).Milliseconds()
-
-	wasm := path.Join("stars", "main.wasm")
-	if s, err := os.Stat(wasm); err != nil {
-		return fmt.Errorf("couldn't build %s: %v", wasm, err)
-	} else {
-		log.Printf("go build took %dms and produced %dKB wasm", compilationTime, s.Size()/1024)
-	}
 	return nil
+}
+
+// Benchmark_main is in the example for GOOS=js to re-use compilation caching
+// infrastructure. This is only used to sporadically check the impact of
+// internal changes as in general, it is known that GOOS=js will be slow due to
+// JavaScript emulation.
+func Benchmark_main(b *testing.B) {
+	// Don't benchmark with interpreter as we know it will be slow.
+	if !platform.CompilerSupported() {
+		b.Skip()
+	}
+
+	ctx := context.Background()
+
+	// Create a new WebAssembly Runtime.
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		// WebAssembly 2.0 allows use of gojs.
+		WithWasmCore2())
+	defer r.Close(ctx) // This closes everything this Runtime created.
+
+	bin, err := os.ReadFile(path.Join("stars", "main.wasm"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	compiled, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// Instead of making real HTTP calls, return fake data.
+	ctx = gojs.WithRoundTripper(ctx, &fakeGitHub{})
+	cfg := wazero.NewModuleConfig()
+
+	b.Run("gojs.Run", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			err = gojs.Run(ctx, r, compiled, cfg)
+			if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
+				b.Fatal(err)
+			} else if !ok {
+				b.Fatal(err)
+			}
+		}
+	})
 }
