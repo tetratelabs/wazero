@@ -4588,7 +4588,7 @@ func (c *amd64Compiler) compileReturnFunction() error {
 
 	returnAddress, callerStackBasePointerInBytes, callerFunction := c.locationStack.getCallFrameLocations(c.ir.Signature)
 
-	// If the return address is zero, meaning that we return from the execution.
+	// A zero return address means return from the execution.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		amd64ReservedRegisterForStackBasePointerAddress, int64(returnAddress.stackPointer)*8,
 		returnAddressRegister,

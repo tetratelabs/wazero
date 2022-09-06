@@ -388,8 +388,8 @@ func (v *runtimeValueLocationStack) getCallFrameLocations(sig *wasm.FunctionType
 	return v.stack[offset], v.stack[offset+1], v.stack[offset+2]
 }
 
-// pushCallFrame pushes a call frame's runtime locations onto the stack when the function call parameters
-// are already pushed there.
+// pushCallFrame pushes a call frame's runtime locations onto the stack assuming that
+// the function call parameters are already pushed there.
 //
 // See the diagram in callEngine.stack.
 func (v *runtimeValueLocationStack) pushCallFrame(callTargetFunctionType *wasm.FunctionType) (

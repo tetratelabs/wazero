@@ -647,7 +647,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.addTable(&wasm.TableInstance{References: table})
 
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-		// and the typeID  matches the table[targetOffset]'s type ID.
+		// and the typeID matches the table[targetOffset]'s type ID.
 		env.module().TypeIDs = make([]wasm.FunctionTypeID, 100)
 		env.module().TypeIDs[operation.TypeIndex] = targetTypeID
 		env.module().Engine = &moduleEngine{functions: []*function{}}
