@@ -401,6 +401,9 @@ func (v *runtimeValueLocationStack) pushCallFrame(callTargetFunctionType *wasm.F
 		v.pushRuntimeValueLocationOnStack()
 	}
 
+	// Push the runtime location for each field of callFrame struct. Note that each of them has
+	// uint64 type, and therefore must be treated as runtimeValueTypeI64.
+
 	// callFrame.returnAddress
 	returnAddress = v.pushRuntimeValueLocationOnStack()
 	returnAddress.valueType = runtimeValueTypeI64
