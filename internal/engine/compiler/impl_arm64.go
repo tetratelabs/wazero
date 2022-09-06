@@ -179,7 +179,7 @@ func (c *arm64Compiler) compilePreamble() error {
 	c.markRegisterUsed(arm64CallingConventionModuleInstanceAddressRegister)
 	defer c.markRegisterUnused(arm64CallingConventionModuleInstanceAddressRegister)
 
-	c.locationStack.setupInitialStack(c.ir.Signature)
+	c.locationStack.init(c.ir.Signature)
 
 	// Check if it's necessary to grow the value stack before entering function body.
 	if err := c.compileMaybeGrowStack(); err != nil {
@@ -339,7 +339,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 // compileGoHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
-	c.locationStack.setupInitialStack(c.ir.Signature)
+	c.locationStack.init(c.ir.Signature)
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallGoHostFunction, 0); err != nil {
 		return err
