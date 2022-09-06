@@ -217,9 +217,3 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 		})
 	}
 }
-
-// requireRuntimeLocationStackPointerEqual ensures that the compiler's runtimeValueLocationStack has
-// the expected stack pointer value relative to the call frame.
-func requireRuntimeLocationStackPointerEqual(t *testing.T, expSP uint64, c compiler) {
-	require.Equal(t, expSP, c.runtimeValueLocationStack().sp-callFrameDataSizeInUint64)
-}

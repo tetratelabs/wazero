@@ -276,3 +276,9 @@ func newCompilerEnvironment() *compilerEnv {
 		ce: me.newCallEngine(initialStackSize, nil),
 	}
 }
+
+// requireRuntimeLocationStackPointerEqual ensures that the compiler's runtimeValueLocationStack has
+// the expected stack pointer value relative to the call frame.
+func requireRuntimeLocationStackPointerEqual(t *testing.T, expSP uint64, c compiler) {
+	require.Equal(t, expSP, c.runtimeValueLocationStack().sp-callFrameDataSizeInUint64)
+}
