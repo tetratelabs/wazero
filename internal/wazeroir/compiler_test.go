@@ -2784,6 +2784,18 @@ func TestCompiler_initializeStack(t *testing.T) {
 			},
 		},
 		{
+			name: "no function local, args=results",
+			sig: &wasm.FunctionType{
+				Params:            []wasm.ValueType{i32},
+				Results:           []wasm.ValueType{i32},
+				ParamNumInUint64:  1,
+				ResultNumInUint64: 1,
+			},
+			expLocalIndexToStackHeightInUint64: map[uint32]int{
+				0: 0,
+			},
+		},
+		{
 			name: "no function local, args>results, with vector",
 			sig: &wasm.FunctionType{
 				Params:            []wasm.ValueType{i32, v128, f32},
