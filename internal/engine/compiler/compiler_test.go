@@ -116,31 +116,31 @@ type compilerEnv struct {
 }
 
 func (j *compilerEnv) stackTopAsUint32() uint32 {
-	return uint32(j.stack()[j.stackPointer()-1])
+	return uint32(j.stack()[j.ce.stackContext.stackPointer-1])
 }
 
 func (j *compilerEnv) stackTopAsInt32() int32 {
-	return int32(j.stack()[j.stackPointer()-1])
+	return int32(j.stack()[j.ce.stackContext.stackPointer-1])
 }
 func (j *compilerEnv) stackTopAsUint64() uint64 {
-	return j.stack()[j.stackPointer()-1]
+	return j.stack()[j.ce.stackContext.stackPointer-1]
 }
 
 func (j *compilerEnv) stackTopAsInt64() int64 {
-	return int64(j.stack()[j.stackPointer()-1])
+	return int64(j.stack()[j.ce.stackContext.stackPointer-1])
 }
 
 func (j *compilerEnv) stackTopAsFloat32() float32 {
-	return math.Float32frombits(uint32(j.stack()[j.stackPointer()-1]))
+	return math.Float32frombits(uint32(j.stack()[j.ce.stackContext.stackPointer-1]))
 }
 
 func (j *compilerEnv) stackTopAsFloat64() float64 {
-	return math.Float64frombits(j.stack()[j.stackPointer()-1])
+	return math.Float64frombits(j.stack()[j.ce.stackContext.stackPointer-1])
 }
 
 func (j *compilerEnv) stackTopAsV128() (lo uint64, hi uint64) {
 	st := j.stack()
-	return st[j.stackPointer()-2], st[j.stackPointer()-1]
+	return st[j.ce.stackContext.stackPointer-2], st[j.ce.stackContext.stackPointer-1]
 }
 
 func (j *compilerEnv) memory() []byte {
@@ -159,8 +159,9 @@ func (j *compilerEnv) builtinFunctionCallAddress() wasm.Index {
 	return j.ce.exitContext.builtinFunctionCallIndex
 }
 
+// stackPointer returns the stack pointer minus the call frame.
 func (j *compilerEnv) stackPointer() uint64 {
-	return j.ce.stackContext.stackPointer
+	return j.ce.stackContext.stackPointer - callFrameDataSizeInUint64
 }
 
 func (j *compilerEnv) stackBasePointer() uint64 {

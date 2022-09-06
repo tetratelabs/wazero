@@ -65,7 +65,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, tc.stackPointer+1, env.stackPointer())
+			require.Equal(t, tc.stackPointer+1, env.ce.stackPointer)
 
 			if tc.isFloat {
 				require.Equal(t, math.Float64frombits(val), env.stackTopAsFloat64())
@@ -149,7 +149,7 @@ func TestCompiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// Compiler status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, tc.stackPointer+1, env.stackPointer())
+			require.Equal(t, tc.stackPointer+1, env.ce.stackPointer)
 
 			if tc.isFloat {
 				require.Equal(t, math.Float64frombits(val)+1, env.stackTopAsFloat64())
@@ -197,12 +197,12 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 			// Push the unused median value.
 			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
-			require.Equal(t, uint64(3)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(3), compiler)
 
 			// Now ready to compile Pick operation.
 			err = compiler.compilePick(op)
 			require.NoError(t, err)
-			require.Equal(t, uint64(5)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(5), compiler)
 
 			hiLoc := compiler.runtimeValueLocationStack().peek()
 			loLoc := compiler.runtimeValueLocationStack().stack[hiLoc.stackPointer-1]
@@ -220,7 +220,7 @@ func TestCompiler_compilePick_v128(t *testing.T) {
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, uint64(5)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(5), env.stackPointer())
 
 			// Verify the top value is the picked one and the pick target's value stays the same.
 			lo, hi := env.stackTopAsV128()
@@ -295,12 +295,12 @@ func TestCompiler_compilePick(t *testing.T) {
 
 			// Push the unused median value.
 			_ = compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
-			require.Equal(t, uint64(2)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 
 			// Now ready to compile Pick operation.
 			err = compiler.compilePick(op)
 			require.NoError(t, err)
-			require.Equal(t, uint64(3)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, uint64(3), compiler)
 
 			pickedLocation := compiler.runtimeValueLocationStack().peek()
 			require.True(t, pickedLocation.onRegister())
@@ -316,7 +316,7 @@ func TestCompiler_compilePick(t *testing.T) {
 
 			// Check the returned status and stack pointer.
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, uint64(3)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(3), env.stackPointer())
 
 			// Verify the top value is the picked one and the pick target's value stays the same.
 			if tc.isPickTargetFloat {
@@ -343,13 +343,13 @@ func TestCompiler_compileDrop(t *testing.T) {
 		for i := 0; i < liveNum; i++ {
 			compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 		}
-		require.Equal(t, uint64(liveNum)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 
 		err = compiler.compileDrop(&wazeroir.OperationDrop{Depth: nil})
 		require.NoError(t, err)
 
 		// After the nil range drop, the stack must remain the same.
-		require.Equal(t, uint64(liveNum)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
@@ -381,13 +381,13 @@ func TestCompiler_compileDrop(t *testing.T) {
 				compiler.runtimeValueLocationStack().pushRuntimeValueLocationOnStack()
 			}
 		}
-		require.Equal(t, uint64(liveNum+dropTargetNum)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum+dropTargetNum), compiler)
 
 		err = compiler.compileDrop(&wazeroir.OperationDrop{Depth: r})
 		require.NoError(t, err)
 
 		// After the drop operation, the stack contains only live contents.
-		require.Equal(t, uint64(liveNum)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+		requireRuntimeLocationStackPointerEqual(t, uint64(liveNum), compiler)
 		// Plus, the top value must stay on a register.
 		top := compiler.runtimeValueLocationStack().peek()
 		require.True(t, top.onRegister())
@@ -400,7 +400,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		env.exec(code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-		require.Equal(t, uint64(5)+callFrameDataSizeInUint64, env.stackPointer())
+		require.Equal(t, uint64(5), env.stackPointer())
 		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
 	})
 
@@ -453,7 +453,7 @@ func TestCompiler_compileDrop(t *testing.T) {
 
 		env.exec(code)
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-		require.Equal(t, uint64(liveTotal), env.stackPointer())
+		require.Equal(t, uint64(liveTotal), env.ce.stackPointer)
 
 		stack := env.stack()[:env.stackPointer()]
 		for i, val := range stack {
@@ -593,7 +593,7 @@ func TestCompiler_compileSelect(t *testing.T) {
 					env.exec(code)
 
 					// Check the selected value.
-					require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+					require.Equal(t, uint64(1), env.stackPointer())
 					if tc.selectX1 {
 						require.Equal(t, env.stack()[x1.stackPointer], x1Value)
 					} else {
@@ -666,8 +666,9 @@ func TestCompiler_compileSwap_v128(t *testing.T) {
 			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, uint64(3)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(3), env.stackPointer())
 
+			// The first variable is above the call frame.
 			st := env.stack()
 			require.Equal(t, x2Lo, st[callFrameDataSizeInUint64])
 			require.Equal(t, x2Hi, st[callFrameDataSizeInUint64+1])
@@ -736,7 +737,7 @@ func TestCompiler_compileSet(t *testing.T) {
 			// Run code.
 			env.exec(code)
 
-			require.Equal(t, uint64(2)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(2), env.stackPointer())
 			// Check the value was set.
 			require.Equal(t, uint64(x1Value), env.stack()[callFrameDataSizeInUint64])
 		})

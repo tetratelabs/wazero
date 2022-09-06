@@ -195,7 +195,7 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			err = compiler.compileV128Shuffle(&wazeroir.OperationV128Shuffle{Lanes: lanes})
 			require.NoError(t, err)
 
-			require.Equal(t, tc.expStackPointerAfterShuffle+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, tc.expStackPointerAfterShuffle, compiler)
 			require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 
 			err = compiler.compileReturnFunction()
@@ -216,4 +216,10 @@ func TestArm64Compiler_V128Shuffle_combinations(t *testing.T) {
 			tc.verifyFnc(t, env)
 		})
 	}
+}
+
+// requireRuntimeLocationStackPointerEqual ensures that the compiler's runtimeValueLocationStack has
+// the expected stack pointer value relative to the call frame.
+func requireRuntimeLocationStackPointerEqual(t *testing.T, expSP uint64, c compiler) {
+	require.Equal(t, expSP, c.runtimeValueLocationStack().sp-callFrameDataSizeInUint64)
 }

@@ -69,7 +69,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 				env.exec(code)
 
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt32())
 			})
 		}
@@ -142,7 +142,7 @@ func TestCompiler_compileSignExtend(t *testing.T) {
 				require.NoError(t, err)
 				env.exec(code)
 
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, tc.expected, env.stackTopAsInt64())
 			})
 		}
@@ -798,7 +798,7 @@ func TestCompiler_compileTableSet(t *testing.T) {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-				require.Equal(t, uint64(0)+callFrameDataSizeInUint64, env.stackPointer())
+				require.Equal(t, uint64(0), env.stackPointer())
 
 				if tc.expExtern {
 					actual := dogFromPtr(externTable.References[tc.offset])
@@ -927,7 +927,7 @@ func TestCompiler_compileTableGet(t *testing.T) {
 				require.Equal(t, nativeCallStatusCodeInvalidTableAccess, env.compilerStatus())
 			} else {
 				require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, uint64(tc.exp), env.stackTopAsUint64())
 			}
 		})
@@ -968,7 +968,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 			env.exec(code)
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(1), env.stackPointer())
 			require.Equal(t, uintptr(unsafe.Pointer(me.functions[i])), uintptr(env.stackTopAsUint64()))
 		})
 	}

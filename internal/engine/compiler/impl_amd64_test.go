@@ -170,7 +170,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
-						require.Equal(t, uint64(2)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())
@@ -190,7 +190,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						env.exec(code)
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
-						require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+						require.Equal(t, uint64(1), env.stackPointer())
 						switch kind {
 						case wazeroir.OperationKindDiv:
 							require.Equal(t, x1Value/x2Value+uint32(dxValue), env.stackTopAsUint32())
@@ -296,7 +296,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Equal(t, registerTypeGeneralPurpose, compiler.runtimeValueLocationStack().peek().getRegisterType())
-						require.Equal(t, uint64(2)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+						requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
 						require.Equal(t, 1, len(compiler.runtimeValueLocationStack().usedRegisters))
 						// At this point, the previous value on the DX register is saved to the stack.
 						require.True(t, prevOnDX.onStack())
@@ -319,13 +319,13 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+							require.Equal(t, uint64(1), env.stackPointer())
 							require.Equal(t, uint64(x1Value/x2Value)+dxValue, env.stackTopAsUint64())
 						case wazeroir.OperationKindMul:
-							require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+							require.Equal(t, uint64(1), env.stackPointer())
 							require.Equal(t, uint64(x1Value*x2Value)+dxValue, env.stackTopAsUint64())
 						case wazeroir.OperationKindRem:
-							require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+							require.Equal(t, uint64(1), env.stackPointer())
 							require.Equal(t, x1Value%x2Value+dxValue, env.stackTopAsUint64())
 						}
 					})
@@ -388,7 +388,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		env.exec(code)
 
 		require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
-		require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+		require.Equal(t, uint64(1), env.stackPointer())
 		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 	})
 }

@@ -55,7 +55,7 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 			// Since we call global.get, the top of the stack must be the global value.
 			require.Equal(t, globalValue, env.stackTopAsUint64())
 			// Plus as we push the value, the stack pointer must be incremented.
-			require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+			require.Equal(t, uint64(1), env.stackPointer())
 		})
 	}
 }
@@ -94,12 +94,12 @@ func TestCompiler_compileGlobalGet_v128(t *testing.T) {
 	// Run the code assembled above.
 	env.exec(code)
 
-	require.Equal(t, uint64(2)+callFrameDataSizeInUint64, env.stackPointer())
+	require.Equal(t, uint64(2), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
 	// Since we call global.get, the top of the stack must be the global value.
 	actual := globals[1]
-	sp := env.stackPointer()
+	sp := env.ce.stackContext.stackPointer
 	stack := env.stack()
 	require.Equal(t, actual.Val, stack[sp-2])
 	require.Equal(t, actual.ValHi, stack[sp-1])
@@ -142,7 +142,8 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 
 			op := &wazeroir.OperationGlobalSet{Index: 1}
 			err = compiler.compileGlobalSet(op)
-			require.Equal(t, uint64(callFrameDataSizeInUint64), compiler.runtimeValueLocationStack().sp)
+			requireRuntimeLocationStackPointerEqual(t, 0, compiler)
+
 			require.NoError(t, err)
 
 			err = compiler.compileReturnFunction()
@@ -157,7 +158,7 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			actual := env.globals()[op.Index]
 			require.Equal(t, valueToSet, actual.Val)
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
-			require.Equal(t, uint64(callFrameDataSizeInUint64), env.stackPointer())
+			require.Equal(t, uint64(0), env.stackPointer())
 		})
 	}
 }
@@ -199,7 +200,7 @@ func TestCompiler_compileGlobalSet_v128(t *testing.T) {
 	require.NoError(t, err)
 	env.exec(code)
 
-	require.Equal(t, uint64(callFrameDataSizeInUint64), env.stackPointer())
+	require.Equal(t, uint64(0), env.stackPointer())
 	require.Equal(t, nativeCallStatusCodeReturned, env.callEngine().statusCode)
 
 	// The global value should be set to valueToSet.

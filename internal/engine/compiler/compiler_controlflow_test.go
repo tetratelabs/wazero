@@ -234,7 +234,7 @@ func TestCompiler_compileBrIf(t *testing.T) {
 					require.NoError(t, err)
 
 					tc.setupFunc(t, compiler, shouldGoToElse)
-					require.Equal(t, uint64(1)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
+					requireRuntimeLocationStackPointerEqual(t, uint64(1), compiler)
 
 					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
 					require.NoError(t, err)
@@ -297,7 +297,7 @@ func TestCompiler_compileBrTable(t *testing.T) {
 		env.exec(code)
 
 		// Check the returned value.
-		require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+		require.Equal(t, uint64(1), env.stackPointer())
 		require.Equal(t, expValue, env.stackTopAsUint32())
 	}
 
@@ -666,8 +666,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
 			require.NoError(t, err)
 
-			require.Equal(t, uint64(2)+callFrameDataSizeInUint64, compiler.runtimeValueLocationStack().sp)
-			err = compiler.compileSet(&wazeroir.OperationSet{Depth: 1 + callFrameDataSizeInUint64})
+			requireRuntimeLocationStackPointerEqual(t, uint64(2), compiler)
+			// The function result value must be set at the bottom of the stack.
+			err = compiler.compileSet(&wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 			require.NoError(t, err)
 			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
@@ -709,15 +710,13 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// At this point, we should have one item (offset value) on the stack.
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, // Call frame + the const ^.
-					compiler.runtimeValueLocationStack().sp)
+				requireRuntimeLocationStackPointerEqual(t, 1, compiler)
 
 				require.NoError(t, compiler.compileCallIndirect(operation))
 
 				// At this point, we consumed the offset value, but the function returns one value,
 				// so the stack pointer results in the same.
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, // Call frame + the return value from the called function.
-					compiler.runtimeValueLocationStack().sp)
+				requireRuntimeLocationStackPointerEqual(t, 1, compiler)
 
 				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
@@ -728,7 +727,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				env.exec(code)
 
 				require.Equal(t, nativeCallStatusCodeReturned.String(), env.compilerStatus().String())
-				require.Equal(t, uint64(1)+callFrameDataSizeInUint64, env.stackPointer())
+				require.Equal(t, uint64(1), env.stackPointer())
 				require.Equal(t, expectedReturnValue, uint32(env.ce.popValue()))
 			})
 		}
@@ -820,11 +819,14 @@ func TestCompiler_compileCall(t *testing.T) {
 
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: addTargetValue})
 		require.NoError(t, err)
-		err = compiler.compilePick(&wazeroir.OperationPick{Depth: 1 + callFrameDataSizeInUint64})
+		// Picks the function argument placed at the bottom of the stack.
+		err = compiler.compilePick(&wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
+		// Adds the const to the picked value.
 		err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 		require.NoError(t, err)
-		err = compiler.compileSet(&wazeroir.OperationSet{Depth: 1 + callFrameDataSizeInUint64})
+		// Then store the added result into the bottom of the stack (which is treated as the result of the function).
+		err = compiler.compileSet(&wazeroir.OperationSet{Depth: int(compiler.runtimeValueLocationStack().sp - 1)})
 		require.NoError(t, err)
 
 		err = compiler.compileReturnFunction()
@@ -876,6 +878,6 @@ func TestCompiler_compileCall(t *testing.T) {
 	// Check status and returned values.
 	require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 	require.Equal(t, uint64(0), env.stackBasePointer())
-	require.Equal(t, uint64(2)+callFrameDataSizeInUint64, env.stackPointer()) // Must be 2 (dummy value + the calculation results)
+	require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
 	require.Equal(t, expectedValue, env.stackTopAsUint32())
 }

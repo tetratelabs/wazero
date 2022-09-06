@@ -26,6 +26,7 @@ func TestCompiler_conditional_value_saving(t *testing.T) {
 	}
 
 	// Pick the f32 floating point local (1.0) twice.
+	// Note that the f32 (function local variable in general) is placed above the call frame.
 	err = compiler.compilePick(&wazeroir.OperationPick{Depth: int(compiler.runtimeValueLocationStack().sp - 1 - callFrameDataSizeInUint64)})
 
 	require.NoError(t, err)
