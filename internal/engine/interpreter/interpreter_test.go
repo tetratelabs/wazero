@@ -9,6 +9,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
@@ -82,7 +83,7 @@ func (e engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 }
 
 // NewEngine implements enginetest.EngineTester NewEngine.
-func (e engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return NewEngine(context.Background(), enabledFeatures)
 }
 
@@ -506,7 +507,7 @@ func TestInterpreter_CallEngine_callNativeFunc_signExtend(t *testing.T) {
 
 func TestInterpreter_Compile(t *testing.T) {
 	t.Run("uncompiled", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205).(*engine)
+		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 		_, err := e.NewModuleEngine("foo",
 			&wasm.Module{},
 			nil, // imports
@@ -517,7 +518,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.EqualError(t, err, "source module for foo must be compiled before instantiation")
 	})
 	t.Run("fail", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205).(*engine)
+		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 
 		errModule := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{{}},
@@ -539,7 +540,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		require.False(t, ok)
 	})
 	t.Run("ok", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205).(*engine)
+		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 
 		okModule := &wasm.Module{
 			TypeSection:     []*wasm.FunctionType{{}},
@@ -565,7 +566,7 @@ func TestInterpreter_Compile(t *testing.T) {
 }
 
 func TestEngine_CachedcodesPerModule(t *testing.T) {
-	e := et.NewEngine(wasm.Features20191205).(*engine)
+	e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 	exp := []*code{
 		{body: []*interpreterOp{}},
 		{body: []*interpreterOp{}},

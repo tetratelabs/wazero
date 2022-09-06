@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -55,7 +56,7 @@ func encodeFunctionType(t *wasm.FunctionType) []byte {
 	return append(data, encodeValTypes(t.Results)...)
 }
 
-func decodeFunctionType(enabledFeatures wasm.Features, r *bytes.Reader) (*wasm.FunctionType, error) {
+func decodeFunctionType(enabledFeatures api.CoreFeatures, r *bytes.Reader) (*wasm.FunctionType, error) {
 	b, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read leading byte: %w", err)
@@ -82,7 +83,7 @@ func decodeFunctionType(enabledFeatures wasm.Features, r *bytes.Reader) (*wasm.F
 
 	// Guard >1.0 feature multi-value
 	if resultCount > 1 {
-		if err = enabledFeatures.Require(wasm.FeatureMultiValue); err != nil {
+		if err = enabledFeatures.RequireEnabled(api.CoreFeatureMultiValue); err != nil {
 			return nil, fmt.Errorf("multiple result types invalid as %v", err)
 		}
 	}

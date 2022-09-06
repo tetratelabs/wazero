@@ -72,7 +72,7 @@ type TableInitEntry struct {
 }
 
 // ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
-// Before FeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
+// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 // this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
 //
 // See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274

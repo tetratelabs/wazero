@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
@@ -92,7 +93,7 @@ func NewHostModule(
 	funcToNames map[string][]string,
 	nameToMemory map[string]*Memory,
 	nameToGlobal map[string]*Global,
-	enabledFeatures Features,
+	enabledFeatures api.CoreFeatures,
 ) (m *Module, err error) {
 	if moduleName != "" {
 		m = &Module{NameSection: &NameSection{ModuleName: moduleName}}
@@ -162,7 +163,7 @@ func addFuncs(
 	m *Module,
 	nameToGoFunc map[string]interface{},
 	funcToNames map[string][]string,
-	enabledFeatures Features,
+	enabledFeatures api.CoreFeatures,
 ) (err error) {
 	if m.NameSection == nil {
 		m.NameSection = &NameSection{}
@@ -307,10 +308,10 @@ func addGlobals(m *Module, globals map[string]*Global) error {
 	return nil
 }
 
-func (m *Module) maybeAddType(params, results []ValueType, enabledFeatures Features) (Index, error) {
+func (m *Module) maybeAddType(params, results []ValueType, enabledFeatures api.CoreFeatures) (Index, error) {
 	if len(results) > 1 {
 		// Guard >1.0 feature multi-value
-		if err := enabledFeatures.Require(FeatureMultiValue); err != nil {
+		if err := enabledFeatures.RequireEnabled(api.CoreFeatureMultiValue); err != nil {
 			return 0, fmt.Errorf("multiple result types invalid as %v", err)
 		}
 	}

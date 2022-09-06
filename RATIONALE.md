@@ -272,6 +272,34 @@ wazero took the path of the former design primarily due to:
 There are other reasons such as test and debug being simpler without options: the above list is constrained to conserve
 space. It is accepted that the options pattern is common in Go, which is the main reason for documenting this decision.
 
+### Why aren't config types deeply structured?
+wazero's configuration types cover the three main scopes of WebAssembly use:
+* `RuntimeConfig`: This is the broadest scope, so applies also to compilation
+  and instantiation. Ex. This controls the WebAssembly Specification Version.
+* `CompileConfig`: This affects any compilation related concerns not defined in
+  the binary format. Ex. This controls the allocation of linear memory.
+* `ModuleConfig`: This affects modules instantiated after compilation and what
+  resources are allowed. Ex. This defines how or if STDOUT is captured.
+
+We could nest configuration, for example have `ModuleConfig.SysConfig` instead
+of a flat definition. However, a flat structure is easier to work with and is
+also easy to discover. Unlike the option pattern described earlier, more
+configuration in the interface doesn't taint the package namespace, only
+`ModuleConfig`.
+
+That said, one might ask if we may one day need to structure `ModuleConfig`, as
+it could become cluttered. The main rationale for not doing so up front is that
+once a configuration structure is nested, it is harder to notice configuration
+sprawl. By keeping the config flat, it is easy to see the cognitive load we may
+be adding to our users.
+
+In other words, discomfort adding more configuration is a feature, not a bug.
+We should only add new configuration rarely, and before doing so, ensure it
+will be used. In fact, this is why we support using context fields for
+experimental configuration. By letting users practice, we can find out if a
+configuration was a good idea or not before committing to it, and potentially
+sprawling our types.
+
 ## Why does InstantiateModule call "_start" by default?
 We formerly had functions like `StartWASICommand` that would verify preconditions and start WASI's "_start" command.
 However, this caused confusion because both many languages compiled a WASI dependency, and many did so inconsistently.

@@ -141,7 +141,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 type runtime struct {
 	store           *wasm.Store
 	ns              *namespace
-	enabledFeatures wasm.Features
+	enabledFeatures api.CoreFeatures
 	isInterpreter   bool
 	compiledModules []*compiledModule
 }

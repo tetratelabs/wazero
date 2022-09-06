@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	testfs "github.com/tetratelabs/wazero/internal/testing/fs"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -24,84 +25,12 @@ func TestRuntimeConfig(t *testing.T) {
 		expected RuntimeConfig
 	}{
 		{
-			name: "bulk-memory-operations",
+			name: "features",
 			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureBulkMemoryOperations(true)
+				return c.WithCoreFeatures(api.CoreFeaturesV1)
 			},
 			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
-			},
-		},
-		{
-			name: "multi-value",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureMultiValue(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureMultiValue,
-			},
-		},
-		{
-			name: "mutable-global",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureMutableGlobal(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureMutableGlobal,
-			},
-		},
-		{
-			name: "nontrapping-float-to-int-conversion",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureNonTrappingFloatToIntConversion(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureNonTrappingFloatToIntConversion,
-			},
-		},
-		{
-			name: "sign-extension-ops",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureSignExtensionOps(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureSignExtensionOps,
-			},
-		},
-		{
-			name: "REC-wasm-core-1-20191205",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureSignExtensionOps(true).WithWasmCore1()
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.Features20191205,
-			},
-		},
-		{
-			name: "WD-wasm-core-2-20220419",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureMutableGlobal(false).WithWasmCore2()
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.Features20220419,
-			},
-		},
-		{
-			name: "reference-types",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureReferenceTypes(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
-			},
-		},
-		{
-			name: "simd",
-			with: func(c RuntimeConfig) RuntimeConfig {
-				return c.WithFeatureSIMD(true)
-			},
-			expected: &runtimeConfig{
-				enabledFeatures: wasm.FeatureSIMD,
+				enabledFeatures: api.CoreFeaturesV1,
 			},
 		},
 	}
@@ -114,77 +43,6 @@ func TestRuntimeConfig(t *testing.T) {
 			require.Equal(t, tc.expected, rc)
 			// The source wasn't modified
 			require.Equal(t, &runtimeConfig{}, input)
-		})
-	}
-}
-
-func TestRuntimeConfig_FeatureToggle(t *testing.T) {
-	tests := []struct {
-		name          string
-		feature       wasm.Features
-		expectDefault bool
-		setFeature    func(RuntimeConfig, bool) RuntimeConfig
-	}{
-		{
-			name:          "bulk-memory-operations",
-			feature:       wasm.FeatureBulkMemoryOperations,
-			expectDefault: false,
-			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
-				return c.WithFeatureBulkMemoryOperations(v)
-			},
-		},
-		{
-			name:          "multi-value",
-			feature:       wasm.FeatureMultiValue,
-			expectDefault: false,
-			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
-				return c.WithFeatureMultiValue(v)
-			},
-		},
-		{
-			name:          "mutable-global",
-			feature:       wasm.FeatureMutableGlobal,
-			expectDefault: true,
-			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
-				return c.WithFeatureMutableGlobal(v)
-			},
-		},
-		{
-			name:          "nontrapping-float-to-int-conversion",
-			feature:       wasm.FeatureNonTrappingFloatToIntConversion,
-			expectDefault: false,
-			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
-				return c.WithFeatureNonTrappingFloatToIntConversion(v)
-			},
-		},
-		{
-			name:          "sign-extension-ops",
-			feature:       wasm.FeatureSignExtensionOps,
-			expectDefault: false,
-			setFeature: func(c RuntimeConfig, v bool) RuntimeConfig {
-				return c.WithFeatureSignExtensionOps(v)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			c := NewRuntimeConfig().(*runtimeConfig)
-			require.Equal(t, tc.expectDefault, c.enabledFeatures.Get(tc.feature))
-
-			// Set to false even if it was initially false.
-			c = tc.setFeature(c, false).(*runtimeConfig)
-			require.False(t, c.enabledFeatures.Get(tc.feature))
-
-			// Set true makes it true
-			c = tc.setFeature(c, true).(*runtimeConfig)
-			require.True(t, c.enabledFeatures.Get(tc.feature))
-
-			// Set false makes it false again
-			c = tc.setFeature(c, false).(*runtimeConfig)
-			require.False(t, c.enabledFeatures.Get(tc.feature))
 		})
 	}
 }

@@ -24,7 +24,7 @@ import (
 func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) (stdout, stderr string, err error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 
-	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
+	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	defer r.Close(ctx)
 
 	compiled, compileErr := r.CompileModule(ctx, testBin, wazero.NewCompileConfig())
@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 
 	// Seed wazero's compilation cache to see any error up-front and to prevent
 	// one test from a cache-miss performance penalty.
-	rt := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
+	rt := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	defer rt.Close(testCtx)
 	_, err = rt.CompileModule(testCtx, testBin, wazero.NewCompileConfig())
 	if err != nil {

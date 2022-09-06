@@ -30,9 +30,7 @@ func Example() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// WebAssembly 2.0 allows use of any version of TinyGo, including 0.24+.
-		WithWasmCore2())
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate WASI, which implements host functions needed for TinyGo to

@@ -46,7 +46,7 @@ type EngineTester interface {
 	// IsCompiler returns true if this engine is a compiler.
 	IsCompiler() bool
 
-	NewEngine(enabledFeatures wasm.Features) wasm.Engine
+	NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine
 
 	ListenerFactory() experimental.FunctionListenerFactory
 
@@ -59,7 +59,7 @@ type EngineTester interface {
 }
 
 func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20191205)
+	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("error before instantiation", func(t *testing.T) {
 		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil, nil, nil, nil)
@@ -77,7 +77,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 }
 
 func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20220419)
+	e := et.NewEngine(api.CoreFeaturesV2)
 
 	i64 := i64
 	m := &wasm.Module{
@@ -120,7 +120,7 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 }
 
 func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20220419)
+	e := et.NewEngine(api.CoreFeaturesV2)
 
 	// Define a basic function which defines two parameters and two results.
 	// This is used to test results when incorrect arity is used.
@@ -180,7 +180,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 }
 
 func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20191205)
+	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("no table elements", func(t *testing.T) {
 		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
@@ -347,7 +347,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 }
 
 func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem *wasm.Code) {
-	e := et.NewEngine(wasm.Features20191205)
+	e := et.NewEngine(api.CoreFeaturesV1)
 	_, importing, done := setupCallMemTests(t, e, readMem, et.ListenerFactory())
 	defer done()
 
@@ -396,7 +396,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 }
 
 func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *wasm.Code) {
-	e := et.NewEngine(wasm.Features20191205)
+	e := et.NewEngine(api.CoreFeaturesV1)
 
 	_, imported, importing, done := setupCallTests(t, e, hostDivBy, et.ListenerFactory())
 	defer done()
@@ -441,7 +441,7 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 }
 
 func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20191205)
+	e := et.NewEngine(api.CoreFeaturesV1)
 
 	_, imported, importing, done := setupCallTests(t, e, hostDivByGo, et.ListenerFactory())
 	defer done()
@@ -548,7 +548,7 @@ wasm stack trace:
 // * Host code calls append on a byte slice returned by api.Memory Read
 // * Wasm code calls wasm.OpcodeMemoryGrowName and this changes the capacity (by default, it will).
 func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
-	e := et.NewEngine(wasm.Features20220419)
+	e := et.NewEngine(api.CoreFeaturesV2)
 
 	wasmPhrase := "Well, that'll be the day when you say goodbye."
 	wasmPhraseSize := uint32(len(wasmPhrase))

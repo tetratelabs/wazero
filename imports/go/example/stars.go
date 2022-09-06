@@ -31,9 +31,7 @@ func main() {
 	}
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// WebAssembly 2.0 allows use of gojs.
-		WithWasmCore2())
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Combine the above into our baseline config, overriding defaults.

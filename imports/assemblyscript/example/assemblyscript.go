@@ -27,9 +27,7 @@ func main() {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	// Use WebAssembly 2.0 because AssemblyScript uses some >1.0 features.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		WithWasmCore2())
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a module implementing functions used by AssemblyScript.

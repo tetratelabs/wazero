@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -59,7 +60,7 @@ func TestTableType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			decoded, err := decodeTable(bytes.NewReader(b), wasm.FeatureReferenceTypes)
+			decoded, err := decodeTable(bytes.NewReader(b), api.CoreFeatureReferenceTypes)
 			require.NoError(t, err)
 			require.Equal(t, decoded, tc.input)
 		})
@@ -71,7 +72,7 @@ func TestDecodeTableType_Errors(t *testing.T) {
 		name        string
 		input       []byte
 		expectedErr string
-		features    wasm.Features
+		features    api.CoreFeatures
 	}{
 		{
 			name:        "not func ref",
@@ -82,13 +83,13 @@ func TestDecodeTableType_Errors(t *testing.T) {
 			name:        "max < min",
 			input:       []byte{wasm.RefTypeFuncref, 0x1, 0x80, 0x80, 0x4, 0},
 			expectedErr: "table size minimum must not be greater than maximum",
-			features:    wasm.FeatureReferenceTypes,
+			features:    api.CoreFeatureReferenceTypes,
 		},
 		{
 			name:        "min > limit",
 			input:       []byte{wasm.RefTypeFuncref, 0x0, 0xff, 0xff, 0xff, 0xff, 0xf},
 			expectedErr: "table min must be at most 134217728",
-			features:    wasm.FeatureReferenceTypes,
+			features:    api.CoreFeatureReferenceTypes,
 		},
 	}
 

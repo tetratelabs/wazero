@@ -91,7 +91,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s, ns := newStore()
-	m, err := NewHostModule("", map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, Features20191205)
+	m, err := NewHostModule("", map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	sysCtx := sys.DefaultContext(nil)
@@ -169,7 +169,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, Features20191205)
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	s, ns := newStore()
@@ -223,7 +223,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, Features20191205)
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
@@ -314,7 +314,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestCallContext_ExportedFunction(t *testing.T) {
-	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, Features20191205)
+	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func(api.Module) {}}, nil, map[string]*Memory{}, map[string]*Global{}, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	s, ns := newStore()
@@ -358,7 +358,7 @@ type mockCallEngine struct {
 }
 
 func newStore() (*Store, *Namespace) {
-	return NewStore(Features20191205, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
+	return NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.

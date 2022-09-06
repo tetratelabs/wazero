@@ -36,7 +36,7 @@ func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
 }
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
-func (e *engineTester) NewEngine(enabledFeatures wasm.Features) wasm.Engine {
+func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return newEngine(context.Background(), enabledFeatures)
 }
 
@@ -116,7 +116,7 @@ func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 
 func TestCompiler_CompileModule(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		e := et.NewEngine(wasm.Features20191205).(*engine)
+		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 		ff := fakeFinalizer{}
 		e.setFinalizer = ff.setFinalizer
 
@@ -162,7 +162,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		}
 		errModule.BuildFunctionDefinitions()
 
-		e := et.NewEngine(wasm.Features20191205).(*engine)
+		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 		err := e.CompileModule(testCtx, errModule)
 		require.EqualError(t, err, "failed to lower func[.$2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
@@ -188,7 +188,7 @@ func TestCompiler_Releasecode_Panic(t *testing.T) {
 // allows us to safely access to their data region from native code.
 // See comments on initialStackSize and initialCallFrameStackSize.
 func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
-	enabledFeatures := wasm.Features20191205
+	enabledFeatures := api.CoreFeaturesV1
 	e := newEngine(context.Background(), enabledFeatures)
 	s, ns := wasm.NewStore(enabledFeatures, e)
 

@@ -175,7 +175,8 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205|FeatureMultiValue)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal,
+				api.CoreFeaturesV1|api.CoreFeatureMultiValue)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -258,7 +259,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, Features20191205)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, tc.nameToMemory, tc.nameToGlobal, api.CoreFeaturesV1)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

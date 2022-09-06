@@ -346,7 +346,7 @@ func TestModule_Validate_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.input.Validate(Features20191205)
+			err := tc.input.Validate(api.CoreFeaturesV1)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -457,12 +457,12 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.NoError(t, err)
 	})
 	t.Run("too many functions", func(t *testing.T) {
 		m := Module{}
-		err := m.validateFunctions(Features20191205, []uint32{1, 2, 3, 4}, nil, nil, nil, 3)
+		err := m.validateFunctions(api.CoreFeaturesV1, []uint32{1, 2, 3, 4}, nil, nil, nil, 3)
 		require.Error(t, err)
 		require.EqualError(t, err, "too many functions in a store")
 	})
@@ -472,7 +472,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{0},
 			CodeSection:     nil,
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.EqualError(t, err, "code count (0) != function count (1)")
 	})
@@ -482,7 +482,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{1},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.EqualError(t, err, "invalid function[0]: type section index 1 out of range")
 	})
@@ -492,7 +492,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid function[0]: cannot pop the 1st f32 operand")
 	})
@@ -503,7 +503,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 0}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1"]: cannot pop the 1st f32`)
 	})
@@ -515,7 +515,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   []*Export{{Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1"]: cannot pop the 1st f32`)
 	})
@@ -529,7 +529,7 @@ func TestModule_validateFunctions(t *testing.T) {
 				{Name: "f2", Type: ExternTypeFunc, Index: 0},
 			},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
+		err := m.validateFunctions(api.CoreFeaturesV1, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1","f2"]: cannot pop the 1st f32`)
 	})
@@ -538,7 +538,7 @@ func TestModule_validateFunctions(t *testing.T) {
 func TestModule_validateMemory(t *testing.T) {
 	t.Run("active data segment exits but memory not declared", func(t *testing.T) {
 		m := Module{DataSection: []*DataSegment{{OffsetExpression: &ConstantExpression{}}}}
-		err := m.validateMemory(nil, nil, Features20191205)
+		err := m.validateMemory(nil, nil, api.CoreFeaturesV1)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
 	})
@@ -548,7 +548,7 @@ func TestModule_validateMemory(t *testing.T) {
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
 		}}}
-		err := m.validateMemory(&Memory{}, nil, Features20191205)
+		err := m.validateMemory(&Memory{}, nil, api.CoreFeaturesV1)
 		require.EqualError(t, err, "calculate offset: invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -559,7 +559,7 @@ func TestModule_validateMemory(t *testing.T) {
 				Data:   leb128.EncodeInt32(1),
 			},
 		}}}
-		err := m.validateMemory(&Memory{}, nil, Features20191205)
+		err := m.validateMemory(&Memory{}, nil, api.CoreFeaturesV1)
 		require.NoError(t, err)
 	})
 }
@@ -567,19 +567,19 @@ func TestModule_validateMemory(t *testing.T) {
 func TestModule_validateImports(t *testing.T) {
 	tests := []struct {
 		name            string
-		enabledFeatures Features
+		enabledFeatures api.CoreFeatures
 		i               *Import
 		expectedErr     string
 	}{
 		{name: "empty import section"},
 		{
 			name:            "func",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			i:               &Import{Module: "m", Name: "n", Type: ExternTypeFunc, DescFunc: 0},
 		},
 		{
 			name:            "global var disabled",
-			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
+			enabledFeatures: api.CoreFeaturesV1.SetEnabled(api.CoreFeatureMutableGlobal, false),
 			i: &Import{
 				Module:     "m",
 				Name:       "n",
@@ -590,7 +590,7 @@ func TestModule_validateImports(t *testing.T) {
 		},
 		{
 			name:            "table",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			i: &Import{
 				Module:    "m",
 				Name:      "n",
@@ -600,7 +600,7 @@ func TestModule_validateImports(t *testing.T) {
 		},
 		{
 			name:            "memory",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			i: &Import{
 				Module:  "m",
 				Name:    "n",
@@ -630,7 +630,7 @@ func TestModule_validateImports(t *testing.T) {
 func TestModule_validateExports(t *testing.T) {
 	tests := []struct {
 		name            string
-		enabledFeatures Features
+		enabledFeatures api.CoreFeatures
 		exportSection   []*Export
 		functions       []Index
 		globals         []*GlobalType
@@ -641,71 +641,71 @@ func TestModule_validateExports(t *testing.T) {
 		{name: "empty export section", exportSection: []*Export{}},
 		{
 			name:            "func",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 0}},
 			functions:       []Index{100 /* arbitrary type id*/},
 		},
 		{
 			name:            "func out of range",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeFunc, Index: 1, Name: "e"}},
 			functions:       []Index{100 /* arbitrary type id*/},
 			expectedErr:     `unknown function for export["e"]`,
 		},
 		{
 			name:            "global const",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32}},
 		},
 		{
 			name:            "global var",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
 		},
 		{
 			name:            "global var disabled",
-			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
+			enabledFeatures: api.CoreFeaturesV1.SetEnabled(api.CoreFeatureMutableGlobal, false),
 			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 0, Name: "e"}},
 			globals:         []*GlobalType{{ValType: ValueTypeI32, Mutable: true}},
 			expectedErr:     `invalid export["e"] global[0]: feature "mutable-global" is disabled`,
 		},
 		{
 			name:            "global out of range",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeGlobal, Index: 1, Name: "e"}},
 			globals:         []*GlobalType{{}},
 			expectedErr:     `unknown global for export["e"]`,
 		},
 		{
 			name:            "table",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}},
 			tables:          []*Table{{}},
 		},
 		{
 			name:            "multiple tables",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeTable, Index: 0}, {Type: ExternTypeTable, Index: 1}, {Type: ExternTypeTable, Index: 2}},
 			tables:          []*Table{{}, {}, {}},
 		},
 		{
 			name:            "table out of range",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeTable, Index: 1, Name: "e"}},
 			tables:          []*Table{},
 			expectedErr:     `table for export["e"] out of range`,
 		},
 		{
 			name:            "memory",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0}},
 			memory:          &Memory{},
 		},
 		{
 			name:            "memory out of range",
-			enabledFeatures: Features20191205,
+			enabledFeatures: api.CoreFeaturesV1,
 			exportSection:   []*Export{{Type: ExternTypeMemory, Index: 0, Name: "e"}},
 			tables:          []*Table{},
 			expectedErr:     `memory for export["e"] out of range`,

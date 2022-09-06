@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -34,11 +35,11 @@ func TestModule_ValidateFunction_validateFunctionWithMaxStackValues(t *testing.T
 	}
 
 	t.Run("not exceed", func(t *testing.T) {
-		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max+1, nil)
+		err := m.validateFunctionWithMaxStackValues(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, max+1, nil)
 		require.NoError(t, err)
 	})
 	t.Run("exceed", func(t *testing.T) {
-		err := m.validateFunctionWithMaxStackValues(Features20191205, 0, []Index{0}, nil, nil, nil, max, nil)
+		err := m.validateFunctionWithMaxStackValues(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, max, nil)
 		require.Error(t, err)
 		expMsg := fmt.Sprintf("function may have %d stack values, which exceeds limit %d", valuesNum, max)
 		require.Equal(t, expMsg, err.Error())
@@ -81,7 +82,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: []byte{tc.input}}},
 				}
-				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
+				err := m.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
@@ -98,7 +99,7 @@ func TestModule_ValidateFunction_SignExtensionOps(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: body}},
 				}
-				err := m.validateFunction(FeatureSignExtensionOps, 0, []Index{0}, nil, nil, nil, nil)
+				err := m.validateFunction(api.CoreFeatureSignExtensionOps, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -153,7 +154,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: []byte{OpcodeMiscPrefix, tc.input}}},
 				}
-				err := m.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
+				err := m.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
@@ -171,7 +172,7 @@ func TestModule_ValidateFunction_NonTrappingFloatToIntConversion(t *testing.T) {
 					FunctionSection: []Index{0},
 					CodeSection:     []*Code{{Body: body}},
 				}
-				err := m.validateFunction(FeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil, nil)
+				err := m.validateFunction(api.CoreFeatureNonTrappingFloatToIntConversion, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -248,11 +249,11 @@ func TestModule_ValidateFunction_MultiValue(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("disabled", func(t *testing.T) {
-				err := tc.module.validateFunction(Features20191205, 0, []Index{0}, nil, nil, nil, nil)
+				err := tc.module.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, nil, nil, nil)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {
-				err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
+				err := tc.module.validateFunction(api.CoreFeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 				require.NoError(t, err)
 			})
 		})
@@ -289,7 +290,7 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 					ElementSection:   []*ElementSegment{{}},
 					DataCountSection: &c,
 				}
-				err := m.validateFunction(FeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
+				err := m.validateFunction(api.CoreFeatureBulkMemoryOperations, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 				require.NoError(t, err)
 			})
 		}
@@ -302,71 +303,71 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			dataCountSectionNil bool
 			memory              *Memory
 			tables              []*Table
-			flag                Features
+			flag                api.CoreFeatures
 			expectedErr         string
 		}{
 			// memory.init
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      nil,
 				expectedErr: "memory must exist for memory.init",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				expectedErr: `memory.init invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:                []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
-				flag:                FeatureBulkMemoryOperations,
+				flag:                api.CoreFeatureBulkMemoryOperations,
 				dataCountSectionNil: true,
 				expectedErr:         `memory must exist for memory.init`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "failed to read data segment index for memory.init: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 100 /* data section out of range */},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "index 100 out of range of data section(len=1)",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "failed to read memory index for memory.init: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 1},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "memory.init reserved byte must be zero encoded with 1 byte",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryInit, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "cannot pop the operand for memory.init: i32 missing",
@@ -374,25 +375,25 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			// data.drop
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				expectedErr: `data.drop invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:                []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
 				dataCountSectionNil: true,
 				memory:              &Memory{},
-				flag:                FeatureBulkMemoryOperations,
+				flag:                api.CoreFeatureBulkMemoryOperations,
 				expectedErr:         `data.drop requires data count section`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "failed to read data segment index for data.drop: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscDataDrop, 100 /* data section out of range */},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				dataSection: []*DataSegment{{}},
 				expectedErr: "index 100 out of range of data section(len=1)",
@@ -400,158 +401,158 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			// memory.copy
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      nil,
 				expectedErr: "memory must exist for memory.copy",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				expectedErr: `memory.copy invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: `failed to read memory index for memory.copy: EOF`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "failed to read memory index for memory.copy: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 1},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "memory.copy reserved byte must be zero encoded with 1 byte",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.copy: i32 missing",
 			},
 			// memory.fill
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      nil,
 				expectedErr: "memory must exist for memory.fill",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				expectedErr: `memory.fill invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: `failed to read memory index for memory.fill: EOF`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill, 1},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: `memory.fill reserved byte must be zero encoded with 1 byte`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscMemoryFill, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				memory:      &Memory{},
 				expectedErr: "cannot pop the operand for memory.fill: i32 missing",
 			},
 			// table.init
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableInit},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				tables:      []*Table{{}},
 				expectedErr: `table.init invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableInit},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "failed to read element segment index for table.init: EOF",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 100 /* data section out of range */},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "index 100 out of range of element section(len=1)",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "failed to read source table index for table.init: EOF",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 10},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "source table index must be zero for table.init as feature \"reference-types\" is disabled",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 10},
-				flag:           FeatureBulkMemoryOperations | FeatureReferenceTypes,
+				flag:           api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "table of index 10 not found",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 1},
-				flag:           FeatureBulkMemoryOperations | FeatureReferenceTypes,
+				flag:           api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:         []*Table{{}, {Type: RefTypeExternref}},
 				elementSection: []*ElementSegment{{Type: RefTypeFuncref}},
 				expectedErr:    "type mismatch for table.init: element type funcref does not match table type externref",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			{
 				body:           []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
 			},
 			{
 				body:           []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableInit, 0, 0},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "cannot pop the operand for table.init: i32 missing",
@@ -559,19 +560,19 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			// elem.drop
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				tables:      []*Table{{}},
 				expectedErr: `elem.drop invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "failed to read element segment index for elem.drop: EOF",
 			},
 			{
 				body:           []byte{OpcodeMiscPrefix, OpcodeMiscElemDrop, 100 /* element section out of range */},
-				flag:           FeatureBulkMemoryOperations,
+				flag:           api.CoreFeatureBulkMemoryOperations,
 				tables:         []*Table{{}},
 				elementSection: []*ElementSegment{{}},
 				expectedErr:    "index 100 out of range of element section(len=1)",
@@ -579,61 +580,61 @@ func TestModule_ValidateFunction_BulkMemoryOperations(t *testing.T) {
 			// table.copy
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy},
-				flag:        Features20191205,
+				flag:        api.CoreFeaturesV1,
 				tables:      []*Table{{}},
 				expectedErr: `table.copy invalid as feature "bulk-memory-operations" is disabled`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: `failed to read destination table index for table.copy: EOF`,
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 10},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "destination table index must be zero for table.copy as feature \"reference-types\" is disabled",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 3},
-				flag:        FeatureBulkMemoryOperations | FeatureReferenceTypes,
+				flag:        api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:      []*Table{{}, {}},
 				expectedErr: "table of index 3 not found",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 3},
-				flag:        FeatureBulkMemoryOperations | FeatureReferenceTypes,
+				flag:        api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:      []*Table{{}, {}, {}, {}},
 				expectedErr: "failed to read source table index for table.copy: EOF",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 3},
-				flag:        FeatureBulkMemoryOperations, // Multiple tables require FeatureReferenceTypes.
+				flag:        api.CoreFeatureBulkMemoryOperations, // Multiple tables require api.CoreFeatureReferenceTypes.
 				tables:      []*Table{{}, {}, {}, {}},
 				expectedErr: "source table index must be zero for table.copy as feature \"reference-types\" is disabled",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 3, 1},
-				flag:        FeatureBulkMemoryOperations | FeatureReferenceTypes,
+				flag:        api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 				tables:      []*Table{{}, {Type: RefTypeFuncref}, {}, {Type: RefTypeExternref}},
 				expectedErr: "table type mismatch for table.copy: funcref (src) != externref (dst)",
 			},
 			{
 				body:        []byte{OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "cannot pop the operand for table.copy: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "cannot pop the operand for table.copy: i32 missing",
 			},
 			{
 				body:        []byte{OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeMiscPrefix, OpcodeMiscTableCopy, 0, 0},
-				flag:        FeatureBulkMemoryOperations,
+				flag:        api.CoreFeatureBulkMemoryOperations,
 				tables:      []*Table{{}},
 				expectedErr: "cannot pop the operand for table.copy: i32 missing",
 			},
@@ -686,7 +687,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		name            string
 		module          *Module
 		expectedErr     string
-		enabledFeatures Features
+		enabledFeatures api.CoreFeatures
 	}{
 		// test/core/func.wast
 
@@ -2181,7 +2182,7 @@ func TestModule_ValidateFunction_MultiValue_TypeMismatch(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.module.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
+			err := tc.module.validateFunction(api.CoreFeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -2198,7 +2199,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 				OpcodeEnd,
 			}}},
 		}
-		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeFuncref}}, nil)
+		err := m.validateFunction(api.CoreFeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeFuncref}}, nil)
 		require.NoError(t, err)
 	})
 	t.Run("non zero table index", func(t *testing.T) {
@@ -2212,11 +2213,11 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 			}}},
 		}
 		t.Run("disabled", func(t *testing.T) {
-			err := m.validateFunction(Features20191205, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
+			err := m.validateFunction(api.CoreFeaturesV1, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 			require.EqualError(t, err, "table index must be zero but was 100: feature \"reference-types\" is disabled")
 		})
 		t.Run("enabled but out of range", func(t *testing.T) {
-			err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
+			err := m.validateFunction(api.CoreFeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{}, {}}, nil)
 			require.EqualError(t, err, "unknown table index: 100")
 		})
 	})
@@ -2230,7 +2231,7 @@ func TestModule_funcValidation_CallIndirect(t *testing.T) {
 				OpcodeEnd,
 			}}},
 		}
-		err := m.validateFunction(FeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeExternref}}, nil)
+		err := m.validateFunction(api.CoreFeatureReferenceTypes, 0, []Index{0}, nil, &Memory{}, []*Table{{Type: RefTypeExternref}}, nil)
 		require.EqualError(t, err, "table is not funcref type but was externref for call_indirect")
 	})
 }
@@ -2239,13 +2240,13 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 	tests := []struct {
 		name                    string
 		body                    []byte
-		flag                    Features
+		flag                    api.CoreFeatures
 		declaredFunctionIndexes map[Index]struct{}
 		expectedErr             string
 	}{
 		{
 			name: "ref.null (funcref)",
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
 				OpcodeRefNull, ValueTypeFuncref,
 				OpcodeDrop, OpcodeEnd,
@@ -2253,7 +2254,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name: "ref.null (externref)",
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
 				OpcodeRefNull, ValueTypeExternref,
 				OpcodeDrop, OpcodeEnd,
@@ -2261,7 +2262,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name: "ref.null - disabled",
-			flag: Features20191205,
+			flag: api.CoreFeaturesV1,
 			body: []byte{
 				OpcodeRefNull, ValueTypeFuncref,
 				OpcodeDrop, OpcodeEnd,
@@ -2270,7 +2271,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name: "ref.is_null",
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 			body: []byte{
 				OpcodeRefNull, ValueTypeFuncref,
 				OpcodeRefIsNull,
@@ -2279,7 +2280,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name: "ref.is_null - disabled",
-			flag: Features20191205,
+			flag: api.CoreFeaturesV1,
 			body: []byte{
 				OpcodeRefIsNull,
 				OpcodeDrop, OpcodeEnd,
@@ -2288,7 +2289,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name:                    "ref.func",
-			flag:                    FeatureReferenceTypes,
+			flag:                    api.CoreFeatureReferenceTypes,
 			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
 			body: []byte{
 				OpcodeRefFunc, 0,
@@ -2297,7 +2298,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name:                    "ref.func - undeclared function index",
-			flag:                    FeatureReferenceTypes,
+			flag:                    api.CoreFeatureReferenceTypes,
 			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
 			body: []byte{
 				OpcodeRefFunc, 100,
@@ -2307,7 +2308,7 @@ func TestModule_funcValidation_RefTypes(t *testing.T) {
 		},
 		{
 			name:                    "ref.func",
-			flag:                    Features20191205,
+			flag:                    api.CoreFeaturesV1,
 			declaredFunctionIndexes: map[uint32]struct{}{0: {}},
 			body: []byte{
 				OpcodeRefFunc, 0,
@@ -2340,7 +2341,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        []byte
-		flag        Features
+		flag        api.CoreFeatures
 		expectedErr string
 	}{
 		{
@@ -2353,7 +2354,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.grow (funcref) - type mismatch",
@@ -2364,7 +2365,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				1, // Table of externref type -> mismatch.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.grow: type mismatch: expected externref, but was funcref`,
 		},
 		{
@@ -2377,7 +2378,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.grow (externref) type mismatch",
@@ -2388,7 +2389,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				0, // Table of funcref type -> mismatch.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.grow: type mismatch: expected funcref, but was externref`,
 		},
 		{
@@ -2400,7 +2401,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				10, // Table Index.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `table of index 10 not found`,
 		},
 		{
@@ -2410,7 +2411,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				10, // Table Index.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `table of index 10 not found`,
 		},
 		{
@@ -2421,7 +2422,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.fill (funcref)",
@@ -2433,7 +2434,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				0, // Table Index.
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.fill (funcref) - type mismatch",
@@ -2445,7 +2446,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				1, // Table of externref type -> mismatch.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.fill: type mismatch: expected externref, but was funcref`,
 		},
 		{
@@ -2458,7 +2459,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				1, // Table Index.
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.fill (externref) - type mismatch",
@@ -2470,7 +2471,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				0, // Table of funcref type -> mismatch.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.fill: type mismatch: expected funcref, but was externref`,
 		},
 		{
@@ -2480,7 +2481,7 @@ func TestModule_funcValidation_TableGrowSizeFill(t *testing.T) {
 				10, // Table Index.
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `table of index 10 not found`,
 		},
 	}
@@ -2508,7 +2509,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        []byte
-		flag        Features
+		flag        api.CoreFeatures
 		expectedErr string
 	}{
 		{
@@ -2520,7 +2521,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.get (externref)",
@@ -2531,7 +2532,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.get (disabled)",
@@ -2541,7 +2542,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag:        Features20191205,
+			flag:        api.CoreFeaturesV1,
 			expectedErr: `table.get is invalid as feature "reference-types" is disabled`,
 		},
 		{
@@ -2552,7 +2553,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeTableSet, 0,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.set type mismatch (src=funcref, dst=externref)",
@@ -2562,7 +2563,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeTableSet, 1,
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.set: type mismatch: expected externref, but was funcref`,
 		},
 		{
@@ -2573,7 +2574,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeTableSet, 1,
 				OpcodeEnd,
 			},
-			flag: FeatureReferenceTypes,
+			flag: api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "table.set type mismatch (src=externref, dst=funcref)",
@@ -2583,7 +2584,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeTableSet, 0,
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `cannot pop the operand for table.set: type mismatch: expected funcref, but was externref`,
 		},
 		{
@@ -2592,7 +2593,7 @@ func TestModule_funcValidation_TableGetSet(t *testing.T) {
 				OpcodeTableSet, 1,
 				OpcodeEnd,
 			},
-			flag:        Features20191205,
+			flag:        api.CoreFeaturesV1,
 			expectedErr: `table.set is invalid as feature "reference-types" is disabled`,
 		},
 	}
@@ -2619,7 +2620,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        []byte
-		flag        Features
+		flag        api.CoreFeatures
 		expectedErr string
 	}{
 		{
@@ -2630,7 +2631,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag:        Features20191205,
+			flag:        api.CoreFeaturesV1,
 			expectedErr: "typed_select is invalid as feature \"reference-types\" is disabled",
 		},
 		{
@@ -2639,7 +2640,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 				OpcodeI32Const, 0, OpcodeI32Const, 0, OpcodeI32Const, 0,
 				OpcodeTypedSelect, 2, // immediate vector's size must be one
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `too many type immediates for typed_select`,
 		},
 		{
@@ -2649,7 +2650,7 @@ func TestModule_funcValidation_Select_error(t *testing.T) {
 				OpcodeTypedSelect, 1, 0,
 				OpcodeEnd,
 			},
-			flag:        FeatureReferenceTypes,
+			flag:        api.CoreFeatureReferenceTypes,
 			expectedErr: `invalid type unknown for typed_select`,
 		},
 	}
@@ -3147,7 +3148,7 @@ func TestModule_funcValidation_SIMD(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(FeatureSIMD, 0, []Index{0}, nil, &Memory{}, nil, nil)
+			err := m.validateFunction(api.CoreFeatureSIMD, 0, []Index{0}, nil, &Memory{}, nil, nil)
 			require.NoError(t, err)
 		})
 	}
@@ -3157,7 +3158,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 	type testCase struct {
 		name        string
 		body        []byte
-		flag        Features
+		flag        api.CoreFeatures
 		expectedErr string
 	}
 
@@ -3168,7 +3169,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				OpcodeVecPrefix,
 				OpcodeVecF32x4Abs,
 			},
-			flag:        Features20191205,
+			flag:        api.CoreFeaturesV1,
 			expectedErr: "f32x4.abs invalid as feature \"simd\" is disabled",
 		},
 		{
@@ -3179,7 +3180,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				1, 1, 1, 1, 1, 1, 1, 1,
 				1, 1, 1, 1, 1, 1, 1,
 			},
-			flag:        FeatureSIMD,
+			flag:        api.CoreFeatureSIMD,
 			expectedErr: "cannot read constant vector value for v128.const",
 		},
 		{
@@ -3194,7 +3195,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag:        FeatureSIMD,
+			flag:        api.CoreFeatureSIMD,
 			expectedErr: "cannot pop the operand for i32x4.add: v128 missing",
 		},
 		{
@@ -3209,12 +3210,12 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 				OpcodeDrop,
 				OpcodeEnd,
 			},
-			flag:        FeatureSIMD,
+			flag:        api.CoreFeatureSIMD,
 			expectedErr: "cannot pop the operand for i64x2.add: v128 missing",
 		},
 		{
 			name: "shuffle lane index not found",
-			flag: FeatureSIMD,
+			flag: api.CoreFeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix,
 				OpcodeVecV128i8x16Shuffle,
@@ -3223,7 +3224,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 		},
 		{
 			name: "shuffle lane index not found",
-			flag: FeatureSIMD,
+			flag: api.CoreFeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix,
 				OpcodeVecV128i8x16Shuffle,
@@ -3238,7 +3239,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 		n := VectorInstructionName(op)
 		tests = append(tests, testCase{
 			name: n + "/lane index out of range",
-			flag: FeatureSIMD,
+			flag: api.CoreFeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix, op, lane,
 			},
@@ -3265,7 +3266,7 @@ func TestModule_funcValidation_SIMD_error(t *testing.T) {
 		n := VectorInstructionName(op)
 		tests = append(tests, testCase{
 			name: n + "/lane index out of range",
-			flag: FeatureSIMD,
+			flag: api.CoreFeatureSIMD,
 			body: []byte{
 				OpcodeVecPrefix, op,
 				0, 0, // align and offset.
@@ -3317,7 +3318,7 @@ func TestDecodeBlockType(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
-				actual, read, err := DecodeBlockType(nil, bytes.NewReader([]byte{tc.in}), Features20220419)
+				actual, read, err := DecodeBlockType(nil, bytes.NewReader([]byte{tc.in}), api.CoreFeaturesV2)
 				require.NoError(t, err)
 				require.Equal(t, uint64(1), read)
 				require.Equal(t, 0, len(actual.Params))
@@ -3341,7 +3342,7 @@ func TestDecodeBlockType(t *testing.T) {
 			{Params: []ValueType{ValueTypeF32, ValueTypeV128}, Results: []ValueType{ValueTypeI32, ValueTypeF32, ValueTypeV128}},
 		}
 		for index, expected := range types {
-			actual, read, err := DecodeBlockType(types, bytes.NewReader([]byte{byte(index)}), FeatureMultiValue)
+			actual, read, err := DecodeBlockType(types, bytes.NewReader([]byte{byte(index)}), api.CoreFeatureMultiValue)
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), read)
 			require.Equal(t, expected, actual)
@@ -3406,7 +3407,7 @@ func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.m.validateFunction(Features20220419, 0, nil, nil, nil, nil, nil)
+			err := tc.m.validateFunction(api.CoreFeaturesV2, 0, nil, nil, nil, nil, nil)
 			require.NoError(t, err)
 
 			// Ensures that funcType has remained intact.
@@ -3530,7 +3531,7 @@ func TestModule_funcValidation_loopWithParams(t *testing.T) {
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{{Body: tc.body}},
 			}
-			err := m.validateFunction(FeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
+			err := m.validateFunction(api.CoreFeatureMultiValue, 0, []Index{0}, nil, nil, nil, nil)
 			if tc.expErr != "" {
 				require.EqualError(t, err, tc.expErr)
 			} else {

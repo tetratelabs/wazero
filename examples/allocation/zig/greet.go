@@ -31,10 +31,7 @@ func run() error {
 	ctx := context.Background()
 
 	// Create a new WebAssembly Runtime.
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		// Enable WebAssembly 2.0 support.
-		WithWasmCore2(),
-	)
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Instantiate a Go-defined module named "env" that exports a function to

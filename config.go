@@ -22,124 +22,25 @@ import (
 //
 // Ex. To explicitly limit to Wasm Core 1.0 features as opposed to relying on defaults:
 //
-//	rConfig = wazero.NewRuntimeConfig().WithWasmCore1()
+//	rConfig = wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV1)
 //
 // Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type RuntimeConfig interface {
-
-	// WithFeatureBulkMemoryOperations adds instructions modify ranges of memory or table entries
-	// ("bulk-memory-operations"). This defaults to false as the feature was not finished in WebAssembly 1.0.
+	// WithCoreFeatures sets the WebAssembly Core specification features this
+	// runtime supports. Defaults to api.CoreFeaturesV2.
 	//
-	// Here are the notable effects:
-	//   - Adds `memory.fill`, `memory.init`, `memory.copy` and `data.drop` instructions.
-	//   - Adds `table.init`, `table.copy` and `elem.drop` instructions.
-	//   - Introduces a "passive" form of element and data segments.
-	//   - Stops checking "active" element and data segment boundaries at compile-time, meaning they can error at runtime.
+	// Example of disabling a specific feature:
+	//	features := api.CoreFeaturesV2.SetEnabled(api.CoreFeatureMutableGlobal, false)
+	//	rConfig = wazero.NewRuntimeConfig().WithCoreFeatures(features)
 	//
-	// Note: "bulk-memory-operations" is mixed with the "reference-types" proposal
-	// due to the WebAssembly Working Group merging them "mutually dependent".
-	// Therefore, enabling this feature results in enabling WithFeatureReferenceTypes, and vice-versa.
+	// # Why default to version 2.0?
 	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/bulk-memory-operations/Overview.md
-	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md and
-	// https://github.com/WebAssembly/spec/pull/1287
-	WithFeatureBulkMemoryOperations(bool) RuntimeConfig
-
-	// WithFeatureMultiValue enables multiple values ("multi-value"). This defaults to false as the feature was not
-	// finished in WebAssembly 1.0 (20191205).
-	//
-	// Here are the notable effects:
-	//   - Function (`func`) types allow more than one result
-	//   - Block types (`block`, `loop` and `if`) can be arbitrary function types
-	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/multi-value/Overview.md
-	WithFeatureMultiValue(bool) RuntimeConfig
-
-	// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
-	// WebAssembly 1.0 (20191205).
-	//
-	// When false, an api.Global can never be cast to an api.MutableGlobal, and any wasm that includes global vars
-	// will fail to parse.
-	WithFeatureMutableGlobal(bool) RuntimeConfig
-
-	// WithFeatureNonTrappingFloatToIntConversion enables non-trapping float-to-int conversions.
-	// ("nontrapping-float-to-int-conversion"). This defaults to false as the feature was not in WebAssembly 1.0.
-	//
-	// The only effect of enabling is allowing the following instructions, which return 0 on NaN instead of panicking.
-	//   - `i32.trunc_sat_f32_s`
-	//   - `i32.trunc_sat_f32_u`
-	//   - `i32.trunc_sat_f64_s`
-	//   - `i32.trunc_sat_f64_u`
-	//   - `i64.trunc_sat_f32_s`
-	//   - `i64.trunc_sat_f32_u`
-	//   - `i64.trunc_sat_f64_s`
-	//   - `i64.trunc_sat_f64_u`
-	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
-	WithFeatureNonTrappingFloatToIntConversion(bool) RuntimeConfig
-
-	// WithFeatureReferenceTypes enables various instructions and features related to table and new reference types.
-	//
-	//   - Introduction of new value types: `funcref` and `externref`.
-	//   - Support for the following new instructions:
-	//	 * `ref.null`
-	//	 * `ref.func`
-	//	 * `ref.is_null`
-	//	 * `table.fill`
-	//	 * `table.get`
-	//	 * `table.grow`
-	//	 * `table.set`
-	//	 * `table.size`
-	//   - Support for multiple tables per module:
-	//	 * `call_indirect`, `table.init`, `table.copy` and `elem.drop` instructions can take non-zero table index.
-	//	 * Element segments can take non-zero table index.
-	//
-	// Note: "reference-types" is mixed with the "bulk-memory-operations" proposal
-	// due to the WebAssembly Working Group merging them "mutually dependent".
-	// Therefore, enabling this feature results in enabling WithFeatureBulkMemoryOperations, and vice-versa.
-	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/bulk-memory-operations/Overview.md
-	// https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/reference-types/Overview.md and
-	// https://github.com/WebAssembly/spec/pull/1287
-	WithFeatureReferenceTypes(enabled bool) RuntimeConfig
-
-	// WithFeatureSignExtensionOps enables sign extension instructions ("sign-extension-ops"). This defaults to false
-	// as the feature was not in WebAssembly 1.0.
-	//
-	// Here are the notable effects:
-	//   - Adds instructions `i32.extend8_s`, `i32.extend16_s`, `i64.extend8_s`, `i64.extend16_s` and `i64.extend32_s`
-	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
-	WithFeatureSignExtensionOps(bool) RuntimeConfig
-
-	// WithFeatureSIMD enables the vector value type and vector instructions (aka SIMD). This defaults to false
-	// as the feature was not in WebAssembly 1.0.
-	//
-	// See https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/simd/SIMD.md
-	WithFeatureSIMD(bool) RuntimeConfig
-
-	// WithWasmCore1 enables features included in the WebAssembly Core Specification 1.0. Selecting this
-	// overwrites any currently accumulated features with only those included in this W3C recommendation.
-	//
-	// This is default because as of mid 2022, this is the only version that is a Web Standard (W3C Recommendation).
-	//
-	// You can select the latest draft of the WebAssembly Core Specification 2.0 instead via WithWasmCore2. You can
-	// also enable or disable individual features via `WithXXX` methods. Ex.
-	//	rConfig = wazero.NewRuntimeConfig().WithWasmCore1().WithFeatureMutableGlobal(false)
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
-	WithWasmCore1() RuntimeConfig
-
-	// WithWasmCore2 enables features included in the WebAssembly Core Specification 2.0 (20220419). Selecting this
-	// overwrites any currently accumulated features with only those included in this W3C working draft.
-	//
-	// This is not default because it is not yet incomplete and also not yet a Web Standard (W3C Recommendation).
-	//
-	// Even after selecting this, you can enable or disable individual features via `WithXXX` methods. Ex.
-	//	rConfig = wazero.NewRuntimeConfig().WithWasmCore2().WithFeatureMutableGlobal(false)
-	//
-	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
-	WithWasmCore2() RuntimeConfig
+	// Many compilers that target WebAssembly require features after
+	// api.CoreFeaturesV1 by default. For example, TinyGo v0.24+ requires
+	// api.CoreFeatureBulkMemoryOperations. To avoid runtime errors, wazero
+	// defaults to api.CoreFeaturesV2, even though it is not yet a Web
+	// Standard (REC).
+	WithCoreFeatures(api.CoreFeatures) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -149,14 +50,14 @@ func NewRuntimeConfig() RuntimeConfig {
 }
 
 type runtimeConfig struct {
-	enabledFeatures wasm.Features
+	enabledFeatures api.CoreFeatures
 	isInterpreter   bool
-	newEngine       func(context.Context, wasm.Features) wasm.Engine
+	newEngine       func(context.Context, api.CoreFeatures) wasm.Engine
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &runtimeConfig{
-	enabledFeatures: wasm.Features20191205,
+	enabledFeatures: api.CoreFeaturesV2,
 }
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
@@ -193,74 +94,14 @@ func (c *runtimeConfig) clone() *runtimeConfig {
 	return &ret
 }
 
-// WithFeatureBulkMemoryOperations implements RuntimeConfig.WithFeatureBulkMemoryOperations
-func (c *runtimeConfig) WithFeatureBulkMemoryOperations(enabled bool) RuntimeConfig {
+// WithCoreFeatures implements RuntimeConfig.WithCoreFeatures
+func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfig {
 	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
-	// bulk-memory-operations proposal is mutually-dependant with reference-types proposal.
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
+	ret.enabledFeatures = features
 	return ret
 }
 
-// WithFeatureMultiValue implements RuntimeConfig.WithFeatureMultiValue
-func (c *runtimeConfig) WithFeatureMultiValue(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMultiValue, enabled)
-	return ret
-}
-
-// WithFeatureMutableGlobal implements RuntimeConfig.WithFeatureMutableGlobal
-func (c *runtimeConfig) WithFeatureMutableGlobal(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureMutableGlobal, enabled)
-	return ret
-}
-
-// WithFeatureNonTrappingFloatToIntConversion implements RuntimeConfig.WithFeatureNonTrappingFloatToIntConversion
-func (c *runtimeConfig) WithFeatureNonTrappingFloatToIntConversion(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureNonTrappingFloatToIntConversion, enabled)
-	return ret
-}
-
-// WithFeatureReferenceTypes implements RuntimeConfig.WithFeatureReferenceTypes
-func (c *runtimeConfig) WithFeatureReferenceTypes(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureReferenceTypes, enabled)
-	// reference-types proposal is mutually-dependant with bulk-memory-operations proposal.
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureBulkMemoryOperations, enabled)
-	return ret
-}
-
-// WithFeatureSignExtensionOps implements RuntimeConfig.WithFeatureSignExtensionOps
-func (c *runtimeConfig) WithFeatureSignExtensionOps(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSignExtensionOps, enabled)
-	return ret
-}
-
-// WithFeatureSIMD implements RuntimeConfig.WithFeatureSIMD
-func (c *runtimeConfig) WithFeatureSIMD(enabled bool) RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = ret.enabledFeatures.Set(wasm.FeatureSIMD, enabled)
-	return ret
-}
-
-// WithWasmCore1 implements RuntimeConfig.WithWasmCore1
-func (c *runtimeConfig) WithWasmCore1() RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = wasm.Features20191205
-	return ret
-}
-
-// WithWasmCore2 implements RuntimeConfig.WithWasmCore2
-func (c *runtimeConfig) WithWasmCore2() RuntimeConfig {
-	ret := c.clone()
-	ret.enabledFeatures = wasm.Features20220419
-	return ret
-}
-
-// CompiledModule is a WebAssembly 1.0 module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
+// CompiledModule is a WebAssembly module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
 // In WebAssembly terminology, this is a decoded, validated, and possibly also compiled module. wazero avoids using
 // the name "Module" for both before and after instantiation as the name conflation has caused confusion.
@@ -327,7 +168,7 @@ func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 // CompileConfig allows you to override what was decoded from wasm, prior to compilation (ModuleBuilder.Compile or
 // Runtime.CompileModule).
 //
-// For example, WithMemorySizer allows you to override memoryc size that doesn't match your requirements.
+// For example, WithMemorySizer allows you to override memory size that doesn't match your requirements.
 //
 // Note: CompileConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type CompileConfig interface {

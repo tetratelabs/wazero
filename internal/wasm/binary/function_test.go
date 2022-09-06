@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -82,7 +83,7 @@ func TestFunctionType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode - %s", tc.name), func(t *testing.T) {
-			binary, err := decodeFunctionType(wasm.Features20220419, bytes.NewReader(b))
+			binary, err := decodeFunctionType(api.CoreFeaturesV2, bytes.NewReader(b))
 			require.NoError(t, err)
 			require.Equal(t, binary, tc.input)
 		})
@@ -94,7 +95,7 @@ func TestDecodeFunctionType_Errors(t *testing.T) {
 	tests := []struct {
 		name            string
 		input           []byte
-		enabledFeatures wasm.Features
+		enabledFeatures api.CoreFeatures
 		expectedErr     string
 	}{
 		{
@@ -133,7 +134,7 @@ func TestDecodeFunctionType_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeFunctionType(wasm.Features20191205, bytes.NewReader(tc.input))
+			_, err := decodeFunctionType(api.CoreFeaturesV1, bytes.NewReader(tc.input))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

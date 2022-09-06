@@ -43,11 +43,8 @@ func main() {
 		log.Panicln(err)
 	}
 
-	// wazero enables WebAssembly 1.0 by default. Opt-in to other features:
-	runtimeWithMultiValue := wazero.NewRuntimeWithConfig(
-		ctx, wazero.NewRuntimeConfig().WithFeatureMultiValue(true),
-		// ^^ Note: WebAssembly 2.0 (WithWasmCore2) includes "multi-value".
-	)
+	// wazero enables WebAssembly Core Specification 2.0 features by default.
+	runtimeWithMultiValue := wazero.NewRuntime(ctx)
 
 	// Add a module that uses multiple results values
 

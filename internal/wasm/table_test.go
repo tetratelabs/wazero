@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
@@ -321,13 +322,13 @@ func TestModule_validateTable(t *testing.T) {
 			_, _, _, tables, err := tc.input.AllDeclarations()
 			require.NoError(t, err)
 
-			vt, err := tc.input.validateTable(Features20191205, tables, maxTableIndex)
+			vt, err := tc.input.validateTable(api.CoreFeaturesV1, tables, maxTableIndex)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, vt)
 
 			// Ensure it was cached. We have to use Equal not Same because this is a slice, not a pointer.
 			require.Equal(t, vt, tc.input.validatedActiveElementSegments)
-			vt2, err := tc.input.validateTable(Features20191205, tables, maxTableIndex)
+			vt2, err := tc.input.validateTable(api.CoreFeaturesV1, tables, maxTableIndex)
 			require.NoError(t, err)
 			require.Equal(t, vt, vt2)
 		})
@@ -595,7 +596,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, _, tables, err := tc.input.AllDeclarations()
 			require.NoError(t, err)
-			_, err = tc.input.validateTable(Features20191205, tables, maxTableIndex)
+			_, err = tc.input.validateTable(api.CoreFeaturesV1, tables, maxTableIndex)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
