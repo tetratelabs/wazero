@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -43,7 +44,7 @@ func TestTableSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			tables, err := decodeTableSection(bytes.NewReader(tc.input), wasm.FeatureReferenceTypes)
+			tables, err := decodeTableSection(bytes.NewReader(tc.input), api.CoreFeatureReferenceTypes)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, tables)
 		})
@@ -55,7 +56,7 @@ func TestTableSection_Errors(t *testing.T) {
 		name        string
 		input       []byte
 		expectedErr string
-		features    wasm.Features
+		features    api.CoreFeatures
 	}{
 		{
 			name: "min and min with max",
@@ -65,7 +66,7 @@ func TestTableSection_Errors(t *testing.T) {
 				wasm.RefTypeFuncref, 0x01, 0x02, 0x03, // (table 2 3)
 			},
 			expectedErr: "at most one table allowed in module as feature \"reference-types\" is disabled",
-			features:    wasm.Features20191205,
+			features:    api.CoreFeaturesV1,
 		},
 	}
 

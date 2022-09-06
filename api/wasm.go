@@ -99,7 +99,7 @@ const (
 	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
 	//  })
 	//
-	// Note: The usage of this type is toggled with WithFeatureBulkMemoryOperations.
+	// Note: The usage of this type is toggled with api.CoreFeatureBulkMemoryOperations.
 	ValueTypeExternref ValueType = 0x6f
 )
 

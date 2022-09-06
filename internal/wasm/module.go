@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	experimental "github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
@@ -24,7 +24,7 @@ import (
 // See binary.DecodeModule and text.DecodeModule
 type DecodeModule func(
 	wasm []byte,
-	enabledFeatures Features,
+	enabledFeatures api.CoreFeatures,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
 ) (result *Module, err error)
 
@@ -43,7 +43,7 @@ type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
 	// Note: Currently, there is no type ambiguity in the index as WebAssembly 1.0 only defines function type.
-	// In the future, other types may be introduced to support Features such as module linking.
+	// In the future, other types may be introduced to support CoreFeatures such as module linking.
 	//
 	// Note: In the Binary Format, this is SectionIDType.
 	//
@@ -167,7 +167,7 @@ type Module struct {
 
 	// DataCountSection is the optional section and holds the number of data segments in the data section.
 	//
-	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations.
+	// Note: This may exist in WebAssembly 2.0 or WebAssembly 1.0 with CoreFeatureBulkMemoryOperations.
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
 	DataCountSection *uint32
@@ -226,7 +226,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	return m.TypeSection[typeIdx]
 }
 
-func (m *Module) Validate(enabledFeatures Features) error {
+func (m *Module) Validate(enabledFeatures api.CoreFeatures) error {
 	for _, tp := range m.TypeSection {
 		tp.CacheNumInUint64()
 	}
@@ -304,7 +304,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, numFuncts, maxGlobals ui
 	return nil
 }
 
-func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, maximumFunctionIndex uint32) error {
+func (m *Module) validateFunctions(enabledFeatures api.CoreFeatures, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table, maximumFunctionIndex uint32) error {
 	if uint32(len(functions)) > maximumFunctionIndex {
 		return fmt.Errorf("too many functions in a store")
 	}
@@ -406,7 +406,7 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
-func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFeatures Features) error {
+func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, _ api.CoreFeatures) error {
 	var activeElementCount int
 	for _, sec := range m.DataSection {
 		if !sec.IsPassive() {
@@ -427,14 +427,14 @@ func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, enabledFe
 	return nil
 }
 
-func (m *Module) validateImports(enabledFeatures Features) error {
+func (m *Module) validateImports(enabledFeatures api.CoreFeatures) error {
 	for _, i := range m.ImportSection {
 		switch i.Type {
 		case ExternTypeGlobal:
 			if !i.DescGlobal.Mutable {
 				continue
 			}
-			if err := enabledFeatures.Require(FeatureMutableGlobal); err != nil {
+			if err := enabledFeatures.RequireEnabled(api.CoreFeatureMutableGlobal); err != nil {
 				return fmt.Errorf("invalid import[%q.%q] global: %w", i.Module, i.Name, err)
 			}
 		}
@@ -442,7 +442,7 @@ func (m *Module) validateImports(enabledFeatures Features) error {
 	return nil
 }
 
-func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
+func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []Index, globals []*GlobalType, memory *Memory, tables []*Table) error {
 	for _, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
@@ -457,7 +457,7 @@ func (m *Module) validateExports(enabledFeatures Features, functions []Index, gl
 			if !globals[index].Mutable {
 				continue
 			}
-			if err := enabledFeatures.Require(FeatureMutableGlobal); err != nil {
+			if err := enabledFeatures.RequireEnabled(api.CoreFeatureMutableGlobal); err != nil {
 				return fmt.Errorf("invalid export[%q] global[%d]: %w", exp.Name, index, err)
 			}
 		case ExternTypeMemory:
@@ -960,7 +960,7 @@ const (
 	SectionIDCode
 	SectionIDData
 
-	// SectionIDDataCount may exist in WebAssembly 2.0 or WebAssembly 1.0 with FeatureBulkMemoryOperations enabled.
+	// SectionIDDataCount may exist in WebAssembly 2.0 or WebAssembly 1.0 with CoreFeatureBulkMemoryOperations enabled.
 	//
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#data-count-section
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions

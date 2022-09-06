@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -13,7 +14,7 @@ func Test_decodeDataSegment(t *testing.T) {
 	tests := []struct {
 		in       []byte
 		exp      *wasm.DataSegment
-		features wasm.Features
+		features api.CoreFeatures
 		expErr   string
 	}{
 		{
@@ -23,7 +24,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 			expErr:   "invalid data segment prefix: 0xf",
 		},
 		{
@@ -40,7 +41,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				},
 				Init: []byte{0xf, 0xf},
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x0,
@@ -49,7 +50,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				0x2, 0xf, 0xf,
 			},
 			expErr:   "read offset expression: constant expression has been not terminated",
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x1, // Passive data segment without memory index and const expr.
@@ -60,7 +61,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				OffsetExpression: nil,
 				Init:             []byte{0xf, 0xf},
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -77,7 +78,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				},
 				Init: []byte{0xf, 0xf},
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -88,7 +89,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				0x2, 0xf, 0xf,
 			},
 			expErr:   "memory index must be zero but was 1",
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -99,7 +100,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				0x2, 0xf, 0xf,
 			},
 			expErr:   "read offset expression: constant expression has been not terminated",
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{0x2,
@@ -109,7 +110,7 @@ func Test_decodeDataSegment(t *testing.T) {
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
-			features: wasm.FeatureMutableGlobal,
+			features: api.CoreFeatureMutableGlobal,
 			expErr:   "non-zero prefix for data segment is invalid as feature \"bulk-memory-operations\" is disabled",
 		},
 	}

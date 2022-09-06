@@ -11,6 +11,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/moremath"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -27,12 +28,12 @@ var callStackCeiling = 2000
 
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
-	enabledFeatures wasm.Features
+	enabledFeatures api.CoreFeatures
 	codes           map[wasm.ModuleID][]*code // guarded by mutex.
 	mux             sync.RWMutex
 }
 
-func NewEngine(_ context.Context, enabledFeatures wasm.Features) wasm.Engine {
+func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
 	return &engine{
 		enabledFeatures: enabledFeatures,
 		codes:           map[wasm.ModuleID][]*code{},

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -12,7 +13,7 @@ func decodeImport(
 	r *bytes.Reader,
 	idx uint32,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
-	enabledFeatures wasm.Features,
+	enabledFeatures api.CoreFeatures,
 ) (i *wasm.Import, err error) {
 	i = &wasm.Import{}
 	if i.Module, _, err = decodeUTF8(r, "import module"); err != nil {

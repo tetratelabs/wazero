@@ -9,6 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -22,7 +23,7 @@ import (
 type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
-		enabledFeatures wasm.Features
+		enabledFeatures api.CoreFeatures
 		codes           map[wasm.ModuleID][]*code // guarded by mutex.
 		Cache           compilationcache.Cache
 		mux             sync.RWMutex
@@ -682,11 +683,11 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 	return
 }
 
-func NewEngine(ctx context.Context, enabledFeatures wasm.Features) wasm.Engine {
+func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
 	return newEngine(ctx, enabledFeatures)
 }
 
-func newEngine(ctx context.Context, enabledFeatures wasm.Features) *engine {
+func newEngine(ctx context.Context, enabledFeatures api.CoreFeatures) *engine {
 	var wazeroVersion string
 	if v := ctx.Value(version.WazeroVersionKey{}); v != nil {
 		wazeroVersion = v.(string)
@@ -884,7 +885,7 @@ func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error)
 	return &code{codeSegment: c}, nil
 }
 
-func compileWasmFunction(_ wasm.Features, ir *wazeroir.CompilationResult) (*code, error) {
+func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult) (*code, error) {
 	compiler, err := newCompiler(ir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)

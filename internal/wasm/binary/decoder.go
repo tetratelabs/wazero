@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -14,7 +15,7 @@ import (
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
 func DecodeModule(
 	binary []byte,
-	enabledFeatures wasm.Features,
+	enabledFeatures api.CoreFeatures,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
 ) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
@@ -103,7 +104,7 @@ func DecodeModule(
 		case wasm.SectionIDData:
 			m.DataSection, err = decodeDataSection(r, enabledFeatures)
 		case wasm.SectionIDDataCount:
-			if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+			if err := enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
 				return nil, fmt.Errorf("data count section not supported as %v", err)
 			}
 			m.DataCountSection, err = decodeDataCountSection(r)

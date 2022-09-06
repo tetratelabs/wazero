@@ -7,6 +7,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
@@ -142,7 +143,7 @@ type validatedActiveElementSegment struct {
 
 // validateTable ensures any ElementSegment is valid. This caches results via Module.validatedActiveElementSegments.
 // Note: limitsType are validated by decoders, so not re-validated here.
-func (m *Module) validateTable(enabledFeatures Features, tables []*Table, maximumTableIndex uint32) ([]*validatedActiveElementSegment, error) {
+func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table, maximumTableIndex uint32) ([]*validatedActiveElementSegment, error) {
 	if len(tables) > int(maximumTableIndex) {
 		return nil, fmt.Errorf("too many tables in a module: %d given with limit %d", len(tables), maximumTableIndex)
 	}
@@ -209,7 +210,7 @@ func (m *Module) validateTable(enabledFeatures Features, tables []*Table, maximu
 				// Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L117 we must pass if imported
 				// table has set its min=0. Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L142, we
 				// have to do fail if module-defined min=0.
-				if !enabledFeatures.Get(FeatureReferenceTypes) && elem.TableIndex >= importedTableCount {
+				if !enabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes) && elem.TableIndex >= importedTableCount {
 					if err = checkSegmentBounds(t.Min, uint64(initCount)+uint64(offset), idx); err != nil {
 						return nil, err
 					}

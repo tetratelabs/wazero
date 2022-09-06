@@ -326,8 +326,8 @@ var spectestWasm []byte
 //
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
-func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures wasm.Features) {
-	mod, err := binaryformat.DecodeModule(spectestWasm, wasm.Features20220419, wasm.MemorySizer)
+func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures api.CoreFeatures) {
+	mod, err := binaryformat.DecodeModule(spectestWasm, api.CoreFeaturesV2, wasm.MemorySizer)
 	require.NoError(t, err)
 
 	// (global (export "global_i32") i32 (i32.const 666))
@@ -385,7 +385,7 @@ func maybeSetMemoryCap(mod *wasm.Module) {
 
 // Run runs all the test inside the testDataFS file system where all the cases are described
 // via JSON files created from wast2json.
-func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(context.Context, wasm.Features) wasm.Engine, enabledFeatures wasm.Features) {
+func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(context.Context, api.CoreFeatures) wasm.Engine, enabledFeatures api.CoreFeatures) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -839,7 +839,7 @@ func requireStripCustomSections(t *testing.T, binary []byte) []byte {
 
 // TestBinaryEncoder ensures that binary.EncodeModule produces exactly the same binaries
 // for wasm.Module via binary.DecodeModule modulo custom sections for all the valid binaries in spectests.
-func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures wasm.Features) {
+func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures api.CoreFeatures) {
 	files, err := testDataFS.ReadDir("testdata")
 	require.NoError(t, err)
 

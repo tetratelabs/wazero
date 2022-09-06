@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -88,13 +89,13 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleWasm, wasm.Features20220419, wasm.MemorySizer)
+		m, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemorySizer)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig().WithWasmCore2())
+		r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 
 		// Add WASI to satisfy import tests
 		wm, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
@@ -117,7 +118,7 @@ func BenchmarkCodec(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleWasm, wasm.Features20220419, wasm.MemorySizer); err != nil {
+			if _, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemorySizer); err != nil {
 				b.Fatal(err)
 			}
 		}

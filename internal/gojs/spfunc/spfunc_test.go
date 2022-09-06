@@ -193,7 +193,7 @@ func i64i32i32i32i32_i64i32_withSP(vRef uint64, mAddr, mLen, argsArray, argsLen 
 }
 
 func TestMustCallFromSP(t *testing.T) {
-	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
+	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(testCtx)
 
 	funcName := "i64i32i32i32i32_i64i32_withSP"

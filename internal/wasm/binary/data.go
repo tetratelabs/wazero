@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -23,14 +24,14 @@ const (
 	dataSegmentPrefixActiveWithMemoryIndex dataSegmentPrefix = 0x2
 )
 
-func decodeDataSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.DataSegment, error) {
+func decodeDataSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm.DataSegment, error) {
 	dataSegmentPrefx, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("read data segment prefix: %w", err)
 	}
 
 	if dataSegmentPrefx != dataSegmentPrefixActive {
-		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+		if err := enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
 			return nil, fmt.Errorf("non-zero prefix for data segment is invalid as %w", err)
 		}
 	}

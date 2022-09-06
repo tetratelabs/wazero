@@ -24,7 +24,7 @@ var (
 func TestNewRuntimeWithConfig_version(t *testing.T) {
 	cfg := NewRuntimeConfig().(*runtimeConfig)
 	oldNewEngine := cfg.newEngine
-	cfg.newEngine = func(ctx context.Context, features wasm.Features) wasm.Engine {
+	cfg.newEngine = func(ctx context.Context, features api.CoreFeatures) wasm.Engine {
 		// Ensures that wazeroVersion is propagated to the engine.
 		v := ctx.Value(version.WazeroVersionKey{})
 		require.NotNil(t, v)
@@ -519,7 +519,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	engine := &mockEngine{name: "mock", cachedModules: map[*wasm.Module]struct{}{}}
 	conf := *engineLessConfig
-	conf.newEngine = func(context.Context, wasm.Features) wasm.Engine {
+	conf.newEngine = func(context.Context, api.CoreFeatures) wasm.Engine {
 		return engine
 	}
 	r := NewRuntimeWithConfig(testCtx, &conf)

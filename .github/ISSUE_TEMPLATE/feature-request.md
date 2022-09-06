@@ -1,5 +1,5 @@
 ---
-name: Feature Request
+name: CoreFeature Request
 about: Suggest an idea for wazero to support.
 title: ''
 labels: enhancement

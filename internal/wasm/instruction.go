@@ -24,13 +24,13 @@ const (
 	OpcodeEnd Opcode = 0x0b
 
 	// OpcodeBr is a stack-polymorphic opcode that performs an unconditional branch. How the stack is modified depends
-	// on whether the "br" is enclosed by a loop, and if FeatureMultiValue is enabled.
+	// on whether the "br" is enclosed by a loop, and if CoreFeatureMultiValue is enabled.
 	//
 	// Here are the rules in pseudocode about how the stack is modified based on the "br" operand L (label):
 	//	if L is loop: append(L.originalStackWithoutInputs, N-values popped from the stack) where N == L.inputs
 	//	else: append(L.originalStackWithoutInputs, N-values popped from the stack) where N == L.results
 	//
-	// In WebAssembly 1.0 (20191205), N can be zero or one. When FeatureMultiValue is enabled, N can be more than one,
+	// In WebAssembly 1.0 (20191205), N can be zero or one. When CoreFeatureMultiValue is enabled, N can be more than one,
 	// depending on the type use of the label L.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfbrl
@@ -57,7 +57,7 @@ const (
 	OpcodeGlobalGet Opcode = 0x23
 	OpcodeGlobalSet Opcode = 0x24
 
-	// Below are toggled with FeatureReferenceTypes
+	// Below are toggled with CoreFeatureReferenceTypes
 
 	OpcodeTableGet Opcode = 0x25
 	OpcodeTableSet Opcode = 0x26
@@ -236,50 +236,50 @@ const (
 	OpcodeF64ReinterpretI64 Opcode = 0xbf
 
 	// OpcodeRefNull pushes a null reference value whose type is specified by immediate to this opcode.
-	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	// This is defined in the reference-types proposal, but necessary for CoreFeatureBulkMemoryOperations as well.
 	//
 	// Currently only supported in the constant expression in element segments.
 	OpcodeRefNull = 0xd0
 	// OpcodeRefIsNull pops a reference value, and pushes 1 if it is null, 0 otherwise.
-	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	// This is defined in the reference-types proposal, but necessary for CoreFeatureBulkMemoryOperations as well.
 	//
 	// Currently not supported.
 	OpcodeRefIsNull = 0xd1
 	// OpcodeRefFunc pushes a funcref value whose index equals the immediate to this opcode.
-	// This is defined in the reference-types proposal, but necessary for FeatureBulkMemoryOperations as well.
+	// This is defined in the reference-types proposal, but necessary for CoreFeatureBulkMemoryOperations as well.
 	//
 	// Currently, this is only supported in the constant expression in element segments.
 	OpcodeRefFunc = 0xd2
 
-	// Below are toggled with FeatureSignExtensionOps
+	// Below are toggled with CoreFeatureSignExtensionOps
 
 	// OpcodeI32Extend8S extends a signed 8-bit integer to a 32-bit integer.
-	// Note: This is dependent on the flag FeatureSignExtensionOps
+	// Note: This is dependent on the flag CoreFeatureSignExtensionOps
 	OpcodeI32Extend8S Opcode = 0xc0
 
 	// OpcodeI32Extend16S extends a signed 16-bit integer to a 32-bit integer.
-	// Note: This is dependent on the flag FeatureSignExtensionOps
+	// Note: This is dependent on the flag CoreFeatureSignExtensionOps
 	OpcodeI32Extend16S Opcode = 0xc1
 
 	// OpcodeI64Extend8S extends a signed 8-bit integer to a 64-bit integer.
-	// Note: This is dependent on the flag FeatureSignExtensionOps
+	// Note: This is dependent on the flag CoreFeatureSignExtensionOps
 	OpcodeI64Extend8S Opcode = 0xc2
 
 	// OpcodeI64Extend16S extends a signed 16-bit integer to a 64-bit integer.
-	// Note: This is dependent on the flag FeatureSignExtensionOps
+	// Note: This is dependent on the flag CoreFeatureSignExtensionOps
 	OpcodeI64Extend16S Opcode = 0xc3
 
 	// OpcodeI64Extend32S extends a signed 32-bit integer to a 64-bit integer.
-	// Note: This is dependent on the flag FeatureSignExtensionOps
+	// Note: This is dependent on the flag CoreFeatureSignExtensionOps
 	OpcodeI64Extend32S Opcode = 0xc4
 
 	// OpcodeMiscPrefix is the prefix of various multi-byte opcodes.
-	// Introduced in FeatureNonTrappingFloatToIntConversion, but used in other
-	// features, such as FeatureBulkMemoryOperations.
+	// Introduced in CoreFeatureNonTrappingFloatToIntConversion, but used in other
+	// features, such as CoreFeatureBulkMemoryOperations.
 	OpcodeMiscPrefix Opcode = 0xfc
 
 	// OpcodeVecPrefix is the prefix of all vector isntructions introduced in
-	// FeatureSIMD.
+	// CoreFeatureSIMD.
 	OpcodeVecPrefix Opcode = 0xfd
 )
 
@@ -288,7 +288,7 @@ const (
 type OpcodeMisc = byte
 
 const (
-	// Below are toggled with FeatureNonTrappingFloatToIntConversion.
+	// Below are toggled with CoreFeatureNonTrappingFloatToIntConversion.
 	// https://github.com/WebAssembly/spec/blob/ce4b6c4d47eb06098cc7ab2e81f24748da822f20/proposals/nontrapping-float-to-int-conversion/Overview.md
 
 	OpcodeMiscI32TruncSatF32S OpcodeMisc = 0x00
@@ -300,7 +300,7 @@ const (
 	OpcodeMiscI64TruncSatF64S OpcodeMisc = 0x06
 	OpcodeMiscI64TruncSatF64U OpcodeMisc = 0x07
 
-	// Below are toggled with FeatureBulkMemoryOperations.
+	// Below are toggled with CoreFeatureBulkMemoryOperations.
 	// Opcodes are those new in document/core/appendix/index-instructions.rst (the commit that merged the feature).
 	// See https://github.com/WebAssembly/spec/commit/7fa2f20a6df4cf1c114582c8cb60f5bfcdbf1be1
 	// See https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/appendix/changes.html#bulk-memory-and-table-instructions
@@ -313,7 +313,7 @@ const (
 	OpcodeMiscElemDrop   OpcodeMisc = 0x0d
 	OpcodeMiscTableCopy  OpcodeMisc = 0x0e
 
-	// Below are toggled with FeatureReferenceTypes
+	// Below are toggled with CoreFeatureReferenceTypes
 
 	OpcodeMiscTableGrow OpcodeMisc = 0x0f
 	OpcodeMiscTableSize OpcodeMisc = 0x10
@@ -323,7 +323,7 @@ const (
 // OpcodeVec represents an opcode of a vector instructions which has
 // multi-byte encoding and is prefixed by OpcodeMiscPrefix.
 //
-// These opcodes are toggled with FeatureSIMD.
+// These opcodes are toggled with CoreFeatureSIMD.
 type OpcodeVec = byte
 
 const (
@@ -805,7 +805,7 @@ const (
 	OpcodeTableGetName = "table.get"
 	OpcodeTableSetName = "table.set"
 
-	// Below are toggled with FeatureSignExtensionOps
+	// Below are toggled with CoreFeatureSignExtensionOps
 
 	OpcodeI32Extend8SName  = "i32.extend8_s"
 	OpcodeI32Extend16SName = "i32.extend16_s"
@@ -999,7 +999,7 @@ var instructionNames = [256]string{
 	OpcodeTableGet: OpcodeTableGetName,
 	OpcodeTableSet: OpcodeTableSetName,
 
-	// Below are toggled with FeatureSignExtensionOps
+	// Below are toggled with CoreFeatureSignExtensionOps
 
 	OpcodeI32Extend8S:  OpcodeI32Extend8SName,
 	OpcodeI32Extend16S: OpcodeI32Extend16SName,

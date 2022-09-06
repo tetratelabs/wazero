@@ -56,15 +56,14 @@ func TestEngineCompiler(t *testing.T) {
 	if !platform.CompilerSupported() {
 		t.Skip()
 	}
-	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler().WithWasmCore2())
+	runAllTests(t, tests, wazero.NewRuntimeConfigCompiler())
 }
 
 func TestEngineInterpreter(t *testing.T) {
-	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
 }
 
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config wazero.RuntimeConfig) {
-	config = config.WithFeatureReferenceTypes(true)
 	for name, testf := range tests {
 		name := name   // pin
 		testf := testf // pin
@@ -416,7 +415,7 @@ func callReturnImportWasm(t *testing.T, importedModule, importingModule string, 
 			},
 		},
 	}
-	require.NoError(t, module.Validate(wasm.Features20220419))
+	require.NoError(t, module.Validate(api.CoreFeaturesV2))
 	return binary.EncodeModule(module)
 }
 
@@ -452,7 +451,7 @@ func callOuterInnerWasm(t *testing.T, importedModule, importingModule string) []
 			},
 		},
 	}
-	require.NoError(t, module.Validate(wasm.Features20220419))
+	require.NoError(t, module.Validate(api.CoreFeaturesV2))
 	return binary.EncodeModule(module)
 }
 

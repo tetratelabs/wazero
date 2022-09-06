@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -48,13 +49,13 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 		in       []byte
 		refType  wasm.RefType
 		exp      []*wasm.Index
-		features wasm.Features
+		features api.CoreFeatures
 	}{
 		{
 			in:       []byte{0},
 			exp:      []*wasm.Index{},
 			refType:  wasm.RefTypeFuncref,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
@@ -64,7 +65,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 			},
 			exp:      []*wasm.Index{nil, uint32Ptr(100)},
 			refType:  wasm.RefTypeFuncref,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
@@ -77,7 +78,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 			},
 			exp:      []*wasm.Index{nil, uint32Ptr(165675008), nil},
 			refType:  wasm.RefTypeFuncref,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			in: []byte{
@@ -87,7 +88,7 @@ func Test_decodeElementConstExprVector(t *testing.T) {
 			},
 			exp:      []*wasm.Index{nil, nil},
 			refType:  wasm.RefTypeExternref,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 	}
 
@@ -107,7 +108,7 @@ func Test_decodeElementConstExprVector_errors(t *testing.T) {
 		in       []byte
 		refType  wasm.RefType
 		expErr   string
-		features wasm.Features
+		features api.CoreFeatures
 	}{
 		{
 			name:   "eof",
@@ -122,28 +123,28 @@ func Test_decodeElementConstExprVector_errors(t *testing.T) {
 			name:     "type mismatch - ref.null",
 			in:       []byte{1, wasm.OpcodeRefNull, wasm.RefTypeExternref, wasm.OpcodeEnd},
 			refType:  wasm.RefTypeFuncref,
-			features: wasm.Features20220419,
+			features: api.CoreFeaturesV2,
 			expErr:   "element type mismatch: want funcref, but constexpr has externref",
 		},
 		{
 			name:     "type mismatch - ref.null",
 			in:       []byte{1, wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd},
 			refType:  wasm.RefTypeExternref,
-			features: wasm.Features20220419,
+			features: api.CoreFeaturesV2,
 			expErr:   "element type mismatch: want externref, but constexpr has funcref",
 		},
 		{
 			name:     "invalid ref type",
 			in:       []byte{1, wasm.OpcodeRefNull, 0xff, wasm.OpcodeEnd},
 			refType:  wasm.RefTypeExternref,
-			features: wasm.Features20220419,
+			features: api.CoreFeaturesV2,
 			expErr:   "invalid type for ref.null: 0xff",
 		},
 		{
 			name:     "type mismatch - ref.fuc",
 			in:       []byte{1, wasm.OpcodeRefFunc, 0, wasm.OpcodeEnd},
 			refType:  wasm.RefTypeExternref,
-			features: wasm.Features20220419,
+			features: api.CoreFeaturesV2,
 			expErr:   "element type mismatch: want externref, but constexpr has funcref",
 		},
 	}
@@ -163,7 +164,7 @@ func TestDecodeElementSegment(t *testing.T) {
 		in       []byte
 		exp      *wasm.ElementSegment
 		expErr   string
-		features wasm.Features
+		features api.CoreFeatures
 	}{
 		{
 			name: "legacy",
@@ -180,7 +181,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "legacy multi byte const expr data",
@@ -197,7 +198,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 
@@ -213,7 +214,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "active with table index encoded.",
@@ -232,7 +233,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 
@@ -253,7 +254,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Type:       wasm.RefTypeFuncref,
 				TableIndex: 10,
 			},
-			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+			features: api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 		},
 		{
 
@@ -268,7 +269,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				5, 1, 2, 3, 4, 5,
 			},
 			expErr:   `table index must be zero but was 10: feature "reference-types" is disabled`,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "declarative",
@@ -283,7 +284,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "active const expr vector",
@@ -305,7 +306,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "passive const expr vector - funcref",
@@ -325,7 +326,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModePassive,
 				Type: wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "passive const expr vector - unknown ref type",
@@ -334,7 +335,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				0xff,
 			},
 			expErr:   `ref type must be funcref or externref for element as of WebAssembly 2.0`,
-			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+			features: api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "active with table index and const expr vector",
@@ -358,7 +359,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode:       wasm.ElementModeActive,
 				Type:       wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "active with non zero table index and const expr vector",
@@ -383,7 +384,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Type:       wasm.RefTypeFuncref,
 				TableIndex: 10,
 			},
-			features: wasm.FeatureBulkMemoryOperations | wasm.FeatureReferenceTypes,
+			features: api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 		},
 		{
 			name: "active with non zero table index and const expr vector but feature disabled",
@@ -402,7 +403,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				wasm.OpcodeRefNull, wasm.RefTypeFuncref, wasm.OpcodeEnd,
 			},
 			expErr:   `table index must be zero but was 10: feature "reference-types" is disabled`,
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
 			name: "declarative const expr vector",
@@ -421,7 +422,7 @@ func TestDecodeElementSegment(t *testing.T) {
 				Mode: wasm.ElementModeDeclarative,
 				Type: wasm.RefTypeFuncref,
 			},
-			features: wasm.FeatureBulkMemoryOperations,
+			features: api.CoreFeatureBulkMemoryOperations,
 		},
 	}
 
@@ -440,6 +441,6 @@ func TestDecodeElementSegment(t *testing.T) {
 }
 
 func TestDecodeElementSegment_errors(t *testing.T) {
-	_, err := decodeElementSegment(bytes.NewReader([]byte{1}), wasm.FeatureMultiValue)
+	_, err := decodeElementSegment(bytes.NewReader([]byte{1}), api.CoreFeatureMultiValue)
 	require.EqualError(t, err, `non-zero prefix for element segment is invalid as feature "bulk-memory-operations" is disabled`)
 }

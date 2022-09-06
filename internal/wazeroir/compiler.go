@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -155,7 +156,7 @@ func (c *compiler) initializeStack() {
 }
 
 type compiler struct {
-	enabledFeatures            wasm.Features
+	enabledFeatures            api.CoreFeatures
 	callFrameStackSizeInUint64 int
 	stack                      []UnsignedType
 	currentID                  uint32
@@ -250,7 +251,7 @@ type CompilationResult struct {
 	HasElementInstances bool
 }
 
-func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, callFrameStackSizeInUint64 int, module *wasm.Module) ([]*CompilationResult, error) {
+func CompileFunctions(_ context.Context, enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module) ([]*CompilationResult, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
@@ -308,7 +309,7 @@ func CompileFunctions(_ context.Context, enabledFeatures wasm.Features, callFram
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the Compiler compilation engine.
-func compile(enabledFeatures wasm.Features,
+func compile(enabledFeatures api.CoreFeatures,
 	callFrameStackSizeInUint64 int,
 	sig *wasm.FunctionType,
 	body []byte,

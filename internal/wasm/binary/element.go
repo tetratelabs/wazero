@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -37,7 +38,7 @@ func decodeElementInitValueVector(r *bytes.Reader) ([]*wasm.Index, error) {
 	return vec, nil
 }
 
-func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enabledFeatures wasm.Features) ([]*wasm.Index, error) {
+func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enabledFeatures api.CoreFeatures) ([]*wasm.Index, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the size of constexpr vector: %w", err)
@@ -83,7 +84,7 @@ func decodeElementRefType(r *bytes.Reader) (ret wasm.RefType, err error) {
 const (
 	// The prefix is explained at https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/binary/modules.html#element-section
 
-	// elementSegmentPrefixLegacy is the legacy prefix and is only valid one before FeatureBulkMemoryOperations.
+	// elementSegmentPrefixLegacy is the legacy prefix and is only valid one before CoreFeatureBulkMemoryOperations.
 	elementSegmentPrefixLegacy = iota
 	// elementSegmentPrefixPassiveFuncrefValueVector is the passive element whose indexes are encoded as vec(varint), and reftype is fixed to funcref.
 	elementSegmentPrefixPassiveFuncrefValueVector
@@ -101,14 +102,14 @@ const (
 	elementSegmentPrefixDeclarativeConstExprVector
 )
 
-func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm.ElementSegment, error) {
+func decodeElementSegment(r *bytes.Reader, enabledFeatures api.CoreFeatures) (*wasm.ElementSegment, error) {
 	prefix, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("read element prefix: %w", err)
 	}
 
 	if prefix != elementSegmentPrefixLegacy {
-		if err := enabledFeatures.Require(wasm.FeatureBulkMemoryOperations); err != nil {
+		if err := enabledFeatures.RequireEnabled(api.CoreFeatureBulkMemoryOperations); err != nil {
 			return nil, fmt.Errorf("non-zero prefix for element segment is invalid as %w", err)
 		}
 	}
@@ -157,7 +158,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 		}
 
 		if tableIndex != 0 {
-			if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+			if err := enabledFeatures.RequireEnabled(api.CoreFeatureReferenceTypes); err != nil {
 				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
 			}
 		}
@@ -236,7 +237,7 @@ func decodeElementSegment(r *bytes.Reader, enabledFeatures wasm.Features) (*wasm
 		}
 
 		if tableIndex != 0 {
-			if err := enabledFeatures.Require(wasm.FeatureReferenceTypes); err != nil {
+			if err := enabledFeatures.RequireEnabled(api.CoreFeatureReferenceTypes); err != nil {
 				return nil, fmt.Errorf("table index must be zero but was %d: %w", tableIndex, err)
 			}
 		}

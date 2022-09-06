@@ -46,11 +46,11 @@ type Module interface {
 }
 
 func NewWazeroInterpreterRuntime() Runtime {
-	return newWazeroRuntime("wazero-interpreter", wazero.NewRuntimeConfigInterpreter().WithWasmCore2())
+	return newWazeroRuntime("wazero-interpreter", wazero.NewRuntimeConfigInterpreter())
 }
 
 func NewWazeroCompilerRuntime() Runtime {
-	return newWazeroRuntime(compilerRuntime, wazero.NewRuntimeConfigCompiler().WithWasmCore2())
+	return newWazeroRuntime(compilerRuntime, wazero.NewRuntimeConfigCompiler())
 }
 
 func newWazeroRuntime(name string, config wazero.RuntimeConfig) *wazeroRuntime {

@@ -31,7 +31,7 @@ type (
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0
 	Store struct {
 		// EnabledFeatures are read-only to allow optimizations.
-		EnabledFeatures Features
+		EnabledFeatures api.CoreFeatures
 
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		Engine Engine
@@ -268,7 +268,7 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(enabledFeatures Features, engine Engine) (*Store, *Namespace) {
+func NewStore(enabledFeatures api.CoreFeatures, engine Engine) (*Store, *Namespace) {
 	ns := newNamespace()
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
@@ -354,7 +354,7 @@ func (s *Store) instantiate(
 
 	tables, tableInit, err := module.buildTables(importedTables, importedGlobals,
 		// As of reference-types proposal, boundary check must be done after instantiation.
-		s.EnabledFeatures.Get(FeatureReferenceTypes))
+		s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes))
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,7 @@ func (s *Store) instantiate(
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
 	// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L395-L405
-	if !s.EnabledFeatures.Get(FeatureReferenceTypes) {
+	if !s.EnabledFeatures.IsEnabled(api.CoreFeatureReferenceTypes) {
 		if err = m.validateData(module.DataSection); err != nil {
 			return nil, err
 		}
