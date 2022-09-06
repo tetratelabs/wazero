@@ -47,13 +47,13 @@ Format, e.g. compiling `.wat` files. Users can work around this using tools such
 compile the text format into the binary format. In practice, the text format is
 too low level for most users, so delays here have limited impact.
 
-#### Post 2.0 CoreFeatures
-CoreFeatures regardless of W3C release are inventoried in the [Proposals][10].
+#### Post 2.0 Features
+Features regardless of W3C release are inventoried in the [Proposals][10].
 repository. wazero implements [Finished Proposals][11] based on user demand,
-using [wazero.RuntimeConfig][7] feature flags. As of mid 2022, all finished proposals
-are included in [2.0][14] Working Draft.
+using [wazero.RuntimeConfig][7] feature flags. As of late 2022, all finished
+proposals are included in [2.0][14] Working Draft.
 
-CoreFeatures not yet assigned to a W3C release are not reliable. Encourage the
+Features not yet assigned to a W3C release are not reliable. Encourage the
 [WebAssembly community][12] to formalize features you rely on, so that they
 become assigned to a release, and reach the W3C recommendation (REC) phase.
 

@@ -34,7 +34,7 @@ Due to lack of adoption, support and relatively high implementation overhead,
 most choose [TinyGo]({{< relref "/tinygo.md" >}}) to compile source code, even if it supports less
 features.
 
-## WebAssembly CoreFeatures
+## WebAssembly Features
 
 `GOARCH=wasm GOOS=js` uses instructions in [WebAssembly Core Specification 1.0]
 [15] unless `GOWASM` includes features added afterwards.
