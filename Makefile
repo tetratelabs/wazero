@@ -5,9 +5,9 @@ space :=
 space +=
 
 goimports := golang.org/x/tools/cmd/goimports@v0.1.12
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.48.0
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.101.0
+hugo          := github.com/gohugoio/hugo@v0.102.3
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
@@ -44,15 +44,17 @@ build.bench:
 
 .PHONY: test.examples
 test.examples:
-	@go test ./examples/... ./imports/assemblyscript/example/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
+	@go test ./examples/... ./imports/assemblyscript/example/... ./imports/emscripten/... ./imports/go/example/... ./imports/wasi_snapshot_preview1/example/...
 
 .PHONY: build.examples.as
 build.examples.as:
 	@cd ./imports/assemblyscript/example/testdata && npm install && npm run build
 
+# Use -fstage1 to avoid bugs in the new compiler
+# https://github.com/ziglang/zig/wiki/Self-Hosted-Compiler-Upgrade-Guide#is-it-time-to-upgrade
 .PHONY: build.examples.zig
 build.examples.zig:
-	@cd examples/allocation/zig/testdata/ && zig build -Drelease-small=true && mv zig-out/lib/greet.wasm .
+	@cd examples/allocation/zig/testdata/ && zig build -fstage1 -Drelease-small=true && mv zig-out/lib/greet.wasm .
 
 tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo

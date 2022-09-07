@@ -2,7 +2,7 @@
 
 // Note: WasmEdge depends on manual installation of a shared library.
 // Ex. wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | \
-//     sudo bash -s -- -p /usr/local -e all -v ${WASMEDGE_VERSION}
+//     sudo bash -s -- -p /usr/local -e none -v ${WASMEDGE_VERSION}
 
 package wasmedge
 
@@ -28,16 +28,17 @@ type wasmedgeRuntime struct {
 type wasmedgeModule struct {
 	store *wasmedge.Store
 	vm    *wasmedge.VM
-	env   *wasmedge.ImportObject
+	env   *wasmedge.Module
 }
 
 func (r *wasmedgeRuntime) Name() string {
 	return "wasmedge"
 }
 
-func (r *wasmedgeRuntime) log(_ interface{}, mem *wasmedge.Memory, params []interface{}) ([]interface{}, wasmedge.Result) {
+func (r *wasmedgeRuntime) log(_ interface{}, callframe *wasmedge.CallingFrame, params []interface{}) ([]interface{}, wasmedge.Result) {
 	offset := params[0].(int32)
 	byteCount := params[1].(int32)
+	mem := callframe.GetMemoryByIndex(0)
 	buf, err := mem.GetData(uint(offset), uint(byteCount))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -66,26 +67,26 @@ func (r *wasmedgeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 
 	// Instantiate WASI, if configured.
 	if cfg.NeedsWASI {
-		wasi := m.vm.GetImportObject(wasmedge.WASI)
+		wasi := m.vm.GetImportModule(wasmedge.WASI)
 		wasi.InitWasi(nil, nil, nil)
 	}
 
 	// Instantiate the host module, "env", if configured.
 	if cfg.LogFn != nil {
 		r.logFn = cfg.LogFn
-		m.env = wasmedge.NewImportObject("env")
+		m.env = wasmedge.NewModule("env")
 		logType := wasmedge.NewFunctionType([]wasmedge.ValType{wasmedge.ValType_I32, wasmedge.ValType_I32}, nil)
 		m.env.AddFunction("log", wasmedge.NewFunction(logType, r.log, nil, 0))
-		if err = m.vm.RegisterImport(m.env); err != nil {
+		if err = m.vm.RegisterModule(m.env); err != nil {
 			return nil, err
 		}
 	} else if cfg.EnvFReturnValue != 0 {
-		m.env = wasmedge.NewImportObject("env")
+		m.env = wasmedge.NewModule("env")
 		fType := wasmedge.NewFunctionType([]wasmedge.ValType{wasmedge.ValType_I64}, []wasmedge.ValType{wasmedge.ValType_I64})
-		m.env.AddFunction("f", wasmedge.NewFunction(fType, func(data interface{}, mem *wasmedge.Memory, params []interface{}) ([]interface{}, wasmedge.Result) {
+		m.env.AddFunction("f", wasmedge.NewFunction(fType, func(interface{}, *wasmedge.CallingFrame, []interface{}) ([]interface{}, wasmedge.Result) {
 			return []interface{}{int64(cfg.EnvFReturnValue)}, wasmedge.Result_Success
 		}, nil, 0))
-		if err = m.vm.RegisterImport(m.env); err != nil {
+		if err = m.vm.RegisterModule(m.env); err != nil {
 			return nil, err
 		}
 	}
@@ -132,7 +133,8 @@ func (r *wasmedgeRuntime) Close(_ context.Context) error {
 }
 
 func (m *wasmedgeModule) Memory() []byte {
-	mem := m.store.FindMemory("memory")
+	mod := m.vm.GetActiveModule()
+	mem := mod.FindMemory("memory")
 	d, err := mem.GetData(0, mem.GetPageSize()*65536)
 	if err != nil {
 		panic(err)
@@ -171,7 +173,8 @@ func (m *wasmedgeModule) CallI64_I64(_ context.Context, funcName string, param u
 }
 
 func (m *wasmedgeModule) WriteMemory(_ context.Context, offset uint32, bytes []byte) error {
-	mem := m.store.FindMemory("memory")
+	mod := m.vm.GetActiveModule()
+	mem := mod.FindMemory("memory")
 	if unsafeSlice, err := mem.GetData(uint(offset), uint(len(bytes))); err != nil {
 		return err
 	} else {

@@ -192,7 +192,7 @@ jobs:
         # The version here is coupled to internal/integration_test/go.mod, but it
         # isn't always the same as sometimes the Go layer has a broken release.
         env:
-          WASMEDGE_VERSION: 0.9.1
+          WASMEDGE_VERSION: 0.11.0
 
       - uses: actions/checkout@v3
 
