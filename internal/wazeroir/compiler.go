@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -360,7 +359,7 @@ func compile(enabledFeatures api.CoreFeatures,
 // and emit the results into c.results.
 func (c *compiler) handleInstruction() error {
 	op := c.body[c.pc]
-	if buildoptions.IsDebugMode {
+	if false {
 		var instName string
 		if op == wasm.OpcodeVecPrefix {
 			instName = wasm.VectorInstructionName(c.body[c.pc+1])
@@ -3027,7 +3026,7 @@ func (c *compiler) emit(ops ...Operation) {
 				}
 			}
 			c.result.Operations = append(c.result.Operations, op)
-			if buildoptions.IsDebugMode {
+			if false {
 				fmt.Printf("emitting ")
 				formatOperation(os.Stdout, op)
 			}

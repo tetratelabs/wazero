@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
@@ -78,7 +77,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 	// control blocks and value types to check the validity of all instructions.
 	for pc := uint64(0); pc < uint64(len(body)); pc++ {
 		op := body[pc]
-		if buildoptions.IsDebugMode {
+		if false {
 			var instName string
 			if op == OpcodeMiscPrefix {
 				instName = MiscInstructionName(body[pc+1])

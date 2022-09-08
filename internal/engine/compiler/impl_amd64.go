@@ -14,7 +14,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/asm/amd64"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/u32"
 	"github.com/tetratelabs/wazero/internal/u64"
@@ -634,7 +633,7 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction asm.Nod
 
 // compileLabel implements compiler.compileLabel for the amd64 architecture.
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
-	if buildoptions.IsDebugMode {
+	if false {
 		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
 	}
 
@@ -667,7 +666,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
-	if buildoptions.IsDebugMode {
+	if false {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
 	}
 	c.currentLabel = labelKey
