@@ -10,7 +10,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/buildoptions"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -804,7 +803,7 @@ entry:
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(ctx, caller.source.Module.Tables)
 			}
-			if buildoptions.IsDebugMode {
+			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
 					runtime.Breakpoint()
 				}
@@ -907,7 +906,7 @@ func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult) (*c
 			continue
 		}
 
-		if buildoptions.IsDebugMode {
+		if false {
 			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
 		}
 		var err error
