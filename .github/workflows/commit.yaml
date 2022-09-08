@@ -47,6 +47,7 @@ jobs:
         with:
           path: |
             ~/.cache/go-build
+            ~/.cache/golangci-lint
             ~/go/pkg/mod
             ~/go/bin
           key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
