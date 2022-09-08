@@ -50,7 +50,7 @@ jobs:
             ~/.cache/golangci-lint
             ~/go/pkg/mod
             ~/go/bin
-          key: cache-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+          key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
       - run: make check
 
