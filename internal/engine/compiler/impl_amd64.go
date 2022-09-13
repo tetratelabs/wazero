@@ -3,8 +3,6 @@ package compiler
 // This file implements the compiler for amd64/x86_64 target.
 // Please refer to https://www.felixcloutier.com/x86/index.html
 // if unfamiliar with amd64 instructions used here.
-// Note that x86 pkg used here prefixes all the instructions with "A"
-// e.g. MOVQ will be given as amd64.MOVQ.
 
 import (
 	"bytes"
