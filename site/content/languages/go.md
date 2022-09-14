@@ -283,12 +283,12 @@ Tips:
 ### Setup ENV variables for your branch.
 
 To test the Go you just built, you need to have `GOROOT` set to your workspace,
-and your PATH configured to find both `bin/go` and `bin/misc/go_js_wasm_exec`.
+and your PATH configured to find both `bin/go` and `misc/wasm/go_js_wasm_exec`.
 
 Ex.
 ```bash
 $ export GOROOT=$PWD
-$ export PATH=${GOROOT}/bin/misc:${GOROOT}/bin:$PATH
+$ export PATH=${GOROOT}/misc/wasm:${GOROOT}/bin:$PATH
 ```
 
 Tip: `go_js_wasm_exec` is used because Go doesn't embed a WebAssembly runtime
@@ -304,7 +304,7 @@ The main thing to keep in mind is where files are, and remember to set
 Ex. If you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
 ```bash
-$ GOOS=js GOARCH=wasm /go test syscall/js
+$ GOOS=js GOARCH=wasm go test syscall/js
 ok  	syscall/js	1.093s
 ```
 
