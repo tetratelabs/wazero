@@ -241,6 +241,73 @@ signature unrelated to the source, more care is needed implementing the host
 side, to ensure the proper count of parameters are read and results written to
 the Go stack.
 
+## Hacking
+
+If you run into an issue where you need to change Go's sourcecode, the first
+thing you should do is read the [contributing guide][20], which details how to
+confirm an issue exists and a fix would be accepted. Assuming they say yes, the
+next step is to ensure you can build and test go.
+
+### Make a branch for your changes
+
+First, clone upstream or your fork of golang/go and make a branch off `master`
+for your work, as GitHub pull requests are against that branch.
+
+```bash
+$ git clone --depth=1 https://github.com/golang/go.git
+$ cd go
+$ git checkout -b my-fix
+```
+
+### Build a branch-specific `go` binary
+
+While your change may not affect the go binary itself, there are checks inside
+go that require version matching. Build a go binary from source to avoid these:
+
+```bash
+$ cd src
+$ GOOS=js GOARCH=wasm ./make.bash
+Building Go cmd/dist using /usr/local/go. (go1.19 darwin/amd64)
+Building Go toolchain1 using /usr/local/go.
+--snip--
+$ cd ..
+$ bin/go version
+go version devel go1.19-c5da4fb7ac Fri Jul 22 20:12:19 2022 +0000 darwin/amd64
+```
+
+Tips:
+* The above `bin/go` was built with whatever go version you had in your path!
+* `GOARCH` here is what the resulting `go` binary can target. It isn't the
+  architecture of the current host (`GOHOSTARCH`).
+
+### Setup ENV variables for your branch.
+
+To test the Go you just built, you need to have `GOROOT` set to your workspace,
+and your PATH configured to find both `bin/go` and `misc/wasm/go_js_wasm_exec`.
+
+Ex.
+```bash
+$ export GOROOT=$PWD
+$ export PATH=${GOROOT}/misc/wasm:${GOROOT}/bin:$PATH
+```
+
+Tip: `go_js_wasm_exec` is used because Go doesn't embed a WebAssembly runtime
+like wazero. In other words, go can't run the wasm it just built. Instead,
+`go test` uses Node.js which it assumes is installed on your host!
+
+### Iterate until ready to submit
+
+Now, you should be all set and can iterate similar to normal Go development.
+The main thing to keep in mind is where files are, and remember to set
+`GOOS=js GOARCH=wasm` when running go commands.
+
+Ex. If you fixed something in the `syscall/js` package
+(`${GOROOT}/src/syscall/js`), test it like so:
+```bash
+$ GOOS=js GOARCH=wasm go test syscall/js
+ok  	syscall/js	1.093s
+```
+
 [1]: https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js
 [2]: https://github.com/golang/go/blob/go1.19/src/cmd/link/internal/wasm/asm.go
 [3]: https://github.com/WebAssembly/wabt
@@ -260,3 +327,4 @@ the Go stack.
 [17]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/nontrapping-float-to-int-conversion/Overview.md
 [18]: https://github.com/WebAssembly/spec/blob/wg-2.0.draft1/proposals/sign-extension-ops/Overview.md
 [19]: https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/
+[20]: https://github.com/golang/go/blob/go1.19/CONTRIBUTING.md
