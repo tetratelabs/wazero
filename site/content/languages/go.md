@@ -248,7 +248,7 @@ thing you should do is read the [contributing guide][20], which details how to
 confirm an issue exists and a fix would be accepted. Assuming they say yes, the
 next step is to ensure you can build and test go.
 
-### Setting up your GOROOT
+### Make a branch for your changes
 
 First, clone upstream or your fork of golang/go and make a branch off `master`
 for your work, as GitHub pull requests are against that branch.
@@ -256,7 +256,6 @@ for your work, as GitHub pull requests are against that branch.
 ```bash
 $ git clone https://github.com/golang/go.git
 $ cd go
-$ export GOROOT=$PWD
 $ git checkout -b my-fix
 ```
 
@@ -264,6 +263,7 @@ $ git checkout -b my-fix
 
 While your change may not affect the go binary itself, there are checks inside
 go that require version matching. Build a go binary from source to avoid these:
+
 ```bash
 $ cd src
 $ GOOS=js GOARCH=wasm ./make.bash
@@ -275,15 +275,34 @@ $ bin/go version
 go version devel go1.19-c5da4fb7ac Fri Jul 22 20:12:19 2022 +0000 darwin/amd64
 ```
 
+Note: The above `bin/go` was built with whatever go version you had in your
+path!
+
+### Setup ENV variables for your branch.
+
+To test the Go you just built, you need to have `GOROOT` set to your workspace,
+and your PATH configured to find both `bin/go` and `bin/misc/go_js_wasm_exec`.
+
+Ex.
+```bash
+$ export GOROOT=$PWD
+$ export PATH=${GOROOT}/bin/misc:${GOROOT}/bin:$PATH
+```
+
+Tip: `go_js_wasm_exec` is used because Go doesn't embed a WebAssembly runtime
+like wazero. In other words, go can't run the wasm it just built. Instead,
+`go test` uses Node.js which it assumes is installed on your host!
+
 ### Iterate until ready to submit
 
-Now that you have your `GOROOT` and a valid binary at `${GOROOT}/bin/go`,
-iterate on changes until they work.
+Now, you should be all set and can iterate similar to normal Go development.
+The main thing to keep in mind is where files are, and remember to set
+`GOOS=js GOARCH=wasm` when running go commands. 
 
 Ex. If you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
 ```bash
-$ GOOS=js GOARCH=wasm ${GOROOT}/bin/go test syscall/js
+$ GOOS=js GOARCH=wasm /go test syscall/js
 ok  	syscall/js	1.093s
 ```
 
