@@ -275,8 +275,10 @@ $ bin/go version
 go version devel go1.19-c5da4fb7ac Fri Jul 22 20:12:19 2022 +0000 darwin/amd64
 ```
 
-Note: The above `bin/go` was built with whatever go version you had in your
-path!
+Tips:
+* The above `bin/go` was built with whatever go version you had in your path!
+* `GOARCH` here is what the resulting `go` binary can target. It isn't the
+  architecture of the current host (`GOHOSTARCH`).
 
 ### Setup ENV variables for your branch.
 
@@ -297,7 +299,7 @@ like wazero. In other words, go can't run the wasm it just built. Instead,
 
 Now, you should be all set and can iterate similar to normal Go development.
 The main thing to keep in mind is where files are, and remember to set
-`GOOS=js GOARCH=wasm` when running go commands. 
+`GOOS=js GOARCH=wasm` when running go commands.
 
 Ex. If you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
