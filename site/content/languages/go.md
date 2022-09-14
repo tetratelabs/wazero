@@ -254,7 +254,7 @@ First, clone upstream or your fork of golang/go and make a branch off `master`
 for your work, as GitHub pull requests are against that branch.
 
 ```bash
-$ git clone https://github.com/golang/go.git
+$ git clone --depth=1 https://github.com/golang/go.git
 $ cd go
 $ git checkout -b my-fix
 ```
