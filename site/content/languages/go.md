@@ -245,8 +245,8 @@ the Go stack.
 
 If you run into an issue where you need to change Go's sourcecode, the first
 thing you should do is read the [contributing guide][20], which details how to
-confirm an issue exists and a fix would be accepted. Assuming they say get a
-yes, the next step is to ensure you can build and test go.
+confirm an issue exists and a fix would be accepted. Assuming they say yes, the
+next step is to ensure you can build and test go.
 
 ### Setting up your GOROOT
 
