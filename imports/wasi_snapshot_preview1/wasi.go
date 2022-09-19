@@ -110,7 +110,8 @@ func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Clo
 // exportFunctions adds all go functions that implement wasi.
 // These should be exported in the module named ModuleName.
 func exportFunctions(builder wazero.ModuleBuilder) {
-	// Note:se are ordered per spec for consistency even if the resulting map can't guarantee that.
+	// Note: these are ordered per spec for consistency even if the resulting
+	// map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	builder.ExportFunction(argsGet.Name, argsGet)
 	builder.ExportFunction(argsSizesGet.Name, argsSizesGet)
@@ -154,6 +155,7 @@ func exportFunctions(builder wazero.ModuleBuilder) {
 	builder.ExportFunction(procRaise.Name, procRaise)
 	builder.ExportFunction(schedYield.Name, schedYield)
 	builder.ExportFunction(randomGet.Name, randomGet)
+	builder.ExportFunction(sockAccept.Name, sockAccept)
 	builder.ExportFunction(sockRecv.Name, sockRecv)
 	builder.ExportFunction(sockSend.Name, sockSend)
 	builder.ExportFunction(sockShutdown.Name, sockShutdown)

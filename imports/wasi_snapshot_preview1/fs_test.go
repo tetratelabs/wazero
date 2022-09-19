@@ -1126,9 +1126,8 @@ func Test_pathOpen(t *testing.T) {
 	pathPtr := uint32(1)
 	pathLen := uint32(len(pathName))
 	oflags := uint32(0)
-	// rights are ignored per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
-	fsRightsBase := uint64(1)
-	fsRightsInheriting := uint64(2)
+	fsRightsBase := uint64(1)       // ignored: rights were removed from WASI.
+	fsRightsInheriting := uint64(2) // ignored: rights were removed from WASI.
 	fdflags := uint32(0)
 	resultOpenedFd := uint32(len(initialMemory) + 1)
 

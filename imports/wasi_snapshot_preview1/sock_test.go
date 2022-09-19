@@ -6,6 +6,17 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
+// Test_sockAccept only tests it is stubbed for GrainLang per #271
+func Test_sockAccept(t *testing.T) {
+	log := requireErrnoNosys(t, functionSockAccept, 0, 0, 0)
+	require.Equal(t, `
+--> proxy.sock_accept(fd=0,flags=0,result.fd=0)
+	--> wasi_snapshot_preview1.sock_accept(fd=0,flags=0,result.fd=0)
+	<-- ENOSYS
+<-- (52)
+`, log)
+}
+
 // Test_sockRecv only tests it is stubbed for GrainLang per #271
 func Test_sockRecv(t *testing.T) {
 	log := requireErrnoNosys(t, functionSockRecv, 0, 0, 0, 0, 0, 0)

@@ -9,7 +9,8 @@ import (
 // # Notes
 //
 //   - This is not always an error, as ErrnoSuccess is a valid code.
-//   - Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
+//   - Codes are defined even when not relevant to WASI for use in higher-level
+//     libraries or alignment with POSIX.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16 and
 // https://linux.die.net/man/3/errno
@@ -176,6 +177,7 @@ const (
 	ErrnoTxtbsy
 	// ErrnoXdev Cross-device link.
 	ErrnoXdev
-	// ErrnoNotcapable Extension: Capabilities insufficient.
-	ErrnoNotcapable
+
+	// Note: ErrnoNotcapable was removed by WASI maintainers.
+	// See https://github.com/WebAssembly/wasi-libc/pull/294
 )

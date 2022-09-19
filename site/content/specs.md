@@ -66,8 +66,9 @@ any working drafts as a result of their work. WASI's last stable point was
 
 Some functions in this tag are used in practice while some others are not known
 to be used at all. Further confusion exists because some compilers, like
-GrainLang, import functions not used. Finally, [wasi_snapshot_preview1][4]
-includes features such as "rights" that [will be removed][13].
+GrainLang, import functions not used. Finally, some functions were added and
+removed after the git tag. For example, [`proc_raise`][13] was removed and
+[`sock_accept`][15] added.
 
 For all of these reasons, wazero will not implement all WASI features, just to
 complete the below chart. If you desire something not yet implemented, please
@@ -91,7 +92,7 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 | fd_datasync             |   ❌    |                 |
 | fd_fdstat_get           |   ✅    |          TinyGo |
 | fd_fdstat_set_flags     |   ❌    |                 |
-| fd_fdstat_set_rights    |   ❌    |                 |
+| fd_fdstat_set_rights    |   💀   |                 |
 | fd_filestat_get         |   ❌    |                 |
 | fd_filestat_set_size    |   ❌    |                 |
 | fd_filestat_set_times   |   ❌    |                 |
@@ -118,12 +119,15 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 | path_unlink_file        |   ❌    |                 |
 | poll_oneoff             |   ✅    | Rust,TinyGo,Zig |
 | proc_exit               |   ✅    |  AssemblyScript |
-| proc_raise              |   ❌    |                 |
+| proc_raise              |   💀   |                 |
 | sched_yield             |   ❌    |                 |
 | random_get              |   ✅    |                 |
+| sock_accept             |   ❌    |                 |
 | sock_recv               |   ❌    |                 |
 | sock_send               |   ❌    |                 |
 | sock_shutdown           |   ❌    |                 |
+
+Note: 💀 means the function was later removed from WASI.
 
 </p>
 </details>
@@ -139,5 +143,6 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 [10]: https://github.com/WebAssembly/proposals
 [11]: https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
 [12]: https://www.w3.org/community/webassembly/
-[13]: https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+[13]: https://github.com/WebAssembly/WASI/pull/136
 [14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
+[15]: https://github.com/WebAssembly/WASI/pull/458
