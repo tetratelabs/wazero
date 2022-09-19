@@ -3,9 +3,21 @@ package wasi_snapshot_preview1
 import "github.com/tetratelabs/wazero/internal/wasm"
 
 const (
+	functionSockAccept   = "sock_accept"
 	functionSockRecv     = "sock_recv"
 	functionSockSend     = "sock_send"
 	functionSockShutdown = "sock_shutdown"
+)
+
+// sockAccept is the WASI function named functionSockAccept which accepts a new
+// incoming connection.
+//
+// See: https://github.com/WebAssembly/WASI/blob/0ba0c5e2e37625ca5a6d3e4255a998dfaa3efc52/phases/snapshot/docs.md#sock_accept
+// and https://github.com/WebAssembly/WASI/pull/458
+var sockAccept = stubFunction(
+	functionSockAccept,
+	[]wasm.ValueType{i32, i32, i32},
+	[]string{"fd", "flags", "result.fd"},
 )
 
 // sockRecv is the WASI function named functionSockRecv which receives a

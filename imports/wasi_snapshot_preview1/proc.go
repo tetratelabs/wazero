@@ -36,8 +36,7 @@ var procExit = wasm.NewGoFunc(
 	},
 )
 
-// procRaise is the WASI function named functionProcRaise which sends a signal
-// to the process of the calling thread.
+// procRaise is stubbed and will never be supported, as it was removed.
 //
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-proc_raisesig-signal---errno
+// See https://github.com/WebAssembly/WASI/pull/136
 var procRaise = stubFunction(functionProcRaise, []wasm.ValueType{i32}, []string{"sig"})

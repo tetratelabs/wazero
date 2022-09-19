@@ -119,11 +119,11 @@ var fdDatasync = stubFunction(
 //   - ErrnoFault: `resultFdstat` points to an offset out of memory
 //
 // fdstat byte layout is 24-byte size, with the following fields:
-//   - fs_filetype 1 byte, to indicate the file type
-//   - fs_flags 2 bytes, to indicate the file descriptor flag
+//   - fs_filetype 1 byte: the file type
+//   - fs_flags 2 bytes: the file descriptor flag
 //   - 5 pad bytes
-//   - fs_right_base 8 bytes, to indicate the current rights of the fd
-//   - fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
+//   - fs_right_base 8 bytes: ignored as rights were removed from WASI.
+//   - fs_right_inheriting 8 bytes: ignored as rights were removed from WASI.
 //
 // For example, with a file corresponding with `fd` was a directory (=3) opened
 // with `fd_read` right (=1) and no fs_flags (=0), parameter resultFdstat=1,
@@ -164,12 +164,9 @@ var fdFdstatSetFlags = stubFunction(
 	[]string{"fd", "flags"},
 )
 
-// fdFdstatSetRights is the WASI function named functionFdFdstatSetRights which
-// adjusts the rights associated with a file descriptor.
+// fdFdstatSetRights will not be implemented as rights were removed from WASI.
 //
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_rightsfd-fd-fs_rights_base-rights-fs_rights_inheriting-rights---errno
-//
-// Note: This will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+// See https://github.com/bytecodealliance/wasmtime/pull/4666
 var fdFdstatSetRights = stubFunction(
 	functionFdFdstatSetRights,
 	[]wasm.ValueType{i32, i64, i64},
@@ -696,8 +693,8 @@ var pathLink = stubFunction(
 //   - path: offset in api.Memory to read the path string from
 //   - pathLen: length of `path`
 //   - oFlags: open flags to indicate the method by which to open the file
-//   - fsRightsBase: rights of the newly created file descriptor for `path`
-//   - fsRightsInheriting: rights of the file descriptors derived from the newly
+//   - fsRightsBase: ignored as rights were removed from WASI.
+//   - fsRightsInheriting: ignored as rights were removed from WASI.
 //     created file descriptor for `path`
 //   - fdFlags: file descriptor flags
 //   - resultOpenedFd: offset in api.Memory to write the newly created file
@@ -737,14 +734,13 @@ var pathLink = stubFunction(
 // # Notes
 //   - This is similar to `openat` in POSIX. https://linux.die.net/man/3/openat
 //   - The returned file descriptor is not guaranteed to be the lowest-number
-//   - Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 var pathOpen = wasm.NewGoFunc(
 	functionPathOpen, functionPathOpen,
 	[]string{"fd", "dirflags", "path", "path_len", "oflags", "fs_rights_base", "fs_rights_inheriting", "fdflags", "result.opened_fd"},
-	func(ctx context.Context, mod api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
-		fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno Errno) {
+	func(ctx context.Context, mod api.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, _, _ uint64,
+		fdflags, resultOpenedFd uint32) (errno Errno) {
 		sysCtx := mod.(*wasm.CallContext).Sys
 		fsc := sysCtx.FS(ctx)
 		if _, ok := fsc.OpenedFile(ctx, fd); !ok {

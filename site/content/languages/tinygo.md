@@ -115,7 +115,7 @@ in more, see [System Calls](#system-calls).
 ## Memory
 
 When TinyGo compiles go into wasm, it configures the WebAssembly linear memory
-to an initial size of 2 pages (16KB), and marks a position in that memory as
+to an initial size of 2 pages (128KB), and marks a position in that memory as
 the heap base. All memory beyond that is used for the Go heap.
 
 Allocations within Go (compiled to `%.wasm`) are managed as one would expect.

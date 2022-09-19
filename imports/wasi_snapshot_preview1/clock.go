@@ -19,10 +19,8 @@ const (
 	clockIDRealtime = iota
 	// clockIDMonotonic is the name ID named "monotonic" like sys.Nanotime
 	clockIDMonotonic
-	// clockIDProcessCputime is the unsupported "process_cputime_id"
-	clockIDProcessCputime
-	// clockIDThreadCputime is the unsupported "thread_cputime_id"
-	clockIDThreadCputime
+	// Note: clockIDProcessCputime and clockIDThreadCputime were removed by
+	// WASI maintainers: https://github.com/WebAssembly/wasi-libc/pull/294
 )
 
 // clockResGet is the WASI function named functionClockResGet that returns the
@@ -65,11 +63,6 @@ var clockResGet = wasm.NewGoFunc(
 			resolution = uint64(sysCtx.WalltimeResolution())
 		case clockIDMonotonic:
 			resolution = uint64(sysCtx.NanotimeResolution())
-		case clockIDProcessCputime, clockIDThreadCputime:
-			// Similar to many other runtimes, we only support realtime and
-			// monotonic clocks. Other types are slated to be removed from the next
-			// version of WASI.
-			return ErrnoNotsup
 		default:
 			return ErrnoInval
 		}
@@ -125,11 +118,6 @@ var clockTimeGet = wasm.NewGoFunc(
 			val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
 		case clockIDMonotonic:
 			val = uint64(sysCtx.Nanotime(ctx))
-		case clockIDProcessCputime, clockIDThreadCputime:
-			// Similar to many other runtimes, we only support realtime and
-			// monotonic clocks. Other types are slated to be removed from the next
-			// version of WASI.
-			return ErrnoNotsup
 		default:
 			return ErrnoInval
 		}

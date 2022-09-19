@@ -86,23 +86,23 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 		{
 			name:          "process cputime",
 			clockID:       2,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_res_get(id=2,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
-	<== ENOTSUP
-<-- (58)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
 			name:          "thread cputime",
 			clockID:       3,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_res_get(id=3,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
-	<== ENOTSUP
-<-- (58)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
@@ -204,23 +204,23 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 		{
 			name:          "process cputime",
 			clockID:       2,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_time_get(id=2,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
-	<== ENOTSUP
-<-- (58)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
 			name:          "thread cputime",
 			clockID:       3,
-			expectedErrno: ErrnoNotsup,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.clock_time_get(id=3,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
-	<== ENOTSUP
-<-- (58)
+	<== EINVAL
+<-- (28)
 `,
 		},
 		{
