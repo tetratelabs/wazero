@@ -417,9 +417,12 @@ func (m *Module) validateMemory(memory *Memory, globals []*GlobalType, _ api.Cor
 		return fmt.Errorf("unknown memory")
 	}
 
+	// Constant expression can only reference imported globals.
+	// https://github.com/WebAssembly/spec/blob/5900d839f38641989a9d8df2df4aee0513365d39/test/core/data.wast#L84-L91
+	importedGlobals := globals[:m.ImportGlobalCount()]
 	for _, d := range m.DataSection {
 		if !d.IsPassive() {
-			if err := validateConstExpression(globals, 0, d.OffsetExpression, ValueTypeI32); err != nil {
+			if err := validateConstExpression(importedGlobals, 0, d.OffsetExpression, ValueTypeI32); err != nil {
 				return fmt.Errorf("calculate offset: %w", err)
 			}
 		}
