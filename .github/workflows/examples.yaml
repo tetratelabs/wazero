@@ -17,6 +17,7 @@ on:
 
 env:
   EMSDK_VERSION: "3.1.20"
+  TINYGO_VERSION: "0.25.0"
 
 jobs:
   # Not all toolchains are idempotent when generating wasm, so we don't check
@@ -34,18 +35,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Cache
-        uses: actions/cache@v3
+      - uses: actions/setup-go@v3
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/go/bin
-          key: check-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum', 'Makefile') }}
+          go-version: ${{ matrix.go-version }}
+          cache: true
 
       - name: Install TinyGo
         run: |  # installing via curl so commands are similar on OS/x
-          tinygo_version=0.25.0
+          tinygo_version=${{ env.TINYGO_VERSION }}
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
           echo "TINYGOROOT=/usr/local/tinygo" >> $GITHUB_ENV
           echo "/usr/local/tinygo/bin" >> $GITHUB_PATH

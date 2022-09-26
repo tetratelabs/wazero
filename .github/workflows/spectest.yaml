@@ -32,18 +32,12 @@ jobs:
         - "v2"
 
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.spec-version }}
+          cache: true
 
       - run: make spectest.${{ matrix.spec-version }}
 
@@ -99,18 +93,12 @@ jobs:
         - "v2"
 
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
-
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: spectest-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}-${{ matrix.spec-version }}
+          cache: true
 
       - name: Build test binaries
         run: go list -f '{{.Dir}}' ./... | grep 'spectest/${{ matrix.spec-version }}' | xargs -Ipkg go test pkg -c -o spectest.test
