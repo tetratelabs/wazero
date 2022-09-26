@@ -31,10 +31,6 @@ jobs:
         - "1.19"
 
     steps:
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
           wabt_version=1.0.29
@@ -42,6 +38,10 @@ jobs:
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 
       - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
 
       - uses: actions/cache@v3
         with:
@@ -182,10 +182,6 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       # Unlike the other CGO libraries, WasmEdge requires offline installation.
       - name: Install WasmEdge
         run: |
@@ -195,13 +191,11 @@ jobs:
         env:
           WASMEDGE_VERSION: 0.11.0
 
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
+      - uses: actions/setup-go@v3
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: bench-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/checkout@v3
 
       - run: make bench.check
