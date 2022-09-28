@@ -11,7 +11,7 @@ import (
 // WebAssembly binary (ex. %.wasm file) can import and use them.
 //
 // Specifically, this implements the host side of an Application Binary
-// Interface (ABI) like as WASI or AssemblyScript.
+// Interface (ABI) like WASI or AssemblyScript.
 //
 // Ex. Below defines and instantiates a module named "env" with one function:
 //
