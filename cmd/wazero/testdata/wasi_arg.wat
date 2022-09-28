@@ -1,3 +1,4 @@
+;; Copied from imports/wasi_snapshot_preview1/testdata/wasi_arg.wat
 ;; $wasi_arg is a WASI command which copies null-terminated args to stdout.
 (module $wasi_arg
 	;; args_get reads command-line argument data.
