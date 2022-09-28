@@ -60,6 +60,9 @@ func TestHelp(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	notWasmPath := filepath.Join(t.TempDir(), "bears.wasm")
+	require.NoError(t, os.WriteFile(notWasmPath, []byte("pooh"), 0755))
+
 	tests := []struct {
 		message string
 		args    []string
@@ -71,6 +74,10 @@ func TestErrors(t *testing.T) {
 		{
 			message: "error reading wasm binary",
 			args:    []string{"non-existent.wasm"},
+		},
+		{
+			message: "error compiling wasm binary",
+			args:    []string{notWasmPath},
 		},
 	}
 
