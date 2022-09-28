@@ -13,6 +13,7 @@ func decodeImport(
 	r *bytes.Reader,
 	idx uint32,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
 ) (i *wasm.Import, err error) {
 	i = &wasm.Import{}
@@ -35,7 +36,7 @@ func decodeImport(
 	case wasm.ExternTypeTable:
 		i.DescTable, err = decodeTable(r, enabledFeatures)
 	case wasm.ExternTypeMemory:
-		i.DescMem, err = decodeMemory(r, memorySizer)
+		i.DescMem, err = decodeMemory(r, memorySizer, memoryLimitPages)
 	case wasm.ExternTypeGlobal:
 		i.DescGlobal, err = decodeGlobalType(r)
 	default:

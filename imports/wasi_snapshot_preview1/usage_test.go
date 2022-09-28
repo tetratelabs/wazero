@@ -25,7 +25,7 @@ func TestInstantiateModule(t *testing.T) {
 	require.NoError(t, err)
 	defer wm.Close(testCtx)
 
-	compiled, err := r.CompileModule(testCtx, wasiArg, wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(testCtx, wasiArg)
 	require.NoError(t, err)
 	defer compiled.Close(testCtx)
 

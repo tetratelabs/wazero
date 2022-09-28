@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"reflect"
 	"testing"
 	"testing/fstest"
 
@@ -33,7 +32,26 @@ func TestRuntimeConfig(t *testing.T) {
 				enabledFeatures: api.CoreFeaturesV1,
 			},
 		},
+		{
+			name: "memoryLimitPages",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithMemoryLimitPages(10)
+			},
+			expected: &runtimeConfig{
+				memoryLimitPages: 10,
+			},
+		},
+		{
+			name: "memoryCapacityFromMax",
+			with: func(c RuntimeConfig) RuntimeConfig {
+				return c.WithMemoryCapacityFromMax(true)
+			},
+			expected: &runtimeConfig{
+				memoryCapacityFromMax: true,
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		tc := tt
 
@@ -45,46 +63,14 @@ func TestRuntimeConfig(t *testing.T) {
 			require.Equal(t, &runtimeConfig{}, input)
 		})
 	}
-}
 
-func TestCompileConfig(t *testing.T) {
-	mp := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-		return 0, 1, 1
-	}
-	tests := []struct {
-		name     string
-		with     func(CompileConfig) CompileConfig
-		expected *compileConfig
-	}{
-		{
-			name: "WithMemorySizer",
-			with: func(c CompileConfig) CompileConfig {
-				return c.WithMemorySizer(mp)
-			},
-			expected: &compileConfig{memorySizer: mp},
-		},
-		{
-			name: "WithMemorySizer twice",
-			with: func(c CompileConfig) CompileConfig {
-				return c.WithMemorySizer(wasm.MemorySizer).WithMemorySizer(mp)
-			},
-			expected: &compileConfig{memorySizer: mp},
-		},
-	}
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			input := &compileConfig{}
-			rc := tc.with(input).(*compileConfig)
-
-			// We cannot compare func, but we can compare reflect.Value
-			// See https://go.dev/ref/spec#Comparison_operators
-			require.Equal(t, reflect.ValueOf(tc.expected.memorySizer), reflect.ValueOf(rc.memorySizer))
-			// The source wasn't modified
-			require.Equal(t, &compileConfig{}, input)
+	t.Run("memoryLimitPages invalid panics", func(t *testing.T) {
+		err := require.CapturePanic(func() {
+			input := &runtimeConfig{}
+			input.WithMemoryLimitPages(wasm.MemoryLimitPages + 1)
 		})
-	}
+		require.EqualError(t, err, "memoryLimitPages invalid: 65537 > 65536")
+	})
 }
 
 func TestModuleConfig(t *testing.T) {

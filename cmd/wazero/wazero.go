@@ -94,7 +94,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
-	code, err := rt.CompileModule(ctx, wasm, wazero.NewCompileConfig())
+	code, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
 		exit(1)

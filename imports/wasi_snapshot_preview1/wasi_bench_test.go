@@ -46,7 +46,7 @@ func Benchmark_EnvironGet(b *testing.B) {
 	compiled, err := r.CompileModule(testCtx, binaryformat.EncodeModule(&wasm.Module{
 		MemorySection: &wasm.Memory{Min: 1, Max: 1},
 		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
-	}), wazero.NewCompileConfig())
+	}))
 	if err != nil {
 		b.Fatal(err)
 	}

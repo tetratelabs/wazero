@@ -38,7 +38,7 @@ func main() {
 	}
 
 	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, asWasm, wazero.NewCompileConfig())
+	code, err := r.CompileModule(ctx, asWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

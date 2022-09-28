@@ -30,7 +30,7 @@ func Example_newLoggingListenerFactory() {
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, listenerWasm, wazero.NewCompileConfig())
+	code, err := r.CompileModule(ctx, listenerWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

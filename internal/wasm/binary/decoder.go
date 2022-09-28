@@ -16,7 +16,8 @@ import (
 func DecodeModule(
 	binary []byte,
 	enabledFeatures api.CoreFeatures,
-	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memoryLimitPages uint32,
+	memoryCapacityFromMax bool,
 ) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
@@ -30,6 +31,8 @@ func DecodeModule(
 	if _, err := io.ReadFull(r, buf); err != nil || !bytes.Equal(buf, version) {
 		return nil, ErrInvalidVersion
 	}
+
+	memorySizer := newMemorySizer(memoryLimitPages, memoryCapacityFromMax)
 
 	m := &wasm.Module{}
 	for {
@@ -77,7 +80,7 @@ func DecodeModule(
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
 		case wasm.SectionIDImport:
-			if m.ImportSection, err = decodeImportSection(r, memorySizer, enabledFeatures); err != nil {
+			if m.ImportSection, err = decodeImportSection(r, memorySizer, memoryLimitPages, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDFunction:
@@ -85,7 +88,7 @@ func DecodeModule(
 		case wasm.SectionIDTable:
 			m.TableSection, err = decodeTableSection(r, enabledFeatures)
 		case wasm.SectionIDMemory:
-			m.MemorySection, err = decodeMemorySection(r, memorySizer)
+			m.MemorySection, err = decodeMemorySection(r, memorySizer, memoryLimitPages)
 		case wasm.SectionIDGlobal:
 			if m.GlobalSection, err = decodeGlobalSection(r, enabledFeatures); err != nil {
 				return nil, err // avoid re-wrapping the error.
@@ -127,4 +130,21 @@ func DecodeModule(
 		return nil, fmt.Errorf("function and code section have inconsistent lengths: %d != %d", functionCount, codeCount)
 	}
 	return m, nil
+}
+
+// memorySizer derives min, capacity and max pages from decoded wasm.
+type memorySizer func(minPages uint32, maxPages *uint32) (min uint32, capacity uint32, max uint32)
+
+// newMemorySizer sets capacity to minPages unless max is defined and
+// memoryCapacityFromMax is true.
+func newMemorySizer(memoryLimitPages uint32, memoryCapacityFromMax bool) memorySizer {
+	return func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
+		if maxPages != nil {
+			if memoryCapacityFromMax {
+				return minPages, *maxPages, *maxPages
+			}
+			return minPages, minPages, *maxPages
+		}
+		return minPages, minPages, memoryLimitPages
+	}
 }

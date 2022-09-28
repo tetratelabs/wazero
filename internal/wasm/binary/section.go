@@ -28,6 +28,7 @@ func decodeTypeSection(enabledFeatures api.CoreFeatures, r *bytes.Reader) ([]*wa
 func decodeImportSection(
 	r *bytes.Reader,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memoryLimitPages uint32,
 	enabledFeatures api.CoreFeatures,
 ) ([]*wasm.Import, error) {
 	vs, _, err := leb128.DecodeUint32(r)
@@ -37,7 +38,7 @@ func decodeImportSection(
 
 	result := make([]*wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeImport(r, i, memorySizer, enabledFeatures); err != nil {
+		if result[i], err = decodeImport(r, i, memorySizer, memoryLimitPages, enabledFeatures); err != nil {
 			return nil, err
 		}
 	}
@@ -84,6 +85,7 @@ func decodeTableSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]*w
 func decodeMemorySection(
 	r *bytes.Reader,
 	memorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32),
+	memoryLimitPages uint32,
 ) (*wasm.Memory, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
@@ -93,7 +95,7 @@ func decodeMemorySection(
 		return nil, fmt.Errorf("at most one memory allowed in module, but read %d", vs)
 	}
 
-	return decodeMemory(r, memorySizer)
+	return decodeMemory(r, memorySizer, memoryLimitPages)
 }
 
 func decodeGlobalSection(r *bytes.Reader, enabledFeatures api.CoreFeatures) ([]*wasm.Global, error) {

@@ -435,7 +435,7 @@ func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.Module
 
 	proxyBin := proxy.GetProxyModuleBinary("env", envCompiled)
 
-	proxyCompiled, err := r.CompileModule(ctx, proxyBin, wazero.NewCompileConfig())
+	proxyCompiled, err := r.CompileModule(ctx, proxyBin)
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateModule(ctx, proxyCompiled, config)

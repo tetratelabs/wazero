@@ -29,7 +29,7 @@ func main() {
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Compile WebAssembly that requires its own "env" module.
-	compiled, err := r.CompileModule(ctx, counterWasm, wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(ctx, counterWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

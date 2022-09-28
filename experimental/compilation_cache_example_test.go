@@ -41,7 +41,7 @@ func newRuntimeCompileClose(ctx context.Context) {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created except the file system cache.
 
-	_, err := r.CompileModule(ctx, fsWasm, wazero.NewCompileConfig())
+	_, err := r.CompileModule(ctx, fsWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

@@ -109,7 +109,7 @@ func TestMemory_Validate(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.mem.Validate()
+			err := tc.mem.Validate(MemoryLimitPages)
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
 			} else {

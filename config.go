@@ -3,6 +3,7 @@ package wazero
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -41,6 +42,28 @@ type RuntimeConfig interface {
 	// defaults to api.CoreFeaturesV2, even though it is not yet a Web
 	// Standard (REC).
 	WithCoreFeatures(api.CoreFeatures) RuntimeConfig
+
+	// WithMemoryLimitPages overrides the maximum pages allowed per memory. The
+	// default is 65536, allowing 4GB total memory per instance. Setting a
+	// value larger than default will panic.
+	//
+	// Ex. To reduce the largest possible memory size from 4GB to 128KB:
+	//	rConfig = wazero.NewRuntimeConfig().WithMemoryLimitPages(2)
+	//
+	// Note: Wasm has 32-bit memory and each page is 65536 (2^16) bytes. This
+	// implies a max of 65536 (2^16) addressable pages.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig
+
+	// WithMemoryCapacityFromMax eagerly allocates max memory, unless max is
+	// not defined. The default is false, which means minimum memory is
+	// allocated and any call to grow memory results in re-allocations.
+	//
+	// Ex. To ensure any memory.grow instruction will never re-allocate:
+	//	rConfig = wazero.NewRuntimeConfig().WithMemoryCapacityFromMax(true)
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
+	WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -50,14 +73,18 @@ func NewRuntimeConfig() RuntimeConfig {
 }
 
 type runtimeConfig struct {
-	enabledFeatures api.CoreFeatures
-	isInterpreter   bool
-	newEngine       func(context.Context, api.CoreFeatures) wasm.Engine
+	enabledFeatures       api.CoreFeatures
+	memoryLimitPages      uint32
+	memoryCapacityFromMax bool
+	isInterpreter         bool
+	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
 }
 
 // engineLessConfig helps avoid copy/pasting the wrong defaults.
 var engineLessConfig = &runtimeConfig{
-	enabledFeatures: api.CoreFeaturesV2,
+	enabledFeatures:       api.CoreFeaturesV2,
+	memoryLimitPages:      wasm.MemoryLimitPages,
+	memoryCapacityFromMax: false,
 }
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
@@ -98,6 +125,24 @@ func (c *runtimeConfig) clone() *runtimeConfig {
 func (c *runtimeConfig) WithCoreFeatures(features api.CoreFeatures) RuntimeConfig {
 	ret := c.clone()
 	ret.enabledFeatures = features
+	return ret
+}
+
+// WithMemoryLimitPages implements RuntimeConfig.WithMemoryLimitPages
+func (c *runtimeConfig) WithMemoryLimitPages(memoryLimitPages uint32) RuntimeConfig {
+	ret := c.clone()
+	// This panics instead of returning an error as it is unlikely.
+	if memoryLimitPages > wasm.MemoryLimitPages {
+		panic(fmt.Errorf("memoryLimitPages invalid: %d > %d", memoryLimitPages, wasm.MemoryLimitPages))
+	}
+	ret.memoryLimitPages = memoryLimitPages
+	return ret
+}
+
+// WithMemoryCapacityFromMax implements RuntimeConfig.WithMemoryCapacityFromMax
+func (c *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig {
+	ret := c.clone()
+	ret.memoryCapacityFromMax = memoryCapacityFromMax
 	return ret
 }
 
@@ -163,45 +208,6 @@ func (c *compiledModule) ImportedFunctions() []api.FunctionDefinition {
 // ExportedFunctions implements CompiledModule.ExportedFunctions
 func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 	return c.module.ExportedFunctions()
-}
-
-// CompileConfig allows you to override what was decoded from wasm, prior to compilation (HostModuleBuilder.Compile or
-// Runtime.CompileModule).
-//
-// For example, WithMemorySizer allows you to override memory size that doesn't match your requirements.
-//
-// Note: CompileConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
-type CompileConfig interface {
-	// WithMemorySizer are the allocation parameters used for a Wasm memory.
-	// The default is to set cap=min and max=65536 if unset. A nil function is invalid and ignored.
-	WithMemorySizer(api.MemorySizer) CompileConfig
-}
-
-type compileConfig struct {
-	memorySizer api.MemorySizer
-}
-
-// NewCompileConfig returns a CompileConfig that can be used for configuring module compilation.
-func NewCompileConfig() CompileConfig {
-	return &compileConfig{
-		memorySizer: wasm.MemorySizer,
-	}
-}
-
-// clone makes a deep copy of this compile config.
-func (c *compileConfig) clone() *compileConfig {
-	ret := *c // copy except maps which share a ref
-	return &ret
-}
-
-// WithMemorySizer implements CompileConfig.WithMemorySizer
-func (c *compileConfig) WithMemorySizer(memorySizer api.MemorySizer) CompileConfig {
-	if memorySizer == nil {
-		return c
-	}
-	ret := c.clone()
-	ret.memorySizer = memorySizer
-	return ret
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating
@@ -284,7 +290,7 @@ type ModuleConfig interface {
 	// otherwise, is compiler-specific. See /RATIONALE.md for notes.
 	WithFS(fs.FS) ModuleConfig
 
-	// WithName configures the module name. Defaults to what was decoded or overridden via CompileConfig.WithModuleName.
+	// WithName configures the module name. Defaults to what was decoded from the name section.
 	WithName(string) ModuleConfig
 
 	// WithStartFunctions configures the functions to call after the module is

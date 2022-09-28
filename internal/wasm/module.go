@@ -751,24 +751,24 @@ type Memory struct {
 }
 
 // Validate ensures values assigned to Min, Cap and Max are within valid thresholds.
-func (m *Memory) Validate() error {
+func (m *Memory) Validate(memoryLimitPages uint32) error {
 	min, capacity, max := m.Min, m.Cap, m.Max
 
-	if max > MemoryLimitPages {
+	if max > memoryLimitPages {
 		return fmt.Errorf("max %d pages (%s) over limit of %d pages (%s)",
-			max, PagesToUnitOfBytes(max), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
-	} else if min > MemoryLimitPages {
+			max, PagesToUnitOfBytes(max), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
+	} else if min > memoryLimitPages {
 		return fmt.Errorf("min %d pages (%s) over limit of %d pages (%s)",
-			min, PagesToUnitOfBytes(min), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
+			min, PagesToUnitOfBytes(min), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
 	} else if min > max {
 		return fmt.Errorf("min %d pages (%s) > max %d pages (%s)",
 			min, PagesToUnitOfBytes(min), max, PagesToUnitOfBytes(max))
 	} else if capacity < min {
 		return fmt.Errorf("capacity %d pages (%s) less than minimum %d pages (%s)",
 			capacity, PagesToUnitOfBytes(capacity), min, PagesToUnitOfBytes(min))
-	} else if capacity > MemoryLimitPages {
+	} else if capacity > memoryLimitPages {
 		return fmt.Errorf("capacity %d pages (%s) over limit of %d pages (%s)",
-			capacity, PagesToUnitOfBytes(capacity), MemoryLimitPages, PagesToUnitOfBytes(MemoryLimitPages))
+			capacity, PagesToUnitOfBytes(capacity), memoryLimitPages, PagesToUnitOfBytes(memoryLimitPages))
 	}
 	return nil
 }

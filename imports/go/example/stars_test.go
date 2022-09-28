@@ -71,7 +71,7 @@ func Benchmark_main(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	compiled, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(ctx, bin)
 	if err != nil {
 		b.Fatal(err)
 	}

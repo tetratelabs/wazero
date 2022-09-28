@@ -158,7 +158,7 @@ func TestReader(t *testing.T) {
 	sys := wazero.NewModuleConfig().WithFS(realFs)
 
 	// Create a module that just delegates to wasi functions.
-	compiled, err := r.CompileModule(testCtx, fsWasm, wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(testCtx, fsWasm)
 	require.NoError(t, err)
 
 	mod, err := r.InstantiateModule(testCtx, compiled, sys)

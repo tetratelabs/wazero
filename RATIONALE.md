@@ -280,8 +280,6 @@ space. It is accepted that the options pattern is common in Go, which is the mai
 wazero's configuration types cover the three main scopes of WebAssembly use:
 * `RuntimeConfig`: This is the broadest scope, so applies also to compilation
   and instantiation. Ex. This controls the WebAssembly Specification Version.
-* `CompileConfig`: This affects any compilation related concerns not defined in
-  the binary format. Ex. This controls the allocation of linear memory.
 * `ModuleConfig`: This affects modules instantiated after compilation and what
   resources are allowed. Ex. This defines how or if STDOUT is captured.
 

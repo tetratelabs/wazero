@@ -24,15 +24,6 @@ const (
 	MemoryPageSizeInBits = 16
 )
 
-// MemorySizer is the default function that derives min, capacity and max pages from decoded wasm. The capacity
-// returned is set to minPages and max defaults to MemoryLimitPages when maxPages is nil.
-var MemorySizer api.MemorySizer = func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-	if maxPages != nil {
-		return minPages, minPages, *maxPages
-	}
-	return minPages, minPages, MemoryLimitPages
-}
-
 // compile-time check to ensure MemoryInstance implements api.Memory
 var _ api.Memory = &MemoryInstance{}
 
