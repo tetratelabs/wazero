@@ -146,7 +146,9 @@ jobs:
 
       - name: Build test binaries
         # Exclude benchmarks as we don't run those in Docker
-        run: go list -f '{{.Dir}}' ./... | egrep -v '(bench|vs|spectest)' | xargs -Ipkg go test pkg -c -o pkg.test
+        run: |
+          go list -f '{{.Dir}}' ./... | egrep -v '(bench|vs|spectest)' | xargs -Ipkg go test pkg -c -o pkg.test
+          go build -o wazerocli ./wazero
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
@@ -166,7 +168,7 @@ jobs:
 
       - name: Run built test binaries
         # This runs all tests compiled above in sequence. Note: This mounts /tmp to allow t.TempDir() in tests.
-        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test --tmpfs /tmp --rm -t wazero:test
+        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test -v $(pwd)/wazerocli:/wazero -e WAZEROCLI=/wazero --tmpfs /tmp --rm -t wazero:test
 
   bench:
     name: Benchmark
