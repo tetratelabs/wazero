@@ -96,16 +96,14 @@ func TestExampleUpToDate(t *testing.T) {
 
 	t.Run("Executable", func(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
+		defer r.Close(testCtx)
 
 		// Add WASI to satisfy import tests
-		wm, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
-		require.NoError(t, err)
-		defer wm.Close(testCtx)
+		wasi_snapshot_preview1.MustInstantiate(testCtx, r)
 
 		// Decode and instantiate the module
 		module, err := r.InstantiateModuleFromBinary(testCtx, exampleWasm)
 		require.NoError(t, err)
-		defer module.Close(testCtx)
 
 		// Call the swap function as a smoke test
 		results, err := module.ExportedFunction("swap").Call(testCtx, 1, 2)

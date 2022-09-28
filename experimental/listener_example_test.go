@@ -61,9 +61,7 @@ func Example_customListenerFactory() {
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Compile the WebAssembly module using the default configuration.
 	code, err := r.CompileModule(ctx, listenerWasm, wazero.NewCompileConfig())

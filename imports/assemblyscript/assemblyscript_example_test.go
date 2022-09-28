@@ -3,7 +3,6 @@ package assemblyscript_test
 import (
 	"context"
 	_ "embed"
-	"log"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/assemblyscript"
@@ -18,9 +17,7 @@ func Example_instantiate() {
 
 	// This adds the "env" module to the runtime, with AssemblyScript's special
 	// function imports.
-	if _, err := assemblyscript.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	assemblyscript.MustInstantiate(ctx, r)
 
 	// Output:
 }

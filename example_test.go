@@ -35,9 +35,7 @@ func Example() {
 
 	// Instantiate WASI, which implements host functions needed for TinyGo to
 	// implement `panic`.
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Instantiate the guest Wasm into the same runtime. It exports the `add`
 	// function, implemented in WebAssembly.
