@@ -102,7 +102,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	// WASI is needed to access args and very commonly required by self-contained wasm
 	// binaries, so we instantiate it by default.
-	_, _ = wasi_snapshot_preview1.Instantiate(ctx, rt)
+	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 
 	_, err = rt.InstantiateModule(ctx, code, conf)
 	if err != nil {
