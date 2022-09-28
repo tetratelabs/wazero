@@ -72,10 +72,6 @@ func TestErrors(t *testing.T) {
 			message: "error reading wasm binary",
 			args:    []string{"non-existent.wasm"},
 		},
-		{
-			message: "error compiling wasm binary",
-			args:    []string{"wazero.go"},
-		},
 	}
 
 	for _, tc := range tests {
