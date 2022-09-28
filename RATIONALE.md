@@ -52,6 +52,10 @@ share internals between compilers.
 End-user packages include `wazero`, with `Config` structs, `api`, with shared types, and the built-in `wasi` library.
 Everything else is internal.
 
+We put the main program for wazero into a directory of the same name to match conventions used in `go install`,
+notably the name of the folder becomes the binary name. We chose to use `cmd/wazero` as it is common practice
+and less surprising than `wazero/wazero`.
+
 ### Internal packages
 Most code in wazero is internal, and it is acknowledged that this prevents external implementation of facets such as
 compilers or decoding. It also prevents splitting this code into separate repositories, resulting in a larger monorepo.

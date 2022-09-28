@@ -56,7 +56,7 @@ build.examples.as:
 build.examples.zig:
 	@cd examples/allocation/zig/testdata/ && zig build -fstage1 -Drelease-small=true && mv zig-out/lib/greet.wasm .
 
-tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
+tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
 build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
