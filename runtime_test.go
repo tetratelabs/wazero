@@ -158,21 +158,20 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 func TestModule_Memory(t *testing.T) {
 	tests := []struct {
 		name        string
-		builder     func(Runtime) ModuleBuilder
+		wasm        []byte
 		expected    bool
 		expectedLen uint32
 	}{
 		{
 			name: "no memory",
-			builder: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder(t.Name())
-			},
+			wasm: binaryformat.EncodeModule(&wasm.Module{}),
 		},
 		{
 			name: "memory exported, one page",
-			builder: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder(t.Name()).ExportMemory("memory", 1)
-			},
+			wasm: binaryformat.EncodeModule(&wasm.Module{
+				MemorySection: &wasm.Memory{Min: 1},
+				ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
+			}),
 			expected:    true,
 			expectedLen: 65536,
 		},
@@ -186,7 +185,7 @@ func TestModule_Memory(t *testing.T) {
 			defer r.Close(testCtx)
 
 			// Instantiate the module and get the export of the above memory
-			module, err := tc.builder(r).Instantiate(testCtx, r)
+			module, err := r.InstantiateModuleFromBinary(testCtx, tc.wasm)
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -206,7 +205,6 @@ func TestModule_Global(t *testing.T) {
 	tests := []struct {
 		name                      string
 		module                    *wasm.Module // module as wat doesn't yet support globals
-		builder                   func(Runtime) ModuleBuilder
 		expected, expectedMutable bool
 	}{
 		{
@@ -226,8 +224,16 @@ func TestModule_Global(t *testing.T) {
 		},
 		{
 			name: "global exported",
-			builder: func(r Runtime) ModuleBuilder {
-				return r.NewModuleBuilder(t.Name()).ExportGlobalI64("global", globalVal)
+			module: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: leb128.EncodeInt64(globalVal)},
+					},
+				},
+				ExportSection: []*wasm.Export{
+					{Type: wasm.ExternTypeGlobal, Name: "global"},
+				},
 			},
 			expected: true,
 		},
@@ -256,13 +262,7 @@ func TestModule_Global(t *testing.T) {
 			r := NewRuntime(testCtx).(*runtime)
 			defer r.Close(testCtx)
 
-			var m CompiledModule
-			if tc.module != nil {
-				m = &compiledModule{module: tc.module}
-			} else {
-				m, _ = tc.builder(r).Compile(testCtx, NewCompileConfig())
-			}
-			code := m.(*compiledModule)
+			code := &compiledModule{module: tc.module}
 
 			err := r.store.Engine.CompileModule(testCtx, code.module)
 			require.NoError(t, err)
@@ -299,7 +299,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		require.Equal(t, testCtx, ctx)
 	}
 
-	_, err := r.NewModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		ExportFunction("start", start).
 		Instantiate(testCtx, r)
 	require.NoError(t, err)
@@ -376,7 +376,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 				panic(errors.New("ice cream"))
 			}
 
-			host, err := r.NewModuleBuilder("").
+			host, err := r.NewHostModuleBuilder("").
 				ExportFunction("start", start).
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
@@ -428,7 +428,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		require.NoError(t, m.CloseWithExitCode(ctx, 2))
 	}
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("exit", start).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("env").ExportFunction("exit", start).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	one := uint32(1)

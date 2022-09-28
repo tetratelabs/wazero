@@ -38,7 +38,7 @@ func main() {
 	// constrained to a subset of numeric types.
 	// Note: "env" is a module name conventionally used for arbitrary
 	// host-defined functions, but any name would do.
-	_, err := r.NewModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		ExportFunction("log_i32", func(v uint32) {
 			fmt.Println("log_i32 >>", v)
 		}).

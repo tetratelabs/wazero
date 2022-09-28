@@ -4,7 +4,10 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
+	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 var testMem = []byte{
@@ -37,11 +40,13 @@ func Test_Benchmark_EnvironGet(t *testing.T) {
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntime(testCtx)
+	defer r.Close(testCtx)
 
-	compiled, err := r.NewModuleBuilder(b.Name()).
-		ExportMemoryWithMax("memory", 1, 1).
-		Compile(testCtx, wazero.NewCompileConfig())
+	compiled, err := r.CompileModule(testCtx, binaryformat.EncodeModule(&wasm.Module{
+		MemorySection: &wasm.Memory{Min: 1, Max: 1},
+		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
+	}), wazero.NewCompileConfig())
 	if err != nil {
 		b.Fatal(err)
 	}

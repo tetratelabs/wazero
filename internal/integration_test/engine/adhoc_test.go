@@ -99,7 +99,7 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 	}
 
 	hostObj := &dog{name: "hello"}
-	host, err := r.NewModuleBuilder("host").
+	host, err := r.NewHostModuleBuilder("host").
 		ExportFunctions(map[string]interface{}{
 			"externref": func(externrefFromRefNull uintptr) uintptr {
 				require.Zero(t, externrefFromRefNull)
@@ -176,7 +176,7 @@ func testUnreachable(t *testing.T, r wazero.Runtime) {
 		panic("panic in host function")
 	}
 
-	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, unreachableWasm)
@@ -199,7 +199,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, err)
 	}
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, recursiveWasm)
@@ -222,7 +222,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 		return 0
 	}
 
-	host, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate(testCtx, r)
+	host, err := r.NewHostModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
@@ -262,7 +262,7 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 		},
 	}
 
-	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx, r)
+	imported, err := r.NewHostModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer imported.Close(testCtx)
 
@@ -299,7 +299,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
-			imported, err := r.NewModuleBuilder(importedName).
+			imported, err := r.NewHostModuleBuilder(importedName).
 				ExportFunction("return_input", fns[test]).
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
@@ -369,7 +369,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			imported, err := r.NewModuleBuilder(importedName).
+			imported, err := r.NewHostModuleBuilder(importedName).
 				ExportFunction("return_input", fns[test.name]).
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
@@ -519,8 +519,8 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			}
 
 			// Create the host module, which exports the function that closes the importing module.
-			importedCode, err = r.NewModuleBuilder(t.Name()+"-imported").
-				ExportFunction("return_input", closeAndReturn).Compile(testCtx, compileConfig)
+			importedCode, err = r.NewHostModuleBuilder(t.Name()+"-imported").
+				ExportFunction("return_input", closeAndReturn).Compile(testCtx)
 			require.NoError(t, err)
 
 			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig)

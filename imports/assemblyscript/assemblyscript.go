@@ -54,7 +54,7 @@ const (
 //   - To add more functions to the "env" module, use FunctionExporter.
 //   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	builder := r.NewModuleBuilder("env")
+	builder := r.NewHostModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
 	return builder.Instantiate(ctx, r)
 }
@@ -77,9 +77,9 @@ type FunctionExporter interface {
 	// appropriate to use WithTraceToStdout instead.
 	WithTraceToStderr() FunctionExporter
 
-	// ExportFunctions builds functions to export with a wazero.ModuleBuilder
+	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".
-	ExportFunctions(builder wazero.ModuleBuilder)
+	ExportFunctions(builder wazero.HostModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
@@ -107,7 +107,7 @@ func (e *functionExporter) WithTraceToStderr() FunctionExporter {
 }
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
-func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
+func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	builder.ExportFunction(functionAbort, e.abortFn)
 	builder.ExportFunction(functionTrace, e.traceFn)
 	builder.ExportFunction(functionSeed, seed)

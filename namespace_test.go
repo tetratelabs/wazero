@@ -13,7 +13,7 @@ func TestRuntime_Namespace(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// Compile a module to add to the runtime
-	compiled, err := r.NewModuleBuilder("env").Compile(testCtx, NewCompileConfig())
+	compiled, err := r.NewHostModuleBuilder("env").Compile(testCtx)
 	require.NoError(t, err)
 
 	// Instantiate "env" into the runtime default namespace (base case)

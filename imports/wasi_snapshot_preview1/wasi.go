@@ -47,12 +47,12 @@ type Builder interface {
 	// Compile compiles the ModuleName module that can instantiated in any
 	// namespace (wazero.Namespace).
 	//
-	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
-	Compile(context.Context, wazero.CompileConfig) (wazero.CompiledModule, error)
+	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
+	Compile(context.Context) (wazero.CompiledModule, error)
 
 	// Instantiate instantiates the ModuleName module into the given namespace.
 	//
-	// Note: This has the same effect as the same function on wazero.ModuleBuilder.
+	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
 	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
 }
 
@@ -63,21 +63,21 @@ func NewBuilder(r wazero.Runtime) Builder {
 
 type builder struct{ r wazero.Runtime }
 
-// moduleBuilder returns a new wazero.ModuleBuilder for ModuleName
-func (b *builder) moduleBuilder() wazero.ModuleBuilder {
-	ret := b.r.NewModuleBuilder(ModuleName)
+// hostModuleBuilder returns a new wazero.HostModuleBuilder for ModuleName
+func (b *builder) hostModuleBuilder() wazero.HostModuleBuilder {
+	ret := b.r.NewHostModuleBuilder(ModuleName)
 	exportFunctions(ret)
 	return ret
 }
 
 // Compile implements Builder.Compile
-func (b *builder) Compile(ctx context.Context, config wazero.CompileConfig) (wazero.CompiledModule, error) {
-	return b.moduleBuilder().Compile(ctx, config)
+func (b *builder) Compile(ctx context.Context) (wazero.CompiledModule, error) {
+	return b.hostModuleBuilder().Compile(ctx)
 }
 
 // Instantiate implements Builder.Instantiate
 func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
-	return b.moduleBuilder().Instantiate(ctx, ns)
+	return b.hostModuleBuilder().Instantiate(ctx, ns)
 }
 
 // ## Translation notes
@@ -109,7 +109,7 @@ func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Clo
 
 // exportFunctions adds all go functions that implement wasi.
 // These should be exported in the module named ModuleName.
-func exportFunctions(builder wazero.ModuleBuilder) {
+func exportFunctions(builder wazero.HostModuleBuilder) {
 	// Note: these are ordered per spec for consistency even if the resulting
 	// map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions

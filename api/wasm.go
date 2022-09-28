@@ -95,7 +95,7 @@ const (
 	//	(func (import "env" "f") (param externref) (result externref))
 	//
 	// This can be defined in Go as:
-	//  r.NewModuleBuilder("env").ExportFunctions(map[string]interface{}{
+	//  r.NewHostModuleBuilder("env").ExportFunctions(map[string]interface{}{
 	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
 	//  })
 	//
@@ -229,7 +229,7 @@ type FunctionDefinition interface {
 	ExportNames() []string
 
 	// GoFunc is present when the function was implemented by the embedder
-	// (ex via wazero.ModuleBuilder) instead of a wasm binary.
+	// (ex via wazero.HostModuleBuilder) instead of a wasm binary.
 	//
 	// This function can be non-deterministic or cause side effects. It also
 	// has special properties not defined in the WebAssembly Core

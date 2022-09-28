@@ -31,7 +31,7 @@ func main() {
 
 	// Instantiate a Go-defined module named "env" that exports a function to
 	// log to the console.
-	_, err := r.NewModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		ExportFunction("log", logString).
 		Instantiate(ctx, r)
 	if err != nil {

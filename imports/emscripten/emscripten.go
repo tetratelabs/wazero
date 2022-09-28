@@ -29,7 +29,7 @@ import (
 //   - To add more functions to the "env" module, use FunctionExporter.
 //   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	builder := r.NewModuleBuilder("env")
+	builder := r.NewHostModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
 	return builder.Instantiate(ctx, r)
 }
@@ -37,9 +37,9 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 // FunctionExporter configures the functions in the "env" module used by
 // Emscripten.
 type FunctionExporter interface {
-	// ExportFunctions builds functions to export with a wazero.ModuleBuilder
+	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".
-	ExportFunctions(builder wazero.ModuleBuilder)
+	ExportFunctions(builder wazero.HostModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
@@ -50,7 +50,7 @@ func NewFunctionExporter() FunctionExporter {
 type functionExporter struct{}
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
-func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
+func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	builder.ExportFunction(notifyMemoryGrowth.Name, notifyMemoryGrowth)
 }
 

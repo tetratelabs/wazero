@@ -62,7 +62,7 @@ func WithRoundTripper(ctx context.Context, rt http.RoundTripper) context.Context
 //   - Both the host and guest module are closed after being run.
 func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, config wazero.ModuleConfig) error {
 	// Instantiate the imports needed by go-compiled wasm.
-	js, err := moduleBuilder(r).Instantiate(ctx, r)
+	js, err := hostModuleBuilder(r).Instantiate(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -86,9 +86,9 @@ func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, 
 	return err
 }
 
-// moduleBuilder returns a new wazero.ModuleBuilder
-func moduleBuilder(r wazero.Runtime) wazero.ModuleBuilder {
-	return r.NewModuleBuilder("go").
+// hostModuleBuilder returns a new wazero.HostModuleBuilder
+func hostModuleBuilder(r wazero.Runtime) wazero.HostModuleBuilder {
+	return r.NewHostModuleBuilder("go").
 		ExportFunction(GetRandomData.Name(), GetRandomData).
 		ExportFunction(Nanotime1.Name(), Nanotime1).
 		ExportFunction(WasmExit.Name(), WasmExit).
