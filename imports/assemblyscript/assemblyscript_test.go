@@ -424,10 +424,10 @@ func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.Module
 
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 
-	builder := r.NewModuleBuilder("env")
+	builder := r.NewHostModuleBuilder("env")
 	fns.ExportFunctions(builder)
 
-	envCompiled, err := builder.Compile(ctx, wazero.NewCompileConfig())
+	envCompiled, err := builder.Compile(ctx)
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(ctx, envCompiled, config)

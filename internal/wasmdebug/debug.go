@@ -128,13 +128,13 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 	}
 
 	// If we have a runtime.Error, something severe happened which should include the stack trace. This could be
-	// a nil pointer from wazero or a user-defined function from ModuleBuilder.
+	// a nil pointer from wazero or a user-defined function from HostModuleBuilder.
 	if runtimeErr, ok := recovered.(runtime.Error); ok {
 		// TODO: consider adding debug.Stack(), but last time we attempted, some tests became unstable.
 		return fmt.Errorf("%w (recovered by wazero)\nwasm stack trace:\n\t%s", runtimeErr, stack)
 	}
 
-	// At this point we expect the error was from a function defined by ModuleBuilder that intentionally called panic.
+	// At this point we expect the error was from a function defined by HostModuleBuilder that intentionally called panic.
 	if runtimeErr, ok := recovered.(error); ok { // Ex. panic(errors.New("whoops"))
 		return fmt.Errorf("%w (recovered by wazero)\nwasm stack trace:\n\t%s", runtimeErr, stack)
 	} else { // Ex. panic("whoops")

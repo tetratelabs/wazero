@@ -165,7 +165,7 @@ func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 	return c.module.ExportedFunctions()
 }
 
-// CompileConfig allows you to override what was decoded from wasm, prior to compilation (ModuleBuilder.Compile or
+// CompileConfig allows you to override what was decoded from wasm, prior to compilation (HostModuleBuilder.Compile or
 // Runtime.CompileModule).
 //
 // For example, WithMemorySizer allows you to override memory size that doesn't match your requirements.

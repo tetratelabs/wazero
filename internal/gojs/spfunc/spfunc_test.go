@@ -197,7 +197,7 @@ func TestMustCallFromSP(t *testing.T) {
 	defer r.Close(testCtx)
 
 	funcName := "i64i32i32i32i32_i64i32_withSP"
-	im, err := r.NewModuleBuilder("go").
+	im, err := r.NewHostModuleBuilder("go").
 		ExportFunction(funcName, MustCallFromSP(true, wasm.NewGoFunc(
 			funcName, funcName,
 			[]string{"v", "mAddr", "mLen", "argsArray", "argsLen"},

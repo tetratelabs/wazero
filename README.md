@@ -38,7 +38,7 @@ For example, you can grant WebAssembly code access to your console by exporting
 a function written in Go. The below function can be imported into standard
 WebAssembly as the module "env" and the function name "log_i32".
 ```go
-_, err := r.NewModuleBuilder("env").
+_, err := r.NewHostModuleBuilder("env").
 	ExportFunction("log_i32", func(v uint32) {
 		fmt.Println("log_i32 >>", v)
 	}).

@@ -34,7 +34,7 @@ func Example_functionExporter() {
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// First construct your own module builder for "env"
-	envBuilder := r.NewModuleBuilder("env").
+	envBuilder := r.NewHostModuleBuilder("env").
 		ExportFunction("get_int", func() uint32 { return 1 })
 
 	// Now, add AssemblyScript special function imports into it.

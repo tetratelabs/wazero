@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -91,8 +90,6 @@ func NewHostModule(
 	moduleName string,
 	nameToGoFunc map[string]interface{},
 	funcToNames map[string][]string,
-	nameToMemory map[string]*Memory,
-	nameToGlobal map[string]*Global,
 	enabledFeatures api.CoreFeatures,
 ) (m *Module, err error) {
 	if moduleName != "" {
@@ -101,52 +98,15 @@ func NewHostModule(
 		m = &Module{}
 	}
 
-	funcCount := uint32(len(nameToGoFunc))
-	memoryCount := uint32(len(nameToMemory))
-	globalCount := uint32(len(nameToGlobal))
-	exportCount := funcCount + memoryCount + globalCount
-	if exportCount > 0 {
+	if exportCount := uint32(len(nameToGoFunc)); exportCount > 0 {
 		m.ExportSection = make([]*Export, 0, exportCount)
-	}
-
-	// Check name collision as exports cannot collide on names, regardless of type.
-	for name := range nameToGoFunc {
-		// manually generate the error message as we don't have debug names yet.
-		if _, ok := nameToMemory[name]; ok {
-			return nil, fmt.Errorf("func[%s.%s] exports the same name as a memory", moduleName, name)
-		}
-		if _, ok := nameToGlobal[name]; ok {
-			return nil, fmt.Errorf("func[%s.%s] exports the same name as a global", moduleName, name)
-		}
-	}
-	for name := range nameToMemory {
-		if _, ok := nameToGlobal[name]; ok {
-			return nil, fmt.Errorf("memory[%s] exports the same name as a global", name)
-		}
-	}
-
-	if funcCount > 0 {
 		if err = addFuncs(m, nameToGoFunc, funcToNames, enabledFeatures); err != nil {
 			return
 		}
 	}
 
-	if memoryCount > 0 {
-		if err = addMemory(m, nameToMemory); err != nil {
-			return
-		}
-	}
-
-	// TODO: we can use enabledFeatures to fail early on things like mutable globals (once supported)
-	if globalCount > 0 {
-		if err = addGlobals(m, nameToGlobal); err != nil {
-			return
-		}
-	}
-
 	// Assigns the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
-	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v:%v:%v",
-		moduleName, nameToGoFunc, nameToMemory, nameToGlobal, enabledFeatures)))
+	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v", moduleName, nameToGoFunc, enabledFeatures)))
 	m.BuildFunctionDefinitions()
 	return
 }
@@ -260,50 +220,6 @@ func addFuncs(
 			m.NameSection.LocalNames = append(m.NameSection.LocalNames, localNames)
 		}
 		idx++
-	}
-	return nil
-}
-
-func addMemory(m *Module, nameToMemory map[string]*Memory) error {
-	memoryCount := uint32(len(nameToMemory))
-
-	// Only one memory can be defined or imported
-	if memoryCount > 1 {
-		memoryNames := make([]string, 0, memoryCount)
-		for k := range nameToMemory {
-			memoryNames = append(memoryNames, k)
-		}
-		sort.Strings(memoryNames) // For consistent error messages
-		return fmt.Errorf("only one memory is allowed, but configured: %s", strings.Join(memoryNames, ", "))
-	}
-
-	// Find the memory name to export.
-	var name string
-	for k, v := range nameToMemory {
-		name = k
-		if v.Min > v.Max {
-			return fmt.Errorf("memory[%s] min %d pages (%s) > max %d pages (%s)", name, v.Min, PagesToUnitOfBytes(v.Min), v.Max, PagesToUnitOfBytes(v.Max))
-		}
-		m.MemorySection = v
-	}
-
-	m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeMemory, Name: name, Index: 0})
-	return nil
-}
-
-func addGlobals(m *Module, globals map[string]*Global) error {
-	globalCount := len(globals)
-	m.GlobalSection = make([]*Global, 0, globalCount)
-
-	globalNames := make([]string, 0, globalCount)
-	for name := range globals {
-		globalNames = append(globalNames, name)
-	}
-	sort.Strings(globalNames) // For consistent iteration order
-
-	for i, name := range globalNames {
-		m.GlobalSection = append(m.GlobalSection, globals[name])
-		m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeGlobal, Name: name, Index: Index(i)})
 	}
 	return nil
 }
