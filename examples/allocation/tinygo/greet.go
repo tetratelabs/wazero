@@ -40,9 +40,7 @@ func main() {
 
 	// Note: testdata/greet.go doesn't use WASI, but TinyGo needs it to
 	// implement functions such as panic.
-	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Instantiate a WebAssembly module that imports the "log" function defined
 	// in "env" and exports "memory" and functions we'll use in this example.

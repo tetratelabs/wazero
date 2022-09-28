@@ -57,9 +57,7 @@ func main() {
 		WithStdout(os.Stdout).WithStderr(os.Stderr).WithFS(rooted)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	if _, err = wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Choose the binary we want to test. Most compilers that implement WASI
 	// are portable enough to use binaries interchangeably.

@@ -27,9 +27,7 @@ func Example_withFS() {
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Instantiate a module exporting a WASI function that uses the filesystem.
 	mod, err := r.InstantiateModuleFromBinary(ctx, fsWasm)

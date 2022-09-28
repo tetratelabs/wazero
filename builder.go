@@ -137,6 +137,7 @@ type HostModuleBuilder interface {
 	Compile(context.Context) (CompiledModule, error)
 
 	// Instantiate is a convenience that calls Compile, then Namespace.InstantiateModule.
+	// This can fail for reasons documented on Namespace.InstantiateModule.
 	//
 	// Ex.
 	//

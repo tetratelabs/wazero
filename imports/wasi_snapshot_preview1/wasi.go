@@ -10,7 +10,7 @@
 //	r := wazero.NewRuntime(ctx)
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
-//	_, _ = Instantiate(ctx, r)
+//	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 //	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 //
 // See https://github.com/WebAssembly/WASI
@@ -30,11 +30,22 @@ import (
 const ModuleName = "wasi_snapshot_preview1"
 const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 
+// MustInstantiate calls Instantiate or panics on error.
+//
+// This is a simpler function for those who know the module ModuleName is not
+// already instantiated, and don't need to unload it.
+func MustInstantiate(ctx context.Context, r wazero.Runtime) {
+	if _, err := Instantiate(ctx, r); err != nil {
+		panic(err)
+	}
+}
+
 // Instantiate instantiates the ModuleName module into the runtime default
-// namespace.
+// namespace..
 //
 // # Notes
 //
+//   - Failure cases are documented on wazero.Namespace InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To instantiate into another wazero.Namespace, use NewBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {

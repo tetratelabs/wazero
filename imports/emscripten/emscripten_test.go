@@ -32,10 +32,9 @@ func TestGrow(t *testing.T) {
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx)
 
-	_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
-	require.NoError(t, err)
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	_, err = Instantiate(ctx, r)
+	_, err := Instantiate(ctx, r)
 	require.NoError(t, err)
 
 	// Emscripten exits main with zero by default

@@ -45,11 +45,22 @@ const (
 	functionSeed  = "seed"
 )
 
+// MustInstantiate calls Instantiate or panics on error.
+//
+// This is a simpler function for those who know the module "env" is not
+// already instantiated, and don't need to unload it.
+func MustInstantiate(ctx context.Context, r wazero.Runtime) {
+	if _, err := Instantiate(ctx, r); err != nil {
+		panic(err)
+	}
+}
+
 // Instantiate instantiates the "env" module used by AssemblyScript into the
 // runtime default namespace.
 //
 // # Notes
 //
+//   - Failure cases are documented on wazero.Namespace InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To add more functions to the "env" module, use FunctionExporter.
 //   - To instantiate into another wazero.Namespace, use FunctionExporter.
