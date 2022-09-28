@@ -787,7 +787,7 @@ func TestModule_buildFunctions(t *testing.T) {
 	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
 	instance.BuildFunctions(m, nil)
 	for i, f := range instance.Functions {
-		require.Equal(t, i, f.FunctionDefinition.Index())
+		require.Equal(t, i, f.Definition.Index())
 		require.Equal(t, nopCode.Body, f.Body)
 	}
 }

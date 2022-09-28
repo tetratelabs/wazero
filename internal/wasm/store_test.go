@@ -401,7 +401,7 @@ func (e *mockModuleEngine) Close(_ context.Context) {
 
 // Call implements the same method as documented on wasm.ModuleEngine.
 func (ce *mockCallEngine) Call(ctx context.Context, callCtx *CallContext, _ ...uint64) (results []uint64, err error) {
-	if ce.callFailIndex >= 0 && ce.f.FunctionDefinition.Index() == Index(ce.callFailIndex) {
+	if ce.callFailIndex >= 0 && ce.f.Definition.Index() == Index(ce.callFailIndex) {
 		err = errors.New("call failed")
 		return
 	}
@@ -617,9 +617,9 @@ func Test_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			f := &FunctionInstance{
-				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
 			g := &FunctionInstance{
-				FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
+				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{
@@ -651,7 +651,7 @@ func Test_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			modules := map[string]*ModuleInstance{
 				moduleName: {Exports: map[string]*ExportInstance{name: {
-					Function: &FunctionInstance{FunctionDefinition: &FunctionDefinition{funcType: &FunctionType{}}},
+					Function: &FunctionInstance{Definition: &FunctionDefinition{funcType: &FunctionType{}}},
 				}}, Name: moduleName},
 			}
 			m := &Module{

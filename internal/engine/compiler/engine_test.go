@@ -311,16 +311,16 @@ func ptrAsUint64(f *function) uint64 {
 
 func TestCallEngine_deferredOnCall(t *testing.T) {
 	f1 := &function{source: &wasm.FunctionInstance{
-		FunctionDefinition: newMockFunctionDefinition("1"),
-		Type:               &wasm.FunctionType{ParamNumInUint64: 2},
+		Definition: newMockFunctionDefinition("1"),
+		Type:       &wasm.FunctionType{ParamNumInUint64: 2},
 	}}
 	f2 := &function{source: &wasm.FunctionInstance{
-		FunctionDefinition: newMockFunctionDefinition("2"),
-		Type:               &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
+		Definition: newMockFunctionDefinition("2"),
+		Type:       &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
 	}}
 	f3 := &function{source: &wasm.FunctionInstance{
-		FunctionDefinition: newMockFunctionDefinition("3"),
-		Type:               &wasm.FunctionType{ResultNumInUint64: 1},
+		Definition: newMockFunctionDefinition("3"),
+		Type:       &wasm.FunctionType{ResultNumInUint64: 1},
 	}}
 
 	ce := &callEngine{

@@ -168,12 +168,31 @@ type CompiledModule interface {
 	// (api.FunctionDefinition) in this module keyed on export name.
 	ExportedFunctions() map[string]api.FunctionDefinition
 
+	// ImportedMemories returns all the imported memories
+	// (api.MemoryDefinition) in this module or nil if there are none.
+	//
+	// ## Notes
+	//   - As of WebAssembly Core Specification 2.0, there can be at most one
+	//     memory.
+	//   - Unlike ExportedMemories, there is no unique constraint on imports.
+	ImportedMemories() []api.MemoryDefinition
+
+	// ExportedMemories returns all the exported memories
+	// (api.MemoryDefinition) in this module keyed on export name.
+	//
+	// Note: As of WebAssembly Core Specification 2.0, there can be at most one
+	// memory.
+	ExportedMemories() map[string]api.MemoryDefinition
+
 	// Close releases all the allocated resources for this CompiledModule.
 	//
 	// Note: It is safe to call Close while having outstanding calls from an
 	// api.Module instantiated from this.
 	Close(context.Context) error
 }
+
+// compile-time check to ensure compiledModule implements CompiledModule
+var _ CompiledModule = &compiledModule{}
 
 type compiledModule struct {
 	module *wasm.Module
@@ -208,6 +227,16 @@ func (c *compiledModule) ImportedFunctions() []api.FunctionDefinition {
 // ExportedFunctions implements CompiledModule.ExportedFunctions
 func (c *compiledModule) ExportedFunctions() map[string]api.FunctionDefinition {
 	return c.module.ExportedFunctions()
+}
+
+// ImportedMemories implements CompiledModule.ImportedMemories
+func (c *compiledModule) ImportedMemories() []api.MemoryDefinition {
+	return c.module.ImportedMemories()
+}
+
+// ExportedMemories implements CompiledModule.ExportedMemories
+func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
+	return c.module.ExportedMemories()
 }
 
 // ModuleConfig configures resources needed by functions that have low-level interactions with the host operating

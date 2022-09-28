@@ -179,20 +179,56 @@ type Closer interface {
 	Close(context.Context) error
 }
 
-// FunctionDefinition is a WebAssembly function exported in a module (wazero.CompiledModule).
+// ExportDefinition is a WebAssembly type exported in a module
+// (wazero.CompiledModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
-type FunctionDefinition interface {
+type ExportDefinition interface {
 	// ModuleName is the possibly empty name of the module defining this
-	// function.
+	// export.
 	//
 	// Note: This may be different from Module.Name, because a compiled module
 	// can be instantiated multiple times as different names.
 	ModuleName() string
 
-	// Index is the position in the module's function index namespace, imports
-	// first.
+	// Index is the position in the module's index namespace, imports first.
 	Index() uint32
+
+	// Import returns true with the module and name when this was imported.
+	// Otherwise, it returns false.
+	//
+	// Note: Empty string is valid for both names in the WebAssembly Core
+	// Specification, so "" "" is possible.
+	Import() (moduleName, name string, isImport bool)
+
+	// ExportNames include all exported names.
+	//
+	// Note: The empty name is allowed in the WebAssembly Core Specification,
+	// so "" is possible.
+	ExportNames() []string
+}
+
+// MemoryDefinition is a WebAssembly memory exported in a module
+// (wazero.CompiledModule). Units are in pages (64KB).
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+type MemoryDefinition interface {
+	ExportDefinition
+
+	// Min returns the possibly zero initial count of 64KB pages.
+	Min() uint32
+
+	// Max returns the possibly zero max count of 64KB pages, or false if
+	// unbounded.
+	Max() (uint32, bool)
+}
+
+// FunctionDefinition is a WebAssembly function exported in a module
+// (wazero.CompiledModule).
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
+type FunctionDefinition interface {
+	ExportDefinition
 
 	// Name is the module-defined name of the function, which is not necessarily
 	// the same as its export name.
@@ -214,19 +250,6 @@ type FunctionDefinition interface {
 	// if Import returns true, the value is still based on the Name or Index
 	// and not the imported function name.
 	DebugName() string
-
-	// Import returns true with the module and function name when this function
-	// is imported. Otherwise, it returns false.
-	//
-	// Note: Empty string is valid for both the imported module and function
-	// name in the WebAssembly specification.
-	Import() (moduleName, name string, isImport bool)
-
-	// ExportNames include all exported names for the given function.
-	//
-	// Note: The empty name is allowed in the WebAssembly specification, so ""
-	// is possible.
-	ExportNames() []string
 
 	// GoFunc is present when the function was implemented by the embedder
 	// (ex via wazero.HostModuleBuilder) instead of a wasm binary.
@@ -326,15 +349,18 @@ type MutableGlobal interface {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
+	// Definition is metadata about this memory from its defining module.
+	Definition() MemoryDefinition
 
-	// Size returns the size in bytes available. Ex. If the underlying memory has 1 page: 65536
+	// Size returns the size in bytes available. Ex. If the underlying memory
+	// has 1 page: 65536
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size(context.Context) uint32
 
 	// Grow increases memory by the delta in pages (65536 bytes per page).
 	// The return val is the previous memory size in pages, or false if the
-	// delta was ignored as it exceeds max memory.
+	// delta was ignored as it exceeds MemoryDefinition.Max.
 	//
 	// # Notes
 	//

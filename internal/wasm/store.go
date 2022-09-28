@@ -140,11 +140,11 @@ type (
 		// Idx holds the index of this function instance in the function index namespace (beginning with imports).
 		Idx Index
 
-		// FunctionDefinition is known at compile time.
-		FunctionDefinition api.FunctionDefinition
+		// Definition is known at compile time.
+		Definition api.FunctionDefinition
 
-		// FunctionListener holds a listener to notify when this function is called.
-		FunctionListener experimentalapi.FunctionListener
+		// Listener holds a listener to notify when this function is called.
+		Listener experimentalapi.FunctionListener
 	}
 
 	// GlobalInstance represents a global instance in a store.
@@ -450,7 +450,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			expectedType := module.TypeSection[i.DescFunc]
 			importedFunction := imported.Function
 
-			d := importedFunction.FunctionDefinition
+			d := importedFunction.Definition
 			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
 				actualType := &FunctionType{Params: d.ParamTypes(), Results: d.ResultTypes()}
 				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))

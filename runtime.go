@@ -181,8 +181,9 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	internal.AssignModuleID(binary)
 
-	// Now that the module is validated, cache the function definitions.
+	// Now that the module is validated, cache the function and memory definitions.
 	internal.BuildFunctionDefinitions()
+	internal.BuildMemoryDefinitions()
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 
