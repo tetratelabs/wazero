@@ -42,9 +42,9 @@ func TestRun(t *testing.T) {
 		cmdExe = cmdPath
 	} else {
 		cmdExe = filepath.Join(runtime.GOROOT(), "bin", "go")
-		cmdArgs = []string{"run", "../../wazero"}
+		cmdArgs = []string{"run", "../../cmd/wazero"}
 	}
-	cmdArgs = append(cmdArgs, wasmPath, "--")
+	cmdArgs = append(cmdArgs, "run", wasmPath)
 
 	for _, tc := range tests {
 		tt := tc

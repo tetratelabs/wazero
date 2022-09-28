@@ -28,6 +28,12 @@ func TestRun(t *testing.T) {
 			// Executable name is first arg so is printed.
 			stdOut: "test.wasm\x00hello world\x00",
 		},
+		{
+			wasmPath: "testdata/wasi_arg.wasm",
+			wasmArgs: []string{"--", "hello world"},
+			// Executable name is first arg so is printed.
+			stdOut: "test.wasm\x00hello world\x00",
+		},
 	}
 
 	for _, tc := range tests {
@@ -39,7 +45,7 @@ func TestRun(t *testing.T) {
 			wasmPath := filepath.Join(t.TempDir(), "test.wasm")
 			require.NoError(t, os.WriteFile(wasmPath, wasmBytes, 0755))
 
-			exitCode, stdOut, stdErr := runMain(t, append([]string{wasmPath, "--"}, tt.wasmArgs...))
+			exitCode, stdOut, stdErr := runMain(t, append([]string{"run", wasmPath}, tt.wasmArgs...))
 			require.Equal(t, 0, exitCode)
 			require.Equal(t, tt.stdOut, stdOut)
 			require.Equal(t, tt.stdErr, stdErr)
@@ -67,10 +73,6 @@ func TestErrors(t *testing.T) {
 			args:    []string{"non-existent.wasm"},
 		},
 		{
-			message: "invalid argument",
-			args:    []string{"non-existent.wasm", "---", "-flag"},
-		},
-		{
 			message: "error compiling wasm binary",
 			args:    []string{"wazero.go"},
 		},
@@ -79,7 +81,7 @@ func TestErrors(t *testing.T) {
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.message, func(t *testing.T) {
-			exitCode, _, stdErr := runMain(t, tt.args)
+			exitCode, _, stdErr := runMain(t, append([]string{"run"}, tt.args...))
 
 			require.Equal(t, 1, exitCode)
 			require.Contains(t, stdErr, tt.message)

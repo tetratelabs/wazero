@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 func main() {
@@ -25,7 +27,7 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 
 	flag.Parse()
 
-	if help {
+	if help || flag.NArg() == 0 {
 		printUsage(stdErr)
 		exit(0)
 	}
@@ -36,21 +38,42 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 		exit(1)
 	}
 
-	var wasmArgs []string
-	if flag.NArg() > 1 {
-		if arg := flag.Arg(1); arg != "--" {
-			fmt.Fprintf(stdErr, "invalid argument: %s\n", arg)
-			printUsage(stdErr)
-			exit(1)
-		}
-		wasmArgs = flag.Args()[2:]
+	subCmd := flag.Arg(0)
+	switch subCmd {
+	case "run":
+		doRun(flag.Args()[1:], stdOut, stdErr, exit)
+	default:
+		fmt.Fprintln(stdErr, "invalid command")
+		printUsage(stdErr)
+		exit(1)
 	}
 
-	wasmPath := flag.Arg(0)
+}
+
+func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
+	flags := flag.NewFlagSet("run", flag.ExitOnError)
+	flags.SetOutput(stdErr)
+
+	_ = flags.Parse(args)
+
+	if flags.NArg() < 1 {
+		fmt.Fprintln(stdErr, "missing path to wasm file")
+		printRunUsage(stdErr, flags)
+		exit(1)
+	}
+	wasmPath := flags.Arg(0)
+
+	wasmArgs := flags.Args()[1:]
+	if len(wasmArgs) > 1 {
+		// Skip "--" if provided
+		if wasmArgs[0] == "--" {
+			wasmArgs = wasmArgs[1:]
+		}
+	}
+
 	wasm, err := os.ReadFile(wasmPath)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
-		printUsage(stdErr)
 		exit(1)
 	}
 
@@ -61,11 +84,15 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 	defer rt.Close(ctx)
 
 	// Because we are running a binary directly rather than embedding in an application,
-	// we default to wiring up standard streams and args.
+	// we default to wiring up commonly used OS functionality.
 	conf := wazero.NewModuleConfig().
 		WithStdout(stdOut).
 		WithStderr(stdErr).
 		WithStdin(os.Stdin).
+		WithRandSource(rand.Reader).
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
 	code, err := rt.CompileModule(ctx, wasm, wazero.NewCompileConfig())
 	if err != nil {
@@ -79,16 +106,29 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 
 	_, err = rt.InstantiateModule(ctx, code, conf)
 	if err != nil {
+		if exitErr, ok := err.(*sys.ExitError); ok {
+			exit(int(exitErr.ExitCode()))
+		}
 		fmt.Fprintf(stdErr, "error instantiating wasm binary: %v\n", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	// We're done, _start was called as part of instantiating the module.
-	os.Exit(0)
+	exit(0)
 }
 
 func printUsage(stdErr io.Writer) {
 	fmt.Fprintln(stdErr, "wazero CLI")
 	fmt.Fprintln(stdErr)
-	fmt.Fprintln(stdErr, "Usage:\n\twazero <path to wasm file> [-- <wasm args>]")
+	fmt.Fprintln(stdErr, "Usage:\n  wazero <command>")
+	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Commands:")
+	fmt.Fprintln(stdErr, "  run\t\tRuns a WebAssembly binary")
+}
+
+func printRunUsage(stdErr io.Writer, flags *flag.FlagSet) {
+	fmt.Fprintln(stdErr, "wazero CLI")
+	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Usage:\n  wazero run <path to wasm file> [--] <wasm args>")
+	fmt.Fprintln(stdErr)
 }

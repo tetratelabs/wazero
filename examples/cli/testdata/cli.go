@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"strconv"
 )
@@ -14,19 +13,19 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() < 2 {
-		fmt.Println("bad arguments")
+		os.Stdout.WriteString("bad arguments\n")
 		os.Exit(1)
 	}
 
 	a, err := strconv.Atoi(flag.Arg(0))
 	if err != nil {
-		fmt.Println("bad arguments")
+		os.Stdout.WriteString("bad arguments\n")
 		os.Exit(1)
 	}
 
 	b, err := strconv.Atoi(flag.Arg(1))
 	if err != nil {
-		fmt.Println("bad arguments")
+		os.Stdout.WriteString("bad arguments\n")
 		os.Exit(1)
 	}
 
@@ -37,5 +36,5 @@ func main() {
 		res = a + b
 	}
 
-	fmt.Printf("result: %d\n", res)
+	os.Stdout.WriteString("result: " + strconv.Itoa(res) + "\n")
 }

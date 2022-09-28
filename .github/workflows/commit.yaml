@@ -148,7 +148,7 @@ jobs:
         # Exclude benchmarks as we don't run those in Docker
         run: |
           go list -f '{{.Dir}}' ./... | egrep -v '(bench|vs|spectest)' | xargs -Ipkg go test pkg -c -o pkg.test
-          go build -o wazerocli ./wazero
+          go build -o wazerocli ./cmd/wazero
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
