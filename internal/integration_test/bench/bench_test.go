@@ -215,7 +215,7 @@ func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 
 	r := wazero.NewRuntimeWithConfig(testCtx, config)
 
-	_, err := r.NewModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		ExportFunction("get_random_string", getRandomString).
 		Instantiate(testCtx, r)
 	if err != nil {
@@ -224,9 +224,6 @@ func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = wasi_snapshot_preview1.Instantiate(testCtx, r)
-	if err != nil {
-		b.Fatal(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(testCtx, r)
 	return r
 }

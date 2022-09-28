@@ -298,7 +298,7 @@ func fail(t TestingT, m1, m2 string, formatWithArgs ...interface{}) {
 	}
 }
 
-// failStack returns the stack leading to the require fail, without test infrastructure.
+// failStack returns the stack leading to the failure, without test infrastructure.
 //
 // Note: This is similar to assert.CallerInfo in testify
 // Note: This is untested because it is a lot of work to do that. The rationale to punt is this is a test-only internal

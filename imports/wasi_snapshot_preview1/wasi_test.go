@@ -34,8 +34,7 @@ func requireProxyModule(t *testing.T, config wazero.ModuleConfig) (api.Module, a
 
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 
-	wasiModuleCompiled, err := (&builder{r}).moduleBuilder().
-		Compile(ctx, wazero.NewCompileConfig())
+	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(ctx)
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, config)
@@ -65,8 +64,7 @@ func requireErrnoNosys(t *testing.T, funcName string, params ...uint64) string {
 	defer r.Close(ctx)
 
 	// Instantiate the wasi module.
-	wasiModuleCompiled, err := (&builder{r}).moduleBuilder().
-		Compile(ctx, wazero.NewCompileConfig())
+	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(ctx)
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(ctx, wasiModuleCompiled, wazero.NewModuleConfig())

@@ -22,7 +22,7 @@ import (
 //
 //	module, _ := r.InstantiateModuleFromBinary(ctx, wasm)
 type Runtime interface {
-	// NewModuleBuilder lets you create modules out of functions defined in Go.
+	// NewHostModuleBuilder lets you create modules out of functions defined in Go.
 	//
 	// Ex. Below defines and instantiates a module named "env" with one function:
 	//
@@ -30,8 +30,8 @@ type Runtime interface {
 	//	hello := func() {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
-	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx, r)
-	NewModuleBuilder(moduleName string) ModuleBuilder
+	//	_, err := r.NewHostModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx, r)
+	NewHostModuleBuilder(moduleName string) HostModuleBuilder
 
 	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.
 	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig or CompileConfig.

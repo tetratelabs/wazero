@@ -71,7 +71,7 @@ func instantiateWithEnv(ctx context.Context, r wazero.Runtime, module wazero.Com
 
 	// Instantiate a new "env" module which exports a stateful function.
 	c := &counter{}
-	_, err := r.NewModuleBuilder("env").
+	_, err := r.NewHostModuleBuilder("env").
 		ExportFunction("next_i32", c.getAndIncrement).
 		Instantiate(ctx, ns)
 	if err != nil {

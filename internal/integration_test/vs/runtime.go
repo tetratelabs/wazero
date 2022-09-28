@@ -93,18 +93,18 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 	r.runtime = wazero.NewRuntimeWithConfig(ctx, r.config)
 	if cfg.LogFn != nil {
 		r.logFn = cfg.LogFn
-		if r.env, err = r.runtime.NewModuleBuilder("env").
-			ExportFunction("log", r.log).Compile(ctx, wazero.NewCompileConfig()); err != nil {
+		if r.env, err = r.runtime.NewHostModuleBuilder("env").
+			ExportFunction("log", r.log).Compile(ctx); err != nil {
 			return err
 		}
 	} else if cfg.EnvFReturnValue != 0 {
-		if r.env, err = r.runtime.NewModuleBuilder("env").
+		if r.env, err = r.runtime.NewHostModuleBuilder("env").
 			ExportFunction("f",
 				// Note: accepting (context.Context, api.Module) is the slowest type of host function with wazero.
 				func(context.Context, api.Module, uint64) uint64 {
 					return cfg.EnvFReturnValue
 				},
-			).Compile(ctx, wazero.NewCompileConfig()); err != nil {
+			).Compile(ctx); err != nil {
 			return err
 		}
 	}

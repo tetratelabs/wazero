@@ -45,16 +45,27 @@ const (
 	functionSeed  = "seed"
 )
 
+// MustInstantiate calls Instantiate or panics on error.
+//
+// This is a simpler function for those who know the module "env" is not
+// already instantiated, and don't need to unload it.
+func MustInstantiate(ctx context.Context, r wazero.Runtime) {
+	if _, err := Instantiate(ctx, r); err != nil {
+		panic(err)
+	}
+}
+
 // Instantiate instantiates the "env" module used by AssemblyScript into the
 // runtime default namespace.
 //
 // # Notes
 //
+//   - Failure cases are documented on wazero.Namespace InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
 //   - To add more functions to the "env" module, use FunctionExporter.
 //   - To instantiate into another wazero.Namespace, use FunctionExporter.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	builder := r.NewModuleBuilder("env")
+	builder := r.NewHostModuleBuilder("env")
 	NewFunctionExporter().ExportFunctions(builder)
 	return builder.Instantiate(ctx, r)
 }
@@ -77,9 +88,9 @@ type FunctionExporter interface {
 	// appropriate to use WithTraceToStdout instead.
 	WithTraceToStderr() FunctionExporter
 
-	// ExportFunctions builds functions to export with a wazero.ModuleBuilder
+	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".
-	ExportFunctions(builder wazero.ModuleBuilder)
+	ExportFunctions(builder wazero.HostModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
@@ -107,7 +118,7 @@ func (e *functionExporter) WithTraceToStderr() FunctionExporter {
 }
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
-func (e *functionExporter) ExportFunctions(builder wazero.ModuleBuilder) {
+func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	builder.ExportFunction(functionAbort, e.abortFn)
 	builder.ExportFunction(functionTrace, e.traceFn)
 	builder.ExportFunction(functionSeed, seed)

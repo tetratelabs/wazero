@@ -152,8 +152,7 @@ func TestReader(t *testing.T) {
 	r := wazero.NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	_, err := wasi_snapshot_preview1.Instantiate(testCtx, r)
-	require.NoError(t, err)
+	wasi_snapshot_preview1.MustInstantiate(testCtx, r)
 
 	realFs := fstest.MapFS{"animals.txt": &fstest.MapFile{Data: animals}}
 	sys := wazero.NewModuleConfig().WithFS(realFs)

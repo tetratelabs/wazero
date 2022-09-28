@@ -3,7 +3,6 @@ package emscripten_test
 import (
 	"context"
 	_ "embed"
-	"log"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/emscripten"
@@ -18,14 +17,10 @@ func Example_instantiate() {
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add WASI which is typically required when using Emscripten.
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Now, add the "env" module to the runtime, Emscripten default imports.
-	if _, err := emscripten.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	emscripten.MustInstantiate(ctx, r)
 
 	// Output:
 }
@@ -39,13 +34,11 @@ func Example_functionExporter() {
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	// Add WASI which is typically required when using Emscripten.
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		log.Panicln(err)
-	}
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
 	// Next, construct your own module builder for "env" with any functions
 	// you need.
-	envBuilder := r.NewModuleBuilder("env").
+	envBuilder := r.NewHostModuleBuilder("env").
 		ExportFunction("get_int", func() uint32 { return 1 })
 
 	// Now, add Emscripten special function imports into it.

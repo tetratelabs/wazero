@@ -415,7 +415,7 @@ ways acts similar to a process with a `main` function.
 
 To capture "hello world" written to the console (stdout a.k.a. file descriptor 1) in `exec.Cmd`, you would set the
 `Stdout` field accordingly, perhaps to a buffer. In WebAssembly 1.0 (20191205), the only way to perform something like
-this is via a host function (ex `ModuleBuilder.ExportFunction`) and internally copy memory corresponding to that string
+this is via a host function (ex `HostModuleBuilder.ExportFunction`) and internally copy memory corresponding to that string
 to a buffer.
 
 WASI implements system interfaces with host functions. Concretely, to write to console, a WASI command `Module` imports
