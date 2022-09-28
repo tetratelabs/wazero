@@ -39,9 +39,20 @@ import (
 //
 // # Memory
 //
-// All host functions act on the importing memory. For example, a `%.wasm`
-// binary compiled to use WASI exports its memory as the name "memory". See
-// ExportFunction for more details.
+// All host functions act on the importing api.Module, including any memory
+// exported in its binary (%.wasm file). If you are reading or writing memory,
+// it is sand-boxed Wasm memory defined by the guest.
+//
+// Below, `m` is the importing module, defined in Wasm. `fn` is a host function
+// added via ExportFunction. This means that `x` was read from memory defined
+// in Wasm, not arbitrary memory in the process.
+//
+//	fn := func(ctx context.Context, m api.Module, offset uint32) uint32 {
+//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
+//		return x
+//	}
+//
+// See ExportFunction for valid host function signatures and other details.
 //
 // # Notes
 //
