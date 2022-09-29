@@ -26,8 +26,7 @@ func (m *Module) ExportedMemories() map[string]api.MemoryDefinition {
 // BuildMemoryDefinitions generates memory metadata that can be parsed from
 // the module. This must be called after all validation.
 //
-// Note: This is exported for tests who don't use wazero.Runtime or
-// NewHostModule to compile the module.
+// Note: This is exported for wazero.Runtime `CompileModule`.
 func (m *Module) BuildMemoryDefinitions() {
 	var moduleName string
 	if m.NameSection != nil {
