@@ -90,22 +90,15 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		}
 	}
 
-	wasm, err := os.ReadFile(wasmPath)
-	if err != nil {
-		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
-		exit(1)
-	}
-
-	wasmExe := filepath.Base(wasmPath)
-
-	env := make(map[string]string)
+	// Don't use map to preserve order
+	var env []string
 	for _, e := range envs {
 		key, value, ok := strings.Cut(e, "=")
 		if !ok {
 			fmt.Fprintf(stdErr, "invalid environment variable: %s\n", e)
 			exit(1)
 		}
-		env[key] = value
+		env = append(env, key, value)
 	}
 
 	var mountFS fs.FS
@@ -131,6 +124,14 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		mountFS = cfs
 	}
 
+	wasm, err := os.ReadFile(wasmPath)
+	if err != nil {
+		fmt.Fprintf(stdErr, "error reading wasm binary: %v\n", err)
+		exit(1)
+	}
+
+	wasmExe := filepath.Base(wasmPath)
+
 	ctx := context.Background()
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -146,8 +147,8 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
-	for k, v := range env {
-		conf = conf.WithEnv(k, v)
+	for i := 0; i < len(env); i += 2 {
+		conf = conf.WithEnv(env[i], env[i+1])
 	}
 	if mountFS != nil {
 		conf = conf.WithFS(mountFS)

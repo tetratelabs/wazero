@@ -17,10 +17,11 @@ var testdata embed.FS
 
 func TestRun(t *testing.T) {
 	tests := []struct {
-		wasmPath string
-		wasmArgs []string
-		stdOut   string
-		stdErr   string
+		wazeroOpts []string
+		wasmPath   string
+		wasmArgs   []string
+		stdOut     string
+		stdErr     string
 	}{
 		{
 			wasmPath: "testdata/wasi_arg.wasm",
@@ -34,6 +35,11 @@ func TestRun(t *testing.T) {
 			// Executable name is first arg so is printed.
 			stdOut: "test.wasm\x00hello world\x00",
 		},
+		{
+			wasmPath:   "testdata/wasi_env.wasm",
+			wazeroOpts: []string{"--env=ANIMAL=bear", "--env=FOOD=sushi"},
+			stdOut:     "ANIMAL=bear\x00FOOD=sushi\x00",
+		},
 	}
 
 	for _, tc := range tests {
@@ -45,7 +51,10 @@ func TestRun(t *testing.T) {
 			wasmPath := filepath.Join(t.TempDir(), "test.wasm")
 			require.NoError(t, os.WriteFile(wasmPath, wasmBytes, 0755))
 
-			exitCode, stdOut, stdErr := runMain(t, append([]string{"run", wasmPath}, tt.wasmArgs...))
+			args := append([]string{"run"}, tt.wazeroOpts...)
+			args = append(args, wasmPath)
+			args = append(args, tt.wasmArgs...)
+			exitCode, stdOut, stdErr := runMain(t, args)
 			require.Equal(t, 0, exitCode)
 			require.Equal(t, tt.stdOut, stdOut)
 			require.Equal(t, tt.stdErr, stdErr)
@@ -78,6 +87,10 @@ func TestErrors(t *testing.T) {
 		{
 			message: "error compiling wasm binary",
 			args:    []string{notWasmPath},
+		},
+		{
+			message: "invalid environment variable",
+			args:    []string{"--env=ANIMAL", "testdata/wasi_env.wasm"},
 		},
 	}
 

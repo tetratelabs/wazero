@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"github.com/tetratelabs/wazero/internal/testing/require"
 	"io/fs"
 	"path/filepath"
 	"testing"
-
-	"github.com/tetratelabs/wazero/internal/testing/require"
+	"testing/fstest"
 )
 
 //go:embed testdata/fs
@@ -30,175 +30,166 @@ func TestCompositeFS(t *testing.T) {
 			name: "single mount to root",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/": testFSSub(""),
+					"": testFSSub(""),
 				},
 			},
-			path:    "/bear.txt",
+			path:    "bear.txt",
 			content: "pooh",
 		},
 		{
 			name: "single mount to root",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/": testFSSub(""),
+					"": testFSSub(""),
+				},
+			},
+			path:    "fish/clownfish.txt",
+			content: "nemo",
+		},
+		{
+			name: "single mount to root",
+			fs: &compositeFS{
+				paths: map[string]fs.FS{
+					"": testFSSub(""),
+				},
+			},
+			path:    "mammals/primates/ape.txt",
+			content: "king kong",
+		},
+		{
+			name: "single mount to path",
+			fs: &compositeFS{
+				paths: map[string]fs.FS{
+					"mammals": testFSSub(""),
+				},
+			},
+			path:    "mammals/bear.txt",
+			content: "pooh",
+		},
+		{
+			name: "single mount to path",
+			fs: &compositeFS{
+				paths: map[string]fs.FS{
+					"mammals": testFSSub(""),
+				},
+			},
+			path: "mammals/whale.txt",
+		},
+		{
+			name: "single mount to path",
+			fs: &compositeFS{
+				paths: map[string]fs.FS{
+					"mammals": testFSSub(""),
 				},
 			},
 			path: "bear.txt",
 		},
 		{
-			name: "single mount to root",
-			fs: &compositeFS{
-				paths: map[string]fs.FS{
-					"/": testFSSub(""),
-				},
-			},
-			path:    "/fish/clownfish.txt",
-			content: "nemo",
-		},
-		{
-			name: "single mount to root",
-			fs: &compositeFS{
-				paths: map[string]fs.FS{
-					"/": testFSSub(""),
-				},
-			},
-			path:    "/mammals/primates/ape.txt",
-			content: "king kong",
-		},
-		{
-			name: "single mount to path",
-			fs: &compositeFS{
-				paths: map[string]fs.FS{
-					"/mammals": testFSSub(""),
-				},
-			},
-			path:    "/mammals/bear.txt",
-			content: "pooh",
-		},
-		{
-			name: "single mount to path",
-			fs: &compositeFS{
-				paths: map[string]fs.FS{
-					"/mammals": testFSSub(""),
-				},
-			},
-			path: "/mammals/whale.txt",
-		},
-		{
-			name: "single mount to path",
-			fs: &compositeFS{
-				paths: map[string]fs.FS{
-					"/mammals": testFSSub(""),
-				},
-			},
-			path: "/bear.txt",
-		},
-		{
 			name: "non-overlapping mounts",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/fish":    testFSSub("fish"),
-					"/mammals": testFSSub("mammals"),
+					"fish":    testFSSub("fish"),
+					"mammals": testFSSub("mammals"),
 				},
 			},
-			path:    "/fish/clownfish.txt",
+			path:    "fish/clownfish.txt",
 			content: "nemo",
 		},
 		{
 			name: "non-overlapping mounts",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/fish":    testFSSub("fish"),
-					"/mammals": testFSSub("mammals"),
+					"fish":    testFSSub("fish"),
+					"mammals": testFSSub("mammals"),
 				},
 			},
-			path:    "/mammals/whale.txt",
+			path:    "mammals/whale.txt",
 			content: "moby dick",
 		},
 		{
 			name: "non-overlapping mounts",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/fish":    testFSSub("fish"),
-					"/mammals": testFSSub("mammals"),
+					"fish":    testFSSub("fish"),
+					"mammals": testFSSub("mammals"),
 				},
 			},
-			path:    "/mammals/primates/ape.txt",
+			path:    "mammals/primates/ape.txt",
 			content: "king kong",
 		},
 		{
 			name: "non-overlapping mounts",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/fish":    testFSSub("fish"),
-					"/mammals": testFSSub("mammals"),
+					"fish":    testFSSub("fish"),
+					"mammals": testFSSub("mammals"),
 				},
 			},
-			path: "/bear.txt",
+			path: "bear.txt",
 		},
 		{
 			name: "overlapping mounts, deep first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals/fish": testFSSub("fish"),
-					"/animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
 				},
 			},
-			path:    "/animals/fish/clownfish.txt",
+			path:    "animals/fish/clownfish.txt",
 			content: "nemo",
 		},
 		{
 			name: "overlapping mounts, deep first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals/fish": testFSSub("fish"),
-					"/animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
 				},
 			},
-			path:    "/animals/whale.txt",
+			path:    "animals/whale.txt",
 			content: "moby dick",
 		},
 		{
 			name: "overlapping mounts, deep first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals/fish": testFSSub("fish"),
-					"/animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
 				},
 			},
-			path: "/animals/bear.txt",
+			path: "animals/bear.txt",
 		},
 		{
 			name: "overlapping mounts, shallow first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals":      testFSSub("mammals"),
-					"/animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
 				},
 			},
-			path:    "/animals/fish/clownfish.txt",
+			path:    "animals/fish/clownfish.txt",
 			content: "nemo",
 		},
 		{
 			name: "overlapping mounts, shallow first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals":      testFSSub("mammals"),
-					"/animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
 				},
 			},
-			path:    "/animals/whale.txt",
+			path:    "animals/whale.txt",
 			content: "moby dick",
 		},
 		{
 			name: "overlapping mounts, shallow first",
 			fs: &compositeFS{
 				paths: map[string]fs.FS{
-					"/animals":      testFSSub("mammals"),
-					"/animals/fish": testFSSub("fish"),
+					"animals":      testFSSub("mammals"),
+					"animals/fish": testFSSub("fish"),
 				},
 			},
-			path: "/animals/bear.txt",
+			path: "animals/bear.txt",
 		},
 	}
 
@@ -214,6 +205,19 @@ func TestCompositeFS(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFSTest(t *testing.T) {
+	fs := &compositeFS{
+		paths: map[string]fs.FS{
+			// TestFS requires non-rooted paths to be read from current directory so we mount
+			// both with . and no prefix.
+			".": testFSSub(""),
+			"":  testFSSub(""),
+		},
+	}
+
+	require.NoError(t, fstest.TestFS(fs, "bear.txt"))
 }
 
 func testFSSub(path string) fs.FS {
