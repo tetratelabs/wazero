@@ -9,6 +9,80 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+func Test_newMemorySizer(t *testing.T) {
+	zero := uint32(0)
+	one := uint32(1)
+	limit := wasm.MemoryLimitPages
+
+	tests := []struct {
+		name                                       string
+		memoryCapacityFromMax                      bool
+		min                                        uint32
+		max                                        *uint32
+		expectedMin, expectedCapacity, expectedMax uint32
+	}{
+		{
+			name:             "min 0",
+			min:              zero,
+			max:              &limit,
+			expectedMin:      zero,
+			expectedCapacity: zero,
+			expectedMax:      limit,
+		},
+		{
+			name:             "min 0 defaults max to limit",
+			min:              zero,
+			expectedMin:      zero,
+			expectedCapacity: zero,
+			expectedMax:      limit,
+		},
+		{
+			name:             "min 0, max 0",
+			min:              zero,
+			max:              &zero,
+			expectedMin:      zero,
+			expectedCapacity: zero,
+			expectedMax:      zero,
+		},
+		{
+			name:             "min 0, max 1",
+			min:              zero,
+			max:              &one,
+			expectedMin:      zero,
+			expectedCapacity: zero,
+			expectedMax:      one,
+		},
+		{
+			name:                  "min 0, max 1 memoryCapacityFromMax",
+			memoryCapacityFromMax: true,
+			min:                   zero,
+			max:                   &one,
+			expectedMin:           zero,
+			expectedCapacity:      one,
+			expectedMax:           one,
+		},
+		{
+			name:             "min=max",
+			min:              one,
+			max:              &one,
+			expectedMin:      one,
+			expectedCapacity: one,
+			expectedMax:      one,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			sizer := newMemorySizer(limit, tc.memoryCapacityFromMax)
+			min, capacity, max := sizer(tc.min, tc.max)
+			require.Equal(t, tc.expectedMin, min)
+			require.Equal(t, tc.expectedCapacity, capacity)
+			require.Equal(t, tc.expectedMax, max)
+		})
+	}
+}
+
 func TestMemoryType(t *testing.T) {
 	zero := uint32(0)
 	max := wasm.MemoryLimitPages
@@ -20,12 +94,12 @@ func TestMemoryType(t *testing.T) {
 	}{
 		{
 			name:     "min 0",
-			input:    &wasm.Memory{Max: wasm.MemoryLimitPages, IsMaxEncoded: true},
+			input:    &wasm.Memory{Max: max, IsMaxEncoded: true},
 			expected: []byte{0x1, 0, 0x80, 0x80, 0x4},
 		},
 		{
 			name:     "min 0 default max",
-			input:    &wasm.Memory{Max: wasm.MemoryLimitPages},
+			input:    &wasm.Memory{Max: max},
 			expected: []byte{0x0, 0},
 		},
 		{
@@ -59,7 +133,7 @@ func TestMemoryType(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("decode %s", tc.name), func(t *testing.T) {
-			binary, err := decodeMemory(bytes.NewReader(b), wasm.MemorySizer)
+			binary, err := decodeMemory(bytes.NewReader(b), newMemorySizer(max, false), max)
 			require.NoError(t, err)
 			require.Equal(t, binary, tc.input)
 		})
@@ -67,6 +141,8 @@ func TestMemoryType(t *testing.T) {
 }
 
 func TestDecodeMemoryType_Errors(t *testing.T) {
+	max := wasm.MemoryLimitPages
+
 	tests := []struct {
 		name        string
 		input       []byte
@@ -93,7 +169,7 @@ func TestDecodeMemoryType_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemory(bytes.NewReader(tc.input), wasm.MemorySizer)
+			_, err := decodeMemory(bytes.NewReader(tc.input), newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

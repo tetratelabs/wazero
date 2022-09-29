@@ -27,7 +27,7 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 	r := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	defer r.Close(ctx)
 
-	compiled, compileErr := r.CompileModule(ctx, testBin, wazero.NewCompileConfig())
+	compiled, compileErr := r.CompileModule(ctx, testBin)
 	if compileErr != nil {
 		err = compileErr
 		return
@@ -85,7 +85,7 @@ func TestMain(m *testing.M) {
 	// one test from a cache-miss performance penalty.
 	rt := wazero.NewRuntimeWithConfig(testCtx, wazero.NewRuntimeConfig())
 	defer rt.Close(testCtx)
-	_, err = rt.CompileModule(testCtx, testBin, wazero.NewCompileConfig())
+	_, err = rt.CompileModule(testCtx, testBin)
 	if err != nil {
 		log.Panicln(err)
 	}

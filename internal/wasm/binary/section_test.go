@@ -81,6 +81,8 @@ func TestTableSection_Errors(t *testing.T) {
 }
 
 func TestMemorySection(t *testing.T) {
+	max := wasm.MemoryLimitPages
+
 	three := uint32(3)
 	tests := []struct {
 		name     string
@@ -101,7 +103,7 @@ func TestMemorySection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			memories, err := decodeMemorySection(bytes.NewReader(tc.input), wasm.MemorySizer)
+			memories, err := decodeMemorySection(bytes.NewReader(tc.input), newMemorySizer(max, false), max)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, memories)
 		})
@@ -109,6 +111,8 @@ func TestMemorySection(t *testing.T) {
 }
 
 func TestMemorySection_Errors(t *testing.T) {
+	max := wasm.MemoryLimitPages
+
 	tests := []struct {
 		name        string
 		input       []byte
@@ -129,7 +133,7 @@ func TestMemorySection_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeMemorySection(bytes.NewReader(tc.input), wasm.MemorySizer)
+			_, err := decodeMemorySection(bytes.NewReader(tc.input), newMemorySizer(max, false), max)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

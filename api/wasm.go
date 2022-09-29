@@ -486,18 +486,3 @@ func EncodeF64(input float64) uint64 {
 func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
 }
-
-// MemorySizer applies during compilation after a module has been decoded from wasm, but before it is instantiated.
-// This determines the amount of memory pages (65536 bytes per page) to use when a memory is instantiated as a []byte.
-//
-// Ex. Here's how to set the capacity to max instead of min, when set:
-//
-//	capIsMax := func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-//		if maxPages != nil {
-//			return minPages, *maxPages, *maxPages
-//		}
-//		return minPages, minPages, 65536
-//	}
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
-type MemorySizer func(minPages uint32, maxPages *uint32) (min, capacity, max uint32)

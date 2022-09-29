@@ -26,14 +26,6 @@ const (
 
 var memoryCapacityPages = uint32(2)
 
-var compileConfig = wazero.NewCompileConfig().
-	WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-		if maxPages != nil {
-			return minPages, memoryCapacityPages, *maxPages
-		}
-		return minPages, memoryCapacityPages, memoryCapacityPages
-	})
-
 var moduleConfig = wazero.NewModuleConfig()
 
 var tests = map[string]func(t *testing.T, r wazero.Runtime){
@@ -529,7 +521,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 
 			// Import that module.
 			binary := callReturnImportWasm(t, imported.Name(), t.Name()+"-importing", i32)
-			importingCode, err = r.CompileModule(testCtx, binary, compileConfig)
+			importingCode, err = r.CompileModule(testCtx, binary)
 			require.NoError(t, err)
 
 			importing, err = r.InstantiateModule(testCtx, importingCode, moduleConfig)
@@ -622,7 +614,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		}},
 		ExportSection: []*wasm.Export{{Name: "store"}},
 	})
-	compiled, err := r.CompileModule(testCtx, bin, compileConfig)
+	compiled, err := r.CompileModule(testCtx, bin)
 	require.NoError(t, err)
 	defer compiled.Close(testCtx)
 

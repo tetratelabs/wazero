@@ -36,7 +36,7 @@ func Example() {
 	defer wm.Close(testCtx)
 
 	// Compile the WebAssembly module using the default configuration.
-	code, err := r.CompileModule(ctx, exitOnStartWasm, wazero.NewCompileConfig())
+	code, err := r.CompileModule(ctx, exitOnStartWasm)
 	if err != nil {
 		log.Panicln(err)
 	}

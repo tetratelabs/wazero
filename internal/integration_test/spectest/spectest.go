@@ -327,7 +327,7 @@ var spectestWasm []byte
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/imports.wast
 // See https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/script/js.ml#L13-L25
 func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, enabledFeatures api.CoreFeatures) {
-	mod, err := binaryformat.DecodeModule(spectestWasm, api.CoreFeaturesV2, wasm.MemorySizer)
+	mod, err := binaryformat.DecodeModule(spectestWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false)
 	require.NoError(t, err)
 
 	// (global (export "global_i32") i32 (i32.const 666))
@@ -422,7 +422,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 					case "module":
 						buf, err := testDataFS.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
+						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages, false)
 						require.NoError(t, err, msg)
 						require.NoError(t, mod.Validate(enabledFeatures))
 						mod.AssignModuleID(buf)
@@ -563,7 +563,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 							//
 							// In practice, such a module instance can be used for invoking functions without any issue. In addition, we have to
 							// retain functions after the expected "instantiation" failure, so in wazero we choose to not raise error in that case.
-							mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
+							mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemoryLimitPages, false)
 							require.NoError(t, err, msg)
 
 							err = mod.Validate(s.EnabledFeatures)
@@ -592,7 +592,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 }
 
 func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store, ns *wasm.Namespace, buf []byte, msg string) {
-	mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemorySizer)
+	mod, err := binaryformat.DecodeModule(buf, s.EnabledFeatures, wasm.MemoryLimitPages, false)
 	if err != nil {
 		return
 	}
@@ -860,7 +860,7 @@ func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures api.Co
 
 						buf = requireStripCustomSections(t, buf)
 
-						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemorySizer)
+						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages, false)
 						require.NoError(t, err)
 
 						encodedBuf := binaryformat.EncodeModule(mod)

@@ -34,7 +34,7 @@ type Runtime interface {
 	NewHostModuleBuilder(moduleName string) HostModuleBuilder
 
 	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.
-	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig or CompileConfig.
+	// Any pre-compilation done after decoding wasm is dependent on RuntimeConfig.
 	//
 	// There are two main reasons to use CompileModule instead of InstantiateModuleFromBinary:
 	//   - Improve performance when the same module is instantiated multiple times under different names
@@ -43,10 +43,10 @@ type Runtime interface {
 	// # Notes
 	//
 	//   - The resulting module name defaults to what was binary from the custom name section.
-	//   - Any pre-compilation done after decoding the source is dependent on RuntimeConfig or CompileConfig.
+	//   - Any pre-compilation done after decoding the source is dependent on RuntimeConfig.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	CompileModule(ctx context.Context, binary []byte, config CompileConfig) (CompiledModule, error)
+	CompileModule(ctx context.Context, binary []byte) (CompiledModule, error)
 
 	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
 	//
@@ -130,20 +130,24 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 	config := rConfig.(*runtimeConfig)
 	store, ns := wasm.NewStore(config.enabledFeatures, config.newEngine(ctx, config.enabledFeatures))
 	return &runtime{
-		store:           store,
-		ns:              &namespace{store: store, ns: ns},
-		enabledFeatures: config.enabledFeatures,
-		isInterpreter:   config.isInterpreter,
+		store:                 store,
+		ns:                    &namespace{store: store, ns: ns},
+		enabledFeatures:       config.enabledFeatures,
+		memoryLimitPages:      config.memoryLimitPages,
+		memoryCapacityFromMax: config.memoryCapacityFromMax,
+		isInterpreter:         config.isInterpreter,
 	}
 }
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	store           *wasm.Store
-	ns              *namespace
-	enabledFeatures api.CoreFeatures
-	isInterpreter   bool
-	compiledModules []*compiledModule
+	store                 *wasm.Store
+	ns                    *namespace
+	enabledFeatures       api.CoreFeatures
+	memoryLimitPages      uint32
+	memoryCapacityFromMax bool
+	isInterpreter         bool
+	compiledModules       []*compiledModule
 }
 
 // NewNamespace implements Runtime.NewNamespace.
@@ -157,17 +161,16 @@ func (r *runtime) Module(moduleName string) api.Module {
 }
 
 // CompileModule implements Runtime.CompileModule
-func (r *runtime) CompileModule(ctx context.Context, binary []byte, cConfig CompileConfig) (CompiledModule, error) {
+func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledModule, error) {
 	if binary == nil {
 		return nil, errors.New("binary == nil")
 	}
 
-	config := cConfig.(*compileConfig)
 	if len(binary) < 4 || !bytes.Equal(binary[0:4], binaryformat.Magic) {
 		return nil, errors.New("invalid binary")
 	}
 
-	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, config.memorySizer)
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, r.memoryLimitPages, r.memoryCapacityFromMax)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {
@@ -215,7 +218,7 @@ func buildListeners(ctx context.Context, r *runtime, internal *wasm.Module) ([]e
 
 // InstantiateModuleFromBinary implements Runtime.InstantiateModuleFromBinary
 func (r *runtime) InstantiateModuleFromBinary(ctx context.Context, binary []byte) (api.Module, error) {
-	if compiled, err := r.CompileModule(ctx, binary, NewCompileConfig()); err != nil {
+	if compiled, err := r.CompileModule(ctx, binary); err != nil {
 		return nil, err
 	} else {
 		compiled.(*compiledModule).closeWithModule = true

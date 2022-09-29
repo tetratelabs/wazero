@@ -63,7 +63,7 @@ func TestRuntime_CompileModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := r.CompileModule(testCtx, tc.wasm, NewCompileConfig())
+			m, err := r.CompileModule(testCtx, tc.wasm)
 			require.NoError(t, err)
 			code := m.(*compiledModule)
 			if tc.expectedName != "" {
@@ -72,29 +72,11 @@ func TestRuntime_CompileModule(t *testing.T) {
 			require.Equal(t, r.(*runtime).store.Engine, code.compiledEngine)
 		})
 	}
-
-	t.Run("WithMemorySizer", func(t *testing.T) {
-		testWasm := binaryformat.EncodeModule(&wasm.Module{MemorySection: &wasm.Memory{Min: 1}})
-
-		m, err := r.CompileModule(testCtx, testWasm, NewCompileConfig().
-			WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-				return 1, 2, 3
-			}))
-		require.NoError(t, err)
-		code := m.(*compiledModule)
-
-		require.Equal(t, &wasm.Memory{
-			Min: 1,
-			Cap: 2,
-			Max: 3,
-		}, code.module.MemorySection)
-	})
 }
 
 func TestRuntime_CompileModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
-		config      CompileConfig
 		wasm        []byte
 		expectedErr string
 	}{
@@ -106,29 +88,6 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 			name:        "invalid binary",
 			wasm:        append(binaryformat.Magic, []byte("yolo")...),
 			expectedErr: "invalid version header",
-		},
-		{
-			name: "memory cap < min", // only one test to avoid duplicating tests in module_test.go
-			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-				return 3, 1, 3
-			}),
-			wasm: binaryformat.EncodeModule(&wasm.Module{
-				MemorySection: &wasm.Memory{Min: 3},
-			}),
-			expectedErr: "section memory: capacity 1 pages (64 Ki) less than minimum 3 pages (192 Ki)",
-		},
-		{
-			name: "memory cap < min exported", // only one test to avoid duplicating tests in module_test.go
-			config: NewCompileConfig().WithMemorySizer(func(minPages uint32, maxPages *uint32) (min, capacity, max uint32) {
-				return 3, 2, 3
-			}),
-			wasm: binaryformat.EncodeModule(&wasm.Module{
-				MemorySection: &wasm.Memory{},
-				ExportSection: []*wasm.Export{
-					{Name: "memory", Type: api.ExternTypeMemory},
-				},
-			}),
-			expectedErr: "section memory: capacity 2 pages (128 Ki) less than minimum 3 pages (192 Ki)",
 		},
 		{
 			name:        "memory has too many pages",
@@ -144,11 +103,7 @@ func TestRuntime_CompileModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			config := tc.config
-			if config == nil {
-				config = NewCompileConfig()
-			}
-			_, err := r.CompileModule(testCtx, tc.wasm, config)
+			_, err := r.CompileModule(testCtx, tc.wasm)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -315,7 +270,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(testCtx, binary, NewCompileConfig())
+	code, err := r.CompileModule(testCtx, binary)
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
@@ -400,7 +355,7 @@ func TestRuntime_InstantiateModule_WithName(t *testing.T) {
 	r := NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	base, err := r.CompileModule(testCtx, binaryNamedZero, NewCompileConfig())
+	base, err := r.CompileModule(testCtx, binaryNamedZero)
 	require.NoError(t, err)
 
 	require.Equal(t, "0", base.(*compiledModule).module.NameSection.ModuleName)
@@ -442,7 +397,7 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		StartSection: &one,
 	})
 
-	code, err := r.CompileModule(testCtx, binary, NewCompileConfig())
+	code, err := r.CompileModule(testCtx, binary)
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function.
@@ -479,7 +434,7 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRuntime(testCtx)
 
-			code, err := r.CompileModule(testCtx, bin, NewCompileConfig())
+			code, err := r.CompileModule(testCtx, bin)
 			require.NoError(t, err)
 
 			// Instantiate two modules.
@@ -526,7 +481,7 @@ func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// Normally compiled modules are closed when instantiated but this is never instantiated.
-	_, err := r.CompileModule(testCtx, binaryNamedZero, NewCompileConfig())
+	_, err := r.CompileModule(testCtx, binaryNamedZero)
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), engine.CompiledModuleCount())
 

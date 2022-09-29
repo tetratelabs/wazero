@@ -89,7 +89,7 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemorySizer)
+		m, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
@@ -116,7 +116,7 @@ func BenchmarkCodec(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemorySizer); err != nil {
+			if _, err := binary.DecodeModule(exampleWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false); err != nil {
 				b.Fatal(err)
 			}
 		}

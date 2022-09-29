@@ -53,7 +53,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 		t.Run("fails on compile if compiler", func(t *testing.T) {
 			r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 			defer r.Close(testCtx) // This closes everything this Runtime created.
-			_, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
+			_, err := r.CompileModule(ctx, bin)
 			require.EqualError(t, err,
 				"context includes a FunctionListenerFactoryKey, which is only supported in the interpreter")
 		})
@@ -62,7 +62,7 @@ func TestFunctionListenerFactory(t *testing.T) {
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
-	_, err := r.CompileModule(ctx, bin, wazero.NewCompileConfig())
+	_, err := r.CompileModule(ctx, bin)
 	require.NoError(t, err)
 
 	// Ensure each function was converted to a listener eagerly
