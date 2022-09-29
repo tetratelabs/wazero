@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -54,7 +56,20 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	flags := flag.NewFlagSet("run", flag.ExitOnError)
 	flags.SetOutput(stdErr)
 
+	var help bool
+	flags.BoolVar(&help, "h", false, "print usage")
+
+	var mounts sliceFlag
+	flags.Var(&mounts, "mount",
+		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
+			"provided, the host path will be used. Can be specified multiple times.")
+
 	_ = flags.Parse(args)
+
+	if help {
+		printRunUsage(stdErr, flags)
+		exit(0)
+	}
 
 	if flags.NArg() < 1 {
 		fmt.Fprintln(stdErr, "missing path to wasm file")
@@ -79,6 +94,27 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
+	var mountFS fs.FS
+	if len(mounts) > 0 {
+		cfs := &compositeFS{
+			paths: map[string]fs.FS{},
+		}
+		for _, mount := range mounts {
+			// TODO(anuraaga): Support paths with colon in them.
+			host, guest, ok := strings.Cut(mount, ":")
+			if !ok {
+				host = mount
+				guest = host
+			}
+			// wazero always calls fs.Open with a relative path.
+			if guest[0] == '/' {
+				guest = guest[1:]
+			}
+			cfs.paths[guest] = os.DirFS(host)
+		}
+		mountFS = cfs
+	}
+
 	ctx := context.Background()
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
@@ -94,6 +130,10 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
+	if mountFS != nil {
+		conf = conf.WithFS(mountFS)
+	}
+
 	code, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
@@ -129,6 +169,19 @@ func printUsage(stdErr io.Writer) {
 func printRunUsage(stdErr io.Writer, flags *flag.FlagSet) {
 	fmt.Fprintln(stdErr, "wazero CLI")
 	fmt.Fprintln(stdErr)
-	fmt.Fprintln(stdErr, "Usage:\n  wazero run <path to wasm file> [--] <wasm args>")
+	fmt.Fprintln(stdErr, "Usage:\n  wazero run <options> <path to wasm file> [--] <wasm args>")
 	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Options:")
+	flags.PrintDefaults()
+}
+
+type sliceFlag []string
+
+func (f *sliceFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *sliceFlag) Set(s string) error {
+	*f = append(*f, s)
+	return nil
 }
