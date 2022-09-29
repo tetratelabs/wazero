@@ -661,7 +661,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		fn := ce.fn
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		for {
-			def := fn.source.FunctionDefinition
+			def := fn.source.Definition
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
 
 			callFrameOffset := callFrameOffset(fn.source.Type)

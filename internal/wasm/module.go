@@ -175,8 +175,11 @@ type Module struct {
 	// ID is the sha256 value of the source wasm and is used for caching.
 	ID ModuleID
 
-	// FunctionDefinitionSection is a wazero specific section built on Validate.
+	// FunctionDefinitionSection is a wazero-specific section built on Validate.
 	FunctionDefinitionSection []*FunctionDefinition
+
+	// MemoryDefinitionSection is a wazero-specific section built on Validate.
+	MemoryDefinitionSection []*MemoryDefinition
 }
 
 // ModuleID represents sha256 hash value uniquely assigned to Module.
@@ -606,9 +609,9 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.Fu
 		f.Module = m
 		f.Idx = d.index
 		f.Type = d.funcType
-		f.FunctionDefinition = d
+		f.Definition = d
 		if listeners != nil {
-			f.FunctionListener = listeners[i]
+			f.Listener = listeners[i]
 		}
 	}
 	return

@@ -163,7 +163,7 @@ type function struct {
 
 // Definition implements the same method as documented on api.FunctionDefinition.
 func (f *function) Definition() api.FunctionDefinition {
-	return f.fi.FunctionDefinition
+	return f.fi.Definition
 }
 
 // Call implements the same method as documented on api.Function.
@@ -180,7 +180,7 @@ type importedFn struct {
 
 // Definition implements the same method as documented on api.Function.
 func (f *importedFn) Definition() api.FunctionDefinition {
-	return f.importedFn.FunctionDefinition
+	return f.importedFn.Definition
 }
 
 // Call implements the same method as documented on api.Function.

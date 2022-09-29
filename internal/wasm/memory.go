@@ -37,6 +37,8 @@ type MemoryInstance struct {
 	Min, Cap, Max uint32
 	// mux is used to prevent overlapping calls to Grow.
 	mux sync.RWMutex
+	// definition is known at compile time.
+	definition api.MemoryDefinition
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
@@ -49,6 +51,11 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 		Cap:    memSec.Cap,
 		Max:    memSec.Max,
 	}
+}
+
+// Definition implements the same method as documented on api.Memory.
+func (m *MemoryInstance) Definition() api.MemoryDefinition {
+	return m.definition
 }
 
 // Size implements the same method as documented on api.Memory.
