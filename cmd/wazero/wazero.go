@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -54,7 +56,24 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	flags := flag.NewFlagSet("run", flag.ExitOnError)
 	flags.SetOutput(stdErr)
 
+	var help bool
+	flags.BoolVar(&help, "h", false, "print usage")
+
+	var envs sliceFlag
+	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
+		"Can be specified multiple times.")
+
+	var mounts sliceFlag
+	flags.Var(&mounts, "mount",
+		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
+			"provided, the host path will be used. Can be specified multiple times.")
+
 	_ = flags.Parse(args)
+
+	if help {
+		printRunUsage(stdErr, flags)
+		exit(0)
+	}
 
 	if flags.NArg() < 1 {
 		fmt.Fprintln(stdErr, "missing path to wasm file")
@@ -69,6 +88,51 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		if wasmArgs[0] == "--" {
 			wasmArgs = wasmArgs[1:]
 		}
+	}
+
+	// Don't use map to preserve order
+	var env []string
+	for _, e := range envs {
+		key, value, ok := strings.Cut(e, "=")
+		if !ok {
+			fmt.Fprintf(stdErr, "invalid environment variable: %s\n", e)
+			exit(1)
+		}
+		env = append(env, key, value)
+	}
+
+	var mountFS fs.FS
+	if len(mounts) > 0 {
+		cfs := &compositeFS{
+			paths: map[string]fs.FS{},
+		}
+		for _, mount := range mounts {
+			if len(mount) == 0 {
+				fmt.Fprintln(stdErr, "invalid mount: empty string")
+				exit(1)
+			}
+
+			// TODO(anuraaga): Support wasm paths with colon in them.
+			var host, guest string
+			if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
+				host, guest = mount[:clnIdx], mount[clnIdx+1:]
+			} else {
+				host = mount
+				guest = host
+			}
+
+			if guest[0] == '.' {
+				fmt.Fprintf(stdErr, "invalid mount: guest path must not start with .: %s\n", guest)
+				exit(1)
+			}
+
+			// wazero always calls fs.Open with a relative path.
+			if guest[0] == '/' {
+				guest = guest[1:]
+			}
+			cfs.paths[guest] = os.DirFS(host)
+		}
+		mountFS = cfs
 	}
 
 	wasm, err := os.ReadFile(wasmPath)
@@ -94,6 +158,13 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
+	for i := 0; i < len(env); i += 2 {
+		conf = conf.WithEnv(env[i], env[i+1])
+	}
+	if mountFS != nil {
+		conf = conf.WithFS(mountFS)
+	}
+
 	code, err := rt.CompileModule(ctx, wasm)
 	if err != nil {
 		fmt.Fprintf(stdErr, "error compiling wasm binary: %v\n", err)
@@ -129,6 +200,19 @@ func printUsage(stdErr io.Writer) {
 func printRunUsage(stdErr io.Writer, flags *flag.FlagSet) {
 	fmt.Fprintln(stdErr, "wazero CLI")
 	fmt.Fprintln(stdErr)
-	fmt.Fprintln(stdErr, "Usage:\n  wazero run <path to wasm file> [--] <wasm args>")
+	fmt.Fprintln(stdErr, "Usage:\n  wazero run <options> <path to wasm file> [--] <wasm args>")
 	fmt.Fprintln(stdErr)
+	fmt.Fprintln(stdErr, "Options:")
+	flags.PrintDefaults()
+}
+
+type sliceFlag []string
+
+func (f *sliceFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *sliceFlag) Set(s string) error {
+	*f = append(*f, s)
+	return nil
 }
