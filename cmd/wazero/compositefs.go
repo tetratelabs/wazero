@@ -2,7 +2,6 @@ package main
 
 import (
 	"io/fs"
-	"path/filepath"
 	"strings"
 )
 
@@ -14,7 +13,6 @@ func (c *compositeFS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	name = filepath.Clean(name)
 	for path, f := range c.paths {
 		if !strings.HasPrefix(name, path) {
 			continue

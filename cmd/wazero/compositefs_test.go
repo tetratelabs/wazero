@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"path/filepath"
 	"testing"
 	"testing/fstest"
 
@@ -222,6 +221,14 @@ func TestFSTest(t *testing.T) {
 }
 
 func testFSSub(path string) fs.FS {
-	f, _ := fs.Sub(testFS, filepath.Join("testdata", "fs", path))
+	// Can't use filepath.Join because we need unix behavior even on Windows.
+	p := "testdata/fs"
+	if len(path) > 0 {
+		p = fmt.Sprintf("%s/%s", p, path)
+	}
+	f, err := fs.Sub(testFS, p)
+	if err != nil {
+		panic(err)
+	}
 	return f
 }
