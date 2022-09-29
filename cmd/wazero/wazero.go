@@ -59,6 +59,10 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	var help bool
 	flags.BoolVar(&help, "h", false, "print usage")
 
+	var envs sliceFlag
+	flags.Var(&envs, "env", "key=value pair of environment variable to expose to the binary. "+
+		"Can be specified multiple times.")
+
 	var mounts sliceFlag
 	flags.Var(&mounts, "mount",
 		"filesystem path to expose to the binary in the form of <host path>[:<wasm path>]. If wasm path is not "+
@@ -93,6 +97,16 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	}
 
 	wasmExe := filepath.Base(wasmPath)
+
+	env := make(map[string]string)
+	for _, e := range envs {
+		key, value, ok := strings.Cut(e, "=")
+		if !ok {
+			fmt.Fprintf(stdErr, "invalid environment variable: %s\n", e)
+			exit(1)
+		}
+		env[key] = value
+	}
 
 	var mountFS fs.FS
 	if len(mounts) > 0 {
@@ -130,6 +144,9 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 		WithSysNanotime().
 		WithSysWalltime().
 		WithArgs(append([]string{wasmExe}, wasmArgs...)...)
+	for k, v := range env {
+		conf = conf.WithEnv(k, v)
+	}
 	if mountFS != nil {
 		conf = conf.WithFS(mountFS)
 	}
