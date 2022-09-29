@@ -114,9 +114,11 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 			paths: map[string]fs.FS{},
 		}
 		for _, mount := range mounts {
-			// TODO(anuraaga): Support paths with colon in them.
-			host, guest, ok := strings.Cut(mount, ":")
-			if !ok {
+			// TODO(anuraaga): Support wasm paths with colon in them.
+			var host, guest string
+			if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
+				host, guest = mount[:clnIdx], mount[clnIdx+1:]
+			} else {
 				host = mount
 				guest = host
 			}
