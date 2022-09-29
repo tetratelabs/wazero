@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"github.com/tetratelabs/wazero/internal/testing/require"
 	"io/fs"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
+
+	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
 //go:embed testdata/fs

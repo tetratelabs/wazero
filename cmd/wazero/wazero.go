@@ -107,6 +107,11 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 			paths: map[string]fs.FS{},
 		}
 		for _, mount := range mounts {
+			if len(mount) == 0 {
+				fmt.Fprintln(stdErr, "invalid mount: empty string")
+				exit(1)
+			}
+
 			// TODO(anuraaga): Support wasm paths with colon in them.
 			var host, guest string
 			if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
@@ -115,6 +120,12 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 				host = mount
 				guest = host
 			}
+
+			if guest[0] == '.' {
+				fmt.Fprintf(stdErr, "invalid mount: guest path must not start with .: %s\n", guest)
+				exit(1)
+			}
+
 			// wazero always calls fs.Open with a relative path.
 			if guest[0] == '/' {
 				guest = guest[1:]
