@@ -3,8 +3,10 @@ package wasm
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -761,5 +763,51 @@ func TestMemoryInstance_Write(t *testing.T) {
 
 		ok = mem.Write(ctx, 9, buf)
 		require.False(t, ok)
+	}
+}
+
+func TestMemoryInstance_WriteString(t *testing.T) {
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+
+		s := "bear"
+		require.True(t, mem.WriteString(ctx, 4, s))
+		require.Equal(t, []byte{0, 0, 0, 0, 'b', 'e', 'a', 'r'}, mem.Buffer)
+
+		ok := mem.WriteString(ctx, 5, s)
+		require.False(t, ok)
+
+		ok = mem.WriteString(ctx, 9, s)
+		require.False(t, ok)
+	}
+}
+
+func BenchmarkWriteString(b *testing.B) {
+	tests := []string{
+		"",
+		"bear",
+		"hello world",
+		strings.Repeat("hello ", 10),
+	}
+	// nolint intentionally testing interface access
+	var mem api.Memory
+	mem = &MemoryInstance{Buffer: make([]byte, 1000), Min: 1}
+	for _, tt := range tests {
+		b.Run("", func(b *testing.B) {
+			b.Run("Write", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					if !mem.Write(testCtx, 0, []byte(tt)) {
+						b.Fail()
+					}
+				}
+			})
+			b.Run("WriteString", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					if !mem.WriteString(testCtx, 0, tt) {
+						b.Fail()
+					}
+				}
+			})
+		})
 	}
 }

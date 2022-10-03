@@ -162,6 +162,15 @@ func (m *MemoryInstance) Write(_ context.Context, offset uint32, val []byte) boo
 	return true
 }
 
+// WriteString implements the same method as documented on api.Memory.
+func (m *MemoryInstance) WriteString(_ context.Context, offset uint32, val string) bool {
+	if !m.hasSize(offset, uint32(len(val))) {
+		return false
+	}
+	copy(m.Buffer[offset:], val)
+	return true
+}
+
 // MemoryPagesToBytesNum converts the given pages into the number of bytes contained in these pages.
 func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 	return uint64(pages) << MemoryPageSizeInBits
