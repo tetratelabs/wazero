@@ -763,3 +763,19 @@ func TestMemoryInstance_Write(t *testing.T) {
 		require.False(t, ok)
 	}
 }
+
+func TestMemoryInstance_WriteString(t *testing.T) {
+	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
+		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+
+		s := "bear"
+		require.True(t, mem.WriteString(ctx, 4, s))
+		require.Equal(t, []byte{0, 0, 0, 0, 'b', 'e', 'a', 'r'}, mem.Buffer)
+
+		ok := mem.WriteString(ctx, 5, s)
+		require.False(t, ok)
+
+		ok = mem.WriteString(ctx, 9, s)
+		require.False(t, ok)
+	}
+}

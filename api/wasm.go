@@ -459,6 +459,9 @@ type Memory interface {
 
 	// Write writes the slice to the underlying buffer at the offset or returns false if out of range.
 	Write(ctx context.Context, offset uint32, v []byte) bool
+
+	// WriteString writes the string to the underlying buffer at the offset or returns false if out of range.
+	WriteString(ctx context.Context, offset uint32, v string) bool
 }
 
 // EncodeExternref encodes the input as a ValueTypeExternref.
