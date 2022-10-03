@@ -3,8 +3,10 @@ package wasm
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
@@ -777,5 +779,34 @@ func TestMemoryInstance_WriteString(t *testing.T) {
 
 		ok = mem.WriteString(ctx, 9, s)
 		require.False(t, ok)
+	}
+}
+
+func BenchmarkWriteString(b *testing.B) {
+	tests := []string{
+		"",
+		"bear",
+		"hello world",
+		strings.Repeat("hello ", 10),
+	}
+	var mem api.Memory
+	mem = &MemoryInstance{Buffer: make([]byte, 1000), Min: 1}
+	for _, tt := range tests {
+		b.Run("", func(b *testing.B) {
+			b.Run("Write", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					if !mem.Write(testCtx, 0, []byte(tt)) {
+						b.Fail()
+					}
+				}
+			})
+			b.Run("WriteString", func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					if !mem.WriteString(testCtx, 0, tt) {
+						b.Fail()
+					}
+				}
+			})
+		})
 	}
 }
