@@ -36,5 +36,5 @@ jobs:
       - name: Pull and push
         run: |  # This will only push a single architecture, which is fine as we currently only support amd64
           docker pull ${{ matrix.source }}
-          docker tag ${{ matrix.source }} ghcr.io/tetratelabs/wazero/internal-${{ matrix.target_tag }}
-          docker push ghcr.io/tetratelabs/wazero/internal-${{ matrix.target_tag }}
+          docker tag ${{ matrix.source }} ghcr.io/${{ github.repository }}/internal-${{ matrix.target_tag }}
+          docker push ghcr.io/${{ github.repository }}/internal-${{ matrix.target_tag }}
