@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
@@ -127,7 +126,7 @@ type (
 		// GoFunc holds the runtime representation of host functions.
 		// This is nil when Kind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
 		// specific to Wasm functions.
-		GoFunc *reflect.Value
+		GoFunc *api.HostFuncSignature
 
 		// Fields above here are settable prior to instantiation. Below are set by the Store during instantiation.
 

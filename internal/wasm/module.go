@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -833,7 +832,7 @@ type Code struct {
 	//
 	// Note: This has no serialization format, so is not encodable.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	GoFunc *reflect.Value
+	GoFunc *api.HostFuncSignature
 }
 
 type DataSegment struct {

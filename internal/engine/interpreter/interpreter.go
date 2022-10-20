@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
@@ -172,13 +171,13 @@ type callFrame struct {
 
 type code struct {
 	body   []*interpreterOp
-	hostFn *reflect.Value
+	hostFn *api.HostFuncSignature
 }
 
 type function struct {
 	source *wasm.FunctionInstance
 	body   []*interpreterOp
-	hostFn *reflect.Value
+	hostFn *api.HostFuncSignature
 }
 
 // functionFromUintptr resurrects the original *function from the given uintptr

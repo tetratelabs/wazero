@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -102,6 +101,13 @@ const (
 	// Note: The usage of this type is toggled with api.CoreFeatureBulkMemoryOperations.
 	ValueTypeExternref ValueType = 0x6f
 )
+
+// HostFuncSignature is the signature of host function
+type HostFuncSignature struct {
+	Fn     func(context.Context, Module, ...uint64) ([]uint64, error)
+	NumIn  []ValueType
+	NumOut []ValueType
+}
 
 // ValueTypeName returns the type name of the given ValueType as a string.
 // These type names match the names used in the WebAssembly text format.
@@ -260,7 +266,7 @@ type FunctionDefinition interface {
 	// different from its defining module.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
-	GoFunc() *reflect.Value
+	GoFunc() *HostFuncSignature
 
 	// ParamTypes are the possibly empty sequence of value types accepted by a
 	// function with this signature.

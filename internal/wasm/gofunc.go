@@ -3,7 +3,6 @@ package wasm
 import (
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 
 	"github.com/tetratelabs/wazero/api"
@@ -41,15 +40,7 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 // as uint32 and float32 respectively.
 func PopGoFuncParams(f *FunctionInstance, popParam func() uint64) []uint64 {
 	// First, determine how many values we need to pop
-	paramCount := f.GoFunc.Type().NumIn()
-	switch f.Kind {
-	case FunctionKindGoNoContext:
-	case FunctionKindGoContextModule:
-		paramCount -= 2
-	default:
-		paramCount--
-	}
-
+	paramCount := len(f.GoFunc.NumIn) - 2
 	return PopValues(paramCount, popParam)
 }
 
@@ -74,64 +65,10 @@ func PopValues(count int, popper func() uint64) []uint64 {
 //
 // Note: ctx must use the caller's memory, which might be different from the defining module on an imported function.
 func CallGoFunc(ctx context.Context, callCtx *CallContext, f *FunctionInstance, params []uint64) []uint64 {
-	tp := f.GoFunc.Type()
-
-	var in []reflect.Value
-	if tp.NumIn() != 0 {
-		in = make([]reflect.Value, tp.NumIn())
-
-		i := 0
-		switch f.Kind {
-		case FunctionKindGoContext:
-			in[0] = newContextVal(ctx)
-			i = 1
-		case FunctionKindGoModule:
-			in[0] = newModuleVal(callCtx)
-			i = 1
-		case FunctionKindGoContextModule:
-			in[0] = newContextVal(ctx)
-			in[1] = newModuleVal(callCtx)
-			i = 2
-		}
-
-		for _, raw := range params {
-			val := reflect.New(tp.In(i)).Elem()
-			k := tp.In(i).Kind()
-			switch k {
-			case reflect.Float32:
-				val.SetFloat(float64(math.Float32frombits(uint32(raw))))
-			case reflect.Float64:
-				val.SetFloat(math.Float64frombits(raw))
-			case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-				val.SetUint(raw)
-			case reflect.Int32, reflect.Int64:
-				val.SetInt(int64(raw))
-			default:
-				panic(fmt.Errorf("BUG: param[%d] has an invalid type: %v", i, k))
-			}
-			in[i] = val
-			i++
-		}
-	}
-
-	// Execute the host function and push back the call result onto the stack.
-	var results []uint64
-	if tp.NumOut() > 0 {
-		results = make([]uint64, 0, tp.NumOut())
-	}
-	for i, ret := range f.GoFunc.Call(in) {
-		switch ret.Kind() {
-		case reflect.Float32:
-			results = append(results, uint64(math.Float32bits(float32(ret.Float()))))
-		case reflect.Float64:
-			results = append(results, math.Float64bits(ret.Float()))
-		case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			results = append(results, ret.Uint())
-		case reflect.Int32, reflect.Int64:
-			results = append(results, uint64(ret.Int()))
-		default:
-			panic(fmt.Errorf("BUG: result[%d] has an invalid type: %v", i, ret.Kind()))
-		}
+	results, err := f.GoFunc.Fn(ctx, callCtx, params...)
+	if err != nil {
+		// todo: add error return
+		panic(err)
 	}
 	return results
 }
@@ -161,72 +98,15 @@ func MustParseGoFuncCode(fn interface{}) *Code {
 }
 
 func parseGoFunc(fn interface{}) (params, results []ValueType, code *Code, err error) {
-	fnV := reflect.ValueOf(fn)
-	p := fnV.Type()
-
-	if fnV.Kind() != reflect.Func {
-		err = fmt.Errorf("kind != func: %s", fnV.Kind().String())
+	fnV, ok := fn.(*api.HostFuncSignature)
+	if !ok {
+		err = fmt.Errorf("host function type mistake")
 		return
 	}
 
-	fk := kind(p)
-	code = &Code{IsHostFunction: true, Kind: fk, GoFunc: &fnV}
-
-	pOffset := 0
-	switch fk {
-	case FunctionKindGoNoContext:
-	case FunctionKindGoContextModule:
-		pOffset = 2
-	default:
-		pOffset = 1
-	}
-
-	pCount := p.NumIn() - pOffset
-	if pCount > 0 {
-		params = make([]ValueType, pCount)
-	}
-	for i := 0; i < len(params); i++ {
-		pI := p.In(i + pOffset)
-		if t, ok := getTypeOf(pI.Kind()); ok {
-			params[i] = t
-			continue
-		}
-
-		// Now, we will definitely err, decide which message is best
-		var arg0Type reflect.Type
-		if hc := pI.Implements(moduleType); hc {
-			arg0Type = moduleType
-		} else if gc := pI.Implements(goContextType); gc {
-			arg0Type = goContextType
-		}
-
-		if arg0Type != nil {
-			err = fmt.Errorf("param[%d] is a %s, which may be defined only once as param[0]", i+pOffset, arg0Type)
-		} else {
-			err = fmt.Errorf("param[%d] is unsupported: %s", i+pOffset, pI.Kind())
-		}
-		return
-	}
-
-	rCount := p.NumOut()
-	if rCount > 0 {
-		results = make([]ValueType, rCount)
-	}
-	for i := 0; i < len(results); i++ {
-		rI := p.Out(i)
-		if t, ok := getTypeOf(rI.Kind()); ok {
-			results[i] = t
-			continue
-		}
-
-		// Now, we will definitely err, decide which message is best
-		if rI.Implements(errorType) {
-			err = fmt.Errorf("result[%d] is an error, which is unsupported", i)
-		} else {
-			err = fmt.Errorf("result[%d] is unsupported: %s", i, rI.Kind())
-		}
-		return
-	}
+	code = &Code{IsHostFunction: true, Kind: FunctionKindGoContextModule, GoFunc: fnV}
+	params = fnV.NumIn
+	results = fnV.NumOut
 	return
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/tetratelabs/wazero/api"
 	"log"
 	"os"
 	"strconv"
@@ -38,16 +39,28 @@ func main() {
 	// constrained to a subset of numeric types.
 	// Note: "env" is a module name conventionally used for arbitrary
 	// host-defined functions, but any name would do.
-	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("log_i32", func(v uint32) {
-			fmt.Println("log_i32 >>", v)
-		}).
-		ExportFunction("current_year", func() uint32 {
+	logI32Host := &api.HostFuncSignature{
+		Fn: func(_ context.Context, _ api.Module, in ...uint64) ([]uint64, error) {
+			fmt.Println("log_i32 >>", uint32(in[0]))
+			return nil, nil
+		},
+		NumIn:  []api.ValueType{api.ValueTypeI32},
+		NumOut: []api.ValueType{},
+	}
+	currentYearHost := &api.HostFuncSignature{
+		Fn: func(_ context.Context, _ api.Module, _ ...uint64) ([]uint64, error) {
 			if envYear, err := strconv.ParseUint(os.Getenv("CURRENT_YEAR"), 10, 64); err == nil {
-				return uint32(envYear) // Allow env-override to prevent annual test maintenance!
+				return []uint64{envYear}, nil // Allow env-override to prevent annual test maintenance!
 			}
-			return uint32(time.Now().Year())
-		}).
+			return []uint64{uint64(time.Now().Year())}, nil
+		},
+		NumIn:  []api.ValueType{},
+		NumOut: []api.ValueType{api.ValueTypeI32},
+	}
+
+	_, err := r.NewHostModuleBuilder("env").
+		ExportFunction("log_i32", logI32Host).
+		ExportFunction("current_year", currentYearHost).
 		Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -209,7 +208,7 @@ type CompilationResult struct {
 
 	// GoFunc is the data returned by the same field documented on wasm.Code.
 	// In this case, IsHostFunction is true and other fields can be ignored.
-	GoFunc *reflect.Value
+	GoFunc *api.HostFuncSignature
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
