@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -20,6 +21,21 @@ var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 )
+
+var _ context.Context = &HostContext{}
+
+// HostContext contain the content will be used in host function call
+type HostContext struct {
+	Content string
+}
+
+func (h *HostContext) Deadline() (deadline time.Time, ok bool) { return }
+
+func (h *HostContext) Done() <-chan struct{} { return nil }
+
+func (h *HostContext) Err() error { return nil }
+
+func (h *HostContext) Value(key interface{}) interface{} { return nil }
 
 func TestNewRuntimeWithConfig_version(t *testing.T) {
 	cfg := NewRuntimeConfig().(*runtimeConfig)
@@ -531,6 +547,75 @@ func TestRuntime_CloseWithExitCode(t *testing.T) {
 			require.ErrorIs(t, err, sys.NewExitError("mod2", tc.exitCode))
 		})
 	}
+}
+
+func TestHostFunctionWithCustomContext(t *testing.T) {
+	const fistString = "hello"
+	const secondString = "hello call"
+	hostCtx := &HostContext{fistString}
+	r := NewRuntime(hostCtx)
+	defer r.Close(hostCtx)
+
+	// Define a function that will be set as the start function
+	var calledStart bool
+	var calledCall bool
+	start := func(ctx context.Context, module api.Module) {
+		hts, ok := ctx.(*HostContext)
+		if !ok {
+			t.Fatal("decorate call context could effect host ctx cast failed, please consider it.")
+		}
+		calledStart = true
+		require.NotNil(t, hts)
+		require.Equal(t, fistString, hts.Content)
+	}
+
+	callFunc := func(ctx context.Context, module api.Module) {
+		hts, ok := ctx.(*HostContext)
+		if !ok {
+			t.Fatal("decorate call context could effect host ctx cast failed, please consider it.")
+		}
+		calledCall = true
+		require.NotNil(t, hts)
+		require.Equal(t, secondString, hts.Content)
+	}
+
+	_, err := r.NewHostModuleBuilder("env").
+		ExportFunction("host", start).
+		ExportFunction("host2", callFunc).
+		Instantiate(hostCtx, r)
+	require.NoError(t, err)
+
+	one := uint32(0)
+	binary := binaryformat.EncodeModule(&wasm.Module{
+		TypeSection: []*wasm.FunctionType{{}, {}},
+		ImportSection: []*wasm.Import{
+			{Module: "env", Name: "host", Type: wasm.ExternTypeFunc, DescFunc: 0},
+			{Module: "env", Name: "host2", Type: wasm.ExternTypeFunc, DescFunc: 0},
+		},
+		FunctionSection: []wasm.Index{0, 1},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Call the imported env.host.
+			{Body: []byte{wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Call the imported env.host.
+		},
+		ExportSection: []*wasm.Export{
+			{Type: api.ExternTypeFunc, Name: "callHost", Index: uint32(3)},
+		},
+		StartSection: &one,
+	})
+
+	code, err := r.CompileModule(hostCtx, binary)
+	require.NoError(t, err)
+
+	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
+	ins, err := r.InstantiateModule(hostCtx, code, NewModuleConfig())
+	require.NoError(t, err)
+	require.True(t, calledStart)
+
+	// add the new context content for call with used in host function
+	hostCtx.Content = secondString
+	_, err = ins.ExportedFunction("callHost").Call(hostCtx)
+	require.NoError(t, err)
+	require.True(t, calledCall)
 }
 
 func TestRuntime_Close_ClosesCompiledModules(t *testing.T) {
