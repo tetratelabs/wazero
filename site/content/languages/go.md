@@ -7,7 +7,7 @@ title = "Go"
 When `GOARCH=wasm GOOS=js`, Go's compiler targets WebAssembly Binary format
 (%.wasm).
 
-Ex.
+Here's a typical compilation command:
 ```bash
 $ GOOS=js GOARCH=wasm go build -o my.wasm .
 ```
@@ -62,12 +62,12 @@ values returned (such as the pid). When not supported, many functions return
 
 Here are the more notable parts of Go which will not work when compiled via
 `GOARCH=wasm GOOS=js`, resulting in `syscall.ENOSYS` errors:
-* Raw network access. Ex. `net.Bind`
-* File descriptor control (`fnctl`). Ex. `syscall.Pipe`
+* Raw network access. e.g. `net.Bind`
+* File descriptor control (`fnctl`). e.g. `syscall.Pipe`
 * Arbitrary syscalls. Ex `syscall.Syscall`
-* Process control. Ex. `syscall.Kill`
-* Kernel parameters. Ex. `syscall.Sysctl`
-* Timezone-specific clock readings. Ex. `syscall.Gettimeofday`
+* Process control. e.g. `syscall.Kill`
+* Kernel parameters. e.g. `syscall.Sysctl`
+* Timezone-specific clock readings. e.g. `syscall.Gettimeofday`
 
 ## Memory
 
@@ -285,7 +285,6 @@ Tips:
 To test the Go you just built, you need to have `GOROOT` set to your workspace,
 and your PATH configured to find both `bin/go` and `misc/wasm/go_js_wasm_exec`.
 
-Ex.
 ```bash
 $ export GOROOT=$PWD
 $ export PATH=${GOROOT}/misc/wasm:${GOROOT}/bin:$PATH
@@ -301,7 +300,7 @@ Now, you should be all set and can iterate similar to normal Go development.
 The main thing to keep in mind is where files are, and remember to set
 `GOOS=js GOARCH=wasm` when running go commands.
 
-Ex. If you fixed something in the `syscall/js` package
+For example, if you fixed something in the `syscall/js` package
 (`${GOROOT}/src/syscall/js`), test it like so:
 ```bash
 $ GOOS=js GOARCH=wasm go test syscall/js

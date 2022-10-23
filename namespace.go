@@ -17,7 +17,7 @@ type Namespace interface {
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
-	// Ex.
+	// Here's an example:
 	//	module, _ := n.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("prod"))
 	//
 	// While CompiledModule is pre-validated, there are a few situations which can cause an error:
@@ -29,7 +29,7 @@ type Namespace interface {
 	// CloseWithExitCode closes all modules initialized in this Namespace with the provided exit code.
 	// An error is returned if any module returns an error when closed.
 	//
-	// Ex.
+	// Here's an example:
 	//	n := r.NewNamespace(ctx)
 	//	defer n.CloseWithExitCode(ctx, 2) // This closes all modules in this Namespace.
 	//
@@ -42,7 +42,7 @@ type Namespace interface {
 
 	// Closer closes modules initialized in this Namespace by delegating to CloseWithExitCode with an exit code of zero.
 	//
-	// Ex.
+	// Here's an example:
 	//	n := r.NewNamespace(ctx)
 	//	defer n.Close(ctx) // This closes all modules in this Namespace.
 	api.Closer

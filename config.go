@@ -19,13 +19,16 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
+// RuntimeConfig controls runtime behavior, with the default implementation as
+// NewRuntimeConfig
 //
-// Ex. To explicitly limit to Wasm Core 1.0 features as opposed to relying on defaults:
+// The example below explicitly limits to Wasm Core 1.0 features as opposed to
+// relying on defaults:
 //
 //	rConfig = wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV1)
 //
-// Note: RuntimeConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
+// Note: RuntimeConfig is immutable. Each WithXXX function returns a new
+// instance including the corresponding change.
 type RuntimeConfig interface {
 	// WithCoreFeatures sets the WebAssembly Core specification features this
 	// runtime supports. Defaults to api.CoreFeaturesV2.
@@ -47,7 +50,7 @@ type RuntimeConfig interface {
 	// default is 65536, allowing 4GB total memory per instance. Setting a
 	// value larger than default will panic.
 	//
-	// Ex. To reduce the largest possible memory size from 4GB to 128KB:
+	// This example reduces the largest possible memory size from 4GB to 128KB:
 	//	rConfig = wazero.NewRuntimeConfig().WithMemoryLimitPages(2)
 	//
 	// Note: Wasm has 32-bit memory and each page is 65536 (2^16) bytes. This
@@ -59,7 +62,7 @@ type RuntimeConfig interface {
 	// not defined. The default is false, which means minimum memory is
 	// allocated and any call to grow memory results in re-allocations.
 	//
-	// Ex. To ensure any memory.grow instruction will never re-allocate:
+	// This example ensures any memory.grow instruction will never re-allocate:
 	//	rConfig = wazero.NewRuntimeConfig().WithMemoryCapacityFromMax(true)
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
@@ -243,7 +246,7 @@ func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
 // system. Using this, resources such as STDIN can be isolated, so that the same module can be safely instantiated
 // multiple times.
 //
-// Ex.
+// Here's an example:
 //
 //	// Initialize base configuration:
 //	config := wazero.NewModuleConfig().WithStdout(buf).WithSysNanotime()
@@ -291,7 +294,7 @@ type ModuleConfig interface {
 	// WithFS assigns the file system to use for any paths beginning at "/".
 	// Defaults return fs.ErrNotExist.
 	//
-	// Ex. This sets a read-only, embedded file-system:
+	// This example sets a read-only, embedded file-system:
 	//
 	//	//go:embed testdata/index.html
 	//	var testdataIndex embed.FS
@@ -302,7 +305,7 @@ type ModuleConfig interface {
 	//	// "index.html" is accessible as "/index.html".
 	//	config := wazero.NewModuleConfig().WithFS(rooted)
 	//
-	// Ex. This sets a mutable file-system:
+	// This example sets a mutable file-system:
 	//
 	//	// Files relative to "/work/appA" are accessible as "/".
 	//	config := wazero.NewModuleConfig().WithFS(os.DirFS("/work/appA"))
@@ -330,7 +333,7 @@ type ModuleConfig interface {
 	//   - If any function doesn't exist, it is skipped. However, all functions
 	//	  that do exist are called in order.
 	//   - Some start functions may exit the module during instantiate with a
-	//	  sys.ExitError (ex. emscripten), preventing use of exported functions.
+	//	  sys.ExitError (e.g. emscripten), preventing use of exported functions.
 	WithStartFunctions(...string) ModuleConfig
 
 	// WithStderr configures where standard error (file descriptor 2) is written. Defaults to io.Discard.
@@ -376,7 +379,7 @@ type ModuleConfig interface {
 	// real time clock. Defaults to a fake result that increases by 1ms on
 	// each reading.
 	//
-	// Ex. To override with your own clock:
+	// Here's an example that uses a custom clock:
 	//	moduleConfig = moduleConfig.
 	//		WithWalltime(func(context.Context) (sec int64, nsec int32) {
 	//			return clock.walltime()
@@ -396,7 +399,7 @@ type ModuleConfig interface {
 	// time in nanoseconds. Defaults to a fake result that increases by 1ms
 	// on each reading.
 	//
-	// Ex. To override with your own clock:
+	// Here's an example that uses a custom clock:
 	//	moduleConfig = moduleConfig.
 	//		WithNanotime(func(context.Context) int64 {
 	//			return clock.nanotime()
@@ -404,7 +407,7 @@ type ModuleConfig interface {
 	//
 	// # Notes:
 	//   - This does not default to time.Since as that violates sandboxing.
-	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
 	//   - If you set this, you should probably set WithNanosleep also.
 	//   - Use WithSysNanotime for a usable implementation.
 	WithNanotime(sys.Nanotime, sys.ClockResolution) ModuleConfig
@@ -417,7 +420,7 @@ type ModuleConfig interface {
 	// WithNanosleep configures the how to pause the current goroutine for at
 	// least the configured nanoseconds. Defaults to return immediately.
 	//
-	// Ex. To override with your own sleep function:
+	// This example uses a custom sleep function:
 	//	moduleConfig = moduleConfig.
 	//		WithNanosleep(func(ctx context.Context, ns int64) {
 	//			rel := unix.NsecToTimespec(ns)
@@ -429,7 +432,7 @@ type ModuleConfig interface {
 	// # Notes:
 	//   - This primarily supports `poll_oneoff` for relative clock events.
 	//   - This does not default to time.Sleep as that violates sandboxing.
-	//   - Some compilers implement sleep by looping on sys.Nanotime (ex. Go).
+	//   - Some compilers implement sleep by looping on sys.Nanotime (e.g. Go).
 	//   - If you set this, you should probably set WithNanotime also.
 	//   - Use WithSysNanosleep for a usable implementation.
 	WithNanosleep(sys.Nanosleep) ModuleConfig

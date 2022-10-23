@@ -3,10 +3,10 @@
 Packages in this directory implement the *host* imports needed for specific
 languages or shared compiler toolchains.
 
-* [AssemblyScript](assemblyscript) Ex. `asc X.ts --debug -b none -o X.wasm`
-* [Emscripten](emscripten) Ex. `em++ ... -s STANDALONE_WASM -o X.wasm X.cc`
-* [Go](go) Ex. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
-* [WASI](wasi_snapshot_preview1) Ex. `tinygo build -o X.wasm -target=wasi X.go`
+* [AssemblyScript](assemblyscript) e.g. `asc X.ts --debug -b none -o X.wasm`
+* [Emscripten](emscripten) e.g. `em++ ... -s STANDALONE_WASM -o X.wasm X.cc`
+* [Go](go) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
+* [WASI](wasi_snapshot_preview1) e.g. `tinygo build -o X.wasm -target=wasi X.go`
 
 Note: You may not see a language listed here because it either works without
 host imports, or it uses WASI. Refer to https://wazero.io/languages/ for more.

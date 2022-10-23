@@ -3,7 +3,6 @@
 This example shows how to extend a Go application with an addition function
 defined in WebAssembly.
 
-Ex.
 ```bash
 $ go run add.go 7 9
 7 + 9 = 16

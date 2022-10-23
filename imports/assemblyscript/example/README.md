@@ -9,7 +9,6 @@ AssemblyScript `abort` built-in function.
 
 This demo configures AssemblyScript imports for errors and trace messages.
 
-Ex.
 ```bash
 $ go run assemblyscript.go 7
 hello_world returned: 10

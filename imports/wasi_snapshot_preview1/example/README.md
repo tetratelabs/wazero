@@ -15,7 +15,7 @@ to use Wasm built with "tinygo". Here are the included examples:
 * [tinygo](testdata/tinygo) - Built via `tinygo build -o cat.wasm -scheduler=none --no-debug -target=wasi cat.go`
 * [zig-cc](testdata/zig-cc) - Built via `zig cc cat.c -o cat.wasm --target=wasm32-wasi -O3`
 
-Ex. To run the same example with zig-cc:
+To run the same example with zig-cc:
 ```bash
 $ TOOLCHAIN=zig-cc go run cat.go /test.txt
 greet filesystem

@@ -18,7 +18,7 @@ func TestEncodeCode(t *testing.T) {
 	}{
 		{
 			name: "smallest function body",
-			input: &wasm.Code{ // Ex. (func)
+			input: &wasm.Code{ // e.g. (func)
 				Body: []byte{wasm.OpcodeEnd},
 			},
 			expected: []byte{
@@ -29,7 +29,7 @@ func TestEncodeCode(t *testing.T) {
 		},
 		{
 			name: "params and instructions", // local.get index space is params, then locals
-			input: &wasm.Code{ // Ex. (func (type 3) local.get 0 local.get 1 i32.add)
+			input: &wasm.Code{ // e.g. (func (type 3) local.get 0 local.get 1 i32.add)
 				Body: addLocalZeroLocalOne,
 			},
 			expected: append([]byte{
@@ -41,7 +41,7 @@ func TestEncodeCode(t *testing.T) {
 		},
 		{
 			name: "locals and instructions",
-			input: &wasm.Code{ // Ex. (func (result i32) (local i32, i32) local.get 0 local.get 1 i32.add)
+			input: &wasm.Code{ // e.g. (func (result i32) (local i32, i32) local.get 0 local.get 1 i32.add)
 				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 				Body:       addLocalZeroLocalOne,
 			},
@@ -55,7 +55,7 @@ func TestEncodeCode(t *testing.T) {
 		},
 		{
 			name: "mixed locals and instructions",
-			input: &wasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
+			input: &wasm.Code{ // e.g. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
 				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeI32},
 				Body:       addLocalZeroLocalTwo,
 			},
@@ -82,7 +82,7 @@ func TestEncodeCode(t *testing.T) {
 }
 
 func BenchmarkEncodeCode(b *testing.B) {
-	input := &wasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
+	input := &wasm.Code{ // e.g. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
 		LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeI32},
 		Body:       addLocalZeroLocalTwo,
 	}

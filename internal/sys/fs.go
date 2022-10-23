@@ -111,7 +111,7 @@ func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) 
 // OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
 //
 // TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
-// Ex. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
+// e.g. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
 // See #390
 func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, perm int */) (uint32, error) {
 	// fs.ValidFile cannot be rooted (start with '/')
@@ -119,7 +119,7 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 	if name[0] == '/' {
 		fsOpenPath = name[1:]
 	}
-	fsOpenPath = path.Clean(fsOpenPath) // ex. "sub/." -> "sub"
+	fsOpenPath = path.Clean(fsOpenPath) // e.g. "sub/." -> "sub"
 
 	f, err := c.fs.Open(fsOpenPath)
 	if err != nil {

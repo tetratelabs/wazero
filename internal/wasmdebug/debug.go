@@ -135,9 +135,9 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 	}
 
 	// At this point we expect the error was from a function defined by HostModuleBuilder that intentionally called panic.
-	if runtimeErr, ok := recovered.(error); ok { // Ex. panic(errors.New("whoops"))
+	if runtimeErr, ok := recovered.(error); ok { // e.g. panic(errors.New("whoops"))
 		return fmt.Errorf("%w (recovered by wazero)\nwasm stack trace:\n\t%s", runtimeErr, stack)
-	} else { // Ex. panic("whoops")
+	} else { // e.g. panic("whoops")
 		return fmt.Errorf("%v (recovered by wazero)\nwasm stack trace:\n\t%s", recovered, stack)
 	}
 }

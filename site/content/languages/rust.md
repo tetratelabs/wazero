@@ -54,7 +54,7 @@ functions you want to export to the WebAssembly host. You can read more about
 this in [The Embedded Rust Book][4].
 
 Next, you'll notice the flag `--crate-type cdylib` passed to `rustc`. This
-compiles the source as a library, ex. without a `main` function.
+compiles the source as a library, e.g. without a `main` function.
 
 ## Disclaimer
 

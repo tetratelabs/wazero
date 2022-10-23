@@ -207,7 +207,7 @@ func (m *MemoryInstance) PageSize(_ context.Context) (result uint32) {
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
 }
 
-// PagesToUnitOfBytes converts the pages to a human-readable form similar to what's specified. Ex. 1 -> "64Ki"
+// PagesToUnitOfBytes converts the pages to a human-readable form similar to what's specified. e.g. 1 -> "64Ki"
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0
 func PagesToUnitOfBytes(pages uint32) string {

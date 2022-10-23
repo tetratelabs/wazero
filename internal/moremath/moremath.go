@@ -109,7 +109,7 @@ func WasmCompatMax32(x, y float32) float32 {
 // WasmCompatNearestF32 is the Wasm spec compatible variant of math.Round, used for Nearest instruction.
 // For example, this converts 1.9 to 2.0, and this has the semantics of LLVM's rint intrinsic.
 //
-// Ex. math.Round(-4.5) results in -5 while this results in -4.
+// e.g. math.Round(-4.5) results in -5 while this results in -4.
 //
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF32(f float32) float32 {
@@ -137,7 +137,7 @@ func WasmCompatNearestF32(f float32) float32 {
 // WasmCompatNearestF64 is the Wasm spec compatible variant of math.Round, used for Nearest instruction.
 // For example, this converts 1.9 to 2.0, and this has the semantics of LLVM's rint intrinsic.
 //
-// Ex. math.Round(-4.5) results in -5 while this results in -4.
+// e.g. math.Round(-4.5) results in -5 while this results in -4.
 //
 // See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func WasmCompatNearestF64(f float64) float64 {

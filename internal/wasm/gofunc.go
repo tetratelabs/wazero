@@ -67,6 +67,8 @@ func PopValues(count int, popper func() uint64) []uint64 {
 	return params
 }
 
+type HostFn func(ctx context.Context, mod api.Module, params ...uint64) ([]uint64, error)
+
 // CallGoFunc executes the FunctionInstance.GoFunc by converting params to Go types. The results of the function call
 // are converted back to api.ValueType.
 //

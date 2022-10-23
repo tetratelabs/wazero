@@ -14,7 +14,7 @@ import (
 
 // Runtime allows embedding of WebAssembly modules.
 //
-// Ex. The below is the basic initialization of wazero's WebAssembly Runtime.
+// The below is an example of basic initialization:
 //
 //	ctx := context.Background()
 //	r := wazero.NewRuntime(ctx)
@@ -24,7 +24,7 @@ import (
 type Runtime interface {
 	// NewHostModuleBuilder lets you create modules out of functions defined in Go.
 	//
-	// Ex. Below defines and instantiates a module named "env" with one function:
+	// Below defines and instantiates a module named "env" with one function:
 	//
 	//	ctx := context.Background()
 	//	hello := func() {
@@ -50,7 +50,7 @@ type Runtime interface {
 
 	// InstantiateModuleFromBinary instantiates a module from the WebAssembly binary (%.wasm) or errs if invalid.
 	//
-	// Ex.
+	// Here's an example:
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime(ctx)
 	//	defer r.Close(ctx) // This closes everything this Runtime created.
@@ -103,7 +103,7 @@ type Runtime interface {
 	// CloseWithExitCode closes all the modules that have been initialized in this Runtime with the provided exit code.
 	// An error is returned if any module returns an error when closed.
 	//
-	// Ex.
+	// Here's an example:
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime(ctx)
 	//	defer r.CloseWithExitCode(ctx, 2) // This closes everything this Runtime created.

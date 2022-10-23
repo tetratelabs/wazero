@@ -19,7 +19,7 @@ func TestEncodeImport(t *testing.T) {
 	}{
 		{
 			name: "func no module, no name, type index 0",
-			input: &wasm.Import{ // Ex. (import "" "" (func (type 0)))
+			input: &wasm.Import{ // e.g. (import "" "" (func (type 0)))
 				Type:     wasm.ExternTypeFunc,
 				Module:   "",
 				Name:     "",
@@ -29,7 +29,7 @@ func TestEncodeImport(t *testing.T) {
 		},
 		{
 			name: "func module, no name, type index 0",
-			input: &wasm.Import{ // Ex. (import "$test" "" (func (type 0)))
+			input: &wasm.Import{ // e.g. (import "$test" "" (func (type 0)))
 				Type:     wasm.ExternTypeFunc,
 				Module:   "test",
 				Name:     "",
@@ -44,7 +44,7 @@ func TestEncodeImport(t *testing.T) {
 		},
 		{
 			name: "func module, name, type index 0",
-			input: &wasm.Import{ // Ex. (import "$math" "$pi" (func (type 0)))
+			input: &wasm.Import{ // e.g. (import "$math" "$pi" (func (type 0)))
 				Type:     wasm.ExternTypeFunc,
 				Module:   "math",
 				Name:     "pi",
@@ -59,7 +59,7 @@ func TestEncodeImport(t *testing.T) {
 		},
 		{
 			name: "func module, name, type index 10",
-			input: &wasm.Import{ // Ex. (import "$math" "$pi" (func (type 10)))
+			input: &wasm.Import{ // e.g. (import "$math" "$pi" (func (type 10)))
 				Type:     wasm.ExternTypeFunc,
 				Module:   "math",
 				Name:     "pi",

@@ -22,7 +22,7 @@ type arm64Compiler struct {
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *runtimeValueLocationStack
-	// labels maps a label (Ex. ".L1_then") to *arm64LabelInfo.
+	// labels maps a label (e.g. ".L1_then") to *arm64LabelInfo.
 	labels map[string]*arm64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from runtimeValueLocationStack) seen during compilation.
 	stackPointerCeil uint64

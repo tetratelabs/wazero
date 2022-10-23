@@ -3,7 +3,7 @@
 // are accessible from WebAssembly-defined functions via importing ModuleName.
 // All WASI functions return a single Errno result: ErrnoSuccess on success.
 //
-// Ex. Call Instantiate before instantiating any wasm binary that imports
+// e.g. Call Instantiate before instantiating any wasm binary that imports
 // "wasi_snapshot_preview1", Otherwise, it will error due to missing imports.
 //
 //	ctx := context.Background()

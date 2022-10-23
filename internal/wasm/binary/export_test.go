@@ -15,7 +15,7 @@ func TestEncodeExport(t *testing.T) {
 	}{
 		{
 			name: "func no name, index 0",
-			input: &wasm.Export{ // Ex. (export "" (func 0)))
+			input: &wasm.Export{ // e.g. (export "" (func 0)))
 				Type:  wasm.ExternTypeFunc,
 				Name:  "",
 				Index: 0,
@@ -24,7 +24,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "func name, func index 0",
-			input: &wasm.Export{ // Ex. (export "pi" (func 0))
+			input: &wasm.Export{ // e.g. (export "pi" (func 0))
 				Type:  wasm.ExternTypeFunc,
 				Name:  "pi",
 				Index: 0,
@@ -37,7 +37,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "func name, index 10",
-			input: &wasm.Export{ // Ex. (export "pi" (func 10))
+			input: &wasm.Export{ // e.g. (export "pi" (func 10))
 				Type:  wasm.ExternTypeFunc,
 				Name:  "pi",
 				Index: 10,
@@ -50,7 +50,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "global no name, index 0",
-			input: &wasm.Export{ // Ex. (export "" (global 0)))
+			input: &wasm.Export{ // e.g. (export "" (global 0)))
 				Type:  wasm.ExternTypeGlobal,
 				Name:  "",
 				Index: 0,
@@ -59,7 +59,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "global name, global index 0",
-			input: &wasm.Export{ // Ex. (export "pi" (global 0))
+			input: &wasm.Export{ // e.g. (export "pi" (global 0))
 				Type:  wasm.ExternTypeGlobal,
 				Name:  "pi",
 				Index: 0,
@@ -72,7 +72,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "global name, index 10",
-			input: &wasm.Export{ // Ex. (export "pi" (global 10))
+			input: &wasm.Export{ // e.g. (export "pi" (global 10))
 				Type:  wasm.ExternTypeGlobal,
 				Name:  "pi",
 				Index: 10,
@@ -85,7 +85,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "memory no name, index 0",
-			input: &wasm.Export{ // Ex. (export "" (memory 0)))
+			input: &wasm.Export{ // e.g. (export "" (memory 0)))
 				Type:  wasm.ExternTypeMemory,
 				Name:  "",
 				Index: 0,
@@ -94,7 +94,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "memory name, memory index 0",
-			input: &wasm.Export{ // Ex. (export "mem" (memory 0))
+			input: &wasm.Export{ // e.g. (export "mem" (memory 0))
 				Type:  wasm.ExternTypeMemory,
 				Name:  "mem",
 				Index: 0,
@@ -107,7 +107,7 @@ func TestEncodeExport(t *testing.T) {
 		},
 		{
 			name: "memory name, index 10",
-			input: &wasm.Export{ // Ex. (export "mem" (memory 10))
+			input: &wasm.Export{ // e.g. (export "mem" (memory 10))
 				Type:  wasm.ExternTypeMemory,
 				Name:  "mem",
 				Index: 10,

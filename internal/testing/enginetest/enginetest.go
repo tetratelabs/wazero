@@ -1,13 +1,13 @@
 // Package enginetest contains tests common to any wasm.Engine implementation. Defining these as top-level
 // functions is less burden than copy/pasting the implementations, while still allowing test caching to operate.
 //
-// Ex. In simplest case, dispatch:
+// In simplest case, dispatch:
 //
 //	func TestModuleEngine_Call(t *testing.T) {
 //		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
 //
-// Ex. Some tests using the Compiler Engine may need to guard as they use compiled features:
+// Some tests using the Compiler Engine may need to guard as they use compiled features:
 //
 //	func TestModuleEngine_Call(t *testing.T) {
 //		requireSupportedOSArch(t)
@@ -907,7 +907,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 //
 // Note: This sets fields that are not needed in the interpreter, but are required by code compiled by Compiler. If a new
 // test here passes in the interpreter and segmentation faults in Compiler, check for a new field offset or a change in Compiler
-// (ex. compiler.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
+// (e.g. compiler.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
 // wasm.Store: store isn't used here for unit test precision.
 func linkModuleToEngine(module *wasm.ModuleInstance, me wasm.ModuleEngine) {
 	module.Engine = me // for Compiler, links the module to the module-engine compiled from it (moduleInstanceEngineOffset).

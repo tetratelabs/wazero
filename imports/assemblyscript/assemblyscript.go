@@ -195,7 +195,7 @@ var traceStderr = traceStdout.MustGoFunc(func(
 	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stderr())
 })
 
-// traceTo implements the function "trace" in AssemblyScript. Ex.
+// traceTo implements the function "trace" in AssemblyScript. e.g.
 //
 //	trace('Hello World!')
 //

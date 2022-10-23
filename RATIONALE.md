@@ -81,7 +81,7 @@ codebase productive.
 wazero shares constants and interfaces with internal code by a sharing pattern described below:
 * shared interfaces and constants go in one package under root: `api`.
 * user APIs and structs depend on `api` and go into the root package `wazero`.
-  * Ex. `InstantiateModule` -> `/wasm.go` depends on the type `api.Module`.
+  * e.g. `InstantiateModule` -> `/wasm.go` depends on the type `api.Module`.
 * implementation code can also depend on `api` in a corresponding package under `/internal`.
   * Ex  package `wasm` -> `/internal/wasm/*.go` and can depend on the type `api.Module`.
 
@@ -106,8 +106,9 @@ field.
 
 In practice, this means shared functionality like memory mutation need to be implemented by interfaces.
 
-Ex. `api.Memory` protects access by exposing functions like `WriteFloat64Le` instead of exporting a buffer (`[]byte`).
-Ex. There is no exported symbol for the `[]byte` representing the `CodeSection`
+Here are some examples:
+* `api.Memory` protects access by exposing functions like `WriteFloat64Le` instead of exporting a buffer (`[]byte`).
+* There is no exported symbol for the `[]byte` representing the `CodeSection`
 
 Besides security, this practice prevents other bugs and allows centralization of validation logic such as decoding Wasm.
 
@@ -117,7 +118,7 @@ All exported types in public packages, regardless of configuration vs runtime, a
 internal flexibility and avoiding people accidentally mis-initializing by instantiating the types on their own vs using
 the `NewXxx` constructor functions. In other words, there's less support load when things can't be done incorrectly.
 
-Ex.
+Here's an example:
 ```go
 rt := &RuntimeConfig{} // not initialized properly (fields are nil which shouldn't be)
 rt := RuntimeConfig{} // not initialized properly (should be a pointer)
@@ -131,9 +132,9 @@ There are a few drawbacks to this, notably some work for maintainers.
 
 ## Config
 
-wazero configures scopes such as Runtime and Module using `XxxConfig` types. Ex. `RuntimeConfig` configures `Runtime`
-and `ModuleConfig` configures `Module` (instantiation). In all cases, config types begin defaults and can be customized
-by a user, for example, selecting features or a module name override.
+wazero configures scopes such as Runtime and Module using `XxxConfig` types. For example, `RuntimeConfig` configures
+`Runtime` and `ModuleConfig` configure `Module` (instantiation). In all cases, config types begin defaults and can be
+customized by a user, e.g., selecting features or a module name override.
 
 ### Why don't we make each configuration setting return an error?
 No config types create resources that would need to be closed, nor do they return errors on use. This helps reduce
@@ -177,13 +178,13 @@ any goroutine.
 
 Since config are immutable, changes apply via return val, similar to `append` in a slice.
 
-Ex. Both of these are the same sort of error:
+For example, both of these are the same sort of error:
 ```go
 append(slice, element) // bug as only the return value has the updated slice.
 cfg.WithName(next) // bug as only the return value has the updated name.
 ```
 
-This means the correct use is re-assigning explicitly or via chaining. Ex.
+Here's an example of correct use: re-assigning explicitly or via chaining.
 ```go
 cfg = cfg.WithName(name) // explicit
 
@@ -279,9 +280,9 @@ space. It is accepted that the options pattern is common in Go, which is the mai
 ### Why aren't config types deeply structured?
 wazero's configuration types cover the three main scopes of WebAssembly use:
 * `RuntimeConfig`: This is the broadest scope, so applies also to compilation
-  and instantiation. Ex. This controls the WebAssembly Specification Version.
+  and instantiation. e.g. This controls the WebAssembly Specification Version.
 * `ModuleConfig`: This affects modules instantiated after compilation and what
-  resources are allowed. Ex. This defines how or if STDOUT is captured.
+  resources are allowed. e.g. This defines how or if STDOUT is captured.
 
 We could nest configuration, for example have `ModuleConfig.SysConfig` instead
 of a flat definition. However, a flat structure is easier to work with and is
@@ -319,7 +320,7 @@ there to be an engine that has multiple stores which have multiple modules. More
 either 1 engine with 1 store and multiple modules, or 1 engine with many stores, each having 1 non-host module. In worst
 case, a user can use multiple runtimes until "multi-store" is better understood.
 
-If later, we have demand for multiple stores, that can be accomplished by overload. Ex. `Runtime.InstantiateInStore` or
+If later, we have demand for multiple stores, that can be accomplished by overload. e.g. `Runtime.InstantiateInStore` or
 `Runtime.Store(name) Store`.
 
 ## wazeroir

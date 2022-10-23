@@ -3,7 +3,6 @@
 This example shows how to pass strings in and out of a Wasm function defined in
 Zig, built with `zig build`.
 
-Ex.
 ```bash
 $ go run greet.go wazero
 wasm >> Hello, wazero!
