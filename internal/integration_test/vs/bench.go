@@ -16,7 +16,7 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-// ensureCompilerFastest is overridable via ldflags. Ex.
+// ensureCompilerFastest is overridable via ldflags. e.g.
 //
 //	-ldflags '-X github.com/tetratelabs/wazero/internal/integration_test/vs.ensureCompilerFastest=true'
 var ensureCompilerFastest = "false"

@@ -218,7 +218,7 @@ type CompilationResult struct {
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
-	// Note: zero possible and allowed in wasm. Ex.
+	// Note: zero possible and allowed in wasm. e.g.
 	//
 	//	(block
 	//	  (br 0)
@@ -1767,13 +1767,13 @@ operatorSwitch:
 				&OperationElemDrop{ElemIndex: elemIndex},
 			)
 		case wasm.OpcodeMiscTableCopy:
-			// Read the source table index.
+			// Read the source table inde.g.
 			dst, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num
-			// Read the destination table index.
+			// Read the destination table inde.g.
 			src, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 
@@ -1784,7 +1784,7 @@ operatorSwitch:
 				&OperationTableCopy{SrcTableIndex: src, DstTableIndex: dst},
 			)
 		case wasm.OpcodeMiscTableGrow:
-			// Read the source table index.
+			// Read the source table inde.g.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)
@@ -1794,7 +1794,7 @@ operatorSwitch:
 				&OperationTableGrow{TableIndex: tableIndex},
 			)
 		case wasm.OpcodeMiscTableSize:
-			// Read the source table index.
+			// Read the source table inde.g.
 			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(c.body[c.pc+1:]))
 			if err != nil {
 				return fmt.Errorf("reading i32.const value: %v", err)

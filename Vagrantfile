@@ -1,6 +1,6 @@
 # Vagrant file for FreeBSD
 #
-# Ex.
+# Here's an example:
 #   GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant up
 #   vagrant rsync
 #   vagrant ssh -c "cd wazero; go test ./..."
@@ -24,7 +24,7 @@ Vagrant.configure("2") do |config|
     v.cpus = 1
   end
 
-  # Ex. `GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant provision`
+  # Similar to `GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant provision`
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.env = {
       'GOVERSION': ENV['GOVERSION'],

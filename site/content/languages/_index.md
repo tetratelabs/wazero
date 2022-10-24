@@ -8,7 +8,7 @@ process and the guest is a program compiled into the WebAssembly Binary Format,
 also known as Wasm. The first step is to take a source file and compile it into
 the Wasm bytecode.
 
-Ex. If your source is in Go, you might compile it with TinyGo.
+e.g. If your source is in Go, you might compile it with TinyGo.
 ```goat
     .-----------.    .----------------------.      .-----------.
    /  main.go  /---->|  tinygo -target=wasi +---->/ main.wasm /
@@ -17,9 +17,9 @@ Ex. If your source is in Go, you might compile it with TinyGo.
 
 Below are notes wazero contributed so far, in alphabetical order by language.
 
-* [Go](go) Ex. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
-* [TinyGo](tinygo) Ex. `tinygo build -o X.wasm -target=wasi X.go`
-* [Rust](rust) Ex. `rustc -o X.wasm --target wasm32-wasi X.rs`
+* [Go](go) e.g. `GOARCH=wasm GOOS=js go build -o X.wasm X.go`
+* [TinyGo](tinygo) e.g. `tinygo build -o X.wasm -target=wasi X.go`
+* [Rust](rust) e.g. `rustc -o X.wasm --target wasm32-wasi X.rs`
 
 wazero is a runtime that embeds in Go applications, not a web browser. As
 such, these notes bias towards backend use of WebAssembly, not browser use.

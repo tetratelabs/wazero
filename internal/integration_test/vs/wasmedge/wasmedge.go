@@ -1,7 +1,7 @@
 //go:build amd64 && cgo && !windows && wasmedge
 
 // Note: WasmEdge depends on manual installation of a shared library.
-// Ex. wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | \
+// e.g. wget -qO- https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install.sh | \
 //     sudo bash -s -- -p /usr/local -e none -v ${WASMEDGE_VERSION}
 
 package wasmedge

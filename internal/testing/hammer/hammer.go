@@ -9,7 +9,7 @@ import (
 
 // Hammer invokes a test concurrently in P goroutines N times per goroutine.
 //
-// Ex.
+// Here's an example:
 //
 //	P := 8               // max count of goroutines
 //	N := 1000            // work per goroutine

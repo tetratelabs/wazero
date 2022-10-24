@@ -8,12 +8,13 @@ import (
 )
 
 // HostModuleBuilder is a way to define host functions (in Go), so that a
-// WebAssembly binary (ex. %.wasm file) can import and use them.
+// WebAssembly binary (e.g. %.wasm file) can import and use them.
 //
 // Specifically, this implements the host side of an Application Binary
 // Interface (ABI) like WASI or AssemblyScript.
 //
-// Ex. Below defines and instantiates a module named "env" with one function:
+// For example, this defines and instantiates a module named "env" with one
+// function:
 //
 //	ctx := context.Background()
 //	r := wazero.NewRuntime(ctx)
@@ -27,7 +28,7 @@ import (
 //		Instantiate(ctx, r)
 //
 // If the same module may be instantiated multiple times, it is more efficient
-// to separate steps. Ex.
+// to separate steps. Here's an example:
 //
 //	compiled, _ := r.NewHostModuleBuilder("env").
 //		ExportFunction("get_random_string", getRandomString).
@@ -75,7 +76,7 @@ type HostModuleBuilder interface {
 	//   - names - If present, the first is the api.FunctionDefinition name.
 	//	  If any follow, they must match the count of goFunc's parameters.
 	//
-	// Ex.
+	// Here's an example:
 	//	// Just export the function, and use "abort" in stack traces.
 	// 	builder.ExportFunction("abort", env.abort)
 	//	// Ensure "~lib/builtins/abort" is used in stack traces.
@@ -90,7 +91,7 @@ type HostModuleBuilder interface {
 	// types must match WebAssembly 1.0 (20191205) value types. This means
 	// uint32, uint64, float32 or float64. Up to one result can be returned.
 	//
-	// Ex. This is a valid host function:
+	// For example, this is a valid host function:
 	//
 	//	addInts := func(x, y uint32) uint32 {
 	//		return x + y
@@ -99,16 +100,16 @@ type HostModuleBuilder interface {
 	// Host functions may also have an initial parameter (param[0]) of type
 	// context.Context or api.Module.
 	//
-	// Ex. This uses a Go Context:
+	// For example, this uses a Go Context:
 	//
 	//	addInts := func(ctx context.Context, x, y uint32) uint32 {
 	//		// add a little extra if we put some in the context!
 	//		return x + y + ctx.Value(extraKey).(uint32)
 	//	}
 	//
-	// Ex. This uses an api.Module to reads the parameters from memory. This is
-	// important because there are only numeric types in Wasm. The only way to
-	// share other data is via writing memory and sharing offsets.
+	// The example below uses an api.Module to read parameters from memory.
+	// This is important because there are only numeric types in Wasm. The
+	// only way to share other data is via writing memory and sharing offsets.
 	//
 	//	addInts := func(ctx context.Context, m api.Module, offset uint32) uint32 {
 	//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
@@ -118,7 +119,7 @@ type HostModuleBuilder interface {
 	//
 	// If both parameters exist, they must be in order at positions 0 and 1.
 	//
-	// Ex. This uses propagates context properly when calling other functions
+	// This example propagates context properly when calling other functions
 	// exported in the api.Module:
 	//	callRead := func(ctx context.Context, m api.Module, offset, byteCount uint32) uint32 {
 	//		fn = m.ExportedFunction("__read")
@@ -139,7 +140,7 @@ type HostModuleBuilder interface {
 	// Instantiate is a convenience that calls Compile, then Namespace.InstantiateModule.
 	// This can fail for reasons documented on Namespace.InstantiateModule.
 	//
-	// Ex.
+	// Here's an example:
 	//
 	//	ctx := context.Background()
 	//	r := wazero.NewRuntime(ctx)

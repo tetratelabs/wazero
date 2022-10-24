@@ -66,7 +66,7 @@ type Module struct {
 	// For example, if there are two imported functions and one defined in this module, the function Index 3 is defined
 	// in this module at FunctionSection[0].
 	//
-	// Note: FunctionSection is index correlated with the CodeSection. If given the same position, ex. 2, a function
+	// Note: FunctionSection is index correlated with the CodeSection. If given the same position, e.g. 2, a function
 	// type is at TypeSection[FunctionSection[2]], while its locals and body are at CodeSection[2].
 	//
 	// Note: In the Binary Format, this is SectionIDFunction.
@@ -700,7 +700,7 @@ func (f *FunctionType) EqualsSignature(params []ValueType, results []ValueType) 
 	return bytes.Equal(f.Params, params) && bytes.Equal(f.Results, results)
 }
 
-// key gets or generates the key for Store.typeIDs. Ex. "i32_v" for one i32 parameter and no (void) result.
+// key gets or generates the key for Store.typeIDs. e.g. "i32_v" for one i32 parameter and no (void) result.
 func (f *FunctionType) key() string {
 	if f.string != "" {
 		return f.string
@@ -800,7 +800,7 @@ type Export struct {
 	Name string
 
 	// Index is the index of the definition to export, the index namespace is by Type
-	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
+	// e.g. If ExternTypeFunc, this is a position in the function index namespace.
 	Index Index
 }
 
@@ -855,17 +855,17 @@ func (d *DataSegment) IsPassive() bool {
 // Note: This can be nil if no names were decoded for any reason including configuration.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 type NameSection struct {
-	// ModuleName is the symbolic identifier for a module. Ex. math
+	// ModuleName is the symbolic identifier for a module. e.g. math
 	//
 	// Note: This can be empty for any reason including configuration.
 	ModuleName string
 
-	// FunctionNames is an association of a function index to its symbolic identifier. Ex. add
+	// FunctionNames is an association of a function index to its symbolic identifier. e.g. add
 	//
 	// * the key (idx) is in the function namespace, where module defined functions are preceded by imported ones.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#functions%E2%91%A7
 	//
-	// Ex. Assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
+	// For example, assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
 	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
 	//
 	// Note: FunctionNames are only used for debugging. At runtime, functions are called based on raw numeric index.
@@ -874,7 +874,8 @@ type NameSection struct {
 
 	// LocalNames contains symbolic names for function parameters or locals that have one.
 	//
-	// Note: In the Text Format, function local names can inherit parameter names from their type. Ex.
+	// Note: In the Text Format, function local names can inherit parameter
+	// names from their type. Here are some examples:
 	//  * (module (import (func (param $x i32) (param i32))) (func (type 0))) = [{0, {x,0}}]
 	//  * (module (import (func (param i32) (param $y i32))) (func (type 0) (local $z i32))) = [0, [{y,1},{z,2}]]
 	//  * (module (func (param $x i32) (local $y i32) (local $z i32))) = [{x,0},{y,1},{z,2}]

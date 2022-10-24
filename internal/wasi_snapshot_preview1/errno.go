@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
+// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. e.g. Errno2big -> "E2BIG"
 func ErrnoName(errno uint32) string {
 	if int(errno) < len(errnoToString) {
 		return errnoToString[errno]

@@ -10,7 +10,7 @@ import (
 //
 // Constants define individual features, such as CoreFeatureMultiValue, or
 // groups of "finished" features, assigned to a WebAssembly Core Specification
-// version, ex. CoreFeaturesV1 or CoreFeaturesV2.
+// version, e.g. CoreFeaturesV1 or CoreFeaturesV2.
 //
 // Note: Numeric values are not intended to be interpreted except as bit flags.
 type CoreFeatures uint64

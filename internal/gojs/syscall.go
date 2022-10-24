@@ -61,7 +61,7 @@ var StringVal = spfunc.MustCallFromSP(false, wasm.NewGoFunc(
 ))
 
 // ValueGet implements js.valueGet, which is used to load a js.Value property
-// by name, ex. `v.Get("address")`. Notably, this is used by js.handleEvent to
+// by name, e.g. `v.Get("address")`. Notably, this is used by js.handleEvent to
 // get the pending event.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L295
@@ -95,7 +95,7 @@ var ValueGet = spfunc.MustCallFromSP(false, wasm.NewGoFunc(
 ))
 
 // ValueSet implements js.valueSet, which is used to store a js.Value property
-// by name, ex. `v.Set("address", a)`. Notably, this is used by js.handleEvent
+// by name, e.g. `v.Set("address", a)`. Notably, this is used by js.handleEvent
 // set the event result.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L309
@@ -122,7 +122,7 @@ var ValueSet = spfunc.MustCallFromSP(false, wasm.NewGoFunc(
 				return
 			}
 		} else if m, ok := v.(*object); ok {
-			m.properties[p] = x // Ex. opt.Set("method", req.Method)
+			m.properties[p] = x // e.g. opt.Set("method", req.Method)
 			return
 		}
 		panic(fmt.Errorf("TODO: valueSet(v=%v, p=%s, x=%v)", v, p, x))
@@ -135,7 +135,7 @@ var ValueSet = spfunc.MustCallFromSP(false, wasm.NewGoFunc(
 var ValueDelete = stubFunction(functionValueDelete)
 
 // ValueIndex implements js.valueIndex, which is used to load a js.Value property
-// by index, ex. `v.Index(0)`. Notably, this is used by js.handleEvent to read
+// by index, e.g. `v.Index(0)`. Notably, this is used by js.handleEvent to read
 // event arguments
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L334
@@ -158,7 +158,7 @@ var ValueIndex = spfunc.MustCallFromSP(false, wasm.NewGoFunc(
 var ValueSetIndex = stubFunction(functionValueSetIndex)
 
 // ValueCall implements js.valueCall, which is used to call a js.Value function
-// by name, ex. `document.Call("createElement", "div")`.
+// by name, e.g. `document.Call("createElement", "div")`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L394
 //
@@ -192,7 +192,7 @@ var ValueCall = spfunc.MustCallFromSP(true, wasm.NewGoFunc(
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L413
 var ValueInvoke = stubFunction(functionValueInvoke)
 
-// ValueNew implements js.valueNew, which is used to call a js.Value, ex.
+// ValueNew implements js.valueNew, which is used to call a js.Value, e.g.
 // `array.New(2)`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L432
@@ -246,7 +246,7 @@ var ValueNew = spfunc.MustCallFromSP(true, wasm.NewGoFunc(
 ))
 
 // ValueLength implements js.valueLength, which is used to load the length
-// property of a value, ex. `array.length`.
+// property of a value, e.g. `array.length`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L372
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L396-L397

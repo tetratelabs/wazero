@@ -453,25 +453,25 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 		closeImporting, closeImported         uint32
 		closeImportingCode, closeImportedCode bool
 	}{
-		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+		{ // e.g. WASI proc_exit or AssemblyScript abort handler.
 			name:           "importing",
 			function:       "call_return_input",
 			closeImporting: 1,
 		},
 		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
-		{ // Ex. A function that stops the runtime.
+		{ // e.g. A function that stops the runtime.
 			name:           "both",
 			function:       "call_return_input",
 			closeImporting: 1,
 			closeImported:  2,
 		},
-		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+		{ // e.g. WASI proc_exit or AssemblyScript abort handler.
 			name:              "importing",
 			function:          "call_return_input",
 			closeImporting:    1,
 			closeImportedCode: true,
 		},
-		{ // Ex. WASI proc_exit or AssemblyScript abort handler.
+		{ // e.g. WASI proc_exit or AssemblyScript abort handler.
 			name:               "importing",
 			function:           "call_return_input",
 			closeImporting:     1,
@@ -479,7 +479,7 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			closeImportingCode: true,
 		},
 		// TODO: A module that re-exports a function (ex "return_input") can call it after it is closed!
-		{ // Ex. A function that stops the runtime.
+		{ // e.g. A function that stops the runtime.
 			name:               "both",
 			function:           "call_return_input",
 			closeImporting:     1,

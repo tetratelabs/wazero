@@ -16,7 +16,7 @@ import (
 // https://linux.die.net/man/3/errno
 type Errno = uint32 // neither uint16 nor an alias for parity with wasm.ValueType
 
-// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
+// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. e.g. Errno2big -> "E2BIG"
 func ErrnoName(errno Errno) string {
 	return internalwasi.ErrnoName(errno)
 }

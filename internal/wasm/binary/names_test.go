@@ -20,7 +20,7 @@ func TestEncodeNameSectionData(t *testing.T) {
 		},
 		{
 			name: "only module",
-			// Ex. (module $simple )
+			// e.g. (module $simple )
 			input: &wasm.NameSection{ModuleName: "simple"},
 			expected: []byte{
 				subsectionIDModuleName, 0x07, // 7 bytes
@@ -50,7 +50,7 @@ func TestEncodeNameSectionData(t *testing.T) {
 			},
 		},
 		{
-			name: "two function names", // Ex. TinyGo which at one point didn't set a module name
+			name: "two function names", // e.g. TinyGo which at one point didn't set a module name
 			//	(module
 			//		(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (param i32, i32) (result i32)))
 			//		(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32, i32, i32, i32) (result i32)))
