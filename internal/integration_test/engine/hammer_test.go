@@ -1,6 +1,7 @@
 package adhoc
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -49,9 +50,13 @@ func closeImportedModuleWhileInUse(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, imported.Close(testCtx))
 
 		// Redefine the imported module, with a function that no longer blocks.
-		imported, err := r.NewHostModuleBuilder(imported.Name()).ExportFunction("return_input", func(x uint32) uint32 {
-			return x
-		}).Instantiate(testCtx, r)
+		imported, err := r.NewHostModuleBuilder(imported.Name()).
+			NewFunctionBuilder().
+			WithFunc(func(ctx context.Context, x uint32) uint32 {
+				return x
+			}).
+			Export("return_input").
+			Instantiate(testCtx, r)
 		require.NoError(t, err)
 
 		// Redefine the importing module, which should link to the redefined host module.
@@ -72,14 +77,15 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(imported
 	// To know return path works on a closed module, we need to block calls.
 	var calls sync.WaitGroup
 	calls.Add(P)
-	blockAndReturn := func(x uint32) uint32 {
+	blockAndReturn := func(ctx context.Context, x uint32) uint32 {
 		calls.Wait()
 		return x
 	}
 
 	// Create the host module, which exports the blocking function.
 	imported, err := r.NewHostModuleBuilder(t.Name()+"-imported").
-		ExportFunction("return_input", blockAndReturn).Instantiate(testCtx, r)
+		NewFunctionBuilder().WithFunc(blockAndReturn).Export("return_input").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer imported.Close(testCtx)
 

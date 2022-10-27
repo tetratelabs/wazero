@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
@@ -209,7 +208,7 @@ type CompilationResult struct {
 
 	// GoFunc is the data returned by the same field documented on wasm.Code.
 	// In this case, IsHostFunction is true and other fields can be ignored.
-	GoFunc *reflect.Value
+	GoFunc interface{}
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
@@ -270,12 +269,14 @@ func CompileFunctions(_ context.Context, enabledFeatures api.CoreFeatures, callF
 		sig := module.TypeSection[typeID]
 		code := module.CodeSection[funcIndex]
 		if code.GoFunc != nil {
+			// Assume the function might use memory if it has a parameter for the api.Module
+			_, usesMemory := code.GoFunc.(api.GoModuleFunction)
+
 			ret = append(ret, &CompilationResult{
 				IsHostFunction: true,
-				// Assume the function might use memory if it has a parameter for the api.Module
-				UsesMemory: code.Kind == wasm.FunctionKindGoModule || code.Kind == wasm.FunctionKindGoContextModule,
-				GoFunc:     code.GoFunc,
-				Signature:  sig,
+				UsesMemory:     usesMemory,
+				GoFunc:         code.GoFunc,
+				Signature:      sig,
 			})
 
 			if len(sig.Params) > 0 && sig.ParamNumInUint64 == 0 {

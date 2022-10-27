@@ -257,9 +257,9 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 	memorySize := mod.Memory().Size(testCtx)
 
 	tests := []struct {
-		name                         string
-		resultTimestamp, argvBufSize uint32
-		expectedLog                  string
+		name                     string
+		resultTimestamp, argvLen uint32
+		expectedLog              string
 	}{
 		{
 			name:            "resultTimestamp out-of-memory",

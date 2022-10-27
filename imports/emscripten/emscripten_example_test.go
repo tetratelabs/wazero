@@ -39,7 +39,9 @@ func Example_functionExporter() {
 	// Next, construct your own module builder for "env" with any functions
 	// you need.
 	envBuilder := r.NewHostModuleBuilder("env").
-		ExportFunction("get_int", func() uint32 { return 1 })
+		NewFunctionBuilder().
+		WithFunc(func(context.Context) uint32 { return 1 }).
+		Export("get_int")
 
 	// Now, add Emscripten special function imports into it.
 	emscripten.NewFunctionExporter().ExportFunctions(envBuilder)

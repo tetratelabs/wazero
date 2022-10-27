@@ -37,7 +37,7 @@ func run() error {
 	// Instantiate a Go-defined module named "env" that exports a function to
 	// log to the console.
 	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("log", logString).
+		NewFunctionBuilder().WithFunc(logString).Export("log").
 		Instantiate(ctx, r)
 	if err != nil {
 		return err

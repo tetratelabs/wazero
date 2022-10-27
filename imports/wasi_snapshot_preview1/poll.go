@@ -47,61 +47,74 @@ const (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
-var pollOneoff = wasm.NewGoFunc(
-	functionPollOneoff, functionPollOneoff,
-	[]string{"in", "out", "nsubscriptions", "result.nevents"},
-	func(ctx context.Context, mod api.Module, in, out, nsubscriptions, resultNevents uint32) Errno {
-		if nsubscriptions == 0 {
-			return ErrnoInval
-		}
-
-		mem := mod.Memory()
-
-		// Ensure capacity prior to the read loop to reduce error handling.
-		inBuf, ok := mem.Read(ctx, in, nsubscriptions*48)
-		if !ok {
-			return ErrnoFault
-		}
-		outBuf, ok := mem.Read(ctx, out, nsubscriptions*32)
-		if !ok {
-			return ErrnoFault
-		}
-
-		// Eagerly write the number of events which will equal subscriptions unless
-		// there's a fault in parsing (not processing).
-		if !mod.Memory().WriteUint32Le(ctx, resultNevents, nsubscriptions) {
-			return ErrnoFault
-		}
-
-		// Loop through all subscriptions and write their output.
-		for sub := uint32(0); sub < nsubscriptions; sub++ {
-			inOffset := sub * 48
-			outOffset := sub * 32
-
-			var errno Errno
-			eventType := inBuf[inOffset+8] // +8 past userdata
-			switch eventType {
-			case eventTypeClock: // handle later
-				// +8 past userdata +8 name alignment
-				errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
-			case eventTypeFdRead, eventTypeFdWrite:
-				// +8 past userdata +4 FD alignment
-				errno = processFDEvent(ctx, mod, eventType, inBuf[inOffset+8+4:])
-			default:
-				return ErrnoInval
-			}
-
-			// Write the event corresponding to the processed subscription.
-			// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
-			copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
-			outBuf[outOffset+8] = byte(errno)        // uint16, but safe as < 255
-			outBuf[outOffset+9] = 0
-			binary.LittleEndian.PutUint32(outBuf[outOffset+10:], uint32(eventType))
-			// TODO: When FD events are supported, write outOffset+16
-		}
-		return ErrnoSuccess
+var pollOneoff = &wasm.HostFunc{
+	ExportNames: []string{functionPollOneoff},
+	Name:        functionPollOneoff,
+	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
+	ParamNames:  []string{"in", "out", "nsubscriptions", "result.nevents"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(pollOneoffFn),
 	},
-)
+}
+
+func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	in := uint32(params[0])
+	out := uint32(params[1])
+	nsubscriptions := uint32(params[2])
+	resultNevents := uint32(params[3])
+
+	if nsubscriptions == 0 {
+		return errnoInval
+	}
+
+	mem := mod.Memory()
+
+	// Ensure capacity prior to the read loop to reduce error handling.
+	inBuf, ok := mem.Read(ctx, in, nsubscriptions*48)
+	if !ok {
+		return errnoFault
+	}
+	outBuf, ok := mem.Read(ctx, out, nsubscriptions*32)
+	if !ok {
+		return errnoFault
+	}
+
+	// Eagerly write the number of events which will equal subscriptions unless
+	// there's a fault in parsing (not processing).
+	if !mod.Memory().WriteUint32Le(ctx, resultNevents, nsubscriptions) {
+		return errnoFault
+	}
+
+	// Loop through all subscriptions and write their output.
+	for sub := uint32(0); sub < nsubscriptions; sub++ {
+		inOffset := sub * 48
+		outOffset := sub * 32
+
+		var errno Errno
+		eventType := inBuf[inOffset+8] // +8 past userdata
+		switch eventType {
+		case eventTypeClock: // handle later
+			// +8 past userdata +8 name alignment
+			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
+		case eventTypeFdRead, eventTypeFdWrite:
+			// +8 past userdata +4 FD alignment
+			errno = processFDEvent(ctx, mod, eventType, inBuf[inOffset+8+4:])
+		default:
+			return errnoInval
+		}
+
+		// Write the event corresponding to the processed subscription.
+		// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-event-struct
+		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
+		outBuf[outOffset+8] = byte(errno)        // uint16, but safe as < 255
+		outBuf[outOffset+9] = 0
+		binary.LittleEndian.PutUint32(outBuf[outOffset+10:], uint32(eventType))
+		// TODO: When FD events are supported, write outOffset+16
+	}
+	return errnoSuccess
+}
 
 // processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.

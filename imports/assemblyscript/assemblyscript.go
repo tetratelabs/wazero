@@ -26,6 +26,7 @@ package assemblyscript
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strconv"
@@ -34,12 +35,13 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
 
 const (
+	i32, f64 = wasm.ValueTypeI32, wasm.ValueTypeF64
+
 	functionAbort = "abort"
 	functionTrace = "trace"
 	functionSeed  = "seed"
@@ -119,9 +121,10 @@ func (e *functionExporter) WithTraceToStderr() FunctionExporter {
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
-	builder.ExportFunction(functionAbort, e.abortFn)
-	builder.ExportFunction(functionTrace, e.traceFn)
-	builder.ExportFunction(functionSeed, seed)
+	exporter := builder.(wasm.HostFuncExporter)
+	exporter.ExportHostFunc(e.abortFn)
+	exporter.ExportHostFunc(e.traceFn)
+	exporter.ExportHostFunc(seed)
 }
 
 // abort is called on unrecoverable errors. This is typically present in Wasm
@@ -137,18 +140,25 @@ func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 //	(import "env" "abort" (func $~lib/builtins/abort (param i32 i32 i32 i32)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L18
-var abortMessageEnabled = wasm.NewGoFunc(
-	"abort", "~lib/builtins/abort",
-	[]string{"message", "fileName", "lineNumber", "columnNumber"},
-	abortWithMessage,
-)
+var abortMessageEnabled = &wasm.HostFunc{
+	ExportNames: []string{functionAbort},
+	Name:        "~lib/builtins/abort",
+	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
+	ParamNames:  []string{"message", "fileName", "lineNumber", "columnNumber"},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(abortWithMessage),
+	},
+}
 
-var abortMessageDisabled = abortMessageEnabled.MustGoFunc(abort)
+var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
 
-// abortWithMessage implements fnAbort
-func abortWithMessage(
-	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
-) {
+// abortWithMessage implements functionAbort
+func abortWithMessage(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
+	message := uint32(params[0])
+	fileName := uint32(params[1])
+	lineNumber := uint32(params[2])
+	columnNumber := uint32(params[3])
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	// Don't panic if there was a problem reading the message
@@ -157,13 +167,12 @@ func abortWithMessage(
 			_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 		}
 	}
-	abort(ctx, mod, message, fileName, lineNumber, columnNumber)
+	abort(ctx, mod, params)
+	return
 }
 
-// abortWithMessage implements fnAbort ignoring the message.
-func abort(
-	ctx context.Context, mod api.Module, message, fileName, lineNumber, columnNumber uint32,
-) {
+// abortWithMessage implements functionAbort ignoring the message.
+func abort(ctx context.Context, mod api.Module, _ []uint64) (_ []uint64) {
 	// AssemblyScript expects the exit code to be 255
 	// See https://github.com/AssemblyScript/assemblyscript/blob/v0.20.13/tests/compiler/wasi/abort.js#L14
 	exitCode := uint32(255)
@@ -179,20 +188,24 @@ func abort(
 var traceDisabled = traceStdout.WithWasm([]byte{wasm.OpcodeEnd})
 
 // traceStdout implements trace to the configured Stdout.
-var traceStdout = wasm.NewGoFunc(functionTrace, "~lib/builtins/trace",
-	[]string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
-	func(
-		ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
-	) {
-		traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stdout())
+var traceStdout = &wasm.HostFunc{
+	ExportNames: []string{functionTrace},
+	Name:        "~lib/builtins/trace",
+	ParamTypes:  []api.ValueType{i32, i32, f64, f64, f64, f64, f64},
+	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
+			traceTo(ctx, mod, params, mod.(*wasm.CallContext).Sys.Stdout())
+			return
+		}),
 	},
-)
+}
 
 // traceStderr implements trace to the configured Stderr.
-var traceStderr = traceStdout.MustGoFunc(func(
-	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
-) {
-	traceTo(ctx, mod, message, nArgs, arg0, arg1, arg2, arg3, arg4, mod.(*wasm.CallContext).Sys.Stderr())
+var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
+	traceTo(ctx, mod, params, mod.(*wasm.CallContext).Sys.Stderr())
+	return
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.
@@ -205,10 +218,15 @@ var traceStderr = traceStdout.MustGoFunc(func(
 //	(import "env" "trace" (func $~lib/builtins/trace (param i32 i32 f64 f64 f64 f64 f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L61
-func traceTo(
-	ctx context.Context, mod api.Module, message uint32, nArgs uint32, arg0, arg1, arg2, arg3, arg4 float64,
-	writer io.Writer,
-) {
+func traceTo(ctx context.Context, mod api.Module, params []uint64, writer io.Writer) {
+	message := uint32(params[0])
+	nArgs := uint32(params[1])
+	arg0 := api.DecodeF64(params[2])
+	arg1 := api.DecodeF64(params[3])
+	arg2 := api.DecodeF64(params[4])
+	arg3 := api.DecodeF64(params[5])
+	arg4 := api.DecodeF64(params[6])
+
 	msg, ok := readAssemblyScriptString(ctx, mod.Memory(), message)
 	if !ok {
 		return // don't panic if unable to trace
@@ -253,16 +271,25 @@ func formatFloat(f float64) string {
 //	(import "env" "seed" (func $~lib/builtins/seed (result f64)))
 //
 // See https://github.com/AssemblyScript/assemblyscript/blob/fa14b3b03bd4607efa52aaff3132bea0c03a7989/std/assembly/wasi/index.ts#L111
-var seed = wasm.NewGoFunc(functionSeed, "~lib/builtins/seed", []string{},
-	func(mod api.Module) float64 {
-		randSource := mod.(*wasm.CallContext).Sys.RandSource()
-		v, err := ieee754.DecodeFloat64(randSource)
-		if err != nil {
-			panic(fmt.Errorf("error reading random seed: %w", err))
-		}
-		return v
+var seed = &wasm.HostFunc{
+	ExportNames: []string{functionSeed},
+	Name:        "~lib/builtins/seed",
+	ResultTypes: []api.ValueType{f64},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+			r := mod.(*wasm.CallContext).Sys.RandSource()
+			buf := make([]byte, 8)
+			_, err := io.ReadFull(r, buf)
+			if err != nil {
+				panic(fmt.Errorf("error reading random seed: %w", err))
+			}
+			// the caller interprets this as a float64
+			raw := binary.LittleEndian.Uint64(buf)
+			return []uint64{raw}
+		}),
 	},
-)
+}
 
 // readAssemblyScriptString reads a UTF-16 string created by AssemblyScript.
 func readAssemblyScriptString(ctx context.Context, mem api.Memory, offset uint32) (string, bool) {

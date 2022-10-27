@@ -54,7 +54,7 @@ func Test_environGet_Errors(t *testing.T) {
 		expectedLog         string
 	}{
 		{
-			name:       "out-of-memory environPtr",
+			name:       "out-of-memory environ",
 			environ:    memorySize,
 			environBuf: validAddress,
 			expectedLog: `
@@ -65,7 +65,7 @@ func Test_environGet_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:       "out-of-memory environBufPtr",
+			name:       "out-of-memory environBuf",
 			environ:    validAddress,
 			environBuf: memorySize,
 			expectedLog: `
@@ -76,8 +76,8 @@ func Test_environGet_Errors(t *testing.T) {
 `,
 		},
 		{
-			name: "environPtr exceeds the maximum valid address by 1",
-			// 4*envCount is the expected length for environPtr, 4 is the size of uint32
+			name: "environ exceeds the maximum valid address by 1",
+			// 4*envCount is the expected length for environ, 4 is the size of uint32
 			environ:    memorySize - 4*2 + 1,
 			environBuf: validAddress,
 			expectedLog: `
@@ -88,7 +88,7 @@ func Test_environGet_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:    "environBufPtr exceeds the maximum valid address by 1",
+			name:    "environBuf exceeds the maximum valid address by 1",
 			environ: validAddress,
 			// "a=bc", "b=cd" size = size of "a=bc0b=cd0" = 10
 			environBuf: memorySize - 10 + 1,
@@ -118,12 +118,12 @@ func Test_environSizesGet(t *testing.T) {
 		WithEnv("a", "b").WithEnv("b", "cd"))
 	defer r.Close(testCtx)
 
-	resultEnvironc := uint32(1)       // arbitrary offset
-	resultEnvironBufSize := uint32(6) // arbitrary offset
+	resultEnvironc := uint32(1)    // arbitrary offset
+	resultEnvironvLen := uint32(6) // arbitrary offset
 	expectedMemory := []byte{
 		'?',                // resultEnvironc is after this
 		0x2, 0x0, 0x0, 0x0, // little endian-encoded environment variable count
-		'?',                // resultEnvironBufSize is after this
+		'?',                // resultEnvironvLen is after this
 		0x9, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	}
@@ -131,10 +131,10 @@ func Test_environSizesGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke environSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionEnvironSizesGet, uint64(resultEnvironc), uint64(resultEnvironBufSize))
+	requireErrno(t, ErrnoSuccess, mod, functionEnvironSizesGet, uint64(resultEnvironc), uint64(resultEnvironvLen))
 	require.Equal(t, `
---> proxy.environ_sizes_get(result.environc=1,result.environBufSize=6)
-	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=1,result.environBufSize=6)
+--> proxy.environ_sizes_get(result.environc=1,result.environv_len=6)
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=1,result.environv_len=6)
 	<== ESUCCESS
 <-- (0)
 `, "\n"+log.String())
@@ -153,50 +153,50 @@ func Test_environSizesGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
 
 	tests := []struct {
-		name                     string
-		environc, environBufSize uint32
-		expectedLog              string
+		name                 string
+		environc, environLen uint32
+		expectedLog          string
 	}{
 		{
-			name:           "out-of-memory environCountPtr",
-			environc:       memorySize,
-			environBufSize: validAddress,
+			name:       "out-of-memory environCount",
+			environc:   memorySize,
+			environLen: validAddress,
 			expectedLog: `
---> proxy.environ_sizes_get(result.environc=65536,result.environBufSize=0)
-	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environBufSize=0)
+--> proxy.environ_sizes_get(result.environc=65536,result.environv_len=0)
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environv_len=0)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:           "out-of-memory environBufSizePtr",
-			environc:       validAddress,
-			environBufSize: memorySize,
+			name:       "out-of-memory environLen",
+			environc:   validAddress,
+			environLen: memorySize,
 			expectedLog: `
---> proxy.environ_sizes_get(result.environc=0,result.environBufSize=65536)
-	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environBufSize=65536)
+--> proxy.environ_sizes_get(result.environc=0,result.environv_len=65536)
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65536)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:           "environCountPtr exceeds the maximum valid address by 1",
-			environc:       memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of environ
-			environBufSize: validAddress,
+			name:       "environCount exceeds the maximum valid address by 1",
+			environc:   memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of environ
+			environLen: validAddress,
 			expectedLog: `
---> proxy.environ_sizes_get(result.environc=65533,result.environBufSize=0)
-	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environBufSize=0)
+--> proxy.environ_sizes_get(result.environc=65533,result.environv_len=0)
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environv_len=0)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:           "environBufSizePtr exceeds the maximum valid size by 1",
-			environc:       validAddress,
-			environBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
+			name:       "environLen exceeds the maximum valid size by 1",
+			environc:   validAddress,
+			environLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
---> proxy.environ_sizes_get(result.environc=0,result.environBufSize=65533)
-	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environBufSize=65533)
+--> proxy.environ_sizes_get(result.environc=0,result.environv_len=65533)
+	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65533)
 	<== EFAULT
 <-- (21)
 `,
@@ -209,7 +209,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionEnvironSizesGet, uint64(tc.environc), uint64(tc.environBufSize))
+			requireErrno(t, ErrnoFault, mod, functionEnvironSizesGet, uint64(tc.environc), uint64(tc.environLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

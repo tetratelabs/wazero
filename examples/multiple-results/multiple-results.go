@@ -111,11 +111,14 @@ func multiValueFromImportedHostWasmFunctions(ctx context.Context, r wazero.Runti
 	// Instantiate the host module with the exported `get_age` function which returns multiple results.
 	if _, err := r.NewHostModuleBuilder("multi-value/host").
 		// Define a function that returns two results
-		ExportFunction("get_age", func() (age uint64, errno uint32) {
+		NewFunctionBuilder().
+		WithFunc(func(context.Context) (age uint64, errno uint32) {
 			age = 37
 			errno = 0
 			return
-		}).Instantiate(ctx, r); err != nil {
+		}).
+		Export("get_age").
+		Instantiate(ctx, r); err != nil {
 		return nil, err
 	}
 	// Then, creates the module which imports the `get_age` function from the `multi-value/host` module above.

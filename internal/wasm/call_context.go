@@ -168,7 +168,7 @@ func (f *function) Definition() api.FunctionDefinition {
 
 // Call implements the same method as documented on api.Function.
 func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	return f.ce.Call(ctx, f.fi.Module.CallCtx, params...)
+	return f.ce.Call(ctx, f.fi.Module.CallCtx, params)
 }
 
 // importedFn implements api.Function and ensures the call context of an imported function is the importing module.
@@ -189,7 +189,7 @@ func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, 
 		return nil, fmt.Errorf("directly calling host function is not supported")
 	}
 	mod := f.importingModule
-	return f.ce.Call(ctx, mod, params...)
+	return f.ce.Call(ctx, mod, params)
 }
 
 // GlobalVal is an internal hack to get the lower 64 bits of a global.

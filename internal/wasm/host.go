@@ -9,6 +9,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
+type ProxyFuncExporter interface {
+	ExportProxyFunc(*ProxyFunc)
+}
+
 // ProxyFunc is a function defined both in wasm and go. This is used to
 // optimize the Go signature or obviate calls based on what can be done
 // mechanically in wasm.
@@ -25,6 +29,10 @@ type ProxyFunc struct {
 
 func (p *ProxyFunc) Name() string {
 	return p.Proxied.Name
+}
+
+type HostFuncExporter interface {
+	ExportHostFunc(*HostFunc)
 }
 
 // HostFunc is a function with an inlined type, used for NewHostModule.
@@ -49,18 +57,9 @@ type HostFunc struct {
 	Code *Code
 }
 
-// NewGoFunc returns a HostFunc for the given parameters or panics.
-func NewGoFunc(exportName string, name string, paramNames []string, fn interface{}) *HostFunc {
-	return (&HostFunc{
-		ExportNames: []string{exportName},
-		Name:        name,
-		ParamNames:  paramNames,
-	}).MustGoFunc(fn)
-}
-
-// MustGoFunc calls WithGoFunc or panics on error.
-func (f *HostFunc) MustGoFunc(fn interface{}) *HostFunc {
-	if ret, err := f.WithGoFunc(fn); err != nil {
+// MustGoReflectFunc calls WithGoReflectFunc or panics on error.
+func (f *HostFunc) MustGoReflectFunc(fn interface{}) *HostFunc {
+	if ret, err := f.WithGoReflectFunc(fn); err != nil {
 		panic(err)
 	} else {
 		return ret
@@ -68,10 +67,24 @@ func (f *HostFunc) MustGoFunc(fn interface{}) *HostFunc {
 }
 
 // WithGoFunc returns a copy of the function, replacing its Code.GoFunc.
-func (f *HostFunc) WithGoFunc(fn interface{}) (*HostFunc, error) {
+func (f *HostFunc) WithGoFunc(fn api.GoFunc) *HostFunc {
+	ret := *f
+	ret.Code = &Code{IsHostFunction: true, GoFunc: fn}
+	return &ret
+}
+
+// WithGoModuleFunc returns a copy of the function, replacing its Code.GoFunc.
+func (f *HostFunc) WithGoModuleFunc(fn api.GoModuleFunc) *HostFunc {
+	ret := *f
+	ret.Code = &Code{IsHostFunction: true, GoFunc: fn}
+	return &ret
+}
+
+// WithGoReflectFunc returns a copy of the function, replacing its Code.GoFunc.
+func (f *HostFunc) WithGoReflectFunc(fn interface{}) (*HostFunc, error) {
 	ret := *f
 	var err error
-	ret.ParamTypes, ret.ResultTypes, ret.Code, err = parseGoFunc(fn)
+	ret.ParamTypes, ret.ResultTypes, ret.Code, err = parseGoReflectFunc(fn)
 	return &ret, err
 }
 
@@ -167,8 +180,8 @@ func addFuncs(
 
 			nameToFunc[proxy.Name] = proxy
 			funcNames = append(funcNames, proxy.Name)
-		} else {
-			params, results, code, ftErr := parseGoFunc(v)
+		} else { // reflection
+			params, results, code, ftErr := parseGoReflectFunc(v)
 			if ftErr != nil {
 				return fmt.Errorf("func[%s.%s] %w", moduleName, k, ftErr)
 			}

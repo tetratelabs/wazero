@@ -158,7 +158,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	ce, err := me.NewCallEngine(module.CallCtx, fn)
 	require.NoError(t, err)
 
-	results, err := ce.Call(testCtx, module.CallCtx, 1, 2)
+	results, err := ce.Call(testCtx, module.CallCtx, []uint64{1, 2})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{1, 2}, results)
 
@@ -166,7 +166,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 		ce, err := me.NewCallEngine(module.CallCtx, fn)
 		require.NoError(t, err)
 
-		_, err = ce.Call(testCtx, module.CallCtx)
+		_, err = ce.Call(testCtx, module.CallCtx, nil)
 		require.EqualError(t, err, "expected 2 params, but passed 0")
 	})
 
@@ -174,7 +174,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 		ce, err := me.NewCallEngine(module.CallCtx, fn)
 		require.NoError(t, err)
 
-		_, err = ce.Call(testCtx, module.CallCtx, 1, 2, 3)
+		_, err = ce.Call(testCtx, module.CallCtx, []uint64{1, 2, 3})
 		require.EqualError(t, err, "expected 2 params, but passed 3")
 	})
 }
@@ -377,7 +377,7 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 			ce, err := tc.fn.Module.Engine.NewCallEngine(tc.fn.Module.CallCtx, tc.fn)
 			require.NoError(t, err)
 
-			results, err := ce.Call(testCtx, importing.CallCtx)
+			results, err := ce.Call(testCtx, importing.CallCtx, nil)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, results[0])
 		})
@@ -433,7 +433,7 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 			ce, err := f.Module.Engine.NewCallEngine(m, f)
 			require.NoError(t, err)
 
-			results, err := ce.Call(testCtx, m, 1)
+			results, err := ce.Call(testCtx, m, []uint64{1})
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -529,11 +529,11 @@ wasm stack trace:
 			ce, err := f.Module.Engine.NewCallEngine(m, f)
 			require.NoError(t, err)
 
-			_, err = ce.Call(testCtx, m, tc.input...)
+			_, err = ce.Call(testCtx, m, tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Ensure the module still works
-			results, err := ce.Call(testCtx, m, 1)
+			results, err := ce.Call(testCtx, m, []uint64{1})
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
 		})
@@ -617,7 +617,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Initialize the memory using Wasm. This copies the test phrase.
 	initCallEngine, err := me.NewCallEngine(module.CallCtx, init)
 	require.NoError(t, err)
-	_, err = initCallEngine.Call(testCtx, module.CallCtx)
+	_, err = initCallEngine.Call(testCtx, module.CallCtx, nil)
 	require.NoError(t, err)
 
 	// We expect the same []byte read earlier to now include the phrase in wasm.
@@ -649,7 +649,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Now, we need to prove the other direction, that when Wasm changes the capacity, the host's buffer is unaffected.
 	growCallEngine, err := me.NewCallEngine(module.CallCtx, grow)
 	require.NoError(t, err)
-	_, err = growCallEngine.Call(testCtx, module.CallCtx, 1)
+	_, err = growCallEngine.Call(testCtx, module.CallCtx, []uint64{1})
 	require.NoError(t, err)
 
 	// The host buffer should still contain the same bytes as before grow
@@ -658,7 +658,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// Re-initialize the memory in wasm, which overwrites the region.
 	initCallEngine2, err := me.NewCallEngine(module.CallCtx, init)
 	require.NoError(t, err)
-	_, err = initCallEngine2.Call(testCtx, module.CallCtx)
+	_, err = initCallEngine2.Call(testCtx, module.CallCtx, nil)
 	require.NoError(t, err)
 
 	// The host was not affected because it is a different slice due to "memory.grow" affecting the underlying memory.
@@ -672,14 +672,14 @@ const (
 	callImportCallDivByGoName = "call_import->" + callDivByGoName
 )
 
-func divByGo(d uint32) uint32 {
+func divByGo(_ context.Context, d uint32) uint32 {
 	if d == math.MaxUint32 {
 		panic(errors.New("host-function panic"))
 	}
 	return 1 / d // go panics if d == 0
 }
 
-var hostDivByGo = wasm.MustParseGoFuncCode(divByGo)
+var hostDivByGo = wasm.MustParseGoReflectFuncCode(divByGo)
 
 // (func (export "div_by.wasm") (param i32) (result i32) (i32.div_u (i32.const 1) (local.get 0)))
 var divByWasm = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeI32DivU, wasm.OpcodeEnd}
@@ -700,7 +700,7 @@ func readMemGo(ctx context.Context, m api.Module) uint64 {
 	return ret
 }
 
-var hostReadMemGo = wasm.MustParseGoFuncCode(readMemGo)
+var hostReadMemGo = wasm.MustParseGoReflectFuncCode(readMemGo)
 
 // (func (export "wasm_read_mem") (result i64) i32.const 0 i64.load)
 var readMemWasm = []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeI64Load, 0x3, 0x0, wasm.OpcodeEnd}

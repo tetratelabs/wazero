@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 )
 
 // ExternType classifies imports and exports with their respective types.
@@ -95,9 +94,10 @@ const (
 	//	(func (import "env" "f") (param externref) (result externref))
 	//
 	// This can be defined in Go as:
-	//  r.NewHostModuleBuilder("env").ExportFunctions(map[string]interface{}{
-	//    "f": func(externref uintptr) (resultExternRef uintptr) { return },
-	//  })
+	//  r.NewHostModuleBuilder("env").
+	//		NewFunctionBuilder().
+	//		WithFunc(func(context.Context, _ uintptr) (_ uintptr) { return }).
+	//		Export("f")
 	//
 	// Note: The usage of this type is toggled with api.CoreFeatureBulkMemoryOperations.
 	ValueTypeExternref ValueType = 0x6f
@@ -251,16 +251,11 @@ type FunctionDefinition interface {
 	// and not the imported function name.
 	DebugName() string
 
-	// GoFunc is present when the function was implemented by the embedder
-	// (ex via wazero.HostModuleBuilder) instead of a wasm binary.
+	// GoFunction is non-nil when implemented by the embedder instead of a wasm
+	// binary, e.g. via wazero.HostModuleBuilder
 	//
-	// This function can be non-deterministic or cause side effects. It also
-	// has special properties not defined in the WebAssembly Core
-	// specification. Notably, it uses the caller's memory, which might be
-	// different from its defining module.
-	//
-	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
-	GoFunc() *reflect.Value
+	// The expected results are nil, GoFunction or GoModuleFunction.
+	GoFunction() any
 
 	// ParamTypes are the possibly empty sequence of value types accepted by a
 	// function with this signature.
@@ -299,6 +294,66 @@ type Function interface {
 	// Call is not goroutine-safe, therefore it is recommended to create another Function if you want to invoke
 	// the same function concurrently. On the other hand, sequential invocations of Call is allowed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+}
+
+// GoModuleFunction is a Function implemented in Go instead of a wasm binary.
+// The Module parameter is the calling module, used to access memory or
+// exported functions. See GoModuleFunc for an example.
+//
+// This function can be non-deterministic or cause side effects. It also
+// has special properties not defined in the WebAssembly Core specification.
+// Notably, this uses the caller's memory (via Module.Memory). See
+// https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
+//
+// Most end users will not define functions directly with this, as they will
+// use reflection or code generators instead. These approaches are more
+// idiomatic as they can map go types to ValueType. This type is exposed for
+// those willing to trade usability and safety for performance.
+type GoModuleFunction interface {
+	Call(ctx context.Context, mod Module, params []uint64) []uint64
+}
+
+// GoModuleFunc is a convenience for defining an inlined function.
+//
+// For example, the following returns a uint32 value read from parameter zero:
+//
+//	api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+//		ret, ok := mod.Memory().ReadUint32Le(ctx, uint32(params[0]))
+//		if !ok {
+//			panic("out of memory")
+//		}
+//		return []uint64{uint64(ret)}
+//	}
+type GoModuleFunc func(ctx context.Context, mod Module, params []uint64) []uint64
+
+// Call implements GoModuleFunction.Call.
+func (f GoModuleFunc) Call(ctx context.Context, mod Module, params []uint64) []uint64 {
+	return f(ctx, mod, params)
+}
+
+// GoFunction is an optimized form of GoModuleFunction which doesn't require
+// the Module parameter. See GoFunc for an example.
+//
+// For example, this function does not need to use the importing module's
+// memory or exported functions.
+type GoFunction interface {
+	Call(ctx context.Context, params []uint64) []uint64
+}
+
+// GoFunc is a convenience for defining an inlined function.
+//
+// For example, the following returns the sum of two uint32 parameters:
+//
+//	api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
+//		x, y := uint32(params[0]), uint32(params[1])
+//		sum := x + y
+//		return []uint64{sum}
+//	}
+type GoFunc func(ctx context.Context, params []uint64) []uint64
+
+// Call implements GoFunction.Call.
+func (f GoFunc) Call(ctx context.Context, params []uint64) []uint64 {
+	return f(ctx, params)
 }
 
 // Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime InstantiateModule).

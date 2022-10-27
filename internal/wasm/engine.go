@@ -59,7 +59,7 @@ type ModuleEngine interface {
 // internally, and shouldn't be used concurrently.
 type CallEngine interface {
 	// Call invokes a function instance f with given parameters.
-	Call(ctx context.Context, m *CallContext, params ...uint64) (results []uint64, err error)
+	Call(ctx context.Context, m *CallContext, params []uint64) (results []uint64, err error)
 }
 
 // TableInitEntry is normalized element segment used for initializing tables by engines.

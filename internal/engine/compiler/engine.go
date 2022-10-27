@@ -309,7 +309,7 @@ const (
 	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 80
+	functionInstanceTypeIDOffset = 88
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
@@ -571,7 +571,7 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params ...uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, params []uint64) (results []uint64, err error) {
 	tp := ce.initialFn.source.Type
 
 	paramCount := len(params)
@@ -784,12 +784,15 @@ entry:
 			calleeHostFunction := ce.moduleContext.fn
 			base := int(ce.stackBasePointerInBytes >> 3)
 			params := ce.stack[base : base+len(calleeHostFunction.source.Type.Params)]
-			results := wasm.CallGoFunc(
-				ctx,
-				callCtx.WithMemory(ce.memoryInstance),
-				calleeHostFunction.source,
-				params,
-			)
+			fn := calleeHostFunction.source.GoFunc
+			var results []uint64
+			switch fn := fn.(type) {
+			case api.GoModuleFunction:
+				results = fn.Call(ctx, callCtx.WithMemory(ce.memoryInstance), params)
+			case api.GoFunction:
+				results = fn.Call(ctx, params)
+			}
+
 			copy(ce.stack[base:], results)
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
 			goto entry

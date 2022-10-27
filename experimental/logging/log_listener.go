@@ -64,14 +64,14 @@ func (l *loggingListener) writeIndented(before bool, err error, vals []uint64, i
 		message.WriteByte('\t')
 	}
 	if before {
-		if l.fnd.GoFunc() != nil {
+		if l.fnd.GoFunction() != nil {
 			message.WriteString("==> ")
 		} else {
 			message.WriteString("--> ")
 		}
 		l.writeFuncEnter(&message, vals)
 	} else { // after
-		if l.fnd.GoFunc() != nil {
+		if l.fnd.GoFunction() != nil {
 			message.WriteString("<== ")
 		} else {
 			message.WriteString("<-- ")

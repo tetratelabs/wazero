@@ -34,23 +34,32 @@ const functionRandomGet = "random_get"
 //	    buf --^
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-var randomGet = wasm.NewGoFunc(
-	functionRandomGet, functionRandomGet,
-	[]string{"buf", "buf_len"},
-	func(ctx context.Context, mod api.Module, buf uint32, bufLen uint32) (errno Errno) {
-		sysCtx := mod.(*wasm.CallContext).Sys
-		randSource := sysCtx.RandSource()
-
-		randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
-		if !ok { // out-of-range
-			return ErrnoFault
-		}
-
-		// We can ignore the returned n as it only != byteCount on error
-		if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
-			return ErrnoIo
-		}
-
-		return ErrnoSuccess
+var randomGet = &wasm.HostFunc{
+	ExportNames: []string{functionRandomGet},
+	Name:        functionRandomGet,
+	ParamTypes:  []api.ValueType{i32, i32},
+	ParamNames:  []string{"buf", "buf_len"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(randomGetFn),
 	},
-)
+}
+
+func randomGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	randSource := sysCtx.RandSource()
+	buf, bufLen := uint32(params[0]), uint32(params[1])
+
+	randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
+	if !ok { // out-of-range
+		return errnoFault
+	}
+
+	// We can ignore the returned n as it only != byteCount on error
+	if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
+		return errnoIo
+	}
+
+	return errnoSuccess
+}

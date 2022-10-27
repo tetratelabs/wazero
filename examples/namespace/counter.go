@@ -58,7 +58,7 @@ type counter struct {
 	counter uint32
 }
 
-func (e *counter) getAndIncrement() (ret uint32) {
+func (e *counter) getAndIncrement(context.Context) (ret uint32) {
 	ret = e.counter
 	e.counter++
 	return
@@ -72,7 +72,7 @@ func instantiateWithEnv(ctx context.Context, r wazero.Runtime, module wazero.Com
 	// Instantiate a new "env" module which exports a stateful function.
 	c := &counter{}
 	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("next_i32", c.getAndIncrement).
+		NewFunctionBuilder().WithFunc(c.getAndIncrement).Export("next_i32").
 		Instantiate(ctx, ns)
 	if err != nil {
 		log.Panicln(err)

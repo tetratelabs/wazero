@@ -1,30 +1,26 @@
 package wasm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 )
 
-// wasiAPI simulates the real WASI api
-type wasiAPI struct {
-}
-
-func (a *wasiAPI) ArgsSizesGet(ctx api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
+func argsSizesGet(ctx context.Context, mod api.Module, resultArgc, resultArgvBufSize uint32) uint32 {
 	return 0
 }
 
-func (a *wasiAPI) FdWrite(ctx api.Module, fd, iovs, iovsCount, resultSize uint32) uint32 {
+func fdWrite(ctx context.Context, mod api.Module, fd, iovs, iovsCount, resultSize uint32) uint32 {
 	return 0
 }
 
-func swap(x, y uint32) (uint32, uint32) {
+func swap(ctx context.Context, x, y uint32) (uint32, uint32) {
 	return y, x
 }
 
 func TestNewHostModule(t *testing.T) {
-	a := wasiAPI{}
 	functionArgsSizesGet := "args_sizes_get"
 	functionFdWrite := "fd_write"
 	functionSwap := "swap"
@@ -47,8 +43,8 @@ func TestNewHostModule(t *testing.T) {
 			name:       "funcs",
 			moduleName: "wasi_snapshot_preview1",
 			nameToGoFunc: map[string]interface{}{
-				functionArgsSizesGet: a.ArgsSizesGet,
-				functionFdWrite:      a.FdWrite,
+				functionArgsSizesGet: argsSizesGet,
+				functionFdWrite:      fdWrite,
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
@@ -56,7 +52,7 @@ func TestNewHostModule(t *testing.T) {
 					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
 				FunctionSection: []Index{0, 1},
-				CodeSection:     []*Code{MustParseGoFuncCode(a.ArgsSizesGet), MustParseGoFuncCode(a.FdWrite)},
+				CodeSection:     []*Code{MustParseGoReflectFuncCode(argsSizesGet), MustParseGoReflectFuncCode(fdWrite)},
 				ExportSection: []*Export{
 					{Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
 					{Name: "fd_write", Type: ExternTypeFunc, Index: 1},
@@ -79,7 +75,7 @@ func TestNewHostModule(t *testing.T) {
 			expected: &Module{
 				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
-				CodeSection:     []*Code{MustParseGoFuncCode(swap)},
+				CodeSection:     []*Code{MustParseGoReflectFuncCode(swap)},
 				ExportSection:   []*Export{{Name: "swap", Type: ExternTypeFunc, Index: 0}},
 				NameSection:     &NameSection{ModuleName: "swapper", FunctionNames: NameMap{{Index: 0, Name: "swap"}}},
 			},
@@ -118,8 +114,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
 	for i, c := range expected.CodeSection {
 		actualCode := actual.CodeSection[i]
 		require.True(t, actualCode.IsHostFunction)
-		require.Equal(t, c.Kind, actualCode.Kind)
-		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+		require.Equal(t, c.GoFunc, actualCode.GoFunc)
 
 		// Not wasm
 		require.Nil(t, actualCode.Body)
@@ -140,7 +135,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		},
 		{
 			name:         "function has multiple results",
-			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
+			nameToGoFunc: map[string]interface{}{"fn": func(context.Context) (uint32, uint32) { return 0, 0 }},
 			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 	}

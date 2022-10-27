@@ -27,10 +27,12 @@ type Runtime interface {
 	// Below defines and instantiates a module named "env" with one function:
 	//
 	//	ctx := context.Background()
-	//	hello := func() {
+	//	hello := func(context.Context) {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
-	//	_, err := r.NewHostModuleBuilder("env").ExportFunction("hello", hello).Instantiate(ctx, r)
+	//	_, err := r.NewHostModuleBuilder("env").
+	//		NewFunctionBuilder().WithFunc(hello).Export("hello").
+	//		Instantiate(ctx, r)
 	NewHostModuleBuilder(moduleName string) HostModuleBuilder
 
 	// CompileModule decodes the WebAssembly binary (%.wasm) or errs if invalid.

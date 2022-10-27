@@ -82,25 +82,16 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func() {})},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context) {})},
 			},
 			expected: &CompilationResult{IsHostFunction: true},
-		},
-		{
-			name: "host go api.Module uses memory",
-			module: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{v_v},
-				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func(api.Module) {})},
-			},
-			expected: &CompilationResult{IsHostFunction: true, UsesMemory: true},
 		},
 		{
 			name: "host go context.Context api.Module uses memory",
 			module: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(func(context.Context, api.Module) {})},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context, api.Module) {})},
 			},
 			expected: &CompilationResult{IsHostFunction: true, UsesMemory: true},
 		},

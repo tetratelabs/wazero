@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
@@ -172,13 +171,13 @@ type callFrame struct {
 
 type code struct {
 	body   []*interpreterOp
-	hostFn *reflect.Value
+	hostFn interface{}
 }
 
 type function struct {
 	source *wasm.FunctionInstance
 	body   []*interpreterOp
-	hostFn *reflect.Value
+	hostFn interface{}
 }
 
 // functionFromUintptr resurrects the original *function from the given uintptr
@@ -776,7 +775,7 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
-func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params ...uint64) (results []uint64, err error) {
+func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []uint64) (results []uint64, err error) {
 	paramSignature := ce.source.Type.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
@@ -834,13 +833,20 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
-	callCtx = callCtx.WithMemory(ce.callerMemory())
 	if f.source.Listener != nil {
 		ctx = f.source.Listener.Before(ctx, f.source.Definition, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
-	results = wasm.CallGoFunc(ctx, callCtx, f.source, params)
+
+	fn := f.source.GoFunc
+	switch fn := fn.(type) {
+	case api.GoModuleFunction:
+		results = fn.Call(ctx, callCtx.WithMemory(ce.callerMemory()), params)
+	case api.GoFunction:
+		results = fn.Call(ctx, params)
+	}
+
 	ce.popFrame()
 	if f.source.Listener != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
@@ -4346,7 +4352,7 @@ func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 }
 
 func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {
-	params := wasm.PopGoFuncParams(f.source, ce.popValue)
+	params := wasm.PopValues(f.source.Type.ParamNumInUint64, ce.popValue)
 	results := ce.callGoFunc(ctx, callCtx, f, params)
 	for _, v := range results {
 		ce.pushValue(v)

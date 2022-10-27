@@ -12,8 +12,8 @@ func Test_crypto(t *testing.T) {
 
 	stdout, stderr, err := compileAndRun(testCtx, "crypto", wazero.NewModuleConfig())
 
-	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Zero(t, stderr)
+	require.EqualError(t, err, `module "" closed with exit_code(0)`)
 	require.Equal(t, `7a0c9f9f0d
 `, stdout)
 }

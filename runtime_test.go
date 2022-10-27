@@ -333,7 +333,7 @@ func TestRuntime_InstantiateModule_UsesContext(t *testing.T) {
 	}
 
 	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("start", start).
+		NewFunctionBuilder().WithFunc(start).Export("start").
 		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
@@ -410,7 +410,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 			}
 
 			host, err := r.NewHostModuleBuilder("").
-				ExportFunction("start", start).
+				NewFunctionBuilder().WithFunc(start).Export("start").
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
 
@@ -461,7 +461,9 @@ func TestRuntime_InstantiateModule_ExitError(t *testing.T) {
 		require.NoError(t, m.CloseWithExitCode(ctx, 2))
 	}
 
-	_, err := r.NewHostModuleBuilder("env").ExportFunction("exit", start).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("env").
+		NewFunctionBuilder().WithFunc(start).Export("exit").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	one := uint32(1)
@@ -580,8 +582,8 @@ func TestHostFunctionWithCustomContext(t *testing.T) {
 	}
 
 	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("host", start).
-		ExportFunction("host2", callFunc).
+		NewFunctionBuilder().WithFunc(start).Export("host").
+		NewFunctionBuilder().WithFunc(callFunc).Export("host2").
 		Instantiate(hostCtx, r)
 	require.NoError(t, err)
 

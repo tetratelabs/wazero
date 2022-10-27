@@ -62,7 +62,8 @@ type functionExporter struct{}
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
 func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
-	builder.ExportFunction(notifyMemoryGrowth.Name, notifyMemoryGrowth)
+	exporter := builder.(wasm.HostFuncExporter)
+	exporter.ExportHostFunc(notifyMemoryGrowth)
 }
 
 // emscriptenNotifyMemoryGrowth is called when wasm is compiled with
