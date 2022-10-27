@@ -613,6 +613,7 @@ var fdWrite = wasm.NewGoFunc(
 			return ErrnoBadf
 		}
 
+		var err error
 		var nwritten uint32
 		for i := uint32(0); i < iovsCount; i++ {
 			iovPtr := iovs + i*8
@@ -626,13 +627,19 @@ var fdWrite = wasm.NewGoFunc(
 			if !ok {
 				return ErrnoFault
 			}
-			b, ok := mod.Memory().Read(ctx, offset, l)
-			if !ok {
-				return ErrnoFault
-			}
-			n, err := writer.Write(b)
-			if err != nil {
-				return ErrnoIo
+
+			var n int
+			if writer == io.Discard { // special-case default
+				n = int(l)
+			} else {
+				b, ok := mod.Memory().Read(ctx, offset, l)
+				if !ok {
+					return ErrnoFault
+				}
+				n, err = writer.Write(b)
+				if err != nil {
+					return ErrnoIo
+				}
 			}
 			nwritten += uint32(n)
 		}

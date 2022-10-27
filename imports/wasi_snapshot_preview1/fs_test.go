@@ -955,6 +955,53 @@ func Test_fdWrite(t *testing.T) {
 	require.Equal(t, []byte("wazero"), buf) // verify the file was actually written
 }
 
+// Test_fdWrite_discard ensures default configuration doesn't add needless
+// overhead, but still returns valid data. For example, writing to STDOUT when
+// it is io.Discard.
+func Test_fdWrite_discard(t *testing.T) {
+	// Default has io.Discard as stdout/stderr
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
+	defer r.Close(testCtx)
+
+	iovs := uint32(1) // arbitrary offset
+	initialMemory := []byte{
+		'?',         // `iovs` is after this
+		18, 0, 0, 0, // = iovs[0].offset
+		4, 0, 0, 0, // = iovs[0].length
+		23, 0, 0, 0, // = iovs[1].offset
+		2, 0, 0, 0, // = iovs[1].length
+		'?',                // iovs[0].offset is after this
+		'w', 'a', 'z', 'e', // iovs[0].length bytes
+		'?',      // iovs[1].offset is after this
+		'r', 'o', // iovs[1].length bytes
+		'?',
+	}
+	iovsCount := uint32(2)   // The count of iovs
+	resultSize := uint32(26) // arbitrary offset
+	expectedMemory := append(
+		initialMemory,
+		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+		'?',
+	)
+
+	maskMemory(t, testCtx, mod, len(expectedMemory))
+	ok := mod.Memory().Write(testCtx, 0, initialMemory)
+	require.True(t, ok)
+
+	fd := 1 // stdout
+	requireErrno(t, ErrnoSuccess, mod, functionFdWrite, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+	require.Equal(t, `
+--> proxy.fd_write(fd=1,iovs=1,iovs_len=2,result.size=26)
+	==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2,result.size=26)
+	<== ESUCCESS
+<-- (0)
+`, "\n"+log.String())
+
+	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
+	require.True(t, ok)
+	require.Equal(t, expectedMemory, actual)
+}
+
 func Test_fdWrite_Errors(t *testing.T) {
 	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 	pathName := "test_path"
