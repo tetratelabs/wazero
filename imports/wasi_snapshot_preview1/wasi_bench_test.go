@@ -5,9 +5,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/proxy"
 	"github.com/tetratelabs/wazero/internal/testing/require"
-	"github.com/tetratelabs/wazero/internal/wasm"
-	binaryformat "github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 var testMem = []byte{
@@ -43,20 +42,11 @@ func Benchmark_EnvironGet(b *testing.B) {
 	r := wazero.NewRuntime(testCtx)
 	defer r.Close(testCtx)
 
-	compiled, err := r.CompileModule(testCtx, binaryformat.EncodeModule(&wasm.Module{
-		MemorySection: &wasm.Memory{Min: 1, Max: 1},
-		ExportSection: []*wasm.Export{{Name: "memory", Type: api.ExternTypeMemory}},
-	}))
+	mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().
+		WithEnv("a", "b").WithEnv("b", "cd"))
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	mod, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig().
-		WithEnv("a", "bc").WithEnv("b", "cd"))
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer r.Close(testCtx)
 
 	b.Run("environGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -70,4 +60,25 @@ func Benchmark_EnvironGet(b *testing.B) {
 			}
 		}
 	})
+}
+
+// instantiateProxyModule instantiates a guest that re-exports WASI functions.
+func instantiateProxyModule(r wazero.Runtime, config wazero.ModuleConfig) (api.Module, error) {
+	wasiModuleCompiled, err := (&builder{r}).hostModuleBuilder().Compile(testCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = r.InstantiateModule(testCtx, wasiModuleCompiled, wazero.NewModuleConfig()); err != nil {
+		return nil, err
+	}
+
+	proxyBin := proxy.GetProxyModuleBinary(ModuleName, wasiModuleCompiled)
+
+	proxyCompiled, err := r.CompileModule(testCtx, proxyBin)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.InstantiateModule(testCtx, proxyCompiled, config)
 }
