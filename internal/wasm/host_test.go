@@ -135,7 +135,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		},
 		{
 			name:         "function has multiple results",
-			nameToGoFunc: map[string]interface{}{"fn": func(context.Context) (uint32, uint32) { return 0, 0 }},
+			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
 			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 	}

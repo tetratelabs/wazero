@@ -165,7 +165,7 @@ func testGlobalExtend(t *testing.T, r wazero.Runtime) {
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {
-	callUnreachable := func(context.Context) {
+	callUnreachable := func() {
 		panic("panic in host function")
 	}
 

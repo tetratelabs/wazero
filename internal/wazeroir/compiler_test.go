@@ -82,7 +82,7 @@ func TestCompile(t *testing.T) {
 			module: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func(context.Context) {})},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(func() {})},
 			},
 			expected: &CompilationResult{IsHostFunction: true},
 		},

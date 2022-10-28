@@ -91,7 +91,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 
 func TestStore_Instantiate(t *testing.T) {
 	s, ns := newStore()
-	m, err := NewHostModule("", map[string]interface{}{"fn": func(context.Context) {}}, nil, api.CoreFeaturesV1)
+	m, err := NewHostModule("", map[string]interface{}{"fn": func() {}}, nil, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	sysCtx := sys.DefaultContext(nil)
@@ -169,7 +169,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(context.Context) {}}, nil, api.CoreFeaturesV1)
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, nil, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	s, ns := newStore()
@@ -223,7 +223,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
-	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(context.Context) {}}, nil, api.CoreFeaturesV1)
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func() {}}, nil, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	t.Run("Fails if module name already in use", func(t *testing.T) {
@@ -314,7 +314,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestCallContext_ExportedFunction(t *testing.T) {
-	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func(context.Context) {}}, nil, api.CoreFeaturesV1)
+	host, err := NewHostModule("host", map[string]interface{}{"host_fn": func() {}}, nil, api.CoreFeaturesV1)
 	require.NoError(t, err)
 
 	s, ns := newStore()
@@ -396,7 +396,7 @@ func (e *mockModuleEngine) Name() string {
 }
 
 // Close implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) Close(_ context.Context) {
+func (e *mockModuleEngine) Close(context.Context) {
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.

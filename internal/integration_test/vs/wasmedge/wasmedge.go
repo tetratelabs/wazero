@@ -124,7 +124,7 @@ func (r *wasmedgeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 	return
 }
 
-func (r *wasmedgeRuntime) Close(_ context.Context) error {
+func (r *wasmedgeRuntime) Close(context.Context) error {
 	if conf := r.conf; conf != nil {
 		conf.Release()
 	}
@@ -183,7 +183,7 @@ func (m *wasmedgeModule) WriteMemory(_ context.Context, offset uint32, bytes []b
 	return nil
 }
 
-func (m *wasmedgeModule) Close(_ context.Context) error {
+func (m *wasmedgeModule) Close(context.Context) error {
 	if env := m.env; env != nil {
 		env.Release()
 	}

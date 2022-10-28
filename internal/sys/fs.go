@@ -153,7 +153,7 @@ func (c *FSContext) CloseFile(_ context.Context, fd uint32) bool {
 }
 
 // Close implements io.Closer
-func (c *FSContext) Close(_ context.Context) (err error) {
+func (c *FSContext) Close(context.Context) (err error) {
 	// Close any files opened in this context
 	for fd, entry := range c.openedFiles {
 		delete(c.openedFiles, fd)

@@ -405,7 +405,7 @@ func TestRuntime_InstantiateModuleFromBinary_ErrorOnStart(t *testing.T) {
 			r := NewRuntime(testCtx)
 			defer r.Close(testCtx)
 
-			start := func(context.Context) {
+			start := func() {
 				panic(errors.New("ice cream"))
 			}
 

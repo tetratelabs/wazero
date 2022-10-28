@@ -27,7 +27,7 @@ type Runtime interface {
 	// Below defines and instantiates a module named "env" with one function:
 	//
 	//	ctx := context.Background()
-	//	hello := func(context.Context) {
+	//	hello := func() {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
 	//	_, err := r.NewHostModuleBuilder("env").

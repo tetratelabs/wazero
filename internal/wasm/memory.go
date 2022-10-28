@@ -59,7 +59,7 @@ func (m *MemoryInstance) Definition() api.MemoryDefinition {
 }
 
 // Size implements the same method as documented on api.Memory.
-func (m *MemoryInstance) Size(_ context.Context) uint32 {
+func (m *MemoryInstance) Size(context.Context) uint32 {
 	return m.size()
 }
 
@@ -203,7 +203,7 @@ func (m *MemoryInstance) Grow(_ context.Context, delta uint32) (result uint32, o
 }
 
 // PageSize returns the current memory buffer size in pages.
-func (m *MemoryInstance) PageSize(_ context.Context) (result uint32) {
+func (m *MemoryInstance) PageSize(context.Context) (result uint32) {
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
 }
 

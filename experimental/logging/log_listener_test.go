@@ -266,7 +266,7 @@ func Test_loggingListener(t *testing.T) {
 
 	var out bytes.Buffer
 	lf := logging.NewLoggingListenerFactory(&out)
-	fn := func(context.Context) {}
+	fn := func() {}
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {

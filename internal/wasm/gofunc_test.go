@@ -21,6 +21,11 @@ func Test_parseGoFunc(t *testing.T) {
 		expectedType      *FunctionType
 	}{
 		{
+			name:         "() -> ()",
+			input:        func() {},
+			expectedType: &FunctionType{},
+		},
+		{
 			name:         "(ctx) -> ()",
 			input:        func(context.Context) {},
 			expectedType: &FunctionType{},
@@ -33,11 +38,16 @@ func Test_parseGoFunc(t *testing.T) {
 		},
 		{
 			name:         "all supported params and i32 result",
+			input:        func(uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
+		},
+		{
+			name:         "all supported params and i32 result - (ctx)",
 			input:        func(context.Context, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
 		},
 		{
-			name:              "all supported params and i32 result - context.Context and api.Module",
+			name:              "all supported params and i32 result - (ctx, mod)",
 			input:             func(context.Context, api.Module, uint32, uint64, float32, float64, uintptr) uint32 { return 0 },
 			expectNeedsModule: true,
 			expectedType:      &FunctionType{Params: []ValueType{i32, i64, f32, f64, externref}, Results: []ValueType{i32}},
@@ -63,11 +73,6 @@ func Test_parseGoFunc_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:        "no context",
-			input:       func() {},
-			expectedErr: "invalid signature: context.Context must be param[0]",
-		},
-		{
 			name:        "module no context",
 			input:       func(api.Module) {},
 			expectedErr: "invalid signature: api.Module parameter must be preceded by context.Context",
@@ -84,12 +89,12 @@ func Test_parseGoFunc_Errors(t *testing.T) {
 		},
 		{
 			name:        "unsupported result",
-			input:       func(context.Context) string { return "" },
+			input:       func() string { return "" },
 			expectedErr: "result[0] is unsupported: string",
 		},
 		{
 			name:        "error result",
-			input:       func(context.Context) error { return nil },
+			input:       func() error { return nil },
 			expectedErr: "result[0] is an error, which is unsupported",
 		},
 		{
@@ -178,20 +183,43 @@ func Test_callGoFunc(t *testing.T) {
 		inputParams, expectedResults []uint64
 	}{
 		{
-			name: "context.Context void return",
+			name:  "() -> ()",
+			input: func() {},
+		},
+		{
+			name: "(ctx) -> ()",
 			input: func(ctx context.Context) {
 				require.Equal(t, testCtx, ctx)
 			},
 		},
 		{
-			name: "context.Context and api.Module void return",
+			name: "(ctx, mod) -> ()",
 			input: func(ctx context.Context, m api.Module) {
 				require.Equal(t, testCtx, ctx)
 				require.Equal(t, callCtx, m)
 			},
 		},
 		{
-			name: "all supported params and i32 result - context.Context",
+			name: "all supported params and i32 result",
+			input: func(v uintptr, w uint32, x uint64, y float32, z float64) uint32 {
+				require.Equal(t, tPtr, v)
+				require.Equal(t, uint32(math.MaxUint32), w)
+				require.Equal(t, uint64(math.MaxUint64), x)
+				require.Equal(t, float32(math.MaxFloat32), y)
+				require.Equal(t, math.MaxFloat64, z)
+				return 100
+			},
+			inputParams: []uint64{
+				api.EncodeExternref(tPtr),
+				math.MaxUint32,
+				math.MaxUint64,
+				api.EncodeF32(math.MaxFloat32),
+				api.EncodeF64(math.MaxFloat64),
+			},
+			expectedResults: []uint64{100},
+		},
+		{
+			name: "all supported params and i32 result - (ctx)",
 			input: func(ctx context.Context, v uintptr, w uint32, x uint64, y float32, z float64) uint32 {
 				require.Equal(t, testCtx, ctx)
 				require.Equal(t, tPtr, v)
@@ -211,7 +239,7 @@ func Test_callGoFunc(t *testing.T) {
 			expectedResults: []uint64{100},
 		},
 		{
-			name: "all supported params and i32 result - context.Context and api.Module",
+			name: "all supported params and i32 result - (ctx, mod)",
 			input: func(ctx context.Context, m api.Module, v uintptr, w uint32, x uint64, y float32, z float64) uint32 {
 				require.Equal(t, testCtx, ctx)
 				require.Equal(t, callCtx, m)

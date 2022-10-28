@@ -20,7 +20,7 @@ func (g *mutableGlobal) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g *mutableGlobal) Get(_ context.Context) uint64 {
+func (g *mutableGlobal) Get(context.Context) uint64 {
 	return g.g.Val
 }
 
@@ -54,7 +54,7 @@ func (g globalI32) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalI32) Get(_ context.Context) uint64 {
+func (g globalI32) Get(context.Context) uint64 {
 	return uint64(g)
 }
 
@@ -74,7 +74,7 @@ func (g globalI64) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalI64) Get(_ context.Context) uint64 {
+func (g globalI64) Get(context.Context) uint64 {
 	return uint64(g)
 }
 
@@ -94,7 +94,7 @@ func (g globalF32) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalF32) Get(_ context.Context) uint64 {
+func (g globalF32) Get(context.Context) uint64 {
 	return uint64(g)
 }
 
@@ -114,7 +114,7 @@ func (g globalF64) Type() api.ValueType {
 }
 
 // Get implements the same method as documented on api.Global.
-func (g globalF64) Get(_ context.Context) uint64 {
+func (g globalF64) Get(context.Context) uint64 {
 	return uint64(g)
 }
 

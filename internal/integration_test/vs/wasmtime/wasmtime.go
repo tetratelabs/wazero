@@ -142,7 +142,7 @@ func (r *wasmtimeRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) 
 	return
 }
 
-func (r *wasmtimeRuntime) Close(_ context.Context) error {
+func (r *wasmtimeRuntime) Close(context.Context) error {
 	r.engine = nil
 	return nil // wasmtime only closes via finalizer
 }
@@ -193,7 +193,7 @@ func (m *wasmtimeModule) WriteMemory(_ context.Context, offset uint32, bytes []b
 	return nil
 }
 
-func (m *wasmtimeModule) Close(_ context.Context) error {
+func (m *wasmtimeModule) Close(context.Context) error {
 	m.store = nil
 	m.instance = nil
 	m.funcs = nil
