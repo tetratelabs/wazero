@@ -11,6 +11,14 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+type paramsKind byte
+
+const (
+	paramsKindNoContext paramsKind = iota
+	paramsKindContext
+	paramsKindContextModule
+)
+
 // Below are reflection code to get the interface type used to parse functions and set values.
 
 var moduleType = reflect.TypeOf((*api.Module)(nil)).Elem()
@@ -46,6 +54,7 @@ var _ api.GoFunction = (*reflectGoFunction)(nil)
 
 type reflectGoFunction struct {
 	fn              *reflect.Value
+	pk              paramsKind
 	params, results []ValueType
 }
 
@@ -55,12 +64,16 @@ func (f *reflectGoFunction) EqualTo(that interface{}) bool {
 		return false
 	} else {
 		// TODO compare reflect pointers
-		return bytes.Equal(f.params, f2.params) && bytes.Equal(f.results, f2.results)
+		return f.pk == f2.pk &&
+			bytes.Equal(f.params, f2.params) && bytes.Equal(f.results, f2.results)
 	}
 }
 
 // Call implements the same method as documented on api.GoFunction.
 func (f *reflectGoFunction) Call(ctx context.Context, params []uint64) []uint64 {
+	if f.pk == paramsKindNoContext {
+		ctx = nil
+	}
 	return callGoFunc(ctx, nil, f.fn, params)
 }
 
@@ -93,8 +106,11 @@ func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, params [
 	if tp.NumIn() != 0 {
 		in = make([]reflect.Value, tp.NumIn())
 
-		i := 1
-		in[0] = newContextVal(ctx)
+		i := 0
+		if ctx != nil {
+			in[0] = newContextVal(ctx)
+			i++
+		}
 		if mod != nil {
 			in[1] = newModuleVal(mod)
 			i++
@@ -175,15 +191,19 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code *Code
 		return
 	}
 
-	needsMod, needsErr := needsModule(p)
-	if needsErr != nil {
-		err = needsErr
+	pk, kindErr := kind(p)
+	if kindErr != nil {
+		err = kindErr
 		return
 	}
 
-	pOffset := 1 // ctx
-	if needsMod {
-		pOffset = 2 // ctx, mod
+	pOffset := 0
+	switch pk {
+	case paramsKindNoContext:
+	case paramsKindContext:
+		pOffset = 1
+	case paramsKindContextModule:
+		pOffset = 2
 	}
 
 	pCount := p.NumIn() - pOffset
@@ -234,30 +254,30 @@ func parseGoReflectFunc(fn interface{}) (params, results []ValueType, code *Code
 	}
 
 	code = &Code{IsHostFunction: true}
-	if needsMod {
+	if pk == paramsKindContextModule {
 		code.GoFunc = &reflectGoModuleFunction{fn: &fnV, params: params, results: results}
 	} else {
-		code.GoFunc = &reflectGoFunction{fn: &fnV, params: params, results: results}
+		code.GoFunc = &reflectGoFunction{pk: pk, fn: &fnV, params: params, results: results}
 	}
 	return
 }
 
-func needsModule(p reflect.Type) (bool, error) {
+func kind(p reflect.Type) (paramsKind, error) {
 	pCount := p.NumIn()
-	if pCount == 0 {
-		return false, errors.New("invalid signature: context.Context must be param[0]")
-	}
-	if p.In(0).Kind() == reflect.Interface {
+	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
 		p0 := p.In(0)
 		if p0.Implements(moduleType) {
-			return false, errors.New("invalid signature: api.Module parameter must be preceded by context.Context")
+			return 0, errors.New("invalid signature: api.Module parameter must be preceded by context.Context")
 		} else if p0.Implements(goContextType) {
 			if pCount >= 2 && p.In(1).Implements(moduleType) {
-				return true, nil
+				return paramsKindContextModule, nil
 			}
+			return paramsKindContext, nil
 		}
 	}
-	return false, nil
+	// Without context param allows portability with reflective runtimes.
+	// This allows people to more easily port to wazero.
+	return paramsKindNoContext, nil
 }
 
 func getTypeOf(kind reflect.Kind) (ValueType, bool) {

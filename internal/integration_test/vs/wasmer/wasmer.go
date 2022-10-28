@@ -144,7 +144,7 @@ func (r *wasmerRuntime) Instantiate(_ context.Context, cfg *vs.RuntimeConfig) (m
 	return
 }
 
-func (r *wasmerRuntime) Close(_ context.Context) error {
+func (r *wasmerRuntime) Close(context.Context) error {
 	r.engine = nil
 	return nil
 }
@@ -195,7 +195,7 @@ func (m *wasmerModule) Memory() []byte {
 	return m.mem.Data()
 }
 
-func (m *wasmerModule) Close(_ context.Context) error {
+func (m *wasmerModule) Close(context.Context) error {
 	if instance := m.instance; instance != nil {
 		instance.Close()
 	}

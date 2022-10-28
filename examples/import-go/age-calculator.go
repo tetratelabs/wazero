@@ -40,12 +40,12 @@ func main() {
 	// host-defined functions, but any name would do.
 	_, err := r.NewHostModuleBuilder("env").
 		NewFunctionBuilder().
-		WithFunc(func(ctx context.Context, v uint32) {
+		WithFunc(func(v uint32) {
 			fmt.Println("log_i32 >>", v)
 		}).
 		Export("log_i32").
 		NewFunctionBuilder().
-		WithFunc(func(context.Context) uint32 {
+		WithFunc(func() uint32 {
 			if envYear, err := strconv.ParseUint(os.Getenv("CURRENT_YEAR"), 10, 64); err == nil {
 				return uint32(envYear) // Allow env-override to prevent annual test maintenance!
 			}

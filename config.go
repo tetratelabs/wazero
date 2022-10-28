@@ -216,7 +216,7 @@ func (c *compiledModule) Name() (moduleName string) {
 }
 
 // Close implements CompiledModule.Close
-func (c *compiledModule) Close(_ context.Context) error {
+func (c *compiledModule) Close(context.Context) error {
 	c.compiledEngine.DeleteCompiledModule(c.module)
 	// It is possible the underlying may need to return an error later, but in any case this matches api.Module.Close.
 	return nil

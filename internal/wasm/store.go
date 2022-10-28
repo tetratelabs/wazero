@@ -278,7 +278,7 @@ func NewStore(enabledFeatures api.CoreFeatures, engine Engine) (*Store, *Namespa
 }
 
 // NewNamespace implements the same method as documented on wazero.Runtime.
-func (s *Store) NewNamespace(_ context.Context) *Namespace {
+func (s *Store) NewNamespace(context.Context) *Namespace {
 	ns := newNamespace()
 	s.mux.Lock()
 	defer s.mux.Unlock()

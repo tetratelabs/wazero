@@ -1,7 +1,6 @@
 package binary
 
 import (
-	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -211,7 +210,7 @@ func TestModule_Encode(t *testing.T) {
 
 func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
 	// We don't currently have an approach to serialize reflect.Value pointers
-	fn := func(context.Context) {}
+	fn := func() {}
 
 	captured := require.CapturePanic(func() {
 		EncodeModule(&wasm.Module{

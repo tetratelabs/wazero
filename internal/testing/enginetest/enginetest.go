@@ -672,7 +672,7 @@ const (
 	callImportCallDivByGoName = "call_import->" + callDivByGoName
 )
 
-func divByGo(_ context.Context, d uint32) uint32 {
+func divByGo(d uint32) uint32 {
 	if d == math.MaxUint32 {
 		panic(errors.New("host-function panic"))
 	}

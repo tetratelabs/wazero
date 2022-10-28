@@ -58,7 +58,7 @@ type counter struct {
 	counter uint32
 }
 
-func (e *counter) getAndIncrement(context.Context) (ret uint32) {
+func (e *counter) getAndIncrement() (ret uint32) {
 	ret = e.counter
 	e.counter++
 	return
