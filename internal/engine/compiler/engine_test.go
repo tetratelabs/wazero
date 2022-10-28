@@ -194,7 +194,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 
 	const hostModuleName = "env"
 	const hostFnName = "grow_and_shrink_goroutine_stack"
-	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
+	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func(context.Context) {
 		// This function aggressively grow the goroutine stack by recursively
 		// calling the function many times.
 		var callNum = 1000

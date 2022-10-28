@@ -621,7 +621,7 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		n, l          uint32
 		err           error
 		expectedOk    bool
-		expectedErrno Errno
+		expectedErrno []uint64
 	}{
 		{
 			name: "break when nothing to read",
@@ -668,13 +668,13 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		{
 			name:          "return ErrnoIo on error on nothing to read",
 			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
+			expectedErrno: errnoIo,
 		},
 		{
 			name:          "return ErrnoIo on error on nothing read",
 			l:             4,
 			err:           io.ErrClosedPipe,
-			expectedErrno: ErrnoIo,
+			expectedErrno: errnoIo,
 		},
 		{ // Special case, allows processing data before err
 			name: "break on error on partial read",
@@ -1170,7 +1170,7 @@ func Test_pathOpen(t *testing.T) {
 	)
 
 	dirflags := uint32(0)
-	pathPtr := uint32(1)
+	path := uint32(1)
 	pathLen := uint32(len(pathName))
 	oflags := uint32(0)
 	fsRightsBase := uint64(1)       // ignored: rights were removed from WASI.
@@ -1186,7 +1186,7 @@ func Test_pathOpen(t *testing.T) {
 	ok := mod.Memory().Write(testCtx, 0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, functionPathOpen, uint64(rootFD), uint64(dirflags), uint64(pathPtr),
+	requireErrno(t, ErrnoSuccess, mod, functionPathOpen, uint64(rootFD), uint64(dirflags), uint64(path),
 		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.Equal(t, `
 --> proxy.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)

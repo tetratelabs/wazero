@@ -42,36 +42,45 @@ const (
 // For example, if the resolution is 100ns, this function writes the below to
 // api.Memory:
 //
-//	                                    uint64le
-//	                  +-------------------------------------+
-//	                  |                                     |
-//	        []byte{?, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, ?}
+//	                                   uint64le
+//	                   +-------------------------------------+
+//	                   |                                     |
+//	         []byte{?, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, ?}
 //	resultResolution --^
 //
 // Note: This is similar to `clock_getres` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
-var clockResGet = wasm.NewGoFunc(
-	functionClockResGet, functionClockResGet,
-	[]string{"id", "result.resolution"},
-	func(ctx context.Context, mod api.Module, id uint32, resultResolution uint32) Errno {
-		sysCtx := mod.(*wasm.CallContext).Sys
-
-		var resolution uint64 // ns
-		switch id {
-		case clockIDRealtime:
-			resolution = uint64(sysCtx.WalltimeResolution())
-		case clockIDMonotonic:
-			resolution = uint64(sysCtx.NanotimeResolution())
-		default:
-			return ErrnoInval
-		}
-		if !mod.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
-			return ErrnoFault
-		}
-		return ErrnoSuccess
+var clockResGet = &wasm.HostFunc{
+	ExportNames: []string{functionClockResGet},
+	Name:        functionClockResGet,
+	ParamTypes:  []api.ValueType{i32, i32},
+	ParamNames:  []string{"id", "result.resolution"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(clockResGetFn),
 	},
-)
+}
+
+func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	id, resultResolution := uint32(params[0]), uint32(params[1])
+
+	var resolution uint64 // ns
+	switch id {
+	case clockIDRealtime:
+		resolution = uint64(sysCtx.WalltimeResolution())
+	case clockIDMonotonic:
+		resolution = uint64(sysCtx.NanotimeResolution())
+	default:
+		return errnoInval
+	}
+	if !mod.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
+		return errnoFault
+	}
+	return errnoSuccess
+}
 
 // clockTimeGet is the WASI function named functionClockTimeGet that returns
 // the time value of a name (time.Now).
@@ -104,27 +113,38 @@ var clockResGet = wasm.NewGoFunc(
 // Note: This is similar to `clock_gettime` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
-var clockTimeGet = wasm.NewGoFunc(
-	functionClockTimeGet, functionClockTimeGet,
-	[]string{"id", "precision", "result.timestamp"},
-	func(ctx context.Context, mod api.Module, id uint32, precision uint64, resultTimestamp uint32) Errno {
-		// TODO: precision is currently ignored.
-		sysCtx := mod.(*wasm.CallContext).Sys
-
-		var val uint64
-		switch id {
-		case clockIDRealtime:
-			sec, nsec := sysCtx.Walltime(ctx)
-			val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
-		case clockIDMonotonic:
-			val = uint64(sysCtx.Nanotime(ctx))
-		default:
-			return ErrnoInval
-		}
-
-		if !mod.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
-			return ErrnoFault
-		}
-		return ErrnoSuccess
+var clockTimeGet = &wasm.HostFunc{
+	ExportNames: []string{functionClockTimeGet},
+	Name:        functionClockTimeGet,
+	ParamTypes:  []api.ValueType{i32, i64, i32},
+	ParamNames:  []string{"id", "precision", "result.timestamp"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(clockTimeGetFn),
 	},
-)
+}
+
+func clockTimeGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	id := uint32(params[0])
+	// TODO: precision is currently ignored.
+	_ = params[1]
+	resultTimestamp := uint32(params[2])
+
+	var val uint64
+	switch id {
+	case clockIDRealtime:
+		sec, nsec := sysCtx.Walltime(ctx)
+		val = (uint64(sec) * uint64(time.Second.Nanoseconds())) + uint64(nsec)
+	case clockIDMonotonic:
+		val = uint64(sysCtx.Nanotime(ctx))
+	default:
+		return errnoInval
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
+		return errnoFault
+	}
+	return errnoSuccess
+}

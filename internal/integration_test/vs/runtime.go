@@ -79,14 +79,18 @@ func (m *wazeroModule) Memory() []byte {
 	return m.mod.Memory().(*wasm.MemoryInstance).Buffer
 }
 
-func (r *wazeroRuntime) log(ctx context.Context, m api.Module, offset, byteCount uint32) {
-	buf, ok := m.Memory().Read(ctx, offset, byteCount)
+func (r *wazeroRuntime) log(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
+	offset, byteCount := uint32(params[0]), uint32(params[1])
+
+	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
 	if !ok {
 		panic("out of memory reading log buffer")
 	}
 	if err := r.logFn(buf); err != nil {
 		panic(err)
 	}
+
+	return
 }
 
 func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err error) {
@@ -94,17 +98,20 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 	if cfg.LogFn != nil {
 		r.logFn = cfg.LogFn
 		if r.env, err = r.runtime.NewHostModuleBuilder("env").
-			ExportFunction("log", r.log).Compile(ctx); err != nil {
+			NewFunctionBuilder().
+			WithGoModuleFunction(api.GoModuleFunc(r.log), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+			Export("log").
+			Compile(ctx); err != nil {
 			return err
 		}
 	} else if cfg.EnvFReturnValue != 0 {
 		if r.env, err = r.runtime.NewHostModuleBuilder("env").
-			ExportFunction("f",
-				// Note: accepting (context.Context, api.Module) is the slowest type of host function with wazero.
-				func(context.Context, api.Module, uint64) uint64 {
-					return cfg.EnvFReturnValue
-				},
-			).Compile(ctx); err != nil {
+			NewFunctionBuilder().
+			WithGoFunction(api.GoFunc(func(context.Context, []uint64) []uint64 {
+				return []uint64{cfg.EnvFReturnValue}
+			}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
+			Export("f").
+			Compile(ctx); err != nil {
 			return err
 		}
 	}

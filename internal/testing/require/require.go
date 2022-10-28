@@ -22,6 +22,10 @@ type TestingT interface {
 	Fatal(args ...interface{})
 }
 
+type EqualTo interface {
+	EqualTo(that interface{}) bool
+}
+
 // TODO: implement, test and document each function without using testify
 
 // Contains fails if `s` does not contain `substr` using strings.Contains.
@@ -69,6 +73,18 @@ func Equal(t TestingT, expected, actual interface{}, formatWithArgs ...interface
 	} else if et.Kind() < reflect.Array {
 		fail(t, fmt.Sprintf("expected %v, but was %v", expected, actual), "", formatWithArgs...)
 		return
+	} else if et.Kind() == reflect.Func {
+		// compare funcs by string pointer
+		expected := fmt.Sprintf("%v", expected)
+		actual := fmt.Sprintf("%v", actual)
+		if expected != actual {
+			fail(t, fmt.Sprintf("expected %s, but was %s", expected, actual), "", formatWithArgs...)
+		}
+		return
+	} else if eq, ok := actual.(EqualTo); ok {
+		if !eq.EqualTo(expected) {
+			fail(t, fmt.Sprintf("expected %v, but was %v", expected, actual), "", formatWithArgs...)
+		}
 	}
 
 	// If we have the same type, and it isn't a string, but the expected and actual values on a different line.

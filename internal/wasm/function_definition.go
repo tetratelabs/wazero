@@ -1,8 +1,6 @@
 package wasm
 
 import (
-	"reflect"
-
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
@@ -110,7 +108,7 @@ type FunctionDefinition struct {
 	index       Index
 	name        string
 	debugName   string
-	goFunc      *reflect.Value
+	goFunc      interface{}
 	funcType    *FunctionType
 	importDesc  *[2]string
 	exportNames []string
@@ -151,7 +149,7 @@ func (f *FunctionDefinition) ExportNames() []string {
 }
 
 // GoFunc implements the same method as documented on api.FunctionDefinition.
-func (f *FunctionDefinition) GoFunc() *reflect.Value {
+func (f *FunctionDefinition) GoFunction() interface{} {
 	return f.goFunc
 }
 

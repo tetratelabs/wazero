@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -595,7 +594,6 @@ func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.Fu
 		code := mod.CodeSection[i]
 		fns = append(fns, &FunctionInstance{
 			IsHostFunction: code.IsHostFunction,
-			Kind:           code.Kind,
 			LocalTypes:     code.LocalTypes,
 			Body:           code.Body,
 			GoFunc:         code.GoFunc,
@@ -816,9 +814,6 @@ type Code struct {
 	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A0
 	IsHostFunction bool
 
-	// Kind describes how this function should be called.
-	Kind FunctionKind
-
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
@@ -827,13 +822,13 @@ type Code struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
 	Body []byte
 
-	// GoFunc is a host function defined in Go.
-	//
-	// When present, LocalTypes and Body must be nil.
+	// GoFunc is non-nil when IsHostFunction and defined in go, either
+	// api.GoFunction or api.GoModuleFunction. When present, LocalTypes and Body must
+	// be nil.
 	//
 	// Note: This has no serialization format, so is not encodable.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	GoFunc *reflect.Value
+	GoFunc interface{}
 }
 
 type DataSegment struct {

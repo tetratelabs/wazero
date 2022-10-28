@@ -16,9 +16,14 @@ import (
 )
 
 const (
-	// callGoHostName is the name of exported function which calls the Go-implemented host function.
+	// callGoHostName is the name of exported function which calls the
+	// Go-implemented host function.
 	callGoHostName = "call_go_host"
-	// callWasmHostName is the name of exported function which calls the Wasm-implemented host function.
+	// callGoReflectHostName is the name of exported function which calls the
+	// Go-implemented host function defined in reflection.
+	callGoReflectHostName = "call_go_reflect_host"
+	// callWasmHostName is the name of exported function which calls the
+	// Wasm-implemented host function.
 	callWasmHostName = "call_wasm_host"
 )
 
@@ -35,46 +40,32 @@ func BenchmarkHostFunctionCall(b *testing.B) {
 		}
 	})
 
-	const offset = 100
+	const offset = uint64(100)
 	const val = float32(1.1234)
 
 	binary.LittleEndian.PutUint32(m.Memory.Buffer[offset:], math.Float32bits(val))
 
-	b.Run(callGoHostName, func(b *testing.B) {
-		ce, err := getCallEngine(m, callGoHostName)
-		if err != nil {
-			b.Fatal(err)
-		}
+	for _, fn := range []string{callGoReflectHostName, callGoHostName, callWasmHostName} {
+		fn := fn
 
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			res, err := ce.Call(testCtx, m.CallCtx, offset)
+		b.Run(fn, func(b *testing.B) {
+			ce, err := getCallEngine(m, fn)
 			if err != nil {
 				b.Fatal(err)
 			}
-			if uint32(res[0]) != math.Float32bits(val) {
-				b.Fail()
-			}
-		}
-	})
 
-	b.Run(callWasmHostName, func(b *testing.B) {
-		ce, err := getCallEngine(m, callWasmHostName)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			res, err := ce.Call(testCtx, m.CallCtx, offset)
-			if err != nil {
-				b.Fatal(err)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				res, err := ce.Call(testCtx, m.CallCtx, []uint64{offset})
+				if err != nil {
+					b.Fatal(err)
+				}
+				if uint32(res[0]) != math.Float32bits(val) {
+					b.Fail()
+				}
 			}
-			if uint32(res[0]) != math.Float32bits(val) {
-				b.Fail()
-			}
-		}
-	})
+		})
+	}
 }
 
 func TestBenchmarkFunctionCall(t *testing.T) {
@@ -92,8 +83,12 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 	callGoHost, err := getCallEngine(m, callGoHostName)
 	require.NoError(t, err)
 
+	callGoReflectHost, err := getCallEngine(m, callGoReflectHostName)
+	require.NoError(t, err)
+
 	require.NotNil(t, callWasmHost)
 	require.NotNil(t, callGoHost)
+	require.NotNil(t, callGoReflectHost)
 
 	tests := []struct {
 		offset uint32
@@ -111,13 +106,14 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 		ce   wasm.CallEngine
 	}{
 		{name: "go", ce: callGoHost},
+		{name: "go-reflect", ce: callGoReflectHost},
 		{name: "wasm", ce: callWasmHost},
 	} {
 		f := f
 		t.Run(f.name, func(t *testing.T) {
 			for _, tc := range tests {
 				binary.LittleEndian.PutUint32(mem[tc.offset:], math.Float32bits(tc.val))
-				res, err := f.ce.Call(context.Background(), m.CallCtx, uint64(tc.offset))
+				res, err := f.ce.Call(context.Background(), m.CallCtx, []uint64{uint64(tc.offset)})
 				require.NoError(t, err)
 				require.Equal(t, math.Float32bits(tc.val), uint32(res[0]))
 			}
@@ -148,9 +144,19 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	// Build the host module.
 	hostModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{ft},
-		FunctionSection: []wasm.Index{0, 0},
+		FunctionSection: []wasm.Index{0, 0, 0},
 		CodeSection: []*wasm.Code{
-			wasm.MustParseGoFuncCode(
+			{
+				IsHostFunction: true,
+				GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+					ret, ok := mod.Memory().ReadUint32Le(ctx, uint32(params[0]))
+					if !ok {
+						panic("couldn't read memory")
+					}
+					return []uint64{uint64(ret)}
+				}),
+			},
+			wasm.MustParseGoReflectFuncCode(
 				func(ctx context.Context, m api.Module, pos uint32) float32 {
 					ret, ok := m.Memory().ReadUint32Le(ctx, pos)
 					if !ok {
@@ -171,7 +177,8 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		},
 		ExportSection: []*wasm.Export{
 			{Name: "go", Type: wasm.ExternTypeFunc, Index: 0},
-			{Name: "wasm", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "go-reflect", Type: wasm.ExternTypeFunc, Index: 1},
+			{Name: "wasm", Type: wasm.ExternTypeFunc, Index: 2},
 		},
 		ID: wasm.ModuleID{1, 2, 3, 4, 5},
 	}
@@ -180,7 +187,9 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	host := &wasm.ModuleInstance{Name: "host", TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	goFn, wasnFn := host.Exports["go"].Function, host.Exports["wasm"].Function
+	goFn := host.Exports["go"].Function
+	goReflectFn := host.Exports["go-reflect"].Function
+	wasnFn := host.Exports["wasm"].Function
 
 	err := eng.CompileModule(testCtx, hostModule)
 	requireNoError(err)
@@ -196,15 +205,18 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 			// Placeholders for imports from hostModule.
 			{Type: wasm.ExternTypeFunc},
 			{Type: wasm.ExternTypeFunc},
+			{Type: wasm.ExternTypeFunc},
 		},
-		FunctionSection: []wasm.Index{0, 0},
+		FunctionSection: []wasm.Index{0, 0, 0},
 		ExportSection: []*wasm.Export{
 			{Name: callGoHostName, Type: wasm.ExternTypeFunc, Index: 2},
-			{Name: callWasmHostName, Type: wasm.ExternTypeFunc, Index: 3},
+			{Name: callGoReflectHostName, Type: wasm.ExternTypeFunc, Index: 3},
+			{Name: callWasmHostName, Type: wasm.ExternTypeFunc, Index: 4},
 		},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = host.wasm.
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 1, wasm.OpcodeEnd}}, // Calling the index 1 = host.go-reflect.
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 2, wasm.OpcodeEnd}}, // Calling the index 2 = host.wasm.
 		},
 		// Indicates that this module has a memory so that compilers are able to assemble memory-related initialization.
 		MemorySection: &wasm.Memory{Min: 1},
@@ -220,7 +232,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	importing.Functions = append([]*wasm.FunctionInstance{goFn, wasnFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
-	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{goFn, wasnFn}, importingFunctions, nil, nil)
+	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{goFn, goReflectFn, wasnFn}, importingFunctions, nil, nil)
 	requireNoError(err)
 	linkModuleToEngine(importing, importingMe)
 

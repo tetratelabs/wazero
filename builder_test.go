@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -12,12 +13,19 @@ import (
 func TestNewHostModuleBuilder_Compile(t *testing.T) {
 	i32, i64 := api.ValueTypeI32, api.ValueTypeI64
 
-	uint32_uint32 := func(uint32) uint32 {
+	uint32_uint32 := func(context.Context, uint32) uint32 {
 		return 0
 	}
-	uint64_uint32 := func(uint64) uint32 {
+	uint64_uint32 := func(context.Context, uint64) uint32 {
 		return 0
 	}
+
+	gofunc1 := api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
+		return []uint64{0}
+	})
+	gofunc2 := api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
+		return []uint64{0}
+	})
 
 	tests := []struct {
 		name     string
@@ -39,16 +47,17 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			expected: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "env"}},
 		},
 		{
-			name: "ExportFunction",
+			name: "WithFunc",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").ExportFunction("1", uint32_uint32)
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -58,16 +67,19 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "ExportFunction with names",
+			name: "WithFunc WithName WithParameterNames",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").ExportFunction("1", uint32_uint32, "get", "x")
+				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+					WithFunc(uint32_uint32).
+					WithName("get").WithParameterNames("x").
+					Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32)},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -78,16 +90,18 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "ExportFunction overwrites existing",
+			name: "WithFunc overwrites existing",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").ExportFunction("1", uint32_uint32).ExportFunction("1", uint64_uint32)
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1").
+					NewFunctionBuilder().WithFunc(uint64_uint32).Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint64_uint32)},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 				},
@@ -97,10 +111,12 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "ExportFunction twice",
+			name: "WithFunc twice",
 			input: func(r Runtime) HostModuleBuilder {
 				// Intentionally out of order
-				return r.NewHostModuleBuilder("").ExportFunction("2", uint64_uint32).ExportFunction("1", uint32_uint32)
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().WithFunc(uint64_uint32).Export("2").
+					NewFunctionBuilder().WithFunc(uint32_uint32).Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
@@ -108,7 +124,7 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32), wasm.MustParseGoReflectFuncCode(uint64_uint32)},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -119,37 +135,92 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "ExportFunctions",
+			name: "WithGoFunction",
 			input: func(r Runtime) HostModuleBuilder {
-				return r.NewHostModuleBuilder("").ExportFunctions(map[string]interface{}{
-					"1": uint32_uint32,
-					"2": uint64_uint32,
-				})
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().
+					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
+					Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
-					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
-				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{
+					{IsHostFunction: true, GoFunc: gofunc1},
+				},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
-					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
 				},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}, {Index: 1, Name: "2"}},
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
 				},
 			},
 		},
 		{
-			name: "ExportFunctions overwrites",
+			name: "WithGoFunction WithName WithParameterNames",
 			input: func(r Runtime) HostModuleBuilder {
-				b := r.NewHostModuleBuilder("").ExportFunction("1", uint64_uint32)
-				return b.ExportFunctions(map[string]interface{}{
-					"1": uint32_uint32,
-					"2": uint64_uint32,
-				})
+				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
+					WithName("get").WithParameterNames("x").
+					Export("1")
+			},
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+				},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{
+					{IsHostFunction: true, GoFunc: gofunc1},
+				},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
+					LocalNames:    []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+				},
+			},
+		},
+		{
+			name: "WithGoFunction overwrites existing",
+			input: func(r Runtime) HostModuleBuilder {
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().
+					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
+					Export("1").
+					NewFunctionBuilder().
+					WithGoFunction(gofunc2, []api.ValueType{i64}, []api.ValueType{i32}).
+					Export("1")
+			},
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
+				},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{
+					{IsHostFunction: true, GoFunc: gofunc2},
+				},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "1"}},
+				},
+			},
+		},
+		{
+			name: "WithGoFunction twice",
+			input: func(r Runtime) HostModuleBuilder {
+				// Intentionally out of order
+				return r.NewHostModuleBuilder("").
+					NewFunctionBuilder().
+					WithGoFunction(gofunc2, []api.ValueType{i64}, []api.ValueType{i32}).
+					Export("2").
+					NewFunctionBuilder().
+					WithGoFunction(gofunc1, []api.ValueType{i32}, []api.ValueType{i32}).
+					Export("1")
 			},
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
@@ -157,7 +228,10 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 					{Params: []api.ValueType{i64}, Results: []api.ValueType{i32}},
 				},
 				FunctionSection: []wasm.Index{0, 1},
-				CodeSection:     []*wasm.Code{wasm.MustParseGoFuncCode(uint32_uint32), wasm.MustParseGoFuncCode(uint64_uint32)},
+				CodeSection: []*wasm.Code{
+					{IsHostFunction: true, GoFunc: gofunc1},
+					{IsHostFunction: true, GoFunc: gofunc2},
+				},
 				ExportSection: []*wasm.Export{
 					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
 					{Name: "2", Type: wasm.ExternTypeFunc, Index: 1},
@@ -204,12 +278,12 @@ func TestNewHostModuleBuilder_Compile_Errors(t *testing.T) {
 		{
 			name: "error compiling", // should fail due to missing result.
 			input: func(rt Runtime) HostModuleBuilder {
-				return rt.NewHostModuleBuilder("").
-					ExportFunction("fn", &wasm.HostFunc{
+				return rt.NewHostModuleBuilder("").NewFunctionBuilder().
+					WithFunc(&wasm.HostFunc{
 						ExportNames: []string{"fn"},
 						ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},
 						Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeEnd}},
-					})
+					}).Export("fn")
 			},
 			expectedErr: `invalid function[0] export["fn"]: not enough results
 	have ()
@@ -275,8 +349,7 @@ func requireHostModuleEquals(t *testing.T, expected, actual *wasm.Module) {
 	for i, c := range expected.CodeSection {
 		actualCode := actual.CodeSection[i]
 		require.True(t, actualCode.IsHostFunction)
-		require.Equal(t, c.Kind, actualCode.Kind)
-		require.Equal(t, c.GoFunc.Type(), actualCode.GoFunc.Type())
+		require.Equal(t, c.GoFunc, actualCode.GoFunc)
 
 		// Not wasm
 		require.Nil(t, actualCode.Body)

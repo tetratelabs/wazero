@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
@@ -112,9 +111,6 @@ type (
 		// wasm.Code.
 		IsHostFunction bool
 
-		// Kind describes how this function should be called.
-		Kind FunctionKind
-
 		// Type is the signature of this function.
 		Type *FunctionType
 
@@ -124,10 +120,12 @@ type (
 		// Body is the function body in WebAssembly Binary Format, set when Kind == FunctionKindWasm
 		Body []byte
 
-		// GoFunc holds the runtime representation of host functions.
-		// This is nil when Kind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
-		// specific to Wasm functions.
-		GoFunc *reflect.Value
+		// GoFunc is non-nil when IsHostFunction and defined in go, either
+		// api.GoFunction or api.GoModuleFunction.
+		//
+		// Note: This has no serialization format, so is not encodable.
+		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
+		GoFunc interface{}
 
 		// Fields above here are settable prior to instantiation. Below are set by the Store during instantiation.
 
@@ -408,7 +406,7 @@ func (s *Store) instantiate(
 				module.funcDesc(SectionIDFunction, funcIdx), err)
 		}
 
-		_, err = ce.Call(ctx, callCtx)
+		_, err = ce.Call(ctx, callCtx, nil)
 		if exitErr, ok := err.(*sys.ExitError); ok { // Don't wrap an exit error!
 			return nil, exitErr
 		} else if err != nil {

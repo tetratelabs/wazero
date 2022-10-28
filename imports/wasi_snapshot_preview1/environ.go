@@ -22,38 +22,45 @@ const (
 //   - environSizesGet result environc * 4 bytes are written to this offset
 //   - environBuf: offset to write the null-terminated variables to api.Memory
 //   - the format is like os.Environ: null-terminated "key=val" entries
-//   - environSizesGet result environBufSize bytes are written to this offset
+//   - environSizesGet result environLen bytes are written to this offset
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
 //   - ErrnoFault: there is not enough memory to write results
 //
-// For example, if environSizesGet wrote environc=2 and environBufSize=9 for
+// For example, if environSizesGet wrote environc=2 and environLen=9 for
 // environment variables: "a=b", "b=cd" and parameters environ=11 and
 // environBuf=1, this function writes the below to api.Memory:
 //
-//	                        environBufSize                 uint32le    uint32le
-//	           +------------------------------------+     +--------+  +--------+
-//	           |                                    |     |        |  |        |
-//	[]byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
-//
-// environBuf --^                                          ^           ^
-//
-//	environ offset for "a=b" --+           |
-//	           environ offset for "b=cd" --+
+//	                              environLen                 uint32le    uint32le
+//	             +------------------------------------+     +--------+  +--------+
+//	             |                                    |     |        |  |        |
+//	  []byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
+//	environBuf --^                                          ^           ^
+//	                             environ offset for "a=b" --+           |
+//	                                        environ offset for "b=cd" --+
 //
 // See environSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var environGet = wasm.NewGoFunc(
-	functionEnvironGet, functionEnvironGet,
-	[]string{"environ", "environ_buf"},
-	func(ctx context.Context, mod api.Module, environ uint32, environBuf uint32) Errno {
-		sysCtx := mod.(*wasm.CallContext).Sys
-		return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
+var environGet = &wasm.HostFunc{
+	ExportNames: []string{functionEnvironGet},
+	Name:        functionEnvironGet,
+	ParamTypes:  []api.ValueType{i32, i32},
+	ParamNames:  []string{"environ", "environ_buf"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(environGetFn),
 	},
-)
+}
+
+func environGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	environ, environBuf := uint32(params[0]), uint32(params[1])
+	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
+}
 
 // environSizesGet is the WASI function named functionEnvironSizesGet that
 // reads environment variable sizes.
@@ -62,7 +69,7 @@ var environGet = wasm.NewGoFunc(
 //
 //   - resultEnvironc: offset to write the count of environment variables to
 //     api.Memory
-//   - resultEnvironBufSize: offset to write the null-terminated environment
+//   - resultEnvironvLen: offset to write the null-terminated environment
 //     variable length to api.Memory
 //
 // Result (Errno)
@@ -71,37 +78,43 @@ var environGet = wasm.NewGoFunc(
 //   - ErrnoFault: there is not enough memory to write results
 //
 // For example, if environ are "a=b","b=cd" and parameters resultEnvironc=1 and
-// resultEnvironBufSize=6, this function writes the below to api.Memory:
+// resultEnvironvLen=6, this function writes the below to api.Memory:
 //
-//	           uint32le       uint32le
-//	          +--------+     +--------+
-//	          |        |     |        |
-//	[]byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
-//
-// resultEnvironc --^              ^
-//
-//	2 variables --+              |
-//	      resultEnvironBufSize --|
-//	len([]byte{'a','=','b',0,    |
-//	       'b','=','c','d',0}) --+
+//	                   uint32le       uint32le
+//	                  +--------+     +--------+
+//	                  |        |     |        |
+//	        []byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
+//	 resultEnvironc --^              ^
+//		2 variables --+              |
+//	             resultEnvironvLen --|
+//	    len([]byte{'a','=','b',0,    |
+//	           'b','=','c','d',0}) --+
 //
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-var environSizesGet = wasm.NewGoFunc(
-	functionEnvironSizesGet, functionEnvironSizesGet,
-	[]string{"result.environc", "result.environBufSize"},
-	func(ctx context.Context, mod api.Module, resultEnvironc uint32, resultEnvironBufSize uint32) Errno {
-		sysCtx := mod.(*wasm.CallContext).Sys
-		mem := mod.Memory()
-
-		if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
-			return ErrnoFault
-		}
-		if !mem.WriteUint32Le(ctx, resultEnvironBufSize, sysCtx.EnvironSize()) {
-			return ErrnoFault
-		}
-
-		return ErrnoSuccess
+var environSizesGet = &wasm.HostFunc{
+	ExportNames: []string{functionEnvironSizesGet},
+	Name:        functionEnvironSizesGet,
+	ParamTypes:  []api.ValueType{i32, i32},
+	ParamNames:  []string{"result.environc", "result.environv_len"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(environSizesGetFn),
 	},
-)
+}
+
+func environSizesGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	mem := mod.Memory()
+	resultEnvironc, resultEnvironvLen := uint32(params[0]), uint32(params[1])
+
+	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
+		return errnoFault
+	}
+	if !mem.WriteUint32Le(ctx, resultEnvironvLen, sysCtx.EnvironSize()) {
+		return errnoFault
+	}
+	return errnoSuccess
+}

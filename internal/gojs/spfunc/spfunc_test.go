@@ -12,6 +12,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
+const i32, i64 = api.ValueTypeI32, api.ValueTypeI64
+
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
@@ -173,7 +175,13 @@ var spMem = []byte{
 	10, 0, 0, 0, 0, 0, 0, 0,
 }
 
-func i64i32i32i32i32_i64i32_withSP(vRef uint64, mAddr, mLen, argsArray, argsLen uint32) (xRef uint64, ok uint32, sp uint32) {
+func i64i32i32i32i32_i64i32_withSP(_ context.Context, params []uint64) []uint64 {
+	vRef := params[0]
+	mAddr := uint32(params[1])
+	mLen := uint32(params[2])
+	argsArray := uint32(params[3])
+	argsLen := uint32(params[4])
+
 	if vRef != 1 {
 		panic("vRef")
 	}
@@ -189,7 +197,8 @@ func i64i32i32i32i32_i64i32_withSP(vRef uint64, mAddr, mLen, argsArray, argsLen 
 	if argsLen != 5 {
 		panic("argsLen")
 	}
-	return 10, 20, 8
+
+	return []uint64{10, 20, 8}
 }
 
 func TestMustCallFromSP(t *testing.T) {
@@ -197,12 +206,18 @@ func TestMustCallFromSP(t *testing.T) {
 	defer r.Close(testCtx)
 
 	funcName := "i64i32i32i32i32_i64i32_withSP"
-	im, err := r.NewHostModuleBuilder("go").
-		ExportFunction(funcName, MustCallFromSP(true, wasm.NewGoFunc(
-			funcName, funcName,
-			[]string{"v", "mAddr", "mLen", "argsArray", "argsLen"},
-			i64i32i32i32i32_i64i32_withSP))).
-		Instantiate(testCtx, r)
+	builder := r.NewHostModuleBuilder("go")
+	builder.(wasm.ProxyFuncExporter).ExportProxyFunc(MustCallFromSP(true, &wasm.HostFunc{
+		ExportNames: []string{funcName},
+		Name:        funcName,
+		ParamTypes:  []api.ValueType{i64, i32, i32, i32, i32},
+		ParamNames:  []string{"v", "mAddr", "mLen", "argsArray", "argsLen"},
+		ResultTypes: []api.ValueType{i64, i32, i32},
+		Code: &wasm.Code{
+			IsHostFunction: true,
+			GoFunc:         api.GoFunc(i64i32i32i32i32_i64i32_withSP),
+		}}))
+	im, err := builder.Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	callDef := im.ExportedFunction(funcName).Definition()

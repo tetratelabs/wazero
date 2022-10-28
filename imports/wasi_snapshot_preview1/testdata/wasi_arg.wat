@@ -10,7 +10,7 @@
 	;;
 	;; See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
     (import "wasi_snapshot_preview1" "args_sizes_get"
-        (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))
+        (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_len i32) (result (;errno;) i32)))
 
     ;; fd_write write bytes to a file descriptor.
     ;;
@@ -45,7 +45,7 @@
         ;; Next, we need to know how many bytes were loaded, as that's how much we'll copy to the file.
         (call $wasi.args_sizes_get
             (global.get $ignored) ;; ignore $result.argc as we only read the argv_buf.
-            (i32.add (global.get $iovs) (i32.const 4)) ;; store $result.argv_buf_size as the length to copy
+            (i32.add (global.get $iovs) (i32.const 4)) ;; store $result.argv_len as the length to copy
         )
         drop ;; ignore the errno returned
 

@@ -32,7 +32,9 @@ func Example_functionExporter() {
 
 	// First construct your own module builder for "env"
 	envBuilder := r.NewHostModuleBuilder("env").
-		ExportFunction("get_int", func() uint32 { return 1 })
+		NewFunctionBuilder().
+		WithFunc(func(context.Context) uint32 { return 1 }).
+		Export("get_int")
 
 	// Now, add AssemblyScript special function imports into it.
 	assemblyscript.NewFunctionExporter().

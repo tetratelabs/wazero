@@ -206,7 +206,6 @@ func (j *compilerEnv) newFunction(codeSegment []byte) *function {
 		codeInitialAddress:    uintptr(unsafe.Pointer(&codeSegment[0])),
 		moduleInstanceAddress: uintptr(unsafe.Pointer(j.moduleInstance)),
 		source: &wasm.FunctionInstance{
-			Kind:   wasm.FunctionKindWasm,
 			Type:   &wasm.FunctionType{},
 			Module: j.moduleInstance,
 		},

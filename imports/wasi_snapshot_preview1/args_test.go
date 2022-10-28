@@ -114,12 +114,12 @@ func Test_argsSizesGet(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
-	resultArgc := uint32(1)        // arbitrary offset
-	resultArgvBufSize := uint32(6) // arbitrary offset
+	resultArgc := uint32(1)    // arbitrary offset
+	resultArgvLen := uint32(6) // arbitrary offset
 	expectedMemory := []byte{
 		'?',                // resultArgc is after this
 		0x2, 0x0, 0x0, 0x0, // little endian-encoded arg count
-		'?',                // resultArgvBufSize is after this
+		'?',                // resultArgvLen is after this
 		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	}
@@ -127,10 +127,10 @@ func Test_argsSizesGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke argsSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
+	requireErrno(t, ErrnoSuccess, mod, functionArgsSizesGet, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
---> proxy.args_sizes_get(result.argc=1,result.argv_buf_size=6)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=1,result.argv_buf_size=6)
+--> proxy.args_sizes_get(result.argc=1,result.argv_len=6)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=1,result.argv_len=6)
 	<== ESUCCESS
 <-- (0)
 `, "\n"+log.String())
@@ -148,50 +148,50 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
-		name              string
-		argc, argvBufSize uint32
-		expectedLog       string
+		name          string
+		argc, argvLen uint32
+		expectedLog   string
 	}{
 		{
-			name:        "out-of-memory argc",
-			argc:        memorySize,
-			argvBufSize: validAddress,
+			name:    "out-of-memory argc",
+			argc:    memorySize,
+			argvLen: validAddress,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=65536,result.argv_buf_size=0)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_buf_size=0)
+--> proxy.args_sizes_get(result.argc=65536,result.argv_len=0)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:        "out-of-memory argvBufSize",
-			argc:        validAddress,
-			argvBufSize: memorySize,
+			name:    "out-of-memory argvLen",
+			argc:    validAddress,
+			argvLen: memorySize,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=0,result.argv_buf_size=65536)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65536)
+--> proxy.args_sizes_get(result.argc=0,result.argv_len=65536)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:        "argc exceeds the maximum valid address by 1",
-			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
-			argvBufSize: validAddress,
+			name:    "argc exceeds the maximum valid address by 1",
+			argc:    memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			argvLen: validAddress,
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=65533,result.argv_buf_size=0)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_buf_size=0)
+--> proxy.args_sizes_get(result.argc=65533,result.argv_len=0)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
 	<== EFAULT
 <-- (21)
 `,
 		},
 		{
-			name:        "argvBufSize exceeds the maximum valid size by 1",
-			argc:        validAddress,
-			argvBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
+			name:    "argvLen exceeds the maximum valid size by 1",
+			argc:    validAddress,
+			argvLen: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 			expectedLog: `
---> proxy.args_sizes_get(result.argc=0,result.argv_buf_size=65533)
-	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_buf_size=65533)
+--> proxy.args_sizes_get(result.argc=0,result.argv_len=65533)
+	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
 	<== EFAULT
 <-- (21)
 `,
@@ -204,7 +204,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
+			requireErrno(t, ErrnoFault, mod, functionArgsSizesGet, uint64(tc.argc), uint64(tc.argvLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

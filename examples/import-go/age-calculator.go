@@ -34,20 +34,24 @@ func main() {
 	// Instantiate a Go-defined module named "env" that exports functions to
 	// get the current year and log to the console.
 	//
-	// Note: As noted on ExportFunction documentation, function signatures are
-	// constrained to a subset of numeric types.
+	// Note: As noted on wazero.HostFunctionBuilder documentation, function
+	// signatures are constrained to a subset of numeric types.
 	// Note: "env" is a module name conventionally used for arbitrary
 	// host-defined functions, but any name would do.
 	_, err := r.NewHostModuleBuilder("env").
-		ExportFunction("log_i32", func(v uint32) {
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, v uint32) {
 			fmt.Println("log_i32 >>", v)
 		}).
-		ExportFunction("current_year", func() uint32 {
+		Export("log_i32").
+		NewFunctionBuilder().
+		WithFunc(func(context.Context) uint32 {
 			if envYear, err := strconv.ParseUint(os.Getenv("CURRENT_YEAR"), 10, 64); err == nil {
 				return uint32(envYear) // Allow env-override to prevent annual test maintenance!
 			}
 			return uint32(time.Now().Year())
 		}).
+		Export("current_year").
 		Instantiate(ctx, r)
 	if err != nil {
 		log.Panicln(err)

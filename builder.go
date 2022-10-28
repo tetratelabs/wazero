@@ -7,6 +7,125 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
+// HostFunctionBuilder defines a host function (in Go), so that a
+// WebAssembly binary (e.g. %.wasm file) can import and use it.
+//
+// Here's an example of an addition function:
+//
+//	hostModuleBuilder.NewFunctionBuilder().
+//		WithFunc(func(cxt context.Context, x, y uint32) uint32 {
+//			return x + y
+//		}).
+//		Export("add")
+//
+// # Memory
+//
+// All host functions act on the importing api.Module, including any memory
+// exported in its binary (%.wasm file). If you are reading or writing memory,
+// it is sand-boxed Wasm memory defined by the guest.
+//
+// Below, `m` is the importing module, defined in Wasm. `fn` is a host function
+// added via Export. This means that `x` was read from memory defined in Wasm,
+// not arbitrary memory in the process.
+//
+//	fn := func(ctx context.Context, m api.Module, offset uint32) uint32 {
+//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
+//		return x
+//	}
+type HostFunctionBuilder interface {
+	// WithGoFunction is an advanced feature for those who need higher
+	// performance than WithFunc at the cost of more complexity.
+	//
+	// Here's an example addition function:
+	//
+	//	builder.WithGoFunction(api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
+	//		x, y := uint32(params[0]), uint32(params[1])
+	//		sum := x + y
+	//		return []uint64{sum}
+	//	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
+	//
+	// As you can see above, defining in this way implies knowledge of which
+	// WebAssembly api.ValueType is appropriate for each parameter and result.
+	//
+	// See WithGoModuleFunction if you also need to access the calling module.
+	WithGoFunction(fn api.GoFunction, params, results []api.ValueType) HostFunctionBuilder
+
+	// WithGoModuleFunction is an advanced feature for those who need higher
+	// performance than WithFunc at the cost of more complexity.
+	//
+	// Here's an example addition function that loads operands from memory:
+	//
+	//	builder.WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	//		mem := m.Memory()
+	//		offset := uint32(params[0])
+	//
+	//		x, _ := mem.ReadUint32Le(ctx, offset)
+	//		y, _ := mem.ReadUint32Le(ctx, offset + 4) // 32 bits == 4 bytes!
+	//		sum := x + y
+	//
+	//		return []uint64{sum}
+	//	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
+	//
+	// As you can see above, defining in this way implies knowledge of which
+	// WebAssembly api.ValueType is appropriate for each parameter and result.
+	//
+	// See WithGoFunction if you don't need access to the calling module.
+	WithGoModuleFunction(fn api.GoModuleFunction, params, results []api.ValueType) HostFunctionBuilder
+
+	// WithFunc uses reflect.Value to map a go `func` to a WebAssembly
+	// compatible Signature. An input that isn't a `func` will fail to
+	// instantiate.
+	//
+	// Here's an example of an addition function:
+	//
+	//	builder.WithFunc(func(cxt context.Context, x, y uint32) uint32 {
+	//		return x + y
+	//	})
+	//
+	// # Defining a function
+	//
+	// Except for the context.Context and optional api.Module, all parameters
+	// or result types must map to WebAssembly numeric value types. This means
+	// uint32, int32, uint64, int32 float32 or float64.
+	//
+	// api.Module may be specified as the second parameter, usually to access
+	// memory. This is important because there are only numeric types in Wasm.
+	// The only way to share other data is via writing memory and sharing
+	// offsets.
+	//
+	//	builder.WithFunc(func(ctx context.Context, m api.Module, offset uint32) uint32 {
+	//		mem := m.Memory()
+	//		x, _ := mem.ReadUint32Le(ctx, offset)
+	//		y, _ := mem.ReadUint32Le(ctx, offset + 4) // 32 bits == 4 bytes!
+	//		return x + y
+	//	})
+	//
+	// This example propagates context properly when calling other functions
+	// exported in the api.Module:
+	//
+	//	builder.WithFunc(func(ctx context.Context, m api.Module, offset, byteCount uint32) uint32 {
+	//		fn = m.ExportedFunction("__read")
+	//		results, err := fn(ctx, offset, byteCount)
+	//	--snip--
+	WithFunc(interface{}) HostFunctionBuilder
+
+	// WithName defines the optional module-local name of this function, e.g.
+	// "random_get"
+	//
+	// Note: This is not required to match the Export name.
+	WithName(name string) HostFunctionBuilder
+
+	// WithParameterNames defines optional parameter names of the function
+	// signature, e.x. "buf", "buf_len"
+	//
+	// Note: When defined, names must be provided for all parameters.
+	WithParameterNames(names ...string) HostFunctionBuilder
+
+	// Export exports this to the HostModuleBuilder as the given name, e.g.
+	// "random_get"
+	Export(name string) HostModuleBuilder
+}
+
 // HostModuleBuilder is a way to define host functions (in Go), so that a
 // WebAssembly binary (e.g. %.wasm file) can import and use them.
 //
@@ -24,36 +143,20 @@ import (
 //		fmt.Fprintln(stdout, "hello!")
 //	}
 //	env, _ := r.NewHostModuleBuilder("env").
-//		ExportFunction("hello", hello).
+//		NewFunctionBuilder().WithFunc(hello).Export("hello").
 //		Instantiate(ctx, r)
 //
 // If the same module may be instantiated multiple times, it is more efficient
 // to separate steps. Here's an example:
 //
 //	compiled, _ := r.NewHostModuleBuilder("env").
-//		ExportFunction("get_random_string", getRandomString).
+//		NewFunctionBuilder().WithFunc(getRandomString).Export("get_random_string").
 //		Compile(ctx)
 //
 //	env1, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.1"))
-//
 //	env2, _ := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("env.2"))
 //
-// # Memory
-//
-// All host functions act on the importing api.Module, including any memory
-// exported in its binary (%.wasm file). If you are reading or writing memory,
-// it is sand-boxed Wasm memory defined by the guest.
-//
-// Below, `m` is the importing module, defined in Wasm. `fn` is a host function
-// added via ExportFunction. This means that `x` was read from memory defined
-// in Wasm, not arbitrary memory in the process.
-//
-//	fn := func(ctx context.Context, m api.Module, offset uint32) uint32 {
-//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
-//		return x
-//	}
-//
-// See ExportFunction for valid host function signatures and other details.
+// See HostFunctionBuilder for valid host function signatures and other details.
 //
 // # Notes
 //
@@ -66,71 +169,8 @@ import (
 type HostModuleBuilder interface {
 	// Note: until golang/go#5860, we can't use example tests to embed code in interface godocs.
 
-	// ExportFunction adds a function written in Go, which a WebAssembly module can import.
-	// If a function is already exported with the same name, this overwrites it.
-	//
-	// # Parameters
-	//
-	//   - exportName - The name to export. Ex "random_get"
-	//   - goFunc - The `func` to export.
-	//   - names - If present, the first is the api.FunctionDefinition name.
-	//	  If any follow, they must match the count of goFunc's parameters.
-	//
-	// Here's an example:
-	//	// Just export the function, and use "abort" in stack traces.
-	// 	builder.ExportFunction("abort", env.abort)
-	//	// Ensure "~lib/builtins/abort" is used in stack traces.
-	//	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort")
-	//	// Allow function listeners to know the param names for logging, etc.
-	//	builder.ExportFunction("abort", env.abort, "~lib/builtins/abort",
-	//		"message", "fileName", "lineNumber", "columnNumber")
-	//
-	// # Valid Signature
-	//
-	// Noting a context exception described later, all parameters or result
-	// types must match WebAssembly 1.0 (20191205) value types. This means
-	// uint32, uint64, float32 or float64. Up to one result can be returned.
-	//
-	// For example, this is a valid host function:
-	//
-	//	addInts := func(x, y uint32) uint32 {
-	//		return x + y
-	//	}
-	//
-	// Host functions may also have an initial parameter (param[0]) of type
-	// context.Context or api.Module.
-	//
-	// For example, this uses a Go Context:
-	//
-	//	addInts := func(ctx context.Context, x, y uint32) uint32 {
-	//		// add a little extra if we put some in the context!
-	//		return x + y + ctx.Value(extraKey).(uint32)
-	//	}
-	//
-	// The example below uses an api.Module to read parameters from memory.
-	// This is important because there are only numeric types in Wasm. The
-	// only way to share other data is via writing memory and sharing offsets.
-	//
-	//	addInts := func(ctx context.Context, m api.Module, offset uint32) uint32 {
-	//		x, _ := m.Memory().ReadUint32Le(ctx, offset)
-	//		y, _ := m.Memory().ReadUint32Le(ctx, offset + 4) // 32 bits == 4 bytes!
-	//		return x + y
-	//	}
-	//
-	// If both parameters exist, they must be in order at positions 0 and 1.
-	//
-	// This example propagates context properly when calling other functions
-	// exported in the api.Module:
-	//	callRead := func(ctx context.Context, m api.Module, offset, byteCount uint32) uint32 {
-	//		fn = m.ExportedFunction("__read")
-	//		results, err := fn(ctx, offset, byteCount)
-	//	--snip--
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	ExportFunction(exportName string, goFunc interface{}, names ...string) HostModuleBuilder
-
-	// ExportFunctions is a convenience that calls ExportFunction for each key/value in the provided map.
-	ExportFunctions(nameToGoFunc map[string]interface{}) HostModuleBuilder
+	// NewFunctionBuilder begins the definition of a host function.
+	NewFunctionBuilder() HostFunctionBuilder
 
 	// Compile returns a CompiledModule that can instantiated in any namespace (Namespace).
 	//
@@ -150,7 +190,7 @@ type HostModuleBuilder interface {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
 	//	env, _ := r.NewHostModuleBuilder("env").
-	//		ExportFunction("hello", hello).
+	//		NewFunctionBuilder().WithFunc(hello).Export("hello").
 	//		Instantiate(ctx, r)
 	//
 	// # Notes
@@ -179,21 +219,84 @@ func (r *runtime) NewHostModuleBuilder(moduleName string) HostModuleBuilder {
 	}
 }
 
-// ExportFunction implements HostModuleBuilder.ExportFunction
-func (b *hostModuleBuilder) ExportFunction(exportName string, goFunc interface{}, names ...string) HostModuleBuilder {
-	b.nameToGoFunc[exportName] = goFunc
-	if len(names) > 0 {
-		b.funcToNames[exportName] = names
-	}
-	return b
+// hostFunctionBuilder implements HostFunctionBuilder
+type hostFunctionBuilder struct {
+	b          *hostModuleBuilder
+	fn         interface{}
+	name       string
+	paramNames []string
 }
 
-// ExportFunctions implements HostModuleBuilder.ExportFunctions
-func (b *hostModuleBuilder) ExportFunctions(nameToGoFunc map[string]interface{}) HostModuleBuilder {
-	for k, v := range nameToGoFunc {
-		b.ExportFunction(k, v)
+// WithGoFunction implements HostFunctionBuilder.WithGoFunction
+func (h *hostFunctionBuilder) WithGoFunction(fn api.GoFunction, params, results []api.ValueType) HostFunctionBuilder {
+	h.fn = &wasm.HostFunc{
+		ParamTypes:  params,
+		ResultTypes: results,
+		Code:        &wasm.Code{IsHostFunction: true, GoFunc: fn},
 	}
-	return b
+	return h
+}
+
+// WithGoModuleFunction implements HostFunctionBuilder.WithGoModuleFunction
+func (h *hostFunctionBuilder) WithGoModuleFunction(fn api.GoModuleFunction, params, results []api.ValueType) HostFunctionBuilder {
+	h.fn = &wasm.HostFunc{
+		ParamTypes:  params,
+		ResultTypes: results,
+		Code:        &wasm.Code{IsHostFunction: true, GoFunc: fn},
+	}
+	return h
+}
+
+// WithFunc implements HostFunctionBuilder.WithFunc
+func (h *hostFunctionBuilder) WithFunc(fn interface{}) HostFunctionBuilder {
+	h.fn = fn
+	return h
+}
+
+// WithName implements HostFunctionBuilder.WithName
+func (h *hostFunctionBuilder) WithName(name string) HostFunctionBuilder {
+	h.name = name
+	return h
+}
+
+// WithParameterNames implements HostFunctionBuilder.WithParameterNames
+func (h *hostFunctionBuilder) WithParameterNames(names ...string) HostFunctionBuilder {
+	h.paramNames = names
+	return h
+}
+
+// Export implements HostFunctionBuilder.Export
+func (h *hostFunctionBuilder) Export(exportName string) HostModuleBuilder {
+	if h.name == "" {
+		h.name = exportName
+	}
+	if fn, ok := h.fn.(*wasm.HostFunc); ok {
+		if fn.Name == "" {
+			fn.Name = h.name
+		}
+		fn.ParamNames = h.paramNames
+		fn.ExportNames = []string{exportName}
+	}
+	h.b.nameToGoFunc[exportName] = h.fn
+	if len(h.paramNames) > 0 {
+		h.b.funcToNames[exportName] = append([]string{h.name}, h.paramNames...)
+	}
+	return h.b
+}
+
+// ExportHostFunc implements wasm.HostFuncExporter
+func (b *hostModuleBuilder) ExportHostFunc(fn *wasm.HostFunc) {
+	b.nameToGoFunc[fn.ExportNames[0]] = fn
+}
+
+// ExportProxyFunc implements wasm.ProxyFuncExporter
+func (b *hostModuleBuilder) ExportProxyFunc(fn *wasm.ProxyFunc) {
+	b.nameToGoFunc[fn.Name()] = fn
+}
+
+// NewFunctionBuilder implements HostModuleBuilder.NewFunctionBuilder
+func (b *hostModuleBuilder) NewFunctionBuilder() HostFunctionBuilder {
+	return &hostFunctionBuilder{b: b}
 }
 
 // Compile implements HostModuleBuilder.Compile

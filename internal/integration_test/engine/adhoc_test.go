@@ -92,12 +92,13 @@ func testReftypeImports(t *testing.T, r wazero.Runtime) {
 
 	hostObj := &dog{name: "hello"}
 	host, err := r.NewHostModuleBuilder("host").
-		ExportFunctions(map[string]interface{}{
-			"externref": func(externrefFromRefNull uintptr) uintptr {
-				require.Zero(t, externrefFromRefNull)
-				return uintptr(unsafe.Pointer(hostObj))
-			},
-		}).Instantiate(testCtx, r)
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, externrefFromRefNull uintptr) uintptr {
+			require.Zero(t, externrefFromRefNull)
+			return uintptr(unsafe.Pointer(hostObj))
+		}).
+		Export("externref").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
@@ -164,11 +165,13 @@ func testGlobalExtend(t *testing.T, r wazero.Runtime) {
 }
 
 func testUnreachable(t *testing.T, r wazero.Runtime) {
-	callUnreachable := func(nil api.Module) {
+	callUnreachable := func(context.Context) {
 		panic("panic in host function")
 	}
 
-	_, err := r.NewHostModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("host").
+		NewFunctionBuilder().WithFunc(callUnreachable).Export("cause_unreachable").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, unreachableWasm)
@@ -186,12 +189,14 @@ wasm stack trace:
 }
 
 func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
-	hostfunc := func(mod api.Module) {
+	hostfunc := func(ctx context.Context, mod api.Module) {
 		_, err := mod.ExportedFunction("called_by_host_func").Call(testCtx)
 		require.NoError(t, err)
 	}
 
-	_, err := r.NewHostModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate(testCtx, r)
+	_, err := r.NewHostModuleBuilder("env").
+		NewFunctionBuilder().WithFunc(hostfunc).Export("host_func").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromBinary(testCtx, recursiveWasm)
@@ -214,7 +219,9 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 		return 0
 	}
 
-	host, err := r.NewHostModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate(testCtx, r)
+	host, err := r.NewHostModuleBuilder("").
+		NewFunctionBuilder().WithFunc(storeInt).Export("store_int").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer host.Close(testCtx)
 
@@ -240,21 +247,24 @@ func testNestedGoContext(t *testing.T, r wazero.Runtime) {
 	importingName := t.Name() + "-importing"
 
 	var importing api.Module
-	fns := map[string]interface{}{
-		"inner": func(ctx context.Context, p uint32) uint32 {
+
+	imported, err := r.NewHostModuleBuilder(importedName).
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, p uint32) uint32 {
 			// We expect the initial context, testCtx, to be overwritten by "outer" when it called this.
 			require.Equal(t, nestedCtx, ctx)
 			return p + 1
-		},
-		"outer": func(ctx context.Context, module api.Module, p uint32) uint32 {
+		}).
+		Export("inner").
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, module api.Module, p uint32) uint32 {
 			require.Equal(t, testCtx, ctx)
 			results, err := module.ExportedFunction("inner").Call(nestedCtx, uint64(p))
 			require.NoError(t, err)
 			return uint32(results[0]) + 1
-		},
-	}
-
-	imported, err := r.NewHostModuleBuilder(importedName).ExportFunctions(fns).Instantiate(testCtx, r)
+		}).
+		Export("outer").
+		Instantiate(testCtx, r)
 	require.NoError(t, err)
 	defer imported.Close(testCtx)
 
@@ -276,14 +286,11 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 
 	var importing api.Module
 	fns := map[string]interface{}{
-		"no_context": func(p uint32) uint32 {
-			return p + 1
-		},
-		"go_context": func(ctx context.Context, p uint32) uint32 {
+		"ctx": func(ctx context.Context, p uint32) uint32 {
 			require.Equal(t, testCtx, ctx)
 			return p + 1
 		},
-		"module_context": func(module api.Module, p uint32) uint32 {
+		"ctx mod": func(ctx context.Context, module api.Module, p uint32) uint32 {
 			require.Equal(t, importing, module)
 			return p + 1
 		},
@@ -292,7 +299,7 @@ func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
 	for test := range fns {
 		t.Run(test, func(t *testing.T) {
 			imported, err := r.NewHostModuleBuilder(importedName).
-				ExportFunction("return_input", fns[test]).
+				NewFunctionBuilder().WithFunc(fns[test]).Export("return_input").
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
@@ -316,16 +323,16 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	importingName := t.Name() + "-importing"
 
 	fns := map[string]interface{}{
-		"i32": func(p uint32) uint32 {
+		"i32": func(ctx context.Context, p uint32) uint32 {
 			return p + 1
 		},
-		"i64": func(p uint64) uint64 {
+		"i64": func(ctx context.Context, p uint64) uint64 {
 			return p + 1
 		},
-		"f32": func(p float32) float32 {
+		"f32": func(ctx context.Context, p float32) float32 {
 			return p + 1
 		},
-		"f64": func(p float64) float64 {
+		"f64": func(ctx context.Context, p float64) float64 {
 			return p + 1
 		},
 	}
@@ -362,7 +369,7 @@ func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			imported, err := r.NewHostModuleBuilder(importedName).
-				ExportFunction("return_input", fns[test.name]).
+				NewFunctionBuilder().WithFunc(fns[test.name]).Export("return_input").
 				Instantiate(testCtx, r)
 			require.NoError(t, err)
 			defer imported.Close(testCtx)
@@ -511,8 +518,9 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			}
 
 			// Create the host module, which exports the function that closes the importing module.
-			importedCode, err = r.NewHostModuleBuilder(t.Name()+"-imported").
-				ExportFunction("return_input", closeAndReturn).Compile(testCtx)
+			importedCode, err = r.NewHostModuleBuilder(t.Name() + "-imported").
+				NewFunctionBuilder().WithFunc(closeAndReturn).Export("return_input").
+				Compile(testCtx)
 			require.NoError(t, err)
 
 			imported, err = r.InstantiateModule(testCtx, importedCode, moduleConfig)

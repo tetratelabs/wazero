@@ -15,6 +15,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	. "github.com/tetratelabs/wazero/internal/gojs"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // WithRoundTripper sets the http.RoundTripper used to Run Wasm.
@@ -87,31 +88,35 @@ func Run(ctx context.Context, r wazero.Runtime, compiled wazero.CompiledModule, 
 }
 
 // hostModuleBuilder returns a new wazero.HostModuleBuilder
-func hostModuleBuilder(r wazero.Runtime) wazero.HostModuleBuilder {
-	return r.NewHostModuleBuilder("go").
-		ExportFunction(GetRandomData.Name(), GetRandomData).
-		ExportFunction(Nanotime1.Name(), Nanotime1).
-		ExportFunction(WasmExit.Name(), WasmExit).
-		ExportFunction(CopyBytesToJS.Name(), CopyBytesToJS).
-		ExportFunction(ValueCall.Name(), ValueCall).
-		ExportFunction(ValueGet.Name(), ValueGet).
-		ExportFunction(ValueIndex.Name(), ValueIndex).
-		ExportFunction(ValueLength.Name(), ValueLength).
-		ExportFunction(ValueNew.Name(), ValueNew).
-		ExportFunction(ValueSet.Name(), ValueSet).
-		ExportFunction(WasmWrite.Name(), WasmWrite).
-		ExportFunction(ResetMemoryDataView.Name, ResetMemoryDataView).
-		ExportFunction(Walltime.Name(), Walltime).
-		ExportFunction(ScheduleTimeoutEvent.Name, ScheduleTimeoutEvent).
-		ExportFunction(ClearTimeoutEvent.Name, ClearTimeoutEvent).
-		ExportFunction(FinalizeRef.Name(), FinalizeRef).
-		ExportFunction(StringVal.Name(), StringVal).
-		ExportFunction(ValueDelete.Name, ValueDelete).
-		ExportFunction(ValueSetIndex.Name, ValueSetIndex).
-		ExportFunction(ValueInvoke.Name, ValueInvoke).
-		ExportFunction(ValuePrepareString.Name(), ValuePrepareString).
-		ExportFunction(ValueInstanceOf.Name, ValueInstanceOf).
-		ExportFunction(ValueLoadString.Name(), ValueLoadString).
-		ExportFunction(CopyBytesToGo.Name(), CopyBytesToGo).
-		ExportFunction(Debug.Name, Debug)
+func hostModuleBuilder(r wazero.Runtime) (builder wazero.HostModuleBuilder) {
+	builder = r.NewHostModuleBuilder("go")
+	hfExporter := builder.(wasm.HostFuncExporter)
+	pfExporter := builder.(wasm.ProxyFuncExporter)
+
+	pfExporter.ExportProxyFunc(GetRandomData)
+	pfExporter.ExportProxyFunc(Nanotime1)
+	pfExporter.ExportProxyFunc(WasmExit)
+	pfExporter.ExportProxyFunc(CopyBytesToJS)
+	pfExporter.ExportProxyFunc(ValueCall)
+	pfExporter.ExportProxyFunc(ValueGet)
+	pfExporter.ExportProxyFunc(ValueIndex)
+	pfExporter.ExportProxyFunc(ValueLength)
+	pfExporter.ExportProxyFunc(ValueNew)
+	pfExporter.ExportProxyFunc(ValueSet)
+	pfExporter.ExportProxyFunc(WasmWrite)
+	hfExporter.ExportHostFunc(ResetMemoryDataView)
+	pfExporter.ExportProxyFunc(Walltime)
+	hfExporter.ExportHostFunc(ScheduleTimeoutEvent)
+	hfExporter.ExportHostFunc(ClearTimeoutEvent)
+	pfExporter.ExportProxyFunc(FinalizeRef)
+	pfExporter.ExportProxyFunc(StringVal)
+	hfExporter.ExportHostFunc(ValueDelete)
+	hfExporter.ExportHostFunc(ValueSetIndex)
+	hfExporter.ExportHostFunc(ValueInvoke)
+	pfExporter.ExportProxyFunc(ValuePrepareString)
+	hfExporter.ExportHostFunc(ValueInstanceOf)
+	pfExporter.ExportProxyFunc(ValueLoadString)
+	pfExporter.ExportProxyFunc(CopyBytesToGo)
+	hfExporter.ExportHostFunc(Debug)
+	return
 }

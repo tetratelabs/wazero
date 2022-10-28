@@ -22,19 +22,28 @@ const (
 //   - exitCode: exit code.
 //
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-var procExit = wasm.NewGoFunc(
-	functionProcExit, functionProcExit,
-	[]string{"rval"},
-	func(ctx context.Context, mod api.Module, exitCode uint32) {
-		// Ensure other callers see the exit code.
-		_ = mod.CloseWithExitCode(ctx, exitCode)
-
-		// Prevent any code from executing after this function. For example, LLVM
-		// inserts unreachable instructions after calls to exit.
-		// See: https://github.com/emscripten-core/emscripten/issues/12322
-		panic(sys.NewExitError(mod.Name(), exitCode))
+var procExit = &wasm.HostFunc{
+	ExportNames: []string{functionProcExit},
+	Name:        functionProcExit,
+	ParamTypes:  []api.ValueType{i32},
+	ParamNames:  []string{"rval"},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(procExitFn),
 	},
-)
+}
+
+func procExitFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	exitCode := uint32(params[0])
+
+	// Ensure other callers see the exit code.
+	_ = mod.CloseWithExitCode(ctx, exitCode)
+
+	// Prevent any code from executing after this function. For example, LLVM
+	// inserts unreachable instructions after calls to exit.
+	// See: https://github.com/emscripten-core/emscripten/issues/12322
+	panic(sys.NewExitError(mod.Name(), exitCode))
+}
 
 // procRaise is stubbed and will never be supported, as it was removed.
 //
