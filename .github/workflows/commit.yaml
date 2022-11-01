@@ -14,7 +14,7 @@ on:
       - 'netlify.toml'
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.18"  # 1.xx == latest patch of 1.xx
+  GO_VERSION: "1.19"  # 1.xx == latest patch of 1.xx
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -24,12 +24,6 @@ jobs:
   check:
     name: Pre-commit check, Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:  # use latest available versions and be consistent on all workflows!
-        go-version:
-        - "1.18" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.19"
-
     steps:
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
@@ -41,7 +35,7 @@ jobs:
 
       - uses: actions/setup-go@v3
         with:  # not cache: true as we also need to cache golint
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/cache@v3
         with:
@@ -61,11 +55,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
-      matrix:  # use latest available versions and be consistent on all workflows!
+      matrix:  # Use versions consistent with wazero's Go support policy.
         os: [ubuntu-20.04, macos-12, windows-2022]
         go-version:
-        - "1.18" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.19"
+          - "1.19"  # Current Go version
+          - "1.17"  # Floor Go version of wazero (current - 2)
+
 
     steps:
 
@@ -93,10 +88,10 @@ jobs:
     runs-on: macos-12
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
-      matrix:
+      matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-          - "1.18" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          - "1.19"
+          - "1.19"  # Current Go version
+          - "1.17"  # Floor Go version of wazero (current - 2)
 
     steps:
 
@@ -126,14 +121,14 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
-      matrix:
+      matrix:  # Use versions consistent with wazero's Go support policy.
         go-version:
-        - "1.18"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.19"
+          - "1.19"  # Current Go version
+          - "1.17"  # Floor Go version of wazero (current - 2)
         arch:
-        - "amd64"
-        - "arm64"
-        - "riscv64"
+          - "amd64"
+          - "arm64"
+          - "riscv64"
 
     steps:
 

@@ -93,12 +93,12 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 	// Don't use map to preserve order
 	var env []string
 	for _, e := range envs {
-		key, value, ok := strings.Cut(e, "=")
-		if !ok {
+		fields := strings.SplitN(e, "=", 2)
+		if len(fields) != 2 {
 			fmt.Fprintf(stdErr, "invalid environment variable: %s\n", e)
 			exit(1)
 		}
-		env = append(env, key, value)
+		env = append(env, fields[0], fields[1])
 	}
 
 	var mountFS fs.FS

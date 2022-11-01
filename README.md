@@ -124,7 +124,8 @@ go get github.com/tetratelabs/wazero@latest
 ```
 
 wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
-scheduled for Feb 2023, following the release of Go 1.20.
+scheduled for Feb 2023, following the release of Go 1.20. wazero 1.0 will build
+with Go 1.18 and above per the below policy.
 
 Meanwhile, please practice the current APIs to ensure they work for you, and
 give us a [star][15] if you are enjoying it so far!
@@ -134,12 +135,15 @@ give us a [star][15] if you are enjoying it so far!
 wazero has no dependencies except Go, so the only source of conflict in your
 project's use of wazero is the Go version.
 
-To simplify our support policy, we adopt Go's [Release Policy][10] (two versions).
+wazero follows the same version policy as Go's [Release Policy][10]: two
+versions. wazero will ensure these versions work and bugs are valid if there's
+an issue with a current Go version.
 
-This means wazero will remain compilable and tested on the version prior to the
-latest release of Go.
-
-For example, once Go 1.29 is released, wazero may use a Go 1.28 feature.
+Additionally, wazero intentionally delays usage of language or standard library
+features one additional version. For example, when Go 1.29 is released, wazero
+can use language features or standard libraries added in 1.27. This is a
+convenience for embedders who have a slower version policy than Go. However,
+only supported Go versions may be used to raise support issues.
 
 ### Platform
 
