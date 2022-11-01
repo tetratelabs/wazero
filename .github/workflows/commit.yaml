@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json.
-          wabt_version=1.0.29
+          wabt_version=1.0.30
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-ubuntu.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 
@@ -60,7 +60,6 @@ jobs:
         go-version:
           - "1.19"  # Current Go version
           - "1.17"  # Floor Go version of wazero (current - 2)
-
 
     steps:
 
@@ -177,7 +176,7 @@ jobs:
         # The version here is coupled to internal/integration_test/go.mod, but it
         # isn't always the same as sometimes the Go layer has a broken release.
         env:
-          WASMEDGE_VERSION: 0.11.0
+          WASMEDGE_VERSION: 0.11.1
 
       - uses: actions/checkout@v3
 
