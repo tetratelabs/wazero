@@ -1,8 +1,7 @@
 module github.com/tetratelabs/wazero
 
-// This should be the minimum supported Go version per
-// https://go.dev/doc/devel/release (1 version behind latest)
-go 1.18
+// Floor Go version of wazero (current - 2)
+go 1.17
 
 // All the beta tags are retracted and replaced with "pre" to prevent users
 // from accidentally upgrading into the broken beta 1.

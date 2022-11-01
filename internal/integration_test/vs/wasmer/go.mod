@@ -1,6 +1,6 @@
 module github.com/tetratelabs/wazero/internal/integration_test/vs/wasmer
 
-go 1.18
+go 1.17
 
 require (
 	github.com/tetratelabs/wazero v0.0.0
