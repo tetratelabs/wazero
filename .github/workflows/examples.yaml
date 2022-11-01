@@ -16,8 +16,8 @@ on:
       - 'Makefile'
 
 env:
-  EMSDK_VERSION: "3.1.20"
-  TINYGO_VERSION: "0.25.0"
+  EMSDK_VERSION: "3.1.24"
+  TINYGO_VERSION: "0.26.0"
 
 jobs:
   # Not all toolchains are idempotent when generating wasm, so we don't check
@@ -26,10 +26,10 @@ jobs:
     name: Build examples
     runs-on: ubuntu-20.04
     strategy:
-      matrix:  # Use versions consistent with wazero's Go support policy.
+      matrix:  # Use versions consistent with TinyGo.
         go-version:
           - "1.19"  # Current Go version
-          - "1.17"  # Floor Go version of wazero (current - 2)
+          - "1.18"  # Floor Go version of latest TinyGo
 
     steps:
       - name: Checkout
