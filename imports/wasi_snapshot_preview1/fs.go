@@ -744,11 +744,86 @@ var pathCreateDirectory = stubFunction(
 // returns the attributes of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_getfd-fd-flags-lookupflags-path-string---errno-filestat
-var pathFilestatGet = stubFunction(
-	functionPathFilestatGet,
-	[]wasm.ValueType{i32, i32, i32, i32, i32},
-	[]string{"fd", "flags", "path", "path_len", "result.buf"},
+var pathFilestatGet = &wasm.HostFunc{
+	ExportNames: []string{functionPathFilestatGet},
+	Name:        functionPathFilestatGet,
+	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
+	ParamNames:  []string{"fd", "flags", "path", "path_len", "result.buf"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(pathFilestatGetFn),
+	},
+}
+
+type wasiFiletype uint8
+
+const (
+	wasiFiletypeUnknown         wasiFiletype = 0
+	wasiFiletypeBlockDevice                  = 1
+	wasiFiletypeCharacterDevice              = 2
+	wasiFiletypeDirectory                    = 3
+	wasiFiletypeRegularFile                  = 4
+	wasiFiletypeSocketDgram                  = 5
+	wasiFiletypeSocketStream                 = 6
+	wasiFiletypeSymbolicLink                 = 7
 )
+
+func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	fd := uint32(params[0])
+	//flags := uint32(params[1])
+	//pathPtr := uint32(params[2])
+	//pathLen := uint32(params[3])
+	buf := uint32(params[4])
+
+	sysCtx := mod.(*wasm.CallContext).Sys
+	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	if !ok {
+		return errnoBadf
+	}
+
+	fileStat, err := file.File.Stat()
+	if err != nil {
+		return errnoIo
+	}
+
+	fileMode := fileStat.Mode()
+
+	wasiFileMode := wasiFiletypeUnknown
+	if fileMode&fs.ModeDevice != 0 {
+		wasiFileMode = wasiFiletypeBlockDevice
+	} else if fileMode&fs.ModeCharDevice != 0 {
+		wasiFileMode = wasiFiletypeCharacterDevice
+	} else if fileMode&fs.ModeDir != 0 {
+		wasiFileMode = wasiFiletypeDirectory
+	} else if fileMode&fs.ModeType == 0 {
+		wasiFileMode = wasiFiletypeRegularFile
+	} else if fileMode&fs.ModeSymlink != 0 {
+		wasiFileMode = wasiFiletypeSymbolicLink
+	}
+
+	if !mod.Memory().WriteByte(ctx, buf+8, uint8(wasiFileMode)) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+32, uint64(fileStat.Size())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+40, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+48, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+56, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	return errnoSuccess
+}
 
 // pathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
 // which adjusts the timestamps of a file or directory.
