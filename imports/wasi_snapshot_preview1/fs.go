@@ -295,7 +295,7 @@ func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uin
 		wasiFileMode = wasiFiletypeSymbolicLink
 	}
 
-	if !mod.Memory().WriteByte(ctx, buf+8, uint8(wasiFileMode)) {
+	if !mod.Memory().WriteByte(ctx, buf+16, uint8(wasiFileMode)) {
 		return errnoFault
 	}
 
