@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -533,20 +532,19 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 // Global initialization constant expression can only reference the imported globals.
 // See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
-	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.DecodeInt32(r)
+		v, _, _ = leb128.LoadInt32(expr.Data)
 	case OpcodeI64Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.DecodeInt64(r)
+		v, _, _ = leb128.LoadInt64(expr.Data)
 	case OpcodeF32Const:
-		v, _ = ieee754.DecodeFloat32(r)
+		v, _ = ieee754.DecodeFloat32(expr.Data)
 	case OpcodeF64Const:
-		v, _ = ieee754.DecodeFloat64(r)
+		v, _ = ieee754.DecodeFloat64(expr.Data)
 	case OpcodeGlobalGet:
-		id, _, _ := leb128.DecodeUint32(r)
+		id, _, _ := leb128.LoadUint32(expr.Data)
 		g := importedGlobals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
@@ -573,7 +571,7 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 		// For ref.func const expression, we temporarily store the index as value,
 		// and if this is the const expr for global, the value will be further downed to
 		// opaque pointer of the engine-specific compiled function.
-		v, _, _ = leb128.DecodeUint32(r)
+		v, _, _ = leb128.LoadUint32(expr.Data)
 	case OpcodeVecV128Const:
 		v = [2]uint64{binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])}
 	}

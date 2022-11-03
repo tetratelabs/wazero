@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -372,7 +373,7 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 	for i, g := range m.GlobalSection {
 		if g.Init.Opcode == OpcodeRefFunc {
 			var index uint32
-			index, _, err = leb128.DecodeUint32(bytes.NewReader(g.Init.Data))
+			index, _, err = leb128.LoadUint32(g.Init.Data)
 			if err != nil {
 				err = fmt.Errorf("%s[%d] failed to initialize: %w", SectionIDName(SectionIDGlobal), i, err)
 				return
@@ -480,36 +481,35 @@ func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []I
 
 func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *ConstantExpression, expectedType ValueType) (err error) {
 	var actualType ValueType
-	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		_, _, err = leb128.DecodeInt32(r)
+		_, _, err = leb128.LoadInt32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i32: %w", err)
 		}
 		actualType = ValueTypeI32
 	case OpcodeI64Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		_, _, err = leb128.DecodeInt64(r)
+		_, _, err = leb128.LoadInt64(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i64: %w", err)
 		}
 		actualType = ValueTypeI64
 	case OpcodeF32Const:
-		_, err = ieee754.DecodeFloat32(r)
+		_, err = ieee754.DecodeFloat32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read f32: %w", err)
 		}
 		actualType = ValueTypeF32
 	case OpcodeF64Const:
-		_, err = ieee754.DecodeFloat64(r)
+		_, err = ieee754.DecodeFloat64(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read f64: %w", err)
 		}
 		actualType = ValueTypeF64
 	case OpcodeGlobalGet:
-		id, _, err := leb128.DecodeUint32(r)
+		id, _, err := leb128.LoadUint32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read index of global: %w", err)
 		}
@@ -518,15 +518,16 @@ func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *Const
 		}
 		actualType = globals[id].ValType
 	case OpcodeRefNull:
-		reftype, err := r.ReadByte()
-		if err != nil {
-			return fmt.Errorf("read reference type for ref.null: %w", err)
-		} else if reftype != RefTypeFuncref && reftype != RefTypeExternref {
+		if len(expr.Data) == 0 {
+			return fmt.Errorf("read reference type for ref.null: %w", io.ErrShortBuffer)
+		}
+		reftype := expr.Data[0]
+		if reftype != RefTypeFuncref && reftype != RefTypeExternref {
 			return fmt.Errorf("invalid type for ref.null: 0x%x", reftype)
 		}
 		actualType = reftype
 	case OpcodeRefFunc:
-		index, _, err := leb128.DecodeUint32(r)
+		index, _, err := leb128.LoadUint32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i32: %w", err)
 		} else if index >= numFuncs {
