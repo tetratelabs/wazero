@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 )
 
@@ -10,7 +11,19 @@ import (
 func main() {
 	// Start at arg[1] because args[0] is the program name.
 	for i := 1; i < len(os.Args); i++ {
-		bytes, err := os.ReadFile(os.Args[i])
+		file, err := os.Open(os.Args[i])
+		if err != nil {
+			os.Exit(1)
+		}
+
+		defer file.Close()
+
+		_, err = file.Stat()
+		if err != nil {
+			os.Exit(1)
+		}
+
+		bytes, err := io.ReadAll(file)
 		if err != nil {
 			os.Exit(1)
 		}
