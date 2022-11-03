@@ -197,11 +197,83 @@ var fdFdstatSetRights = stubFunction(
 // the attributes of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_getfd-fd---errno-filestat
-var fdFilestatGet = stubFunction(
-	functionFdFilestatGet,
-	[]wasm.ValueType{i32, i32},
-	[]string{"fd", "result.buf"},
+var fdFilestatGet = &wasm.HostFunc{
+	ExportNames: []string{functionFdFilestatGet},
+	Name:        functionFdFilestatGet,
+	ParamTypes:  []api.ValueType{i32, i32},
+	ParamNames:  []string{"fd", "result.buf"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(fdFilestatGetFn),
+	},
+}
+
+type wasiFiletype uint8
+
+const (
+	wasiFiletypeUnknown         wasiFiletype = 0
+	wasiFiletypeBlockDevice                  = 1
+	wasiFiletypeCharacterDevice              = 2
+	wasiFiletypeDirectory                    = 3
+	wasiFiletypeRegularFile                  = 4
+	wasiFiletypeSocketDgram                  = 5
+	wasiFiletypeSocketStream                 = 6
+	wasiFiletypeSymbolicLink                 = 7
 )
+
+func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	fd := uint32(params[0])
+	buf := uint32(params[1])
+
+	sysCtx := mod.(*wasm.CallContext).Sys
+	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	if !ok {
+		return errnoBadf
+	}
+
+	fileStat, err := file.File.Stat()
+	if err != nil {
+		return errnoIo
+	}
+
+	fileMode := fileStat.Mode()
+
+	wasiFileMode := wasiFiletypeUnknown
+	if fileMode&fs.ModeDevice != 0 {
+		wasiFileMode = wasiFiletypeBlockDevice
+	} else if fileMode&fs.ModeCharDevice != 0 {
+		wasiFileMode = wasiFiletypeCharacterDevice
+	} else if fileMode&fs.ModeDir != 0 {
+		wasiFileMode = wasiFiletypeDirectory
+	} else if fileMode&fs.ModeType == 0 {
+		wasiFileMode = wasiFiletypeRegularFile
+	} else if fileMode&fs.ModeSymlink != 0 {
+		wasiFileMode = wasiFiletypeSymbolicLink
+	}
+
+	if !mod.Memory().WriteByte(ctx, buf+8, uint8(wasiFileMode)) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+32, uint64(fileStat.Size())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+40, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+48, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	if !mod.Memory().WriteUint64Le(ctx, buf+56, uint64(fileStat.ModTime().UnixNano())) {
+		return errnoFault
+	}
+
+	return errnoSuccess
+}
 
 // fdFilestatSetSize is the WASI function named functionFdFilestatSetSize which
 // adjusts the size of an open file.
