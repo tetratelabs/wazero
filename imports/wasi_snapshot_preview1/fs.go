@@ -194,9 +194,52 @@ var fdFdstatSetRights = stubFunction(
 )
 
 // fdFilestatGet is the WASI function named functionFdFilestatGet which returns
-// the attributes of an open file.
+// the stat attributes of an open file.
 //
+// # Parameters
+//
+//   - fd: file descriptor to get the filestat attributes data for
+//   - resultFilestat: offset to write the result filestat data
+//
+// Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoIo: could not stat `fd` on filesystem
+//   - ErrnoFault: `resultFilestat` points to an offset out of memory
+//
+// filestat byte layout is 64-byte size, with the following fields:
+//   - dev 8 bytes: the device ID of device containing the file
+//   - ino 8 bytes: the file serial number
+//   - filetype 1 byte: the type of the file
+//   - 7 pad bytes
+//   - nlink 8 bytes: number of hard links to the file
+//   - size 8 bytes: for regular files, the file size in bytes. For symbolic links, the length in bytes of the pathname contained in the symbolic link
+//   - atim 8 bytes: ast data access timestamp
+//   - mtim 8 bytes: last data modification timestamp
+//   - ctim 8 bytes: ast file status change timestamp
+//
+// For example, with a regular file this function writes the below to api.Memory:
+//
+//	                                                             uint8 --+
+//		                         uint64le                uint64le        |        padding               uint64le                uint64le                         uint64le                               uint64le                             uint64le
+//		                 +--------------------+  +--------------------+  |  +-----------------+  +--------------------+  +-----------------------+  +----------------------------------+  +----------------------------------+  +----------------------------------+
+//		                 |                    |  |                    |  |  |                 |  |                    |  |                       |  |                                  |  |                                  |  |                                  |
+//		          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 117, 80, 0, 0, 0, 0, 0, 0, 160, 153, 212, 128, 110, 221, 35, 23, 160, 153, 212, 128, 110, 221, 35, 23, 160, 153, 212, 128, 110, 221, 35, 23}
+//		resultFilestat   ^-- dev                 ^-- ino                 ^                       ^-- nlink               ^-- size                   ^-- atim                              ^-- mtim                              ^-- ctim
+//		                                                                 |
+//		                                                                 +-- filetype
+//
+// The following properties of filestat are not implemented:
+//   - dev: not supported by Golang FS
+//   - ino: not supported by Golang FS
+//   - nlink: not supported by Golang FS
+//   - atime: not supported by Golang FS, we use mtim for this
+//   - ctim: not supported by Golang FS, we use mtim for this
+//
+// Note: This is similar to `fstat` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_getfd-fd---errno-filestat
+// and https://linux.die.net/man/3/fstat
 var fdFilestatGet = &wasm.HostFunc{
 	ExportNames: []string{functionFdFilestatGet},
 	Name:        functionFdFilestatGet,
