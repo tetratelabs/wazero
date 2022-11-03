@@ -255,14 +255,14 @@ var fdFilestatGet = &wasm.HostFunc{
 type wasiFiletype uint8
 
 const (
-	wasiFiletypeUnknown         wasiFiletype = 0
-	wasiFiletypeBlockDevice                  = 1
-	wasiFiletypeCharacterDevice              = 2
-	wasiFiletypeDirectory                    = 3
-	wasiFiletypeRegularFile                  = 4
-	wasiFiletypeSocketDgram                  = 5
-	wasiFiletypeSocketStream                 = 6
-	wasiFiletypeSymbolicLink                 = 7
+	wasiFiletypeUnknown wasiFiletype = iota
+	wasiFiletypeBlockDevice
+	wasiFiletypeCharacterDevice
+	wasiFiletypeDirectory
+	wasiFiletypeRegularFile
+	wasiFiletypeSocketDgram
+	wasiFiletypeSocketStream
+	wasiFiletypeSymbolicLink
 )
 
 func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
