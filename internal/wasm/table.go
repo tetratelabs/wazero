@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -185,7 +184,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 			// global.get needs to be discovered during initialization
 			oc := elem.OffsetExpr.Opcode
 			if oc == OpcodeGlobalGet {
-				globalIdx, _, err := leb128.DecodeUint32(bytes.NewReader(elem.OffsetExpr.Data))
+				globalIdx, _, err := leb128.LoadUint32(elem.OffsetExpr.Data)
 				if err != nil {
 					return nil, fmt.Errorf("%s[%d] couldn't read global.get parameter: %w", SectionIDName(SectionIDElement), idx, err)
 				} else if err = m.verifyImportGlobalI32(SectionIDElement, idx, globalIdx); err != nil {
@@ -199,7 +198,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 				ret = append(ret, &validatedActiveElementSegment{opcode: oc, arg: globalIdx, init: elem.Init, tableIndex: elem.TableIndex})
 			} else if oc == OpcodeI32Const {
 				// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-				o, _, err := leb128.DecodeInt32(bytes.NewReader(elem.OffsetExpr.Data))
+				o, _, err := leb128.LoadInt32(elem.OffsetExpr.Data)
 				if err != nil {
 					return nil, fmt.Errorf("%s[%d] couldn't read i32.const parameter: %w", SectionIDName(SectionIDElement), idx, err)
 				}

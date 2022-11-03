@@ -32,14 +32,14 @@ func (m *Module) validateFunction(enabledFeatures api.CoreFeatures, idx Index, f
 }
 
 func readMemArg(pc uint64, body []byte) (align, offset uint32, read uint64, err error) {
-	align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+	align, num, err := leb128.LoadUint32(body[pc:])
 	if err != nil {
 		err = fmt.Errorf("read memory align: %v", err)
 		return
 	}
 	read += num
 
-	offset, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc+num:]))
+	offset, num, err = leb128.LoadUint32(body[pc+num:])
 	if err != nil {
 		err = fmt.Errorf("read memory offset: %v", err)
 		return
@@ -276,7 +276,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
-			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			val, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -297,14 +297,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc++
 			switch Opcode(op) {
 			case OpcodeI32Const:
-				_, num, err := leb128.DecodeInt32(bytes.NewReader(body[pc:]))
+				_, num, err := leb128.LoadInt32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Const:
-				_, num, err := leb128.DecodeInt64(bytes.NewReader(body[pc:]))
+				_, num, err := leb128.LoadInt64(body[pc:])
 				if err != nil {
 					return fmt.Errorf("read i64 immediate: %v", err)
 				}
@@ -319,7 +319,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if OpcodeLocalGet <= op && op <= OpcodeGlobalSet {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -384,7 +384,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeBr {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
@@ -406,7 +406,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeBrIf {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
@@ -526,7 +526,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -545,7 +545,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeCallIndirect {
 			pc++
-			typeIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			typeIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -555,7 +555,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("invalid type index at %s: %d", OpcodeCallIndirectName, typeIndex)
 			}
 
-			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			tableIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read table index: %v", err)
 			}
@@ -827,7 +827,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeRefFunc:
 				pc++
-				index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				index, num, err := leb128.LoadUint32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("failed to read function index for ref.func: %v", err)
 				}
@@ -842,7 +842,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("%s is invalid as %v", InstructionName(op), err)
 			}
 			pc++
-			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			tableIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -903,7 +903,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 					// We need to read the index to the data section.
 					pc++
-					index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					index, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -924,7 +924,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 						// We need to read the index to the data section.
 						pc++
-						index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						index, num, err := leb128.LoadUint32(body[pc:])
 						if err != nil {
 							return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 						}
@@ -935,7 +935,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 
 					pc++
-					val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					val, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -945,7 +945,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					if miscOpcode == OpcodeMiscMemoryCopy {
 						pc++
 						// memory.copy needs two memory index which are reserved as zero.
-						val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						val, num, err := leb128.LoadUint32(body[pc:])
 						if err != nil {
 							return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
 						}
@@ -957,7 +957,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				case OpcodeMiscTableInit:
 					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					pc++
-					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					elementIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -966,7 +966,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 					pc += num
 
-					tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					tableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -988,7 +988,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					pc += num - 1
 				case OpcodeMiscElemDrop:
 					pc++
-					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					elementIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					} else if int(elementIndex) >= len(m.ElementSection) {
@@ -999,7 +999,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					pc++
 
-					dstTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					dstTableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read destination table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -1013,7 +1013,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 					pc += num
 
-					srcTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					srcTableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -1044,7 +1044,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 
 				pc++
-				tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				tableIndex, num, err := leb128.LoadUint32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
 				}

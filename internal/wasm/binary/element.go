@@ -54,7 +54,7 @@ func decodeElementConstExprVector(r *bytes.Reader, elemType wasm.RefType, enable
 			if elemType != wasm.RefTypeFuncref {
 				return nil, fmt.Errorf("element type mismatch: want %s, but constexpr has funcref", wasm.RefTypeName(elemType))
 			}
-			v, _, _ := leb128.DecodeUint32(bytes.NewReader(expr.Data))
+			v, _, _ := leb128.LoadUint32(expr.Data)
 			vec[i] = &v
 		case wasm.OpcodeRefNull:
 			if elemType != expr.Data[0] {

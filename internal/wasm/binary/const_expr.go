@@ -3,6 +3,7 @@ package binary
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
@@ -28,9 +29,17 @@ func decodeConstantExpression(r *bytes.Reader, enabledFeatures api.CoreFeatures)
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
 		_, _, err = leb128.DecodeInt64(r)
 	case wasm.OpcodeF32Const:
-		_, err = ieee754.DecodeFloat32(r)
+		buf := make([]byte, 4)
+		if _, err := io.ReadFull(r, buf); err != nil {
+			return nil, fmt.Errorf("read f32 constant: %v", err)
+		}
+		_, err = ieee754.DecodeFloat32(buf)
 	case wasm.OpcodeF64Const:
-		_, err = ieee754.DecodeFloat64(r)
+		buf := make([]byte, 8)
+		if _, err := io.ReadFull(r, buf); err != nil {
+			return nil, fmt.Errorf("read f64 constant: %v", err)
+		}
+		_, err = ieee754.DecodeFloat64(buf)
 	case wasm.OpcodeGlobalGet:
 		_, _, err = leb128.DecodeUint32(r)
 	case wasm.OpcodeRefNull:

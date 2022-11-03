@@ -28,7 +28,7 @@ func TestEncode_DecodeInt32(t *testing.T) {
 		{input: int32(math.MaxInt32), expected: []byte{0xff, 0xff, 0xff, 0xff, 0x7}},
 	} {
 		require.Equal(t, c.expected, EncodeInt32(c.input))
-		decoded, _, err := DecodeInt32(bytes.NewReader(c.expected))
+		decoded, _, err := LoadInt32(c.expected)
 		require.NoError(t, err)
 		require.Equal(t, c.input, decoded)
 	}
@@ -55,7 +55,7 @@ func TestEncode_DecodeInt64(t *testing.T) {
 		{input: math.MaxInt64, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}},
 	} {
 		require.Equal(t, c.expected, EncodeInt64(c.input))
-		decoded, _, err := DecodeInt64(bytes.NewReader(c.expected))
+		decoded, _, err := LoadInt64(c.expected)
 		require.NoError(t, err)
 		require.Equal(t, c.input, decoded)
 	}
@@ -115,7 +115,7 @@ func TestDecodeUint32(t *testing.T) {
 		{bytes: []byte{0x82, 0x80, 0x80, 0x80, 0x70}, expErr: true},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x00}, expErr: true},
 	} {
-		actual, num, err := DecodeUint32(bytes.NewReader(c.bytes))
+		actual, num, err := LoadUint32(c.bytes)
 		if c.expErr {
 			require.Error(t, err)
 		} else {
@@ -140,7 +140,7 @@ func TestDecodeUint64(t *testing.T) {
 		{bytes: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1}, exp: math.MaxUint64},
 		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x71}, expErr: true},
 	} {
-		actual, num, err := DecodeUint64(bytes.NewReader(c.bytes))
+		actual, num, err := LoadUint64(c.bytes)
 		if c.expErr {
 			require.Error(t, err)
 		} else {
@@ -169,7 +169,7 @@ func TestDecodeInt32(t *testing.T) {
 		{bytes: []byte{0xff, 0xff, 0xff, 0xff, 0x4f}, expErr: true},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x80, 0x70}, expErr: true},
 	} {
-		actual, num, err := DecodeInt32(bytes.NewReader(c.bytes))
+		actual, num, err := LoadInt32(c.bytes)
 		if c.expErr {
 			require.Error(t, err, fmt.Sprintf("%d-th got value %d", i, actual))
 		} else {
@@ -220,7 +220,7 @@ func TestDecodeInt64(t *testing.T) {
 		{bytes: []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x7f},
 			exp: -9223372036854775808},
 	} {
-		actual, num, err := DecodeInt64(bytes.NewReader(c.bytes))
+		actual, num, err := LoadInt64(c.bytes)
 		require.NoError(t, err)
 		require.Equal(t, c.exp, actual)
 		require.Equal(t, uint64(len(c.bytes)), num)
