@@ -9,6 +9,7 @@ import (
 	"path"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -200,15 +201,111 @@ func Test_fdFdstatSetRights(t *testing.T) {
 `, log)
 }
 
-// Test_fdFilestatGet only tests it is stubbed for GrainLang per #271
 func Test_fdFilestatGet(t *testing.T) {
-	log := requireErrnoNosys(t, functionFdFilestatGet, 0, 0)
-	require.Equal(t, `
---> proxy.fd_filestat_get(fd=0,result.buf=0)
-	--> wasi_snapshot_preview1.fd_filestat_get(fd=0,result.buf=0)
-	<-- ENOSYS
-<-- (52)
-`, log)
+	file, dir := "a", "b"
+	testFS := fstest.MapFS{file: {Data: make([]byte, 123456), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	defer r.Close(testCtx)
+	memorySize := mod.Memory().Size(testCtx)
+
+	// open both paths without using WASI
+	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+
+	fileFd, err := fsc.OpenFile(testCtx, file)
+	require.NoError(t, err)
+
+	dirFd, err := fsc.OpenFile(testCtx, dir)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name               string
+		fd, resultFilestat uint32
+		expectedMemory     []byte
+		expectedErrno      Errno
+		expectedLog        string
+	}{
+		{
+			name: "file",
+			fd:   fileFd,
+			expectedMemory: []byte{
+				'?', '?', '?', '?', '?', '?', '?', '?', // dev
+				'?', '?', '?', '?', '?', '?', '?', '?', // ino
+				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
+				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0x40, 0xe2, 0x1, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=4,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=4,result.buf=0)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name: "dir",
+			fd:   dirFd,
+			expectedMemory: []byte{
+				'?', '?', '?', '?', '?', '?', '?', '?', // dev
+				'?', '?', '?', '?', '?', '?', '?', '?', // ino
+				3, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
+				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=5,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=5,result.buf=0)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name:          "bad FD",
+			fd:            math.MaxUint32,
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=4294967295,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=4294967295,result.buf=0)
+	<== EBADF
+<-- (8)
+`,
+		},
+		{
+			name:           "resultFilestat exceeds the maximum valid address by 1",
+			fd:             dirFd,
+			resultFilestat: memorySize - 64 + 1,
+			expectedErrno:  ErrnoFault,
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=5,result.buf=65473)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=5,result.buf=65473)
+	<== EFAULT
+<-- (21)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+
+			requireErrno(t, tc.expectedErrno, mod, functionFdFilestatGet, uint64(tc.fd), uint64(tc.resultFilestat))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+		})
+	}
 }
 
 // Test_fdFilestatSetSize only tests it is stubbed for GrainLang per #271
