@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 )
@@ -18,10 +19,13 @@ func main() {
 
 		defer file.Close()
 
-		_, err = file.Stat()
+		stat, err := file.Stat()
 		if err != nil {
 			os.Exit(1)
 		}
+
+		os.Stdout.Write([]byte(fmt.Sprintf("Size: %d\n", stat.Size())))
+		os.Stdout.Write([]byte(fmt.Sprintf("Mode: %d\n", stat.Mode())))
 
 		bytes, err := io.ReadAll(file)
 		if err != nil {
@@ -29,6 +33,6 @@ func main() {
 		}
 
 		// Use write to avoid needing to worry about Windows newlines.
-		os.Stdout.Write(bytes)
+		os.Stdout.Write([]byte(fmt.Sprintf("Content: %s", string(bytes))))
 	}
 }

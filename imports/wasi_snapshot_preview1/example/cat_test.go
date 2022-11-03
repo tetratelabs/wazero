@@ -18,13 +18,31 @@ import (
 //
 //	go run cat.go /test.txt
 func Test_main(t *testing.T) {
-	for _, toolchain := range []string{"cargo-wasi", "tinygo", "zig-cc"} {
-		toolchain := toolchain
-		t.Run(toolchain, func(t *testing.T) {
-			t.Setenv("TOOLCHAIN", toolchain)
+	tests := []struct {
+		toolchain      string
+		expectedOutput string
+	}{
+		{
+			toolchain:      "cargo-wasi",
+			expectedOutput: "greet filesystem\n",
+		},
+		{
+			toolchain:      "tinygo",
+			expectedOutput: "Size: 17\nMode: 0\nContent: greet filesystem\n",
+		},
+		{
+			toolchain:      "zig-cc",
+			expectedOutput: "greet filesystem\n",
+		},
+	}
+
+	for _, tc := range tests {
+		tt := tc
+		t.Run(tt.toolchain, func(t *testing.T) {
+			t.Setenv("TOOLCHAIN", tt.toolchain)
 			stdout, stderr := maintester.TestMain(t, main, "cat", "/test.txt")
 			require.Equal(t, "", stderr)
-			require.Equal(t, "greet filesystem\n", stdout)
+			require.Equal(t, tt.expectedOutput, stdout)
 		})
 	}
 }
@@ -34,20 +52,24 @@ func Test_main(t *testing.T) {
 // go run github.com/tetratelabs/wazero/cmd/wazero run -mount=testdata:/ cat.wasm /test.txt
 func Test_cli(t *testing.T) {
 	tests := []struct {
-		toolchain string
-		wasm      []byte
+		toolchain      string
+		wasm           []byte
+		expectedOutput string
 	}{
 		{
-			toolchain: "cargo-wasi",
-			wasm:      catWasmCargoWasi,
+			toolchain:      "cargo-wasi",
+			wasm:           catWasmCargoWasi,
+			expectedOutput: "greet filesystem\n",
 		},
 		{
-			toolchain: "tinygo",
-			wasm:      catWasmTinyGo,
+			toolchain:      "tinygo",
+			wasm:           catWasmTinyGo,
+			expectedOutput: "Size: 17\nMode: 0\nContent: greet filesystem\n",
 		},
 		{
-			toolchain: "zig-cc",
-			wasm:      catWasmZigCc,
+			toolchain:      "zig-cc",
+			wasm:           catWasmZigCc,
+			expectedOutput: "greet filesystem\n",
 		},
 	}
 
@@ -87,7 +109,7 @@ func Test_cli(t *testing.T) {
 					cmd.Stdout = stdOut
 					cmd.Stderr = stdErr
 					require.NoError(t, cmd.Run(), stdErr.String())
-					require.Equal(t, "greet filesystem\n", stdOut.String())
+					require.Equal(t, tt.expectedOutput, stdOut.String())
 				})
 			}
 		})
