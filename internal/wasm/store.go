@@ -582,9 +582,6 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 const GlobalInstanceNullFuncRefValue int64 = -1
 
 func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
-	// We take write-lock here as the following might end up mutating typeIDs map.
-	s.mux.Lock()
-	defer s.mux.Unlock()
 	ret := make([]FunctionTypeID, len(ts))
 	for i, t := range ts {
 		inst, err := s.getFunctionTypeID(t)
@@ -598,8 +595,16 @@ func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error)
 
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 	key := t.String()
+	s.mux.RLock()
 	id, ok := s.typeIDs[key]
+	s.mux.RUnlock()
 	if !ok {
+		s.mux.Lock()
+		defer s.mux.Unlock()
+		// Check again in case another goroutine has already added the type.
+		if id, ok = s.typeIDs[key]; ok {
+			return id, nil
+		}
 		l := uint32(len(s.typeIDs))
 		if l >= s.functionMaxTypes {
 			return 0, fmt.Errorf("too many function types in a store")
