@@ -2,9 +2,9 @@ package bench
 
 import (
 	"context"
+	"crypto/rand"
 	_ "embed"
 	"fmt"
-	"math/rand"
 	"runtime"
 	"testing"
 
@@ -89,9 +89,10 @@ func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
 func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	compiled := runCompilation(b, r)
 	defer compiled.Close(testCtx)
+	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mod, err := r.InstantiateModule(testCtx, compiled, wazero.NewModuleConfig())
+		mod, err := r.InstantiateModule(testCtx, compiled, config)
 		if err != nil {
 			b.Fatal(err)
 		}
