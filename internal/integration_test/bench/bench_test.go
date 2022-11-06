@@ -89,6 +89,8 @@ func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
 func runInitializationBench(b *testing.B, r wazero.Runtime) {
 	compiled := runCompilation(b, r)
 	defer compiled.Close(testCtx)
+	// Configure with real sources to avoid performance hit initializing fake ones. These sources are not used
+	// in the benchmark.
 	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
