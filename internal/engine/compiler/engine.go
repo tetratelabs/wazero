@@ -479,16 +479,16 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
 func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInits []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
-	imported := uint32(len(importedFunctions))
+	imported := len(importedFunctions)
 	me := &moduleEngine{
 		name:                  name,
-		functions:             make([]*function, 0, imported+uint32(len(moduleFunctions))),
-		importedFunctionCount: imported,
+		functions:             make([]*function, imported+len(moduleFunctions)),
+		importedFunctionCount: uint32(imported),
 	}
 
-	for _, f := range importedFunctions {
+	for i, f := range importedFunctions {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
-		me.functions = append(me.functions, cf)
+		me.functions[i] = cf
 	}
 
 	codes, ok, err := e.getCodes(module)
@@ -501,7 +501,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	for i, c := range codes {
 		f := moduleFunctions[i]
 		function := c.createFunction(f)
-		me.functions = append(me.functions, function)
+		me.functions[imported+i] = function
 	}
 
 	for _, init := range tableInits {

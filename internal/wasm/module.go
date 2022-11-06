@@ -590,28 +590,26 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 //   - This is exported for tests that don't call Instantiate, notably only
 //     enginetest.go.
 func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.FunctionListener) (fns []*FunctionInstance) {
-	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
-	for i := range mod.FunctionSection {
+	importCount := mod.ImportFuncCount()
+	fns = make([]*FunctionInstance, len(mod.FunctionSection))
+	for i, section := range mod.FunctionSection {
 		code := mod.CodeSection[i]
-		fns = append(fns, &FunctionInstance{
+		d := mod.FunctionDefinitionSection[uint32(i)+importCount]
+		f := &FunctionInstance{
 			IsHostFunction: code.IsHostFunction,
 			LocalTypes:     code.LocalTypes,
 			Body:           code.Body,
 			GoFunc:         code.GoFunc,
-			TypeID:         m.TypeIDs[mod.FunctionSection[i]],
-		})
-	}
-
-	importCount := mod.ImportFuncCount()
-	for i, f := range fns {
-		d := mod.FunctionDefinitionSection[uint32(i)+importCount]
-		f.Module = m
-		f.Idx = d.index
-		f.Type = d.funcType
-		f.Definition = d
+			TypeID:         m.TypeIDs[section],
+			Module:         m,
+			Idx:            d.index,
+			Type:           d.funcType,
+			Definition:     d,
+		}
 		if listeners != nil {
 			f.Listener = listeners[i]
 		}
+		fns[i] = f
 	}
 	return
 }
