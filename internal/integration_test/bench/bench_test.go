@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -44,10 +46,20 @@ func BenchmarkInitialization(b *testing.B) {
 		runInitializationBench(b, r)
 	})
 
+	b.Run("interpreter-multiple", func(b *testing.B) {
+		r := createRuntime(b, wazero.NewRuntimeConfigInterpreter())
+		runInitializationConcurrentBench(b, r)
+	})
+
 	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
 		b.Run("compiler", func(b *testing.B) {
 			r := createRuntime(b, wazero.NewRuntimeConfigCompiler())
 			runInitializationBench(b, r)
+		})
+
+		b.Run("compiler-multiple", func(b *testing.B) {
+			r := createRuntime(b, wazero.NewRuntimeConfigCompiler())
+			runInitializationConcurrentBench(b, r)
 		})
 	}
 }
@@ -100,6 +112,28 @@ func runInitializationBench(b *testing.B, r wazero.Runtime) {
 		}
 		mod.Close(testCtx)
 	}
+}
+
+func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
+	compiled := runCompilation(b, r)
+	defer compiled.Close(testCtx)
+	// Configure with real sources to avoid performance hit initializing fake ones. These sources are not used
+	// in the benchmark.
+	config := wazero.NewModuleConfig().WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
+	wg := &sync.WaitGroup{}
+	wg.Add(b.N)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		go func(name string) {
+			_, err := r.InstantiateModule(testCtx, compiled, config.WithName(name))
+			if err != nil {
+				b.Error(err)
+			}
+			wg.Done()
+		}(strconv.Itoa(i))
+	}
+	wg.Wait()
+	b.StopTimer()
 }
 
 func runAllInvocationBenches(b *testing.B, m api.Module) {
