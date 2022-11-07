@@ -594,7 +594,7 @@ func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error)
 }
 
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
-	key := t.String()
+	key := t.key()
 	s.mux.RLock()
 	id, ok := s.typeIDs[key]
 	s.mux.RUnlock()
@@ -605,11 +605,11 @@ func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 		if id, ok = s.typeIDs[key]; ok {
 			return id, nil
 		}
-		l := uint32(len(s.typeIDs))
-		if l >= s.functionMaxTypes {
+		l := len(s.typeIDs)
+		if uint32(l) >= s.functionMaxTypes {
 			return 0, fmt.Errorf("too many function types in a store")
 		}
-		id = FunctionTypeID(len(s.typeIDs))
+		id = FunctionTypeID(l)
 		s.typeIDs[key] = id
 	}
 	return id, nil

@@ -10,8 +10,11 @@ import (
 
 // Namespace is a collection of instantiated modules which cannot conflict on name.
 type Namespace struct {
-	// moduleNames ensures no race conditions instantiating two modules of the same name
-	moduleNames []string // guarded by mux
+	// moduleNamesList ensures modules are closed in reverse initialization order.
+	moduleNamesList []string // guarded by mux
+
+	// moduleNamesSet ensures no race conditions instantiating two modules of the same name
+	moduleNamesSet map[string]struct{} // guarded by mux
 
 	// modules holds the instantiated Wasm modules by module name from Instantiate.
 	modules map[string]*ModuleInstance // guarded by mux
@@ -23,8 +26,9 @@ type Namespace struct {
 // newNamespace returns an empty namespace.
 func newNamespace() *Namespace {
 	return &Namespace{
-		moduleNames: nil,
-		modules:     map[string]*ModuleInstance{},
+		moduleNamesList: nil,
+		moduleNamesSet:  map[string]struct{}{},
+		modules:         map[string]*ModuleInstance{},
 	}
 }
 
@@ -40,10 +44,11 @@ func (ns *Namespace) deleteModule(moduleName string) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	delete(ns.modules, moduleName)
+	delete(ns.moduleNamesSet, moduleName)
 	// remove this module name
-	for i, n := range ns.moduleNames {
+	for i, n := range ns.moduleNamesList {
 		if n == moduleName {
-			ns.moduleNames = append(ns.moduleNames[:i], ns.moduleNames[i+1:]...)
+			ns.moduleNamesList = append(ns.moduleNamesList[:i], ns.moduleNamesList[i+1:]...)
 			break
 		}
 	}
@@ -58,10 +63,11 @@ func (ns *Namespace) module(moduleName string) *ModuleInstance {
 
 // requireModules returns all instantiated modules whose names equal the keys in the input, or errs if any are missing.
 func (ns *Namespace) requireModules(moduleNames map[string]struct{}) (map[string]*ModuleInstance, error) {
+	ret := make(map[string]*ModuleInstance, len(moduleNames))
+
 	ns.mux.RLock()
 	defer ns.mux.RUnlock()
 
-	ret := make(map[string]*ModuleInstance, len(moduleNames))
 	for n := range moduleNames {
 		m, ok := ns.modules[n]
 		if !ok {
@@ -77,12 +83,11 @@ func (ns *Namespace) requireModules(moduleNames map[string]struct{}) (map[string
 func (ns *Namespace) requireModuleName(moduleName string) error {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
-	for _, n := range ns.moduleNames {
-		if n == moduleName {
-			return fmt.Errorf("module[%s] has already been instantiated", moduleName)
-		}
+	if _, ok := ns.moduleNamesSet[moduleName]; ok {
+		return fmt.Errorf("module[%s] has already been instantiated", moduleName)
 	}
-	ns.moduleNames = append(ns.moduleNames, moduleName)
+	ns.moduleNamesSet[moduleName] = struct{}{}
+	ns.moduleNamesList = append(ns.moduleNamesList, moduleName)
 	return nil
 }
 
@@ -98,15 +103,16 @@ func (ns *Namespace) CloseWithExitCode(ctx context.Context, exitCode uint32) (er
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	// Close modules in reverse initialization order.
-	for i := len(ns.moduleNames) - 1; i >= 0; i-- {
+	for i := len(ns.moduleNamesList) - 1; i >= 0; i-- {
 		// If closing this module errs, proceed anyway to close the others.
-		if m, ok := ns.modules[ns.moduleNames[i]]; ok {
+		if m, ok := ns.modules[ns.moduleNamesList[i]]; ok {
 			if _, e := m.CallCtx.close(ctx, exitCode); e != nil && err == nil {
 				err = e // first error
 			}
 		}
 	}
-	ns.moduleNames = nil
+	ns.moduleNamesList = nil
+	ns.moduleNamesSet = map[string]struct{}{}
 	ns.modules = map[string]*ModuleInstance{}
 	return
 }

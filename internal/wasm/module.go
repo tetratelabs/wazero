@@ -559,7 +559,8 @@ func (m *Module) validateDataCountSection() (err error) {
 }
 
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
-	for _, gs := range m.GlobalSection {
+	globals = make([]*GlobalInstance, len(m.GlobalSection))
+	for i, gs := range m.GlobalSection {
 		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case uint32:
@@ -577,7 +578,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 		default:
 			panic(fmt.Errorf("BUG: invalid conversion %d", v))
 		}
-		globals = append(globals, g)
+		globals[i] = g
 	}
 	return
 }
@@ -707,9 +708,10 @@ func (f *FunctionType) key() string {
 		ret += ValueTypeName(b)
 	}
 	if len(f.Params) == 0 {
-		ret += "v"
+		ret += "v_"
+	} else {
+		ret += "_"
 	}
-	ret += "_"
 	for _, b := range f.Results {
 		ret += ValueTypeName(b)
 	}
