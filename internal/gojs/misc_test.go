@@ -40,3 +40,13 @@ func Test_stdio(t *testing.T) {
 	require.Equal(t, "println stdin\nStderr.Write", stderr)
 	require.Equal(t, "Stdout.Write", stdout)
 }
+
+func Test_gc(t *testing.T) {
+	t.Parallel()
+
+	stdout, stderr, err := compileAndRun(testCtx, "gc", wazero.NewModuleConfig())
+
+	require.EqualError(t, err, `module "" closed with exit_code(0)`)
+	require.Equal(t, "", stderr)
+	require.Equal(t, "before gc\nafter gc\n", stdout)
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/argsenv"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/crypto"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/fs"
+	"github.com/tetratelabs/wazero/internal/gojs/testdata/gc"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/goroutine"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/http"
 	"github.com/tetratelabs/wazero/internal/gojs/testdata/mem"
@@ -24,6 +25,8 @@ func main() {
 		crypto.Main()
 	case "fs":
 		fs.Main()
+	case "gc":
+		gc.Main()
 	case "goroutine":
 		goroutine.Main()
 	case "http":
