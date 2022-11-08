@@ -97,7 +97,7 @@ type FunctionExporter interface {
 	ExportFunctions(wazero.HostModuleBuilder)
 }
 
-// NewFunctionExporter returns a new FunctionExporter. This is used for two
+// NewFunctionExporter returns a new FunctionExporter. This is used for the
 // following two use cases:
 //   - Overriding a builtin function with an alternate implementation.
 //   - Exporting functions to the module "wasi_unstable" for legacy code.
@@ -106,7 +106,7 @@ type FunctionExporter interface {
 //
 //	// Export the default WASI functions.
 //	wasiBuilder := r.NewHostModuleBuilder(ModuleName)
-//	NewFunctionExporter().ExportFunctions(wasiBuilder)
+//	wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
 //
 //	// Subsequent calls to NewFunctionBuilder override built-in exports.
 //	wasiBuilder.NewFunctionBuilder().
@@ -119,7 +119,7 @@ type FunctionExporter interface {
 //	// Instantiate the current WASI functions under the wasi_unstable
 //	// instead of wasi_snapshot_preview1.
 //	wasiBuilder := r.NewHostModuleBuilder("wasi_unstable")
-//	NewFunctionExporter().ExportFunctions(wasiBuilder)
+//	wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
 //	_, err := wasiBuilder.Instantiate(testCtx, r)
 func NewFunctionExporter() FunctionExporter {
 	return &functionExporter{}
