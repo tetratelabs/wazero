@@ -195,6 +195,7 @@ func (j *values) increment(v interface{}) uint32 {
 }
 
 func (j *values) decrement(id uint32) {
+	// Special IDs are not refcounted.
 	if id < nextID {
 		return
 	}
