@@ -195,6 +195,9 @@ func (j *values) increment(v interface{}) uint32 {
 }
 
 func (j *values) decrement(id uint32) {
+	if id < nextID {
+		return
+	}
 	id -= nextID
 	j.goRefCounts[id]--
 	if j.goRefCounts[id] == 0 {
