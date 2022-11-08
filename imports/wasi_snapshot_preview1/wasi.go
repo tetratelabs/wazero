@@ -27,8 +27,10 @@ import (
 // ModuleName is the module name WASI functions are exported into.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-const ModuleName = "wasi_snapshot_preview1"
-const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+const (
+	ModuleName = "wasi_snapshot_preview1"
+	i32, i64   = wasm.ValueTypeI32, wasm.ValueTypeI64
+)
 
 // MustInstantiate calls Instantiate or panics on error.
 //
@@ -41,7 +43,7 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 }
 
 // Instantiate instantiates the ModuleName module into the runtime default
-// namespace..
+// namespace.
 //
 // # Notes
 //
@@ -54,7 +56,6 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
 type Builder interface {
-
 	// Compile compiles the ModuleName module that can instantiated in any
 	// namespace (wazero.Namespace).
 	//
@@ -89,6 +90,46 @@ func (b *builder) Compile(ctx context.Context) (wazero.CompiledModule, error) {
 // Instantiate implements Builder.Instantiate
 func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
 	return b.hostModuleBuilder().Instantiate(ctx, ns)
+}
+
+// FunctionExporter exports functions into a wazero.HostModuleBuilder.
+type FunctionExporter interface {
+	ExportFunctions(wazero.HostModuleBuilder)
+}
+
+// NewFunctionExporter returns a new FunctionExporter. This is used for two
+// following two use cases:
+//   - Overriding a builtin function with an alternate implementation.
+//   - Exporting functions to the module "wasi_unstable" for legacy code.
+//
+// # Example of overriding default behavior
+//
+//	// Export the default WASI functions.
+//	wasiBuilder := r.NewHostModuleBuilder(ModuleName)
+//	NewFunctionExporter().ExportFunctions(wasiBuilder)
+//
+//	// Subsequent calls to NewFunctionBuilder override built-in exports.
+//	wasiBuilder.NewFunctionBuilder().
+//		WithFunc(func(ctx context.Context, mod api.Module, exitCode uint32) {
+//		// your custom logic
+//		}).Export("proc_exit")
+//
+// # Example of using the old module name for WASI
+//
+//	// Instantiate the current WASI functions under the wasi_unstable
+//	// instead of wasi_snapshot_preview1.
+//	wasiBuilder := r.NewHostModuleBuilder("wasi_unstable")
+//	NewFunctionExporter().ExportFunctions(wasiBuilder)
+//	_, err := wasiBuilder.Instantiate(testCtx, r)
+func NewFunctionExporter() FunctionExporter {
+	return &functionExporter{}
+}
+
+type functionExporter struct{}
+
+// ExportFunctions implements FunctionExporter.ExportFunctions
+func (functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
+	exportFunctions(builder)
 }
 
 // ## Translation notes

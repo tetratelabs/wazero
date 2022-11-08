@@ -92,7 +92,7 @@ type FunctionExporter interface {
 
 	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".
-	ExportFunctions(builder wazero.HostModuleBuilder)
+	ExportFunctions(wazero.HostModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.

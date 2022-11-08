@@ -16,18 +16,17 @@ var wasiArg []byte
 
 func TestInstantiateModule(t *testing.T) {
 	r := wazero.NewRuntime(testCtx)
+	defer r.Close(testCtx)
 
 	stdout := bytes.NewBuffer(nil)
 
 	// Configure WASI to write stdout to a buffer, so that we can verify it later.
 	sys := wazero.NewModuleConfig().WithStdout(stdout)
-	wm, err := Instantiate(testCtx, r)
+	_, err := Instantiate(testCtx, r)
 	require.NoError(t, err)
-	defer wm.Close(testCtx)
 
 	compiled, err := r.CompileModule(testCtx, wasiArg)
 	require.NoError(t, err)
-	defer compiled.Close(testCtx)
 
 	// Re-use the same module many times.
 	tests := []string{"a", "b", "c"}
