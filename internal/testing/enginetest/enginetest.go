@@ -222,7 +222,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
 		fns := module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
 
-		var func1, func2 = uint32(2), uint32(1)
+		func1, func2 := uint32(2), uint32(1)
 		tableInits := []wasm.TableInitEntry{
 			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1}},
 			{TableIndex: 1, Offset: 5, FunctionIndexes: []*wasm.Index{&func2}},
@@ -247,7 +247,9 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 			FunctionSection: []uint32{0, 0, 0, 0},
 			CodeSection: []*wasm.Code{
 				{Body: []byte{wasm.OpcodeEnd}},
-				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
+				{Body: []byte{wasm.OpcodeEnd}},
 			},
 			ID: wasm.ModuleID{2},
 		}
@@ -329,7 +331,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		importing := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
 		fns := importing.BuildFunctions(importingModule, buildListeners(et.ListenerFactory(), importingModule))
 
-		var func1, func2 = uint32(0), uint32(4)
+		func1, func2 := uint32(0), uint32(4)
 		tableInits := []wasm.TableInitEntry{
 			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1, &func2}},
 		}
@@ -682,8 +684,10 @@ func divByGo(d uint32) uint32 {
 var hostDivByGo = wasm.MustParseGoReflectFuncCode(divByGo)
 
 // (func (export "div_by.wasm") (param i32) (result i32) (i32.div_u (i32.const 1) (local.get 0)))
-var divByWasm = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeI32DivU, wasm.OpcodeEnd}
-var hostDivByWasm = &wasm.Code{IsHostFunction: true, Body: divByWasm}
+var (
+	divByWasm     = []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeLocalGet, 0, wasm.OpcodeI32DivU, wasm.OpcodeEnd}
+	hostDivByWasm = &wasm.Code{IsHostFunction: true, Body: divByWasm}
+)
 
 const (
 	readMemName               = "read_mem"
@@ -703,8 +707,10 @@ func readMemGo(ctx context.Context, m api.Module) uint64 {
 var hostReadMemGo = wasm.MustParseGoReflectFuncCode(readMemGo)
 
 // (func (export "wasm_read_mem") (result i64) i32.const 0 i64.load)
-var readMemWasm = []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeI64Load, 0x3, 0x0, wasm.OpcodeEnd}
-var hostReadMemWasm = &wasm.Code{IsHostFunction: true, Body: readMemWasm}
+var (
+	readMemWasm     = []byte{wasm.OpcodeI32Const, 0, wasm.OpcodeI64Load, 0x3, 0x0, wasm.OpcodeEnd}
+	hostReadMemWasm = &wasm.Code{IsHostFunction: true, Body: readMemWasm}
+)
 
 func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experimental.FunctionListenerFactory) (*wasm.ModuleInstance, *wasm.ModuleInstance, *wasm.ModuleInstance, func()) {
 	ft := &wasm.FunctionType{Params: []wasm.ValueType{i32}, Results: []wasm.ValueType{i32}, ParamNumInUint64: 1, ResultNumInUint64: 1}

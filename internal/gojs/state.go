@@ -45,8 +45,10 @@ func (e *event) get(_ context.Context, propertyKey string) interface{} {
 	panic(fmt.Sprintf("TODO: event.%s", propertyKey))
 }
 
-var undefined = struct{ name string }{name: "undefined"}
-var NaN = math.NaN()
+var (
+	undefined = struct{ name string }{name: "undefined"}
+	NaN       = math.NaN()
+)
 
 // loadValue reads up to 8 bytes at the memory offset `addr` to return the
 // value written by storeValue.

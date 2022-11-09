@@ -1777,7 +1777,6 @@ operatorSwitch:
 			// Read the destination table inde.g.
 			src, num, err := leb128.LoadUint32(c.body[c.pc+1:])
 			if err != nil {
-
 				return fmt.Errorf("reading i32.const value: %v", err)
 			}
 			c.pc += num

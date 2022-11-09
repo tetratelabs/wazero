@@ -201,7 +201,6 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-
 			name: "passive value vector",
 			in: []byte{
 				1, // Prefix.
@@ -236,7 +235,6 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-
 			name: "active with non zero table index encoded.",
 			in: []byte{
 				2, // Prefix.
@@ -257,7 +255,6 @@ func TestDecodeElementSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations | api.CoreFeatureReferenceTypes,
 		},
 		{
-
 			name: "active with non zero table index encoded but reference-types disabled",
 			in: []byte{
 				2, // Prefix.

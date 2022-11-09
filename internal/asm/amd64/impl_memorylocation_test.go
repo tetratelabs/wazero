@@ -18,18 +18,24 @@ func TestNodeImpl_GetMemoryLocation_errors(t *testing.T) {
 			expErr: "offset does not fit in 32-bit integer",
 		},
 		{
-			n: &nodeImpl{instruction: ADDL, types: operandTypesMemoryToRegister,
-				srcConst: 10, srcReg: asm.NilRegister, srcMemIndex: RegR12, srcMemScale: 1, dstReg: RegR10},
+			n: &nodeImpl{
+				instruction: ADDL, types: operandTypesMemoryToRegister,
+				srcConst: 10, srcReg: asm.NilRegister, srcMemIndex: RegR12, srcMemScale: 1, dstReg: RegR10,
+			},
 			expErr: "addressing without base register but with index is not implemented",
 		},
 		{
-			n: &nodeImpl{instruction: ADDL, types: operandTypesMemoryToRegister,
-				srcConst: 10, srcReg: RegAX, srcMemIndex: RegSP, srcMemScale: 1, dstReg: RegR10},
+			n: &nodeImpl{
+				instruction: ADDL, types: operandTypesMemoryToRegister,
+				srcConst: 10, srcReg: RegAX, srcMemIndex: RegSP, srcMemScale: 1, dstReg: RegR10,
+			},
 			expErr: "SP cannot be used for SIB index",
 		},
 		{
-			n: &nodeImpl{instruction: ADDL, types: operandTypesMemoryToRegister,
-				srcConst: 10, srcReg: RegAX, srcMemIndex: RegR9, srcMemScale: 3, dstReg: RegR10},
+			n: &nodeImpl{
+				instruction: ADDL, types: operandTypesMemoryToRegister,
+				srcConst: 10, srcReg: RegAX, srcMemIndex: RegR9, srcMemScale: 3, dstReg: RegR10,
+			},
 			expErr: "scale in SIB must be one of 1, 2, 4, 8 but got 3",
 		},
 	}
@@ -38,6 +44,7 @@ func TestNodeImpl_GetMemoryLocation_errors(t *testing.T) {
 		require.EqualError(t, err, tt.expErr, tt.expErr)
 	}
 }
+
 func TestNodeImpl_GetMemoryLocation_without_base(t *testing.T) {
 	tests := []struct {
 		offset                        int64
@@ -50,8 +57,10 @@ func TestNodeImpl_GetMemoryLocation_without_base(t *testing.T) {
 		{offset: -2147483648, modRM: 0x4, sbi: 0x25},
 	}
 	for _, tc := range tests {
-		n := &nodeImpl{types: operandTypesMemoryToRegister,
-			srcReg: asm.NilRegister, srcConst: tc.offset}
+		n := &nodeImpl{
+			types:  operandTypesMemoryToRegister,
+			srcReg: asm.NilRegister, srcConst: tc.offset,
+		}
 		rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
 		require.NoError(t, err)
 		require.Equal(t, RexPrefixNone, rexPrefix)
@@ -60,6 +69,7 @@ func TestNodeImpl_GetMemoryLocation_without_base(t *testing.T) {
 		require.Equal(t, byte(32), displacementWidth)
 	}
 }
+
 func TestNodeImpl_GetMemoryLocation_with_base(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -1673,8 +1683,10 @@ func TestNodeImpl_GetMemoryLocation_with_base(t *testing.T) {
 		{name: "baseReg=RegR15/indexReg=Nil/scale=8/offset=-2147483648", baseReg: RegR15, indexReg: asm.NilRegister, scale: 8, offset: -2147483648, expRex: 0x41, expModRM: 0x87, needSBI: false, displacementWidth: 32},
 	}
 	for _, tc := range tests {
-		n := &nodeImpl{types: operandTypesMemoryToRegister,
-			srcReg: tc.baseReg, srcConst: tc.offset, srcMemIndex: tc.indexReg, srcMemScale: tc.scale}
+		n := &nodeImpl{
+			types:  operandTypesMemoryToRegister,
+			srcReg: tc.baseReg, srcConst: tc.offset, srcMemIndex: tc.indexReg, srcMemScale: tc.scale,
+		}
 		rexPrefix, modRM, sbi, displacementWidth, err := n.GetMemoryLocation()
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.expRex, rexPrefix, tc.name)

@@ -49,8 +49,10 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "ADD V0, V10",
 		},
 		{
-			in: &nodeImpl{instruction: ADD, types: operandTypesLeftShiftedRegisterToRegister,
-				srcReg: RegR0, srcReg2: RegR11, srcConst: 4, dstReg: RegR10},
+			in: &nodeImpl{
+				instruction: ADD, types: operandTypesLeftShiftedRegisterToRegister,
+				srcReg: RegR0, srcReg2: RegR11, srcConst: 4, dstReg: RegR10,
+			},
 			exp: "ADD (R0, R11 << 4), R10",
 		},
 		{
@@ -58,8 +60,10 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "ADD (R0, R8), R10",
 		},
 		{
-			in: &nodeImpl{instruction: MSUB, types: operandTypesThreeRegistersToRegister,
-				srcReg: RegR0, srcReg2: RegR8, dstReg: RegR10, dstReg2: RegR1},
+			in: &nodeImpl{
+				instruction: MSUB, types: operandTypesThreeRegistersToRegister,
+				srcReg: RegR0, srcReg2: RegR8, dstReg: RegR10, dstReg2: RegR1,
+			},
 			exp: "MSUB (R0, R8, R10), R1)",
 		},
 		{
@@ -91,51 +95,69 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "MOVD 0x123, R8",
 		},
 		{
-			in: &nodeImpl{instruction: VMOV, types: operandTypesMemoryToVectorRegister,
-				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2S},
+			in: &nodeImpl{
+				instruction: VMOV, types: operandTypesMemoryToVectorRegister,
+				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2S,
+			},
 			exp: "VMOV [R1], V29.2S",
 		},
 		{
-			in: &nodeImpl{instruction: VMOV, types: operandTypesVectorRegisterToMemory,
+			in: &nodeImpl{
+				instruction: VMOV, types: operandTypesVectorRegisterToMemory,
 				dstReg: RegR1, dstReg2: RegR6,
-				srcReg: RegV29, vectorArrangement: VectorArrangementQ},
+				srcReg: RegV29, vectorArrangement: VectorArrangementQ,
+			},
 			exp: "VMOV V29.Q, [R1 + R6]",
 		},
 		{
-			in: &nodeImpl{instruction: VMOV, types: operandTypesVectorRegisterToMemory,
+			in: &nodeImpl{
+				instruction: VMOV, types: operandTypesVectorRegisterToMemory,
 				dstReg: RegR1, dstConst: 0x10,
-				srcReg: RegV29, vectorArrangement: VectorArrangementQ},
+				srcReg: RegV29, vectorArrangement: VectorArrangementQ,
+			},
 			exp: "VMOV V29.Q, [R1 + 0x10]",
 		},
 		{
-			in: &nodeImpl{instruction: VMOV, types: operandTypesRegisterToVectorRegister,
-				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2D, dstVectorIndex: 1},
+			in: &nodeImpl{
+				instruction: VMOV, types: operandTypesRegisterToVectorRegister,
+				srcReg: RegR1, dstReg: RegV29, vectorArrangement: VectorArrangement2D, dstVectorIndex: 1,
+			},
 			exp: "VMOV R1, V29.2D[1]",
 		},
 		{
-			in: &nodeImpl{instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
-				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1},
+			in: &nodeImpl{
+				instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
+				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1,
+			},
 			exp: "VCNT V3.2D, V29.2D",
 		},
 		{
-			in: &nodeImpl{instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
-				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1},
+			in: &nodeImpl{
+				instruction: VCNT, types: operandTypesVectorRegisterToVectorRegister,
+				srcReg: RegV3, dstReg: RegV29, vectorArrangement: VectorArrangement2D, srcVectorIndex: 1,
+			},
 			exp: "VCNT V3.2D, V29.2D",
 		},
 		{
-			in: &nodeImpl{instruction: UMOV, types: operandTypesVectorRegisterToRegister,
-				srcReg: RegV31, dstReg: RegR8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1},
+			in: &nodeImpl{
+				instruction: UMOV, types: operandTypesVectorRegisterToRegister,
+				srcReg: RegV31, dstReg: RegR8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1,
+			},
 			exp: "UMOV V31.S[1], R8",
 		},
 		{
-			in: &nodeImpl{instruction: UMOV, types: operandTypesTwoVectorRegistersToVectorRegister,
-				srcReg: RegV31, srcReg2: RegV1, dstReg: RegV8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1},
+			in: &nodeImpl{
+				instruction: UMOV, types: operandTypesTwoVectorRegistersToVectorRegister,
+				srcReg: RegV31, srcReg2: RegV1, dstReg: RegV8, vectorArrangement: VectorArrangementS, srcVectorIndex: 1,
+			},
 			exp: "UMOV (V31.S, V1.S), V8.S",
 		},
 		{
-			in: &nodeImpl{instruction: VORR, types: operandTypesStaticConstToVectorRegister,
+			in: &nodeImpl{
+				instruction: VORR, types: operandTypesStaticConstToVectorRegister,
 				staticConst: &asm.StaticConst{Raw: []byte{1, 2, 3, 4}},
-				dstReg:      RegV8, vectorArrangement: VectorArrangement16B, srcVectorIndex: 1},
+				dstReg:      RegV8, vectorArrangement: VectorArrangement16B, srcVectorIndex: 1,
+			},
 			exp: "VORR $0x01020304 V8.16B",
 		},
 	}
@@ -572,7 +594,11 @@ func Test_validateMemoryOffset(t *testing.T) {
 		offset int64
 		expErr string
 	}{
-		{offset: 0}, {offset: -256}, {offset: 255}, {offset: 123 * 8}, {offset: 123 * 4},
+		{offset: 0},
+		{offset: -256},
+		{offset: 255},
+		{offset: 123 * 8},
+		{offset: 123 * 4},
 		{offset: -257, expErr: "negative memory offset must be larget than or equal -256 but got -257"},
 		{offset: 257, expErr: "large memory offset (>255) must be a multiple of 4 but got 257"},
 	}
@@ -2325,28 +2351,38 @@ func TestAssemblerImpl_EncodeLeftShiftedRegisterToRegister(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: SUB, types: operandTypesLeftShiftedRegisterToRegister,
-					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
+				n: &nodeImpl{
+					instruction: SUB, types: operandTypesLeftShiftedRegisterToRegister,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
+				},
 				expErr: "SUB is unsupported for from:left-shifted-register,to:register type",
 			},
 			{
-				n: &nodeImpl{instruction: ADD,
-					srcConst: -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
+				n: &nodeImpl{
+					instruction: ADD,
+					srcConst:    -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
+				},
 				expErr: "shift amount must fit in unsigned 6-bit integer (0-64) but got -1",
 			},
 			{
-				n: &nodeImpl{instruction: ADD,
-					srcConst: -1, srcReg: RegV0, srcReg2: RegR0, dstReg: RegR0},
+				n: &nodeImpl{
+					instruction: ADD,
+					srcConst:    -1, srcReg: RegV0, srcReg2: RegR0, dstReg: RegR0,
+				},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &nodeImpl{instruction: ADD,
-					srcConst: -1, srcReg: RegR0, srcReg2: RegV0, dstReg: RegR0},
+				n: &nodeImpl{
+					instruction: ADD,
+					srcConst:    -1, srcReg: RegR0, srcReg2: RegV0, dstReg: RegR0,
+				},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &nodeImpl{instruction: ADD,
-					srcConst: -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegV0},
+				n: &nodeImpl{
+					instruction: ADD,
+					srcConst:    -1, srcReg: RegR0, srcReg2: RegR0, dstReg: RegV0,
+				},
 				expErr: "V0 is not integer",
 			},
 		}
@@ -2490,18 +2526,24 @@ func TestAssemblerImpl_encodeTwoRegistersToNone(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: SUB, types: operandTypesTwoRegistersToNone,
-					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0},
+				n: &nodeImpl{
+					instruction: SUB, types: operandTypesTwoRegistersToNone,
+					srcReg: RegR0, srcReg2: RegR0, dstReg: RegR0,
+				},
 				expErr: "SUB is unsupported for from:two-registers,to:none type",
 			},
 			{
-				n: &nodeImpl{instruction: CMP,
-					srcReg: RegR0, srcReg2: RegV0},
+				n: &nodeImpl{
+					instruction: CMP,
+					srcReg:      RegR0, srcReg2: RegV0,
+				},
 				expErr: "V0 is not integer",
 			},
 			{
-				n: &nodeImpl{instruction: FCMPS,
-					srcReg: RegR0, srcReg2: RegV0},
+				n: &nodeImpl{
+					instruction: FCMPS,
+					srcReg:      RegR0, srcReg2: RegV0,
+				},
 				expErr: "R0 is not vector",
 			},
 		}

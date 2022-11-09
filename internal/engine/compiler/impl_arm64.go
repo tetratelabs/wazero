@@ -74,9 +74,7 @@ const (
 	arm64ReservedRegisterForTemporary = arm64.RegR27
 )
 
-var (
-	arm64CallingConventionModuleInstanceAddressRegister = arm64.RegR29
-)
+var arm64CallingConventionModuleInstanceAddressRegister = arm64.RegR29
 
 const (
 	// arm64CallEngineArchContextCompilerCallReturnAddressOffset is the offset of archContext.nativeCallReturnAddress in callEngine.
@@ -447,7 +445,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 		c.pushVectorRuntimeValueLocationOnRegister(resultReg)
 	} else {
-		var ldr = arm64.NOP
+		ldr := arm64.NOP
 		var result asm.Register
 		var vt runtimeValueType
 		switch wasmValueType {
@@ -886,8 +884,7 @@ func (c *arm64Compiler) compileCallImpl(targetFunctionAddressRegister asm.Regist
 
 	nextStackBasePointerOffset := int64(c.locationStack.sp) - int64(functype.ParamNumInUint64)
 
-	callFrameReturnAddressLoc, callFrameStackBasePointerInBytesLoc, callFrameFunctionLoc :=
-		c.locationStack.pushCallFrame(functype)
+	callFrameReturnAddressLoc, callFrameStackBasePointerInBytesLoc, callFrameFunctionLoc := c.locationStack.pushCallFrame(functype)
 
 	// Save the current stack base pointer at callFrameStackBasePointerInBytesLoc.
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
@@ -1297,7 +1294,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 
 	// At this point, at least one of x1 or x2 registers is non zero.
 	// Choose the non-zero register as destination.
-	var destinationReg = x1.register
+	destinationReg := x1.register
 	if isZeroRegister(x1.register) {
 		destinationReg = x2.register
 	}
@@ -1691,7 +1688,7 @@ func (c *arm64Compiler) compileAnd(o *wazeroir.OperationAnd) error {
 
 	// At this point, at least one of x1 or x2 registers is non zero.
 	// Choose the non-zero register as destination.
-	var destinationReg = x1.register
+	destinationReg := x1.register
 	if isZeroRegister(x1.register) {
 		destinationReg = x2.register
 	}
@@ -1747,7 +1744,7 @@ func (c *arm64Compiler) compileXor(o *wazeroir.OperationXor) error {
 
 	// At this point, at least one of x1 or x2 registers is non zero.
 	// Choose the non-zero register as destination.
-	var destinationReg = x1.register
+	destinationReg := x1.register
 	if isZeroRegister(x1.register) {
 		destinationReg = x2.register
 	}
@@ -2027,7 +2024,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 
 	var vt runtimeValueType
 	var convinst asm.Instruction
-	var is32bitFloat = o.InputType == wazeroir.Float32
+	is32bitFloat := o.InputType == wazeroir.Float32
 	if is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
 		convinst = arm64.FCVTZSSW
 		vt = runtimeValueTypeI32
@@ -2540,7 +2537,8 @@ func (c *arm64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 
 // compileLoadImpl implements compileLoadImpl* variants for arm64 architecture.
 func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst asm.Instruction,
-	targetSizeInBytes int64, isFloat bool, resultRuntimeValueType runtimeValueType) error {
+	targetSizeInBytes int64, isFloat bool, resultRuntimeValueType runtimeValueType,
+) error {
 	offsetReg, err := c.compileMemoryAccessOffsetSetup(offsetArg, targetSizeInBytes)
 	if err != nil {
 		return err
@@ -2902,7 +2900,7 @@ func (c *arm64Compiler) compileInitImpl(isTable bool, index, tableIndex uint32) 
 	}
 	c.markRegisterUsed(destinationOffset.register)
 
-	var tableInstanceAddressReg = asm.NilRegister
+	tableInstanceAddressReg := asm.NilRegister
 	if isTable {
 		tableInstanceAddressReg, err = c.allocateRegister(registerTypeGeneralPurpose)
 		if err != nil {
@@ -3948,7 +3946,6 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // ce.moduleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
-
 	regs, found := c.locationStack.takeFreeRegisters(registerTypeGeneralPurpose, 2)
 	if !found {
 		panic("BUG: all the registers should be free at this point")

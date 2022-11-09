@@ -197,7 +197,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
 		// This function aggressively grow the goroutine stack by recursively
 		// calling the function many times.
-		var callNum = 1000
+		callNum := 1000
 		var growGoroutineStack func()
 		growGoroutineStack = func() {
 			if callNum != 0 {

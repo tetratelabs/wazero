@@ -14,7 +14,7 @@ import (
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 func Test_parseGoFunc(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		input             interface{}
 		expectNeedsModule bool
@@ -138,7 +138,7 @@ func (s *stack) pop() (result uint64) {
 
 func TestPopValues(t *testing.T) {
 	stackVals := []uint64{1, 2, 3, 4, 5, 6, 7}
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		count    int
 		expected []uint64
@@ -177,7 +177,7 @@ func Test_callGoFunc(t *testing.T) {
 	tPtr := uintptr(unsafe.Pointer(t))
 	callCtx := &CallContext{}
 
-	var tests = []struct {
+	tests := []struct {
 		name                         string
 		input                        interface{}
 		inputParams, expectedResults []uint64

@@ -422,7 +422,8 @@ func TestCompiler_compileStore(t *testing.T) {
 
 func TestCompiler_MemoryOutOfBounds(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
-	offsets := []uint32{0,
+	offsets := []uint32{
+		0,
 		1 << 10, 1 << 31,
 		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
 		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,

@@ -32,7 +32,7 @@ func TestRun(t *testing.T) {
 	}
 
 	wasmPath := filepath.Join(t.TempDir(), "cli.wasm")
-	require.NoError(t, os.WriteFile(wasmPath, cliWasm, 0755))
+	require.NoError(t, os.WriteFile(wasmPath, cliWasm, 0o755))
 
 	// We can't invoke go run in our docker based cross-architecture tests. We do want to use
 	// otherwise so running unit tests normally does not require special build steps.

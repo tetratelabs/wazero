@@ -167,8 +167,8 @@ const maximumFunctionTypes = 1 << 27
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
-	types []*FunctionType) {
-
+	types []*FunctionType,
+) {
 	m.Types = types
 	m.Functions = append(importedFunctions, functions...)
 	m.Globals = append(importedGlobals, globals...)

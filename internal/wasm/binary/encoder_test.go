@@ -154,9 +154,9 @@ func TestModule_Encode(t *testing.T) {
 				0x06, 'A', 'd', 'd', 'I', 'n', 't', // size of "AddInt", "AddInt"
 				wasm.ExternTypeFunc, 0x00, // func[0]
 				wasm.SectionIDCode, 0x09, // 9 bytes in this section
-				01,                     // one code section
-				07,                     // length of the body + locals
-				00,                     // count of local blocks
+				0o1,                    // one code section
+				0o7,                    // length of the body + locals
+				0o0,                    // count of local blocks
 				wasm.OpcodeLocalGet, 0, // local.get 0
 				wasm.OpcodeLocalGet, 1, // local.get 1
 				wasm.OpcodeI32Add,          // i32.add

@@ -7,7 +7,7 @@ import (
 )
 
 func BenchmarkMemory(b *testing.B) {
-	var mem = &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1}
+	mem := &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1}
 	if !mem.WriteByte(testCtx, 10, 16) {
 		b.Fail()
 	}

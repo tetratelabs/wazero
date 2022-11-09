@@ -44,13 +44,15 @@ func compileAndRun(ctx context.Context, arg string, config wazero.ModuleConfig) 
 var testBin []byte
 
 // testCtx is configured in TestMain to re-use wazero's compilation cache.
-var testCtx context.Context
-var testFS = fstest.MapFS{
-	"empty.txt":    {},
-	"test.txt":     {Data: []byte("animals")},
-	"sub":          {Mode: fs.ModeDir},
-	"sub/test.txt": {Data: []byte("greet sub dir\n")},
-}
+var (
+	testCtx context.Context
+	testFS  = fstest.MapFS{
+		"empty.txt":    {},
+		"test.txt":     {Data: []byte("animals")},
+		"sub":          {Mode: fs.ModeDir},
+		"sub/test.txt": {Data: []byte("greet sub dir\n")},
+	}
+)
 
 func TestMain(m *testing.M) {
 	// For some reason, windows and freebsd fail to compile with exit status 1.

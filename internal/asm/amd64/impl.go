@@ -230,8 +230,10 @@ type AssemblerImpl struct {
 }
 
 func NewAssembler() *AssemblerImpl {
-	return &AssemblerImpl{buf: bytes.NewBuffer(nil), enablePadding: true, pool: asm.NewStaticConstPool(),
-		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool}
+	return &AssemblerImpl{
+		buf: bytes.NewBuffer(nil), enablePadding: true, pool: asm.NewStaticConstPool(),
+		MaxDisplacementForConstantPool: defaultMaxDisplacementForConstantPool,
+	}
 }
 
 // newNode creates a new Node and appends it into the linked list.

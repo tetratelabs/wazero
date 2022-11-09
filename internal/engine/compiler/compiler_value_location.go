@@ -383,7 +383,8 @@ func (v *runtimeValueLocationStack) init(sig *wasm.FunctionType) {
 //
 // See the diagram in callEngine.stack.
 func (v *runtimeValueLocationStack) getCallFrameLocations(sig *wasm.FunctionType) (
-	returnAddress, callerStackBasePointerInBytes, callerFunction *runtimeValueLocation) {
+	returnAddress, callerStackBasePointerInBytes, callerFunction *runtimeValueLocation,
+) {
 	offset := callFrameOffset(sig)
 	return v.stack[offset], v.stack[offset+1], v.stack[offset+2]
 }

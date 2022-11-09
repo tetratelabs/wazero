@@ -13,7 +13,7 @@ func Main() {
 	fmt.Printf("syscall.Getuid()=%d\n", syscall.Getuid())
 	fmt.Printf("syscall.Getgid()=%d\n", syscall.Getgid())
 	fmt.Printf("syscall.Geteuid()=%d\n", syscall.Geteuid())
-	fmt.Printf("syscall.Umask(0077)=%O\n", syscall.Umask(0077))
+	fmt.Printf("syscall.Umask(0077)=%O\n", syscall.Umask(0o077))
 	if g, err := syscall.Getgroups(); err != nil {
 		log.Panicln(err)
 	} else {

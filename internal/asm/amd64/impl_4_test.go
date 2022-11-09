@@ -279,8 +279,10 @@ func TestAssemblerImpl_encodeConstToRegister(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeConstToRegister(&nodeImpl{instruction: tc.inst,
-			types: operandTypesConstToRegister, srcConst: tc.c, dstReg: tc.dstReg})
+		err := a.encodeConstToRegister(&nodeImpl{
+			instruction: tc.inst,
+			types:       operandTypesConstToRegister, srcConst: tc.c, dstReg: tc.dstReg,
+		})
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
@@ -574,8 +576,10 @@ func TestAssemblerImpl_encodeRegisterToConst(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeRegisterToConst(&nodeImpl{instruction: tc.inst,
-			types: operandTypesRegisterToConst, srcReg: tc.srcReg, dstConst: tc.c})
+		err := a.encodeRegisterToConst(&nodeImpl{
+			instruction: tc.inst,
+			types:       operandTypesRegisterToConst, srcReg: tc.srcReg, dstConst: tc.c,
+		})
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}

@@ -68,12 +68,10 @@ var (
 	}
 )
 
-var (
-	// amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister holds *wasm.ModuleInstance of the
-	// next executing function instance. The value is set and used when making function calls
-	// or function returns in the ModuleContextInitialization. See compileModuleContextInitialization.
-	amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister = amd64.RegR12
-)
+// amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister holds *wasm.ModuleInstance of the
+// next executing function instance. The value is set and used when making function calls
+// or function returns in the ModuleContextInitialization. See compileModuleContextInitialization.
+var amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister = amd64.RegR12
 
 func (c *amd64Compiler) String() string {
 	return c.locationStack.String()
@@ -1302,7 +1300,6 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 
 // compileRem implements compiler.compileRem for the amd64 architecture.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
-
 	var vt runtimeValueType
 	switch o.Type {
 	case wazeroir.SignedInt32:
@@ -2693,7 +2690,8 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 // compileSimpleConversion pops a value type from the stack, and applies the
 // given instruction on it, and push the result onto a register of the given type.
 func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction,
-	destinationRegisterType registerType, destinationValueType runtimeValueType) error {
+	destinationRegisterType registerType, destinationValueType runtimeValueType,
+) error {
 	origin := c.locationStack.pop()
 	if err := c.compileEnsureOnRegister(origin); err != nil {
 		return err
@@ -2864,7 +2862,8 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 }
 
 func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction,
-	shouldEqual bool) error {
+	shouldEqual bool,
+) error {
 	c.assembler.CompileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
 
 	// Record that the result is on the conditional register.
@@ -4472,8 +4471,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(functionAddressRegister asm.Regi
 
 	nextStackBasePointerOffset := int64(c.locationStack.sp) - int64(functype.ParamNumInUint64)
 
-	callFrameReturnAddressLoc, callFrameStackBasePointerInBytesLoc, callFrameFunctionLoc :=
-		c.locationStack.pushCallFrame(functype)
+	callFrameReturnAddressLoc, callFrameStackBasePointerInBytesLoc, callFrameFunctionLoc := c.locationStack.pushCallFrame(functype)
 
 	// Save the current stack base pointer at callFrameStackBasePointerInBytesLoc.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,

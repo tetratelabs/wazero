@@ -27,7 +27,8 @@ const maximumValuesOnStack = 1 << 27
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
 func (m *Module) validateFunction(enabledFeatures api.CoreFeatures, idx Index, functions []Index,
-	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{}) error {
+	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{},
+) error {
 	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
 

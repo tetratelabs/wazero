@@ -22,7 +22,6 @@ var asWasm []byte
 //
 // See README.md for a full description.
 func main() {
-
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 

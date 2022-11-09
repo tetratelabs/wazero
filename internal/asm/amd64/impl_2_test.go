@@ -22,8 +22,10 @@ import (
 func TestAssemblerImpl_EncodeNoneToRegister(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		a := NewAssembler()
-		err := a.encodeNoneToRegister(&nodeImpl{instruction: ADDL,
-			types: operandTypesNoneToRegister, dstReg: RegAX})
+		err := a.encodeNoneToRegister(&nodeImpl{
+			instruction: ADDL,
+			types:       operandTypesNoneToRegister, dstReg: RegAX,
+		})
 		require.Error(t, err)
 
 		t.Run("error", func(t *testing.T) {
@@ -475,8 +477,10 @@ func TestAssemblerImpl_EncodeNoneToMemory(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		a := NewAssembler()
-		err := a.encodeNoneToMemory(&nodeImpl{types: operandTypesNoneToMemory,
-			instruction: tc.inst, dstReg: tc.dst, dstConst: tc.dstOffset})
+		err := a.encodeNoneToMemory(&nodeImpl{
+			types:       operandTypesNoneToMemory,
+			instruction: tc.inst, dstReg: tc.dst, dstConst: tc.dstOffset,
+		})
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
@@ -581,8 +585,10 @@ func TestAssemblerImpl_EncodeRegisterToNone(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeRegisterToNone(&nodeImpl{instruction: tc.inst,
-			types: operandTypesRegisterToNone, srcReg: tc.reg})
+		err := a.encodeRegisterToNone(&nodeImpl{
+			instruction: tc.inst,
+			types:       operandTypesRegisterToNone, srcReg: tc.reg,
+		})
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}
@@ -649,14 +655,18 @@ func TestAssemblerImpl_EncodeRegisterToRegister(t *testing.T) {
 		{name: "punpckhbw xmm11, xmm1", n: &nodeImpl{instruction: PUNPCKHBW, srcReg: RegX1, dstReg: RegX11}, exp: []byte{0x66, 0x44, 0xf, 0x68, 0xd9}},
 		{name: "pslld xmm11, xmm1", n: &nodeImpl{instruction: PSLLD, srcReg: RegX1, dstReg: RegX11}, exp: []byte{0x66, 0x44, 0xf, 0xf2, 0xd9}},
 		{name: "psllq xmm11, xmm15", n: &nodeImpl{instruction: PSLLQ, srcReg: RegX15, dstReg: RegX11}, exp: []byte{0x66, 0x45, 0xf, 0xf3, 0xdf}},
-		{name: "cmpeqps xmm11, xmm15", n: &nodeImpl{instruction: CMPPS, srcReg: RegX15, dstReg: RegX11, arg: 0}, // CMPPS with arg=0 == Pseudo-Op CMPEQPS.
+		{
+			name: "cmpeqps xmm11, xmm15", n: &nodeImpl{instruction: CMPPS, srcReg: RegX15, dstReg: RegX11, arg: 0}, // CMPPS with arg=0 == Pseudo-Op CMPEQPS.
 			exp: []byte{0x45, 0xf, 0xc2, 0xdf, 0x0},
 		},
-		{name: "cmpordps xmm1, xmm5", n: &nodeImpl{instruction: CMPPS, srcReg: RegX5, dstReg: RegX1, arg: 7}, // CMPPS with arg=7 == Pseudo-Op CMPORDPS.
+		{
+			name: "cmpordps xmm1, xmm5", n: &nodeImpl{instruction: CMPPS, srcReg: RegX5, dstReg: RegX1, arg: 7}, // CMPPS with arg=7 == Pseudo-Op CMPORDPS.
 			exp: []byte{0xf, 0xc2, 0xcd, 0x7},
 		},
 		{name: "cmplepd xmm11, xmm15", n: &nodeImpl{instruction: CMPPD, srcReg: RegX15, dstReg: RegX11, arg: 2}, // CMPPD with arg=2 == Pseudo-Op CMPLEPD.
-			exp: []byte{0x66, 0x45, 0xf, 0xc2, 0xdf, 0x2}}, {name: "cmpneqpd xmm1, xmm5", n: &nodeImpl{instruction: CMPPD, srcReg: RegX5, dstReg: RegX1, arg: 4}, // CMPPD with arg=4 == Pseudo-Op CMPNEQPD.
+			exp: []byte{0x66, 0x45, 0xf, 0xc2, 0xdf, 0x2}},
+		{
+			name: "cmpneqpd xmm1, xmm5", n: &nodeImpl{instruction: CMPPD, srcReg: RegX5, dstReg: RegX1, arg: 4}, // CMPPD with arg=4 == Pseudo-Op CMPNEQPD.
 			exp: []byte{0x66, 0xf, 0xc2, 0xcd, 0x4},
 		},
 		{name: "pcmpgtq xmm10, xmm3", n: &nodeImpl{instruction: PCMPGTQ, srcReg: RegX3, dstReg: RegX10}, exp: []byte{0x66, 0x44, 0xf, 0x38, 0x37, 0xd3}},

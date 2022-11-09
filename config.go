@@ -259,7 +259,6 @@ func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
 //
 // Note: ModuleConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type ModuleConfig interface {
-
 	// WithArgs assigns command-line arguments visible to an imported function that reads an arg vector (argv). Defaults to
 	// none. Runtime.InstantiateModule errs if any arg is empty.
 	//

@@ -343,7 +343,8 @@ func TestCompiler_compileDataDrop(t *testing.T) {
 			copy(env.module().DataInstances, origins)
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasDataInstances: true, Signature: &wasm.FunctionType{}})
+				HasDataInstances: true, Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -418,7 +419,8 @@ func TestCompiler_compileMemoryInit(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				HasDataInstances: true, HasMemory: true,
-				Signature: &wasm.FunctionType{}})
+				Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -482,7 +484,8 @@ func TestCompiler_compileElemDrop(t *testing.T) {
 			}
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
-				HasElementInstances: true, Signature: &wasm.FunctionType{}})
+				HasElementInstances: true, Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -645,7 +648,8 @@ func TestCompiler_compileTableInit(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				HasElementInstances: true, HasTable: true,
-				Signature: &wasm.FunctionType{}})
+				Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -771,7 +775,8 @@ func TestCompiler_compileTableSet(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				HasTable:  true,
-				Signature: &wasm.FunctionType{}})
+				Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -837,7 +842,6 @@ func functionFromPtr(ptr uintptr) *function {
 }
 
 func TestCompiler_compileTableGet(t *testing.T) {
-
 	externDog := &dog{name: "sushi"}
 	externrefOpaque := uintptr(unsafe.Pointer(externDog))
 	funcref := &function{source: &wasm.FunctionInstance{}}
@@ -903,7 +907,8 @@ func TestCompiler_compileTableGet(t *testing.T) {
 
 			compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
 				HasTable:  true,
-				Signature: &wasm.FunctionType{}})
+				Signature: &wasm.FunctionType{},
+			})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

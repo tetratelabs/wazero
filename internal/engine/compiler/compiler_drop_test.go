@@ -107,7 +107,6 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 		for _, freeRegisterExists := range []bool{false, true} {
 			freeRegisterExists := freeRegisterExists
 			t.Run(fmt.Sprintf("free register exists=%v", freeRegisterExists), func(t *testing.T) {
-
 				liveValues := []*runtimeValueLocation{
 					// Even multiple integer values are alive and on stack,
 					// only one general purpose register should be chosen.
@@ -146,7 +145,6 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 		for _, freeRegisterExists := range []bool{false, true} {
 			freeRegisterExists := freeRegisterExists
 			t.Run(fmt.Sprintf("free register exists=%v", freeRegisterExists), func(t *testing.T) {
-
 				liveValues := []*runtimeValueLocation{
 					// Even multiple vectors are alive and on stack,
 					// only one vector register should be chosen.

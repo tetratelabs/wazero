@@ -198,8 +198,9 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeF32},
-						Init: &ConstantExpression{Opcode: OpcodeF32Const,
-							Data: u64.LeBytes(api.EncodeF32(1.0)),
+						Init: &ConstantExpression{
+							Opcode: OpcodeF32Const,
+							Data:   u64.LeBytes(api.EncodeF32(1.0)),
 						},
 					},
 				},
@@ -213,8 +214,9 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeF64},
-						Init: &ConstantExpression{Opcode: OpcodeF64Const,
-							Data: u64.LeBytes(api.EncodeF64(1.0)),
+						Init: &ConstantExpression{
+							Opcode: OpcodeF64Const,
+							Data:   u64.LeBytes(api.EncodeF64(1.0)),
 						},
 					},
 				},
@@ -258,8 +260,9 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeF32, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeF32Const,
-							Data: u64.LeBytes(api.EncodeF32(1.0)),
+						Init: &ConstantExpression{
+							Opcode: OpcodeF32Const,
+							Data:   u64.LeBytes(api.EncodeF32(1.0)),
 						},
 					},
 				},
@@ -275,8 +278,9 @@ func TestPublicModule_Global(t *testing.T) {
 				GlobalSection: []*Global{
 					{
 						Type: &GlobalType{ValType: ValueTypeF64, Mutable: true},
-						Init: &ConstantExpression{Opcode: OpcodeF64Const,
-							Data: u64.LeBytes(api.EncodeF64(1.0)),
+						Init: &ConstantExpression{
+							Opcode: OpcodeF64Const,
+							Data:   u64.LeBytes(api.EncodeF64(1.0)),
 						},
 					},
 				},

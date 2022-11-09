@@ -1507,7 +1507,6 @@ func (c *amd64Compiler) compileV128MulI64x2() error {
 
 // compileV128Div implements compiler.compileV128Div for amd64.
 func (c *amd64Compiler) compileV128Div(o *wazeroir.OperationV128Div) error {
-
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err
@@ -1860,11 +1859,9 @@ func (c *amd64Compiler) compileV128FloatMinImpl(is32bit bool, x1r, x2r asm.Regis
 	var min, cmp, andn, or, srl /* shit right logical */ asm.Instruction
 	var shiftNumToInverseNaN asm.ConstantValue
 	if is32bit {
-		min, cmp, andn, or, srl, shiftNumToInverseNaN =
-			amd64.MINPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.PSRLD, 0xa
+		min, cmp, andn, or, srl, shiftNumToInverseNaN = amd64.MINPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.PSRLD, 0xa
 	} else {
-		min, cmp, andn, or, srl, shiftNumToInverseNaN =
-			amd64.MINPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.PSRLQ, 0xd
+		min, cmp, andn, or, srl, shiftNumToInverseNaN = amd64.MINPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.PSRLQ, 0xd
 	}
 
 	// Let v1 and v2 be the operand values on x1r and x2r at this point.
@@ -1958,11 +1955,9 @@ func (c *amd64Compiler) compileV128FloatMaxImpl(is32bit bool, x1r, x2r asm.Regis
 	var max, cmp, andn, or, xor, sub, srl /* shit right logical */ asm.Instruction
 	var shiftNumToInverseNaN asm.ConstantValue
 	if is32bit {
-		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN =
-			amd64.MAXPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.XORPS, amd64.SUBPS, amd64.PSRLD, 0xa
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN = amd64.MAXPS, amd64.CMPPS, amd64.ANDNPS, amd64.ORPS, amd64.XORPS, amd64.SUBPS, amd64.PSRLD, 0xa
 	} else {
-		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN =
-			amd64.MAXPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.XORPD, amd64.SUBPD, amd64.PSRLQ, 0xd
+		max, cmp, andn, or, xor, sub, srl, shiftNumToInverseNaN = amd64.MAXPD, amd64.CMPPD, amd64.ANDNPD, amd64.ORPD, amd64.XORPD, amd64.SUBPD, amd64.PSRLQ, 0xd
 	}
 
 	// Let v1 and v2 be the operand values on x1r and x2r at this point.
@@ -2066,7 +2061,6 @@ func (c *amd64Compiler) compileV128Pmin(o *wazeroir.OperationV128Pmin) error {
 
 // compileV128Pmax implements compiler.compileV128Pmax for amd64.
 func (c *amd64Compiler) compileV128Pmax(o *wazeroir.OperationV128Pmax) error {
-
 	x2 := c.locationStack.popV128()
 	if err := c.compileEnsureOnRegister(x2); err != nil {
 		return err

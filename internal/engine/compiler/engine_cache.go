@@ -91,11 +91,7 @@ func (e *engine) getCodesFromCache(module *wasm.Module) (codes []*code, hit bool
 	return
 }
 
-var (
-	wazeroMagic = "WAZERO"
-	// version must be synced with the tag of the wazero library.
-
-)
+var wazeroMagic = "WAZERO" // version must be synced with the tag of the wazero library.
 
 func serializeCodes(wazeroVersion string, codes []*code) io.Reader {
 	buf := bytes.NewBuffer(nil)

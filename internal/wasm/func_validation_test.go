@@ -3355,8 +3355,10 @@ func TestDecodeBlockType(t *testing.T) {
 // targeting the function return label.
 func TestFuncValidation_UnreachableBrTable_NotModifyTypes(t *testing.T) {
 	funcType := &FunctionType{Results: []ValueType{i32, i64}, Params: []ValueType{i32}}
-	copiedFuncType := &FunctionType{Params: make([]ValueType, len(funcType.Params)),
-		Results: make([]ValueType, len(funcType.Results))}
+	copiedFuncType := &FunctionType{
+		Params:  make([]ValueType, len(funcType.Params)),
+		Results: make([]ValueType, len(funcType.Results)),
+	}
 
 	copy(copiedFuncType.Results, funcType.Results)
 	copy(copiedFuncType.Params, funcType.Params)
