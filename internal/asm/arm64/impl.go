@@ -1833,11 +1833,11 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 		}
 
 		offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
-		if offset > 1<<20 {
+		if i64 := int64(offset); i64 >= 1<<20 || i64 < -1<<20 {
 			// We could support offset over 20-bit range by special casing them here,
 			// but 20-bit range should be enough for our impl. If the necessity comes up,
 			// we could add the special casing here to support arbitrary large offset.
-			return fmt.Errorf("BUG: too large offset for ADR: %d", offset)
+			return fmt.Errorf("BUG: too large offset for ADR: %#x", offset)
 		}
 
 		adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]

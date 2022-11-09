@@ -2,6 +2,7 @@ package arm64
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math"
 	"testing"
 
@@ -683,25 +684,31 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 		require.EqualError(t, err, "BUG: target instruction NOP not found for ADR")
 	})
 	t.Run("offset too large", func(t *testing.T) {
-		a := NewAssembler(asm.NilRegister)
-		a.CompileReadInstructionAddress(RegR27, RET)
-		a.CompileJumpToRegister(RET, RegR25)
-		a.CompileConstToRegister(MOVD, 1000, RegR10)
+		for _, offset := range []int64{
+			1 << 20, -(1 << 20) - 1, math.MinInt64, math.MinInt64,
+		} {
+			t.Run(fmt.Sprintf("offset=%#x", offset), func(t *testing.T) {
+				a := NewAssembler(asm.NilRegister)
+				a.CompileReadInstructionAddress(RegR27, RET)
+				a.CompileJumpToRegister(RET, RegR25)
+				a.CompileConstToRegister(MOVD, 1000, RegR10)
 
-		for n := a.Root; n != nil; n = n.next {
-			n.offsetInBinaryField = uint64(a.Buf.Len())
+				for n := a.Root; n != nil; n = n.next {
+					n.offsetInBinaryField = uint64(a.Buf.Len())
 
-			err := a.encodeNode(n)
-			require.NoError(t, err)
+					err := a.encodeNode(n)
+					require.NoError(t, err)
+				}
+
+				require.Equal(t, 1, len(a.OnGenerateCallbacks))
+				cb := a.OnGenerateCallbacks[0]
+
+				targetNode := a.Current
+				targetNode.offsetInBinaryField = uint64(offset)
+
+				err := cb(nil)
+				require.EqualError(t, err, fmt.Sprintf("BUG: too large offset for ADR: %#x", uint64(offset)))
+			})
 		}
-
-		require.Equal(t, 1, len(a.OnGenerateCallbacks))
-		cb := a.OnGenerateCallbacks[0]
-
-		targetNode := a.Current
-		targetNode.offsetInBinaryField = uint64(math.MaxInt64)
-
-		err := cb(nil)
-		require.EqualError(t, err, "BUG: too large offset for ADR: 9223372036854775807")
 	})
 }
