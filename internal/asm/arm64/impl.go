@@ -1838,7 +1838,7 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 		if offset > math.MaxUint8 {
 			// We could support up to 20-bit integer, but byte should be enough for our impl.
 			// If the necessity comes up, we could fix the below to support larger offsets.
-			return fmt.Errorf("BUG: too large offset for ADR")
+			return fmt.Errorf("BUG: too large offset for ADR: %d", offset)
 		}
 
 		// Now ready to write an offset byte.
