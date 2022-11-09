@@ -663,17 +663,65 @@ func TestAssemblerImpl_EncodeMemoryToRegister(t *testing.T) {
 
 func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		const targetBeforeInstruction, dstReg = RET, RegR23
-		a := NewAssembler(asm.NilRegister)
+		tests := []struct {
+			name                   string
+			numDummyInstructions   int
+			expADRInstructionBytes []byte
+		}{
+			{
+				name:                   "< 8-bit offset",
+				numDummyInstructions:   1,
+				expADRInstructionBytes: []byte{0x77, 0x0, 0x0, 0x10},
+			},
+			{
+				name:                   "> 8-bit offset",
+				numDummyInstructions:   5000,
+				expADRInstructionBytes: []byte{0x57, 0x71, 0x2, 0x10},
+			},
+		}
 
-		a.CompileReadInstructionAddress(dstReg, targetBeforeInstruction)
-		a.CompileConstToRegister(MOVD, 1000, RegR10) // Dummy
-		a.CompileJumpToRegister(targetBeforeInstruction, RegR25)
-		a.CompileConstToRegister(MOVD, 1000, RegR10) // Target.
+		for _, tc := range tests {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				const targetBeforeInstruction, dstReg = RET, RegR23
+				a := NewAssembler(asm.NilRegister)
 
-		actual, err := a.Assemble()
-		require.NoError(t, err)
-		require.Equal(t, []byte{0x77, 0x0, 0x0, 0x10, 0xa, 0x7d, 0x80, 0xd2, 0x20, 0x3, 0x5f, 0xd6, 0xa, 0x7d, 0x80, 0xd2}, actual)
+				a.CompileReadInstructionAddress(dstReg, targetBeforeInstruction)
+				adrInst := a.Current
+				for i := 0; i < tc.numDummyInstructions; i++ {
+					a.CompileJumpToRegister(B, RegR5)
+				}
+				a.CompileJumpToRegister(targetBeforeInstruction, RegR25)
+				a.CompileConstToRegister(MOVD, 0x3e8, RegR10) // Target.
+				target := a.Current
+
+				actual, err := a.Assemble()
+				require.NoError(t, err)
+				// The binary should start with ADR instruction.
+				require.Equal(t, tc.expADRInstructionBytes, actual[:4], hex.EncodeToString(actual))
+				// Then, follow the dummy B instructions.
+				pos := 4
+				for i := 0; i < tc.numDummyInstructions; i++ {
+					require.Equal(t,
+						// A0 00 1F D6    br   x5
+						[]byte{0xa0, 0x0, 0x1f, 0xd6},
+						actual[pos:pos+4], hex.EncodeToString(actual))
+					pos += 4
+				}
+				// And targetBeforeInstruction follows: "20 03 5F D6    ret  x25"
+				require.Equal(t, []byte{0x20, 0x03, 0x5F, 0xd6},
+					actual[pos:pos+4], hex.EncodeToString(actual))
+
+				// After that, we end with the target instruction "movz x10, #0x3e8"
+				pos += 4
+				require.Equal(t, []byte{0xa, 0x7d, 0x80, 0xd2},
+					actual[pos:pos+4], hex.EncodeToString(actual))
+				fmt.Println(hex.EncodeToString(actual))
+
+				require.Equal(t, uint64(4+tc.numDummyInstructions*4+4),
+					target.offsetInBinaryField-adrInst.offsetInBinaryField)
+			})
+		}
 	})
 
 	t.Run("not found", func(t *testing.T) {
@@ -685,9 +733,12 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 	})
 	t.Run("offset too large", func(t *testing.T) {
 		for _, offset := range []int64{
-			1 << 20, -(1 << 20) - 1, math.MinInt64, math.MinInt64,
+			1 << 20,
+			-(1 << 20) - 1,
+			math.MaxInt64, math.MinInt64,
 		} {
-			t.Run(fmt.Sprintf("offset=%#x", offset), func(t *testing.T) {
+			u64 := uint64(offset)
+			t.Run(fmt.Sprintf("offset=%#b", u64), func(t *testing.T) {
 				a := NewAssembler(asm.NilRegister)
 				a.CompileReadInstructionAddress(RegR27, RET)
 				a.CompileJumpToRegister(RET, RegR25)
@@ -704,10 +755,10 @@ func TestAssemblerImpl_encodeReadInstructionAddress(t *testing.T) {
 				cb := a.OnGenerateCallbacks[0]
 
 				targetNode := a.Current
-				targetNode.offsetInBinaryField = uint64(offset)
+				targetNode.offsetInBinaryField = u64
 
 				err := cb(nil)
-				require.EqualError(t, err, fmt.Sprintf("BUG: too large offset for ADR: %#x", uint64(offset)))
+				require.EqualError(t, err, fmt.Sprintf("BUG: too large offset for ADR: %#x", u64))
 			})
 		}
 	})
