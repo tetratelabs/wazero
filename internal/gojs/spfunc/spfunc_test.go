@@ -216,7 +216,8 @@ func TestMustCallFromSP(t *testing.T) {
 		Code: &wasm.Code{
 			IsHostFunction: true,
 			GoFunc:         api.GoFunc(i64i32i32i32i32_i64i32_withSP),
-		}}))
+		},
+	}))
 	im, err := builder.Instantiate(testCtx, r)
 	require.NoError(t, err)
 

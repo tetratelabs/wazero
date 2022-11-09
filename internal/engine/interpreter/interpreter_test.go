@@ -65,9 +65,11 @@ func TestInterpreter_CallEngine_PushFrame_StackOverflow(t *testing.T) {
 }
 
 // et is used for tests defined in the enginetest package.
-var et = &engineTester{}
-var functionLog bytes.Buffer
-var listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
+var (
+	et              = &engineTester{}
+	functionLog     bytes.Buffer
+	listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
+)
 
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
@@ -353,11 +355,15 @@ func TestInterpreter_NonTrappingFloatToIntConversion(t *testing.T) {
 				t.Run(strconv.Itoa(i), func(t *testing.T) {
 					var body []*interpreterOp
 					if in32bit {
-						body = append(body, &interpreterOp{kind: wazeroir.OperationKindConstF32,
-							us: []uint64{uint64(math.Float32bits(tc.input32bit[i]))}})
+						body = append(body, &interpreterOp{
+							kind: wazeroir.OperationKindConstF32,
+							us:   []uint64{uint64(math.Float32bits(tc.input32bit[i]))},
+						})
 					} else {
-						body = append(body, &interpreterOp{kind: wazeroir.OperationKindConstF64,
-							us: []uint64{uint64(math.Float64bits(tc.input64bit[i]))}})
+						body = append(body, &interpreterOp{
+							kind: wazeroir.OperationKindConstF64,
+							us:   []uint64{uint64(math.Float64bits(tc.input64bit[i]))},
+						})
 					}
 
 					body = append(body, &interpreterOp{

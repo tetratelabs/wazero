@@ -73,7 +73,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			in:             wasm.MemoryPageSize,
 			nsubscriptions: 1,
 			out:            128, // past in
-			resultNevents:  512, //past out
+			resultNevents:  512, // past out
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
 --> proxy.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
@@ -85,7 +85,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 		{
 			name:           "out out of range",
 			out:            wasm.MemoryPageSize,
-			resultNevents:  512, //past out
+			resultNevents:  512, // past out
 			nsubscriptions: 1,
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
@@ -110,7 +110,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 		{
 			name:          "nsubscriptions zero",
 			out:           128, // past in
-			resultNevents: 512, //past out
+			resultNevents: 512, // past out
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
@@ -130,7 +130,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoSuccess,
 			out:           128, // past in
-			resultNevents: 512, //past out
+			resultNevents: 512, // past out
 			expectedMem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				byte(ErrnoNotsup), 0x0, // errno is 16 bit

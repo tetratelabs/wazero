@@ -59,8 +59,7 @@ func TestCompiler_compileLabel(t *testing.T) {
 }
 
 func TestCompiler_compileBrIf(t *testing.T) {
-	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus :=
-		nativeCallStatusCodeUnreachable, nativeCallStatusCodeUnreachable+1, nativeCallStatusCodeUnreachable+2
+	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus := nativeCallStatusCodeUnreachable, nativeCallStatusCodeUnreachable+1, nativeCallStatusCodeUnreachable+2
 	thenBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}}
 	elseBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}}
 
@@ -302,8 +301,10 @@ func TestCompiler_compileBrTable(t *testing.T) {
 	}
 
 	getBranchTargetDropFromFrameID := func(frameid uint32) *wazeroir.BranchTargetDrop {
-		return &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{
-			Label: &wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader}},
+		return &wazeroir.BranchTargetDrop{
+			Target: &wazeroir.BranchTarget{
+				Label: &wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader},
+			},
 		}
 	}
 
@@ -694,7 +695,6 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		for i := 1; i < len(table); i++ {
 			expectedReturnValue := uint32(i * 1000)
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-
 				compiler := env.requireNewCompiler(t, newCompiler,
 					&wazeroir.CompilationResult{
 						Signature: &wasm.FunctionType{},

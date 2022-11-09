@@ -13,15 +13,19 @@ func TestAssemblerImpl_EncodeRegisterToMemory(t *testing.T) {
 			expErr string
 		}{
 			{
-				n: &nodeImpl{instruction: JMP,
-					types:  operandTypesRegisterToMemory,
-					srcReg: RegAX, dstReg: RegAX},
+				n: &nodeImpl{
+					instruction: JMP,
+					types:       operandTypesRegisterToMemory,
+					srcReg:      RegAX, dstReg: RegAX,
+				},
 				expErr: "JMP is unsupported for from:register,to:memory type",
 			},
 			{
-				n: &nodeImpl{instruction: SHLQ,
-					types:  operandTypesRegisterToMemory,
-					srcReg: RegAX, dstReg: RegAX},
+				n: &nodeImpl{
+					instruction: SHLQ,
+					types:       operandTypesRegisterToMemory,
+					srcReg:      RegAX, dstReg: RegAX,
+				},
 				expErr: "shifting instruction SHLQ require CX register as src but got AX",
 			},
 		}

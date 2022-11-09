@@ -127,7 +127,8 @@ func TestEncodeNameSubsection(t *testing.T) {
 	require.Equal(t, []byte{
 		subsectionID,
 		byte(1 + 6), // 1 is the size of 6 in LEB128 encoding
-		6, 's', 'i', 'm', 'p', 'l', 'e'}, encodeNameSubsection(subsectionID, encodeSizePrefixed(name)))
+		6, 's', 'i', 'm', 'p', 'l', 'e',
+	}, encodeNameSubsection(subsectionID, encodeSizePrefixed(name)))
 }
 
 func TestEncodeNameAssoc(t *testing.T) {
@@ -152,10 +153,11 @@ func TestDecodeNameSection(t *testing.T) {
 	tests := []struct {
 		name  string
 		input *wasm.NameSection // round trip test!
-	}{{
-		name:  "empty",
-		input: &wasm.NameSection{},
-	},
+	}{
+		{
+			name:  "empty",
+			input: &wasm.NameSection{},
+		},
 		{
 			name:  "only module",
 			input: &wasm.NameSection{ModuleName: "simple"},

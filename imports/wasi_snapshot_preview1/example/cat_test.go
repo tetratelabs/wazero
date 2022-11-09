@@ -58,12 +58,12 @@ func Test_cli(t *testing.T) {
 				t.Run(testPath, func(t *testing.T) {
 					// Write out embedded files instead of accessing directly for docker cross-architecture tests.
 					wasmPath := filepath.Join(t.TempDir(), "cat.wasm")
-					require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0755))
+					require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0o755))
 
 					testTxt, err := fs.ReadFile(catFS, "testdata/test.txt")
 					require.NoError(t, err)
 					testTxtPath := filepath.Join(t.TempDir(), "test.txt")
-					require.NoError(t, os.WriteFile(testTxtPath, testTxt, 0755))
+					require.NoError(t, os.WriteFile(testTxtPath, testTxt, 0o755))
 
 					// We can't invoke go run in our docker based cross-architecture tests. We do want to use
 					// otherwise so running unit tests normally does not require special build steps.

@@ -154,6 +154,7 @@ func (m *wasmedgeModule) CallI32I32_V(_ context.Context, funcName string, x, y u
 	_, err = m.vm.Execute(funcName, int32(x), int32(y))
 	return
 }
+
 func (m *wasmedgeModule) CallV_V(_ context.Context, funcName string) (err error) {
 	_, err = m.vm.Execute(funcName)
 	return

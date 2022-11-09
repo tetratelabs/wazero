@@ -95,7 +95,7 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 
 func TestMemoryInstance_ReadByte(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
 		v, ok := mem.ReadByte(ctx, 7)
 		require.True(t, ok)
 		require.Equal(t, byte(16), v)
@@ -463,7 +463,7 @@ func TestMemoryInstance_ReadFloat64Le(t *testing.T) {
 
 func TestMemoryInstance_Read(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
 
 		buf, ok := mem.Read(ctx, 4, 4)
 		require.True(t, ok)
@@ -747,7 +747,7 @@ func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
 
 func TestMemoryInstance_Write(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
 
 		buf := []byte{16, 0, 0, 4}
 		require.True(t, mem.Write(ctx, 4, buf))
@@ -768,7 +768,7 @@ func TestMemoryInstance_Write(t *testing.T) {
 
 func TestMemoryInstance_WriteString(t *testing.T) {
 	for _, ctx := range []context.Context{nil, testCtx} { // Ensure it doesn't crash on nil!
-		var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+		mem := &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
 
 		s := "bear"
 		require.True(t, mem.WriteString(ctx, 4, s))

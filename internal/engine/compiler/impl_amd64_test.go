@@ -437,7 +437,6 @@ func TestAmd64Compiler_preventCrossedTargetdRegisters(t *testing.T) {
 		// Require initial state after restoring.
 		require.Equal(t, initialRegisters, collectRegistersFromRuntimeValues(tt.initial))
 	}
-
 }
 
 // collectRegistersFromRuntimeValues returns the registers occupied by locs.

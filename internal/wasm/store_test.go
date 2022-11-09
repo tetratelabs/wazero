@@ -617,9 +617,11 @@ func Test_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			f := &FunctionInstance{
-				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeF32}}},
+			}
 			g := &FunctionInstance{
-				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}}}
+				Definition: &FunctionDefinition{funcType: &FunctionType{Results: []ValueType{ValueTypeI32}}},
+			}
 			modules := map[string]*ModuleInstance{
 				moduleName: {
 					Exports: map[string]*ExportInstance{

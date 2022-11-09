@@ -80,13 +80,11 @@ func TestDeserializeCodes(t *testing.T) {
 		expErr        string
 	}{
 		{
-
 			name:   "invalid header",
 			in:     []byte{1},
 			expErr: "compilationcache: invalid header length: 1",
 		},
 		{
-
 			name: "version mismatch",
 			in: concat(
 				[]byte(wazeroMagic),
@@ -97,7 +95,6 @@ func TestDeserializeCodes(t *testing.T) {
 			expStaleCache: true,
 		},
 		{
-
 			name: "version mismatch",
 			in: concat(
 				[]byte(wazeroMagic),

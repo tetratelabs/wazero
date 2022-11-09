@@ -66,7 +66,7 @@ var (
 	// oRDWR = jsfsConstants Get("O_RDWR").Int() // fs_js.go init
 	oRDWR = api.EncodeF64(float64(os.O_RDWR))
 
-	//o CREAT = jsfsConstants Get("O_CREAT").Int() // fs_js.go init
+	// o CREAT = jsfsConstants Get("O_CREAT").Int() // fs_js.go init
 	oCREAT = api.EncodeF64(float64(os.O_CREATE))
 
 	// oTRUNC = jsfsConstants Get("O_TRUNC").Int() // fs_js.go init

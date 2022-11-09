@@ -519,7 +519,9 @@ func TestCompiler_compileSelect(t *testing.T) {
 		tc := tt
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			for _, vals := range [][2]uint64{
-				{1, 2}, {0, 1}, {1, 0},
+				{1, 2},
+				{0, 1},
+				{1, 0},
 				{math.Float64bits(-1), math.Float64bits(-1)},
 				{math.Float64bits(-1), math.Float64bits(1)},
 				{math.Float64bits(1), math.Float64bits(-1)},

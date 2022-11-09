@@ -109,7 +109,6 @@ func TestCompiler_compileV128Add(t *testing.T) {
 }
 
 func TestCompiler_compileV128Sub(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -478,8 +477,10 @@ func TestCompiler_compileV128Load(t *testing.T) {
 					1, 0xff, 3, 0xff, 5, 6, 7, 0xff, 9, 0xff,
 				})
 			},
-			exp: [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
 		},
 		{
 			name: "16splat offset=0", loadType: wazeroir.V128LoadType16Splat, offset: 0,
@@ -833,8 +834,10 @@ func TestCompiler_compileV128Store(t *testing.T) {
 			require.Equal(t, uint64(0), env.stackPointer())
 
 			mem := env.memory()
-			require.Equal(t, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			require.Equal(t, []byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
 				mem[tc.offset:tc.offset+16])
 		})
 	}
@@ -1705,6 +1708,7 @@ func TestCompiler_compileV128AllTrue(t *testing.T) {
 		})
 	}
 }
+
 func i8ToU8(v int8) byte {
 	return byte(v)
 }
@@ -1722,7 +1726,6 @@ func i64ToU64(v int64) uint64 {
 }
 
 func TestCompiler_compileV128Swizzle(t *testing.T) {
-
 	tests := []struct {
 		name              string
 		indexVec, baseVec [16]byte
@@ -1736,11 +1739,15 @@ func TestCompiler_compileV128Swizzle(t *testing.T) {
 		},
 		{
 			name: "2",
-			baseVec: [16]byte{i8ToU8(-16), i8ToU8(-15), i8ToU8(-14), i8ToU8(-13), i8ToU8(-12),
+			baseVec: [16]byte{
+				i8ToU8(-16), i8ToU8(-15), i8ToU8(-14), i8ToU8(-13), i8ToU8(-12),
 				i8ToU8(-11), i8ToU8(-10), i8ToU8(-9), i8ToU8(-8), i8ToU8(-7), i8ToU8(-6), i8ToU8(-5),
-				i8ToU8(-4), i8ToU8(-3), i8ToU8(-2), i8ToU8(-1)},
-			indexVec: [16]byte{i8ToU8(-8), i8ToU8(-7), i8ToU8(-6), i8ToU8(-5), i8ToU8(-4),
-				i8ToU8(-3), i8ToU8(-2), i8ToU8(-1), 16, 17, 18, 19, 20, 21, 22, 23},
+				i8ToU8(-4), i8ToU8(-3), i8ToU8(-2), i8ToU8(-1),
+			},
+			indexVec: [16]byte{
+				i8ToU8(-8), i8ToU8(-7), i8ToU8(-6), i8ToU8(-5), i8ToU8(-4),
+				i8ToU8(-3), i8ToU8(-2), i8ToU8(-1), 16, 17, 18, 19, 20, 21, 22, 23,
+			},
 			expVec: [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		},
 		{
@@ -1921,7 +1928,6 @@ func TestCompiler_compileV128Shuffle(t *testing.T) {
 }
 
 func TestCompiler_compileV128Bitmask(t *testing.T) {
-
 	u16x8 := func(u1, u2, u3, u4, u5, u6, u7, u8 uint16) (ret [16]byte) {
 		binary.LittleEndian.PutUint16(ret[0:], u1)
 		binary.LittleEndian.PutUint16(ret[2:], u2)
@@ -2090,7 +2096,6 @@ func TestCompiler_compileV128_Not(t *testing.T) {
 }
 
 func TestCompiler_compileV128_And_Or_Xor_AndNot(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		op          wazeroir.OperationKind
@@ -3097,16 +3102,20 @@ func TestCompiler_compileV128Cmp(t *testing.T) {
 			cmpType: wazeroir.V128CmpTypeF64x2Gt,
 			x1:      f64x2(math.MaxFloat64, -123.0),
 			x2:      f64x2(123, -123.0),
-			exp: [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0, 0, 0, 0, 0, 0, 0, 0},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0, 0, 0, 0, 0, 0, 0, 0,
+			},
 		},
 		{
 			name:    "f64x2 ge",
 			cmpType: wazeroir.V128CmpTypeF64x2Ge,
 			x1:      f64x2(math.MaxFloat64, -123.0),
 			x2:      f64x2(123, -123.0),
-			exp: [16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			exp: [16]byte{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
 		},
 		{
 			name:    "i8x16 eq",
@@ -3491,7 +3500,6 @@ func TestCompiler_compileV128AvgrU(t *testing.T) {
 }
 
 func TestCompiler_compileV128Sqrt(t *testing.T) {
-
 	tests := []struct {
 		name   string
 		shape  wazeroir.Shape
@@ -3918,7 +3926,6 @@ func TestCompiler_compileV128Div(t *testing.T) {
 }
 
 func TestCompiler_compileV128Min(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		shape       wazeroir.Shape
@@ -4838,9 +4845,9 @@ func TestCompiler_compileV128Round(t *testing.T) {
 					math.Float32frombits(uint32(lo)),
 					math.Float32frombits(uint32(lo >> 32)),
 					math.Float32frombits(uint32(hi)),
-					math.Float32frombits(uint32(hi >> 32))}
-				f1Original, f2Original, f3Original, f4Original :=
-					math.Float32frombits(binary.LittleEndian.Uint32(tc.v[:4])),
+					math.Float32frombits(uint32(hi >> 32)),
+				}
+				f1Original, f2Original, f3Original, f4Original := math.Float32frombits(binary.LittleEndian.Uint32(tc.v[:4])),
 					math.Float32frombits(binary.LittleEndian.Uint32(tc.v[4:8])),
 					math.Float32frombits(binary.LittleEndian.Uint32(tc.v[8:12])),
 					math.Float32frombits(binary.LittleEndian.Uint32(tc.v[12:]))
@@ -4879,8 +4886,7 @@ func TestCompiler_compileV128Round(t *testing.T) {
 				}
 			} else {
 				actualFs := [2]float64{math.Float64frombits(lo), math.Float64frombits(hi)}
-				f1Original, f2Original :=
-					math.Float64frombits(binary.LittleEndian.Uint64(tc.v[:8])), math.Float64frombits(binary.LittleEndian.Uint64(tc.v[8:]))
+				f1Original, f2Original := math.Float64frombits(binary.LittleEndian.Uint64(tc.v[:8])), math.Float64frombits(binary.LittleEndian.Uint64(tc.v[8:]))
 
 				var expFs [2]float64
 				switch tc.kind {
@@ -5131,7 +5137,8 @@ func TestCompiler_compileV128_Pmax_Pmin(t *testing.T) {
 					math.Float32frombits(uint32(lo)),
 					math.Float32frombits(uint32(lo >> 32)),
 					math.Float32frombits(uint32(hi)),
-					math.Float32frombits(uint32(hi >> 32))}
+					math.Float32frombits(uint32(hi >> 32)),
+				}
 				expFs := [4]float32{
 					math.Float32frombits(binary.LittleEndian.Uint32(tc.exp[:4])),
 					math.Float32frombits(binary.LittleEndian.Uint32(tc.exp[4:8])),
@@ -6301,7 +6308,6 @@ func TestCompiler_compileV128Extend(t *testing.T) {
 }
 
 func TestCompiler_compileV128Q15mulrSatS(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		x1, x2, exp [16]byte
@@ -6538,7 +6544,8 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 				math.Float32frombits(uint32(lo)),
 				math.Float32frombits(uint32(lo >> 32)),
 				math.Float32frombits(uint32(hi)),
-				math.Float32frombits(uint32(hi >> 32))}
+				math.Float32frombits(uint32(hi >> 32)),
+			}
 			expFs := [4]float32{
 				math.Float32frombits(binary.LittleEndian.Uint32(tc.exp[:4])),
 				math.Float32frombits(binary.LittleEndian.Uint32(tc.exp[4:8])),
@@ -6558,7 +6565,6 @@ func TestCompiler_compileV128FloatDemote(t *testing.T) {
 }
 
 func TestCompiler_compileV128ExtAddPairwise(t *testing.T) {
-
 	tests := []struct {
 		name   string
 		shape  wazeroir.Shape
@@ -7210,7 +7216,6 @@ func TestCompiler_compileV128Dot(t *testing.T) {
 }
 
 func TestCompiler_compileV128ITruncSatFromF(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		originShape wazeroir.Shape

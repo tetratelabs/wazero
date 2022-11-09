@@ -20,15 +20,19 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 				expErr: "ADDL is unsupported for from:const,to:memory type",
 			},
 			{
-				n: &nodeImpl{instruction: MOVB, types: operandTypesConstToMemory,
+				n: &nodeImpl{
+					instruction: MOVB, types: operandTypesConstToMemory,
 					srcConst: math.MaxInt16,
-					dstReg:   RegAX, dstConst: 0xff_ff},
+					dstReg:   RegAX, dstConst: 0xff_ff,
+				},
 				expErr: "too large load target const 32767 for MOVB",
 			},
 			{
-				n: &nodeImpl{instruction: MOVL, types: operandTypesConstToMemory,
+				n: &nodeImpl{
+					instruction: MOVL, types: operandTypesConstToMemory,
 					srcConst: math.MaxInt64,
-					dstReg:   RegAX, dstConst: 0xff_ff},
+					dstReg:   RegAX, dstConst: 0xff_ff,
+				},
 				expErr: "too large load target const 9223372036854775807 for MOVL",
 			},
 		}
@@ -645,8 +649,10 @@ func TestAssemblerImpl_EncodeConstToMemory(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeConstToMemory(&nodeImpl{instruction: tc.inst,
-			types: operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset)})
+		err := a.encodeConstToMemory(&nodeImpl{
+			instruction: tc.inst,
+			types:       operandTypesConstToMemory, srcConst: tc.c, dstReg: tc.baseReg, dstConst: int64(tc.offset),
+		})
 		require.NoError(t, err)
 	}
 }
@@ -915,8 +921,10 @@ func TestAssemblerImpl_EncodeMemoryToConst(t *testing.T) {
 
 	for _, tc := range tests {
 		a := NewAssembler()
-		err := a.encodeMemoryToConst(&nodeImpl{instruction: tc.inst,
-			types: operandTypesMemoryToConst, srcReg: tc.baseReg, srcConst: tc.offset, dstConst: tc.c})
+		err := a.encodeMemoryToConst(&nodeImpl{
+			instruction: tc.inst,
+			types:       operandTypesMemoryToConst, srcReg: tc.baseReg, srcConst: tc.offset, dstConst: tc.c,
+		})
 		require.NoError(t, err, tc.name)
 		require.Equal(t, tc.exp, a.buf.Bytes(), tc.name)
 	}

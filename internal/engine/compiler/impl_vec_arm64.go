@@ -18,7 +18,7 @@ func (c *arm64Compiler) compileV128Const(o *wazeroir.OperationV128Const) error {
 	}
 
 	// Moves the lower 64-bits as a scalar float.
-	var intReg = arm64ReservedRegisterForTemporary
+	intReg := arm64ReservedRegisterForTemporary
 	if o.Lo == 0 {
 		intReg = arm64.RegRZR
 	} else {
@@ -967,7 +967,7 @@ func (c *arm64Compiler) compileV128Cmp(o *wazeroir.OperationV128Cmp) error {
 		arr = arm64.VectorArrangement2D
 	}
 
-	var result = x1.register
+	result := x1.register
 	switch o.Type {
 	case wazeroir.V128CmpTypeI8x16Eq, wazeroir.V128CmpTypeI16x8Eq, wazeroir.V128CmpTypeI32x4Eq, wazeroir.V128CmpTypeI64x2Eq:
 		c.assembler.CompileTwoVectorRegistersToVectorRegister(arm64.CMEQ, x1.register, x2.register, result, arr)

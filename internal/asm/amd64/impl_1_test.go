@@ -114,35 +114,47 @@ func TestNodeImpl_String(t *testing.T) {
 			exp: "ADDL DX, R14",
 		},
 		{
-			in: &nodeImpl{instruction: MOVQ, types: operandTypesRegisterToMemory,
-				srcReg: RegDX, dstReg: RegR14, dstConst: 100},
+			in: &nodeImpl{
+				instruction: MOVQ, types: operandTypesRegisterToMemory,
+				srcReg: RegDX, dstReg: RegR14, dstConst: 100,
+			},
 			exp: "MOVQ DX, [R14 + 0x64]",
 		},
 		{
-			in: &nodeImpl{instruction: MOVQ, types: operandTypesRegisterToMemory,
-				srcReg: RegDX, dstReg: RegR14, dstConst: 100, dstMemIndex: RegCX, dstMemScale: 4},
+			in: &nodeImpl{
+				instruction: MOVQ, types: operandTypesRegisterToMemory,
+				srcReg: RegDX, dstReg: RegR14, dstConst: 100, dstMemIndex: RegCX, dstMemScale: 4,
+			},
 			exp: "MOVQ DX, [R14 + 0x64 + CX*0x4]",
 		},
 		{
-			in: &nodeImpl{instruction: CMPL, types: operandTypesRegisterToConst,
-				srcReg: RegDX, dstConst: 100},
+			in: &nodeImpl{
+				instruction: CMPL, types: operandTypesRegisterToConst,
+				srcReg: RegDX, dstConst: 100,
+			},
 			exp: "CMPL DX, 0x64",
 		},
 		{
-			in: &nodeImpl{instruction: MOVL, types: operandTypesMemoryToRegister,
-				srcReg: RegDX, srcConst: 1, dstReg: RegAX},
+			in: &nodeImpl{
+				instruction: MOVL, types: operandTypesMemoryToRegister,
+				srcReg: RegDX, srcConst: 1, dstReg: RegAX,
+			},
 			exp: "MOVL [DX + 0x1], AX",
 		},
 		{
-			in: &nodeImpl{instruction: MOVL, types: operandTypesMemoryToRegister,
+			in: &nodeImpl{
+				instruction: MOVL, types: operandTypesMemoryToRegister,
 				srcReg: RegDX, srcConst: 1, srcMemIndex: RegR12, srcMemScale: 2,
-				dstReg: RegAX},
+				dstReg: RegAX,
+			},
 			exp: "MOVL [DX + 0x1 + R12*0x2], AX",
 		},
 		{
-			in: &nodeImpl{instruction: CMPQ, types: operandTypesMemoryToConst,
+			in: &nodeImpl{
+				instruction: CMPQ, types: operandTypesMemoryToConst,
 				srcReg: RegDX, srcConst: 1, srcMemIndex: RegR12, srcMemScale: 2,
-				dstConst: 123},
+				dstConst: 123,
+			},
 			exp: "CMPQ [DX + 0x1 + R12*0x2], 0x7b",
 		},
 		{

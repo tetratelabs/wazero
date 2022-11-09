@@ -122,6 +122,7 @@ func (j *compilerEnv) stackTopAsUint32() uint32 {
 func (j *compilerEnv) stackTopAsInt32() int32 {
 	return int32(j.stack()[j.ce.stackContext.stackPointer-1])
 }
+
 func (j *compilerEnv) stackTopAsUint64() uint64 {
 	return j.stack()[j.ce.stackContext.stackPointer-1]
 }

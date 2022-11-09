@@ -18,7 +18,8 @@ func Test_decodeDataSegment(t *testing.T) {
 		expErr   string
 	}{
 		{
-			in: []byte{0xf,
+			in: []byte{
+				0xf,
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
 				// Two initial data.
@@ -28,7 +29,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			expErr:   "invalid data segment prefix: 0xf",
 		},
 		{
-			in: []byte{0x0,
+			in: []byte{
+				0x0,
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
 				// Two initial data.
@@ -44,7 +46,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x0,
+			in: []byte{
+				0x0,
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1,
 				0x2, 0xf, 0xf,
@@ -53,7 +56,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x1, // Passive data segment without memory index and const expr.
+			in: []byte{
+				0x1, // Passive data segment without memory index and const expr.
 				// Two initial data.
 				0x2, 0xf, 0xf,
 			},
@@ -64,7 +68,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x2,
+			in: []byte{
+				0x2,
 				0x0, // Memory index.
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
@@ -81,7 +86,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x2,
+			in: []byte{
+				0x2,
 				0x1, // Memory index.
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,
@@ -92,7 +98,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x2,
+			in: []byte{
+				0x2,
 				0x0, // Memory index.
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1,
@@ -103,7 +110,8 @@ func Test_decodeDataSegment(t *testing.T) {
 			features: api.CoreFeatureBulkMemoryOperations,
 		},
 		{
-			in: []byte{0x2,
+			in: []byte{
+				0x2,
 				0x0, // Memory index.
 				// Const expression.
 				wasm.OpcodeI32Const, 0x1, wasm.OpcodeEnd,

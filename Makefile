@@ -4,10 +4,11 @@ comma := ,
 space :=
 space +=
 
-goimports := golang.org/x/tools/cmd/goimports@v0.1.12
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
+gofumpt := mvdan.cc/gofumpt@v0.4.0
+goimports := golang.org/x/tools/cmd/goimports@v0.2.0
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.102.3
+hugo          := github.com/gohugoio/hugo@v0.105.0
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
@@ -195,12 +196,8 @@ lint: $(golangci_lint_path)
 
 .PHONY: format
 format:
-	@find . -type f -name '*.go' | xargs gofmt -s -w
-	@for f in `find . -name '*.go'`; do \
-	    awk '/^import \($$/,/^\)$$/{if($$0=="")next}{print}' $$f > /tmp/fmt; \
-	    mv /tmp/fmt $$f; \
-	done
-	@go run $(goimports) -w -local github.com/tetratelabs/wazero `find . -name '*.go'`
+	@go run $(gofumpt) -l -w .
+	@go run $(goimports) -local github.com/tetratelabs/ -w $(shell find . -name '*.go' -type f)
 
 .PHONY: check
 check:

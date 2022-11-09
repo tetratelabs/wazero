@@ -49,7 +49,6 @@ func doMain(stdOut io.Writer, stdErr io.Writer, exit func(code int)) {
 		printUsage(stdErr)
 		exit(1)
 	}
-
 }
 
 func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int)) {

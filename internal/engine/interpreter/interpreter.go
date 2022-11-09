@@ -4060,7 +4060,8 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					math.Trunc(float64(math.Float32frombits(uint32(lo)))),
 					math.Trunc(float64(math.Float32frombits(uint32(lo >> 32)))),
 					math.Trunc(float64(math.Float32frombits(uint32(hi)))),
-					math.Trunc(float64(math.Float32frombits(uint32(hi >> 32))))} {
+					math.Trunc(float64(math.Float32frombits(uint32(hi >> 32)))),
+				} {
 
 					var v uint32
 					if math.IsNaN(f64) {

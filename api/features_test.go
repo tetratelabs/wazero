@@ -63,9 +63,11 @@ func TestCoreFeatures_String(t *testing.T) {
 		{name: "simd", feature: CoreFeatureSIMD, expected: "simd"},
 		{name: "features", feature: CoreFeatureMutableGlobal | CoreFeatureMultiValue, expected: "multi-value|mutable-global"},
 		{name: "undefined", feature: 1 << 63, expected: ""},
-		{name: "2.0", feature: CoreFeaturesV2,
+		{
+			name: "2.0", feature: CoreFeaturesV2,
 			expected: "bulk-memory-operations|multi-value|mutable-global|" +
-				"nontrapping-float-to-int-conversion|reference-types|sign-extension-ops|simd"},
+				"nontrapping-float-to-int-conversion|reference-types|sign-extension-ops|simd",
+		},
 	}
 
 	for _, tt := range tests {

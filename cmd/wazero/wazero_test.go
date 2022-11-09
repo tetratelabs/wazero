@@ -26,7 +26,7 @@ var bearTxt []byte
 
 func TestRun(t *testing.T) {
 	bearPath := filepath.Join(t.TempDir(), "bear.txt")
-	require.NoError(t, os.WriteFile(bearPath, bearTxt, 0755))
+	require.NoError(t, os.WriteFile(bearPath, bearTxt, 0o755))
 
 	tests := []struct {
 		name       string
@@ -68,7 +68,7 @@ func TestRun(t *testing.T) {
 		tt := tc
 		t.Run(tt.name, func(t *testing.T) {
 			wasmPath := filepath.Join(t.TempDir(), "test.wasm")
-			require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0755))
+			require.NoError(t, os.WriteFile(wasmPath, tt.wasm, 0o755))
 
 			args := append([]string{"run"}, tt.wazeroOpts...)
 			args = append(args, wasmPath)
@@ -89,7 +89,7 @@ func TestHelp(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	notWasmPath := filepath.Join(t.TempDir(), "bears.wasm")
-	require.NoError(t, os.WriteFile(notWasmPath, []byte("pooh"), 0755))
+	require.NoError(t, os.WriteFile(notWasmPath, []byte("pooh"), 0o755))
 
 	tests := []struct {
 		message string

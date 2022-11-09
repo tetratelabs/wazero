@@ -85,7 +85,6 @@ func main() {
 	// InstantiateModule runs the "_start" function, WASI's "main".
 	// * Set the program name (arg[0]) to "wasi"; arg[1] should be "/test.txt".
 	if _, err = r.InstantiateModule(ctx, code, config.WithArgs("wasi", os.Args[1])); err != nil {
-
 		// Note: Most compilers do not exit the module after running "_start",
 		// unless there was an error. This allows you to call exported functions.
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {

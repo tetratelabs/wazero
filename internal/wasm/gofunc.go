@@ -21,9 +21,11 @@ const (
 
 // Below are reflection code to get the interface type used to parse functions and set values.
 
-var moduleType = reflect.TypeOf((*api.Module)(nil)).Elem()
-var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var (
+	moduleType    = reflect.TypeOf((*api.Module)(nil)).Elem()
+	goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
+	errorType     = reflect.TypeOf((*error)(nil)).Elem()
+)
 
 // compile-time check to ensure reflectGoModuleFunction implements
 // api.GoModuleFunction.

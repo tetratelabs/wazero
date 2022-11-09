@@ -141,8 +141,10 @@ func DefaultContext(fs fs.FS) *Context {
 	}
 }
 
-var _ = DefaultContext(nil) // Force panic on bug.
-var ns sys.Nanosleep = platform.FakeNanosleep
+var (
+	_                = DefaultContext(nil) // Force panic on bug.
+	ns sys.Nanosleep = platform.FakeNanosleep
+)
 
 // NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.

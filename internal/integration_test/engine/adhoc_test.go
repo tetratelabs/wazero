@@ -241,7 +241,7 @@ func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 
 // testNestedGoContext ensures context is updated when a function calls another.
 func testNestedGoContext(t *testing.T, r wazero.Runtime) {
-	var nestedCtx = context.WithValue(context.Background(), struct{}{}, "nested")
+	nestedCtx := context.WithValue(context.Background(), struct{}{}, "nested")
 
 	importedName := t.Name() + "-imported"
 	importingName := t.Name() + "-importing"

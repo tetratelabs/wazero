@@ -341,5 +341,4 @@ func Test_loggingListener_indentation(t *testing.T) {
 	<-- ()
 <-- ()
 `, out.String())
-
 }

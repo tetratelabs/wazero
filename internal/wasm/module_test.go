@@ -731,22 +731,29 @@ func TestModule_buildGlobals(t *testing.T) {
 	m := Module{GlobalSection: []*Global{
 		{
 			Type: &GlobalType{Mutable: true, ValType: ValueTypeF64},
-			Init: &ConstantExpression{Opcode: OpcodeF64Const,
-				Data: u64.LeBytes(api.EncodeF64(math.MaxFloat64))},
+			Init: &ConstantExpression{
+				Opcode: OpcodeF64Const,
+				Data:   u64.LeBytes(api.EncodeF64(math.MaxFloat64)),
+			},
 		},
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: &ConstantExpression{Opcode: OpcodeI32Const,
-				Data: leb128.EncodeInt32(math.MaxInt32)},
+			Init: &ConstantExpression{
+				Opcode: OpcodeI32Const,
+				Data:   leb128.EncodeInt32(math.MaxInt32),
+			},
 		},
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeI32},
-			Init: &ConstantExpression{Opcode: OpcodeI32Const,
-				Data: leb128.EncodeInt32(minusOne)},
+			Init: &ConstantExpression{
+				Opcode: OpcodeI32Const,
+				Data:   leb128.EncodeInt32(minusOne),
+			},
 		},
 		{
 			Type: &GlobalType{Mutable: false, ValType: ValueTypeV128},
-			Init: &ConstantExpression{Opcode: OpcodeVecV128Const,
+			Init: &ConstantExpression{
+				Opcode: OpcodeVecV128Const,
 				Data: []byte{
 					1, 0, 0, 0, 0, 0, 0, 0,
 					2, 0, 0, 0, 0, 0, 0, 0,
