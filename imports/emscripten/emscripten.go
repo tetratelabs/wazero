@@ -50,7 +50,7 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 type FunctionExporter interface {
 	// ExportFunctions builds functions to export with a wazero.HostModuleBuilder
 	// named "env".
-	ExportFunctions(builder wazero.HostModuleBuilder)
+	ExportFunctions(wazero.HostModuleBuilder)
 }
 
 // NewFunctionExporter returns a FunctionExporter object with trace disabled.
@@ -61,7 +61,7 @@ func NewFunctionExporter() FunctionExporter {
 type functionExporter struct{}
 
 // ExportFunctions implements FunctionExporter.ExportFunctions
-func (e *functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
+func (functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
 	exporter := builder.(wasm.HostFuncExporter)
 	exporter.ExportHostFunc(notifyMemoryGrowth)
 }
