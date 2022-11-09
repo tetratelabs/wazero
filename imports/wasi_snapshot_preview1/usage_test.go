@@ -1,9 +1,12 @@
-package wasi_snapshot_preview1
+package wasi_snapshot_preview1_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"testing"
+
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -15,17 +18,18 @@ import (
 var wasiArg []byte
 
 func TestInstantiateModule(t *testing.T) {
-	r := wazero.NewRuntime(testCtx)
-	defer r.Close(testCtx)
+	ctx := context.Background()
 
-	stdout := bytes.NewBuffer(nil)
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+
+	var stdout bytes.Buffer
 
 	// Configure WASI to write stdout to a buffer, so that we can verify it later.
-	sys := wazero.NewModuleConfig().WithStdout(stdout)
-	_, err := Instantiate(testCtx, r)
-	require.NoError(t, err)
+	sys := wazero.NewModuleConfig().WithStdout(&stdout)
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-	compiled, err := r.CompileModule(testCtx, wasiArg)
+	compiled, err := r.CompileModule(ctx, wasiArg)
 	require.NoError(t, err)
 
 	// Re-use the same module many times.
@@ -33,13 +37,13 @@ func TestInstantiateModule(t *testing.T) {
 
 	for _, tt := range tests {
 		tc := tt
-		mod, err := r.InstantiateModule(testCtx, compiled, sys.WithArgs(tc).WithName(tc))
+		mod, err := r.InstantiateModule(ctx, compiled, sys.WithArgs(tc).WithName(tc))
 		require.NoError(t, err)
 
 		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).
 		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
 
 		stdout.Reset()
-		require.NoError(t, mod.Close(testCtx))
+		require.NoError(t, mod.Close(ctx))
 	}
 }
