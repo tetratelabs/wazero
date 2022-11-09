@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
-
 	"github.com/tetratelabs/wazero/internal/asm"
 )
 
@@ -1835,25 +1833,23 @@ func (a *AssemblerImpl) encodeADR(n *nodeImpl) (err error) {
 		}
 
 		offset := targetNode.OffsetInBinary() - n.OffsetInBinary()
-		if offset > math.MaxUint8 {
-			// We could support up to 20-bit integer, but byte should be enough for our impl.
-			// If the necessity comes up, we could fix the below to support larger offsets.
+		if offset > 1<<20 {
+			// We could support offset over 20-bit range by special casing them here,
+			// but 20-bit range should be enough for our impl. If the necessity comes up,
+			// we could add the special casing here to support arbitrary large offset.
 			return fmt.Errorf("BUG: too large offset for ADR: %d", offset)
 		}
 
-		// Now ready to write an offset byte.
-		v := byte(offset)
-
 		adrInstructionBytes := code[n.OffsetInBinary() : n.OffsetInBinary()+4]
-		// According to the binary format of ADR instruction in arm64:
+		// According to the binary format of ADR instruction:
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
-		//
-		// The 0 to 1 bits live on 29 to 30 bits of the instruction.
-		adrInstructionBytes[3] |= (v & 0b00000011) << 5
-		// The 2 to 4 bits live on 5 to 7 bits of the instruction.
-		adrInstructionBytes[0] |= (v & 0b00011100) << 3
-		// The 5 to 7 bits live on 8 to 10 bits of the instruction.
-		adrInstructionBytes[1] |= (v & 0b11100000) >> 5
+		adrInstructionBytes[3] |= byte(offset & 0b00000011 << 5)
+		offset >>= 2
+		adrInstructionBytes[0] |= byte(offset << 5)
+		offset >>= 3
+		adrInstructionBytes[1] |= byte(offset)
+		offset >>= 8
+		adrInstructionBytes[2] |= byte(offset)
 		return nil
 	})
 	return
