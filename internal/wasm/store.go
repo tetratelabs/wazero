@@ -181,13 +181,6 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	}
 
 	m.BuildExports(module.ExportSection)
-	m.buildDataInstances(module.DataSection)
-}
-
-func (m *ModuleInstance) buildDataInstances(segments []*DataSegment) {
-	for _, d := range segments {
-		m.DataInstances = append(m.DataInstances, d.Init)
-	}
 }
 
 func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
@@ -241,7 +234,9 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 // This is called after all the validation phase passes and out of bounds memory access error here is
 // not a validation error, but rather a runtime error.
 func (m *ModuleInstance) applyData(data []*DataSegment) error {
+	m.DataInstances = make([][]byte, len(data))
 	for i, d := range data {
+		m.DataInstances[i] = d.Init
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
 			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
