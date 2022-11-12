@@ -788,6 +788,7 @@ func TestModuleInstance_applyData(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
+		require.Equal(t, [][]byte{{0xa, 0xf}, {0x1, 0x5}}, m.DataInstances)
 	})
 	t.Run("error", func(t *testing.T) {
 		m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
