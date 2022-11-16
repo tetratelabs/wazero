@@ -201,6 +201,7 @@ format:
 
 .PHONY: check
 check:
+	@GOARCH=amd64 GOOS=dragonfly go build ./... # Check if the internal/platform can be built on compiler-unsupported platforms
 	@$(MAKE) lint golangci_lint_goarch=arm64
 	@$(MAKE) lint golangci_lint_goarch=amd64
 	@$(MAKE) format
