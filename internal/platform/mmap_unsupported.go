@@ -4,6 +4,7 @@ package platform
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 )
 
@@ -13,10 +14,10 @@ func munmapCodeSegment(code []byte) error {
 	panic(errUnsupported)
 }
 
-func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
+func mmapCodeSegmentAMD64(code io.Reader, size int) ([]byte, error) {
 	panic(errUnsupported)
 }
 
-func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
+func mmapCodeSegmentARM64(code io.Reader, size int) ([]byte, error) {
 	panic(errUnsupported)
 }
