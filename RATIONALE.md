@@ -117,12 +117,26 @@ Besides security, this practice prevents other bugs and allows centralization of
 
 ## API Design
 
-### Why are Go function signature parameters and results uint64?
+### Why does `api.ValueType` map to uint64?
 
-Go-defined function signatures include parameters and results expressed as a
-slice of uint64 values. The most notable rationale for this is that a uint64 is
-holds the largest value type in WebAssembly 1.0 (i64). A slice allows you to
-express empty (e.g. a nullary signature), for example a start function.
+WebAssembly allows functions to be defined either by the guest or the host,
+with signatures expressed as WebAssembly types. For example, `i32` is a 32-bit
+type which might be interpreted as signed. Function signatures can have zero or
+more parameters or results even if WebAssembly 1.0 allows up to one result.
+
+The guest can export functions, so that the host can call it. In the case of
+wazero, the host is Go and an exported function can be called via
+`api.Function`. `api.Function` allows users to supply parameters and read
+results as a slice of uint64. For example, if there are no results, an empty
+slice is returned. The user can learn the signature via `FunctionDescription`,
+which returns the `api.ValueType` corresponding to each parameter or result.
+`api.ValueType` defines the mapping of WebAssembly types to `uint64` values for
+reason described in this section. The special case of `v128` is also mentioned
+below.
+
+wazero maps each value type to a uint64 values because it holds the largest
+type in WebAssembly 1.0 (i64). A slice allows you to express empty (e.g. a
+nullary signature), for example a start function.
 
 Here's an example of calling a function, noting this syntax works for both a
 signature `(param i32 i32) (result i32)` and `(param i64 i64) (result i64)`
