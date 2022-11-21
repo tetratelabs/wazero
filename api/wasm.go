@@ -48,8 +48,8 @@ func ExternTypeName(et ExternType) string {
 	return fmt.Sprintf("%#x", et)
 }
 
-// ValueType describes a numeric type used in Web Assembly 1.0 (20191205). For example, Function parameters and results are
-// only definable as a value type.
+// ValueType describes a parameter or result type mapped to a WebAssembly
+// function signature.
 //
 // The following describes how to convert between Wasm and Golang types:
 //
@@ -57,19 +57,23 @@ func ExternTypeName(et ExternType) string {
 //   - ValueTypeI64 - uint64(int64)
 //   - ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //   - ValueTypeF64 - EncodeF64 DecodeF64 from float64
-//   - ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer type in Go (e.g. *string)
+//   - ValueTypeExternref - unintptr(unsafe.Pointer(p)) where p is any pointer
+//     type in Go (e.g. *string)
 //
-// e.g. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
+// e.g. Given a Text Format type use (param i64) (result i64), no conversion is
+// necessary.
 //
 //	results, _ := fn(ctx, input)
 //	result := result[0]
 //
-// e.g. Given a Text Format type use (param f64) (result f64), conversion is necessary.
+// e.g. Given a Text Format type use (param f64) (result f64), conversion is
+// necessary.
 //
 //	results, _ := fn(ctx, api.EncodeF64(input))
 //	result := api.DecodeF64(result[0])
 //
-// Note: This is a type alias as it is easier to encode and decode in the binary format.
+// Note: This is a type alias as it is easier to encode and decode in the
+// binary format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-valtype
 type ValueType = byte
@@ -276,23 +280,26 @@ type FunctionDefinition interface {
 	ResultTypes() []ValueType
 }
 
-// Function is a WebAssembly function exported from an instantiated module (wazero.Runtime InstantiateModule).
+// Function is a WebAssembly function exported from an instantiated module
+// (wazero.Runtime InstantiateModule).
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
 	// Definition is metadata about this function from its defining module.
 	Definition() FunctionDefinition
 
-	// Call invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
-	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
-	// including signature mismatch.
+	// Call invokes the function with the given parameters and returns any
+	// results or an error for any failure looking up or invoking the function.
 	//
-	// If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
-	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
-	// function that exits.
+	// Encoding is described in Definition, and supplying an incorrect count of
+	// parameters vs FunctionDefinition.ParamTypes is an error.
 	//
-	// Call is not goroutine-safe, therefore it is recommended to create another Function if you want to invoke
-	// the same function concurrently. On the other hand, sequential invocations of Call is allowed.
+	// If the exporting Module was closed during this call, the error returned
+	// may be a sys.ExitError. See Module.CloseWithExitCode for details.
+	//
+	// Call is not goroutine-safe, therefore it is recommended to create
+	// another Function if you want to invoke the same function concurrently.
+	// On the other hand, sequential invocations of Call is allowed.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
