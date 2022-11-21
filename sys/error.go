@@ -5,8 +5,9 @@ import (
 	"fmt"
 )
 
-// ExitError is returned to a caller of api.Function still running when api.Module CloseWithExitCode was invoked.
-// ExitCode zero value means success, while any other value is an error.
+// ExitError is returned to a caller of api.Function still running when
+// api.Module CloseWithExitCode was invoked. ExitCode zero value means success,
+// while any other value is an error.
 //
 // Here's an example of how to get the exit code:
 //
