@@ -72,7 +72,8 @@ type (
 
 		// TypeIDs is index-correlated with types and holds typeIDs which is uniquely assigned to a type by store.
 		// This is necessary to achieve fast runtime type checking for indirect function calls at runtime.
-		TypeIDs []FunctionTypeID
+		TypeIDs     []FunctionTypeID
+		TypeIDIndex map[string]FunctionTypeID
 
 		// DataInstances holds data segments bytes of the module.
 		// This is only used by bulk memory operations.
@@ -170,6 +171,10 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	types []*FunctionType,
 ) {
 	m.Types = types
+	m.TypeIDIndex = make(map[string]FunctionTypeID, len(types))
+	for i, t := range types {
+		m.TypeIDIndex[t.string] = m.TypeIDs[i]
+	}
 	m.Functions = append(importedFunctions, functions...)
 	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables

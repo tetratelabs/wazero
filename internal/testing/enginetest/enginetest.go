@@ -29,6 +29,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 const (
@@ -39,7 +40,8 @@ var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 	// v_v is a nullary function type (void -> void)
-	v_v = &wasm.FunctionType{}
+	v_v          = &wasm.FunctionType{}
+	func1, func2 = wasm.Index(2), wasm.Index(1)
 )
 
 type EngineTester interface {
@@ -82,7 +84,7 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 	i64 := i64
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
-		FunctionSection: []uint32{0, 0, 0},
+		FunctionSection: []wasm.Index{0, 0, 0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
@@ -124,7 +126,6 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// Define a basic function which defines two parameters and two results.
 	// This is used to test results when incorrect arity is used.
-	i64 := i64
 	m := &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{
@@ -134,7 +135,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 				ResultNumInUint64: 2,
 			},
 		},
-		FunctionSection: []uint32{0},
+		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeEnd}},
 		},
@@ -183,168 +184,248 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("no table elements", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, References: make([]wasm.Reference, 2)}
-		m := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{},
-			FunctionSection: []uint32{},
-			CodeSection:     []*wasm.Code{},
-			ID:              wasm.ModuleID{0},
-		}
-		m.BuildFunctionDefinitions()
-		err := e.CompileModule(testCtx, m)
-		require.NoError(t, err)
-
-		// Instantiate the module, which has nothing but an empty table.
-		_, err = e.NewModuleEngine(t.Name(), m, nil, nil, []*wasm.TableInstance{table}, nil)
-		require.NoError(t, err)
-
-		// Since there are no elements to initialize, we expect the table to be nil.
-		require.Equal(t, table.References, make([]wasm.Reference, 2))
+		requireNewModuleEngine_emptyTable(t, e, et)
 	})
-	t.Run("module-defined function", func(t *testing.T) {
-		tables := []*wasm.TableInstance{
-			{Min: 2, References: make([]wasm.Reference, 2)},
-			{Min: 10, References: make([]wasm.Reference, 10)},
-		}
-
-		m := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{v_v},
-			FunctionSection: []uint32{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
-				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
-			},
-			ID: wasm.ModuleID{1},
-		}
-		m.BuildFunctionDefinitions()
-		err := e.CompileModule(testCtx, m)
-		require.NoError(t, err)
-
-		module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-		fns := module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
-
-		func1, func2 := uint32(2), uint32(1)
-		tableInits := []wasm.TableInitEntry{
-			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1}},
-			{TableIndex: 1, Offset: 5, FunctionIndexes: []*wasm.Index{&func2}},
-		}
-
-		// Instantiate the module whose table points to its own functions.
-		me, err := e.NewModuleEngine(t.Name(), m, nil, fns, tables, tableInits)
-		require.NoError(t, err)
-
-		// The functions mapped to the table are defined in the same moduleEngine
-		expectedTables := et.InitTables(me, map[wasm.Index]int{0: 2, 1: 10}, tableInits)
-		for idx, table := range tables {
-			require.Equal(t, expectedTables[idx], table.References)
-		}
+	t.Run("multi-table", func(t *testing.T) {
+		requireNewModuleEngine_multiTable(t, e, et)
 	})
 
 	t.Run("imported function", func(t *testing.T) {
-		tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
-
-		importedModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{v_v},
-			FunctionSection: []uint32{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
-				{Body: []byte{wasm.OpcodeEnd}},
-				{Body: []byte{wasm.OpcodeEnd}},
-				{Body: []byte{wasm.OpcodeEnd}},
-				{Body: []byte{wasm.OpcodeEnd}},
-			},
-			ID: wasm.ModuleID{2},
-		}
-		importedModule.BuildFunctionDefinitions()
-		err := e.CompileModule(testCtx, importedModule)
-		require.NoError(t, err)
-
-		imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-		importedFunctions := imported.BuildFunctions(importedModule, buildListeners(et.ListenerFactory(), importedModule))
-
-		// Imported functions are compiled before the importing module is instantiated.
-		importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
-		require.NoError(t, err)
-		imported.Engine = importedMe
-
-		// Instantiate the importing module, which is whose table is initialized.
-		importingModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{},
-			FunctionSection: []uint32{},
-			CodeSection:     []*wasm.Code{},
-			ID:              wasm.ModuleID{3},
-		}
-		importingModule.BuildFunctionDefinitions()
-		err = e.CompileModule(testCtx, importingModule)
-		require.NoError(t, err)
-
-		f := uint32(2)
-		tableInits := []wasm.TableInitEntry{
-			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&f}},
-		}
-
-		importing := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-		fns := importing.BuildFunctions(importingModule, buildListeners(et.ListenerFactory(), importingModule))
-
-		importingMe, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
-		require.NoError(t, err)
-
-		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
-		for idx, table := range tables {
-			require.Equal(t, expectedTables[idx], table.References)
-		}
+		requireNewModuleEngine_tableWithImportedFunction(t, e, et)
 	})
 
 	t.Run("mixed functions", func(t *testing.T) {
-		tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
+		requireNewModuleEngine_tableWithMixedFunctions(t, e, et)
+	})
+}
 
-		importedModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{v_v},
-			FunctionSection: []uint32{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
-				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
-			},
-			ID: wasm.ModuleID{4},
-		}
-		importedModule.BuildFunctionDefinitions()
-		err := e.CompileModule(testCtx, importedModule)
+func requireNewModuleEngine_emptyTable(t *testing.T, e wasm.Engine, et EngineTester) (me wasm.ModuleEngine, module *wasm.ModuleInstance) {
+	tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
+
+	// define a module with a function, but it isn't in the table.
+	m := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0},
+		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeEnd}}},
+		ID:              wasm.ModuleID{0},
+	}
+	m.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, m)
+	require.NoError(t, err)
+
+	module = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
+	fns := module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
+
+	// Instantiate the module, which has nothing but an empty table.
+	me, err = e.NewModuleEngine(t.Name(), m, nil, fns, tables, nil)
+	require.NoError(t, err)
+
+	// Since there are no elements to initialize, we expect the table to be nil.
+	require.Equal(t, tables[0].References, make([]wasm.Reference, 2))
+
+	return
+}
+
+// requireNewModuleEngine_multiTable ensures WebAssembly 2.0 multi-table feature works.
+func requireNewModuleEngine_multiTable(t *testing.T, e wasm.Engine, et EngineTester) (me wasm.ModuleEngine, module *wasm.ModuleInstance) {
+	tables := []*wasm.TableInstance{
+		{Min: 2, References: make([]wasm.Reference, 2)},
+		{Min: 10, References: make([]wasm.Reference, 10)},
+	}
+
+	m := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0, 0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+		},
+		ID: wasm.ModuleID{1},
+	}
+	m.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, m)
+	require.NoError(t, err)
+
+	module = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
+	fns := module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
+
+	tableInits := []wasm.TableInitEntry{
+		{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1}},
+		{TableIndex: 1, Offset: 5, FunctionIndexes: []*wasm.Index{&func2}},
+	}
+
+	// Instantiate the module whose table points to its own functions.
+	me, err = e.NewModuleEngine(t.Name(), m, nil, fns, tables, tableInits)
+	require.NoError(t, err)
+
+	// The functions mapped to the table are defined in the same moduleEngine
+	expectedTables := et.InitTables(me, map[wasm.Index]int{0: 2, 1: 10}, tableInits)
+	for idx, table := range tables {
+		require.Equal(t, expectedTables[idx], table.References)
+	}
+
+	return
+}
+
+func requireNewModuleEngine_tableWithImportedFunction(t *testing.T, e wasm.Engine, et EngineTester) (importingMe wasm.ModuleEngine, importing *wasm.ModuleInstance) {
+	tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
+
+	importedModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0, 0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+		},
+		ID: wasm.ModuleID{2},
+	}
+	importedModule.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, importedModule)
+	require.NoError(t, err)
+
+	imported := &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
+	importedFunctions := imported.BuildFunctions(importedModule, buildListeners(et.ListenerFactory(), importedModule))
+
+	// Imported functions are compiled before the importing module is instantiated.
+	importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
+	require.NoError(t, err)
+	imported.Engine = importedMe
+
+	// Instantiate the importing module, which is whose table is initialized.
+	importingModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{},
+		FunctionSection: []wasm.Index{},
+		CodeSection:     []*wasm.Code{},
+		ID:              wasm.ModuleID{3},
+	}
+	importingModule.BuildFunctionDefinitions()
+	err = e.CompileModule(testCtx, importingModule)
+	require.NoError(t, err)
+
+	tableInits := []wasm.TableInitEntry{
+		{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1}},
+	}
+
+	importing = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
+	fns := importing.BuildFunctions(importingModule, buildListeners(et.ListenerFactory(), importingModule))
+
+	importingMe, err = e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
+	require.NoError(t, err)
+
+	// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
+	expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
+	for idx, table := range tables {
+		require.Equal(t, expectedTables[idx], table.References)
+	}
+	return
+}
+
+func requireNewModuleEngine_tableWithMixedFunctions(t *testing.T, e wasm.Engine, et EngineTester) (importingMe wasm.ModuleEngine, importing *wasm.ModuleInstance) {
+	tables := []*wasm.TableInstance{{Min: 2, References: make([]wasm.Reference, 2)}}
+
+	importedModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0, 0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
+		},
+		ID: wasm.ModuleID{4},
+	}
+	importedModule.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, importedModule)
+	require.NoError(t, err)
+	imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
+	importedFunctions := imported.BuildFunctions(importedModule, buildListeners(et.ListenerFactory(), importedModule))
+
+	// Imported functions are compiled before the importing module is instantiated.
+	importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
+	require.NoError(t, err)
+	imported.Engine = importedMe
+
+	importingModule := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{v_v},
+		FunctionSection: []wasm.Index{0, 0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+		},
+		ID: wasm.ModuleID{5},
+	}
+	importingModule.BuildFunctionDefinitions()
+	err = e.CompileModule(testCtx, importingModule)
+	require.NoError(t, err)
+
+	importing = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
+	fns := importing.BuildFunctions(importingModule, buildListeners(et.ListenerFactory(), importingModule))
+
+	tableInits := []wasm.TableInitEntry{
+		{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1, &func2}},
+	}
+
+	// Instantiate the importing module, which is whose table is initialized.
+	importingMe, err = e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
+	require.NoError(t, err)
+
+	// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
+	expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
+	for idx, table := range tables {
+		require.Equal(t, expectedTables[idx], table.References)
+	}
+
+	return
+}
+
+func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
+	e := et.NewEngine(api.CoreFeaturesV1)
+
+	t.Run("no table elements", func(t *testing.T) {
+		me, m := requireNewModuleEngine_emptyTable(t, e, et)
+
+		_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0 /* out of range */)
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	t.Run("multi-table", func(t *testing.T) {
+		me, m := requireNewModuleEngine_multiTable(t, e, et)
+
+		// table[0][0] should point to func1
+		idx, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0)
 		require.NoError(t, err)
-		imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-		importedFunctions := imported.BuildFunctions(importedModule, buildListeners(et.ListenerFactory(), importedModule))
+		require.Equal(t, func1, idx)
 
-		// Imported functions are compiled before the importing module is instantiated.
-		importedMe, err := e.NewModuleEngine(t.Name(), importedModule, nil, importedFunctions, nil, nil)
+		// table[1][5] should point to func2
+		idx, err = me.LookupFunction(m.Tables[1], m.TypeIDs[0], 5)
 		require.NoError(t, err)
-		imported.Engine = importedMe
+		require.Equal(t, func2, idx)
+	})
 
-		importingModule := &wasm.Module{
-			TypeSection:     []*wasm.FunctionType{v_v},
-			FunctionSection: []uint32{0, 0, 0, 0},
-			CodeSection: []*wasm.Code{
-				{Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
-			},
-			ID: wasm.ModuleID{5},
-		}
-		importingModule.BuildFunctionDefinitions()
-		err = e.CompileModule(testCtx, importingModule)
+	t.Run("imported function", func(t *testing.T) {
+		me, m := requireNewModuleEngine_tableWithImportedFunction(t, e, et)
+
+		// table[0][0] should point to func1
+		idx, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0)
 		require.NoError(t, err)
+		require.Equal(t, func1, idx)
+	})
 
-		importing := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-		fns := importing.BuildFunctions(importingModule, buildListeners(et.ListenerFactory(), importingModule))
+	t.Run("mixed functions", func(t *testing.T) {
+		me, m := requireNewModuleEngine_tableWithMixedFunctions(t, e, et)
 
-		func1, func2 := uint32(0), uint32(4)
-		tableInits := []wasm.TableInitEntry{
-			{TableIndex: 0, Offset: 0, FunctionIndexes: []*wasm.Index{&func1, &func2}},
-		}
-
-		// Instantiate the importing module, which is whose table is initialized.
-		importingMe, err := e.NewModuleEngine(t.Name(), importingModule, importedFunctions, fns, tables, tableInits)
+		// table[0][0] should point to func1
+		idx, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0)
 		require.NoError(t, err)
+		require.Equal(t, func1, idx)
 
-		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		expectedTables := et.InitTables(importingMe, map[wasm.Index]int{0: 2}, tableInits)
-		for idx, table := range tables {
-			require.Equal(t, expectedTables[idx], table.References)
-		}
+		// table[0][1] should point to func2
+		idx, err = me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1)
+		require.NoError(t, err)
+		require.Equal(t, func2, idx)
 	})
 }
 
@@ -745,7 +826,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	importedModule := &wasm.Module{
 		ImportSection:   []*wasm.Import{{}},
 		TypeSection:     []*wasm.FunctionType{ft},
-		FunctionSection: []uint32{0, 0},
+		FunctionSection: []wasm.Index{0, 0},
 		CodeSection: []*wasm.Code{
 			{Body: divByWasm},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, byte(0), // Calling imported host function ^.
@@ -783,7 +864,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	importingModule := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{ft},
 		ImportSection:   []*wasm.Import{{}},
-		FunctionSection: []uint32{0},
+		FunctionSection: []wasm.Index{0},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0 /* only one imported function */, wasm.OpcodeEnd}},
 		},

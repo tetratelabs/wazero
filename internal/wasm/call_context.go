@@ -141,16 +141,31 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 		return nil
 	}
 
-	fi := exp.Function
-	ce, err := exp.Function.Module.Engine.NewCallEngine(m, fi)
+	return m.function(exp.Function)
+}
+
+// Module is exposed for emscripten.
+func (m *CallContext) Module() *ModuleInstance {
+	return m.module
+}
+
+func (m *CallContext) Function(funcIdx Index) api.Function {
+	if uint32(len(m.module.Functions)) < funcIdx {
+		return nil
+	}
+	return m.function(m.module.Functions[funcIdx])
+}
+
+func (m *CallContext) function(f *FunctionInstance) api.Function {
+	ce, err := f.Module.Engine.NewCallEngine(m, f)
 	if err != nil {
 		return nil
 	}
 
-	if exp.Function.Module == m.module {
-		return &function{fi: fi, ce: ce}
+	if f.Module == m.module {
+		return &function{fi: f, ce: ce}
 	} else {
-		return &importedFn{importingModule: m, importedFn: fi, ce: ce}
+		return &importedFn{importingModule: m, importedFn: f, ce: ce}
 	}
 }
 

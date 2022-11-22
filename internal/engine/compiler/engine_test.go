@@ -77,6 +77,10 @@ func TestCompiler_Engine_NewModuleEngine_InitTable(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
+func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
+	enginetest.RunTestModuleEngine_LookupFunction(t, et)
+}
+
 func TestCompiler_ModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call(t, et)

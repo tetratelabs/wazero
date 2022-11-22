@@ -301,8 +301,8 @@ const (
 	moduleInstanceTablesOffset           = 80
 	moduleInstanceEngineOffset           = 136
 	moduleInstanceTypeIDsOffset          = 152
-	moduleInstanceDataInstancesOffset    = 176
-	moduleInstanceElementInstancesOffset = 200
+	moduleInstanceDataInstancesOffset    = 184
+	moduleInstanceElementInstancesOffset = 208
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -568,6 +568,40 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 		initStackSize = compiled.stackPointerCeil * 2
 	}
 	return e.newCallEngine(initStackSize, compiled), nil
+}
+
+// LookupFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
+	if tableOffset >= uint32(len(t.References)) {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+	rawPtr := t.References[tableOffset]
+	if rawPtr == 0 {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+
+	tf := functionFromUintptr(rawPtr)
+	if tf.source.TypeID != typeId {
+		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+		return
+	}
+	idx = tf.source.Idx
+
+	return
+}
+
+// functionFromUintptr resurrects the original *function from the given uintptr
+// which comes from either funcref table or OpcodeRefFunc instruction.
+func functionFromUintptr(ptr uintptr) *function {
+	// Wraps ptrs as the double pointer in order to avoid the unsafe access as detected by race detector.
+	//
+	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
+	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
+	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
+	var wrapped *uintptr = &ptr
+	return *(**function)(unsafe.Pointer(wrapped))
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.

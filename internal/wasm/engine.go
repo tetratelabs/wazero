@@ -47,6 +47,9 @@ type ModuleEngine interface {
 	// NewCallEngine returns a CallEngine for the given FunctionInstance.
 	NewCallEngine(callCtx *CallContext, f *FunctionInstance) (CallEngine, error)
 
+	// LookupFunction returns the index of the function in the function table.
+	LookupFunction(t *TableInstance, typeId FunctionTypeID, tableOffset Index) (Index, error)
+
 	// CreateFuncElementInstance creates an ElementInstance whose references are engine-specific function pointers
 	// corresponding to the given `indexes`.
 	CreateFuncElementInstance(indexes []*Index) *ElementInstance
