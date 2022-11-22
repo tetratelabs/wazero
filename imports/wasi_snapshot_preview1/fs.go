@@ -2,6 +2,7 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"io"
 	"io/fs"
@@ -267,7 +268,7 @@ const (
 
 func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	fd := uint32(params[0])
-	buf := uint32(params[1])
+	resultBuf := uint32(params[1])
 
 	sysCtx := mod.(*wasm.CallContext).Sys
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
@@ -295,25 +296,18 @@ func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uin
 		wasiFileMode = wasiFiletypeSymbolicLink
 	}
 
-	if !mod.Memory().WriteByte(ctx, buf+16, uint8(wasiFileMode)) {
+	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
+	if !ok {
 		return errnoFault
 	}
 
-	if !mod.Memory().WriteUint64Le(ctx, buf+32, uint64(fileStat.Size())) {
-		return errnoFault
-	}
-
-	if !mod.Memory().WriteUint64Le(ctx, buf+40, uint64(fileStat.ModTime().UnixNano())) {
-		return errnoFault
-	}
-
-	if !mod.Memory().WriteUint64Le(ctx, buf+48, uint64(fileStat.ModTime().UnixNano())) {
-		return errnoFault
-	}
-
-	if !mod.Memory().WriteUint64Le(ctx, buf+56, uint64(fileStat.ModTime().UnixNano())) {
-		return errnoFault
-	}
+	buf[16] = uint8(wasiFileMode)
+	size := uint64(fileStat.Size())
+	binary.LittleEndian.PutUint64(buf[32:], size)
+	mtim := uint64(fileStat.ModTime().UnixNano())
+	binary.LittleEndian.PutUint64(buf[40:], mtim)
+	binary.LittleEndian.PutUint64(buf[48:], mtim)
+	binary.LittleEndian.PutUint64(buf[56:], mtim)
 
 	return errnoSuccess
 }
