@@ -364,6 +364,11 @@ func newStore() (*Store, *Namespace) {
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *mockEngine) CompileModule(context.Context, *Module) error { return nil }
 
+// LookupFunction implements the same method as documented on wasm.Engine.
+func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (Index, error) {
+	return 0, nil
+}
+
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
 func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 

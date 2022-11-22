@@ -774,9 +774,36 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 	return e.newCallEngine(f, compiled), nil
 }
 
-// Call implements the same method as documented on wasm.ModuleEngine.
+// LookupFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
+	if tableOffset >= uint32(len(t.References)) {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+	rawPtr := t.References[tableOffset]
+	if rawPtr == 0 {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+
+	tf := functionFromUintptr(rawPtr)
+	if tf.source.TypeID != typeId {
+		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+		return
+	}
+	idx = tf.source.Idx
+
+	return
+}
+
+// Call implements the same method as documented on wasm.CallEngine.
 func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []uint64) (results []uint64, err error) {
-	paramSignature := ce.source.Type.ParamNumInUint64
+	return ce.call(ctx, m, ce.compiled, params)
+}
+
+func (ce *callEngine) call(ctx context.Context, m *wasm.CallContext, tf *function, params []uint64) (results []uint64, err error) {
+	ft := tf.source.Type
+	paramSignature := ft.ParamNumInUint64
 	paramCount := len(params)
 	if paramSignature != paramCount {
 		return nil, fmt.Errorf("expected %d params, but passed %d", paramSignature, paramCount)
@@ -798,9 +825,9 @@ func (ce *callEngine) Call(ctx context.Context, m *wasm.CallContext, params []ui
 		ce.pushValue(param)
 	}
 
-	ce.callFunction(ctx, m, ce.compiled)
+	ce.callFunction(ctx, m, tf)
 
-	results = wasm.PopValues(ce.source.Type.ResultNumInUint64, ce.popValue)
+	results = wasm.PopValues(ft.ResultNumInUint64, ce.popValue)
 	return
 }
 

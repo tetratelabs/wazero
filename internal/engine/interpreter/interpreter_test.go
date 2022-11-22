@@ -124,6 +124,10 @@ func TestInterpreter_Engine_NewModuleEngine_InitTable(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
+func TestInterpreter_ModuleEngine_LookupFunction(t *testing.T) {
+	enginetest.RunTestModuleEngine_LookupFunction(t, et)
+}
+
 func TestInterpreter_ModuleEngine_Call(t *testing.T) {
 	defer functionLog.Reset()
 	enginetest.RunTestModuleEngine_Call(t, et)
