@@ -203,7 +203,7 @@ func Test_fdFdstatSetRights(t *testing.T) {
 
 func Test_fdFilestatGet(t *testing.T) {
 	file, dir := "a", "b"
-	testFS := fstest.MapFS{file: {Data: make([]byte, 123456), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
+	testFS := fstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
@@ -233,7 +233,7 @@ func Test_fdFilestatGet(t *testing.T) {
 				'?', '?', '?', '?', '?', '?', '?', '?', // ino
 				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
 				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
-				0x40, 0xe2, 0x1, 0, 0, 0, 0, 0, // size
+				10, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
@@ -1426,15 +1426,225 @@ func Test_pathCreateDirectory(t *testing.T) {
 `, log)
 }
 
-// Test_pathFilestatGet only tests it is stubbed for GrainLang per #271
 func Test_pathFilestatGet(t *testing.T) {
-	log := requireErrnoNosys(t, functionPathFilestatGet, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> proxy.path_filestat_get(fd=0,flags=0,path=0,path_len=0,result.buf=0)
-	--> wasi_snapshot_preview1.path_filestat_get(fd=0,flags=0,path=0,path_len=0,result.buf=0)
-	<-- ENOSYS
-<-- (52)
-`, log)
+	file, dir := "a", "b"
+	testFS := fstest.MapFS{
+		file:             {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
+		dir:              {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
+		dir + "/" + file: {Data: make([]byte, 20), ModTime: time.Unix(1667482413, 0)},
+	}
+
+	initialMemoryFile := append([]byte{'?'}, file...)
+	initialMemoryDir := append([]byte{'?'}, dir...)
+	initialMemoryNotExists := []byte{'?', '?'}
+
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
+	defer r.Close(testCtx)
+	memorySize := mod.Memory().Size(testCtx)
+
+	// open both paths without using WASI
+	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+
+	rootFd := uint32(3) // after stderr
+
+	fileFd, err := fsc.OpenFile(testCtx, file)
+	require.NoError(t, err)
+
+	dirFd, err := fsc.OpenFile(testCtx, dir)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                        string
+		fd, pathLen, resultFilestat uint32
+		memory, expectedMemory      []byte
+		expectedErrno               Errno
+		expectedLog                 string
+	}{
+		{
+			name:           "file under root",
+			fd:             rootFd,
+			memory:         initialMemoryFile,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedMemory: append(
+				initialMemoryFile,
+				'?', '?', '?', '?', '?', '?', '?', '?', // dev
+				'?', '?', '?', '?', '?', '?', '?', '?', // ino
+				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
+				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				10, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			),
+			expectedLog: `
+--> proxy.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name:           "file under dir",
+			fd:             dirFd, // root
+			memory:         initialMemoryFile,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedMemory: append(
+				initialMemoryFile,
+				'?', '?', '?', '?', '?', '?', '?', '?', // dev
+				'?', '?', '?', '?', '?', '?', '?', '?', // ino
+				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
+				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				20, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			),
+			expectedLog: `
+--> proxy.path_filestat_get(fd=5,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=0,path=1,path_len=1,result.buf=2)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name:           "dir under root",
+			fd:             rootFd,
+			memory:         initialMemoryDir,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedMemory: append(
+				initialMemoryDir,
+				'?', '?', '?', '?', '?', '?', '?', '?', // dev
+				'?', '?', '?', '?', '?', '?', '?', '?', // ino
+				3, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
+				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
+				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // ctim
+			),
+			expectedLog: `
+--> proxy.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name:          "bad FD - not opened",
+			fd:            math.MaxUint32,
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=4294967295,flags=0,path=1,path_len=0,result.buf=0)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=4294967295,flags=0,path=1,path_len=0,result.buf=0)
+	<== EBADF
+<-- (8)
+`,
+		},
+		{
+			name:           "bad FD - not dir",
+			fd:             fileFd,
+			memory:         initialMemoryFile,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedErrno:  ErrnoNotdir,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=4,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=4,flags=0,path=1,path_len=1,result.buf=2)
+	<== ENOTDIR
+<-- (54)
+`,
+		},
+		{
+			name:           "path under root doesn't exist",
+			fd:             rootFd,
+			memory:         initialMemoryNotExists,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedErrno:  ErrnoNoent,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=2)
+	<== ENOENT
+<-- (44)
+`,
+		},
+		{
+			name:           "path under dir doesn't exist",
+			fd:             dirFd,
+			memory:         initialMemoryNotExists,
+			pathLen:        1,
+			resultFilestat: 2,
+			expectedErrno:  ErrnoNoent,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=5,flags=0,path=1,path_len=1,result.buf=2)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=0,path=1,path_len=1,result.buf=2)
+	<== ENOENT
+<-- (44)
+`,
+		},
+		{
+			name:           "path invalid",
+			fd:             dirFd,
+			memory:         []byte("?../foo"),
+			pathLen:        6,
+			resultFilestat: 7,
+			expectedErrno:  ErrnoInval,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=5,flags=0,path=1,path_len=6,result.buf=7)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=0,path=1,path_len=6,result.buf=7)
+	<== EINVAL
+<-- (28)
+`,
+		},
+		{
+			name:          "path is out of memory",
+			fd:            rootFd,
+			memory:        initialMemoryFile,
+			pathLen:       memorySize,
+			expectedErrno: ErrnoNametoolong,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=3,flags=0,path=1,path_len=65536,result.buf=0)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=0,path=1,path_len=65536,result.buf=0)
+	<== ENAMETOOLONG
+<-- (37)
+`,
+		},
+		{
+			name:           "resultFilestat exceeds the maximum valid address by 1",
+			fd:             rootFd,
+			memory:         initialMemoryFile,
+			pathLen:        1,
+			resultFilestat: memorySize - 64 + 1,
+			expectedErrno:  ErrnoFault,
+			expectedLog: `
+--> proxy.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=65473)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=3,flags=0,path=1,path_len=1,result.buf=65473)
+	<== EFAULT
+<-- (21)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+			mod.Memory().Write(testCtx, 0, tc.memory)
+
+			requireErrno(t, tc.expectedErrno, mod, functionPathFilestatGet, uint64(tc.fd), uint64(0), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+		})
+	}
 }
 
 // Test_pathFilestatSetTimes only tests it is stubbed for GrainLang per #271
@@ -1462,7 +1672,7 @@ func Test_pathLink(t *testing.T) {
 func Test_pathOpen(t *testing.T) {
 	rootFD := uint32(3) // after 0, 1, and 2, that are stdin/out/err
 	expectedFD := rootFD + 1
-	// Setup the initial memory to include the path name starting at an offset.
+	// set up the initial memory to include the path name starting at an offset.
 	pathName := "wazero"
 	initialMemory := append([]byte{'?'}, pathName...)
 
