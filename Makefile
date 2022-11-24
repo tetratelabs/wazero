@@ -53,9 +53,12 @@ build.examples.as:
 
 # Use -fstage1 to avoid bugs in the new compiler
 # https://github.com/ziglang/zig/wiki/Self-Hosted-Compiler-Upgrade-Guide#is-it-time-to-upgrade
+%.wasm: %.zig
+	@(cd $(@D); zig build -fstage1 -Drelease-small=true)
+	@mv $(@D)/zig-out/*/$(@F) $(@D)
+
 .PHONY: build.examples.zig
-build.examples.zig:
-	@cd examples/allocation/zig/testdata/ && zig build -fstage1 -Drelease-small=true && mv zig-out/lib/greet.wasm .
+build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm
 
 tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
