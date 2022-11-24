@@ -330,15 +330,222 @@ func Test_fdFilestatSetTimes(t *testing.T) {
 `, log)
 }
 
-// Test_fdPread only tests it is stubbed for GrainLang per #271
 func Test_fdPread(t *testing.T) {
-	log := requireErrnoNosys(t, functionFdPread, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> proxy.fd_pread(fd=0,iovs=0,iovs_len=0,offset=0,result.nread=0)
-	--> wasi_snapshot_preview1.fd_pread(fd=0,iovs=0,iovs_len=0,offset=0,result.nread=0)
-	<-- ENOSYS
-<-- (52)
-`, log)
+	mod, fd, log, r := requireOpenFile(t, "/test_path", []byte("wazero"))
+	defer r.Close(testCtx)
+
+	iovs := uint32(1) // arbitrary offset
+	initialMemory := []byte{
+		'?',         // `iovs` is after this
+		18, 0, 0, 0, // = iovs[0].offset
+		4, 0, 0, 0, // = iovs[0].length
+		23, 0, 0, 0, // = iovs[1].offset
+		2, 0, 0, 0, // = iovs[1].length
+		'?',
+	}
+
+	iovsCount := uint32(2)   // The count of iovs
+	resultSize := uint32(26) // arbitrary offset
+
+	tests := []struct {
+		name           string
+		offset         int64
+		expectedMemory []byte
+		expectedLog    string
+	}{
+		{
+			name:   "offset zero",
+			offset: 0,
+			expectedMemory: append(
+				initialMemory,
+				'w', 'a', 'z', 'e', // iovs[0].length bytes
+				'?',      // iovs[1].offset is after this
+				'r', 'o', // iovs[1].length bytes
+				'?',        // resultSize is after this
+				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+				'?',
+			),
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.size=26)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.size=26)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+		{
+			name:   "offset 2",
+			offset: 2,
+			expectedMemory: append(
+				initialMemory,
+				'z', 'e', 'r', 'o', // iovs[0].length bytes
+				'?', '?', '?', '?', // resultSize is after this
+				4, 0, 0, 0, // sum(iovs[...].length) == length of "zero"
+				'?',
+			),
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.size=26)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.size=26)
+	<== ESUCCESS
+<-- (0)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+
+			ok := mod.Memory().Write(testCtx, 0, initialMemory)
+			require.True(t, ok)
+
+			requireErrno(t, ErrnoSuccess, mod, functionFdPread, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultSize))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
+		})
+	}
+}
+
+func Test_fdPread_Errors(t *testing.T) {
+	contents := []byte("wazero")
+	mod, fd, log, r := requireOpenFile(t, "/test_path", contents)
+	defer r.Close(testCtx)
+
+	tests := []struct {
+		name                            string
+		fd, iovs, iovsCount, resultSize uint32
+		offset                          int64
+		memory                          []byte
+		expectedErrno                   Errno
+		expectedLog                     string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+--> proxy.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.size=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.size=65536)
+	<== EBADF
+<-- (8)
+`,
+		},
+		{
+			name:          "seek past file",
+			fd:            fd,
+			offset:        int64(len(contents) + 1),
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.size=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.size=65536)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name:          "out-of-memory reading iovs[0].offset",
+			fd:            fd,
+			iovs:          1,
+			memory:        []byte{'?'},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.size=65535)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.size=65535)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name: "out-of-memory reading iovs[0].length",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.size=65531)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.size=65531)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name: "iovs[0].offset is outside memory",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',          // `iovs` is after this
+				0, 0, 0x1, 0, // = iovs[0].offset on the second page
+				1, 0, 0, 0, // = iovs[0].length
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.size=65527)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.size=65527)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name: "length to read exceeds memory by 1",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				0, 0, 0x1, 0, // = iovs[0].length on the second page
+				'?',
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65526)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65526)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name: "resultSize offset is outside memory",
+			fd:   fd,
+			iovs: 1, iovsCount: 1,
+			resultSize: 10, // 1 past memory
+			memory: []byte{
+				'?',        // `iovs` is after this
+				9, 0, 0, 0, // = iovs[0].offset
+				1, 0, 0, 0, // = iovs[0].length
+				'?',
+			},
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65536)
+	<== EFAULT
+<-- (21)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			offset := uint32(wasm.MemoryPagesToBytesNum(testMemoryPageSize) - uint64(len(tc.memory)))
+
+			memoryWriteOK := mod.Memory().Write(testCtx, offset, tc.memory)
+			require.True(t, memoryWriteOK)
+
+			requireErrno(t, tc.expectedErrno, mod, functionFdPread, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultSize+offset))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
 }
 
 func Test_fdPrestatGet(t *testing.T) {

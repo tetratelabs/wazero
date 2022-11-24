@@ -335,12 +335,24 @@ var fdFilestatSetTimes = stubFunction(
 // fdPread is the WASI function named functionFdPread which reads from a file
 // descriptor, without using and updating the file descriptor's offset.
 //
+// Except for handling offset, this implementation is identical to fdRead.
+//
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_preadfd-fd-iovs-iovec_array-offset-filesize---errno-size
-var fdPread = stubFunction(
-	functionFdPread,
-	[]wasm.ValueType{i32, i32, i32, i64, i32},
-	[]string{"fd", "iovs", "iovs_len", "offset", "result.nread"},
-)
+var fdPread = &wasm.HostFunc{
+	ExportNames: []string{functionFdPread},
+	Name:        functionFdPread,
+	ParamTypes:  []api.ValueType{i32, i32, i32, i64, i32},
+	ParamNames:  []string{"fd", "iovs", "iovs_len", "offset", "result.size"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(fdPreadFn),
+	},
+}
+
+func fdPreadFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	return fdReadOrPread(ctx, mod, params, true)
+}
 
 // fdPrestatGet is the WASI function named functionFdPrestatGet which returns
 // the prestat data of a file descriptor.
@@ -541,16 +553,39 @@ var fdRead = &wasm.HostFunc{
 }
 
 func fdReadFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	return fdReadOrPread(ctx, mod, params, false)
+}
+
+func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread bool) []uint64 {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	fd := uint32(params[0])
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
-	resultSize := uint32(params[3])
 
-	reader := internalsys.FdReader(ctx, sysCtx, fd)
-	if reader == nil {
+	var offset int64
+	var resultSize uint32
+	if isPread {
+		offset = int64(params[3])
+		resultSize = uint32(params[4])
+	} else {
+		resultSize = uint32(params[3])
+	}
+
+	r := internalsys.FdReader(ctx, sysCtx, fd)
+	if r == nil {
 		return errnoBadf
+	}
+
+	// Tolerate use non-seekable inputs when the offset is zero.
+	if isPread && offset != 0 {
+		if s, ok := r.(io.Seeker); ok {
+			if _, err := s.Seek(offset, io.SeekStart); err != nil {
+				return errnoFault
+			}
+		} else {
+			return errnoInval
+		}
 	}
 
 	var nread uint32
@@ -569,7 +604,7 @@ func fdReadFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 			return errnoFault
 		}
 
-		n, err := reader.Read(b)
+		n, err := r.Read(b)
 		nread += uint32(n)
 
 		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
