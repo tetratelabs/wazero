@@ -18,7 +18,7 @@ import (
 //
 //	go run cat.go /test.txt
 func Test_main(t *testing.T) {
-	for _, toolchain := range []string{"cargo-wasi", "tinygo", "zig", "zig-cc"} {
+	for _, toolchain := range []string{"cargo-wasi", "tinygo", "zig-cc"} {
 		toolchain := toolchain
 		t.Run(toolchain, func(t *testing.T) {
 			t.Setenv("TOOLCHAIN", toolchain)
@@ -44,10 +44,6 @@ func Test_cli(t *testing.T) {
 		{
 			toolchain: "tinygo",
 			wasm:      catWasmTinyGo,
-		},
-		{
-			toolchain: "zig",
-			wasm:      catWasmZig,
 		},
 		{
 			toolchain: "zig-cc",

@@ -28,11 +28,6 @@ var catWasmCargoWasi []byte
 //go:embed testdata/tinygo/cat.wasm
 var catWasmTinyGo []byte
 
-// catWasmZig was compiled from testdata/zig/cat.zig
-//
-//go:embed testdata/zig/cat.wasm
-var catWasmZig []byte
-
 // catWasmZigCc was compiled from testdata/zig-cc/cat.c
 //
 //go:embed testdata/zig-cc/cat.wasm
@@ -75,8 +70,6 @@ func main() {
 		catWasm = catWasmCargoWasi
 	case "tinygo":
 		catWasm = catWasmTinyGo
-	case "zig":
-		catWasm = catWasmZig
 	case "zig-cc":
 		catWasm = catWasmZigCc
 	default:
