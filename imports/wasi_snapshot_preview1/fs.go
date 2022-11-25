@@ -1157,6 +1157,7 @@ func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd 
 	case errors.Is(err, fs.ErrExist):
 		errnoResult = errnoExist
 	case errors.Is(err, syscall.EBADF):
+		// fsc.OpenFile currently returns this on out of file descriptors
 		errnoResult = errnoBadf
 	default:
 		errnoResult = errnoIo
