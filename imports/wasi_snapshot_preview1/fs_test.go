@@ -1591,12 +1591,12 @@ func Test_pathFilestatGet(t *testing.T) {
 			memory:         []byte("?../foo"),
 			pathLen:        6,
 			resultFilestat: 7,
-			expectedErrno:  ErrnoInval,
+			expectedErrno:  ErrnoNoent,
 			expectedLog: `
 --> proxy.path_filestat_get(fd=5,flags=0,path=1,path_len=6,result.buf=7)
 	==> wasi_snapshot_preview1.path_filestat_get(fd=5,flags=0,path=1,path_len=6,result.buf=7)
-	<== EINVAL
-<-- (28)
+	<== ENOENT
+<-- (44)
 `,
 		},
 		{
