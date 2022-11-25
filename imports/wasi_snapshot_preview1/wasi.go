@@ -222,6 +222,7 @@ var (
 	errnoInval       = []uint64{uint64(ErrnoInval)}
 	errnoIo          = []uint64{uint64(ErrnoIo)}
 	errnoNoent       = []uint64{uint64(ErrnoNoent)}
+	errnoNotdir      = []uint64{uint64(ErrnoNotdir)}
 	errnoFault       = []uint64{uint64(ErrnoFault)}
 	errnoNametoolong = []uint64{uint64(ErrnoNametoolong)}
 	errnoSuccess     = []uint64{uint64(ErrnoSuccess)}

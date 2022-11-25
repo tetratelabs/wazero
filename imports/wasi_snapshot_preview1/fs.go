@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"path"
+	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -267,9 +269,10 @@ const (
 )
 
 func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	fd := uint32(params[0])
-	resultBuf := uint32(params[1])
+	return fdFilestatGetFunc(ctx, mod, uint32(params[0]), uint32(params[1]))
+}
 
+func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) []uint64 {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
@@ -884,14 +887,85 @@ var pathCreateDirectory = stubFunction(
 )
 
 // pathFilestatGet is the WASI function named functionPathFilestatGet which
-// returns the attributes of a file or directory.
+// returns the stat attributes of a file or directory.
 //
+// # Parameters
+//
+//   - fd: file descriptor of the folder to look in for the path
+//   - flags: flags determining the method of how paths are resolved
+//   - path: path under fd to get the filestat attributes data for
+//   - path_len: length of the path that was given
+//   - resultFilestat: offset to write the result filestat data
+//
+// Result (Errno)
+//
+// The return value is ErrnoSuccess except the following error conditions:
+//   - ErrnoBadf: `fd` is invalid
+//   - ErrnoNotdir: `fd` points to a file not a directory
+//   - ErrnoIo: could not stat `fd` on filesystem
+//   - ErrnoInval: the path contained "../"
+//   - ErrnoNametoolong: `path` + `path_len` is out of memory
+//   - ErrnoFault: `resultFilestat` points to an offset out of memory
+//   - ErrnoNoent: could not find the path
+//
+// The rest of this implementation matches that of fdFilestatGet, so is not
+// repeated here.
+//
+// Note: This is similar to `fstatat` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_getfd-fd-flags-lookupflags-path-string---errno-filestat
-var pathFilestatGet = stubFunction(
-	functionPathFilestatGet,
-	[]wasm.ValueType{i32, i32, i32, i32, i32},
-	[]string{"fd", "flags", "path", "path_len", "result.buf"},
-)
+// and https://linux.die.net/man/2/fstatat
+var pathFilestatGet = &wasm.HostFunc{
+	ExportNames: []string{functionPathFilestatGet},
+	Name:        functionPathFilestatGet,
+	ParamTypes:  []api.ValueType{i32, i32, i32, i32, i32},
+	ParamNames:  []string{"fd", "flags", "path", "path_len", "result.buf"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         api.GoModuleFunc(pathFilestatGetFn),
+	},
+}
+
+func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := sysCtx.FS(ctx)
+
+	fd := uint32(params[0])
+
+	// TODO: implement flags?
+	// flags := uint32(params[1])
+
+	pathOffset := uint32(params[2])
+	pathLen := uint32(params[3])
+	resultBuf := uint32(params[4])
+
+	// open_at isn't supported in fs.FS, so we check the path can't escape,
+	// then join it with its parent
+	b, ok := mod.Memory().Read(ctx, pathOffset, pathLen)
+	if !ok {
+		return errnoNametoolong
+	}
+	pathName := string(b)
+
+	if dir, ok := fsc.OpenedFile(ctx, fd); !ok {
+		return errnoBadf
+	} else if dir.File == nil { // root
+	} else if _, ok := dir.File.(fs.ReadDirFile); !ok {
+		return errnoNotdir
+	} else {
+		pathName = path.Join(dir.Path, pathName)
+	}
+
+	// Sadly, we need to open the file to stat it.
+	pathFd, errnoResult := openFile(ctx, fsc, pathName)
+	if errnoResult != nil {
+		return errnoResult
+	}
+
+	// Close it when the function returns.
+	defer fsc.CloseFile(ctx, pathFd)
+	return fdFilestatGetFunc(ctx, mod, pathFd, resultBuf)
+}
 
 // pathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
 // which adjusts the timestamps of a file or directory.
@@ -1001,16 +1075,12 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 		return errnoFault
 	}
 
-	if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return errnoNoent
-		case errors.Is(err, fs.ErrExist):
-			return errnoExist
-		default:
-			return errnoIo
-		}
-	} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
+	newFD, errnoResult := openFile(ctx, fsc, string(b))
+	if errnoResult != nil {
+		return errnoResult
+	}
+
+	if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
 		_ = fsc.CloseFile(ctx, newFD)
 		return errnoFault
 	}
@@ -1064,3 +1134,33 @@ var pathUnlinkFile = stubFunction(
 	[]wasm.ValueType{i32, i32, i32},
 	[]string{"fd", "path", "path_len"},
 )
+
+// openFile attempts to open the file at the given path. Errors coerce to WASI
+// Errno, returned as a slice to avoid allocation per-error.
+//
+// Note: Coercion isn't centralized in internalsys.FSContext because ABI use
+// different error codes. For example, wasi-filesystem and GOOS=js don't map to
+// these Errno.
+func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errnoResult []uint64) {
+	newFD, err := fsc.OpenFile(ctx, name)
+	if err == nil {
+		fd = newFD
+		return
+	}
+	// handle all the cases of FS.Open or internal to FSContext.OpenFile
+	switch {
+	case errors.Is(err, fs.ErrInvalid):
+		errnoResult = errnoInval
+	case errors.Is(err, fs.ErrNotExist):
+		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
+		errnoResult = errnoNoent
+	case errors.Is(err, fs.ErrExist):
+		errnoResult = errnoExist
+	case errors.Is(err, syscall.EBADF):
+		// fsc.OpenFile currently returns this on out of file descriptors
+		errnoResult = errnoBadf
+	default:
+		errnoResult = errnoIo
+	}
+	return
+}

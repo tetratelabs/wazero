@@ -127,7 +127,7 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 	}
 
 	newFD := c.nextFD()
-	if newFD == 0 {
+	if newFD == 0 { // TODO: out of file descriptors
 		_ = f.Close()
 		return 0, syscall.EBADF
 	}
