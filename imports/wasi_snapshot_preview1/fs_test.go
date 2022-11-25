@@ -1729,10 +1729,9 @@ func Test_pathOpen_Errors(t *testing.T) {
 
 	validPath := uint32(0)    // arbitrary offset
 	validPathLen := uint32(6) // the length of "wazero"
-	mod.Memory().Write(testCtx, validPath, []byte(pathName))
 
 	tests := []struct {
-		name                                      string
+		name, pathName                            string
 		fd, path, pathLen, oflags, resultOpenedFd uint32
 		expectedErrno                             Errno
 		expectedLog                               string
@@ -1762,6 +1761,20 @@ func Test_pathOpen_Errors(t *testing.T) {
 `,
 		},
 		{
+			name:     "path invalid",
+			fd:       validFD,
+			pathName: "../foo",
+			pathLen:  6,
+			// fstest.MapFS returns file not found instead of invalid on invalid path
+			expectedErrno: ErrnoNoent,
+			expectedLog: `
+--> proxy.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	<== ENOENT
+<-- (44)
+`,
+		},
+		{
 			name:          "out-of-memory reading pathLen",
 			fd:            validFD,
 			path:          validPath,
@@ -1777,6 +1790,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:          "no such file exists",
 			fd:            validFD,
+			pathName:      pathName,
 			path:          validPath,
 			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
 			expectedErrno: ErrnoNoent,
@@ -1790,6 +1804,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:           "out-of-memory writing resultOpenedFd",
 			fd:             validFD,
+			pathName:       pathName,
 			path:           validPath,
 			pathLen:        validPathLen,
 			resultOpenedFd: mod.Memory().Size(testCtx), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
@@ -1807,6 +1822,8 @@ func Test_pathOpen_Errors(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
+
+			mod.Memory().Write(testCtx, validPath, []byte(tc.pathName))
 
 			requireErrno(t, tc.expectedErrno, mod, functionPathOpen, uint64(tc.fd), uint64(0), uint64(tc.path),
 				uint64(tc.pathLen), uint64(tc.oflags), 0, 0, 0, uint64(tc.resultOpenedFd))

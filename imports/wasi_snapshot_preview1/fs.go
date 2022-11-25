@@ -7,7 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"path"
-	"strings"
+	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -946,9 +946,6 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []u
 		return errnoNametoolong
 	}
 	pathName := string(b)
-	if strings.Contains(pathName, "../") {
-		return errnoInval // don't allow escaping the root of the FD
-	}
 
 	if dir, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return errnoBadf
@@ -960,12 +957,9 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []u
 	}
 
 	// Sadly, we need to open the file to stat it.
-	pathFd, err := fsc.OpenFile(ctx, pathName)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return errnoNoent
-		}
-		return errnoIo
+	pathFd, errnoResult := openFile(ctx, fsc, pathName)
+	if errnoResult != nil {
+		return errnoResult
 	}
 
 	// Close it when the function returns.
@@ -1081,16 +1075,12 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 		return errnoFault
 	}
 
-	if newFD, err := fsc.OpenFile(ctx, string(b)); err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return errnoNoent
-		case errors.Is(err, fs.ErrExist):
-			return errnoExist
-		default:
-			return errnoIo
-		}
-	} else if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
+	newFD, errnoResult := openFile(ctx, fsc, string(b))
+	if errnoResult != nil {
+		return errnoResult
+	}
+
+	if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
 		_ = fsc.CloseFile(ctx, newFD)
 		return errnoFault
 	}
@@ -1144,3 +1134,32 @@ var pathUnlinkFile = stubFunction(
 	[]wasm.ValueType{i32, i32, i32},
 	[]string{"fd", "path", "path_len"},
 )
+
+// openFile attempts to open the file at the given path. Errors coerce to WASI
+// Errno, returned as a slice to avoid allocation per-error.
+//
+// Note: Coercion isn't centralized in internalsys.FSContext because ABI use
+// different error codes. For example, wasi-filesystem and GOOS=js don't map to
+// these Errno.
+func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errnoResult []uint64) {
+	newFD, err := fsc.OpenFile(ctx, name)
+	if err == nil {
+		fd = newFD
+		return
+	}
+	// handle all the cases of FS.Open or internal to FSContext.OpenFile
+	switch {
+	case errors.Is(err, fs.ErrInvalid):
+		errnoResult = errnoInval
+	case errors.Is(err, fs.ErrNotExist):
+		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
+		errnoResult = errnoNoent
+	case errors.Is(err, fs.ErrExist):
+		errnoResult = errnoExist
+	case errors.Is(err, syscall.EBADF):
+		errnoResult = errnoBadf
+	default:
+		errnoResult = errnoIo
+	}
+	return
+}
