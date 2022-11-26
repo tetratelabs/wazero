@@ -37,12 +37,11 @@ var WasmExit = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func wasmExit(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	code := uint32(params[0])
+func wasmExit(ctx context.Context, mod api.Module, stack []uint64) {
+	code := uint32(stack[0])
 
 	getState(ctx).clear()
 	_ = mod.CloseWithExitCode(ctx, code) // TODO: should ours be signed bit (like -1 == 255)?
-	return
 }
 
 // WasmWrite implements runtime.wasmWrite which supports runtime.write and
@@ -60,8 +59,8 @@ var WasmWrite = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func wasmWrite(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	fd, p, n := uint32(params[0]), uint32(params[1]), uint32(params[2])
+func wasmWrite(ctx context.Context, mod api.Module, stack []uint64) {
+	fd, p, n := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
 
 	var writer io.Writer
 
@@ -78,7 +77,6 @@ func wasmWrite(ctx context.Context, mod api.Module, params []uint64) (_ []uint64
 	if _, err := writer.Write(mustRead(ctx, mod.Memory(), "p", p, n)); err != nil {
 		panic(fmt.Errorf("error writing p: %w", err))
 	}
-	return
 }
 
 // ResetMemoryDataView signals wasm.OpcodeMemoryGrow happened, indicating any
@@ -107,9 +105,9 @@ var Nanotime1 = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func nanotime1(ctx context.Context, mod api.Module, _ []uint64) []uint64 {
+func nanotime1(ctx context.Context, mod api.Module, stack []uint64) {
 	time := mod.(*wasm.CallContext).Sys.Nanotime(ctx)
-	return []uint64{api.EncodeI64(time)}
+	stack[0] = api.EncodeI64(time)
 }
 
 // Walltime implements runtime.walltime which supports time.Now.
@@ -125,9 +123,10 @@ var Walltime = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func walltime(ctx context.Context, mod api.Module, _ []uint64) []uint64 {
+func walltime(ctx context.Context, mod api.Module, stack []uint64) {
 	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime(ctx)
-	return []uint64{api.EncodeI64(sec), api.EncodeI32(nsec)}
+	stack[0] = api.EncodeI64(sec)
+	stack[1] = api.EncodeI32(nsec)
 }
 
 // ScheduleTimeoutEvent implements runtime.scheduleTimeoutEvent which supports
@@ -164,9 +163,9 @@ var GetRandomData = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func getRandomData(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
+func getRandomData(ctx context.Context, mod api.Module, stack []uint64) {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
-	buf, bufLen := uint32(params[0]), uint32(params[1])
+	buf, bufLen := uint32(stack[0]), uint32(stack[1])
 
 	r := mustRead(ctx, mod.Memory(), "r", buf, bufLen)
 
@@ -175,5 +174,4 @@ func getRandomData(ctx context.Context, mod api.Module, params []uint64) (_ []ui
 	} else if uint32(n) != bufLen {
 		panic(fmt.Errorf("RandSource.Read(r /* len=%d */) read %d bytes", bufLen, n))
 	}
-	return
 }

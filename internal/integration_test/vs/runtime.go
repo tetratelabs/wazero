@@ -79,8 +79,8 @@ func (m *wazeroModule) Memory() []byte {
 	return m.mod.Memory().(*wasm.MemoryInstance).Buffer
 }
 
-func (r *wazeroRuntime) log(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	offset, byteCount := uint32(params[0]), uint32(params[1])
+func (r *wazeroRuntime) log(ctx context.Context, mod api.Module, stack []uint64) {
+	offset, byteCount := uint32(stack[0]), uint32(stack[1])
 
 	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
 	if !ok {
@@ -89,8 +89,6 @@ func (r *wazeroRuntime) log(ctx context.Context, mod api.Module, params []uint64
 	if err := r.logFn(buf); err != nil {
 		panic(err)
 	}
-
-	return
 }
 
 func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err error) {
@@ -107,8 +105,8 @@ func (r *wazeroRuntime) Compile(ctx context.Context, cfg *RuntimeConfig) (err er
 	} else if cfg.EnvFReturnValue != 0 {
 		if r.env, err = r.runtime.NewHostModuleBuilder("env").
 			NewFunctionBuilder().
-			WithGoFunction(api.GoFunc(func(context.Context, []uint64) []uint64 {
-				return []uint64{cfg.EnvFReturnValue}
+			WithGoFunction(api.GoFunc(func(ctx context.Context, stack []uint64) {
+				stack[0] = cfg.EnvFReturnValue
 			}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
 			Export("f").
 			Compile(ctx); err != nil {

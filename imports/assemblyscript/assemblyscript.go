@@ -154,11 +154,11 @@ var abortMessageEnabled = &wasm.HostFunc{
 var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
 
 // abortWithMessage implements functionAbort
-func abortWithMessage(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	message := uint32(params[0])
-	fileName := uint32(params[1])
-	lineNumber := uint32(params[2])
-	columnNumber := uint32(params[3])
+func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
+	message := uint32(stack[0])
+	fileName := uint32(stack[1])
+	lineNumber := uint32(stack[2])
+	columnNumber := uint32(stack[3])
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	// Don't panic if there was a problem reading the message
@@ -167,12 +167,11 @@ func abortWithMessage(ctx context.Context, mod api.Module, params []uint64) (_ [
 			_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 		}
 	}
-	abort(ctx, mod, params)
-	return
+	abort(ctx, mod, stack)
 }
 
 // abortWithMessage implements functionAbort ignoring the message.
-func abort(ctx context.Context, mod api.Module, _ []uint64) (_ []uint64) {
+func abort(ctx context.Context, mod api.Module, _ []uint64) {
 	// AssemblyScript expects the exit code to be 255
 	// See https://github.com/AssemblyScript/assemblyscript/blob/v0.20.13/tests/compiler/wasi/abort.js#L14
 	exitCode := uint32(255)
@@ -195,17 +194,15 @@ var traceStdout = &wasm.HostFunc{
 	ParamNames:  []string{"message", "nArgs", "arg0", "arg1", "arg2", "arg3", "arg4"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-			traceTo(ctx, mod, params, mod.(*wasm.CallContext).Sys.Stdout())
-			return
+		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			traceTo(ctx, mod, stack, mod.(*wasm.CallContext).Sys.Stdout())
 		}),
 	},
 }
 
 // traceStderr implements trace to the configured Stderr.
-var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	traceTo(ctx, mod, params, mod.(*wasm.CallContext).Sys.Stderr())
-	return
+var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+	traceTo(ctx, mod, stack, mod.(*wasm.CallContext).Sys.Stderr())
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.
@@ -277,16 +274,16 @@ var seed = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{f64},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			r := mod.(*wasm.CallContext).Sys.RandSource()
 			buf := make([]byte, 8)
 			_, err := io.ReadFull(r, buf)
 			if err != nil {
 				panic(fmt.Errorf("error reading random seed: %w", err))
 			}
-			// the caller interprets this as a float64
-			raw := binary.LittleEndian.Uint64(buf)
-			return []uint64{raw}
+
+			// the caller interprets the result as a float64
+			stack[0] = binary.LittleEndian.Uint64(buf)
 		}),
 	},
 }

@@ -92,19 +92,18 @@ var fdClose = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdCloseFn),
+		GoFunc:         wasiFunc(fdCloseFn),
 	},
 }
 
-func fdCloseFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdCloseFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd := uint32(params[0])
 
 	if ok := sysCtx.FS(ctx).CloseFile(ctx, fd); !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
-
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // fdDatasync is the WASI function named functionFdDatasync which synchronizes
@@ -162,19 +161,19 @@ var fdFdstatGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdFdstatGetFn),
+		GoFunc:         wasiFunc(fdFdstatGetFn),
 	},
 }
 
-func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	// TODO: actually write the fdstat!
 	fd, _ := uint32(params[0]), uint32(params[1])
 
 	if _, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // fdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags which
@@ -251,7 +250,7 @@ var fdFilestatGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdFilestatGetFn),
+		GoFunc:         wasiFunc(fdFilestatGetFn),
 	},
 }
 
@@ -268,20 +267,20 @@ const (
 	wasiFiletypeSymbolicLink
 )
 
-func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return fdFilestatGetFunc(ctx, mod, uint32(params[0]), uint32(params[1]))
 }
 
-func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) []uint64 {
+func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	fileStat, err := file.File.Stat()
 	if err != nil {
-		return errnoIo
+		return ErrnoIo
 	}
 
 	fileMode := fileStat.Mode()
@@ -301,7 +300,7 @@ func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32
 
 	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
 	if !ok {
-		return errnoFault
+		return ErrnoFault
 	}
 
 	buf[16] = uint8(wasiFileMode)
@@ -312,7 +311,7 @@ func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32
 	binary.LittleEndian.PutUint64(buf[48:], mtim)
 	binary.LittleEndian.PutUint64(buf[56:], mtim)
 
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // fdFilestatSetSize is the WASI function named functionFdFilestatSetSize which
@@ -349,11 +348,11 @@ var fdPread = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdPreadFn),
+		GoFunc:         wasiFunc(fdPreadFn),
 	},
 }
 
-func fdPreadFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdPreadFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return fdReadOrPread(ctx, mod, params, true)
 }
 
@@ -396,29 +395,29 @@ var fdPrestatGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdPrestatGetFn),
+		GoFunc:         wasiFunc(fdPrestatGetFn),
 	},
 }
 
-func fdPrestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdPrestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd, resultPrestat := uint32(params[0]), uint32(params[1])
 
 	entry, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	// Zero-value 8-bit tag, and 3-byte zero-value paddings, which is uint32le(0) in short.
 	if !mod.Memory().WriteUint32Le(ctx, resultPrestat, uint32(0)) {
-		return errnoFault
-	}
-	// Write the length of the directory name at offset 4.
-	if !mod.Memory().WriteUint32Le(ctx, resultPrestat+4, uint32(len(entry.Path))) {
-		return errnoFault
+		return ErrnoFault
 	}
 
-	return errnoSuccess
+	// Write the length of the directory name at offset 4.
+	if !mod.Memory().WriteUint32Le(ctx, resultPrestat+4, uint32(len(entry.Path))) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
 }
 
 // fdPrestatDirName is the WASI function named functionFdPrestatDirName which
@@ -459,30 +458,30 @@ var fdPrestatDirName = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdPrestatDirNameFn),
+		GoFunc:         wasiFunc(fdPrestatDirNameFn),
 	},
 }
 
-func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
 
 	f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	// Some runtimes may have another semantics. See /RATIONALE.md
 	if uint32(len(f.Path)) < pathLen {
-		return errnoNametoolong
+		return ErrnoNametoolong
 	}
 
 	// TODO: fdPrestatDirName may have to return ErrnoNotdir if the type of the
 	// prestat data of `fd` is not a PrestatDir.
 	if !mod.Memory().Write(ctx, path, []byte(f.Path)[:pathLen]) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // fdPwrite is the WASI function named functionFdPwrite which writes to a file
@@ -551,15 +550,15 @@ var fdRead = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdReadFn),
+		GoFunc:         wasiFunc(fdReadFn),
 	},
 }
 
-func fdReadFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdReadFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return fdReadOrPread(ctx, mod, params, false)
 }
 
-func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread bool) []uint64 {
+func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread bool) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	fd := uint32(params[0])
@@ -577,16 +576,16 @@ func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread
 
 	r := internalsys.FdReader(ctx, sysCtx, fd)
 	if r == nil {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	if isPread {
 		if s, ok := r.(io.Seeker); ok {
 			if _, err := s.Seek(offset, io.SeekStart); err != nil {
-				return errnoFault
+				return ErrnoFault
 			}
 		} else {
-			return errnoInval
+			return ErrnoInval
 		}
 	}
 
@@ -595,31 +594,32 @@ func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread
 		iov := iovs + i*8
 		offset, ok := mem.ReadUint32Le(ctx, iov)
 		if !ok {
-			return errnoFault
+			return ErrnoFault
 		}
 		l, ok := mem.ReadUint32Le(ctx, iov+4)
 		if !ok {
-			return errnoFault
+			return ErrnoFault
 		}
 		b, ok := mem.Read(ctx, offset, l)
 		if !ok {
-			return errnoFault
+			return ErrnoFault
 		}
 
 		n, err := r.Read(b)
 		nread += uint32(n)
 
 		shouldContinue, errno := fdRead_shouldContinueRead(uint32(n), l, err)
-		if errno != nil {
+		if errno != ErrnoSuccess {
 			return errno
 		} else if !shouldContinue {
 			break
 		}
 	}
 	if !mem.WriteUint32Le(ctx, resultSize, nread) {
-		return errnoFault
+		return ErrnoFault
+	} else {
+		return ErrnoSuccess
 	}
-	return errnoSuccess
 }
 
 // fdRead_shouldContinueRead decides whether to continue reading the next iovec
@@ -627,16 +627,16 @@ func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread
 //
 // Note: When there are both bytes read (n) and an error, this continues.
 // See /RATIONALE.md "Why ignore the error returned by io.Reader when n > 1?"
-func fdRead_shouldContinueRead(n, l uint32, err error) (bool, []uint64) {
+func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
 	if errors.Is(err, io.EOF) {
-		return false, nil // EOF isn't an error, and we shouldn't continue.
+		return false, ErrnoSuccess // EOF isn't an error, and we shouldn't continue.
 	} else if err != nil && n == 0 {
-		return false, errnoIo
+		return false, ErrnoIo
 	} else if err != nil {
-		return false, nil // Allow the caller to process n bytes.
+		return false, ErrnoSuccess // Allow the caller to process n bytes.
 	}
 	// Continue reading, unless there's a partial read or nothing to read.
-	return n == l && n != 0, nil
+	return n == l && n != 0, ErrnoSuccess
 }
 
 // fdReaddir is the WASI function named functionFdReaddir which reads directory
@@ -704,11 +704,11 @@ var fdSeek = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdSeekFn),
+		GoFunc:         wasiFunc(fdSeekFn),
 	},
 }
 
-func fdSeekFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdSeekFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd := uint32(params[0])
 	offset := params[1]
@@ -718,25 +718,24 @@ func fdSeekFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
 	if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
-		return errnoBadf
+		return ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
-		return errnoInval
+		return ErrnoInval
 	}
+
 	newOffset, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
-		return errnoIo
+		return ErrnoIo
 	}
-
 	if !mod.Memory().WriteUint64Le(ctx, resultNewoffset, uint64(newOffset)) {
-		return errnoFault
+		return ErrnoFault
 	}
-
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // fdSync is the WASI function named functionFdSync which synchronizes the data
@@ -824,11 +823,11 @@ var fdWrite = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(fdWriteFn),
+		GoFunc:         wasiFunc(fdWriteFn),
 	},
 }
 
-func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	fd := uint32(params[0])
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
@@ -837,7 +836,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	writer := internalsys.FdWriter(ctx, sysCtx, fd)
 	if writer == nil {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	var err error
@@ -846,13 +845,13 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 		iov := iovs + i*8
 		offset, ok := mod.Memory().ReadUint32Le(ctx, iov)
 		if !ok {
-			return errnoFault
+			return ErrnoFault
 		}
 		// Note: emscripten has been known to write zero length iovec. However,
 		// it is not common in other compilers, so we don't optimize for it.
 		l, ok := mod.Memory().ReadUint32Le(ctx, iov+4)
 		if !ok {
-			return errnoFault
+			return ErrnoFault
 		}
 
 		var n int
@@ -861,19 +860,19 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 		} else {
 			b, ok := mod.Memory().Read(ctx, offset, l)
 			if !ok {
-				return errnoFault
+				return ErrnoFault
 			}
 			n, err = writer.Write(b)
 			if err != nil {
-				return errnoIo
+				return ErrnoIo
 			}
 		}
 		nwritten += uint32(n)
 	}
 	if !mod.Memory().WriteUint32Le(ctx, resultSize, nwritten) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // pathCreateDirectory is the WASI function named functionPathCreateDirectory
@@ -922,11 +921,11 @@ var pathFilestatGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(pathFilestatGetFn),
+		GoFunc:         wasiFunc(pathFilestatGetFn),
 	},
 }
 
-func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fsc := sysCtx.FS(ctx)
 
@@ -943,22 +942,22 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) []u
 	// then join it with its parent
 	b, ok := mod.Memory().Read(ctx, pathOffset, pathLen)
 	if !ok {
-		return errnoNametoolong
+		return ErrnoNametoolong
 	}
 	pathName := string(b)
 
 	if dir, ok := fsc.OpenedFile(ctx, fd); !ok {
-		return errnoBadf
+		return ErrnoBadf
 	} else if dir.File == nil { // root
 	} else if _, ok := dir.File.(fs.ReadDirFile); !ok {
-		return errnoNotdir
+		return ErrnoNotdir
 	} else {
 		pathName = path.Join(dir.Path, pathName)
 	}
 
 	// Sadly, we need to open the file to stat it.
 	pathFd, errnoResult := openFile(ctx, fsc, pathName)
-	if errnoResult != nil {
+	if errnoResult != ErrnoSuccess {
 		return errnoResult
 	}
 
@@ -1048,11 +1047,11 @@ var pathOpen = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(pathOpenFn),
+		GoFunc:         wasiFunc(pathOpenFn),
 	},
 }
 
-func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fsc := sysCtx.FS(ctx)
 
@@ -1067,24 +1066,24 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	resultOpenedFd := uint32(params[8])
 
 	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
-		return errnoBadf
+		return ErrnoBadf
 	}
 
 	b, ok := mod.Memory().Read(ctx, path, pathLen)
 	if !ok {
-		return errnoFault
+		return ErrnoFault
 	}
 
 	newFD, errnoResult := openFile(ctx, fsc, string(b))
-	if errnoResult != nil {
+	if errnoResult != ErrnoSuccess {
 		return errnoResult
 	}
 
 	if !mod.Memory().WriteUint32Le(ctx, resultOpenedFd, newFD) {
 		_ = fsc.CloseFile(ctx, newFD)
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // pathReadlink is the WASI function named functionPathReadlink that reads the
@@ -1141,26 +1140,27 @@ var pathUnlinkFile = stubFunction(
 // Note: Coercion isn't centralized in internalsys.FSContext because ABI use
 // different error codes. For example, wasi-filesystem and GOOS=js don't map to
 // these Errno.
-func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errnoResult []uint64) {
+func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) {
 	newFD, err := fsc.OpenFile(ctx, name)
 	if err == nil {
 		fd = newFD
+		errno = ErrnoSuccess
 		return
 	}
 	// handle all the cases of FS.Open or internal to FSContext.OpenFile
 	switch {
 	case errors.Is(err, fs.ErrInvalid):
-		errnoResult = errnoInval
+		errno = ErrnoInval
 	case errors.Is(err, fs.ErrNotExist):
 		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
-		errnoResult = errnoNoent
+		errno = ErrnoNoent
 	case errors.Is(err, fs.ErrExist):
-		errnoResult = errnoExist
+		errno = ErrnoExist
 	case errors.Is(err, syscall.EBADF):
 		// fsc.OpenFile currently returns this on out of file descriptors
-		errnoResult = errnoBadf
+		errno = ErrnoBadf
 	default:
-		errnoResult = errnoIo
+		errno = ErrnoIo
 	}
 	return
 }

@@ -59,11 +59,11 @@ var clockResGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(clockResGetFn),
+		GoFunc:         wasiFunc(clockResGetFn),
 	},
 }
 
-func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	id, resultResolution := uint32(params[0]), uint32(params[1])
 
@@ -74,12 +74,13 @@ func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) []uint6
 	case clockIDMonotonic:
 		resolution = uint64(sysCtx.NanotimeResolution())
 	default:
-		return errnoInval
+		return ErrnoInval
 	}
+
 	if !mod.Memory().WriteUint64Le(ctx, resultResolution, resolution) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // clockTimeGet is the WASI function named functionClockTimeGet that returns
@@ -121,15 +122,15 @@ var clockTimeGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(clockTimeGetFn),
+		GoFunc:         wasiFunc(clockTimeGetFn),
 	},
 }
 
-func clockTimeGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func clockTimeGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	id := uint32(params[0])
 	// TODO: precision is currently ignored.
-	_ = params[1]
+	// precision = params[1]
 	resultTimestamp := uint32(params[2])
 
 	var val uint64
@@ -140,11 +141,11 @@ func clockTimeGetFn(ctx context.Context, mod api.Module, params []uint64) []uint
 	case clockIDMonotonic:
 		val = uint64(sysCtx.Nanotime(ctx))
 	default:
-		return errnoInval
+		return ErrnoInval
 	}
 
 	if !mod.Memory().WriteUint64Le(ctx, resultTimestamp, val) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }

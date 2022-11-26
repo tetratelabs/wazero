@@ -42,24 +42,24 @@ var randomGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(randomGetFn),
+		GoFunc:         wasiFunc(randomGetFn),
 	},
 }
 
-func randomGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func randomGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	randSource := sysCtx.RandSource()
 	buf, bufLen := uint32(params[0]), uint32(params[1])
 
 	randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
 	if !ok { // out-of-range
-		return errnoFault
+		return ErrnoFault
 	}
 
 	// We can ignore the returned n as it only != byteCount on error
 	if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
-		return errnoIo
+		return ErrnoIo
 	}
 
-	return errnoSuccess
+	return ErrnoSuccess
 }

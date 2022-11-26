@@ -925,7 +925,7 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		n, l          uint32
 		err           error
 		expectedOk    bool
-		expectedErrno []uint64
+		expectedErrno Errno
 	}{
 		{
 			name: "break when nothing to read",
@@ -972,13 +972,13 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 		{
 			name:          "return ErrnoIo on error on nothing to read",
 			err:           io.ErrClosedPipe,
-			expectedErrno: errnoIo,
+			expectedErrno: ErrnoIo,
 		},
 		{
 			name:          "return ErrnoIo on error on nothing read",
 			l:             4,
 			err:           io.ErrClosedPipe,
-			expectedErrno: errnoIo,
+			expectedErrno: ErrnoIo,
 		},
 		{ // Special case, allows processing data before err
 			name: "break on error on partial read",

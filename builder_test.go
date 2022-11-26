@@ -20,11 +20,11 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 		return 0
 	}
 
-	gofunc1 := api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
-		return []uint64{0}
+	gofunc1 := api.GoFunc(func(ctx context.Context, stack []uint64) {
+		stack[0] = 0
 	})
-	gofunc2 := api.GoFunc(func(ctx context.Context, params []uint64) []uint64 {
-		return []uint64{0}
+	gofunc2 := api.GoFunc(func(ctx context.Context, stack []uint64) {
+		stack[0] = 0
 	})
 
 	tests := []struct {

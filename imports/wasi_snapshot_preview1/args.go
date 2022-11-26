@@ -52,11 +52,11 @@ var argsGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(argsGetFn),
+		GoFunc:         wasiFunc(argsGetFn),
 	},
 }
 
-func argsGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	argv, argvBuf := uint32(params[0]), uint32(params[1])
 	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf)
@@ -99,20 +99,21 @@ var argsSizesGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(argsSizesGetFn),
+		GoFunc:         wasiFunc(argsSizesGetFn),
 	},
 }
 
-func argsSizesGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func argsSizesGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	resultArgc, resultArgvLen := uint32(params[0]), uint32(params[1])
 
+	// Write the Errno back to the stack
 	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
-		return errnoFault
+		return ErrnoFault
 	}
 	if !mem.WriteUint32Le(ctx, resultArgvLen, sysCtx.ArgsSize()) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }

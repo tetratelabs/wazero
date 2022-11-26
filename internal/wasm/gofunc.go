@@ -37,8 +37,8 @@ type reflectGoModuleFunction struct {
 }
 
 // Call implements the same method as documented on api.GoModuleFunction.
-func (f *reflectGoModuleFunction) Call(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	return callGoFunc(ctx, mod, f.fn, params)
+func (f *reflectGoModuleFunction) Call(ctx context.Context, mod api.Module, stack []uint64) {
+	callGoFunc(ctx, mod, f.fn, stack)
 }
 
 // EqualTo is exposed for testing.
@@ -72,11 +72,11 @@ func (f *reflectGoFunction) EqualTo(that interface{}) bool {
 }
 
 // Call implements the same method as documented on api.GoFunction.
-func (f *reflectGoFunction) Call(ctx context.Context, params []uint64) []uint64 {
+func (f *reflectGoFunction) Call(ctx context.Context, stack []uint64) {
 	if f.pk == paramsKindNoContext {
 		ctx = nil
 	}
-	return callGoFunc(ctx, nil, f.fn, params)
+	callGoFunc(ctx, nil, f.fn, stack)
 }
 
 // PopValues pops the specified number of api.ValueType parameters off the
@@ -101,12 +101,13 @@ func PopValues(count int, popper func() uint64) []uint64 {
 
 // callGoFunc executes the reflective function by converting params to Go
 // types. The results of the function call are converted back to api.ValueType.
-func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, params []uint64) []uint64 {
+func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, stack []uint64) {
 	tp := fn.Type()
 
 	var in []reflect.Value
-	if tp.NumIn() != 0 {
-		in = make([]reflect.Value, tp.NumIn())
+	pLen := tp.NumIn()
+	if pLen != 0 {
+		in = make([]reflect.Value, pLen)
 
 		i := 0
 		if ctx != nil {
@@ -118,9 +119,13 @@ func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, params [
 			i++
 		}
 
-		for _, raw := range params {
-			val := reflect.New(tp.In(i)).Elem()
-			k := tp.In(i).Kind()
+		for j := 0; i < pLen; i++ {
+			next := tp.In(i)
+			val := reflect.New(next).Elem()
+			k := next.Kind()
+			raw := stack[j]
+			j++
+
 			switch k {
 			case reflect.Float32:
 				val.SetFloat(float64(math.Float32frombits(uint32(raw))))
@@ -134,30 +139,24 @@ func callGoFunc(ctx context.Context, mod api.Module, fn *reflect.Value, params [
 				panic(fmt.Errorf("BUG: param[%d] has an invalid type: %v", i, k))
 			}
 			in[i] = val
-			i++
 		}
 	}
 
 	// Execute the host function and push back the call result onto the stack.
-	var results []uint64
-	if tp.NumOut() > 0 {
-		results = make([]uint64, 0, tp.NumOut())
-	}
 	for i, ret := range fn.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float32:
-			results = append(results, uint64(math.Float32bits(float32(ret.Float()))))
+			stack[i] = uint64(math.Float32bits(float32(ret.Float())))
 		case reflect.Float64:
-			results = append(results, math.Float64bits(ret.Float()))
+			stack[i] = math.Float64bits(ret.Float())
 		case reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			results = append(results, ret.Uint())
+			stack[i] = ret.Uint()
 		case reflect.Int32, reflect.Int64:
-			results = append(results, uint64(ret.Int()))
+			stack[i] = uint64(ret.Int())
 		default:
 			panic(fmt.Errorf("BUG: result[%d] has an invalid type: %v", i, ret.Kind()))
 		}
 	}
-	return results
 }
 
 func newContextVal(ctx context.Context) reflect.Value {

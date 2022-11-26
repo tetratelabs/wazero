@@ -519,6 +519,14 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 			results, err := ce.Call(testCtx, m, []uint64{1})
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), results[0])
+
+			results2, err := ce.Call(testCtx, m, []uint64{1})
+			require.NoError(t, err)
+			require.Equal(t, results, results2)
+
+			// Ensure the result slices are unique
+			results[0] = 255
+			require.Equal(t, uint64(1), results2[0])
 		})
 	}
 }

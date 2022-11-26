@@ -147,12 +147,12 @@ var invokeI = &wasm.HostFunc{
 	},
 }
 
-func invokeIFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_i32", wasm.Index(params[0]), nil)
+func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_i32", wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
-	return ret
+	stack[0] = ret[0]
 }
 
 var invokeIi = &wasm.HostFunc{
@@ -167,12 +167,12 @@ var invokeIi = &wasm.HostFunc{
 	},
 }
 
-func invokeIiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_i32", wasm.Index(params[0]), params[1:])
+func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_i32", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
+	stack[0] = ret[0]
 }
 
 var invokeIii = &wasm.HostFunc{
@@ -187,12 +187,12 @@ var invokeIii = &wasm.HostFunc{
 	},
 }
 
-func invokeIiiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_i32", wasm.Index(params[0]), params[1:])
+func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_i32", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
+	stack[0] = ret[0]
 }
 
 var invokeIiii = &wasm.HostFunc{
@@ -207,12 +207,12 @@ var invokeIiii = &wasm.HostFunc{
 	},
 }
 
-func invokeIiiiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_i32", wasm.Index(params[0]), params[1:])
+func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_i32", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
+	stack[0] = ret[0]
 }
 
 var invokeIiiii = &wasm.HostFunc{
@@ -227,12 +227,12 @@ var invokeIiiii = &wasm.HostFunc{
 	},
 }
 
-func invokeIiiiiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_i32", wasm.Index(params[0]), params[1:])
+func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_i32", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
+	stack[0] = ret[0]
 }
 
 var invokeV = &wasm.HostFunc{
@@ -247,12 +247,11 @@ var invokeV = &wasm.HostFunc{
 	},
 }
 
-func invokeVFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_v", wasm.Index(params[0]), nil)
+func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_v", wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
 
 var invokeVi = &wasm.HostFunc{
@@ -267,12 +266,11 @@ var invokeVi = &wasm.HostFunc{
 	},
 }
 
-func invokeViFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_v", wasm.Index(params[0]), params[1:])
+func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_v", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
 
 var invokeVii = &wasm.HostFunc{
@@ -287,12 +285,11 @@ var invokeVii = &wasm.HostFunc{
 	},
 }
 
-func invokeViiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_v", wasm.Index(params[0]), params[1:])
+func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_v", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
 
 var invokeViii = &wasm.HostFunc{
@@ -307,12 +304,11 @@ var invokeViii = &wasm.HostFunc{
 	},
 }
 
-func invokeViiiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_v", wasm.Index(params[0]), params[1:])
+func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_v", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
 
 var invokeViiii = &wasm.HostFunc{
@@ -327,12 +323,11 @@ var invokeViiii = &wasm.HostFunc{
 	},
 }
 
-func invokeViiiiFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_v", wasm.Index(params[0]), params[1:])
+func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_v", wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
-	return ret
 }
 
 // callDynamic special cases dynamic calls needed for emscripten `invoke_`
