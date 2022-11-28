@@ -241,7 +241,7 @@ func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, va
 // result. The returned value will be written back to the stack at index zero.
 type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
 
-// Call implements the same method as documented on api.GoModuleFunc.
+// Call implements the same method as documented on api.GoModuleFunction.
 func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// Write the result back onto the stack
 	stack[0] = uint64(f(ctx, mod, stack))
