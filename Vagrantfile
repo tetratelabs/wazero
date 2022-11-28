@@ -15,11 +15,14 @@
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/freebsd13"
-  config.vm.provision "file", source: ".", destination: "/home/vagrant/wazero"
+  config.vm.synced_folder ".", "/home/vagrant/wazero",
+    type: "rsync",
+    rsync__exclude: ".git/"
 
   config.vm.provider "virtualbox" do |v|
     v.memory = 1024
     v.cpus = 1
+    v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
   end
 
   # Similar to `GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant provision`
