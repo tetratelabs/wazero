@@ -13,6 +13,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -1004,15 +1005,331 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 	}
 }
 
-// Test_fdReaddir only tests it is stubbed for GrainLang per #271
+var fdReadDirFs = fstest.MapFS{
+	"notdir":  {},
+	"dir":     {Mode: fs.ModeDir},
+	"dir/-":   {},                 // len = 24+1 = 25
+	"dir/a-":  {Mode: fs.ModeDir}, // len = 24+2 = 26
+	"dir/ab-": {},                 // len = 24+3 = 27
+}
+
 func Test_fdReaddir(t *testing.T) {
-	log := requireErrnoNosys(t, functionFdReaddir, 0, 0, 0, 0, 0)
-	require.Equal(t, `
---> proxy.fd_readdir(fd=0,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	--> wasi_snapshot_preview1.fd_readdir(fd=0,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	<-- ENOSYS
-<-- (52)
-`, log)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
+	defer r.Close(testCtx)
+	memLen := mod.Memory().Size(testCtx)
+
+	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+
+	dirFD, err := fsc.OpenFile(testCtx, "dir")
+	require.NoError(t, err)
+
+	fileFD, err := fsc.OpenFile(testCtx, "notdir")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                           string
+		fd, buf, bufLen, resultBufused uint32
+		cookie                         uint64
+		expectedErrno                  Errno
+		expectedLog                    string
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: ErrnoBadf,
+			expectedLog: `
+--> proxy.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	==> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	<== EBADF
+<-- (8)
+`,
+		},
+		{
+			name:          "not a dir",
+			fd:            fileFD,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+--> proxy.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
+	<== ENOTDIR
+<-- (54)
+`,
+		},
+		{
+			name:          "out-of-memory reading buf",
+			fd:            dirFD,
+			buf:           memLen,
+			bufLen:        1000,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name:          "out-of-memory reading bufLen",
+			fd:            dirFD,
+			buf:           memLen - 1,
+			bufLen:        1000,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
+	<== EFAULT
+<-- (21)
+`,
+		},
+		{
+			name: "resultBufused is outside memory",
+			fd:   dirFD,
+			buf:  0, bufLen: 1,
+			resultBufused: memLen,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
+	<== EFAULT
+<-- (21)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			requireErrno(t, tc.expectedErrno, mod, functionFdReaddir,
+				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), tc.cookie, uint64(tc.resultBufused))
+			require.Equal(t, tc.expectedLog, "\n"+log.String())
+		})
+	}
+}
+
+var testDirEntries = func() []fs.DirEntry {
+	entries, err := fdReadDirFs.ReadDir("dir")
+	if err != nil {
+		panic(err)
+	}
+	return entries
+}()
+
+func Test_lastDirEntries(t *testing.T) {
+	tests := []struct {
+		name            string
+		f               *internalsys.ReadDir
+		cookie          uint64
+		expectedEntries []fs.DirEntry
+		expectedErrno   Errno
+	}{
+		{
+			name: "no prior call",
+		},
+		{
+			name:          "no prior call, but passed a cookie",
+			cookie:        1,
+			expectedErrno: ErrnoInval,
+		},
+		{
+			name: "cookie is greater than count read",
+			f: &internalsys.ReadDir{
+				CountRead: 1,
+				Pos:       1,
+				Entries:   testDirEntries,
+			},
+			cookie:        2,
+			expectedErrno: ErrnoInval,
+		},
+		{
+			name: "cookie is last pos",
+			f: &internalsys.ReadDir{
+				CountRead: 1,
+				Pos:       1,
+				Entries:   testDirEntries,
+			},
+			cookie:          1,
+			expectedEntries: testDirEntries[1:],
+		},
+		{
+			name: "cookie is one before last pos",
+			f: &internalsys.ReadDir{
+				CountRead: 1,
+				Pos:       1,
+				Entries:   testDirEntries,
+			},
+			cookie:          0,
+			expectedEntries: testDirEntries,
+		},
+		{
+			name: "cookie is before current entries",
+			f: &internalsys.ReadDir{
+				CountRead: 3,
+				Pos:       1,
+				Entries:   testDirEntries,
+			},
+			cookie:        1,
+			expectedErrno: ErrnoNosys, // not implemented
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			f := tc.f
+			if f == nil {
+				f = &internalsys.ReadDir{}
+			}
+			entries, errno := lastDirEntries(f, tc.cookie)
+			require.Equal(t, tc.expectedEntries, entries)
+			require.Equal(t, tc.expectedErrno, errno)
+		})
+	}
+}
+
+func Test_maxDirents(t *testing.T) {
+	tests := []struct {
+		name                                        string
+		entries                                     []fs.DirEntry
+		maxLen                                      uint32
+		expectedCount, expectedLen, expectedBufused uint32
+	}{
+		{
+			name: "no entries",
+		},
+		{
+			name:            "can't fit one",
+			entries:         testDirEntries,
+			maxLen:          24,
+			expectedBufused: 25,
+		},
+		{
+			name:            "one",
+			entries:         testDirEntries,
+			maxLen:          25,
+			expectedCount:   1,
+			expectedLen:     25,
+			expectedBufused: 25 + 26,
+		},
+		{
+			name:            "one but not two",
+			entries:         testDirEntries,
+			maxLen:          25 + 25,
+			expectedCount:   1,
+			expectedLen:     25,
+			expectedBufused: 25 + 26,
+		},
+		{
+			name:            "two",
+			entries:         testDirEntries,
+			maxLen:          25 + 26,
+			expectedCount:   2,
+			expectedLen:     25 + 26,
+			expectedBufused: 25 + 26 + 27,
+		},
+		{
+			name:            "two but not three",
+			entries:         testDirEntries,
+			maxLen:          25 + 26 + 26,
+			expectedCount:   2,
+			expectedLen:     25 + 26,
+			expectedBufused: 25 + 26 + 27,
+		},
+		{
+			name:            "three",
+			entries:         testDirEntries,
+			maxLen:          25 + 26 + 27,
+			expectedCount:   3,
+			expectedLen:     25 + 26 + 27,
+			expectedBufused: 25 + 26 + 27,
+		},
+		{
+			name:            "max",
+			entries:         testDirEntries,
+			maxLen:          100,
+			expectedCount:   3,
+			expectedLen:     25 + 26 + 27,
+			expectedBufused: 25 + 26 + 27,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			direntCount, direntsLen, bufused := maxDirents(tc.entries, tc.maxLen)
+			require.Equal(t, tc.expectedCount, direntCount)
+			require.Equal(t, tc.expectedLen, direntsLen)
+			require.Equal(t, tc.expectedBufused, bufused)
+		})
+	}
+}
+
+func Test_writeDirents(t *testing.T) {
+	dirent1 := []byte{
+		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		1, 0, 0, 0, // d_namlen = 1 character
+		4, 0, 0, 0, // d_type = regular_file
+		'-', // name
+	}
+	dirent2 := []byte{
+		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		2, 0, 0, 0, // d_namlen = 1 character
+		3, 0, 0, 0, // d_type =  directory
+		'a', '-', // name
+	}
+	dirent3 := []byte{
+		4, 0, 0, 0, 0, 0, 0, 0, // d_next = 4
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		3, 0, 0, 0, // d_namlen = 3 characters
+		4, 0, 0, 0, // d_type = regular_file
+		'a', 'b', '-', // name
+	}
+
+	tests := []struct {
+		name               string
+		entries            []fs.DirEntry
+		entryCount         uint32
+		expectedEntriesBuf []byte
+	}{
+		{
+			name:    "none",
+			entries: testDirEntries,
+		},
+		{
+			name:               "one",
+			entries:            testDirEntries,
+			entryCount:         1,
+			expectedEntriesBuf: dirent1,
+		},
+		{
+			name:               "two",
+			entries:            testDirEntries,
+			entryCount:         2,
+			expectedEntriesBuf: append(dirent1, dirent2...),
+		},
+		{
+			name:               "three",
+			entries:            testDirEntries,
+			entryCount:         3,
+			expectedEntriesBuf: append(append(dirent1, dirent2...), dirent3...),
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			lastCookie := uint64(1)
+			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
+			writeDirents(tc.entries, tc.entryCount, entriesBuf, lastCookie)
+			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
+		})
+	}
 }
 
 // Test_fdRenumber only tests it is stubbed for GrainLang per #271

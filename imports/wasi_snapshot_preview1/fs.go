@@ -643,11 +643,195 @@ func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
 // entries from a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
-var fdReaddir = stubFunction(
-	functionFdReaddir,
-	[]wasm.ValueType{i32, i32, i32, i64, i32},
-	[]string{"fd", "buf", "buf_len", "cookie", "result.bufused"},
-)
+var fdReaddir = &wasm.HostFunc{
+	ExportNames: []string{functionFdReaddir},
+	Name:        functionFdReaddir,
+	ParamTypes:  []wasm.ValueType{i32, i32, i32, i64, i32},
+	ParamNames:  []string{"fd", "buf", "buf_len", "cookie", "result.bufused"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         wasiFunc(fdReaddirFn),
+	},
+}
+
+func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	buf := uint32(params[1])
+	bufLen := uint32(params[2])
+	cookie := params[3]
+	resultBufused := uint32(params[4])
+
+	// Validate the FD is a directory
+	rd, dir, errno := openedDir(ctx, mod, fd)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	entries, errno := lastDirEntries(dir, cookie)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	// Page the directory until writing its entries as dirents exceeds bufLen,
+	// or we hit the end of the directory.
+	mem := mod.Memory()
+	totalBufUsed := uint32(0) // == the value to write to resultBufUsed
+
+	for isEOF := false; bufLen > 0; {
+		direntCount, direntsLen, bufused := maxDirents(entries, bufLen)
+		totalBufUsed += bufused // size possibly truncated
+
+		if direntCount > 0 { // we have entries to write
+			entriesBuf, ok := mem.Read(ctx, buf, direntsLen)
+			if !ok {
+				return ErrnoFault
+			}
+
+			writeDirents(entries, direntCount, entriesBuf, cookie)
+			cookie += uint64(direntCount)
+
+			buf += direntsLen
+			bufLen -= direntsLen
+			dir.Pos = int(direntCount)
+			dir.CountRead += uint64(direntCount)
+
+			// bufused > direntsLen is a signal that the directory has more
+			// entries than can fit in bufLen.
+			if bufused > direntsLen {
+				break
+			}
+		} else if bufused > 0 || isEOF {
+			break // The current entries are still readable or only ones left.
+		}
+
+		// Read another page of entries from the directory, the max that can be
+		// serialized. The base overhead is 24 per entry, and minimum size file
+		// name is one character. Hence, the max entries are bufLen / 25.
+		maxDirEntries := int(bufLen / 25)
+		l, err := rd.ReadDir(maxDirEntries)
+		if errors.Is(err, io.EOF) { // EOF isn't an error
+			isEOF = true
+		} else if err != nil {
+			return ErrnoIo
+		}
+		// We cache only one page in the directory list intentionally, to avoid
+		// consuming host resources on directories that aren't closed.
+		entries = l
+		dir.Entries = l
+		dir.Pos = 0
+	}
+
+	// Finally, we are out of the loop, and may have written entries. When
+	// that's the case, totalBufUsed will be greater than zero. In any case,
+	// we overwrite that position in case it was non-zero from a prior call.
+	if !mem.WriteUint32Le(ctx, resultBufused, totalBufUsed) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
+}
+
+// lastDirEntries is broken out from fdReaddirFn for testability.
+func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEntry, errno Errno) {
+	if dir.Entries == nil { // there was no prior call
+		if cookie != 0 {
+			errno = ErrnoInval // invalid as we haven't sent that cookie
+		}
+		return
+	} else if cookie > dir.CountRead {
+		errno = ErrnoInval // invalid as we haven't sent that cookie, yet.
+		return
+	}
+
+	// The entries cached were of the last call to ReadDir, which may have
+	// been partially consumed. Use the last read position and the cookie to
+	// determine how many to return.
+	pos := dir.Pos
+	if relativePos := int64(cookie) - int64(dir.CountRead); relativePos < 0 {
+		// ReadDir can't read backwards, so we can only implement positions
+		// we still have data for.
+		if pos = pos + int(relativePos); pos < 0 {
+			errno = ErrnoNosys // unimplemented
+			return
+		}
+	}
+
+	entries = dir.Entries
+	if pos > 0 {
+		entries = entries[pos:]
+	}
+	return
+}
+
+// maxDirents returns the maximum count and total serialized size of entries
+// that can fit in maxLen bytes.
+//
+// bufused is how much room the next entry would take to store. We need to
+// track this independently because fd_readdir uses this value to tell if the
+// directory is exhausted or not.
+func maxDirents(entries []fs.DirEntry, maxLen uint32) (direntCount, direntsLen, bufused uint32) {
+	for _, e := range entries {
+		nameLen := uint32(len(e.Name()))
+		entryLen := uint32(24) + nameLen
+
+		// Check if we go out of bounds of we would write the struct.
+		bufused += entryLen
+		if bufused > maxLen {
+			break
+		}
+		direntsLen += entryLen
+		direntCount++
+	}
+	return
+}
+
+// writeDirents writes the directory entries to the buffer, which is pre-sized
+// based on maxDirents.
+func writeDirents(
+	entries []fs.DirEntry,
+	entryCount uint32,
+	entriesBuf []byte,
+	lastCookie uint64,
+) {
+	pos := 0
+	for i := uint32(0); i < entryCount; i++ {
+		e := entries[i]
+		lastCookie++
+		nameLen := len(e.Name())
+
+		// Now, write the layout of dirent.
+		binary.LittleEndian.PutUint64(entriesBuf[pos:], lastCookie) // d_next
+		pos += 8
+		binary.LittleEndian.PutUint64(entriesBuf[pos:], 0) // no d_ino
+		pos += 8
+		binary.LittleEndian.PutUint32(entriesBuf[pos:], uint32(nameLen)) // d_namlen
+		pos += 4
+
+		filetype := wasiFiletypeRegularFile
+		if e.IsDir() {
+			filetype = wasiFiletypeDirectory
+		}
+		entriesBuf[pos] = uint8(filetype)
+		pos += 4
+		copy(entriesBuf[pos:], e.Name())
+		pos += nameLen
+	}
+}
+
+// openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
+func openedDir(ctx context.Context, mod api.Module, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
+	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
+	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+		return nil, nil, ErrnoBadf
+	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
+		return nil, nil, ErrnoNotdir
+	} else {
+		if f.ReadDir == nil {
+			f.ReadDir = &internalsys.ReadDir{}
+		}
+		return d, f.ReadDir, ErrnoSuccess
+	}
+}
 
 // fdRenumber is the WASI function named functionFdRenumber which atomically
 // replaces a file descriptor by renumbering another file descriptor.
