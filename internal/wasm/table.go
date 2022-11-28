@@ -164,6 +164,21 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 		idx := Index(i)
 		initCount := uint32(len(elem.Init))
 
+		if elem.Type == RefTypeFuncref {
+			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
+			for ei, funcIdx := range elem.Init {
+				if funcIdx != nil && *funcIdx >= funcCount {
+					return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
+				}
+			}
+		} else {
+			for j, elem := range elem.Init {
+				if elem != nil {
+					return nil, fmt.Errorf("%s[%d].init[%d] must be ref.null but was %v", SectionIDName(SectionIDElement), idx, j, *elem)
+				}
+			}
+		}
+
 		if elem.IsActive() {
 			if len(tables) <= int(elem.TableIndex) {
 				return nil, fmt.Errorf("unknown table %d as active element target", elem.TableIndex)
@@ -172,23 +187,8 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 			t := tables[elem.TableIndex]
 			if t.Type != elem.Type {
 				return nil, fmt.Errorf("element type mismatch: table has %s but element has %s",
-					RefTypeName(elem.Type), RefTypeName(t.Type),
+					RefTypeName(t.Type), RefTypeName(elem.Type),
 				)
-			}
-
-			if t.Type == RefTypeFuncref {
-				// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
-				for ei, funcIdx := range elem.Init {
-					if funcIdx != nil && *funcIdx >= funcCount {
-						return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
-					}
-				}
-			} else {
-				for j, elem := range elem.Init {
-					if elem != nil {
-						return nil, fmt.Errorf("externref-typed element[%d][%d] must only contain ref.null but was %v", i, j, elem)
-					}
-				}
 			}
 
 			// global.get needs to be discovered during initialization
