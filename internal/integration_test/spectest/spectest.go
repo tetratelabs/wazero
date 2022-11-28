@@ -836,38 +836,3 @@ func requireStripCustomSections(t *testing.T, binary []byte) []byte {
 	}
 	return out.Bytes()
 }
-
-// TestBinaryEncoder ensures that binary.EncodeModule produces exactly the same binaries
-// for wasm.Module via binary.DecodeModule modulo custom sections for all the valid binaries in spectests.
-func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures api.CoreFeatures) {
-	files, err := testDataFS.ReadDir("testdata")
-	require.NoError(t, err)
-
-	for _, f := range files {
-		filename := f.Name()
-		if strings.HasSuffix(filename, ".json") {
-			raw, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", filename))
-			require.NoError(t, err)
-
-			var base testbase
-			require.NoError(t, json.Unmarshal(raw, &base))
-
-			for _, c := range base.Commands {
-				if c.CommandType == "module" {
-					t.Run(c.Filename, func(t *testing.T) {
-						buf, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", c.Filename))
-						require.NoError(t, err)
-
-						buf = requireStripCustomSections(t, buf)
-
-						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages, false)
-						require.NoError(t, err)
-
-						encodedBuf := binaryformat.EncodeModule(mod)
-						require.Equal(t, buf, encodedBuf)
-					})
-				}
-			}
-		}
-	}
-}

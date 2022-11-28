@@ -868,9 +868,19 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 		} else if op == OpcodeMiscPrefix {
 			pc++
-			// Miscellaneous instructions come with two bytes which starts with OpcodeMiscPrefix,
-			// and the second byte determines the actual instruction.
-			miscOpcode := body[pc]
+			// A misc opcode is encoded as an unsigned variable 32-bit integer.
+			miscOp32, num, err := leb128.LoadUint32(body[pc:])
+			if err != nil {
+				return fmt.Errorf("failed to read misc opcode: %v", err)
+			}
+			pc += num - 1
+			miscOpcode := byte(miscOp32)
+			// If the misc opcode is beyond byte range, it is highly likely this is an invalid binary, or
+			// it is due to the new opcode from a new proposal. In the latter case, we have to
+			// change the alias type of OpcodeMisc (which is currently byte) to uint32.
+			if uint32(byte(miscOp32)) != miscOp32 {
+				return fmt.Errorf("invalid misc opcode: %#x", miscOp32)
+			}
 			if miscOpcode >= OpcodeMiscI32TruncSatF32S && miscOpcode <= OpcodeMiscI64TruncSatF64U {
 				if err := enabledFeatures.RequireEnabled(api.CoreFeatureNonTrappingFloatToIntConversion); err != nil {
 					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)

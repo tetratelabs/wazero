@@ -20,7 +20,3 @@ func TestCompiler(t *testing.T) {
 func TestInterpreter(t *testing.T) {
 	spectest.Run(t, Testcases, context.Background(), interpreter.NewEngine, EnabledFeatures)
 }
-
-func TestBinaryEncoder(t *testing.T) {
-	spectest.TestBinaryEncoder(t, Testcases, EnabledFeatures)
-}

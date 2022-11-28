@@ -93,6 +93,9 @@ func decodeMemorySection(
 	}
 	if vs > 1 {
 		return nil, fmt.Errorf("at most one memory allowed in module, but read %d", vs)
+	} else if vs == 0 {
+		// memory count can be zero.
+		return nil, nil
 	}
 
 	return decodeMemory(r, memorySizer, memoryLimitPages)
