@@ -215,39 +215,36 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 	exporter.ExportHostFunc(sockShutdown)
 }
 
-// Declare constants to avoid slice allocation per call.
-var (
-	errnoBadf        = []uint64{uint64(ErrnoBadf)}
-	errnoExist       = []uint64{uint64(ErrnoExist)}
-	errnoInval       = []uint64{uint64(ErrnoInval)}
-	errnoIo          = []uint64{uint64(ErrnoIo)}
-	errnoNoent       = []uint64{uint64(ErrnoNoent)}
-	errnoNotdir      = []uint64{uint64(ErrnoNotdir)}
-	errnoFault       = []uint64{uint64(ErrnoFault)}
-	errnoNametoolong = []uint64{uint64(ErrnoNametoolong)}
-	errnoSuccess     = []uint64{uint64(ErrnoSuccess)}
-)
-
-func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) []uint64 {
+func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {
 	for _, value := range values {
 		// Write current offset and advance it.
 		if !mem.WriteUint32Le(ctx, offsets, bytes) {
-			return errnoFault
+			return ErrnoFault
 		}
 		offsets += 4 // size of uint32
 
 		// Write the next value to memory with a NUL terminator
 		if !mem.Write(ctx, bytes, []byte(value)) {
-			return errnoFault
+			return ErrnoFault
 		}
 		bytes += uint32(len(value))
 		if !mem.WriteByte(ctx, bytes, 0) {
-			return errnoFault
+			return ErrnoFault
 		}
 		bytes++
 	}
 
-	return errnoSuccess
+	return ErrnoSuccess
+}
+
+// wasiFunc special cases that all WASI functions return a single Errno
+// result. The returned value will be written back to the stack at index zero.
+type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
+
+// Call implements the same method as documented on api.GoModuleFunction.
+func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
+	// Write the result back onto the stack
+	stack[0] = uint64(f(ctx, mod, stack))
 }
 
 // stubFunction stubs for GrainLang per #271.

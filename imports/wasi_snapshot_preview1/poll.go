@@ -55,18 +55,18 @@ var pollOneoff = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(pollOneoffFn),
+		GoFunc:         wasiFunc(pollOneoffFn),
 	},
 }
 
-func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	in := uint32(params[0])
 	out := uint32(params[1])
 	nsubscriptions := uint32(params[2])
 	resultNevents := uint32(params[3])
 
 	if nsubscriptions == 0 {
-		return errnoInval
+		return ErrnoInval
 	}
 
 	mem := mod.Memory()
@@ -74,17 +74,17 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) []uint64
 	// Ensure capacity prior to the read loop to reduce error handling.
 	inBuf, ok := mem.Read(ctx, in, nsubscriptions*48)
 	if !ok {
-		return errnoFault
+		return ErrnoFault
 	}
 	outBuf, ok := mem.Read(ctx, out, nsubscriptions*32)
 	if !ok {
-		return errnoFault
+		return ErrnoFault
 	}
 
 	// Eagerly write the number of events which will equal subscriptions unless
 	// there's a fault in parsing (not processing).
 	if !mod.Memory().WriteUint32Le(ctx, resultNevents, nsubscriptions) {
-		return errnoFault
+		return ErrnoFault
 	}
 
 	// Loop through all subscriptions and write their output.
@@ -102,7 +102,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) []uint64
 			// +8 past userdata +4 FD alignment
 			errno = processFDEvent(ctx, mod, eventType, inBuf[inOffset+8+4:])
 		default:
-			return errnoInval
+			return ErrnoInval
 		}
 
 		// Write the event corresponding to the processed subscription.
@@ -113,7 +113,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) []uint64
 		binary.LittleEndian.PutUint32(outBuf[outOffset+10:], uint32(eventType))
 		// TODO: When FD events are supported, write outOffset+16
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }
 
 // processClockEvent supports only relative name events, as that's what's used

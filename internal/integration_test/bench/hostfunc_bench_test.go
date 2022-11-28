@@ -148,12 +148,12 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		CodeSection: []*wasm.Code{
 			{
 				IsHostFunction: true,
-				GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-					ret, ok := mod.Memory().ReadUint32Le(ctx, uint32(params[0]))
+				GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+					ret, ok := mod.Memory().ReadUint32Le(ctx, uint32(stack[0]))
 					if !ok {
 						panic("couldn't read memory")
 					}
-					return []uint64{uint64(ret)}
+					stack[0] = uint64(ret)
 				}),
 			},
 			wasm.MustParseGoReflectFuncCode(

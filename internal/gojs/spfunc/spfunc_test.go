@@ -175,12 +175,12 @@ var spMem = []byte{
 	10, 0, 0, 0, 0, 0, 0, 0,
 }
 
-func i64i32i32i32i32_i64i32_withSP(_ context.Context, params []uint64) []uint64 {
-	vRef := params[0]
-	mAddr := uint32(params[1])
-	mLen := uint32(params[2])
-	argsArray := uint32(params[3])
-	argsLen := uint32(params[4])
+func i64i32i32i32i32_i64i32_withSP(_ context.Context, stack []uint64) {
+	vRef := stack[0]
+	mAddr := uint32(stack[1])
+	mLen := uint32(stack[2])
+	argsArray := uint32(stack[3])
+	argsLen := uint32(stack[4])
 
 	if vRef != 1 {
 		panic("vRef")
@@ -198,7 +198,10 @@ func i64i32i32i32i32_i64i32_withSP(_ context.Context, params []uint64) []uint64 
 		panic("argsLen")
 	}
 
-	return []uint64{10, 20, 8}
+	// set results
+	stack[0] = 10
+	stack[1] = 20
+	stack[2] = 8
 }
 
 func TestMustCallFromSP(t *testing.T) {

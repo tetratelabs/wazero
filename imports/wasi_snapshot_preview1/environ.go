@@ -52,13 +52,14 @@ var environGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(environGetFn),
+		GoFunc:         wasiFunc(environGetFn),
 	},
 }
 
-func environGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func environGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	environ, environBuf := uint32(params[0]), uint32(params[1])
+
 	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
 }
 
@@ -101,20 +102,20 @@ var environSizesGet = &wasm.HostFunc{
 	ResultTypes: []api.ValueType{i32},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(environSizesGetFn),
+		GoFunc:         wasiFunc(environSizesGetFn),
 	},
 }
 
-func environSizesGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func environSizesGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	resultEnvironc, resultEnvironvLen := uint32(params[0]), uint32(params[1])
 
 	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
-		return errnoFault
+		return ErrnoFault
 	}
 	if !mem.WriteUint32Le(ctx, resultEnvironvLen, sysCtx.EnvironSize()) {
-		return errnoFault
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }

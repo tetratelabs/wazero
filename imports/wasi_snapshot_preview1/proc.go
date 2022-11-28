@@ -29,11 +29,11 @@ var procExit = &wasm.HostFunc{
 	ParamNames:  []string{"rval"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(procExitFn),
+		GoFunc:         wasiFunc(procExitFn),
 	},
 }
 
-func procExitFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func procExitFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	exitCode := uint32(params[0])
 
 	// Ensure other callers see the exit code.

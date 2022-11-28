@@ -267,14 +267,26 @@ func Test_callGoFunc(t *testing.T) {
 			_, _, code, err := parseGoReflectFunc(tc.input)
 			require.NoError(t, err)
 
-			var results []uint64
+			resultLen := len(tc.expectedResults)
+			stackLen := len(tc.inputParams)
+			if resultLen > stackLen {
+				stackLen = resultLen
+			}
+			stack := make([]uint64, stackLen)
+			copy(stack, tc.inputParams)
+
 			switch code.GoFunc.(type) {
 			case api.GoFunction:
-				results = code.GoFunc.(api.GoFunction).Call(testCtx, tc.inputParams)
+				code.GoFunc.(api.GoFunction).Call(testCtx, stack)
 			case api.GoModuleFunction:
-				results = code.GoFunc.(api.GoModuleFunction).Call(testCtx, callCtx, tc.inputParams)
+				code.GoFunc.(api.GoModuleFunction).Call(testCtx, callCtx, stack)
 			default:
 				t.Fatal("unexpected type.")
+			}
+
+			var results []uint64
+			if resultLen > 0 {
+				results = stack[:resultLen]
 			}
 			require.Equal(t, tc.expectedResults, results)
 		})

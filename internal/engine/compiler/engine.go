@@ -629,7 +629,13 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	ce.initializeStack(tp, params)
 	ce.execWasmFunction(ctx, callCtx)
 
-	results = ce.stack[:tp.ResultNumInUint64]
+	// This returns a safe copy of the results, instead of a slice view. If we
+	// returned a re-slice, the caller could accidentally or purposefully
+	// corrupt the stack of subsequent calls
+	if resultCount := tp.ResultNumInUint64; resultCount > 0 {
+		results = make([]uint64, resultCount)
+		copy(results, ce.stack[:resultCount])
+	}
 	return
 }
 
@@ -817,17 +823,24 @@ entry:
 		case nativeCallStatusCodeCallGoHostFunction:
 			calleeHostFunction := ce.moduleContext.fn
 			base := int(ce.stackBasePointerInBytes >> 3)
-			params := ce.stack[base : base+len(calleeHostFunction.source.Type.Params)]
+
+			// In the compiler engine, ce.stack has enough capacity for the
+			// max of param or result length, so we don't need to grow when
+			// there are more results than parameters.
+			stackLen := calleeHostFunction.source.Type.ParamNumInUint64
+			if resultLen := calleeHostFunction.source.Type.ResultNumInUint64; resultLen > stackLen {
+				stackLen = resultLen
+			}
+			stack := ce.stack[base : base+stackLen]
+
 			fn := calleeHostFunction.source.GoFunc
-			var results []uint64
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				results = fn.Call(ctx, callCtx.WithMemory(ce.memoryInstance), params)
+				fn.Call(ctx, callCtx.WithMemory(ce.memoryInstance), stack)
 			case api.GoFunction:
-				results = fn.Call(ctx, params)
+				fn.Call(ctx, stack)
 			}
 
-			copy(ce.stack[base:], results)
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
 			goto entry
 		case nativeCallStatusCodeCallBuiltInFunction:

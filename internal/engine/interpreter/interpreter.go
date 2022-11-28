@@ -827,6 +827,9 @@ func (ce *callEngine) call(ctx context.Context, m *wasm.CallContext, tf *functio
 
 	ce.callFunction(ctx, m, tf)
 
+	// This returns a safe copy of the results, instead of a slice view. If we
+	// returned a re-slice, the caller could accidentally or purposefully
+	// corrupt the stack of subsequent calls.
 	results = wasm.PopValues(ft.ResultNumInUint64, ce.popValue)
 	return
 }
@@ -859,8 +862,9 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 	}
 }
 
-func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, params []uint64) (results []uint64) {
+func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
 	if f.source.Listener != nil {
+		params := stack[:f.source.Type.ParamNumInUint64]
 		ctx = f.source.Listener.Before(ctx, f.source.Definition, params)
 	}
 	frame := &callFrame{f: f}
@@ -869,17 +873,17 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	fn := f.source.GoFunc
 	switch fn := fn.(type) {
 	case api.GoModuleFunction:
-		results = fn.Call(ctx, callCtx.WithMemory(ce.callerMemory()), params)
+		fn.Call(ctx, callCtx.WithMemory(ce.callerMemory()), stack)
 	case api.GoFunction:
-		results = fn.Call(ctx, params)
+		fn.Call(ctx, stack)
 	}
 
 	ce.popFrame()
 	if f.source.Listener != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
+		results := stack[:f.source.Type.ResultNumInUint64]
 		f.source.Listener.After(ctx, f.source.Definition, nil, results)
 	}
-	return
 }
 
 func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallContext, f *function) {
@@ -4380,9 +4384,25 @@ func (ce *callEngine) popMemoryOffset(op *interpreterOp) uint32 {
 }
 
 func (ce *callEngine) callGoFuncWithStack(ctx context.Context, callCtx *wasm.CallContext, f *function) {
-	params := wasm.PopValues(f.source.Type.ParamNumInUint64, ce.popValue)
-	results := ce.callGoFunc(ctx, callCtx, f, params)
-	for _, v := range results {
-		ce.pushValue(v)
+	paramLen := f.source.Type.ParamNumInUint64
+	resultLen := f.source.Type.ResultNumInUint64
+	stackLen := paramLen
+
+	// In the interpreter engine, ce.stack may only have capacity to store
+	// parameters. Grow when there are more results than parameters.
+	if growLen := resultLen - paramLen; growLen > 0 {
+		for i := 0; i < growLen; i++ {
+			ce.stack = append(ce.stack, 0)
+		}
+		stackLen += growLen
+	}
+
+	// Pass the stack elements to the go function.
+	stack := ce.stack[len(ce.stack)-stackLen:]
+	ce.callGoFunc(ctx, callCtx, f, stack)
+
+	// Shrink the stack when there were more parameters than results.
+	if shrinkLen := paramLen - resultLen; shrinkLen > 0 {
+		ce.stack = ce.stack[0 : len(ce.stack)-shrinkLen]
 	}
 }

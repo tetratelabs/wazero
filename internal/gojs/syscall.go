@@ -49,11 +49,10 @@ var FinalizeRef = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func finalizeRef(ctx context.Context, params []uint64) (_ []uint64) {
-	id := uint32(params[0]) // 32-bits of the ref are the ID
+func finalizeRef(ctx context.Context, stack []uint64) {
+	id := uint32(stack[0]) // 32-bits of the ref are the ID
 
 	getState(ctx).values.decrement(id)
-	return
 }
 
 // StringVal implements js.stringVal, which is used to load the string for
@@ -73,11 +72,12 @@ var StringVal = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func stringVal(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	xAddr, xLen := uint32(params[0]), uint32(params[1])
+func stringVal(ctx context.Context, mod api.Module, stack []uint64) {
+	xAddr, xLen := uint32(stack[0]), uint32(stack[1])
 
 	x := string(mustRead(ctx, mod.Memory(), "x", xAddr, xLen))
-	return []uint64{storeRef(ctx, x)}
+
+	stack[0] = storeRef(ctx, x)
 }
 
 // ValueGet implements js.valueGet, which is used to load a js.Value property
@@ -98,10 +98,10 @@ var ValueGet = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valueGet(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	vRef := params[0]
-	pAddr := uint32(params[1])
-	pLen := uint32(params[2])
+func valueGet(ctx context.Context, mod api.Module, stack []uint64) {
+	vRef := stack[0]
+	pAddr := uint32(stack[1])
+	pLen := uint32(stack[2])
 
 	p := string(mustRead(ctx, mod.Memory(), "p", pAddr, pLen))
 	v := loadValue(ctx, ref(vRef))
@@ -122,8 +122,7 @@ func valueGet(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 		panic(fmt.Errorf("TODO: valueGet(v=%v, p=%s)", v, p))
 	}
 
-	xRef := storeRef(ctx, result)
-	return []uint64{xRef}
+	stack[0] = storeRef(ctx, result)
 }
 
 // ValueSet implements js.valueSet, which is used to store a js.Value property
@@ -143,11 +142,11 @@ var ValueSet = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valueSet(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	vRef := params[0]
-	pAddr := uint32(params[1])
-	pLen := uint32(params[2])
-	xRef := params[3]
+func valueSet(ctx context.Context, mod api.Module, stack []uint64) {
+	vRef := stack[0]
+	pAddr := uint32(stack[1])
+	pLen := uint32(stack[2])
+	xRef := stack[3]
 
 	v := loadValue(ctx, ref(vRef))
 	p := string(mustRead(ctx, mod.Memory(), "p", pAddr, pLen))
@@ -196,15 +195,14 @@ var ValueIndex = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valueIndex(ctx context.Context, params []uint64) []uint64 {
-	vRef := params[0]
-	i := uint32(params[1])
+func valueIndex(ctx context.Context, stack []uint64) {
+	vRef := stack[0]
+	i := uint32(stack[1])
 
 	v := loadValue(ctx, ref(vRef))
 	result := v.(*objectArray).slice[i]
-	xRef := storeRef(ctx, result)
 
-	return []uint64{xRef}
+	stack[0] = storeRef(ctx, result)
 }
 
 // ValueSetIndex is stubbed as it is only used for js.ValueOf when the input is
@@ -231,12 +229,12 @@ var ValueCall = spfunc.MustCallFromSP(true, &wasm.HostFunc{
 	},
 })
 
-func valueCall(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	vRef := params[0]
-	mAddr := uint32(params[1])
-	mLen := uint32(params[2])
-	argsArray := uint32(params[3])
-	argsLen := uint32(params[4])
+func valueCall(ctx context.Context, mod api.Module, stack []uint64) {
+	vRef := stack[0]
+	mAddr := uint32(stack[1])
+	mLen := uint32(stack[2])
+	argsArray := uint32(stack[3])
+	argsLen := uint32(stack[4])
 
 	this := ref(vRef)
 	v := loadValue(ctx, this)
@@ -256,7 +254,7 @@ func valueCall(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	}
 
 	sp = refreshSP(mod)
-	return []uint64{xRef, uint64(ok), uint64(sp)}
+	stack[0], stack[1], stack[2] = xRef, uint64(ok), uint64(sp)
 }
 
 // ValueInvoke is stubbed as it isn't used in Go's main source tree.
@@ -281,10 +279,10 @@ var ValueNew = spfunc.MustCallFromSP(true, &wasm.HostFunc{
 	},
 })
 
-func valueNew(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	vRef := params[0]
-	argsArray := uint32(params[1])
-	argsLen := uint32(params[2])
+func valueNew(ctx context.Context, mod api.Module, stack []uint64) {
+	vRef := stack[0]
+	argsArray := uint32(stack[1])
+	argsLen := uint32(stack[2])
 
 	args := loadArgs(ctx, mod, argsArray, argsLen)
 	ref := ref(vRef)
@@ -328,7 +326,7 @@ func valueNew(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 	}
 
 	sp = refreshSP(mod)
-	return []uint64{xRef, uint64(ok), uint64(sp)}
+	stack[0], stack[1], stack[2] = xRef, uint64(ok), uint64(sp)
 }
 
 // ValueLength implements js.valueLength, which is used to load the length
@@ -348,13 +346,13 @@ var ValueLength = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valueLength(ctx context.Context, params []uint64) []uint64 {
-	vRef := params[0]
+func valueLength(ctx context.Context, stack []uint64) {
+	vRef := stack[0]
 
 	v := loadValue(ctx, ref(vRef))
 	l := uint32(len(v.(*objectArray).slice))
 
-	return []uint64{uint64(l)}
+	stack[0] = uint64(l)
 }
 
 // ValuePrepareString implements js.valuePrepareString, which is used to load
@@ -376,8 +374,8 @@ var ValuePrepareString = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valuePrepareString(ctx context.Context, params []uint64) []uint64 {
-	vRef := params[0]
+func valuePrepareString(ctx context.Context, stack []uint64) {
+	vRef := stack[0]
 
 	v := loadValue(ctx, ref(vRef))
 	s := valueString(v)
@@ -385,7 +383,7 @@ func valuePrepareString(ctx context.Context, params []uint64) []uint64 {
 	sRef := storeRef(ctx, s)
 	sLen := uint32(len(s))
 
-	return []uint64{sRef, uint64(sLen)}
+	stack[0], stack[1] = sRef, uint64(sLen)
 }
 
 // ValueLoadString implements js.valueLoadString, which is used copy a string
@@ -405,16 +403,15 @@ var ValueLoadString = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func valueLoadString(ctx context.Context, mod api.Module, params []uint64) (_ []uint64) {
-	vRef := params[0]
-	bAddr := uint32(params[1])
-	bLen := uint32(params[2])
+func valueLoadString(ctx context.Context, mod api.Module, stack []uint64) {
+	vRef := stack[0]
+	bAddr := uint32(stack[1])
+	bLen := uint32(stack[2])
 
 	v := loadValue(ctx, ref(vRef))
 	s := valueString(v)
 	b := mustRead(ctx, mod.Memory(), "b", bAddr, bLen)
 	copy(b, s)
-	return
 }
 
 // ValueInstanceOf is stubbed as it isn't used in Go's main source tree.
@@ -444,11 +441,11 @@ var CopyBytesToGo = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func copyBytesToGo(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	dstAddr := uint32(params[0])
-	dstLen := uint32(params[1])
-	_ /* unknown */ = uint32(params[2])
-	srcRef := params[3]
+func copyBytesToGo(ctx context.Context, mod api.Module, stack []uint64) {
+	dstAddr := uint32(stack[0])
+	dstLen := uint32(stack[1])
+	_ /* unknown */ = uint32(stack[2])
+	srcRef := stack[3]
 
 	dst := mustRead(ctx, mod.Memory(), "dst", dstAddr, dstLen) // nolint
 	v := loadValue(ctx, ref(srcRef))
@@ -459,7 +456,7 @@ func copyBytesToGo(ctx context.Context, mod api.Module, params []uint64) []uint6
 		ok = 1
 	}
 
-	return []uint64{uint64(n), uint64(ok)}
+	stack[0], stack[1] = uint64(n), uint64(ok)
 }
 
 // CopyBytesToJS copies linear memory to a JavaScript managed byte array.
@@ -485,11 +482,11 @@ var CopyBytesToJS = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func copyBytesToJS(ctx context.Context, mod api.Module, params []uint64) []uint64 {
-	dstRef := params[0]
-	srcAddr := uint32(params[1])
-	srcLen := uint32(params[2])
-	_ /* unknown */ = uint32(params[3])
+func copyBytesToJS(ctx context.Context, mod api.Module, stack []uint64) {
+	dstRef := stack[0]
+	srcAddr := uint32(stack[1])
+	srcLen := uint32(stack[2])
+	_ /* unknown */ = uint32(stack[3])
 
 	src := mustRead(ctx, mod.Memory(), "src", srcAddr, srcLen) // nolint
 	v := loadValue(ctx, ref(dstRef))
@@ -502,7 +499,7 @@ func copyBytesToJS(ctx context.Context, mod api.Module, params []uint64) []uint6
 		ok = 1
 	}
 
-	return []uint64{uint64(n), uint64(ok)}
+	stack[0], stack[1] = uint64(n), uint64(ok)
 }
 
 // refreshSP refreshes the stack pointer, which is needed prior to storeValue
