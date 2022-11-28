@@ -46,12 +46,30 @@ func NewMemoryInstance(memSec *Memory) *MemoryInstance {
 	min := MemoryPagesToBytesNum(memSec.Min)
 	capacity := MemoryPagesToBytesNum(memSec.Cap)
 	return &MemoryInstance{
-		Buffer: make([]byte, min, capacity),
+		//Buffer: make([]byte, min, capacity),
+		Buffer: allocateNonZeroedSlice(min, capacity)[:min:capacity],
 		Min:    memSec.Min,
 		Cap:    memSec.Cap,
 		Max:    memSec.Max,
 	}
 }
+
+func allocateNonZeroedSlice(min, capacity uint64) []byte {
+	allocSize := min
+	if allocSize < capacity {
+		allocSize = capacity
+	}
+
+	p := mallocgc(uintptr(allocSize), nil, false)
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(p),
+		Len:  int(allocSize),
+		Cap:  int(allocSize),
+	}))
+}
+
+//go:linkname mallocgc runtime.mallocgc
+func mallocgc(size uintptr, typ *byte, needszero bool) unsafe.Pointer
 
 // Definition implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Definition() api.MemoryDefinition {
