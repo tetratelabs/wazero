@@ -1,12 +1,10 @@
 package spectest
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -803,71 +801,4 @@ func callFunction(ns *wasm.Namespace, ctx context.Context, moduleName, funcName 
 	fn := ns.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(ctx, params...)
 	return results, fn.Definition().ResultTypes(), err
-}
-
-// requireStripCustomSections strips all the custom sections from the given binary.
-func requireStripCustomSections(t *testing.T, binary []byte) []byte {
-	r := bytes.NewReader(binary)
-	out := bytes.NewBuffer(nil)
-	_, err := io.CopyN(out, r, 8)
-	require.NoError(t, err)
-
-	for {
-		sectionID, err := r.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			require.NoError(t, err)
-		}
-
-		sectionSize, _, err := leb128.DecodeUint32(r)
-		require.NoError(t, err)
-
-		switch sectionID {
-		case wasm.SectionIDCustom:
-			_, err = io.CopyN(io.Discard, r, int64(sectionSize))
-			require.NoError(t, err)
-		default:
-			out.WriteByte(sectionID)
-			out.Write(leb128.EncodeUint32(sectionSize))
-			_, err := io.CopyN(out, r, int64(sectionSize))
-			require.NoError(t, err)
-		}
-	}
-	return out.Bytes()
-}
-
-// TestBinaryEncoder ensures that binary.EncodeModule produces exactly the same binaries
-// for wasm.Module via binary.DecodeModule modulo custom sections for all the valid binaries in spectests.
-func TestBinaryEncoder(t *testing.T, testDataFS embed.FS, enabledFeatures api.CoreFeatures) {
-	files, err := testDataFS.ReadDir("testdata")
-	require.NoError(t, err)
-
-	for _, f := range files {
-		filename := f.Name()
-		if strings.HasSuffix(filename, ".json") {
-			raw, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", filename))
-			require.NoError(t, err)
-
-			var base testbase
-			require.NoError(t, json.Unmarshal(raw, &base))
-
-			for _, c := range base.Commands {
-				if c.CommandType == "module" {
-					t.Run(c.Filename, func(t *testing.T) {
-						buf, err := testDataFS.ReadFile(fmt.Sprintf("testdata/%s", c.Filename))
-						require.NoError(t, err)
-
-						buf = requireStripCustomSections(t, buf)
-
-						mod, err := binaryformat.DecodeModule(buf, enabledFeatures, wasm.MemoryLimitPages, false)
-						require.NoError(t, err)
-
-						encodedBuf := binaryformat.EncodeModule(mod)
-						require.Equal(t, buf, encodedBuf)
-					})
-				}
-			}
-		}
-	}
 }

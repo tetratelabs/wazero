@@ -1679,7 +1679,13 @@ operatorSwitch:
 		)
 	case wasm.OpcodeMiscPrefix:
 		c.pc++
-		switch miscOp := c.body[c.pc]; miscOp {
+		// A misc opcode is encoded as an unsigned variable 32-bit integer.
+		miscOp, num, err := leb128.LoadUint32(c.body[c.pc:])
+		if err != nil {
+			return fmt.Errorf("failed to read misc opcode: %v", err)
+		}
+		c.pc += num - 1
+		switch byte(miscOp) {
 		case wasm.OpcodeMiscI32TruncSatF32S:
 			c.emit(
 				&OperationITruncFromF{InputType: Float32, OutputType: SignedInt32, NonTrapping: true},
