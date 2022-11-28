@@ -290,7 +290,7 @@
 (assert_malformed
   (module binary
     "\00asm" "\01\00\00\00"
-    "\01\08\01"                          ;; type section
+    "\01\0c\01"                          ;; type section
     "\60"                                ;; func type
     "\02"                                ;; num params
     "\7f\7e"                             ;; param type

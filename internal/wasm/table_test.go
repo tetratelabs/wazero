@@ -90,7 +90,7 @@ func TestModule_validateTable(t *testing.T) {
 			name: "constant derived element offset=0 and no index",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -106,7 +106,7 @@ func TestModule_validateTable(t *testing.T) {
 			name: "constant derived element offset=0 and one index",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -125,7 +125,7 @@ func TestModule_validateTable(t *testing.T) {
 			name: "constant derived element offset - ignores min on imported table",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				ImportSection:   []*Import{{Type: ExternTypeTable, DescTable: &Table{}}},
+				ImportSection:   []*Import{{Type: ExternTypeTable, DescTable: &Table{Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -144,7 +144,7 @@ func TestModule_validateTable(t *testing.T) {
 			name: "constant derived element offset=0 and one index - imported table",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				ImportSection:   []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1}}},
+				ImportSection:   []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1, Type: RefTypeFuncref}}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -163,7 +163,7 @@ func TestModule_validateTable(t *testing.T) {
 			name: "constant derived element offset and two indices",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 3}},
+				TableSection:    []*Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
@@ -185,7 +185,7 @@ func TestModule_validateTable(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -204,7 +204,7 @@ func TestModule_validateTable(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -224,7 +224,7 @@ func TestModule_validateTable(t *testing.T) {
 			input: &Module{
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{
-					{Type: ExternTypeTable, DescTable: &Table{Min: 1}},
+					{Type: ExternTypeTable, DescTable: &Table{Min: 1, Type: RefTypeFuncref}},
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
@@ -246,7 +246,7 @@ func TestModule_validateTable(t *testing.T) {
 			input: &Module{
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{
-					{Type: ExternTypeTable, DescTable: &Table{}},
+					{Type: ExternTypeTable, DescTable: &Table{Type: RefTypeFuncref}},
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
 				FunctionSection: []Index{0},
@@ -271,7 +271,7 @@ func TestModule_validateTable(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 3}},
+				TableSection:    []*Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
@@ -294,7 +294,7 @@ func TestModule_validateTable(t *testing.T) {
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI64}},
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{Min: 3}},
+				TableSection:    []*Table{{Min: 3, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0, 0, 0, 0},
 				CodeSection:     []*Code{codeEnd, codeEnd, codeEnd, codeEnd},
 				ElementSection: []*ElementSegment{
@@ -352,9 +352,9 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			expectedErr: "too many tables in a module: 6 given with limit 5",
 		},
 		{
-			name: "unknown ref type",
+			name: "type mismatch: unknown ref type",
 			input: &Module{
-				TableSection: []*Table{{}},
+				TableSection: []*Table{{Type: RefTypeFuncref}},
 				ElementSection: []*ElementSegment{
 					{
 						OffsetExpr: &ConstantExpression{
@@ -365,13 +365,62 @@ func TestModule_validateTable_Errors(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "only funcref or externref element can be used to initialize table, but was unknown(0xff)",
+			expectedErr: "element type mismatch: table has funcref but element has unknown(0xff)",
+		},
+		{
+			name: "type mismatch: funcref elem on extern table",
+			input: &Module{
+				TableSection: []*Table{{Type: RefTypeExternref}},
+				ElementSection: []*ElementSegment{
+					{
+						OffsetExpr: &ConstantExpression{
+							Opcode: OpcodeI32Const,
+							Data:   leb128.EncodeUint64(math.MaxUint64),
+						},
+						Type: RefTypeFuncref,
+					},
+				},
+			},
+			expectedErr: "element type mismatch: table has externref but element has funcref",
+		},
+		{
+			name: "type mismatch: extern elem on funcref table",
+			input: &Module{
+				TableSection: []*Table{{Type: RefTypeFuncref}},
+				ElementSection: []*ElementSegment{
+					{
+						OffsetExpr: &ConstantExpression{
+							Opcode: OpcodeI32Const,
+							Data:   leb128.EncodeUint64(math.MaxUint64),
+						},
+						Type: RefTypeExternref,
+					},
+				},
+			},
+			expectedErr: "element type mismatch: table has funcref but element has externref",
+		},
+		{
+			name: "non-nil externref",
+			input: &Module{
+				TableSection: []*Table{{Type: RefTypeFuncref}},
+				ElementSection: []*ElementSegment{
+					{
+						OffsetExpr: &ConstantExpression{
+							Opcode: OpcodeI32Const,
+							Data:   leb128.EncodeUint64(math.MaxUint64),
+						},
+						Type: RefTypeExternref,
+						Init: []*Index{uint32Ptr(0)},
+					},
+				},
+			},
+			expectedErr: "element[0].init[0] must be ref.null but was 0",
 		},
 		{
 			name: "constant derived element offset - decode error",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -391,7 +440,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			name: "constant derived element offset - wrong ValType",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -422,7 +471,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			name: "constant derived element offset exceeds table min",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -438,7 +487,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			name: "constant derived element offset puts init beyond table min",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 2}},
+				TableSection:    []*Table{{Min: 2, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -458,7 +507,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			name: "constant derived element offset beyond table min - no init elements",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{Min: 1}},
+				TableSection:    []*Table{{Min: 1, Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -530,7 +579,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI64}},
 				},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -549,7 +598,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeI32}},
 				},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{codeEnd},
 				ElementSection: []*ElementSegment{
@@ -569,7 +618,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 			name: "imported global derived element offset - no imports",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				GlobalSection:   []*Global{{Type: &GlobalType{ValType: ValueTypeI32}}}, // ignored as not imported
 				CodeSection:     []*Code{codeEnd},
@@ -589,7 +638,7 @@ func TestModule_validateTable_Errors(t *testing.T) {
 				ImportSection: []*Import{
 					{Type: ExternTypeFunc, DescFunc: 0},
 				},
-				TableSection:    []*Table{{}},
+				TableSection:    []*Table{{Type: RefTypeFuncref}},
 				FunctionSection: []Index{0},
 				GlobalSection:   []*Global{{Type: &GlobalType{ValType: ValueTypeI32}}}, // ignored as not imported
 				CodeSection:     []*Code{codeEnd},

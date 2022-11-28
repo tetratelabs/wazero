@@ -162,13 +162,20 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 	// are any imported globals that are known to be invalid by their declarations.
 	for i, elem := range m.ElementSection {
 		idx := Index(i)
-
 		initCount := uint32(len(elem.Init))
 
-		// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
-		for ei, funcIdx := range elem.Init {
-			if funcIdx != nil && *funcIdx >= funcCount {
-				return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
+		if elem.Type == RefTypeFuncref {
+			// Any offset applied is to the element, not the function index: validate here if the funcidx is sound.
+			for ei, funcIdx := range elem.Init {
+				if funcIdx != nil && *funcIdx >= funcCount {
+					return nil, fmt.Errorf("%s[%d].init[%d] funcidx %d out of range", SectionIDName(SectionIDElement), idx, ei, *funcIdx)
+				}
+			}
+		} else {
+			for j, elem := range elem.Init {
+				if elem != nil {
+					return nil, fmt.Errorf("%s[%d].init[%d] must be ref.null but was %v", SectionIDName(SectionIDElement), idx, j, *elem)
+				}
 			}
 		}
 
@@ -177,8 +184,11 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 				return nil, fmt.Errorf("unknown table %d as active element target", elem.TableIndex)
 			}
 
-			if elem.Type != RefTypeFuncref && elem.Type != RefTypeExternref {
-				return nil, fmt.Errorf("only funcref or externref element can be used to initialize table, but was %s", RefTypeName(elem.Type))
+			t := tables[elem.TableIndex]
+			if t.Type != elem.Type {
+				return nil, fmt.Errorf("element type mismatch: table has %s but element has %s",
+					RefTypeName(t.Type), RefTypeName(elem.Type),
+				)
 			}
 
 			// global.get needs to be discovered during initialization
@@ -203,8 +213,6 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 					return nil, fmt.Errorf("%s[%d] couldn't read i32.const parameter: %w", SectionIDName(SectionIDElement), idx, err)
 				}
 				offset := Index(o)
-
-				t := tables[elem.TableIndex]
 
 				// Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L117 we must pass if imported
 				// table has set its min=0. Per https://github.com/WebAssembly/spec/blob/wg-1.0/test/core/elem.wast#L142, we
@@ -270,9 +278,19 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 				return
 			}
 		}
-		inits = append(inits, TableInitEntry{
-			TableIndex: elem.tableIndex, Offset: offset, FunctionIndexes: elem.init,
-		})
+
+		if table := tables[elem.tableIndex]; table.Type == RefTypeExternref {
+			// ExternRef elements are guaranteed to be all null via the validation phase,
+			// so applies null references.
+			for i := range elem.init {
+				table.References[offset+uint32(i)] = uintptr(0)
+			}
+		} else {
+			// Only FuncRef table needs to be initialized by engines.
+			inits = append(inits, TableInitEntry{
+				TableIndex: elem.tableIndex, Offset: offset, FunctionIndexes: elem.init,
+			})
+		}
 	}
 	return
 }
