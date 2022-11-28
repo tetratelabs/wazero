@@ -1,12 +1,10 @@
 package spectest
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -803,36 +801,4 @@ func callFunction(ns *wasm.Namespace, ctx context.Context, moduleName, funcName 
 	fn := ns.Module(moduleName).ExportedFunction(funcName)
 	results, err := fn.Call(ctx, params...)
 	return results, fn.Definition().ResultTypes(), err
-}
-
-// requireStripCustomSections strips all the custom sections from the given binary.
-func requireStripCustomSections(t *testing.T, binary []byte) []byte {
-	r := bytes.NewReader(binary)
-	out := bytes.NewBuffer(nil)
-	_, err := io.CopyN(out, r, 8)
-	require.NoError(t, err)
-
-	for {
-		sectionID, err := r.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			require.NoError(t, err)
-		}
-
-		sectionSize, _, err := leb128.DecodeUint32(r)
-		require.NoError(t, err)
-
-		switch sectionID {
-		case wasm.SectionIDCustom:
-			_, err = io.CopyN(io.Discard, r, int64(sectionSize))
-			require.NoError(t, err)
-		default:
-			out.WriteByte(sectionID)
-			out.Write(leb128.EncodeUint32(sectionSize))
-			_, err := io.CopyN(out, r, int64(sectionSize))
-			require.NoError(t, err)
-		}
-	}
-	return out.Bytes()
 }
