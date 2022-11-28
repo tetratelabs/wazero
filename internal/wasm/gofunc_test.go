@@ -286,7 +286,7 @@ func Test_callGoFunc(t *testing.T) {
 
 			var results []uint64
 			if resultLen > 0 {
-				results = stack[0:resultLen]
+				results = stack[:resultLen]
 			}
 			require.Equal(t, tc.expectedResults, results)
 		})
