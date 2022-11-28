@@ -407,9 +407,6 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := basename(base.SourceFile)
-		//if wastName != "elem.wast" {
-		//	continue
-		//}
 
 		t.Run(wastName, func(t *testing.T) {
 			s, ns := wasm.NewStore(enabledFeatures, newEngine(ctx, enabledFeatures))
