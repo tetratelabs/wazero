@@ -22,6 +22,9 @@ Vagrant.configure("2") do |config|
   config.vm.provider "virtualbox" do |v|
     v.memory = 1024
     v.cpus = 1
+    # To prevent any DNS-related provisioning errors:
+    # https://serverfault.com/questions/453185/vagrant-virtualbox-dns-10-0-2-3-not-working/506206
+    v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
   end
 
   # Similar to `GOVERSION=$(go env GOVERSION) GOARCH=$(go env GOARCH) vagrant provision`
