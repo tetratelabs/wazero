@@ -15,9 +15,7 @@
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/freebsd13"
-  config.vm.synced_folder ".", "/home/vagrant/wazero",
-    type: "rsync",
-    rsync__exclude: ".git/"
+  config.vm.provision "file", source: ".", destination: "/home/vagrant/wazero"
 
   config.vm.provider "virtualbox" do |v|
     v.memory = 1024
