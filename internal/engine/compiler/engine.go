@@ -448,31 +448,32 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 		return err
 	}
 
-	funcs := make([]*code, 0, len(module.FunctionSection))
-
 	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameDataSizeInUint64, module)
 	if err != nil {
 		return err
 	}
-	for funcIndex, ir := range irs {
+
+	importedFuncs := module.ImportFuncCount()
+	funcs := make([]*code, len(module.FunctionSection))
+	for i, ir := range irs {
+		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
 			if compiled, err = compileGoDefinedHostFunction(ir); err != nil {
-				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
 		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
-			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
 		e.setFinalizer(compiled, releaseCode)
 
-		compiled.indexInModule = wasm.Index(funcIndex)
+		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
-
-		funcs = append(funcs, compiled)
+		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs)
 }
