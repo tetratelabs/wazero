@@ -88,6 +88,7 @@ func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
 }
 
 func TestCompiler_ModuleEngine_Call(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call(t, et)
 	require.Equal(t, `
@@ -97,11 +98,13 @@ func TestCompiler_ModuleEngine_Call(t *testing.T) {
 }
 
 func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
 

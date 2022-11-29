@@ -120,10 +120,16 @@ type (
 		// initialFn is the initial function for this call engine.
 		initialFn *function
 
-		ctx          context.Context
+		// ctx is the context.Context passed to all the host function calls.
+		// This is modified when there's function listeners, otherwise it's alwyas the context.Context
+		// passed to the Call API.
+		ctx context.Context
+		// contextStack is a stack of contexts which is pushed and popped by function listeners.
+		// This is used and modified when there's function listeners.
 		contextStack *contextStack
 	}
 
+	// contextStack is a stack of context.Context.
 	contextStack struct {
 		self context.Context
 		prev *contextStack
