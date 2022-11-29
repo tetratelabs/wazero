@@ -13,6 +13,6 @@ import (
 type archContext struct{}
 
 // newCompiler returns an unsupported error.
-func newCompiler(ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(ir *wazeroir.CompilationResult, _ bool) (compiler, error) {
 	return nil, fmt.Errorf("unsupported GOARCH %s", runtime.GOARCH)
 }
