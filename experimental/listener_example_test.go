@@ -58,7 +58,7 @@ func Example_customListenerFactory() {
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(context.Background(), FunctionListenerFactoryKey{}, u)
 
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx) // This closes everything this Runtime created.
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)

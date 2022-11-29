@@ -121,7 +121,7 @@ type (
 		initialFn *function
 
 		// ctx is the context.Context passed to all the host function calls.
-		// This is modified when there's function listeners, otherwise it's alwyas the context.Context
+		// This is modified when there's a function listener call, otherwise it's always the context.Context
 		// passed to the Call API.
 		ctx context.Context
 		// contextStack is a stack of contexts which is pushed and popped by function listeners.

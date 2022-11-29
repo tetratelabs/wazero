@@ -190,37 +190,18 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
+	}
+
 	// We must initialize the stack base pointer register so that we can manipulate the stack properly.
 	c.compileReservedStackBasePointerRegisterInitialization()
 
 	c.compileReservedMemoryRegisterInitialization()
 
-	return c.maybeCompileFunctionListenerBefore()
-}
-
-func (c *arm64Compiler) maybeCompileFunctionListenerBefore() (err error) {
-	if !c.withListener {
-		return
-	}
-
-	err = c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerBefore)
-
-	// After return, we re-initialize reserved registers just like preamble of functions.
-	c.compileReservedStackBasePointerRegisterInitialization()
-	c.compileReservedMemoryRegisterInitialization()
-	return
-}
-
-func (c *arm64Compiler) maybeCompileFunctionListenerAfter() (err error) {
-	if !c.withListener {
-		return
-	}
-
-	err = c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerAfter)
-
-	// After return, we re-initialize reserved registers just like preamble of functions.
-	c.compileReservedStackBasePointerRegisterInitialization()
-	return
+	return nil
 }
 
 // compileMaybeGrowStack adds instructions to check the necessity to grow the value stack,
@@ -291,8 +272,12 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		return err
 	}
 
-	if err := c.maybeCompileFunctionListenerAfter(); err != nil {
-		return err
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerAfter); err != nil {
+			return err
+		}
+		// After return, we re-initialize the stack base pointer as that is used to return to the caller below.
+		c.compileReservedStackBasePointerRegisterInitialization()
 	}
 
 	// arm64CallingConventionModuleInstanceAddressRegister holds the module intstance's address
@@ -371,8 +356,11 @@ func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
 
-	if err := c.maybeCompileFunctionListenerBefore(); err != nil {
-		return err
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction,
+			builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
 	}
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallGoHostFunction, 0); err != nil {

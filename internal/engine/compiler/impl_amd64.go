@@ -91,15 +91,17 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
+	withListener                         bool
 }
 
-func newAmd64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
+func newAmd64Compiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
 	c := &amd64Compiler{
 		assembler:     amd64.NewAssembler(),
 		locationStack: newRuntimeValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,
 		labels:        map[string]*amd64LabelInfo{},
+		withListener:  withListener,
 	}
 	return c, nil
 }
@@ -157,6 +159,12 @@ func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 func (c *amd64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
+
+	if c.withListener {
+		if err := c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
+	}
 
 	if err := c.compileCallGoHostFunction(); err != nil {
 		return err
@@ -4572,6 +4580,14 @@ func (c *amd64Compiler) compileReturnFunction() error {
 		return err
 	}
 
+	if c.withListener {
+		if err := c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerAfter); err != nil {
+			return err
+		}
+		// After return, we re-initialize the stack base pointer as that is used to return to the caller below.
+		c.compileReservedStackBasePointerInitialization()
+	}
+
 	// amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister holds the module instance's address
 	// so mark it used so that it won't be used as a free register.
 	c.locationStack.markRegisterUsed(amd64CallingConventionDestinationFunctionModuleInstanceAddressRegister)
@@ -4733,10 +4749,28 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 		return err
 	}
 
+	if c.withListener {
+		if err = c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
+	}
+
 	c.compileReservedStackBasePointerInitialization()
 
 	// Finally, we initialize the reserved memory register based on the module context.
 	c.compileReservedMemoryPointerInitialization()
+	return
+}
+
+func (c *amd64Compiler) maybeCompileFunctionListenerAfter() (err error) {
+	if !c.withListener {
+		return
+	}
+
+	err = c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerAfter)
+
+	// After return, we re-initialize the stack base pointer as that is used to return to the caller.
+	c.compileReservedStackBasePointerInitialization()
 	return
 }
 
