@@ -12,17 +12,41 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 )
 
-// NewLoggingListenerFactory implements FunctionListenerFactory to log all
-// functions that have a name to the writer.
+// NewLoggingListenerFactory is an experimental.FunctionListenerFactory that
+// logs all functions that have a name to the writer.
+//
+// Use NewHostLoggingListenerFactory if only interested in host interactions.
 func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
-	return &loggingListenerFactory{writer}
+	return &loggingListenerFactory{writer: writer}
 }
 
-type loggingListenerFactory struct{ writer io.Writer }
+// NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory
+// that logs exported and host functions to the writer.
+//
+// This is an alternative to NewLoggingListenerFactory, and would weed out
+// guest defined functions such as those implementing garbage collection.
+//
+// For example, "_start" is defined by the guest, but exported, so would be
+// written to the writer in order to provide minimal context needed to
+// understand host calls such as "fd_open".
+func NewHostLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFactory {
+	return &loggingListenerFactory{writer: writer, hostOnly: true}
+}
+
+type loggingListenerFactory struct {
+	writer   io.Writer
+	hostOnly bool
+}
 
 // NewListener implements the same method as documented on
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
+	exported := len(fnd.ExportNames()) > 0
+	if f.hostOnly && // choose functions defined or callable by the host
+		fnd.GoFunction() == nil && // not defined by the host
+		!exported { // not callable by the host
+		return nil
+	}
 	return &loggingListener{writer: f.writer, fnd: fnd, isWasi: fnd.ModuleName() == "wasi_snapshot_preview1"}
 }
 
