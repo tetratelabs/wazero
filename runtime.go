@@ -189,11 +189,12 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 
-	if c.listeners, err = buildListeners(ctx, internal); err != nil {
+	listeners, err := buildListeners(ctx, internal)
+	if err != nil {
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal, c.listeners); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
 		return nil, err
 	}
 

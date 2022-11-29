@@ -261,6 +261,8 @@ type (
 		indexInModule wasm.Index
 		// sourceModule is the module from which this function is compiled. For logging purpose.
 		sourceModule *wasm.Module
+		// listener holds a listener to notify when this function is called.
+		listener experimental.FunctionListener
 	}
 )
 
@@ -472,16 +474,19 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	funcs := make([]*code, len(module.FunctionSection))
 	ln := len(listeners)
 	for i, ir := range irs {
-		withListener := i < ln && listeners[i] != nil
+		var lsn experimental.FunctionListener
+		if i < ln {
+			lsn = listeners[i]
+		}
 
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
-			if compiled, err = compileGoDefinedHostFunction(ir, withListener); err != nil {
+			if compiled, err = compileGoDefinedHostFunction(ir, lsn != nil); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir, withListener); err != nil {
+		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir, lsn != nil); err != nil {
 			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 		}
@@ -489,6 +494,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
 		e.setFinalizer(compiled, releaseCode)
 
+		compiled.listener = lsn
 		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
 		funcs[funcIndex] = compiled
@@ -875,9 +881,9 @@ entry:
 			case builtinFunctionIndexTableGrow:
 				ce.builtinFunctionTableGrow(ce.ctx, caller.source.Module.Tables)
 			case builtinFunctionIndexFunctionListenerBefore:
-				ce.builtinFunctionFunctionListenerBefore(ce.ctx, caller.source)
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, caller)
 			case builtinFunctionIndexFunctionListenerAfter:
-				ce.builtinFunctionFunctionListenerAfter(ce.ctx, caller.source)
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, caller)
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -942,17 +948,17 @@ func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wa
 	ce.pushValue(uint64(res))
 }
 
-func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, fn *wasm.FunctionInstance) {
+func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	listerCtx := fn.Listener.Before(ctx, fn.Definition, ce.stack[base:base+fn.Type.ParamNumInUint64])
+	listerCtx := fn.parent.listener.Before(ctx, fn.source.Definition, ce.stack[base:base+fn.source.Type.ParamNumInUint64])
 	prevStackTop := ce.contextStack
 	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
 	ce.ctx = listerCtx
 }
 
-func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, fn *wasm.FunctionInstance) {
+func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, fn *function) {
 	base := int(ce.stackBasePointerInBytes >> 3)
-	fn.Listener.After(ctx, fn.Definition, nil, ce.stack[base:base+fn.Type.ResultNumInUint64])
+	fn.parent.listener.After(ctx, fn.source.Definition, nil, ce.stack[base:base+fn.source.Type.ResultNumInUint64])
 	ce.ctx = ce.contextStack.self
 	ce.contextStack = ce.contextStack.prev
 }

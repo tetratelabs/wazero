@@ -282,7 +282,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	err = s.Engine.CompileModule(testCtx, hm, nil)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil, nil)
+	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	const stackCorruption = "value_stack_corruption"
@@ -338,7 +338,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	err = s.Engine.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
-	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil, nil)
+	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{stackCorruption, callStackCorruption} {
@@ -583,14 +583,19 @@ func Test_callFrameOffset(t *testing.T) {
 
 func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
-	f := &wasm.FunctionInstance{
-		Definition: newMockFunctionDefinition("1"),
-		Type:       &wasm.FunctionType{ParamNumInUint64: 3},
-		Listener: mockListener{
-			before: func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
-				require.Equal(t, currentContext, ctx)
-				require.Equal(t, []uint64{2, 3, 4}, paramValues)
-				return nextContext
+
+	f := &function{
+		source: &wasm.FunctionInstance{
+			Definition: newMockFunctionDefinition("1"),
+			Type:       &wasm.FunctionType{ParamNumInUint64: 3},
+		},
+		parent: &code{
+			listener: mockListener{
+				before: func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
+					require.Equal(t, currentContext, ctx)
+					require.Equal(t, []uint64{2, 3, 4}, paramValues)
+					return nextContext
+				},
 			},
 		},
 	}
@@ -608,16 +613,21 @@ func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
 
 func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
 	currentContext, prevContext := context.Background(), context.Background()
-	f := &wasm.FunctionInstance{
-		Definition: newMockFunctionDefinition("1"),
-		Type:       &wasm.FunctionType{ResultNumInUint64: 1},
-		Listener: mockListener{
-			after: func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
-				require.Equal(t, currentContext, ctx)
-				require.Equal(t, []uint64{5}, resultValues)
+	f := &function{
+		source: &wasm.FunctionInstance{
+			Definition: newMockFunctionDefinition("1"),
+			Type:       &wasm.FunctionType{ResultNumInUint64: 1},
+		},
+		parent: &code{
+			listener: mockListener{
+				after: func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
+					require.Equal(t, currentContext, ctx)
+					require.Equal(t, []uint64{5}, resultValues)
+				},
 			},
 		},
 	}
+
 	ce := &callEngine{
 		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
 		stackContext: stackContext{stackBasePointerInBytes: 40},
