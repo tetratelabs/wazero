@@ -125,7 +125,7 @@ type (
 		// passed to the Call API.
 		ctx context.Context
 		// contextStack is a stack of contexts which is pushed and popped by function listeners.
-		// This is used and modified when there's function listeners.
+		// This is used and modified when there are function listeners.
 		contextStack *contextStack
 	}
 
@@ -472,10 +472,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	funcs := make([]*code, len(module.FunctionSection))
 	ln := len(listeners)
 	for i, ir := range irs {
-		var withListener bool
-		if i < ln {
-			withListener = listeners[i] != nil
-		}
+		withListener := i < ln && listeners[i] != nil
 
 		funcIndex := wasm.Index(i)
 		var compiled *code
