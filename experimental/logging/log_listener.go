@@ -20,8 +20,8 @@ func NewLoggingListenerFactory(writer io.Writer) experimental.FunctionListenerFa
 	return &loggingListenerFactory{writer: writer}
 }
 
-// NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory that
-// only logs functions called or implemented by the host to the writer.
+// NewHostLoggingListenerFactory is an experimental.FunctionListenerFactory
+// that logs exported and host functions to the writer.
 //
 // This is an alternative to NewLoggingListenerFactory, and would weed out
 // guest defined functions such as those implementing garbage collection.
@@ -41,7 +41,10 @@ type loggingListenerFactory struct {
 // NewListener implements the same method as documented on
 // experimental.FunctionListener.
 func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experimental.FunctionListener {
-	if f.hostOnly && fnd.GoFunction() == nil && len(fnd.ExportNames()) == 0 {
+	exported := len(fnd.ExportNames()) > 0
+	if f.hostOnly && // choose functions defined or callable by the host
+		fnd.GoFunction() == nil && // not defined by the host
+		!exported { // not callable by the host
 		return nil
 	}
 	return &loggingListener{writer: f.writer, fnd: fnd, isWasi: fnd.ModuleName() == "wasi_snapshot_preview1"}
