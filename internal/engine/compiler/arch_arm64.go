@@ -47,6 +47,6 @@ func newArchContextImpl() archContext {
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(ir *wazeroir.CompilationResult) (compiler, error) {
-	return newArm64Compiler(ir)
+func newCompiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
+	return newArm64Compiler(ir, withListener)
 }

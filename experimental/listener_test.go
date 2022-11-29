@@ -8,7 +8,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	. "github.com/tetratelabs/wazero/experimental"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
@@ -48,16 +47,6 @@ func TestFunctionListenerFactory(t *testing.T) {
 			},
 		},
 	})
-
-	if platform.CompilerSupported() {
-		t.Run("fails on compile if compiler", func(t *testing.T) {
-			r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
-			defer r.Close(testCtx) // This closes everything this Runtime created.
-			_, err := r.CompileModule(ctx, bin)
-			require.EqualError(t, err,
-				"context includes a FunctionListenerFactoryKey, which is only supported in the interpreter")
-		})
-	}
 
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer r.Close(ctx) // This closes everything this Runtime created.

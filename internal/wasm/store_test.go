@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/hammer"
@@ -362,7 +363,9 @@ func newStore() (*Store, *Namespace) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(context.Context, *Module) error { return nil }
+func (e *mockEngine) CompileModule(context.Context, *Module, []experimental.FunctionListener) error {
+	return nil
+}
 
 // LookupFunction implements the same method as documented on wasm.Engine.
 func (e *mockModuleEngine) LookupFunction(*TableInstance, FunctionTypeID, Index) (Index, error) {

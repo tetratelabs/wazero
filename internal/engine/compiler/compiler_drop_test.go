@@ -11,7 +11,7 @@ import (
 
 func Test_compileDropRange(t *testing.T) {
 	t.Run("nil range", func(t *testing.T) {
-		c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 		require.NoError(t, err)
 
 		err = compileDropRange(c, nil)
@@ -19,7 +19,7 @@ func Test_compileDropRange(t *testing.T) {
 	})
 
 	t.Run("start at the top", func(t *testing.T) {
-		c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 		require.NoError(t, err)
 
 		// Use up all unreserved registers.
@@ -94,7 +94,7 @@ func TestRuntimeValueLocationStack_dropsLivesForInclusiveRange(t *testing.T) {
 func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 	t.Run("no stacked values", func(t *testing.T) {
 		liveValues := []*runtimeValueLocation{{register: 1}, {register: 2}}
-		c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 		require.NoError(t, err)
 
 		gpTmp, vecTmp, err := getTemporariesForStackedLiveValues(c, liveValues)
@@ -113,7 +113,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 					{valueType: runtimeValueTypeI32},
 					{valueType: runtimeValueTypeI64},
 				}
-				c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+				c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 				require.NoError(t, err)
 
 				if !freeRegisterExists {
@@ -154,7 +154,7 @@ func Test_getTemporariesForStackedLiveValues(t *testing.T) {
 					{valueType: runtimeValueTypeV128Lo},
 					{valueType: runtimeValueTypeV128Hi},
 				}
-				c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+				c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 				require.NoError(t, err)
 
 				if !freeRegisterExists {
@@ -189,7 +189,7 @@ func Test_migrateLiveValue(t *testing.T) {
 	})
 	t.Run("already on register", func(t *testing.T) {
 		// This case, we don't use tmp registers.
-		c, err := newCompiler(nil) // we don't use ir in compileDropRange, so passing nil is fine.
+		c, err := newCompiler(nil, false) // we don't use ir in compileDropRange, so passing nil is fine.
 		require.NoError(t, err)
 
 		// Push the dummy values.

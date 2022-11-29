@@ -28,14 +28,16 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
+	withListener                         bool
 }
 
-func newArm64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
+func newArm64Compiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
 	return &arm64Compiler{
 		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
 		ir:            ir,
 		labels:        map[string]*arm64LabelInfo{},
+		withListener:  withListener,
 	}, nil
 }
 
@@ -192,7 +194,33 @@ func (c *arm64Compiler) compilePreamble() error {
 	c.compileReservedStackBasePointerRegisterInitialization()
 
 	c.compileReservedMemoryRegisterInitialization()
-	return nil
+
+	return c.maybeCompileFunctionListenerBefore()
+}
+
+func (c *arm64Compiler) maybeCompileFunctionListenerBefore() (err error) {
+	if !c.withListener {
+		return
+	}
+
+	err = c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerBefore)
+
+	// After return, we re-initialize reserved registers just like preamble of functions.
+	c.compileReservedStackBasePointerRegisterInitialization()
+	c.compileReservedMemoryRegisterInitialization()
+	return
+}
+
+func (c *arm64Compiler) maybeCompileFunctionListenerAfter() (err error) {
+	if !c.withListener {
+		return
+	}
+
+	err = c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerAfter)
+
+	// After return, we re-initialize reserved registers just like preamble of functions.
+	c.compileReservedStackBasePointerRegisterInitialization()
+	return
 }
 
 // compileMaybeGrowStack adds instructions to check the necessity to grow the value stack,
@@ -260,6 +288,10 @@ func (c *arm64Compiler) compileMaybeGrowStack() error {
 func (c *arm64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
+		return err
+	}
+
+	if err := c.maybeCompileFunctionListenerAfter(); err != nil {
 		return err
 	}
 
@@ -338,6 +370,10 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
+
+	if err := c.maybeCompileFunctionListenerBefore(); err != nil {
+		return err
+	}
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallGoHostFunction, 0); err != nil {
 		return err

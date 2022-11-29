@@ -191,7 +191,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	goReflectFn := host.Exports["go-reflect"].Function
 	wasnFn := host.Exports["wasm"].Function
 
-	err := eng.CompileModule(testCtx, hostModule)
+	err := eng.CompileModule(testCtx, hostModule, nil)
 	requireNoError(err)
 
 	hostME, err := eng.NewModuleEngine(host.Name, hostModule, nil, host.Functions, nil, nil)
@@ -224,7 +224,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	}
 
 	importingModule.BuildFunctionDefinitions()
-	err = eng.CompileModule(testCtx, importingModule)
+	err = eng.CompileModule(testCtx, importingModule, nil)
 	requireNoError(err)
 
 	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
