@@ -1110,7 +1110,7 @@ func Test_fdReaddir(t *testing.T) {
 			expectedMem:     nil,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 0,
-				Entries:   testDirEntries,
+				Entries:   testDirEntries[0:1],
 				Pos:       0,
 			},
 		},

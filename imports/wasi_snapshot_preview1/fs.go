@@ -699,6 +699,10 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 			// bufused > direntsLen is a signal that the directory has more
 			// entries than can fit in bufLen.
 			if bufused >= direntsLen {
+				// TODO: the bug is around here. unit test which use exact size
+				// pass when bufused >= direntsLen, but wasi-libc fails unless
+				// unless it is bufused > direntsLen (in a large directory, not
+				// all are returned).
 				break
 			}
 		} else if bufused > 0 || isEOF {
@@ -709,22 +713,32 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		// serialized. The base overhead is 24 per entry, and minimum size file
 		// name is one character. Hence, the max entries are bufLen / 25.
 		maxDirEntries := int(bufLen / 25)
-		l, err := rd.ReadDir(maxDirEntries)
-		if errors.Is(err, io.EOF) { // EOF isn't an error
-			isEOF = true
-		} else if err != nil {
-			return ErrnoIo
+		if maxDirEntries == 0 { // ensure we can ask for at least one.
+			maxDirEntries += 1
+		}
+
+		// loop until EOF or hit max entries
+		var nextEntries []fs.DirEntry
+		for maxDirEntries > 0 && !isEOF {
+			l, err := rd.ReadDir(maxDirEntries)
+			if err == io.EOF { // EOF isn't an error
+				isEOF = true
+			} else if err != nil {
+				return ErrnoIo
+			} else {
+				nextEntries = append(nextEntries, l...)
+				maxDirEntries -= len(l)
+			}
 		}
 
 		// We cache only one page in the directory list intentionally, to avoid
 		// consuming host resources on directories that aren't closed.
-		entries = l
-		dir.Pos = 0 // reset
-		if len(entries) == 0 {
-			dir.Entries = nil
+		if len(nextEntries) == 0 {
 			break // empty read
 		} else {
-			dir.Entries = l
+			entries = nextEntries
+			dir.Entries = nextEntries
+			dir.Pos = 0 // reset
 		}
 	}
 
