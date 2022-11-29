@@ -170,14 +170,16 @@ type callFrame struct {
 }
 
 type code struct {
-	body   []*interpreterOp
-	hostFn interface{}
+	body     []*interpreterOp
+	listener experimental.FunctionListener
+	hostFn   interface{}
 }
 
 type function struct {
 	source *wasm.FunctionInstance
 	body   []*interpreterOp
 	hostFn interface{}
+	parent *code
 }
 
 // functionFromUintptr resurrects the original *function from the given uintptr
@@ -197,6 +199,7 @@ func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 		source: f,
 		body:   c.body,
 		hostFn: c.hostFn,
+		parent: c,
 	}
 }
 
@@ -220,29 +223,38 @@ type interpreterOp struct {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, _ []experimental.FunctionListener) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}
 
-	funcs := make([]*code, 0, len(module.FunctionSection))
+	funcs := make([]*code, len(module.FunctionSection))
 	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameStackSize, module)
 	if err != nil {
 		return err
 	}
 	for i, ir := range irs {
+		var lsn experimental.FunctionListener
+		if i < len(listeners) {
+			lsn = listeners[i]
+		}
+
 		// If this is the host function, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
 		if ir.GoFunc != nil {
-			funcs = append(funcs, &code{hostFn: ir.GoFunc})
+			funcs[i] = &code{hostFn: ir.GoFunc, listener: lsn}
 			continue
-		} else if compiled, err := e.lowerIR(ir); err != nil {
-			def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
-			return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 		} else {
-			funcs = append(funcs, compiled)
+			compiled, err := e.lowerIR(ir)
+			if err != nil {
+				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
+				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
+			}
+			compiled.listener = lsn
+			funcs[i] = compiled
 		}
+
 	}
 	e.addCodes(module, funcs)
 	return nil
@@ -855,7 +867,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContext, f *function) {
 	if f.hostFn != nil {
 		ce.callGoFuncWithStack(ctx, callCtx, f)
-	} else if lsn := f.source.Listener; lsn != nil {
+	} else if lsn := f.parent.listener; lsn != nil {
 		ce.callNativeFuncWithListener(ctx, callCtx, f, lsn)
 	} else {
 		ce.callNativeFunc(ctx, callCtx, f)
@@ -863,9 +875,10 @@ func (ce *callEngine) callFunction(ctx context.Context, callCtx *wasm.CallContex
 }
 
 func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext, f *function, stack []uint64) {
-	if f.source.Listener != nil {
+	lsn := f.parent.listener
+	if lsn != nil {
 		params := stack[:f.source.Type.ParamNumInUint64]
-		ctx = f.source.Listener.Before(ctx, f.source.Definition, params)
+		ctx = lsn.Before(ctx, f.source.Definition, params)
 	}
 	frame := &callFrame{f: f}
 	ce.pushFrame(frame)
@@ -879,10 +892,10 @@ func (ce *callEngine) callGoFunc(ctx context.Context, callCtx *wasm.CallContext,
 	}
 
 	ce.popFrame()
-	if f.source.Listener != nil {
+	if lsn != nil {
 		// TODO: This doesn't get the error due to use of panic to propagate them.
 		results := stack[:f.source.Type.ResultNumInUint64]
-		f.source.Listener.After(ctx, f.source.Definition, nil, results)
+		lsn.After(ctx, f.source.Definition, nil, results)
 	}
 }
 

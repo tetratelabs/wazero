@@ -309,11 +309,12 @@ func (b *hostModuleBuilder) Compile(ctx context.Context) (CompiledModule, error)
 	}
 
 	c := &compiledModule{module: module, compiledEngine: b.r.store.Engine}
-	if c.listeners, err = buildListeners(ctx, module); err != nil {
+	listeners, err := buildListeners(ctx, module)
+	if err != nil {
 		return nil, err
 	}
 
-	if err = b.r.store.Engine.CompileModule(ctx, module, c.listeners); err != nil {
+	if err = b.r.store.Engine.CompileModule(ctx, module, listeners); err != nil {
 		return nil, err
 	}
 

@@ -79,7 +79,7 @@ func (ns *namespace) InstantiateModule(
 	}
 
 	// Instantiate the module in the appropriate namespace.
-	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx, code.listeners)
+	mod, err = ns.store.Instantiate(ctx, ns.ns, code.module, name, sysCtx)
 	if err != nil {
 		// If there was an error, don't leak the compiled module.
 		if code.closeWithModule {

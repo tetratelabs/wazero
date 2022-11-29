@@ -298,7 +298,7 @@ func TestPublicModule_Global(t *testing.T) {
 		s, ns := newStore()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above global
-			module, err := s.Instantiate(context.Background(), ns, tc.module, t.Name(), nil, nil)
+			module, err := s.Instantiate(context.Background(), ns, tc.module, t.Name(), nil)
 			require.NoError(t, err)
 
 			if global := module.ExportedGlobal("global"); tc.expected != nil {

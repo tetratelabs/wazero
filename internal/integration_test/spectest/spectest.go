@@ -370,7 +370,7 @@ func addSpectestModule(t *testing.T, ctx context.Context, s *wasm.Store, ns *was
 	err = s.Engine.CompileModule(ctx, mod, nil)
 	require.NoError(t, err)
 
-	_, err = s.Instantiate(ctx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil), nil)
+	_, err = s.Instantiate(ctx, ns, mod, mod.NameSection.ModuleName, sys.DefaultContext(nil))
 	require.NoError(t, err)
 }
 
@@ -436,7 +436,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 						err = s.Engine.CompileModule(ctx, mod, nil)
 						require.NoError(t, err, msg)
 
-						_, err = s.Instantiate(ctx, ns, mod, moduleName, nil, nil)
+						_, err = s.Instantiate(ctx, ns, mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -574,7 +574,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 							err = s.Engine.CompileModule(ctx, mod, nil)
 							require.NoError(t, err, msg)
 
-							_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil, nil)
+							_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil)
 							require.NoError(t, err, msg)
 						} else {
 							requireInstantiationError(t, ctx, s, ns, buf, msg)
@@ -609,7 +609,7 @@ func requireInstantiationError(t *testing.T, ctx context.Context, s *wasm.Store,
 		return
 	}
 
-	_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil, nil)
+	_, err = s.Instantiate(ctx, ns, mod, t.Name(), nil)
 	require.Error(t, err, msg)
 }
 

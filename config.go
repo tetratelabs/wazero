@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -201,8 +200,6 @@ type compiledModule struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
-	// listeners are present if the code was compiled with a listener
-	listeners []experimental.FunctionListener
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
 }

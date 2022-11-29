@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -140,9 +139,6 @@ type (
 
 		// Definition is known at compile time.
 		Definition api.FunctionDefinition
-
-		// Listener holds a listener to notify when this function is called.
-		Listener experimentalapi.FunctionListener
 	}
 
 	// GlobalInstance represents a global instance in a store.
@@ -299,7 +295,6 @@ func (s *Store) Instantiate(
 	module *Module,
 	name string,
 	sys *internalsys.Context,
-	listeners []experimentalapi.FunctionListener,
 ) (*CallContext, error) {
 	// Collect any imported modules to avoid locking the namespace too long.
 	importedModuleNames := map[string]struct{}{}
@@ -319,7 +314,7 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the namespace so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, listeners, importedModules); err != nil {
+	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, importedModules); err != nil {
 		ns.deleteModule(name)
 		return nil, err
 	} else {
@@ -336,7 +331,6 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	listeners []experimentalapi.FunctionListener,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {
 	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
@@ -358,7 +352,7 @@ func (s *Store) instantiate(
 	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module, listeners)
+	functions := m.BuildFunctions(module)
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
