@@ -4762,18 +4762,6 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 	return
 }
 
-func (c *amd64Compiler) maybeCompileFunctionListenerAfter() (err error) {
-	if !c.withListener {
-		return
-	}
-
-	err = c.compileCallBuiltinFunction(builtinFunctionIndexFunctionListenerAfter)
-
-	// After return, we re-initialize the stack base pointer as that is used to return to the caller.
-	c.compileReservedStackBasePointerInitialization()
-	return
-}
-
 func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 	// First, make reservedRegisterForStackBasePointer point to the beginning of the slice backing array.
 	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
