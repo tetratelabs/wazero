@@ -1005,15 +1005,255 @@ func Test_fdRead_shouldContinueRead(t *testing.T) {
 	}
 }
 
-var fdReadDirFs = fstest.MapFS{
-	"notdir":  {},
-	"dir":     {Mode: fs.ModeDir},
-	"dir/-":   {},                 // len = 24+1 = 25
-	"dir/a-":  {Mode: fs.ModeDir}, // len = 24+2 = 26
-	"dir/ab-": {},                 // len = 24+3 = 27
-}
+var (
+	fdReadDirFs = fstest.MapFS{
+		"notdir":   {},
+		"emptydir": {Mode: fs.ModeDir},
+		"dir":      {Mode: fs.ModeDir},
+		"dir/-":    {},                 // len = 24+1 = 25
+		"dir/a-":   {Mode: fs.ModeDir}, // len = 24+2 = 26
+		"dir/ab-":  {},                 // len = 24+3 = 27
+	}
+
+	testDirEntries = func() []fs.DirEntry {
+		entries, err := fdReadDirFs.ReadDir("dir")
+		if err != nil {
+			panic(err)
+		}
+		return entries
+	}()
+
+	dirent1 = []byte{
+		1, 0, 0, 0, 0, 0, 0, 0, // d_next = 1
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		1, 0, 0, 0, // d_namlen = 1 character
+		4, 0, 0, 0, // d_type = regular_file
+		'-', // name
+	}
+	dirent2 = []byte{
+		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		2, 0, 0, 0, // d_namlen = 1 character
+		3, 0, 0, 0, // d_type =  directory
+		'a', '-', // name
+	}
+	dirent3 = []byte{
+		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 3
+		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
+		3, 0, 0, 0, // d_namlen = 3 characters
+		4, 0, 0, 0, // d_type = regular_file
+		'a', 'b', '-', // name
+	}
+)
 
 func Test_fdReaddir(t *testing.T) {
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
+	defer r.Close(testCtx)
+
+	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+
+	fd, err := fsc.OpenFile(testCtx, "dir")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		dir             func() *internalsys.FileEntry
+		buf, bufLen     uint32
+		cookie          uint64
+		expectedMem     []byte
+		expectedBufUsed uint32
+		expectedReadDir *internalsys.ReadDir
+	}{
+		{
+			name: "empty dir",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("emptydir")
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{File: dir}
+			},
+			buf: 0, bufLen: 1,
+			cookie:          0,
+			expectedBufUsed: 0,
+			expectedMem:     []byte{},
+			expectedReadDir: &internalsys.ReadDir{},
+		},
+		{
+			name: "full read",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{File: dir}
+			},
+			buf: 0, bufLen: 4096,
+			cookie:          0,
+			expectedBufUsed: 78, // length of all entries
+			expectedMem:     append(append(dirent1, dirent2...), dirent3...),
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries,
+				Pos:       3,
+			},
+		},
+		{
+			name: "can't read",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{File: dir}
+			},
+			buf: 0, bufLen: 24, // length is too short
+			cookie:          0,
+			expectedBufUsed: 25, // length needed for one entry
+			expectedMem:     nil,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 0,
+				Entries:   testDirEntries,
+				Pos:       0,
+			},
+		},
+		{
+			name: "read exactly 1",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{File: dir}
+			},
+			buf: 0, bufLen: 25, // length is long enough for one, but not more.
+			cookie:          0,
+			expectedBufUsed: 25, // length to read exactly one.
+			expectedMem:     dirent1,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 1,
+				Entries:   testDirEntries[0:1],
+				Pos:       1,
+			},
+		},
+		{
+			name: "read exactly second",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 1,
+						Entries:   entry,
+						Pos:       1,
+					},
+				}
+			},
+			buf: 0, bufLen: 26, // length is long enough for one more.
+			cookie:          1,
+			expectedBufUsed: 26, // length to read exactly one more.
+			expectedMem:     dirent2,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 2,
+				Entries:   testDirEntries[1:2],
+				Pos:       1,
+			},
+		},
+		{
+			name: "read exactly third",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				two, err := dir.(fs.ReadDirFile).ReadDir(2)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 2,
+						Entries:   two[1:],
+						Pos:       1,
+					},
+				}
+			},
+			buf: 0, bufLen: 27, // length is long enough for one more.
+			cookie:          2,
+			expectedBufUsed: 27, // length to read exactly one more.
+			expectedMem:     dirent3,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries[2:],
+				Pos:       1,
+			},
+		},
+		{
+			name: "re-read last again",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				_, err = dir.(fs.ReadDirFile).ReadDir(3)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 3,
+						Entries:   testDirEntries[2:],
+						Pos:       1,
+					},
+				}
+			},
+			buf: 0, bufLen: 27, // length for the previous entry.
+			cookie:          2,  // previous cookie
+			expectedBufUsed: 27, // length to re-read the previous entry.
+			expectedMem:     dirent3,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries[2:],
+				Pos:       1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			defer log.Reset()
+
+			// Assign the state we are testing
+			file, ok := fsc.OpenedFile(testCtx, fd)
+			require.True(t, ok)
+			dir := tc.dir()
+			defer dir.File.Close()
+
+			file.File = dir.File
+			file.ReadDir = dir.ReadDir
+
+			maskMemory(t, testCtx, mod, int(tc.bufLen))
+
+			// use an arbitrarily high value for the buf used position.
+			resultBufused := uint32(16192)
+			requireErrno(t, ErrnoSuccess, mod, functionFdReaddir,
+				uint64(fd), uint64(tc.buf), uint64(tc.bufLen), tc.cookie, uint64(resultBufused))
+
+			// read back the bufused and compare memory against it
+			bufUsed, ok := mod.Memory().ReadUint32Le(testCtx, resultBufused)
+			require.True(t, ok)
+			require.Equal(t, tc.expectedBufUsed, bufUsed)
+
+			mem, ok := mod.Memory().Read(testCtx, tc.buf, bufUsed)
+			require.True(t, ok)
+
+			if tc.expectedMem != nil {
+				require.Equal(t, tc.expectedMem, mem)
+			}
+
+			require.Equal(t, tc.expectedReadDir, file.ReadDir)
+		})
+	}
+}
+
+func Test_fdReaddir_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
 	defer r.Close(testCtx)
 	memLen := mod.Memory().Size(testCtx)
@@ -1033,6 +1273,19 @@ func Test_fdReaddir(t *testing.T) {
 		expectedErrno                  Errno
 		expectedLog                    string
 	}{
+		{
+			name:          "out-of-memory reading buf",
+			fd:            dirFD,
+			buf:           memLen,
+			bufLen:        1000,
+			expectedErrno: ErrnoFault,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+	<== EFAULT
+<-- (21)
+`,
+		},
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
@@ -1107,14 +1360,6 @@ func Test_fdReaddir(t *testing.T) {
 		})
 	}
 }
-
-var testDirEntries = func() []fs.DirEntry {
-	entries, err := fdReadDirFs.ReadDir("dir")
-	if err != nil {
-		panic(err)
-	}
-	return entries
-}()
 
 func Test_lastDirEntries(t *testing.T) {
 	tests := []struct {
@@ -1268,28 +1513,6 @@ func Test_maxDirents(t *testing.T) {
 }
 
 func Test_writeDirents(t *testing.T) {
-	dirent1 := []byte{
-		2, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		1, 0, 0, 0, // d_namlen = 1 character
-		4, 0, 0, 0, // d_type = regular_file
-		'-', // name
-	}
-	dirent2 := []byte{
-		3, 0, 0, 0, 0, 0, 0, 0, // d_next = 2
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		2, 0, 0, 0, // d_namlen = 1 character
-		3, 0, 0, 0, // d_type =  directory
-		'a', '-', // name
-	}
-	dirent3 := []byte{
-		4, 0, 0, 0, 0, 0, 0, 0, // d_next = 4
-		0, 0, 0, 0, 0, 0, 0, 0, // d_ino = 0
-		3, 0, 0, 0, // d_namlen = 3 characters
-		4, 0, 0, 0, // d_type = regular_file
-		'a', 'b', '-', // name
-	}
-
 	tests := []struct {
 		name               string
 		entries            []fs.DirEntry
@@ -1324,7 +1547,7 @@ func Test_writeDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			lastCookie := uint64(1)
+			lastCookie := uint64(0)
 			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
 			writeDirents(tc.entries, tc.entryCount, entriesBuf, lastCookie)
 			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)

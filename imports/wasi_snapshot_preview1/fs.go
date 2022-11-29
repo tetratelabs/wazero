@@ -698,7 +698,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 			// bufused > direntsLen is a signal that the directory has more
 			// entries than can fit in bufLen.
-			if bufused > direntsLen {
+			if bufused >= direntsLen {
 				break
 			}
 		} else if bufused > 0 || isEOF {
@@ -715,11 +715,17 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		} else if err != nil {
 			return ErrnoIo
 		}
+
 		// We cache only one page in the directory list intentionally, to avoid
 		// consuming host resources on directories that aren't closed.
 		entries = l
-		dir.Entries = l
-		dir.Pos = 0
+		dir.Pos = 0 // reset
+		if len(entries) == 0 {
+			dir.Entries = nil
+			break // empty read
+		} else {
+			dir.Entries = l
+		}
 	}
 
 	// Finally, we are out of the loop, and may have written entries. When
@@ -754,6 +760,7 @@ func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEn
 			errno = ErrnoNosys // unimplemented
 			return
 		}
+		dir.CountRead += uint64(relativePos) // rewind
 	}
 
 	entries = dir.Entries
@@ -811,7 +818,7 @@ func writeDirents(
 		if e.IsDir() {
 			filetype = wasiFiletypeDirectory
 		}
-		entriesBuf[pos] = uint8(filetype)
+		binary.LittleEndian.PutUint32(entriesBuf[pos:], uint32(filetype)) //  d_type
 		pos += 4
 		copy(entriesBuf[pos:], e.Name())
 		pos += nameLen
