@@ -5,13 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/tetratelabs/wazero/experimental/logging"
 	"runtime"
 	"testing"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -153,7 +153,6 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 	<-- (1)
 <-- (1)
 `, "\n"+functionLog.String())
-
 }
 
 func TestCompiler_ModuleEngine_Memory(t *testing.T) {
