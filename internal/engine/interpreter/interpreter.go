@@ -220,7 +220,7 @@ type interpreterOp struct {
 const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, _ []experimental.FunctionListener) error {
 	if _, ok := e.getCodes(module); ok { // cache hit!
 		return nil
 	}

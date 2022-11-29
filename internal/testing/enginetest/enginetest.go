@@ -70,7 +70,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 
 	t.Run("sets module name", func(t *testing.T) {
 		m := &wasm.Module{}
-		err := e.CompileModule(testCtx, m)
+		err := e.CompileModule(testCtx, m, nil)
 		require.NoError(t, err)
 		me, err := e.NewModuleEngine(t.Name(), m, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
 		},
 	}
 	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m)
+	err := e.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
@@ -140,13 +140,15 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeEnd}},
 		},
 	}
+
 	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m)
+	listeners := buildListeners(et.ListenerFactory(), m)
+	err := e.CompileModule(testCtx, m, listeners)
 	require.NoError(t, err)
 
 	// To use the function, we first need to add it to a module.
 	module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-	module.Functions = module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
+	module.Functions = module.BuildFunctions(m, listeners)
 
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions, nil, nil)
@@ -210,7 +212,7 @@ func requireNewModuleEngine_emptyTable(t *testing.T, e wasm.Engine, et EngineTes
 		ID:              wasm.ModuleID{0},
 	}
 	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m)
+	err := e.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
 	module = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
@@ -245,7 +247,7 @@ func requireNewModuleEngine_multiTable(t *testing.T, e wasm.Engine, et EngineTes
 		ID: wasm.ModuleID{1},
 	}
 	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m)
+	err := e.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
 	module = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
@@ -284,7 +286,7 @@ func requireNewModuleEngine_tableWithImportedFunction(t *testing.T, e wasm.Engin
 		ID: wasm.ModuleID{2},
 	}
 	importedModule.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, importedModule)
+	err := e.CompileModule(testCtx, importedModule, nil)
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
@@ -303,7 +305,7 @@ func requireNewModuleEngine_tableWithImportedFunction(t *testing.T, e wasm.Engin
 		ID:              wasm.ModuleID{3},
 	}
 	importingModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importingModule)
+	err = e.CompileModule(testCtx, importingModule, nil)
 	require.NoError(t, err)
 
 	tableInits := []wasm.TableInitEntry{
@@ -336,7 +338,7 @@ func requireNewModuleEngine_tableWithMixedFunctions(t *testing.T, e wasm.Engine,
 		ID: wasm.ModuleID{4},
 	}
 	importedModule.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, importedModule)
+	err := e.CompileModule(testCtx, importedModule, nil)
 	require.NoError(t, err)
 	imported := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
 	importedFunctions := imported.BuildFunctions(importedModule, buildListeners(et.ListenerFactory(), importedModule))
@@ -358,7 +360,7 @@ func requireNewModuleEngine_tableWithMixedFunctions(t *testing.T, e wasm.Engine,
 		ID: wasm.ModuleID{5},
 	}
 	importingModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importingModule)
+	err = e.CompileModule(testCtx, importingModule, nil)
 	require.NoError(t, err)
 
 	importing = &wasm.ModuleInstance{Name: t.Name(), Tables: tables, TypeIDs: []wasm.FunctionTypeID{0}}
@@ -678,8 +680,9 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 		},
 	}
 	m.BuildFunctionDefinitions()
+	listeners := buildListeners(et.ListenerFactory(), m)
 
-	err := e.CompileModule(testCtx, m)
+	err := e.CompileModule(testCtx, m, listeners)
 	require.NoError(t, err)
 
 	// Assign memory to the module instance
@@ -692,7 +695,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	var memory api.Memory = module.Memory
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
-	module.Functions = module.BuildFunctions(m, buildListeners(et.ListenerFactory(), m))
+	module.Functions = module.BuildFunctions(m, listeners)
 	module.BuildExports(m.ExportSection)
 	grow, init := module.Functions[0], module.Functions[1]
 
@@ -820,10 +823,11 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{0},
 	}
 	hostModule.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, hostModule)
+	lns := buildListeners(fnlf, hostModule)
+	err := e.CompileModule(testCtx, hostModule, lns)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule, buildListeners(fnlf, hostModule))
+	host.Functions = host.BuildFunctions(hostModule, lns)
 	host.BuildExports(hostModule.ExportSection)
 	hostFn := host.Exports[divByGoName].Function
 
@@ -854,11 +858,12 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{1},
 	}
 	importedModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importedModule)
+	lns = buildListeners(fnlf, importedModule)
+	err = e.CompileModule(testCtx, importedModule, lns)
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importedFunctions := imported.BuildFunctions(importedModule, buildListeners(fnlf, importedModule))
+	importedFunctions := imported.BuildFunctions(importedModule, lns)
 	imported.Functions = append([]*wasm.FunctionInstance{hostFn}, importedFunctions...)
 	imported.BuildExports(importedModule.ExportSection)
 	callHostFn := imported.Exports[callDivByGoName].Function
@@ -886,12 +891,13 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 		ID: wasm.ModuleID{2},
 	}
 	importingModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importingModule)
+	lns = buildListeners(fnlf, importingModule)
+	err = e.CompileModule(testCtx, importingModule, lns)
 	require.NoError(t, err)
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule, buildListeners(fnlf, importingModule))
+	importingFunctions := importing.BuildFunctions(importingModule, lns)
 	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
@@ -936,7 +942,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ID: wasm.ModuleID{0},
 	}
 	hostModule.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, hostModule)
+	err := e.CompileModule(testCtx, hostModule, nil)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, buildListeners(fnlf, hostModule))
@@ -976,7 +982,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 		ID:            wasm.ModuleID{1},
 	}
 	importingModule.BuildFunctionDefinitions()
-	err = e.CompileModule(testCtx, importingModule)
+	err = e.CompileModule(testCtx, importingModule, nil)
 	require.NoError(t, err)
 
 	// Add the exported function.

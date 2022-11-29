@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -118,6 +119,20 @@ type (
 
 		// initialFn is the initial function for this call engine.
 		initialFn *function
+
+		// ctx is the context.Context passed to all the host function calls.
+		// This is modified when there's a function listener call, otherwise it's always the context.Context
+		// passed to the Call API.
+		ctx context.Context
+		// contextStack is a stack of contexts which is pushed and popped by function listeners.
+		// This is used and modified when there are function listeners.
+		contextStack *contextStack
+	}
+
+	// contextStack is a stack of context.Context.
+	contextStack struct {
+		self context.Context
+		prev *contextStack
 	}
 
 	// moduleContext holds the per-function call specific module information.
@@ -441,7 +456,7 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
 		return nil
 	} else if err != nil {
@@ -455,15 +470,18 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
 
 	importedFuncs := module.ImportFuncCount()
 	funcs := make([]*code, len(module.FunctionSection))
+	ln := len(listeners)
 	for i, ir := range irs {
+		withListener := i < ln && listeners[i] != nil
+
 		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
-			if compiled, err = compileGoDefinedHostFunction(ir); err != nil {
+			if compiled, err = compileGoDefinedHostFunction(ir, withListener); err != nil {
 				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
+		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir, withListener); err != nil {
 			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 		}
@@ -805,6 +823,8 @@ const (
 	builtinFunctionIndexMemoryGrow wasm.Index = iota
 	builtinFunctionIndexGrowStack
 	builtinFunctionIndexTableGrow
+	builtinFunctionIndexFunctionListenerBefore
+	builtinFunctionIndexFunctionListenerAfter
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
@@ -812,6 +832,7 @@ const (
 func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstanceAddress
+	ce.ctx = ctx
 
 entry:
 	{
@@ -837,9 +858,9 @@ entry:
 			fn := calleeHostFunction.source.GoFunc
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				fn.Call(ctx, callCtx.WithMemory(ce.memoryInstance), stack)
+				fn.Call(ce.ctx, callCtx.WithMemory(ce.memoryInstance), stack)
 			case api.GoFunction:
-				fn.Call(ctx, stack)
+				fn.Call(ce.ctx, stack)
 			}
 
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
@@ -848,11 +869,15 @@ entry:
 			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				ce.builtinFunctionMemoryGrow(ctx, caller.source.Module.Memory)
+				ce.builtinFunctionMemoryGrow(ce.ctx, caller.source.Module.Memory)
 			case builtinFunctionIndexGrowStack:
 				ce.builtinFunctionGrowStack(caller.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
-				ce.builtinFunctionTableGrow(ctx, caller.source.Module.Tables)
+				ce.builtinFunctionTableGrow(ce.ctx, caller.source.Module.Tables)
+			case builtinFunctionIndexFunctionListenerBefore:
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, caller.source)
+			case builtinFunctionIndexFunctionListenerAfter:
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, caller.source)
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -917,8 +942,23 @@ func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wa
 	ce.pushValue(uint64(res))
 }
 
-func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
-	compiler, err := newCompiler(ir)
+func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, fn *wasm.FunctionInstance) {
+	base := int(ce.stackBasePointerInBytes >> 3)
+	listerCtx := fn.Listener.Before(ctx, fn.Definition, ce.stack[base:base+fn.Type.ParamNumInUint64])
+	prevStackTop := ce.contextStack
+	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
+	ce.ctx = listerCtx
+}
+
+func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, fn *wasm.FunctionInstance) {
+	base := int(ce.stackBasePointerInBytes >> 3)
+	fn.Listener.After(ctx, fn.Definition, nil, ce.stack[base:base+fn.Type.ResultNumInUint64])
+	ce.ctx = ce.contextStack.self
+	ce.contextStack = ce.contextStack.prev
+}
+
+func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult, withListener bool) (*code, error) {
+	compiler, err := newCompiler(ir, withListener)
 	if err != nil {
 		return nil, err
 	}
@@ -935,8 +975,8 @@ func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error)
 	return &code{codeSegment: c}, nil
 }
 
-func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult) (*code, error) {
-	compiler, err := newCompiler(ir)
+func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult, withListener bool) (*code, error) {
+	compiler, err := newCompiler(ir, withListener)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
 	}

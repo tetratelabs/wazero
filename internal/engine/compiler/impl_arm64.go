@@ -28,14 +28,16 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
+	withListener                         bool
 }
 
-func newArm64Compiler(ir *wazeroir.CompilationResult) (compiler, error) {
+func newArm64Compiler(ir *wazeroir.CompilationResult, withListener bool) (compiler, error) {
 	return &arm64Compiler{
 		assembler:     arm64.NewAssembler(arm64ReservedRegisterForTemporary),
 		locationStack: newRuntimeValueLocationStack(),
 		ir:            ir,
 		labels:        map[string]*arm64LabelInfo{},
+		withListener:  withListener,
 	}, nil
 }
 
@@ -188,10 +190,17 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
+	}
+
 	// We must initialize the stack base pointer register so that we can manipulate the stack properly.
 	c.compileReservedStackBasePointerRegisterInitialization()
 
 	c.compileReservedMemoryRegisterInitialization()
+
 	return nil
 }
 
@@ -261,6 +270,14 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
+	}
+
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction, builtinFunctionIndexFunctionListenerAfter); err != nil {
+			return err
+		}
+		// After return, we re-initialize the stack base pointer as that is used to return to the caller below.
+		c.compileReservedStackBasePointerRegisterInitialization()
 	}
 
 	// arm64CallingConventionModuleInstanceAddressRegister holds the module intstance's address
@@ -338,6 +355,13 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 func (c *arm64Compiler) compileGoDefinedHostFunction() error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.locationStack.init(c.ir.Signature)
+
+	if c.withListener {
+		if err := c.compileCallGoFunction(nativeCallStatusCodeCallBuiltInFunction,
+			builtinFunctionIndexFunctionListenerBefore); err != nil {
+			return err
+		}
+	}
 
 	if err := c.compileCallGoFunction(nativeCallStatusCodeCallGoHostFunction, 0); err != nil {
 		return err

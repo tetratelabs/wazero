@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -297,7 +298,7 @@ func TestModule_Global(t *testing.T) {
 
 			code := &compiledModule{module: tc.module}
 
-			err := r.store.Engine.CompileModule(testCtx, code.module)
+			err := r.store.Engine.CompileModule(testCtx, code.module, nil)
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above global
@@ -647,7 +648,7 @@ type mockEngine struct {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module) error {
+func (e *mockEngine) CompileModule(_ context.Context, module *wasm.Module, _ []experimental.FunctionListener) error {
 	e.cachedModules[module] = struct{}{}
 	return nil
 }

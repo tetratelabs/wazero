@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	"github.com/tetratelabs/wazero/internal/testing/require"
@@ -19,8 +21,12 @@ import (
 // testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
-// et is used for tests defined in the enginetest package.
-var et = &engineTester{}
+var (
+	// et is used for tests defined in the enginetest package.
+	et              = &engineTester{}
+	functionLog     bytes.Buffer
+	listenerFactory = logging.NewLoggingListenerFactory(&functionLog)
+)
 
 // engineTester implements enginetest.EngineTester.
 type engineTester struct{}
@@ -32,7 +38,7 @@ func (e *engineTester) IsCompiler() bool {
 
 // ListenerFactory implements the same method as documented on enginetest.EngineTester.
 func (e *engineTester) ListenerFactory() experimental.FunctionListenerFactory {
-	return nil
+	return listenerFactory
 }
 
 // NewEngine implements the same method as documented on enginetest.EngineTester.
@@ -82,18 +88,74 @@ func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {
 }
 
 func TestCompiler_ModuleEngine_Call(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call(t, et)
+	require.Equal(t, `
+--> .$0(1,2)
+<-- (1,2)
+`, "\n"+functionLog.String())
 }
 
 func TestCompiler_ModuleEngine_Call_HostFn(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
+	defer functionLog.Reset()
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_Errors(t, et)
+
+	// TODO: Currently, the listener doesn't get notified on errors as they are
+	// implemented with panic. This means the end hooks aren't make resulting
+	// in dangling logs like this:
+	//	==> host.host_div_by(4294967295)
+	// instead of seeing a return like
+	//	<== DivByZero
+	require.Equal(t, `
+--> imported.div_by.wasm(1)
+<-- (1)
+--> imported.div_by.wasm(1)
+<-- (1)
+--> imported.div_by.wasm(0)
+--> imported.div_by.wasm(1)
+<-- (1)
+--> imported.call->div_by.go(4294967295)
+	==> host.div_by.go(4294967295)
+--> imported.call->div_by.go(1)
+	==> host.div_by.go(1)
+	<== (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(0)
+	--> imported.call->div_by.go(0)
+		==> host.div_by.go(0)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(4294967295)
+	--> imported.call->div_by.go(4294967295)
+		==> host.div_by.go(4294967295)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+--> importing.call_import->call->div_by.go(0)
+	--> imported.call->div_by.go(0)
+		==> host.div_by.go(0)
+--> importing.call_import->call->div_by.go(1)
+	--> imported.call->div_by.go(1)
+		==> host.div_by.go(1)
+		<== (1)
+	<-- (1)
+<-- (1)
+`, "\n"+functionLog.String())
 }
 
 func TestCompiler_ModuleEngine_Memory(t *testing.T) {
@@ -136,11 +198,11 @@ func TestCompiler_CompileModule(t *testing.T) {
 			ID: wasm.ModuleID{},
 		}
 
-		err := e.CompileModule(testCtx, okModule)
+		err := e.CompileModule(testCtx, okModule, nil)
 		require.NoError(t, err)
 
 		// Compiling same module shouldn't be compiled again, but instead should be cached.
-		err = e.CompileModule(testCtx, okModule)
+		err = e.CompileModule(testCtx, okModule, nil)
 		require.NoError(t, err)
 
 		compiled, ok := e.codes[okModule.ID]
@@ -167,7 +229,7 @@ func TestCompiler_CompileModule(t *testing.T) {
 		errModule.BuildFunctionDefinitions()
 
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
-		err := e.CompileModule(testCtx, errModule)
+		err := e.CompileModule(testCtx, errModule, nil)
 		require.EqualError(t, err, "failed to lower func[.$2] to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, the compiled functions must not be cached.
@@ -217,7 +279,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}}, nil, enabledFeatures)
 	require.NoError(t, err)
 
-	err = s.Engine.CompileModule(testCtx, hm)
+	err = s.Engine.CompileModule(testCtx, hm, nil)
 	require.NoError(t, err)
 
 	_, err = s.Instantiate(testCtx, ns, hm, hostModuleName, nil, nil)
@@ -273,7 +335,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 	}
 	m.BuildFunctionDefinitions()
 
-	err = s.Engine.CompileModule(testCtx, m)
+	err = s.Engine.CompileModule(testCtx, m, nil)
 	require.NoError(t, err)
 
 	mi, err := s.Instantiate(testCtx, ns, m, t.Name(), nil, nil)
@@ -517,4 +579,66 @@ func Test_callFrameOffset(t *testing.T) {
 	require.Equal(t, 1, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 1, ResultNumInUint64: 0}))
 	require.Equal(t, 10, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 10, ResultNumInUint64: 5}))
 	require.Equal(t, 100, callFrameOffset(&wasm.FunctionType{ParamNumInUint64: 100, ResultNumInUint64: 50}))
+}
+
+func TestCallEngine_builtinFunctionFunctionListenerBefore(t *testing.T) {
+	nextContext, currentContext, prevContext := context.Background(), context.Background(), context.Background()
+	f := &wasm.FunctionInstance{
+		Definition: newMockFunctionDefinition("1"),
+		Type:       &wasm.FunctionType{ParamNumInUint64: 3},
+		Listener: mockListener{
+			before: func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
+				require.Equal(t, currentContext, ctx)
+				require.Equal(t, []uint64{2, 3, 4}, paramValues)
+				return nextContext
+			},
+		},
+	}
+	ce := &callEngine{
+		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
+		stackContext: stackContext{stackBasePointerInBytes: 16},
+		contextStack: &contextStack{self: prevContext},
+	}
+	ce.builtinFunctionFunctionListenerBefore(ce.ctx, f)
+
+	// Contexts must be stacked.
+	require.Equal(t, currentContext, ce.contextStack.self)
+	require.Equal(t, prevContext, ce.contextStack.prev.self)
+}
+
+func TestCallEngine_builtinFunctionFunctionListenerAfter(t *testing.T) {
+	currentContext, prevContext := context.Background(), context.Background()
+	f := &wasm.FunctionInstance{
+		Definition: newMockFunctionDefinition("1"),
+		Type:       &wasm.FunctionType{ResultNumInUint64: 1},
+		Listener: mockListener{
+			after: func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
+				require.Equal(t, currentContext, ctx)
+				require.Equal(t, []uint64{5}, resultValues)
+			},
+		},
+	}
+	ce := &callEngine{
+		ctx: currentContext, stack: []uint64{0, 1, 2, 3, 4, 5},
+		stackContext: stackContext{stackBasePointerInBytes: 40},
+		contextStack: &contextStack{self: prevContext},
+	}
+	ce.builtinFunctionFunctionListenerAfter(ce.ctx, f)
+
+	// Contexts must be popped.
+	require.Nil(t, ce.contextStack)
+	require.Equal(t, prevContext, ce.ctx)
+}
+
+type mockListener struct {
+	before func(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context
+	after  func(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64)
+}
+
+func (m mockListener) Before(ctx context.Context, def api.FunctionDefinition, paramValues []uint64) context.Context {
+	return m.before(ctx, def, paramValues)
+}
+
+func (m mockListener) After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
+	m.after(ctx, def, err, resultValues)
 }

@@ -422,7 +422,7 @@ func requireProxyModule(t *testing.T, fns FunctionExporter, config wazero.Module
 	// Set context to one that has an experimental listener
 	ctx := context.WithValue(testCtx, FunctionListenerFactoryKey{}, logging.NewLoggingListenerFactory(&log))
 
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
+	r := wazero.NewRuntime(ctx)
 
 	builder := r.NewHostModuleBuilder("env")
 	fns.ExportFunctions(builder)

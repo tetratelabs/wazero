@@ -8,8 +8,6 @@ import (
 
 // FunctionListenerFactoryKey is a context.Context Value key. Its associated value should be a FunctionListenerFactory.
 //
-// Note: This is interpreter-only for now!
-//
 // See https://github.com/tetratelabs/wazero/issues/451
 type FunctionListenerFactoryKey struct{}
 
