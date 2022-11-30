@@ -301,8 +301,8 @@ type Function interface {
 	// another Function if you want to invoke the same function concurrently.
 	// On the other hand, sequential invocations of Call is allowed.
 	//
-	// To safely encode/decode params/results as expressed as uint64, users are
-	// encouraged to use api.EncodeXXX or DecodeXXX functions. See the docs on api.ValueType.
+	// To safely encode/decode params/results expressed as uint64, users are encouraged to
+	// use api.EncodeXXX or DecodeXXX functions. See the docs on api.ValueType.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
