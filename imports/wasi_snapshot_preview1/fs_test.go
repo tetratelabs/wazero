@@ -1466,12 +1466,11 @@ func Test_maxDirents(t *testing.T) {
 			expectedTruncatedEntryLen: 0,
 		},
 		{
-			name:                      "one",
-			entries:                   testDirEntries,
-			maxLen:                    25,
-			expectedCount:             1,
-			expectedTruncatedEntryLen: 24, // not at end of dir
-			expectedBufused:           25,
+			name:            "one",
+			entries:         testDirEntries,
+			maxLen:          25,
+			expectedCount:   1,
+			expectedBufused: 25,
 		},
 		{
 			name:                      "one but not room for two's name",
@@ -1482,12 +1481,11 @@ func Test_maxDirents(t *testing.T) {
 			expectedBufused:           25 + 25,
 		},
 		{
-			name:                      "two",
-			entries:                   testDirEntries,
-			maxLen:                    25 + 26,
-			expectedCount:             2,
-			expectedTruncatedEntryLen: 24, // not at end of dir
-			expectedBufused:           25 + 26,
+			name:            "two",
+			entries:         testDirEntries,
+			maxLen:          25 + 26,
+			expectedCount:   2,
+			expectedBufused: 25 + 26,
 		},
 		{
 			name:                      "two but not three's dirent",

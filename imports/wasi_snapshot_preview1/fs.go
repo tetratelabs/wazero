@@ -784,12 +784,26 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount, tru
 		nameLen := uint32(len(e.Name()))
 		entryLen := direntSize + nameLen
 
-		if lenRemaining == 0 { // There is another entry
-			truncatedEntryLen = direntSize
+		if lenRemaining == 0 {
+			// We've hit exactly the end of bufLen, so cannot write the next
+			// entry. A caller who wants more will retry.
 			break
-		} else if lenRemaining < entryLen {
-			bufused += lenRemaining
-			if lenRemaining < direntSize { // overflow for wasi-libc
+		}
+
+		if lenRemaining < entryLen {
+			// We haven't room to write the entry, and docs say to write the
+			// header. This helps especially when there is an entry with a very
+			// long filename. Ex if bufLen is 4096 and the filename is 4096,
+			// we need to write direntSize(24) + 4096 bytes to write the entry.
+			// In this case, we only write up to direntSize(24) to allow the
+			// caller to resize.
+
+			// bufused != bufLen means more entries exist, which is the case
+			// when the next entry is larger than bytes remaining.
+			bufused = bufLen
+
+			// When the next entry is truncated, only write the dirent.
+			if lenRemaining < direntSize {
 				truncatedEntryLen = direntSize - lenRemaining
 			}
 			break
