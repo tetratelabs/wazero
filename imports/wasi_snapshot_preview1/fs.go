@@ -669,10 +669,8 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	}
 
 	// expect a cookie only if we are continuing a read.
-	if cookie == uint64(0) {
-		if dir.CountRead > 0 {
-			return ErrnoInval // invalid as a cookie is minimally one.
-		}
+	if cookie == uint64(0) && dir.CountRead > 0 {
+		return ErrnoInval // invalid as a cookie is minimally one.
 	}
 
 	// Ensure we have the max directory entries that can be serialized as
