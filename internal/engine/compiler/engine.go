@@ -503,7 +503,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInits []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
 	me := &moduleEngine{
 		name:                  name,
@@ -528,25 +528,17 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		function := c.createFunction(f)
 		me.functions[imported+i] = function
 	}
-
-	for _, init := range tableInits {
-		references := tables[init.TableIndex].References
-		if int(init.Offset)+(len(init.FunctionIndexes)) > len(references) {
-			return me, wasm.ErrElementOffsetOutOfBounds
-		}
-
-		for i, funcIdx := range init.FunctionIndexes {
-			if funcIdx != nil {
-				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*funcIdx]))
-			}
-		}
-	}
 	return me, nil
 }
 
 // Name implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) Name() string {
 	return e.name
+}
+
+// FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
+	return uintptr(unsafe.Pointer(e.functions[funcIndex]))
 }
 
 // CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
@@ -597,7 +589,7 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
-	if tableOffset >= uint32(len(t.References)) {
+	if tableOffset >= uint32(len(t.References)) || t.Type != wasm.RefTypeFuncref {
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
 		return
 	}

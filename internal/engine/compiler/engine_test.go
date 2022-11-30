@@ -46,23 +46,6 @@ func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return newEngine(context.Background(), enabledFeatures)
 }
 
-// InitTables implements the same method as documented on enginetest.EngineTester.
-func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, tableInits []wasm.TableInitEntry) [][]wasm.Reference {
-	references := make([][]wasm.Reference, len(tableIndexToLen))
-	for tableIndex, l := range tableIndexToLen {
-		references[tableIndex] = make([]uintptr, l)
-	}
-	internal := me.(*moduleEngine)
-
-	for _, init := range tableInits {
-		referencesPerTable := references[init.TableIndex]
-		for idx, fnidx := range init.FunctionIndexes {
-			referencesPerTable[int(init.Offset)+idx] = uintptr(unsafe.Pointer(internal.functions[*fnidx]))
-		}
-	}
-	return references
-}
-
 // CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
@@ -76,11 +59,6 @@ func TestCompiler_Engine_NewModuleEngine(t *testing.T) {
 
 func TestCompiler_Engine_InitializeFuncrefGlobals(t *testing.T) {
 	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
-}
-
-func TestCompiler_Engine_NewModuleEngine_InitTable(t *testing.T) {
-	requireSupportedOSArch(t)
-	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
 func TestCompiler_ModuleEngine_LookupFunction(t *testing.T) {

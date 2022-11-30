@@ -245,7 +245,7 @@ func (m *Module) validateTable(enabledFeatures api.CoreFeatures, tables []*Table
 // If the result `init` is non-nil, it is the `tableInit` parameter of Engine.NewModuleEngine.
 //
 // Note: An error is only possible when an ElementSegment.OffsetExpr is out of range of the TableInstance.Min.
-func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []*GlobalInstance, skipBoundCheck bool) (tables []*TableInstance, inits []TableInitEntry, err error) {
+func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []*GlobalInstance, skipBoundCheck bool) (tables []*TableInstance, inits []tableInitEntry, err error) {
 	tables = importedTables
 
 	for _, tsec := range m.TableSection {
@@ -279,20 +279,31 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 			}
 		}
 
-		if table := tables[elem.tableIndex]; table.Type == RefTypeExternref {
-			// ExternRef elements are guaranteed to be all null via the validation phase,
-			// so applies null references.
-			for i := range elem.init {
-				table.References[offset+uint32(i)] = uintptr(0)
-			}
+		if table.Type == RefTypeExternref {
+			inits = append(inits, tableInitEntry{
+				tableIndex: elem.tableIndex, offset: offset,
+				// ExternRef elements are guaranteed to be all null via the validation phase.
+				nullExternRefCount: len(elem.init),
+			})
 		} else {
-			// Only FuncRef table needs to be initialized by engines.
-			inits = append(inits, TableInitEntry{
-				TableIndex: elem.tableIndex, Offset: offset, FunctionIndexes: elem.init,
+			inits = append(inits, tableInitEntry{
+				tableIndex: elem.tableIndex, offset: offset, functionIndexes: elem.init,
 			})
 		}
 	}
 	return
+}
+
+// tableInitEntry is normalized element segment used for initializing tables.
+type tableInitEntry struct {
+	tableIndex Index
+	// offset is the offset in the table from which the table is initialized by engine.
+	offset Index
+	// functionIndexes contains nullable function indexes. This is set when the target table has RefTypeFuncref.
+	functionIndexes []*Index
+	// nullExternRefCount is the number of nul reference which is the only available RefTypeExternref value in elements as of
+	// WebAssembly 2.0. This is set when the target table has RefTypeExternref.
+	nullExternRefCount int
 }
 
 // checkSegmentBounds fails if the capacity needed for an ElementSegment.Init is larger than limitsType.Min

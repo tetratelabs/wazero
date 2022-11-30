@@ -257,7 +257,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		require.EqualError(t, err, "module[non-exist] not instantiated")
 	})
 
-	t.Run("compilation failed", func(t *testing.T) {
+	t.Run("creating engine failed", func(t *testing.T) {
 		s, ns := newStore()
 
 		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
@@ -283,7 +283,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		importingModule.BuildFunctionDefinitions()
 
 		_, err = s.Instantiate(testCtx, ns, importingModule, importingModuleName, nil)
-		require.EqualError(t, err, "compilation failed: some compilation error")
+		require.EqualError(t, err, "some engine creation error")
 	})
 
 	t.Run("start func failed", func(t *testing.T) {
@@ -379,13 +379,19 @@ func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance, _ []*TableInstance, _ []TableInitEntry) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance) (ModuleEngine, error) {
 	if e.shouldCompileFail {
-		return nil, fmt.Errorf("some compilation error")
+		return nil, fmt.Errorf("some engine creation error")
 	}
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
+// FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
+func (e *mockModuleEngine) FunctionInstanceReference(Index) Reference {
+	return 0
+}
+
+// NewCallEngine implements the same method as documented on wasm.ModuleEngine.
 func (e *mockModuleEngine) NewCallEngine(callCtx *CallContext, f *FunctionInstance) (CallEngine, error) {
 	return &mockCallEngine{f: f, callFailIndex: e.callFailIndex}, nil
 }

@@ -329,3 +329,10 @@ func Test733(t *testing.T) {
 		})
 	})
 }
+
+func Test873(t *testing.T) {
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 873))
+		require.NoError(t, err)
+	})
+}

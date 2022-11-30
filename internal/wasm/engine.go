@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"errors"
 
 	"github.com/tetratelabs/wazero/experimental"
 )
@@ -27,18 +26,10 @@ type Engine interface {
 	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
 	// * importedFunctions: functions this module imports, already compiled in this engine.
 	// * moduleFunctions: functions declared in this module that must be compiled.
-	// * tables: possibly shared tables used by this module. When nil tableInit will be nil.
-	// * tableInit: a mapping of Table's index to a mapping of TableInstance.Table index to the function index it should point to.
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(
-		name string,
-		module *Module,
-		importedFunctions, moduleFunctions []*FunctionInstance,
-		tables []*TableInstance,
-		tableInits []TableInitEntry,
-	) (ModuleEngine, error)
+	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance) (ModuleEngine, error)
 }
 
 // ModuleEngine implements function calls for a given module.
@@ -58,6 +49,10 @@ type ModuleEngine interface {
 
 	// InitializeFuncrefGlobals initializes the globals of Funcref type as the opaque pointer values of engine specific compiled functions.
 	InitializeFuncrefGlobals(globals []*GlobalInstance)
+
+	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
+	// the initialization via ElementSegment.
+	FunctionInstanceReference(funcIndex Index) Reference
 }
 
 // CallEngine implements function calls for a FunctionInstance. It manages its own call frame stack and value stack,
@@ -66,19 +61,3 @@ type CallEngine interface {
 	// Call invokes a function instance f with given parameters.
 	Call(ctx context.Context, m *CallContext, params []uint64) (results []uint64, err error)
 }
-
-// TableInitEntry is normalized element segment used for initializing tables by engines.
-type TableInitEntry struct {
-	TableIndex Index
-	// Offset is the offset in the table from which the table is initialized by engine.
-	Offset Index
-	// FunctionIndexes contains nullable function indexes.
-	FunctionIndexes []*Index
-}
-
-// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
-// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
-// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
-//
-// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
-var ErrElementOffsetOutOfBounds = errors.New("element offset ouf of bounds")

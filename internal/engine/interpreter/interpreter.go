@@ -261,7 +261,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInits []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -283,19 +283,6 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		f := moduleFunctions[i]
 		insntantiatedcode := c.instantiate(f)
 		me.functions = append(me.functions, insntantiatedcode)
-	}
-
-	for _, init := range tableInits {
-		references := tables[init.TableIndex].References
-		if int(init.Offset)+len(init.FunctionIndexes) > len(references) {
-			return me, wasm.ErrElementOffsetOutOfBounds
-		}
-
-		for i, fnIndex := range init.FunctionIndexes {
-			if fnIndex != nil {
-				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*fnIndex]))
-			}
-		}
 	}
 	return me, nil
 }
@@ -759,7 +746,7 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	}
 }
 
-// InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
+// InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
 	for _, g := range globals {
 		if g.Type.ValType == wasm.ValueTypeFuncref {
@@ -773,6 +760,12 @@ func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) 
 	}
 }
 
+// FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
+	return uintptr(unsafe.Pointer(e.functions[funcIndex]))
+}
+
+// NewCallEngine implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
