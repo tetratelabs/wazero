@@ -52,17 +52,13 @@ type FileEntry struct {
 
 // ReadDir is the status of a prior fs.ReadDirFile call.
 type ReadDir struct {
-	// CountRead is the total count of files read into wasm memory from the
-	// current directory. This value is used as a cookie.
+	// CountRead is the total count of files read including Entries.
 	CountRead uint64
 
 	// Entries is the contents of the last fs.ReadDirFile call. Notably,
 	// directory listing are not rewindable, so we keep entries around in case
 	// the caller mis-estimated their buffer and needs a few still cached.
 	Entries []fs.DirEntry
-
-	// Pos is the last position read from Entries.
-	Pos int
 }
 
 type FSContext struct {

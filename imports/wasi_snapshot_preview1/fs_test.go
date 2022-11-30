@@ -1056,13 +1056,14 @@ func Test_fdReaddir(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name            string
-		dir             func() *internalsys.FileEntry
-		buf, bufLen     uint32
-		cookie          uint64
-		expectedMem     []byte
-		expectedBufUsed uint32
-		expectedReadDir *internalsys.ReadDir
+		name             string
+		dir              func() *internalsys.FileEntry
+		buf, bufLen      uint32
+		cookie           uint64
+		expectedMem      []byte
+		expectedBufused  uint32
+		expectedOverflow uint32
+		expectedReadDir  *internalsys.ReadDir
 	}{
 		{
 			name: "empty dir",
@@ -1074,7 +1075,7 @@ func Test_fdReaddir(t *testing.T) {
 			},
 			buf: 0, bufLen: 1,
 			cookie:          0,
-			expectedBufUsed: 0,
+			expectedBufused: 0,
 			expectedMem:     []byte{},
 			expectedReadDir: &internalsys.ReadDir{},
 		},
@@ -1088,12 +1089,11 @@ func Test_fdReaddir(t *testing.T) {
 			},
 			buf: 0, bufLen: 4096,
 			cookie:          0,
-			expectedBufUsed: 78, // length of all entries
+			expectedBufused: 78, // length of all entries
 			expectedMem:     append(append(dirent1, dirent2...), dirent3...),
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
-				Pos:       3,
 			},
 		},
 		{
@@ -1106,12 +1106,11 @@ func Test_fdReaddir(t *testing.T) {
 			},
 			buf: 0, bufLen: 24, // length is too short
 			cookie:          0,
-			expectedBufUsed: 25, // length needed for one entry
+			expectedBufused: 24, // == bufLen which is the size of the dirent
 			expectedMem:     nil,
 			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 0,
-				Entries:   testDirEntries[0:1],
-				Pos:       0,
+				CountRead: 3,
+				Entries:   testDirEntries,
 			},
 		},
 		{
@@ -1123,13 +1122,13 @@ func Test_fdReaddir(t *testing.T) {
 				return &internalsys.FileEntry{File: dir}
 			},
 			buf: 0, bufLen: 25, // length is long enough for one, but not more.
-			cookie:          0,
-			expectedBufUsed: 25, // length to read exactly one.
-			expectedMem:     dirent1,
+			cookie:           0,
+			expectedBufused:  25, // length to read exactly one.
+			expectedOverflow: 24, // length to read the next entry.
+			expectedMem:      append(dirent1, dirent2[0:direntSize]...),
 			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 1,
-				Entries:   testDirEntries[0:1],
-				Pos:       1,
+				CountRead: 3,
+				Entries:   testDirEntries,
 			},
 		},
 		{
@@ -1145,18 +1144,17 @@ func Test_fdReaddir(t *testing.T) {
 					ReadDir: &internalsys.ReadDir{
 						CountRead: 1,
 						Entries:   entry,
-						Pos:       1,
 					},
 				}
 			},
 			buf: 0, bufLen: 26, // length is long enough for one more.
-			cookie:          1,
-			expectedBufUsed: 26, // length to read exactly one more.
-			expectedMem:     dirent2,
+			cookie:           2,  // previous d_next
+			expectedBufused:  26, // length to read exactly one more.
+			expectedOverflow: 24,
+			expectedMem:      append(dirent2, dirent3[0:direntSize]...),
 			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 2,
-				Entries:   testDirEntries[1:2],
-				Pos:       1,
+				CountRead: 3,
+				Entries:   testDirEntries[1:],
 			},
 		},
 		{
@@ -1172,45 +1170,16 @@ func Test_fdReaddir(t *testing.T) {
 					ReadDir: &internalsys.ReadDir{
 						CountRead: 2,
 						Entries:   two[1:],
-						Pos:       1,
 					},
 				}
 			},
 			buf: 0, bufLen: 27, // length is long enough for one more.
-			cookie:          2,
-			expectedBufUsed: 27, // length to read exactly one more.
+			cookie:          3,  // previous d_next
+			expectedBufused: 27, // length to read exactly one more.
 			expectedMem:     dirent3,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[2:],
-				Pos:       1,
-			},
-		},
-		{
-			name: "re-read last again",
-			dir: func() *internalsys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
-				require.NoError(t, err)
-				_, err = dir.(fs.ReadDirFile).ReadDir(3)
-				require.NoError(t, err)
-
-				return &internalsys.FileEntry{
-					File: dir,
-					ReadDir: &internalsys.ReadDir{
-						CountRead: 3,
-						Entries:   testDirEntries[2:],
-						Pos:       1,
-					},
-				}
-			},
-			buf: 0, bufLen: 27, // length for the previous entry.
-			cookie:          2,  // previous cookie
-			expectedBufUsed: 27, // length to re-read the previous entry.
-			expectedMem:     dirent3,
-			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries[2:],
-				Pos:       1,
 			},
 		},
 	}
@@ -1229,7 +1198,8 @@ func Test_fdReaddir(t *testing.T) {
 			file.File = dir.File
 			file.ReadDir = dir.ReadDir
 
-			maskMemory(t, testCtx, mod, int(tc.bufLen))
+			bufLen := tc.bufLen + tc.expectedOverflow
+			maskMemory(t, testCtx, mod, int(bufLen))
 
 			// use an arbitrarily high value for the buf used position.
 			resultBufused := uint32(16192)
@@ -1239,9 +1209,9 @@ func Test_fdReaddir(t *testing.T) {
 			// read back the bufused and compare memory against it
 			bufUsed, ok := mod.Memory().ReadUint32Le(testCtx, resultBufused)
 			require.True(t, ok)
-			require.Equal(t, tc.expectedBufUsed, bufUsed)
+			require.Equal(t, tc.expectedBufused, bufUsed)
 
-			mem, ok := mod.Memory().Read(testCtx, tc.buf, bufUsed)
+			mem, ok := mod.Memory().Read(testCtx, tc.buf, bufUsed+tc.expectedOverflow)
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
@@ -1268,6 +1238,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 
 	tests := []struct {
 		name                           string
+		dir                            func() *internalsys.FileEntry
 		fd, buf, bufLen, resultBufused uint32
 		cookie                         uint64
 		expectedErrno                  Errno
@@ -1347,12 +1318,36 @@ func Test_fdReaddir_Errors(t *testing.T) {
 <-- (21)
 `,
 		},
+		{
+			name: "cookie invalid when no prior state",
+			fd:   dirFD,
+			buf:  0, bufLen: 1000,
+			cookie:        1,
+			resultBufused: 2000,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+	<== EINVAL
+<-- (28)
+`,
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
+
+			// Reset the directory so that tests don't taint each other.
+			if file, ok := fsc.OpenedFile(testCtx, tc.fd); ok && tc.fd == dirFD {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				defer dir.Close()
+
+				file.File = dir
+				file.ReadDir = nil
+			}
 
 			requireErrno(t, tc.expectedErrno, mod, functionFdReaddir,
 				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), tc.cookie, uint64(tc.resultBufused))
@@ -1378,40 +1373,36 @@ func Test_lastDirEntries(t *testing.T) {
 			expectedErrno: ErrnoInval,
 		},
 		{
-			name: "cookie is greater than count read",
+			name: "cookie is greater than last d_next",
 			f: &internalsys.ReadDir{
-				CountRead: 1,
-				Pos:       1,
+				CountRead: 3,
 				Entries:   testDirEntries,
 			},
-			cookie:        2,
+			cookie:        5,
 			expectedErrno: ErrnoInval,
 		},
 		{
 			name: "cookie is last pos",
 			f: &internalsys.ReadDir{
-				CountRead: 1,
-				Pos:       1,
+				CountRead: 3,
 				Entries:   testDirEntries,
 			},
-			cookie:          1,
-			expectedEntries: testDirEntries[1:],
+			cookie:          3,
+			expectedEntries: nil,
 		},
 		{
 			name: "cookie is one before last pos",
 			f: &internalsys.ReadDir{
-				CountRead: 1,
-				Pos:       1,
+				CountRead: 3,
 				Entries:   testDirEntries,
 			},
-			cookie:          0,
-			expectedEntries: testDirEntries,
+			cookie:          2,
+			expectedEntries: testDirEntries[2:],
 		},
 		{
 			name: "cookie is before current entries",
 			f: &internalsys.ReadDir{
-				CountRead: 3,
-				Pos:       1,
+				CountRead: 5,
 				Entries:   testDirEntries,
 			},
 			cookie:        1,
@@ -1428,75 +1419,84 @@ func Test_lastDirEntries(t *testing.T) {
 				f = &internalsys.ReadDir{}
 			}
 			entries, errno := lastDirEntries(f, tc.cookie)
-			require.Equal(t, tc.expectedEntries, entries)
 			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedEntries, entries)
 		})
 	}
 }
 
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
-		name                                        string
-		entries                                     []fs.DirEntry
-		maxLen                                      uint32
-		expectedCount, expectedLen, expectedBufused uint32
+		name                                             string
+		entries                                          []fs.DirEntry
+		maxLen                                           uint32
+		expectedCount, expectedOverflow, expectedBufused uint32
 	}{
 		{
 			name: "no entries",
 		},
 		{
-			name:            "can't fit one",
-			entries:         testDirEntries,
-			maxLen:          24,
-			expectedBufused: 25,
+			name:             "can't fit one",
+			entries:          testDirEntries,
+			maxLen:           24,
+			expectedBufused:  24,
+			expectedOverflow: 0,
 		},
 		{
-			name:            "one",
-			entries:         testDirEntries,
-			maxLen:          25,
-			expectedCount:   1,
-			expectedLen:     25,
-			expectedBufused: 25 + 26,
+			name:             "one",
+			entries:          testDirEntries,
+			maxLen:           25,
+			expectedCount:    1,
+			expectedOverflow: 24, // not at end of dir
+			expectedBufused:  25,
 		},
 		{
-			name:            "one but not two",
-			entries:         testDirEntries,
-			maxLen:          25 + 25,
-			expectedCount:   1,
-			expectedLen:     25,
-			expectedBufused: 25 + 26,
+			name:             "one but not room for two's name",
+			entries:          testDirEntries,
+			maxLen:           25 + 25,
+			expectedCount:    1,
+			expectedOverflow: 0, // can write direntSize
+			expectedBufused:  25 + 25,
 		},
 		{
-			name:            "two",
-			entries:         testDirEntries,
-			maxLen:          25 + 26,
-			expectedCount:   2,
-			expectedLen:     25 + 26,
-			expectedBufused: 25 + 26 + 27,
+			name:             "two",
+			entries:          testDirEntries,
+			maxLen:           25 + 26,
+			expectedCount:    2,
+			expectedOverflow: 24, // not at end of dir
+			expectedBufused:  25 + 26,
 		},
 		{
-			name:            "two but not three",
-			entries:         testDirEntries,
-			maxLen:          25 + 26 + 26,
-			expectedCount:   2,
-			expectedLen:     25 + 26,
-			expectedBufused: 25 + 26 + 27,
+			name:             "two but not three's dirent",
+			entries:          testDirEntries,
+			maxLen:           25 + 26 + 20,
+			expectedCount:    2,
+			expectedOverflow: 4, // 20 + 4 == direntSize
+			expectedBufused:  25 + 26 + 20,
 		},
 		{
-			name:            "three",
-			entries:         testDirEntries,
-			maxLen:          25 + 26 + 27,
-			expectedCount:   3,
-			expectedLen:     25 + 26 + 27,
-			expectedBufused: 25 + 26 + 27,
+			name:             "two but not three's name",
+			entries:          testDirEntries,
+			maxLen:           25 + 26 + 26,
+			expectedCount:    2,
+			expectedOverflow: 0, // can write direntSize
+			expectedBufused:  25 + 26 + 26,
 		},
 		{
-			name:            "max",
-			entries:         testDirEntries,
-			maxLen:          100,
-			expectedCount:   3,
-			expectedLen:     25 + 26 + 27,
-			expectedBufused: 25 + 26 + 27,
+			name:             "three",
+			entries:          testDirEntries,
+			maxLen:           25 + 26 + 27,
+			expectedCount:    3,
+			expectedOverflow: 0, // end of dir
+			expectedBufused:  25 + 26 + 27,
+		},
+		{
+			name:             "max",
+			entries:          testDirEntries,
+			maxLen:           100,
+			expectedCount:    3,
+			expectedOverflow: 0, // end of dir
+			expectedBufused:  25 + 26 + 27,
 		},
 	}
 
@@ -1504,9 +1504,9 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			direntCount, direntsLen, bufused := maxDirents(tc.entries, tc.maxLen)
+			bufused, direntCount, overflow := maxDirents(tc.entries, tc.maxLen)
 			require.Equal(t, tc.expectedCount, direntCount)
-			require.Equal(t, tc.expectedLen, direntsLen)
+			require.Equal(t, tc.expectedOverflow, overflow)
 			require.Equal(t, tc.expectedBufused, bufused)
 		})
 	}
@@ -1517,6 +1517,7 @@ func Test_writeDirents(t *testing.T) {
 		name               string
 		entries            []fs.DirEntry
 		entryCount         uint32
+		callerOverBufLen   bool
 		expectedEntriesBuf []byte
 	}{
 		{
@@ -1547,9 +1548,9 @@ func Test_writeDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			lastCookie := uint64(0)
+			cookie := uint64(1)
 			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
-			writeDirents(tc.entries, tc.entryCount, entriesBuf, lastCookie)
+			writeDirents(tc.entries, tc.entryCount, tc.callerOverBufLen, entriesBuf, cookie)
 			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
 		})
 	}

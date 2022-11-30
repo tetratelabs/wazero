@@ -668,84 +668,60 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
+	// If, we are continuing a read, so we expect a cookie.
+	if cookie == uint64(0) {
+		if dir.CountRead > 0 {
+			return ErrnoInval // invalid as a cookie is minimally one.
+		}
+	}
+
+	// Ensure we have the max directory entries that can be serialized as
+	// dirents, knowing file names come after.
+	maxDirEntries := int(bufLen/direntSize + 1)
+
+	// Add one more to know if maxDirEntries is the end of the directory.
+	//	>> If less than the size of the read buffer, the end of the
+	//	>> directory has been reached.
+	maxDirEntries += 1
+
+	// Entries here are truncated to those that start at the cookie.
 	entries, errno := lastDirEntries(dir, cookie)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	// Page the directory until writing its entries as dirents exceeds bufLen,
-	// or we hit the end of the directory.
-	mem := mod.Memory()
-	totalBufUsed := uint32(0) // == the value to write to resultBufUsed
-
-	for isEOF := false; bufLen > 0; {
-		direntCount, direntsLen, bufused := maxDirents(entries, bufLen)
-		totalBufUsed += bufused // size possibly truncated
-
-		if direntCount > 0 { // we have entries to write
-			entriesBuf, ok := mem.Read(ctx, buf, direntsLen)
-			if !ok {
-				return ErrnoFault
-			}
-
-			writeDirents(entries, direntCount, entriesBuf, cookie)
-			cookie += uint64(direntCount)
-
-			buf += direntsLen
-			bufLen -= direntsLen
-			dir.Pos = int(direntCount)
-			dir.CountRead += uint64(direntCount)
-
-			// bufused > direntsLen is a signal that the directory has more
-			// entries than can fit in bufLen.
-			if bufused >= direntsLen {
-				// TODO: the bug is around here. unit test which use exact size
-				// pass when bufused >= direntsLen, but wasi-libc fails unless
-				// unless it is bufused > direntsLen (in a large directory, not
-				// all are returned).
-				break
-			}
-		} else if bufused > 0 || isEOF {
-			break // The current entries are still readable or only ones left.
-		}
-
-		// Read another page of entries from the directory, the max that can be
-		// serialized. The base overhead is 24 per entry, and minimum size file
-		// name is one character. Hence, the max entries are bufLen / 25.
-		maxDirEntries := int(bufLen / 25)
-		if maxDirEntries == 0 { // ensure we can ask for at least one.
-			maxDirEntries += 1
-		}
-
-		// loop until EOF or hit max entries
-		var nextEntries []fs.DirEntry
-		for maxDirEntries > 0 && !isEOF {
-			l, err := rd.ReadDir(maxDirEntries)
-			if err == io.EOF { // EOF isn't an error
-				isEOF = true
-			} else if err != nil {
+	// Append more entries as needed to fill bufLen
+	if entryCount := len(entries); entryCount < maxDirEntries {
+		if l, err := rd.ReadDir(maxDirEntries - entryCount); err != io.EOF {
+			if err != nil {
 				return ErrnoIo
-			} else {
-				nextEntries = append(nextEntries, l...)
-				maxDirEntries -= len(l)
 			}
-		}
-
-		// We cache only one page in the directory list intentionally, to avoid
-		// consuming host resources on directories that aren't closed.
-		if len(nextEntries) == 0 {
-			break // empty read
-		} else {
-			entries = nextEntries
-			dir.Entries = nextEntries
-			dir.Pos = 0 // reset
+			dir.CountRead += uint64(len(l))
+			entries = append(entries, l...)
+			// Replace the cache with up to maxDirEntries, starting at cookie.
+			dir.Entries = entries
 		}
 	}
 
-	// Finally, we are out of the loop, and may have written entries. When
-	// that's the case, totalBufUsed will be greater than zero. In any case,
-	// we overwrite that position in case it was non-zero from a prior call.
-	if !mem.WriteUint32Le(ctx, resultBufused, totalBufUsed) {
+	mem := mod.Memory()
+
+	// Determine how many much data to write, and write it.
+	bufused, direntCount, overflow := maxDirents(entries, bufLen)
+	if cookie == uint64(0) {
+		cookie = 1
+	}
+
+	// lenToWrite can be past bufused to allow wasi-libc to read a full dirent.
+	if lenToWrite := bufused + overflow; lenToWrite > 0 {
+		entriesBuf, ok := mem.Read(ctx, buf, lenToWrite)
+		if !ok {
+			return ErrnoFault
+		}
+
+		writeDirents(entries, direntCount, overflow > 0, entriesBuf, cookie)
+	}
+
+	if !mem.WriteUint32Le(ctx, resultBufused, bufused) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -753,90 +729,119 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 // lastDirEntries is broken out from fdReaddirFn for testability.
 func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEntry, errno Errno) {
-	if dir.Entries == nil { // there was no prior call
+	entryCount := len(dir.Entries)
+	if entryCount == 0 { // there was no prior call
 		if cookie != 0 {
 			errno = ErrnoInval // invalid as we haven't sent that cookie
 		}
 		return
-	} else if cookie > dir.CountRead {
-		errno = ErrnoInval // invalid as we haven't sent that cookie, yet.
+	}
+
+	countRead := int(dir.CountRead)
+	if int(cookie)-countRead == 1 {
+		// cookie is asking for the next page.
+		dir.Entries = nil
+		return
+	} else if int(cookie)-countRead > 1 {
+		errno = ErrnoInval // invalid as we read that far, yet.
 		return
 	}
 
-	// The entries cached were of the last call to ReadDir, which may have
-	// been partially consumed. Use the last read position and the cookie to
-	// determine how many to return.
-	pos := dir.Pos
-	if relativePos := int64(cookie) - int64(dir.CountRead); relativePos < 0 {
+	// Get the first absolute position in our window of results
+	firstPos := countRead - entryCount
+	if p := int(cookie) - firstPos; p < 0 {
 		// ReadDir can't read backwards, so we can only implement positions
 		// we still have data for.
-		if pos = pos + int(relativePos); pos < 0 {
-			errno = ErrnoNosys // unimplemented
-			return
-		}
-		dir.CountRead += uint64(relativePos) // rewind
-	}
-
-	entries = dir.Entries
-	if pos > 0 {
-		entries = entries[pos:]
+		errno = ErrnoNosys // unimplemented
+		return
+	} else if p == entryCount {
+		return // at the position of the next page.
+	} else if p > 0 {
+		entries = dir.Entries[p:] // truncate so to avoid large lists.
+	} else if dir.Entries != nil {
+		entries = dir.Entries
 	}
 	return
 }
 
-// maxDirents returns the maximum count and total serialized size of entries
-// that can fit in maxLen bytes.
+// direntSize is the size of the dirent struct, which should be followed by the
+// length of a file name.
+const direntSize = uint32(24)
+
+// maxDirents returns the maximum count and total entries that can fit in
+// maxLen bytes. overflow is the amount of bytes past bufLen needed to write
+// direntSize of the next entry that doesn't fit, or zero if they all fit.
 //
-// bufused is how much room the next entry would take to store. We need to
-// track this independently because fd_readdir uses this value to tell if the
-// directory is exhausted or not.
-func maxDirents(entries []fs.DirEntry, maxLen uint32) (direntCount, direntsLen, bufused uint32) {
+// While not documented on the specification, wasi-libc implies the host must
+// write past maxLen to complete a dirent (without its name), to avoid
+// conflating not enough buffer space with end of directory.
+//
+// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
+func maxDirents(entries []fs.DirEntry, maxLen uint32) (bufused, direntCount, overflow uint32) {
+	lenRemaining := maxLen
 	for _, e := range entries {
 		nameLen := uint32(len(e.Name()))
-		entryLen := uint32(24) + nameLen
+		entryLen := direntSize + nameLen
 
-		// Check if we go out of bounds of we would write the struct.
-		bufused += entryLen
-		if bufused > maxLen {
+		if lenRemaining == 0 { // There is another entry
+			overflow = direntSize
+			break
+		} else if lenRemaining < entryLen {
+			bufused += lenRemaining
+			if lenRemaining < direntSize { // overflow for wasi-libc
+				overflow = direntSize - lenRemaining
+			}
 			break
 		}
-		direntsLen += entryLen
+
+		// At this point, this entry can fit within bufLen.
+		bufused += entryLen
+		lenRemaining -= entryLen
 		direntCount++
 	}
 	return
 }
 
 // writeDirents writes the directory entries to the buffer, which is pre-sized
-// based on maxDirents.
+// based on maxDirents.	callerOverBufLen means write one past entryCount,
+// without its name. See maxDirents for why
 func writeDirents(
 	entries []fs.DirEntry,
 	entryCount uint32,
+	callerOverBufLen bool,
 	entriesBuf []byte,
-	lastCookie uint64,
+	cookie uint64,
 ) {
-	pos := 0
-	for i := uint32(0); i < entryCount; i++ {
+	pos, i := uint32(0), uint32(0)
+	for ; i < entryCount; i++ {
 		e := entries[i]
-		lastCookie++
-		nameLen := len(e.Name())
+		nameLen := uint32(len(e.Name()))
 
-		// Now, write the layout of dirent.
-		binary.LittleEndian.PutUint64(entriesBuf[pos:], lastCookie) // d_next
-		pos += 8
-		binary.LittleEndian.PutUint64(entriesBuf[pos:], 0) // no d_ino
-		pos += 8
-		binary.LittleEndian.PutUint32(entriesBuf[pos:], uint32(nameLen)) // d_namlen
-		pos += 4
+		writeDirent(entriesBuf[pos:], cookie, nameLen, e.IsDir())
+		pos += direntSize
 
-		filetype := wasiFiletypeRegularFile
-		if e.IsDir() {
-			filetype = wasiFiletypeDirectory
-		}
-		binary.LittleEndian.PutUint32(entriesBuf[pos:], uint32(filetype)) //  d_type
-		pos += 4
 		copy(entriesBuf[pos:], e.Name())
 		pos += nameLen
+		cookie++
 	}
+
+	if callerOverBufLen { // write one more entry, without its name.
+		e := entries[i]
+		writeDirent(entriesBuf[pos:], cookie, uint32(len(e.Name())), e.IsDir())
+	}
+}
+
+// writeDirent writes direntSize bytes
+func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
+	binary.LittleEndian.PutUint64(buf, dNext)        // d_next
+	binary.LittleEndian.PutUint64(buf[8:], 0)        // no d_ino
+	binary.LittleEndian.PutUint32(buf[16:], dNamlen) // d_namlen
+
+	filetype := wasiFiletypeRegularFile
+	if dType {
+		filetype = wasiFiletypeDirectory
+	}
+	binary.LittleEndian.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
