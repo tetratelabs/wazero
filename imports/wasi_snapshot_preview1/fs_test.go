@@ -1122,26 +1122,26 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 24, // length is too short for name
+			buf: 0, bufLen: 24, // length is long enough for first, but not the name.
 			cookie:          0,
-			expectedBufused: 24,                       // == bufLen which is the size of the dirent
-			expectedMem:     dirent1[:len(dirent1)-1], // header without name
+			expectedBufused: 24,           // == bufLen which is the size of the dirent
+			expectedMem:     dirent1[:24], // header without name
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
 			},
 		},
 		{
-			name: "read exactly 1",
+			name: "read exactly first",
 			dir: func() *internalsys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 25, // length is long enough for one, but not more.
+			buf: 0, bufLen: 25, // length is long enough for first + the name, but not more.
 			cookie:          0,
-			expectedBufused: 25, // length to read exactly one.
+			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     dirent1,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1164,9 +1164,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 26, // length is long enough for one more.
-			cookie:          1,  // previous d_next
-			expectedBufused: 26, // length to read exactly one more.
+			buf: 0, bufLen: 26, // length is long enough for exactly second.
+			cookie:          1,  // d_next of first
+			expectedBufused: 26, // length to read exactly second.
 			expectedMem:     dirent2,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1189,9 +1189,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 30, // length is longer than the second entry
-			cookie:          1,  // previous d_next
-			expectedBufused: 30, // length to read some more, but not enough for a header.
+			buf: 0, bufLen: 30, // length is longer than the second entry, but not long enough for a header.
+			cookie:          1,  // d_next of first
+			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     append(dirent2),
 			expectedMemSize: len(dirent2), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
 			expectedReadDir: &internalsys.ReadDir{
@@ -1200,7 +1200,7 @@ func Test_fdReaddir(t *testing.T) {
 			},
 		},
 		{
-			name: "read second and another header",
+			name: "read second and header of third",
 			dir: func() *internalsys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
@@ -1215,9 +1215,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 50, // length is longer than the second entry
-			cookie:          1,  // previous d_next
-			expectedBufused: 50, // length to read exactly one more.
+			buf: 0, bufLen: 50, // length is longer than the second entry + enough for the header of third.
+			cookie:          1,  // d_next of first
+			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(dirent2, dirent3[0:24]...),
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1240,9 +1240,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 53, // length is longer than the second entry
-			cookie:          1,  // previous d_next
-			expectedBufused: 53, // length to read exactly one more.
+			buf: 0, bufLen: 53, // length is long enough for second and third.
+			cookie:          1,  // d_next of first
+			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(dirent2, dirent3...),
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1265,9 +1265,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 27, // length is long enough for one more.
-			cookie:          2,  // previous d_next
-			expectedBufused: 27, // length to read exactly one more.
+			buf: 0, bufLen: 27, // length is long enough for exactly third.
+			cookie:          2,  // d_next of second.
+			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent3,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1290,9 +1290,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 100, // length is long enough for one more, but there is nothing more.
-			cookie:          2,  // previous d_next
-			expectedBufused: 27, // length to read exactly one more.
+			buf: 0, bufLen: 100, // length is long enough for third and more, but there is nothing more.
+			cookie:          2,  // d_next of second.
+			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent3,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
