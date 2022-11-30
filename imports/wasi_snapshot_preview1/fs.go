@@ -668,7 +668,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		return errno
 	}
 
-	// If, we are continuing a read, so we expect a cookie.
+	// expect a cookie only if we are continuing a read.
 	if cookie == uint64(0) {
 		if dir.CountRead > 0 {
 			return ErrnoInval // invalid as a cookie is minimally one.
@@ -705,20 +705,21 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 	mem := mod.Memory()
 
-	// Determine how many much data to write, and write it.
-	bufused, direntCount, overflow := maxDirents(entries, bufLen)
+	// Determine how many dirents we can write, excluding a potentially
+	// truncated entry.
+	bufused, direntCount, truncatedEntryLen := maxDirents(entries, bufLen)
 	if cookie == uint64(0) {
 		cookie = 1
 	}
 
-	// lenToWrite can be past bufused to allow wasi-libc to read a full dirent.
-	if lenToWrite := bufused + overflow; lenToWrite > 0 {
-		entriesBuf, ok := mem.Read(ctx, buf, lenToWrite)
+	// Now, write entries to the underlying buffer.
+	if bufused > 0 {
+		dirents, ok := mem.Read(ctx, buf, bufused)
 		if !ok {
 			return ErrnoFault
 		}
 
-		writeDirents(entries, direntCount, overflow > 0, entriesBuf, cookie)
+		writeDirents(entries, direntCount, truncatedEntryLen, dirents, cookie)
 	}
 
 	if !mem.WriteUint32Le(ctx, resultBufused, bufused) {
@@ -769,27 +770,27 @@ func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEn
 const direntSize = uint32(24)
 
 // maxDirents returns the maximum count and total entries that can fit in
-// maxLen bytes. overflow is the amount of bytes past bufLen needed to write
-// direntSize of the next entry that doesn't fit, or zero if they all fit.
+// maxLen bytes.
 //
-// While not documented on the specification, wasi-libc implies the host must
-// write past maxLen to complete a dirent (without its name), to avoid
-// conflating not enough buffer space with end of directory.
+// truncatedEntryLen is the amount of bytes past bufLen needed to write the
+// next entry. We have to return bufused == bufLen unless the directory is
+// exhausted.
 //
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(entries []fs.DirEntry, maxLen uint32) (bufused, direntCount, overflow uint32) {
-	lenRemaining := maxLen
+func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount, truncatedEntryLen uint32) {
+	lenRemaining := bufLen
 	for _, e := range entries {
 		nameLen := uint32(len(e.Name()))
 		entryLen := direntSize + nameLen
 
 		if lenRemaining == 0 { // There is another entry
-			overflow = direntSize
+			truncatedEntryLen = direntSize
 			break
 		} else if lenRemaining < entryLen {
 			bufused += lenRemaining
 			if lenRemaining < direntSize { // overflow for wasi-libc
-				overflow = direntSize - lenRemaining
+				truncatedEntryLen = direntSize - lenRemaining
 			}
 			break
 		}
@@ -803,13 +804,13 @@ func maxDirents(entries []fs.DirEntry, maxLen uint32) (bufused, direntCount, ove
 }
 
 // writeDirents writes the directory entries to the buffer, which is pre-sized
-// based on maxDirents.	callerOverBufLen means write one past entryCount,
+// based on maxDirents.	truncatedEntryLen means write one past entryCount,
 // without its name. See maxDirents for why
 func writeDirents(
 	entries []fs.DirEntry,
 	entryCount uint32,
-	callerOverBufLen bool,
-	entriesBuf []byte,
+	truncatedEntryLen uint32,
+	dirents []byte,
 	cookie uint64,
 ) {
 	pos, i := uint32(0), uint32(0)
@@ -817,18 +818,25 @@ func writeDirents(
 		e := entries[i]
 		nameLen := uint32(len(e.Name()))
 
-		writeDirent(entriesBuf[pos:], cookie, nameLen, e.IsDir())
+		writeDirent(dirents[pos:], cookie, nameLen, e.IsDir())
 		pos += direntSize
 
-		copy(entriesBuf[pos:], e.Name())
+		copy(dirents[pos:], e.Name())
 		pos += nameLen
 		cookie++
 	}
 
-	if callerOverBufLen { // write one more entry, without its name.
-		e := entries[i]
-		writeDirent(entriesBuf[pos:], cookie, uint32(len(e.Name())), e.IsDir())
+	if truncatedEntryLen == 0 {
+		return
 	}
+
+	// Write a dirent without its name
+	dirent := make([]byte, direntSize)
+	e := entries[i]
+	writeDirent(dirent, cookie, uint32(len(e.Name())), e.IsDir())
+
+	// Potentially truncate it
+	copy(dirents[pos:], dirent)
 }
 
 // writeDirent writes direntSize bytes
