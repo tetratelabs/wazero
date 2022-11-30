@@ -351,6 +351,7 @@ type mockEngine struct {
 type mockModuleEngine struct {
 	name          string
 	callFailIndex int
+	functionRefs  map[Index]Reference
 }
 
 type mockCallEngine struct {
@@ -387,8 +388,8 @@ func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstan
 }
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
-func (e *mockModuleEngine) FunctionInstanceReference(Index) Reference {
-	return 0
+func (e *mockModuleEngine) FunctionInstanceReference(i Index) Reference {
+	return e.functionRefs[i]
 }
 
 // NewCallEngine implements the same method as documented on wasm.ModuleEngine.
@@ -829,4 +830,55 @@ func functionsContain(functions []*FunctionInstance, want *FunctionInstance) boo
 		}
 	}
 	return false
+}
+
+func TestModuleInstance_applyTableInits(t *testing.T) {
+	t.Run("extenref", func(t *testing.T) {
+		tables := []*TableInstance{{Type: RefTypeExternref, References: make([]Reference, 10)}}
+		for i := range tables[0].References {
+			tables[0].References[i] = 0xffff // non-null ref.
+		}
+		m := &ModuleInstance{}
+
+		// This shouldn't panic.
+		m.applyTableInits(tables, []tableInitEntry{{offset: 100}})
+		m.applyTableInits(tables, []tableInitEntry{
+			{offset: 0, nullExternRefCount: 3},
+			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{offset: 5, nullExternRefCount: 5},
+		})
+		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+			tables[0].References)
+		m.applyTableInits(tables, []tableInitEntry{
+			{offset: 5, nullExternRefCount: 5},
+		})
+		require.Equal(t, []Reference{0, 0, 0, 0xffff, 0xffff, 0, 0, 0, 0, 0}, tables[0].References)
+	})
+	t.Run("funcref", func(t *testing.T) {
+		e := &mockEngine{}
+		me, err := e.NewModuleEngine("", nil, nil, nil)
+		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: 0xa, 1: 0xaa, 2: 0xaaa, 3: 0xaaaa}
+		require.NoError(t, err)
+		m := &ModuleInstance{Engine: me}
+
+		tables := []*TableInstance{{Type: RefTypeFuncref, References: make([]Reference, 10)}}
+		for i := range tables[0].References {
+			tables[0].References[i] = 0xffff // non-null ref.
+		}
+
+		// This shouldn't panic.
+		m.applyTableInits(tables, []tableInitEntry{{offset: 100}})
+		m.applyTableInits(tables, []tableInitEntry{
+			{offset: 0, functionIndexes: []*Index{uint32Ptr(0), uint32Ptr(1), uint32Ptr(2)}},
+			{offset: 100}, // Iteration stops at this point, so the offset:5 below shouldn't be applied.
+			{offset: 5, nullExternRefCount: 5},
+		})
+		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff},
+			tables[0].References)
+		m.applyTableInits(tables, []tableInitEntry{
+			{offset: 5, functionIndexes: []*Index{uint32Ptr(0), nil, uint32Ptr(2)}},
+		})
+		require.Equal(t, []Reference{0xa, 0xaa, 0xaaa, 0xffff, 0xffff, 0xa, 0xffff, 0xaaa, 0xffff, 0xffff},
+			tables[0].References)
+	})
 }

@@ -198,7 +198,8 @@ func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []t
 	for _, init := range tableInits {
 		table := tables[init.tableIndex]
 		references := table.References
-		if int(init.offset)+len(init.functionIndexes) > len(references) {
+		if int(init.offset)+len(init.functionIndexes) > len(references) ||
+			int(init.offset)+init.nullExternRefCount > len(references) {
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
