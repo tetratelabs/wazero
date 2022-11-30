@@ -2,6 +2,7 @@ package wasi_snapshot_preview1
 
 import (
 	"bytes"
+	_ "embed"
 	"io"
 	"io/fs"
 	"math"

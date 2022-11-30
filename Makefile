@@ -68,7 +68,7 @@ build.examples.tinygo: $(tinygo_sources)
 	done
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
-c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c
+c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/ls.c
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
 	@for f in $^; do \
