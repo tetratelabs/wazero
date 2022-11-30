@@ -2,8 +2,6 @@ package wasm
 
 import (
 	"context"
-	"errors"
-
 	"github.com/tetratelabs/wazero/experimental"
 )
 
@@ -62,22 +60,3 @@ type CallEngine interface {
 	// Call invokes a function instance f with given parameters.
 	Call(ctx context.Context, m *CallContext, params []uint64) (results []uint64, err error)
 }
-
-// TableInitEntry is normalized element segment used for initializing tables by engines.
-type TableInitEntry struct {
-	TableIndex Index
-	// Offset is the offset in the table from which the table is initialized by engine.
-	Offset Index
-	// FunctionIndexes contains nullable function indexes. This is set when the target table has RefTypeFuncref.
-	FunctionIndexes []*Index
-	// NullExternRefCount is the number of nul reference which is the only available RefTypeExternref value in elements as of
-	// WebAssembly 2.0. This is set when the target table has RefTypeExternref.
-	NullExternRefCount int
-}
-
-// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
-// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
-// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
-//
-// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
-var ErrElementOffsetOutOfBounds = errors.New("element offset ouf of bounds")

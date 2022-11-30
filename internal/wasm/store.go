@@ -193,30 +193,30 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []TableInitEntry) {
+func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []tableInitEntry) {
 	for _, init := range tableInits {
-		table := tables[init.TableIndex]
+		table := tables[init.tableIndex]
 		references := table.References
-		if int(init.Offset)+len(init.FunctionIndexes) > len(references) {
+		if int(init.offset)+len(init.functionIndexes) > len(references) {
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
 			//
-			// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
-			//
 			// In wazero, we ignore it as in any way, the instantiated module and engines are fine and can be used
 			// for function invocations.
+			//
+			// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
 			return
 		}
 
 		if table.Type == RefTypeExternref {
-			for i := 0; i < init.NullExternRefCount; i++ {
-				references[init.Offset+uint32(i)] = Reference(0)
+			for i := 0; i < init.nullExternRefCount; i++ {
+				references[init.offset+uint32(i)] = Reference(0)
 			}
 		} else {
-			for i, fnIndex := range init.FunctionIndexes {
+			for i, fnIndex := range init.functionIndexes {
 				if fnIndex != nil {
-					references[init.Offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
+					references[init.offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
 				}
 			}
 		}
