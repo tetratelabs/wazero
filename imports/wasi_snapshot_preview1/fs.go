@@ -710,16 +710,16 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
 
-		// Cookie is the index of the next file in the list, so it should
+		// d_next is the index of the next file in the list, so it should
 		// always be one higher than the requested cookie.
-		cookie++
+		d_next := cookie + 1
 
 		dirents, ok := mem.Read(ctx, buf, bufused)
 		if !ok {
 			return ErrnoFault
 		}
 
-		writeDirents(entries, direntCount, truncatedEntryLen, dirents, cookie)
+		writeDirents(entries, direntCount, truncatedEntryLen, dirents, d_next)
 	}
 
 	if !mem.WriteUint32Le(ctx, resultBufused, bufused) {
@@ -828,19 +828,19 @@ func writeDirents(
 	entryCount uint32,
 	writeTruncatedEntry bool,
 	dirents []byte,
-	cookie uint64,
+	d_next uint64,
 ) {
 	pos, i := uint32(0), uint32(0)
 	for ; i < entryCount; i++ {
 		e := entries[i]
 		nameLen := uint32(len(e.Name()))
 
-		writeDirent(dirents[pos:], cookie, nameLen, e.IsDir())
+		writeDirent(dirents[pos:], d_next, nameLen, e.IsDir())
 		pos += direntSize
 
 		copy(dirents[pos:], e.Name())
 		pos += nameLen
-		cookie++
+		d_next++
 	}
 
 	if !writeTruncatedEntry {
@@ -850,7 +850,7 @@ func writeDirents(
 	// Write a dirent without its name
 	dirent := make([]byte, direntSize)
 	e := entries[i]
-	writeDirent(dirent, cookie, uint32(len(e.Name())), e.IsDir())
+	writeDirent(dirent, d_next, uint32(len(e.Name())), e.IsDir())
 
 	// Potentially truncate it
 	copy(dirents[pos:], dirent)
