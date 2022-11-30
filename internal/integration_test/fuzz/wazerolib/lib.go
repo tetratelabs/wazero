@@ -34,49 +34,53 @@ func run_wazero(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) 
 		Cap:  watSize,
 	}))
 
+	// Create two runtimes.
+
+	failed := true
+	defer func() {
+		if failed {
+			// If the test fails, we save the binary and wat into testdata directory.
+			saveFailedBinary(wasmBin, wat)
+		}
+	}()
+
+	requireNoDiff(wasmBin, func(err error) {
+		if err != nil {
+			panic(err)
+		}
+	})
+
+	failed = false
+	return
+}
+
+func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
 
-	// Create two runtimes.
 	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 	interpreter := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 
 	defer compiler.Close(ctx)
 	defer interpreter.Close(ctx)
 
-	failed := true
-	defer func() {
-		if failed {
-			saveFailedBinary(wasmBin, wat)
-		}
-	}()
 	compiledCompiled, err := compiler.CompileModule(ctx, wasmBin)
-	if err != nil {
-		panic(err)
-	}
+	requireNoError(err)
 
 	interpreterCompiled, err := interpreter.CompileModule(ctx, wasmBin)
-	if err != nil {
-		panic(err)
-	}
+	requireNoError(err)
 
 	// Instantiate module.
 	compilerMod, compilerInstErr := compiler.InstantiateModule(ctx, compiledCompiled, wazero.NewModuleConfig())
 	interpreterMod, interpreterInstErr := interpreter.InstantiateModule(ctx, interpreterCompiled, wazero.NewModuleConfig())
 
 	okToInvoke, err := ensureInstantiationError(compilerInstErr, interpreterInstErr)
-	if err != nil {
-		panic(err)
-	}
+	requireNoError(err)
 
 	if okToInvoke {
-		if err = ensureInvocationResultMatch(compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions()); err != nil {
-			panic(err)
-		}
+		err = ensureInvocationResultMatch(compilerMod, interpreterMod, interpreterCompiled.ExportedFunctions())
+		requireNoError(err)
 	}
-
-	failed = false
-	return
 }
 
 const valueTypeVector = 0x7b
@@ -246,7 +250,7 @@ Failed WebAssembly Text:
 
 Failed Wasm binary has been written to %s
 Failed Wasm Text has been written to %s
-To reproduce the failure, execute: WASM_BINARY_PATH=%s go test wazerolib/...
+To reproduce the failure, execute: WASM_BINARY_PATH=%s go test ./wazerolib/...
 
 
 `, wat, binaryPath, watPath, binaryPath)

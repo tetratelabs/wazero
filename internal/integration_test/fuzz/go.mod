@@ -1,4 +1,4 @@
-module wazerolib
+module github.com/tetratelabs/wazero/internal/integration_test/fuzz
 
 go 1.18
 
