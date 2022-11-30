@@ -788,8 +788,8 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
 
-			// bufused != bufLen means more entries exist, which is the case
-			// when the next entry is larger than bytes remaining.
+			// bufused == bufLen means more entries exist, which is the case
+			// when the dirent is larger than bytes remaining.
 			bufused = bufLen
 			break
 		}
@@ -802,7 +802,7 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 			// In this case, we only write up to direntSize(24) to allow the
 			// caller to resize.
 
-			// bufused != bufLen means more entries exist, which is the case
+			// bufused == bufLen means more entries exist, which is the case
 			// when the next entry is larger than bytes remaining.
 			bufused = bufLen
 
