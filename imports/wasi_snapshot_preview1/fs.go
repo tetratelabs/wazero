@@ -710,11 +710,9 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
 
-		// Cookie is zero when there is no cookie. Now that we know we will
-		// write entries, ensure the first one is one not zero.
-		if cookie == uint64(0) {
-			cookie = 1
-		}
+		// Cookie is the index of the next file in the list, so it should
+		// always be one higher than the requested cookie.
+		cookie++
 
 		dirents, ok := mem.Read(ctx, buf, bufused)
 		if !ok {
@@ -780,15 +778,19 @@ const direntSize = uint32(24)
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
 // See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
-func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount, truncatedEntryLen uint32) {
+func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for _, e := range entries {
 		nameLen := uint32(len(e.Name()))
 		entryLen := direntSize + nameLen
 
-		if lenRemaining == 0 {
-			// We've hit exactly the end of bufLen, so cannot write the next
+		if lenRemaining < direntSize {
+			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
+
+			// bufused != bufLen means more entries exist, which is the case
+			// when the next entry is larger than bytes remaining.
+			bufused = bufLen
 			break
 		}
 
@@ -804,10 +806,9 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount, tru
 			// when the next entry is larger than bytes remaining.
 			bufused = bufLen
 
-			// When the next entry is truncated, only write the dirent.
-			if lenRemaining < direntSize {
-				truncatedEntryLen = direntSize - lenRemaining
-			}
+			// We do have enough space to write the header, this value will be
+			// passed on to writeDirents to only write the header for this entry.
+			writeTruncatedEntry = true
 			break
 		}
 
@@ -825,7 +826,7 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount, tru
 func writeDirents(
 	entries []fs.DirEntry,
 	entryCount uint32,
-	truncatedEntryLen uint32,
+	writeTruncatedEntry bool,
 	dirents []byte,
 	cookie uint64,
 ) {
@@ -842,7 +843,7 @@ func writeDirents(
 		cookie++
 	}
 
-	if truncatedEntryLen == 0 {
+	if !writeTruncatedEntry {
 		return
 	}
 
