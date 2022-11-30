@@ -188,9 +188,9 @@ jobs:
       - run: make bench.check
 
   # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
-  # run full-length fuzzing.
-  build_fuzzer:
-    name: Build fuzzer
+  # run full-length fuzzing while trying to find low-hanging frontend bugs.
+  fuzz:
+    name: Minimal Fuzzing
     runs-on: ubuntu-20.04
 
     steps:
