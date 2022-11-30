@@ -11,7 +11,13 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/sys"
 )
+
+// lsZigCc was compiled from testdata/zig/ls.zig
+//
+//go:embed testdata/zig/ls.wasm
+var lsZig []byte
 
 // lsZigCc was compiled from testdata/zig-cc/ls.c
 //
@@ -22,6 +28,7 @@ var lsZigCc []byte
 // matches the wasi spec, but also at least two compilers use of sdks.
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
+		"zig":    lsZig,
 		"zig-cc": lsZigCc,
 	} {
 		toolchain := toolchain
@@ -84,7 +91,11 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (stdout
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf))
-	require.NoError(t, err)
+	if exitErr, ok := err.(*sys.ExitError); ok {
+		require.Zero(t, exitErr.ExitCode())
+	} else {
+		require.NoError(t, err)
+	}
 
 	stdout = stdoutBuf.String()
 	stderr = stderrBuf.String()
