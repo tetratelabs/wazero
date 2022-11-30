@@ -111,7 +111,7 @@ func TestEncodeDecodeF64(t *testing.T) {
 	}
 }
 
-func TestEncodeCastI32(t *testing.T) {
+func TestEncodeI32(t *testing.T) {
 	for _, v := range []int32{
 		0, 100, -100, 1, -1,
 		math.MaxInt32,
@@ -126,7 +126,57 @@ func TestEncodeCastI32(t *testing.T) {
 	}
 }
 
-func TestEncodeCastI64(t *testing.T) {
+func TestDecodeI32(t *testing.T) {
+	mini32 := math.MinInt32
+	for _, tc := range []struct {
+		in  uint64
+		exp int32
+	}{
+		{in: 0, exp: 0},
+		{in: 1 << 60, exp: 0},
+		{in: 1 << 30, exp: 1 << 30},
+		{in: 1<<30 | 1<<60, exp: 1 << 30},
+		{in: uint64(uint32(mini32)) | 1<<59, exp: math.MinInt32},
+		{in: uint64(uint32(math.MaxInt32)) | 1<<50, exp: math.MaxInt32},
+	} {
+		decoded := DecodeI32(tc.in)
+		require.Equal(t, tc.exp, decoded)
+	}
+}
+
+func TestEncodeU32(t *testing.T) {
+	for _, v := range []uint32{
+		0, 100, 1, 1 << 31,
+		math.MaxInt32,
+		math.MaxUint32,
+	} {
+		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+			encoded := EncodeU32(v)
+			require.Zero(t, encoded>>32) // Ensures high bits aren't set
+			require.Equal(t, v, uint32(encoded))
+		})
+	}
+}
+
+func TestDecodeU32(t *testing.T) {
+	mini32 := math.MinInt32
+	for _, tc := range []struct {
+		in  uint64
+		exp uint32
+	}{
+		{in: 0, exp: 0},
+		{in: 1 << 60, exp: 0},
+		{in: 1 << 30, exp: 1 << 30},
+		{in: 1<<30 | 1<<60, exp: 1 << 30},
+		{in: uint64(uint32(mini32)) | 1<<59, exp: uint32(mini32)},
+		{in: uint64(uint32(math.MaxInt32)) | 1<<50, exp: math.MaxInt32},
+	} {
+		decoded := DecodeU32(tc.in)
+		require.Equal(t, tc.exp, decoded)
+	}
+}
+
+func TestEncodeI64(t *testing.T) {
 	for _, v := range []int64{
 		0, 100, -100, 1, -1,
 		math.MaxInt64,
