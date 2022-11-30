@@ -22,7 +22,12 @@ cargo fuzz run basic-x86_64-apple-darwin
 
 See `cargo fuzz run --help` for the options. Especially, the following flags are useful:
 
-- `--jobs N`: `cargo fuzz run` by default only spawns one worker, so this flag helps do the parallel fuzzing,
+- `-jobs=N`: `cargo fuzz run` by default only spawns one worker, so this flag helps do the parallel fuzzing.
+  - usage: `cargo fuzz run basic -- -jobs=5` will run 5 parallel workers to run fuzzing jobs.
+- `-max_total_time`: the maximum total time in seconds to run the fuzzer.
+  - usage: `cargo fuzz run basic -- -max_total_time=100` will run fuzzing for 100 seconds.
+- `-timeout` sets the timeout seconds _per fuzzing run_, not the entire job.
+
 
 ### Reproduce errors
 
