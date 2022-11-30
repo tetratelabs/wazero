@@ -53,7 +53,7 @@ func ExternTypeName(et ExternType) string {
 //
 // The following describes how to convert between Wasm and Golang types:
 //
-//   - ValueTypeI32 - uint64(uint32,int32)
+//   - ValueTypeI32 - EncodeU32 DecodeU32 for uint32 / EncodeI32 DecodeI32 for int32
 //   - ValueTypeI64 - uint64(int64)
 //   - ValueTypeF32 - EncodeF32 DecodeF32 from float32
 //   - ValueTypeF64 - EncodeF64 DecodeF64 from float64
@@ -300,6 +300,9 @@ type Function interface {
 	// Call is not goroutine-safe, therefore it is recommended to create
 	// another Function if you want to invoke the same function concurrently.
 	// On the other hand, sequential invocations of Call is allowed.
+	//
+	// To safely encode and decode parameters as uint64, users are encouraged to use
+	// api.EncodeXXX or api.DecodeXXX functions. See the docs on api.ValueType.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
@@ -315,10 +318,10 @@ type Function interface {
 // Here's a typical way to read three parameters and write back one.
 //
 //	// read parameters off the stack in index order
-//	argv, argvBuf := uint32(stack[0]), uint32(stack[1])
+//	argv, argvBuf := api.DecodeU32(stack[0]), api.DecodeU32(stack[1])
 //
 //	// write results back to the stack in index order
-//	stack[0] = uint64(ErrnoSuccess)
+//	stack[0] = api.EncodeU32(ErrnoSuccess)
 //
 // This function can be non-deterministic or cause side effects. It also
 // has special properties not defined in the WebAssembly Core specification.
@@ -329,23 +332,26 @@ type Function interface {
 // use reflection or code generators instead. These approaches are more
 // idiomatic as they can map go types to ValueType. This type is exposed for
 // those willing to trade usability and safety for performance.
+//
+// To safely encode and decode parameters as uint64, users are encouraged to use
+// api.EncodeXXX or api.DecodeXXX functions. See the docs on api.ValueType.
 type GoModuleFunction interface {
 	Call(ctx context.Context, mod Module, stack []uint64)
 }
 
 // GoModuleFunc is a convenience for defining an inlined function.
 //
-// For example, the following returns a uint32 value read from parameter zero:
+// For example, the following returns an uint32 value read from parameter zero:
 //
 //	api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-//		offset := uint32(params[0]) // read the parameter from the stack
+//		offset := api.DecodeU32(params[0]) // read the parameter from the stack
 //
 //		ret, ok := mod.Memory().ReadUint32Le(ctx, offset)
 //		if !ok {
 //			panic("out of memory")
 //		}
 //
-//		results[0] = uint64(ret) // add the result back to the stack.
+//		results[0] = api.EncodeU32(ret) // add the result back to the stack.
 //	})
 type GoModuleFunc func(ctx context.Context, mod Module, stack []uint64)
 
@@ -368,8 +374,8 @@ type GoFunction interface {
 // For example, the following returns the sum of two uint32 parameters:
 //
 //	api.GoFunc(func(ctx context.Context, stack []uint64) {
-//		x, y := uint32(params[0]), uint32(params[1])
-//		results[0] = uint64(x + y)
+//		x, y := api.DecodeU32(params[0]), api.DecodeU32(params[1])
+//		results[0] = api.EncodeU32(x + y)
 //	})
 type GoFunc func(ctx context.Context, stack []uint64)
 
@@ -558,6 +564,21 @@ func DecodeExternref(input uint64) uintptr {
 // EncodeI32 encodes the input as a ValueTypeI32.
 func EncodeI32(input int32) uint64 {
 	return uint64(uint32(input))
+}
+
+// DecodeI32 decodes the input as a ValueTypeI32.
+func DecodeI32(input uint64) int32 {
+	return int32(input)
+}
+
+// EncodeU32 encodes the input as a ValueTypeI32.
+func EncodeU32(input uint32) uint64 {
+	return uint64(input)
+}
+
+// DecodeU32 decodes the input as a ValueTypeI32.
+func DecodeU32(input uint64) uint32 {
+	return uint32(input)
 }
 
 // EncodeI64 encodes the input as a ValueTypeI64.
