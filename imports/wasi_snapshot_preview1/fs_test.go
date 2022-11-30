@@ -1062,6 +1062,7 @@ func Test_fdReaddir(t *testing.T) {
 		buf, bufLen     uint32
 		cookie          uint64
 		expectedMem     []byte
+		expectedMemSize int
 		expectedBufused uint32
 		expectedReadDir *internalsys.ReadDir
 	}{
@@ -1104,26 +1105,43 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 24, // length is too short
+			buf: 0, bufLen: 23, // length is too short for header
 			cookie:          0,
-			expectedBufused: 24, // == bufLen which is the size of the dirent
+			expectedBufused: 23, // == bufLen which is the size of the dirent
 			expectedMem:     nil,
 			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 3,
-				Entries:   testDirEntries,
+				CountRead: 2,
+				Entries:   testDirEntries[:2],
 			},
 		},
 		{
-			name: "read exactly 1",
+			name: "can't read name",
 			dir: func() *internalsys.FileEntry {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 25, // length is long enough for one, but not more.
+			buf: 0, bufLen: 24, // length is long enough for first, but not the name.
 			cookie:          0,
-			expectedBufused: 25, // length to read exactly one.
+			expectedBufused: 24,           // == bufLen which is the size of the dirent
+			expectedMem:     dirent1[:24], // header without name
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries,
+			},
+		},
+		{
+			name: "read exactly first",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{File: dir}
+			},
+			buf: 0, bufLen: 25, // length is long enough for first + the name, but not more.
+			cookie:          0,
+			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     dirent1,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1146,9 +1164,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 26, // length is long enough for one more.
-			cookie:          2,  // previous d_next
-			expectedBufused: 26, // length to read exactly one more.
+			buf: 0, bufLen: 26, // length is long enough for exactly second.
+			cookie:          1,  // d_next of first
+			expectedBufused: 26, // length to read exactly second.
 			expectedMem:     dirent2,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1171,10 +1189,61 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 30, // length is longer than the second entry
-			cookie:          2,  // previous d_next
-			expectedBufused: 30, // length to read exactly one more.
-			expectedMem:     append(dirent2, dirent3[0:4]...),
+			buf: 0, bufLen: 30, // length is longer than the second entry, but not long enough for a header.
+			cookie:          1,  // d_next of first
+			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
+			expectedMem:     append(dirent2),
+			expectedMemSize: len(dirent2), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries[1:],
+			},
+		},
+		{
+			name: "read second and header of third",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 1,
+						Entries:   entry,
+					},
+				}
+			},
+			buf: 0, bufLen: 50, // length is longer than the second entry + enough for the header of third.
+			cookie:          1,  // d_next of first
+			expectedBufused: 50, // length to read exactly second and the header of third.
+			expectedMem:     append(dirent2, dirent3[0:24]...),
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries[1:],
+			},
+		},
+		{
+			name: "read second and third",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				entry, err := dir.(fs.ReadDirFile).ReadDir(1)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 1,
+						Entries:   entry,
+					},
+				}
+			},
+			buf: 0, bufLen: 53, // length is long enough for second and third.
+			cookie:          1,  // d_next of first
+			expectedBufused: 53, // length to read exactly one second and third.
+			expectedMem:     append(dirent2, dirent3...),
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries[1:],
@@ -1196,9 +1265,34 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 27, // length is long enough for one more.
-			cookie:          3,  // previous d_next
-			expectedBufused: 27, // length to read exactly one more.
+			buf: 0, bufLen: 27, // length is long enough for exactly third.
+			cookie:          2,  // d_next of second.
+			expectedBufused: 27, // length to read exactly third.
+			expectedMem:     dirent3,
+			expectedReadDir: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries[2:],
+			},
+		},
+		{
+			name: "read third and beyond",
+			dir: func() *internalsys.FileEntry {
+				dir, err := fdReadDirFs.Open("dir")
+				require.NoError(t, err)
+				two, err := dir.(fs.ReadDirFile).ReadDir(2)
+				require.NoError(t, err)
+
+				return &internalsys.FileEntry{
+					File: dir,
+					ReadDir: &internalsys.ReadDir{
+						CountRead: 2,
+						Entries:   two[1:],
+					},
+				}
+			},
+			buf: 0, bufLen: 100, // length is long enough for third and more, but there is nothing more.
+			cookie:          2,  // d_next of second.
+			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent3,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1237,7 +1331,10 @@ func Test_fdReaddir(t *testing.T) {
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
-				require.Equal(t, tc.expectedMem, mem)
+				if tc.expectedMemSize == 0 {
+					tc.expectedMemSize = len(tc.expectedMem)
+				}
+				require.Equal(t, tc.expectedMem, mem[:tc.expectedMemSize])
 			}
 
 			require.Equal(t, tc.expectedReadDir, file.ReadDir)
@@ -1449,22 +1546,29 @@ func Test_lastDirEntries(t *testing.T) {
 
 func Test_maxDirents(t *testing.T) {
 	tests := []struct {
-		name                      string
-		entries                   []fs.DirEntry
-		maxLen                    uint32
-		expectedCount             uint32
-		expectedTruncatedEntryLen uint32
-		expectedBufused           uint32
+		name                        string
+		entries                     []fs.DirEntry
+		maxLen                      uint32
+		expectedCount               uint32
+		expectedwriteTruncatedEntry bool
+		expectedBufused             uint32
 	}{
 		{
 			name: "no entries",
 		},
 		{
-			name:                      "can't fit one",
-			entries:                   testDirEntries,
-			maxLen:                    24,
-			expectedBufused:           24,
-			expectedTruncatedEntryLen: 0,
+			name:                        "can't fit one",
+			entries:                     testDirEntries,
+			maxLen:                      23,
+			expectedBufused:             23,
+			expectedwriteTruncatedEntry: false,
+		},
+		{
+			name:                        "only fits header",
+			entries:                     testDirEntries,
+			maxLen:                      24,
+			expectedBufused:             24,
+			expectedwriteTruncatedEntry: true,
 		},
 		{
 			name:            "one",
@@ -1474,12 +1578,12 @@ func Test_maxDirents(t *testing.T) {
 			expectedBufused: 25,
 		},
 		{
-			name:                      "one but not room for two's name",
-			entries:                   testDirEntries,
-			maxLen:                    25 + 25,
-			expectedCount:             1,
-			expectedTruncatedEntryLen: 0, // can write direntSize
-			expectedBufused:           25 + 25,
+			name:                        "one but not room for two's name",
+			entries:                     testDirEntries,
+			maxLen:                      25 + 25,
+			expectedCount:               1,
+			expectedwriteTruncatedEntry: true, // can write direntSize
+			expectedBufused:             25 + 25,
 		},
 		{
 			name:            "two",
@@ -1489,36 +1593,36 @@ func Test_maxDirents(t *testing.T) {
 			expectedBufused: 25 + 26,
 		},
 		{
-			name:                      "two but not three's dirent",
-			entries:                   testDirEntries,
-			maxLen:                    25 + 26 + 20,
-			expectedCount:             2,
-			expectedTruncatedEntryLen: 4, // 20 + 4 == direntSize
-			expectedBufused:           25 + 26 + 20,
+			name:                        "two but not three's dirent",
+			entries:                     testDirEntries,
+			maxLen:                      25 + 26 + 20,
+			expectedCount:               2,
+			expectedwriteTruncatedEntry: false, // 20 + 4 == direntSize
+			expectedBufused:             25 + 26 + 20,
 		},
 		{
-			name:                      "two but not three's name",
-			entries:                   testDirEntries,
-			maxLen:                    25 + 26 + 26,
-			expectedCount:             2,
-			expectedTruncatedEntryLen: 0, // can write direntSize
-			expectedBufused:           25 + 26 + 26,
+			name:                        "two but not three's name",
+			entries:                     testDirEntries,
+			maxLen:                      25 + 26 + 26,
+			expectedCount:               2,
+			expectedwriteTruncatedEntry: true, // can write direntSize
+			expectedBufused:             25 + 26 + 26,
 		},
 		{
-			name:                      "three",
-			entries:                   testDirEntries,
-			maxLen:                    25 + 26 + 27,
-			expectedCount:             3,
-			expectedTruncatedEntryLen: 0, // end of dir
-			expectedBufused:           25 + 26 + 27,
+			name:                        "three",
+			entries:                     testDirEntries,
+			maxLen:                      25 + 26 + 27,
+			expectedCount:               3,
+			expectedwriteTruncatedEntry: false, // end of dir
+			expectedBufused:             25 + 26 + 27,
 		},
 		{
-			name:                      "max",
-			entries:                   testDirEntries,
-			maxLen:                    100,
-			expectedCount:             3,
-			expectedTruncatedEntryLen: 0, // end of dir
-			expectedBufused:           25 + 26 + 27,
+			name:                        "max",
+			entries:                     testDirEntries,
+			maxLen:                      100,
+			expectedCount:               3,
+			expectedwriteTruncatedEntry: false, // end of dir
+			expectedBufused:             25 + 26 + 27,
 		},
 	}
 
@@ -1526,9 +1630,9 @@ func Test_maxDirents(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			bufused, direntCount, truncatedEntryLen := maxDirents(tc.entries, tc.maxLen)
+			bufused, direntCount, writeTruncatedEntry := maxDirents(tc.entries, tc.maxLen)
 			require.Equal(t, tc.expectedCount, direntCount)
-			require.Equal(t, tc.expectedTruncatedEntryLen, truncatedEntryLen)
+			require.Equal(t, tc.expectedwriteTruncatedEntry, writeTruncatedEntry)
 			require.Equal(t, tc.expectedBufused, bufused)
 		})
 	}
@@ -1536,11 +1640,11 @@ func Test_maxDirents(t *testing.T) {
 
 func Test_writeDirents(t *testing.T) {
 	tests := []struct {
-		name               string
-		entries            []fs.DirEntry
-		entryCount         uint32
-		truncatedEntryLen  uint32
-		expectedEntriesBuf []byte
+		name                string
+		entries             []fs.DirEntry
+		entryCount          uint32
+		writeTruncatedEntry bool
+		expectedEntriesBuf  []byte
 	}{
 		{
 			name:    "none",
@@ -1559,11 +1663,11 @@ func Test_writeDirents(t *testing.T) {
 			expectedEntriesBuf: append(dirent1, dirent2...),
 		},
 		{
-			name:               "two with truncated",
-			entries:            testDirEntries,
-			entryCount:         2,
-			truncatedEntryLen:  10,
-			expectedEntriesBuf: append(append(dirent1, dirent2...), dirent3[0:10]...),
+			name:                "two with truncated",
+			entries:             testDirEntries,
+			entryCount:          2,
+			writeTruncatedEntry: true,
+			expectedEntriesBuf:  append(append(dirent1, dirent2...), dirent3[0:10]...),
 		},
 		{
 			name:               "three",
@@ -1579,7 +1683,7 @@ func Test_writeDirents(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cookie := uint64(1)
 			entriesBuf := make([]byte, len(tc.expectedEntriesBuf))
-			writeDirents(tc.entries, tc.entryCount, tc.truncatedEntryLen, entriesBuf, cookie)
+			writeDirents(tc.entries, tc.entryCount, tc.writeTruncatedEntry, entriesBuf, cookie)
 			require.Equal(t, tc.expectedEntriesBuf, entriesBuf)
 		})
 	}
