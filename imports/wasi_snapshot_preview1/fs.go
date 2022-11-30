@@ -706,12 +706,16 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	// Determine how many dirents we can write, excluding a potentially
 	// truncated entry.
 	bufused, direntCount, truncatedEntryLen := maxDirents(entries, bufLen)
-	if cookie == uint64(0) {
-		cookie = 1
-	}
 
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
+
+		// Cookie is zero when there is no cookie. Now that we know we will
+		// write entries, ensure the first one is one not zero.
+		if cookie == uint64(0) {
+			cookie = 1
+		}
+
 		dirents, ok := mem.Read(ctx, buf, bufused)
 		if !ok {
 			return ErrnoFault
