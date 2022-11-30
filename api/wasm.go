@@ -301,8 +301,8 @@ type Function interface {
 	// another Function if you want to invoke the same function concurrently.
 	// On the other hand, sequential invocations of Call is allowed.
 	//
-	// To safely encode and decode parameters as uint64, users are encouraged to use
-	// api.EncodeXXX or api.DecodeXXX functions. See the docs on api.ValueType.
+	// To safely encode/decode params/results as expressed as uint64, users are
+	// encouraged to use api.EncodeXXX or DecodeXXX functions. See the docs on api.ValueType.
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
@@ -333,7 +333,7 @@ type Function interface {
 // idiomatic as they can map go types to ValueType. This type is exposed for
 // those willing to trade usability and safety for performance.
 //
-// To safely encode and decode parameters as uint64, users are encouraged to use
+// To safely decode/encode values from/to the uint64 stack, users are encouraged to use
 // api.EncodeXXX or api.DecodeXXX functions. See the docs on api.ValueType.
 type GoModuleFunction interface {
 	Call(ctx context.Context, mod Module, stack []uint64)
