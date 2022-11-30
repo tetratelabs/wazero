@@ -27,18 +27,10 @@ type Engine interface {
 	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
 	// * importedFunctions: functions this module imports, already compiled in this engine.
 	// * moduleFunctions: functions declared in this module that must be compiled.
-	// * tables: possibly shared tables used by this module. When nil tableInit will be nil.
-	// * tableInit: a mapping of Table's index to a mapping of TableInstance.Table index to the function index it should point to.
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(
-		name string,
-		module *Module,
-		importedFunctions, moduleFunctions []*FunctionInstance,
-		tables []*TableInstance,
-		tableInits []TableInitEntry,
-	) (ModuleEngine, error)
+	NewModuleEngine(name string, module *Module, importedFunctions, moduleFunctions []*FunctionInstance) (ModuleEngine, error)
 }
 
 // ModuleEngine implements function calls for a given module.
@@ -58,6 +50,10 @@ type ModuleEngine interface {
 
 	// InitializeFuncrefGlobals initializes the globals of Funcref type as the opaque pointer values of engine specific compiled functions.
 	InitializeFuncrefGlobals(globals []*GlobalInstance)
+
+	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
+	// the initialization via ElementSegment.
+	FunctionInstanceReference(funcIndex Index) Reference
 }
 
 // CallEngine implements function calls for a FunctionInstance. It manages its own call frame stack and value stack,
@@ -72,8 +68,11 @@ type TableInitEntry struct {
 	TableIndex Index
 	// Offset is the offset in the table from which the table is initialized by engine.
 	Offset Index
-	// FunctionIndexes contains nullable function indexes.
+	// FunctionIndexes contains nullable function indexes. This is set when the target table has RefTypeFuncref.
 	FunctionIndexes []*Index
+	// NullExternRefCount is the number of nul reference which is the only available RefTypeExternref value in elements as of
+	// WebAssembly 2.0. This is set when the target table has RefTypeExternref.
+	NullExternRefCount int
 }
 
 // ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.

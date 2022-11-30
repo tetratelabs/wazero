@@ -280,13 +280,12 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 		}
 
 		if table := tables[elem.tableIndex]; table.Type == RefTypeExternref {
-			// ExternRef elements are guaranteed to be all null via the validation phase,
-			// so applies null references.
-			for i := range elem.init {
-				table.References[offset+uint32(i)] = uintptr(0)
-			}
+			inits = append(inits, TableInitEntry{
+				TableIndex: elem.tableIndex, Offset: offset,
+				// ExternRef elements are guaranteed to be all null via the validation phase.
+				NullExternRefCount: len(elem.init),
+			})
 		} else {
-			// Only FuncRef table needs to be initialized by engines.
 			inits = append(inits, TableInitEntry{
 				TableIndex: elem.tableIndex, Offset: offset, FunctionIndexes: elem.init,
 			})

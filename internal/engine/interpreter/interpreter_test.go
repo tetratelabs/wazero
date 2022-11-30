@@ -89,23 +89,6 @@ func (e engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 	return NewEngine(context.Background(), enabledFeatures)
 }
 
-// InitTables implements enginetest.EngineTester InitTables.
-func (e engineTester) InitTables(me wasm.ModuleEngine, tableIndexToLen map[wasm.Index]int, tableInits []wasm.TableInitEntry) [][]wasm.Reference {
-	references := make([][]wasm.Reference, len(tableIndexToLen))
-	for tableIndex, l := range tableIndexToLen {
-		references[tableIndex] = make([]wasm.Reference, l)
-	}
-	internal := me.(*moduleEngine)
-
-	for _, init := range tableInits {
-		referencesPerTable := references[init.TableIndex]
-		for idx, fnidx := range init.FunctionIndexes {
-			referencesPerTable[int(init.Offset)+idx] = uintptr(unsafe.Pointer(internal.functions[*fnidx]))
-		}
-	}
-	return references
-}
-
 // CompiledFunctionPointerValue implements enginetest.EngineTester CompiledFunctionPointerValue.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
@@ -118,10 +101,6 @@ func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 
 func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
 	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
-}
-
-func TestInterpreter_Engine_NewModuleEngine_InitTable(t *testing.T) {
-	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
 func TestInterpreter_ModuleEngine_LookupFunction(t *testing.T) {
@@ -522,8 +501,6 @@ func TestInterpreter_Compile(t *testing.T) {
 			&wasm.Module{},
 			nil, // imports
 			nil, // moduleFunctions
-			nil, // table
-			nil, // tableInit
 		)
 		require.EqualError(t, err, "source module for foo must be compiled before instantiation")
 	})
