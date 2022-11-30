@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"sync"
+
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/sys"
-	"sync"
 )
 
 type (
@@ -201,11 +202,10 @@ func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []t
 			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
 			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
 			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
+			// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
 			//
-			// In wazero, we ignore it as in any way, the instantiated module and engines are fine and can be used
+			// In wazero, we ignore it since in any way, the instantiated module and engines are fine and can be used
 			// for function invocations.
-			//
-			// See https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
 			return
 		}
 

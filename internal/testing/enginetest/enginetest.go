@@ -29,6 +29,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/u64"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 const (
@@ -39,8 +40,7 @@ var (
 	// testCtx is an arbitrary, non-default context. Non-nil also prevents linter errors.
 	testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 	// v_v is a nullary function type (void -> void)
-	v_v          = &wasm.FunctionType{}
-	func1, func2 = wasm.Index(2), wasm.Index(1)
+	v_v = &wasm.FunctionType{}
 )
 
 type EngineTester interface {
@@ -178,28 +178,79 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 }
 
 func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
-	//e := et.NewEngine(api.CoreFeaturesV1)
-	//
-	//t.Run("no table elements", func(t *testing.T) {
-	//	me, m := requireNewModuleEngine_emptyTable(t, e, et)
-	//
-	//	_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0 /* out of range */)
-	//	require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
-	//})
-	//
-	//t.Run("multi-table", func(t *testing.T) {
-	//	me, m := requireNewModuleEngine_multiTable(t, e, et)
-	//
-	//	// table[0][0] should point to func1
-	//	idx, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0)
-	//	require.NoError(t, err)
-	//	require.Equal(t, func1, idx)
-	//
-	//	// table[1][5] should point to func2
-	//	idx, err = me.LookupFunction(m.Tables[1], m.TypeIDs[0], 5)
-	//	require.NoError(t, err)
-	//	require.Equal(t, func2, idx)
-	//})
+	e := et.NewEngine(api.CoreFeaturesV1)
+
+	mod := &wasm.Module{
+		TypeSection:     []*wasm.FunctionType{{}, {Params: []wasm.ValueType{wasm.ValueTypeV128}}},
+		FunctionSection: []wasm.Index{0, 0, 0},
+		CodeSection: []*wasm.Code{
+			{
+				Body: []byte{wasm.OpcodeEnd},
+			}, {Body: []byte{wasm.OpcodeEnd}}, {Body: []byte{wasm.OpcodeEnd}},
+		},
+	}
+
+	mod.BuildFunctionDefinitions()
+	err := e.CompileModule(testCtx, mod, nil)
+	require.NoError(t, err)
+	m := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0, 1}}
+	m.Tables = []*wasm.TableInstance{
+		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeFuncref},
+		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeExternref},
+		{Min: 10, References: make([]wasm.Reference, 10), Type: wasm.RefTypeFuncref},
+	}
+	m.Functions = m.BuildFunctions(mod)
+
+	me, err := e.NewModuleEngine(m.Name, mod, nil, m.Functions)
+	require.NoError(t, err)
+	linkModuleToEngine(m, me)
+
+	t.Run("null reference", func(t *testing.T) {
+		_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is not initialized yet.
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+		_, err = me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is not initialized yet.
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	m.Tables[0].References[0] = me.FunctionInstanceReference(2)
+	m.Tables[0].References[1] = me.FunctionInstanceReference(0)
+
+	t.Run("initialized", func(t *testing.T) {
+		index, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 0) // offset 0 is now initialized.
+		require.NoError(t, err)
+		require.Equal(t, wasm.Index(2), index)
+		index, err = me.LookupFunction(m.Tables[0], m.TypeIDs[0], 1) // offset 1 is now initialized.
+		require.NoError(t, err)
+		require.Equal(t, wasm.Index(0), index)
+	})
+
+	t.Run("out of range", func(t *testing.T) {
+		_, err := me.LookupFunction(m.Tables[0], m.TypeIDs[0], 100 /* out of range */)
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	t.Run("access to externref table", func(t *testing.T) {
+		_, err := me.LookupFunction(m.Tables[1], /* table[1] has externref type. */
+			m.TypeIDs[0], 0)
+		require.Equal(t, wasmruntime.ErrRuntimeInvalidTableAccess, err)
+	})
+
+	t.Run("access to externref table", func(t *testing.T) {
+		_, err := me.LookupFunction(m.Tables[0], /* type mismatch */
+			m.TypeIDs[1], 0)
+		require.Equal(t, wasmruntime.ErrRuntimeIndirectCallTypeMismatch, err)
+	})
+
+	m.Tables[2].References[0] = me.FunctionInstanceReference(1)
+	m.Tables[2].References[5] = me.FunctionInstanceReference(2)
+	t.Run("initialized - tables[2]", func(t *testing.T) {
+		index, err := me.LookupFunction(m.Tables[2], m.TypeIDs[0], 0)
+		require.NoError(t, err)
+		require.Equal(t, wasm.Index(1), index)
+		index, err = me.LookupFunction(m.Tables[2], m.TypeIDs[0], 5)
+		require.NoError(t, err)
+		require.Equal(t, wasm.Index(2), index)
+	})
 }
 
 func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem *wasm.Code) {

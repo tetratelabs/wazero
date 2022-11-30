@@ -279,7 +279,7 @@ func (m *Module) buildTables(importedTables []*TableInstance, importedGlobals []
 			}
 		}
 
-		if table := tables[elem.tableIndex]; table.Type == RefTypeExternref {
+		if table.Type == RefTypeExternref {
 			inits = append(inits, tableInitEntry{
 				tableIndex: elem.tableIndex, offset: offset,
 				// ExternRef elements are guaranteed to be all null via the validation phase.

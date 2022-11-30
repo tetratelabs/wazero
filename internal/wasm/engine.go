@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+
 	"github.com/tetratelabs/wazero/experimental"
 )
 

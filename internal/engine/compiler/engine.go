@@ -589,7 +589,7 @@ func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.Function
 
 // LookupFunction implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
-	if tableOffset >= uint32(len(t.References)) {
+	if tableOffset >= uint32(len(t.References)) || t.Type != wasm.RefTypeFuncref {
 		err = wasmruntime.ErrRuntimeInvalidTableAccess
 		return
 	}
