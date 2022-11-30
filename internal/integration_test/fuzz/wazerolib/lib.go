@@ -44,7 +44,7 @@ func run_wazero(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) 
 	defer compiler.Close(ctx)
 	defer interpreter.Close(ctx)
 
-	var failed = true
+	failed := true
 	defer func() {
 		if failed {
 			saveFailedBinary(wasmBin, wat)
@@ -106,7 +106,7 @@ outer:
 			panic(fmt.Sprintf("error mismatch on invoking %s: %v", name, errMismatch))
 		}
 
-		var matched = true
+		matched := true
 		var typesIndex int
 		for i := 0; i < len(cmpRes); i++ {
 			switch resultTypes[typesIndex] {
@@ -180,9 +180,9 @@ func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, er
 	}
 
 	if !allowedErrorDuringInstantiation(compilerErrMsg) {
-		return false, fmt.Errorf("invalid erro occur with compiler: %v", compilerErr)
+		return false, fmt.Errorf("invalid error occur with compiler: %v", compilerErr)
 	} else if !allowedErrorDuringInstantiation(interpErrMsg) {
-		return false, fmt.Errorf("invalid erro occur with interpreter: %v", interpErrMsg)
+		return false, fmt.Errorf("invalid error occur with interpreter: %v", interpErrMsg)
 	}
 
 	if compilerErrMsg != interpErrMsg {

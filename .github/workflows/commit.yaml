@@ -186,3 +186,31 @@ jobs:
           cache: true
 
       - run: make bench.check
+
+  # This ensures that internal/integration_test/fuzz is runnable, and is not intended to
+  # run full-length fuzzing.
+  build_fuzzer:
+    name: Build fuzzer
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            internal/integration_test/fuzz/target
+          key: fuzz-build-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml') }}
+
+      # Fuzzer requires nightly rustc.
+      - run: rustup default nightly
+      - run: cargo install cargo-fuzz
+      # By default, make fuzz only runs a few seconds.
+      - run: make fuzz

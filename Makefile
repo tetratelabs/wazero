@@ -227,4 +227,4 @@ clean: ## Ensure a clean build
 fuzz_timeout ?= 10s
 .PHONY: fuzz
 fuzz:
-	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -timeout=$(fuzz_timeout)
+	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -max_total_time=$(fuzz_timeout)
