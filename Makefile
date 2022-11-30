@@ -223,3 +223,8 @@ site: ## Serve website content
 clean: ## Ensure a clean build
 	@rm -rf dist build coverage.txt
 	@go clean -testcache
+
+fuzz_timeout ?= 10s
+.PHONY: fuzz
+fuzz:
+	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -timeout=$(fuzz_timeout)

@@ -1,0 +1,50 @@
+[package]
+name = "wazero-fuzz-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.3"
+wasm-smith = "0.11.4"
+wasmprinter = "0.2.39"
+
+[[bin]]
+name = "basic"
+path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+
+# Note: having different bin target for each architecture in order to have separate corpus and artifacts and
+# to run both fuzzing on M1 Mac.
+[[bin]]
+name = "basic-x86_64-apple-darwin"
+path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+target = "x86_64-apple-darwin"
+
+[[bin]]
+name = "basic-aarch64-apple-darwin"
+path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+target = "aarch64-apple-darwin"
+
+[[bin]]
+name = "basic-x86_64-unknown-linux-gnu"
+path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+target = "x86_64-unknown-linux-gnu"
+
+[[bin]]
+name = "basic-aarch64-unknown-linux-gnu"
+path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+target = "aarch64-unknown-linux-gnu"
