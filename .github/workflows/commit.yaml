@@ -212,5 +212,6 @@ jobs:
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
       - run: cargo install cargo-fuzz
-      # By default, make fuzz only runs a few seconds.
-      - run: make fuzz
+      # Run fuzzing only for a few seconds, not a full-length intensive one, but 30s seems enough to find minor "front-end"
+      # bugs which might exist in binary parser, validation, or instantiation phase while not pressuring CI jobs.
+      - run: make fuzz fuzz_timeout=30s
