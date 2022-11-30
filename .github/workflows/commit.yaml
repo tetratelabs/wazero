@@ -202,16 +202,20 @@ jobs:
 
       - uses: actions/cache@v3
         with:
+          # Cache corpus and artifacts so that we don't start from scratch but rather with a meaningful corpus
+          # in the subsequent CI jobs.
           path: |
             ~/.cargo
             ~/.cache/go-build
             ~/go/pkg/mod
             internal/integration_test/fuzz/target
-          key: fuzz-build-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml') }}
+            internal/integration_test/fuzz/fuzz/artifacts
+            internal/integration_test/fuzz/fuzz/corpus
+          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml') }}
 
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
       - run: cargo install cargo-fuzz
-      # Run fuzzing only for a minute, not a full-length intensive one, but 30s seems enough to find minor "front-end"
+      # Run fuzzing only for a minute, not a full-length intensive one, but 60 seconds seems enough to find minor "front-end"
       # bugs which might exist in binary parser, validation, or instantiation phase while not pressuring CI jobs.
-      - run: make fuzz fuzz_timeout=60s
+      - run: make fuzz fuzz_timeout_seconds=60

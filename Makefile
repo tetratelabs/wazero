@@ -224,7 +224,7 @@ clean: ## Ensure a clean build
 	@rm -rf dist build coverage.txt
 	@go clean -testcache
 
-fuzz_timeout ?= 10s
+fuzz_timeout_seconds ?= 10
 .PHONY: fuzz
 fuzz:
-	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -max_total_time=$(fuzz_timeout)
+	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -max_total_time=$(fuzz_timeout_seconds)
