@@ -659,7 +659,10 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	fd := uint32(params[0])
 	buf := uint32(params[1])
 	bufLen := uint32(params[2])
-	cookie := params[3]
+	// We control the value of the cookie, and it should never be negative.
+	// However, we coerce it to signed to ensure the caller doesn't manipulate
+	// it in such a way that becomes negative.
+	cookie := int64(params[3])
 	resultBufused := uint32(params[4])
 
 	// Validate the FD is a directory
@@ -669,7 +672,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	}
 
 	// expect a cookie only if we are continuing a read.
-	if cookie == uint64(0) && dir.CountRead > 0 {
+	if cookie == 0 && dir.CountRead > 0 {
 		return ErrnoInval // invalid as a cookie is minimally one.
 	}
 
@@ -717,7 +720,9 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 		// d_next is the index of the next file in the list, so it should
 		// always be one higher than the requested cookie.
-		d_next := cookie + 1
+		d_next := uint64(cookie + 1)
+		// ^^ yes this can overflow to negative, which means our implementation
+		// doesn't support writing greater than max int64 entries.
 
 		dirents, ok := mem.Read(ctx, buf, bufused)
 		if !ok {
@@ -734,8 +739,13 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 }
 
 // lastDirEntries is broken out from fdReaddirFn for testability.
-func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEntry, errno Errno) {
-	entryCount := len(dir.Entries)
+func lastDirEntries(dir *internalsys.ReadDir, cookie int64) (entries []fs.DirEntry, errno Errno) {
+	if cookie < 0 {
+		errno = ErrnoInval // invalid as we will never send a negative cookie.
+		return
+	}
+
+	entryCount := int64(len(dir.Entries))
 	if entryCount == 0 { // there was no prior call
 		if cookie != 0 {
 			errno = ErrnoInval // invalid as we haven't sent that cookie
@@ -743,29 +753,23 @@ func lastDirEntries(dir *internalsys.ReadDir, cookie uint64) (entries []fs.DirEn
 		return
 	}
 
-	countRead := int(dir.CountRead)
-	if int(cookie)-countRead == 1 {
-		// cookie is asking for the next page.
-		dir.Entries = nil
-		return
-	} else if int(cookie)-countRead > 1 {
-		errno = ErrnoInval // invalid as we read that far, yet.
-		return
-	}
-
 	// Get the first absolute position in our window of results
-	firstPos := countRead - entryCount
-	if p := int(cookie) - firstPos; p < 0 {
-		// ReadDir can't read backwards, so we can only implement positions
-		// we still have data for.
-		errno = ErrnoNosys // unimplemented
-		return
-	} else if p == entryCount {
-		return // at the position of the next page.
-	} else if p > 0 {
-		entries = dir.Entries[p:] // truncate so to avoid large lists.
-	} else if dir.Entries != nil {
+	firstPos := int64(dir.CountRead) - entryCount
+	cookiePos := cookie - firstPos
+
+	switch {
+	case cookiePos < 0: // cookie is asking for results outside our window.
+		errno = ErrnoNosys // we can't implement directory seeking backwards.
+	case cookiePos == 0: // cookie is asking for the next page.
+	case cookiePos > entryCount:
+		errno = ErrnoInval // invalid as we read that far, yet.
+	case cookiePos > 0: // truncate so to avoid large lists.
+		entries = dir.Entries[cookiePos:]
+	default:
 		entries = dir.Entries
+	}
+	if len(entries) == 0 {
+		entries = nil
 	}
 	return
 }

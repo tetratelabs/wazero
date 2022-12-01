@@ -1060,7 +1060,7 @@ func Test_fdReaddir(t *testing.T) {
 		name            string
 		dir             func() *internalsys.FileEntry
 		buf, bufLen     uint32
-		cookie          uint64
+		cookie          int64
 		expectedMem     []byte
 		expectedMemSize int
 		expectedBufused uint32
@@ -1192,7 +1192,7 @@ func Test_fdReaddir(t *testing.T) {
 			buf: 0, bufLen: 30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
-			expectedMem:     append(dirent2),
+			expectedMem:     dirent2,
 			expectedMemSize: len(dirent2), // we do not want to compare the full buffer since we don't know what the leftover 4 bytes will contain.
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1320,7 +1320,7 @@ func Test_fdReaddir(t *testing.T) {
 			// use an arbitrarily high value for the buf used position.
 			resultBufused := uint32(16192)
 			requireErrno(t, ErrnoSuccess, mod, functionFdReaddir,
-				uint64(fd), uint64(tc.buf), uint64(tc.bufLen), tc.cookie, uint64(resultBufused))
+				uint64(fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
 			bufUsed, ok := mod.Memory().ReadUint32Le(testCtx, resultBufused)
@@ -1359,7 +1359,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 		name                           string
 		dir                            func() *internalsys.FileEntry
 		fd, buf, bufLen, resultBufused uint32
-		cookie                         uint64
+		cookie                         int64
+		readDir                        *internalsys.ReadDir
 		expectedErrno                  Errno
 		expectedLog                    string
 	}{
@@ -1451,6 +1452,21 @@ func Test_fdReaddir_Errors(t *testing.T) {
 <-- (28)
 `,
 		},
+		{
+			name: "negative cookie invalid",
+			fd:   dirFD,
+			buf:  0, bufLen: 1000,
+			cookie:        -1,
+			readDir:       &internalsys.ReadDir{CountRead: 1},
+			resultBufused: 2000,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=18446744073709551615,result.bufused=2000)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=18446744073709551615,result.bufused=2000)
+	<== EINVAL
+<-- (28)
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1469,7 +1485,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			}
 
 			requireErrno(t, tc.expectedErrno, mod, functionFdReaddir,
-				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), tc.cookie, uint64(tc.resultBufused))
+				uint64(tc.fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(tc.resultBufused))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1479,7 +1495,7 @@ func Test_lastDirEntries(t *testing.T) {
 	tests := []struct {
 		name            string
 		f               *internalsys.ReadDir
-		cookie          uint64
+		cookie          int64
 		expectedEntries []fs.DirEntry
 		expectedErrno   Errno
 	}{
@@ -1489,6 +1505,15 @@ func Test_lastDirEntries(t *testing.T) {
 		{
 			name:          "no prior call, but passed a cookie",
 			cookie:        1,
+			expectedErrno: ErrnoInval,
+		},
+		{
+			name: "cookie is negative",
+			f: &internalsys.ReadDir{
+				CountRead: 3,
+				Entries:   testDirEntries,
+			},
+			cookie:        -1,
 			expectedErrno: ErrnoInval,
 		},
 		{
