@@ -714,7 +714,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 	// Determine how many dirents we can write, excluding a potentially
 	// truncated entry.
-	bufused, direntCount, truncatedEntryLen := maxDirents(entries, bufLen)
+	bufused, direntCount, writeTruncatedEntry := maxDirents(entries, bufLen)
 
 	// Now, write entries to the underlying buffer.
 	if bufused > 0 {
@@ -730,7 +730,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 			return ErrnoFault
 		}
 
-		writeDirents(entries, direntCount, truncatedEntryLen, dirents, d_next)
+		writeDirents(entries, direntCount, writeTruncatedEntry, dirents, d_next)
 	}
 
 	if !mem.WriteUint32Le(ctx, resultBufused, bufused) {
