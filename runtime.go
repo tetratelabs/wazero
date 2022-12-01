@@ -172,7 +172,7 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, errors.New("invalid binary")
 	}
 
-	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, r.memoryLimitPages, r.memoryCapacityFromMax)
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, r.memoryLimitPages, r.memoryCapacityFromMax, false)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {

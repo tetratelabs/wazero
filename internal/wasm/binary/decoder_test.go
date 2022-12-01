@@ -81,7 +81,7 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := DecodeModule(EncodeModule(tc.input), api.CoreFeaturesV1, wasm.MemoryLimitPages, false)
+			m, e := DecodeModule(EncodeModule(tc.input), api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false)
 			require.NoError(t, e)
 			require.Equal(t, tc.input, m)
 		})
@@ -92,9 +92,26 @@ func TestDecodeModule(t *testing.T) {
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
-		m, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false)
+		m, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false)
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{}, m)
+	})
+
+	t.Run("reads custom sections", func(t *testing.T) {
+		input := append(append(Magic, version...),
+			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
+			0x04, 'm', 'e', 'm', 'e',
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
+		m, e := DecodeModule(input, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true)
+		require.NoError(t, e)
+		require.Equal(t, &wasm.Module{
+			CustomSections: []*wasm.CustomSection{
+				{
+					Name: "meme",
+					Data: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+				},
+			},
+		}, m)
 	})
 
 	t.Run("skips custom section, but not name", func(t *testing.T) {
@@ -107,14 +124,38 @@ func TestDecodeModule(t *testing.T) {
 			subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 			0x06, // the Module name simple is 6 bytes long
 			's', 'i', 'm', 'p', 'l', 'e')
-		m, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false)
+		m, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false)
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "simple"}}, m)
 	})
+
+	t.Run("read custom sections and name separately", func(t *testing.T) {
+		input := append(append(Magic, version...),
+			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
+			0x04, 'm', 'e', 'm', 'e',
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 0,
+			wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
+			0x04, 'n', 'a', 'm', 'e',
+			subsectionIDModuleName, 0x07, // 7 bytes in this subsection
+			0x06, // the Module name simple is 6 bytes long
+			's', 'i', 'm', 'p', 'l', 'e')
+		m, e := DecodeModule(input, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true)
+		require.NoError(t, e)
+		require.Equal(t, &wasm.Module{
+			NameSection: &wasm.NameSection{ModuleName: "simple"},
+			CustomSections: []*wasm.CustomSection{
+				{
+					Name: "meme",
+					Data: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+				},
+			},
+		}, m)
+	})
+
 	t.Run("data count section disabled", func(t *testing.T) {
 		input := append(append(Magic, version...),
 			wasm.SectionIDDataCount, 1, 0)
-		_, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false)
+		_, e := DecodeModule(input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false)
 		require.EqualError(t, e, `data count section not supported as feature "bulk-memory-operations" is disabled`)
 	})
 }
@@ -164,7 +205,7 @@ func TestDecodeModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := DecodeModule(tc.input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false)
+			_, e := DecodeModule(tc.input, api.CoreFeaturesV1, wasm.MemoryLimitPages, false, false)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}
