@@ -212,7 +212,7 @@ jobs:
             internal/integration_test/fuzz/target
             internal/integration_test/fuzz/fuzz/artifacts
             internal/integration_test/fuzz/fuzz/corpus
-          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/.*rs') }}
+          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
 
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
