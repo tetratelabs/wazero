@@ -18,10 +18,11 @@ import (
 
 func main() {}
 
-// run_wazero ensures that the behavior is the same between the compiler and the interpreter for any given binary.
+// require_no_diff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
+// And if there's diff, this also saves the problematic binary and wat into testdata directory.
 //
-//export run_wazero
-func run_wazero(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) {
+//export require_no_diff
+func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) {
 	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: binaryPtr,
 		Len:  binarySize,
@@ -54,6 +55,7 @@ func run_wazero(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) 
 	return
 }
 
+// requireNoDiff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
 func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
 	// Choose the context to use for function calls.
 	ctx := context.Background()
@@ -85,6 +87,7 @@ func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
 
 const valueTypeVector = 0x7b
 
+// ensureInvocationResultMatch invokes all the exported functions from the module, and compare all the results between compiler vs interpreter.
 func ensureInvocationResultMatch(compiledMod, interpreterMod api.Module, exportedFunctions map[string]api.FunctionDefinition) (err error) {
 	ctx := context.Background()
 
@@ -132,6 +135,7 @@ outer:
 	return
 }
 
+// getDummyValues returns a dummy input values for function invocations.
 func getDummyValues(valueTypes []api.ValueType) (ret []uint64) {
 	for _, vt := range valueTypes {
 		if vt != 0x7b { // v128
@@ -143,6 +147,7 @@ func getDummyValues(valueTypes []api.ValueType) (ret []uint64) {
 	return
 }
 
+// ensureInvocationError ensures that function invocation errors returned by interpreter and compiler match each other's.
 func ensureInvocationError(compilerErr, interpErr error) error {
 	if compilerErr == nil && interpErr == nil {
 		return nil
@@ -166,6 +171,7 @@ func ensureInvocationError(compilerErr, interpErr error) error {
 	return nil
 }
 
+// ensureInstantiationError ensures that instantiation errors returned by interpreter and compiler match each other's.
 func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, err error) {
 	if compilerErr == nil && interpErr == nil {
 		return true, nil
@@ -195,11 +201,15 @@ func ensureInstantiationError(compilerErr, interpErr error) (okToInvoke bool, er
 	return false, nil
 }
 
+// allowedErrorDuringInstantiation checks if the error message is considered sane.
 func allowedErrorDuringInstantiation(errMsg string) bool {
+	// This happens when data segment causes out of bound, but it is considered as runtime-error in WebAssembly 2.0
+	// which is fine.
 	if strings.HasPrefix(errMsg, "data[") && strings.HasSuffix(errMsg, "]: out of bounds memory access") {
 		return true
 	}
 
+	// Start function failure is neither instantiation nor compilation error, but rather a runtime error, so that is fine.
 	if strings.HasPrefix(errMsg, "start function[") && strings.Contains(errMsg, "failed: wasm error:") {
 		return true
 	}
@@ -208,6 +218,7 @@ func allowedErrorDuringInstantiation(errMsg string) bool {
 
 const failedCasesDir = "wazerolib/testdata"
 
+// saveFailedBinary writes binary and wat into failedCasesDir so that it is easy to reproduce the error.
 func saveFailedBinary(bin []byte, wat string) {
 	checksum := sha256.Sum256(bin)
 	checkSumStr := hex.EncodeToString(checksum[:])

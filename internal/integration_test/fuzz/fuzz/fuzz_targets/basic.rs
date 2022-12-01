@@ -52,7 +52,7 @@ fn run(data: &[u8]) -> Result<()> {
 
     // Pass the randomly generated module to the wazero library.
     unsafe {
-        run_wazero(
+        require_no_diff(
             module_bytes.as_ptr(),
             module_bytes.len(),
             wat_bytes.as_ptr(),
@@ -60,11 +60,16 @@ fn run(data: &[u8]) -> Result<()> {
         );
     }
 
-    // We always return Ok as inside run_wazero, we cause panic if the binary is interesting.
+    // We always return Ok as inside require_no_diff, we cause panic if the binary is interesting.
     Ok(())
 }
 
 extern "C" {
-    // run_wazero is implemented in Go, and accepts the pointer to the binary and its size.
-    fn run_wazero(binary_ptr: *const u8, binary_size: usize, wat_ptr: *const u8, wat_size: usize);
+    // require_no_diff is implemented in Go, and accepts the pointer to the binary and its size.
+    fn require_no_diff(
+        binary_ptr: *const u8,
+        binary_size: usize,
+        wat_ptr: *const u8,
+        wat_size: usize,
+    );
 }

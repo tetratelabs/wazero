@@ -43,3 +43,17 @@ then you can check the wasm and wat as well as reproduce the error by running
 ```
 WASM_BINARY_PATH=/Users/mathetake/wazero/internal/integration_test/fuzz/wazerolib/testdata/73c61e218b8547ef35271a22ca95f932dcc102bda9b3a9bdf1976e6ed36da31d.wasm go test ./wazerolib/...
 ```
+
+
+Also, in the bottom of the output, you can find the message as
+
+```
+
+Minimize test case with:
+
+        cargo fuzz tmin basic fuzz/artifacts/basic/crash-d2c1f5307fde6f057454606bcc21d5653be9be8d
+
+────────────────────────────────────────────────────────────────────────────────
+```
+
+and you can use that command to "minimize" the input binary while keeping the same error.
