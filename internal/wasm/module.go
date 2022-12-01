@@ -154,6 +154,11 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
 
+	// CustomSections are set when the SectionIDCustom other than "name" were successfully decoded from the binary format.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
+	CustomSections []*CustomSection
+
 	// validatedActiveElementSegments are built on Validate when
 	// SectionIDElement is non-empty and all inputs are valid.
 	//
@@ -875,6 +880,12 @@ type NameSection struct {
 	// Note: LocalNames are only used for debugging. At runtime, locals are called based on raw numeric index.
 	// Note: This can be nil for any reason including configuration.
 	LocalNames IndirectNameMap
+}
+
+// CustomSection contains the name and raw data of a custom section.
+type CustomSection struct {
+	Name string
+	Data []byte
 }
 
 // NameMap associates an index with any associated names.
