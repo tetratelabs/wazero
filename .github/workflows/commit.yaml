@@ -208,10 +208,11 @@ jobs:
             ~/.cargo
             ~/.cache/go-build
             ~/go/pkg/mod
+            ~/.rustup/toolchains/
             internal/integration_test/fuzz/target
             internal/integration_test/fuzz/fuzz/artifacts
             internal/integration_test/fuzz/fuzz/corpus
-          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml') }}
+          key: build-fuzzer-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile', '**/Cargo.lock', '**/Cargo.toml', '**/*.rs') }}
 
       # Fuzzer requires nightly rustc.
       - run: rustup default nightly
@@ -219,3 +220,7 @@ jobs:
       # Run fuzzing only for a minute, not a full-length intensive one, but 60 seconds seems enough to find minor "front-end"
       # bugs which might exist in binary parser, validation, or instantiation phase while not pressuring CI jobs.
       - run: make fuzz fuzz_timeout_seconds=60
+        if: ${{ github.event_name  == 'pull_request' }}
+      # Run a bit longer on main branch push!
+      - run: make fuzz fuzz_timeout_seconds=180
+        if: ${{ github.event_name  == 'push' }}
