@@ -673,22 +673,27 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		return ErrnoInval // invalid as a cookie is minimally one.
 	}
 
-	// Ensure we have the max directory entries that can be serialized as
-	// dirents, knowing file names come after.
+	// First, determine the maximum directory entries that can be encoded as
+	// dirents. The total size is direntSize(24) + nameSize, for each file.
+	// Since a zero-length file name is invalid, the minimum size entry is
+	// 25 (direntSize + 1 character).
 	maxDirEntries := int(bufLen/direntSize + 1)
 
-	// Add one more to know if maxDirEntries is the end of the directory.
+	// While unlikely maxDirEntries will fit into bufLen, add one more just in
+	// case, as we need to know if we hit the end of the directory or not to
+	// write the correct bufused (e.g. == bufLen unless EOF).
 	//	>> If less than the size of the read buffer, the end of the
 	//	>> directory has been reached.
 	maxDirEntries += 1
 
-	// Entries here are truncated to those that start at the cookie.
+	// The host keeps state for any unread entries from the prior call because
+	// we cannot seek to a previous directory position. Collect these entries.
 	entries, errno := lastDirEntries(dir, cookie)
 	if errno != ErrnoSuccess {
 		return errno
 	}
 
-	// Append more entries as needed to fill bufLen
+	// Check if we have maxDirEntries, and read more from the FS as needed.
 	if entryCount := len(entries); entryCount < maxDirEntries {
 		if l, err := rd.ReadDir(maxDirEntries - entryCount); err != io.EOF {
 			if err != nil {
