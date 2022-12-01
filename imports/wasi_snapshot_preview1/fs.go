@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"math"
 	"path"
 	"syscall"
 
@@ -738,6 +739,8 @@ func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
+const largestDirent = int64(math.MaxUint32 - direntSize)
+
 // lastDirEntries is broken out from fdReaddirFn for testability.
 func lastDirEntries(dir *internalsys.ReadDir, cookie int64) (entries []fs.DirEntry, errno Errno) {
 	if cookie < 0 {
@@ -790,9 +793,6 @@ const direntSize = uint32(24)
 func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
 	lenRemaining := bufLen
 	for _, e := range entries {
-		nameLen := uint32(len(e.Name()))
-		entryLen := direntSize + nameLen
-
 		if lenRemaining < direntSize {
 			// We don't have enough space in bufLen for another struct,
 			// entry. A caller who wants more will retry.
@@ -803,7 +803,21 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 			break
 		}
 
-		if lenRemaining < entryLen {
+		// use int64 to guard against huge filenames
+		nameLen := int64(len(e.Name()))
+		var entryLen uint32
+
+		// Check to see if direntSize + nameLen overflows, or if it would be
+		// larger than possible to encode.
+		if el := int64(direntSize) + nameLen; el < 0 || el > largestDirent {
+			// panic, as testing is difficult. ex we would have to extract a
+			// function to get size of a string or allocate a 2^32 size one!
+			panic("invalid filename: too large")
+		} else { // we know this can fit into a uint32
+			entryLen = uint32(el)
+		}
+
+		if entryLen > lenRemaining {
 			// We haven't room to write the entry, and docs say to write the
 			// header. This helps especially when there is an entry with a very
 			// long filename. Ex if bufLen is 4096 and the filename is 4096,
@@ -821,9 +835,9 @@ func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint
 			break
 		}
 
-		// At this point, this entry can fit within bufLen.
-		bufused += entryLen
+		// This won't go negative because we checked entryLen <= lenRemaining.
 		lenRemaining -= entryLen
+		bufused += entryLen
 		direntCount++
 	}
 	return
