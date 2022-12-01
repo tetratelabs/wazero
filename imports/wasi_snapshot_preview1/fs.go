@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"math"
 	"path"
 	"syscall"
 
@@ -643,11 +644,268 @@ func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
 // entries from a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
-var fdReaddir = stubFunction(
-	functionFdReaddir,
-	[]wasm.ValueType{i32, i32, i32, i64, i32},
-	[]string{"fd", "buf", "buf_len", "cookie", "result.bufused"},
-)
+var fdReaddir = &wasm.HostFunc{
+	ExportNames: []string{functionFdReaddir},
+	Name:        functionFdReaddir,
+	ParamTypes:  []wasm.ValueType{i32, i32, i32, i64, i32},
+	ParamNames:  []string{"fd", "buf", "buf_len", "cookie", "result.bufused"},
+	ResultTypes: []api.ValueType{i32},
+	Code: &wasm.Code{
+		IsHostFunction: true,
+		GoFunc:         wasiFunc(fdReaddirFn),
+	},
+}
+
+func fdReaddirFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+	fd := uint32(params[0])
+	buf := uint32(params[1])
+	bufLen := uint32(params[2])
+	// We control the value of the cookie, and it should never be negative.
+	// However, we coerce it to signed to ensure the caller doesn't manipulate
+	// it in such a way that becomes negative.
+	cookie := int64(params[3])
+	resultBufused := uint32(params[4])
+
+	// Validate the FD is a directory
+	rd, dir, errno := openedDir(ctx, mod, fd)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	// expect a cookie only if we are continuing a read.
+	if cookie == 0 && dir.CountRead > 0 {
+		return ErrnoInval // invalid as a cookie is minimally one.
+	}
+
+	// First, determine the maximum directory entries that can be encoded as
+	// dirents. The total size is direntSize(24) + nameSize, for each file.
+	// Since a zero-length file name is invalid, the minimum size entry is
+	// 25 (direntSize + 1 character).
+	maxDirEntries := int(bufLen/direntSize + 1)
+
+	// While unlikely maxDirEntries will fit into bufLen, add one more just in
+	// case, as we need to know if we hit the end of the directory or not to
+	// write the correct bufused (e.g. == bufLen unless EOF).
+	//	>> If less than the size of the read buffer, the end of the
+	//	>> directory has been reached.
+	maxDirEntries += 1
+
+	// The host keeps state for any unread entries from the prior call because
+	// we cannot seek to a previous directory position. Collect these entries.
+	entries, errno := lastDirEntries(dir, cookie)
+	if errno != ErrnoSuccess {
+		return errno
+	}
+
+	// Check if we have maxDirEntries, and read more from the FS as needed.
+	if entryCount := len(entries); entryCount < maxDirEntries {
+		if l, err := rd.ReadDir(maxDirEntries - entryCount); err != io.EOF {
+			if err != nil {
+				return ErrnoIo
+			}
+			dir.CountRead += uint64(len(l))
+			entries = append(entries, l...)
+			// Replace the cache with up to maxDirEntries, starting at cookie.
+			dir.Entries = entries
+		}
+	}
+
+	mem := mod.Memory()
+
+	// Determine how many dirents we can write, excluding a potentially
+	// truncated entry.
+	bufused, direntCount, writeTruncatedEntry := maxDirents(entries, bufLen)
+
+	// Now, write entries to the underlying buffer.
+	if bufused > 0 {
+
+		// d_next is the index of the next file in the list, so it should
+		// always be one higher than the requested cookie.
+		d_next := uint64(cookie + 1)
+		// ^^ yes this can overflow to negative, which means our implementation
+		// doesn't support writing greater than max int64 entries.
+
+		dirents, ok := mem.Read(ctx, buf, bufused)
+		if !ok {
+			return ErrnoFault
+		}
+
+		writeDirents(entries, direntCount, writeTruncatedEntry, dirents, d_next)
+	}
+
+	if !mem.WriteUint32Le(ctx, resultBufused, bufused) {
+		return ErrnoFault
+	}
+	return ErrnoSuccess
+}
+
+const largestDirent = int64(math.MaxUint32 - direntSize)
+
+// lastDirEntries is broken out from fdReaddirFn for testability.
+func lastDirEntries(dir *internalsys.ReadDir, cookie int64) (entries []fs.DirEntry, errno Errno) {
+	if cookie < 0 {
+		errno = ErrnoInval // invalid as we will never send a negative cookie.
+		return
+	}
+
+	entryCount := int64(len(dir.Entries))
+	if entryCount == 0 { // there was no prior call
+		if cookie != 0 {
+			errno = ErrnoInval // invalid as we haven't sent that cookie
+		}
+		return
+	}
+
+	// Get the first absolute position in our window of results
+	firstPos := int64(dir.CountRead) - entryCount
+	cookiePos := cookie - firstPos
+
+	switch {
+	case cookiePos < 0: // cookie is asking for results outside our window.
+		errno = ErrnoNosys // we can't implement directory seeking backwards.
+	case cookiePos == 0: // cookie is asking for the next page.
+	case cookiePos > entryCount:
+		errno = ErrnoInval // invalid as we read that far, yet.
+	case cookiePos > 0: // truncate so to avoid large lists.
+		entries = dir.Entries[cookiePos:]
+	default:
+		entries = dir.Entries
+	}
+	if len(entries) == 0 {
+		entries = nil
+	}
+	return
+}
+
+// direntSize is the size of the dirent struct, which should be followed by the
+// length of a file name.
+const direntSize = uint32(24)
+
+// maxDirents returns the maximum count and total entries that can fit in
+// maxLen bytes.
+//
+// truncatedEntryLen is the amount of bytes past bufLen needed to write the
+// next entry. We have to return bufused == bufLen unless the directory is
+// exhausted.
+//
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
+// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c#L44
+func maxDirents(entries []fs.DirEntry, bufLen uint32) (bufused, direntCount uint32, writeTruncatedEntry bool) {
+	lenRemaining := bufLen
+	for _, e := range entries {
+		if lenRemaining < direntSize {
+			// We don't have enough space in bufLen for another struct,
+			// entry. A caller who wants more will retry.
+
+			// bufused == bufLen means more entries exist, which is the case
+			// when the dirent is larger than bytes remaining.
+			bufused = bufLen
+			break
+		}
+
+		// use int64 to guard against huge filenames
+		nameLen := int64(len(e.Name()))
+		var entryLen uint32
+
+		// Check to see if direntSize + nameLen overflows, or if it would be
+		// larger than possible to encode.
+		if el := int64(direntSize) + nameLen; el < 0 || el > largestDirent {
+			// panic, as testing is difficult. ex we would have to extract a
+			// function to get size of a string or allocate a 2^32 size one!
+			panic("invalid filename: too large")
+		} else { // we know this can fit into a uint32
+			entryLen = uint32(el)
+		}
+
+		if entryLen > lenRemaining {
+			// We haven't room to write the entry, and docs say to write the
+			// header. This helps especially when there is an entry with a very
+			// long filename. Ex if bufLen is 4096 and the filename is 4096,
+			// we need to write direntSize(24) + 4096 bytes to write the entry.
+			// In this case, we only write up to direntSize(24) to allow the
+			// caller to resize.
+
+			// bufused == bufLen means more entries exist, which is the case
+			// when the next entry is larger than bytes remaining.
+			bufused = bufLen
+
+			// We do have enough space to write the header, this value will be
+			// passed on to writeDirents to only write the header for this entry.
+			writeTruncatedEntry = true
+			break
+		}
+
+		// This won't go negative because we checked entryLen <= lenRemaining.
+		lenRemaining -= entryLen
+		bufused += entryLen
+		direntCount++
+	}
+	return
+}
+
+// writeDirents writes the directory entries to the buffer, which is pre-sized
+// based on maxDirents.	truncatedEntryLen means write one past entryCount,
+// without its name. See maxDirents for why
+func writeDirents(
+	entries []fs.DirEntry,
+	entryCount uint32,
+	writeTruncatedEntry bool,
+	dirents []byte,
+	d_next uint64,
+) {
+	pos, i := uint32(0), uint32(0)
+	for ; i < entryCount; i++ {
+		e := entries[i]
+		nameLen := uint32(len(e.Name()))
+
+		writeDirent(dirents[pos:], d_next, nameLen, e.IsDir())
+		pos += direntSize
+
+		copy(dirents[pos:], e.Name())
+		pos += nameLen
+		d_next++
+	}
+
+	if !writeTruncatedEntry {
+		return
+	}
+
+	// Write a dirent without its name
+	dirent := make([]byte, direntSize)
+	e := entries[i]
+	writeDirent(dirent, d_next, uint32(len(e.Name())), e.IsDir())
+
+	// Potentially truncate it
+	copy(dirents[pos:], dirent)
+}
+
+// writeDirent writes direntSize bytes
+func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
+	binary.LittleEndian.PutUint64(buf, dNext)        // d_next
+	binary.LittleEndian.PutUint64(buf[8:], 0)        // no d_ino
+	binary.LittleEndian.PutUint32(buf[16:], dNamlen) // d_namlen
+
+	filetype := wasiFiletypeRegularFile
+	if dType {
+		filetype = wasiFiletypeDirectory
+	}
+	binary.LittleEndian.PutUint32(buf[20:], uint32(filetype)) //  d_type
+}
+
+// openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
+func openedDir(ctx context.Context, mod api.Module, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
+	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
+	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+		return nil, nil, ErrnoBadf
+	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
+		return nil, nil, ErrnoNotdir
+	} else {
+		if f.ReadDir == nil {
+			f.ReadDir = &internalsys.ReadDir{}
+		}
+		return d, f.ReadDir, ErrnoSuccess
+	}
+}
 
 // fdRenumber is the WASI function named functionFdRenumber which atomically
 // replaces a file descriptor by renumbering another file descriptor.
