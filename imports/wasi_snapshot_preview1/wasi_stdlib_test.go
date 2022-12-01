@@ -14,22 +14,22 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// lsZigCc was compiled from testdata/zig/ls.zig
+// lsWasmCargoWasi was compiled from testdata/cargo-wasi/ls.rs
 //
-//go:embed testdata/zig/ls.wasm
-var lsZig []byte
+//go:embed testdata/cargo-wasi/ls.wasm
+var lsWasmCargoWasi []byte
 
 // lsZigCc was compiled from testdata/zig-cc/ls.c
 //
 //go:embed testdata/zig-cc/ls.wasm
 var lsZigCc []byte
 
-// Test_fdReaddir_e2e ensures that the behavior we've implemented not only
+// Test_fdReaddir_ls ensures that the behavior we've implemented not only
 // matches the wasi spec, but also at least two compilers use of sdks.
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
-		"zig":    lsZig,
-		"zig-cc": lsZigCc,
+		"cargo-wasi": lsWasmCargoWasi,
+		"zig-cc":     lsZigCc,
 	} {
 		toolchain := toolchain
 		bin := bin
@@ -57,9 +57,9 @@ func testFdReaddirLs(t *testing.T, bin []byte) {
 			}), bin)
 
 		require.Zero(t, stderr)
-		require.Equal(t, `-
-a-
-ab-
+		require.Equal(t, `./-
+./a-
+./ab-
 `, stdout)
 	})
 

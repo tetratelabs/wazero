@@ -58,7 +58,7 @@ build.examples.as:
 	@mv $(@D)/zig-out/*/$(@F) $(@D)
 
 .PHONY: build.examples.zig
-build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm imports/wasi_snapshot_preview1/testdata/zig/ls.wasm
+build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm
 
 tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
@@ -103,9 +103,10 @@ build.examples.emscripten: $(emscripten_sources)
 
 %/greet.wasm : cargo_target := wasm32-unknown-unknown
 %/cat.wasm : cargo_target := wasm32-wasi
+%/ls.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/ls.wasm
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs

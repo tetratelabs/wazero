@@ -7,7 +7,7 @@ int main(void) {
   d = opendir(".");
   if (d) {
     while ((dir = readdir(d)) != NULL) {
-      printf("%s\n", dir->d_name);
+      printf("./%s\n", dir->d_name);
     }
     closedir(d);
   }
