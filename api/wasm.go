@@ -344,14 +344,14 @@ type GoModuleFunction interface {
 // For example, the following returns an uint32 value read from parameter zero:
 //
 //	api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-//		offset := api.DecodeU32(params[0]) // read the parameter from the stack
+//		offset := api.DecodeU32(stack[0]) // read the parameter from the stack
 //
 //		ret, ok := mod.Memory().ReadUint32Le(ctx, offset)
 //		if !ok {
 //			panic("out of memory")
 //		}
 //
-//		results[0] = api.EncodeU32(ret) // add the result back to the stack.
+//		stack[0] = api.EncodeU32(ret) // add the result back to the stack.
 //	})
 type GoModuleFunc func(ctx context.Context, mod Module, stack []uint64)
 
@@ -374,8 +374,8 @@ type GoFunction interface {
 // For example, the following returns the sum of two uint32 parameters:
 //
 //	api.GoFunc(func(ctx context.Context, stack []uint64) {
-//		x, y := api.DecodeU32(params[0]), api.DecodeU32(params[1])
-//		results[0] = api.EncodeU32(x + y)
+//		x, y := api.DecodeU32(stack[0]), api.DecodeU32(stack[1])
+//		stack[0] = api.EncodeU32(x + y)
 //	})
 type GoFunc func(ctx context.Context, stack []uint64)
 
