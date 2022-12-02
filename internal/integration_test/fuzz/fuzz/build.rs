@@ -8,7 +8,7 @@ fn main() {
 
     let wazero_fuzz_lib_dir = format!("{}/wazerolib", wazero_fuzz_dir.as_str());
     let library_out_path = format!("{}/libwazero.a", wazero_fuzz_lib_dir);
-    let library_source_path = format!("{}/lib.go", wazero_fuzz_lib_dir);
+    let library_source_path = format!("{}/...", wazero_fuzz_lib_dir);
 
     // Parse the GOARCH from the --target argument passed to cargo.
     let goarch = var("TARGET")
