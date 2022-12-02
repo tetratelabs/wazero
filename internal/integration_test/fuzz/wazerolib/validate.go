@@ -22,7 +22,7 @@ func validate(binaryPtr uintptr, binarySize int) {
 	defer func() {
 		if failed {
 			// If the test fails, we save the binary and wat into testdata directory.
-			saveFailedBinary(wasmBin, "", "TestReRunFailedRequireNoDiffCase")
+			saveFailedBinary(wasmBin, "", "TestReRunFailedValidateCase")
 		}
 	}()
 
