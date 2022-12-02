@@ -18,6 +18,33 @@ import (
 
 func main() {}
 
+//export validate
+func validate(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize int) {
+	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: binaryPtr,
+		Len:  binarySize,
+		Cap:  binarySize,
+	}))
+
+	wat := *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: watPtr,
+		Len:  watSize,
+		Cap:  watSize,
+	}))
+
+	failed := true
+	defer func() {
+		if failed {
+			// If the test fails, we save the binary and wat into testdata directory.
+			saveFailedBinary(wasmBin, wat)
+		}
+	}()
+
+	ctx := context.Background()
+	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
+	_, _ = compiler.CompileModule(ctx, wasmBin)
+}
+
 // require_no_diff ensures that the behavior is the same between the compiler and the interpreter for any given binary.
 // And if there's diff, this also saves the problematic binary and wat into testdata directory.
 //
