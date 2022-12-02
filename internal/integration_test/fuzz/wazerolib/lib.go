@@ -51,10 +51,7 @@ func saveFailedBinary(bin []byte, wat string, reproduceTestName string) {
 		if err != nil {
 			panic(err)
 		}
-		wat = "N/A"
-		watPath = "N/A"
-	}
-	fmt.Printf(`
+		fmt.Printf(`
 Failed WebAssembly Text:
 %s
 
@@ -63,5 +60,12 @@ Failed Wasm Text has been written to %s
 To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerolib/...
 
 
-`, wat, binaryPath, watPath, reproduceTestName, binaryPath)
+`, wat, binaryPath, watPath, binaryPath, reproduceTestName)
+	} else {
+		fmt.Printf(`
+Failed WebAssembly Binary in hex: %s
+Failed Wasm binary has been written to %s
+To reproduce the failure, execute: WASM_BINARY_PATH=%s go test -run=%s ./wazerolib/...
+`, hex.EncodeToString(bin), binaryPath, binaryPath, reproduceTestName)
+	}
 }

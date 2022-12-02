@@ -4,11 +4,12 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"reflect"
 	"strings"
 	"unsafe"
+
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // require_no_diff ensures that the behavior is the same between the compiler and the interpreter for any given binary.

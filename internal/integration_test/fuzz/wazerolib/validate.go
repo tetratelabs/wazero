@@ -4,9 +4,10 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero"
 	"reflect"
 	"unsafe"
+
+	"github.com/tetratelabs/wazero"
 )
 
 //export validate
