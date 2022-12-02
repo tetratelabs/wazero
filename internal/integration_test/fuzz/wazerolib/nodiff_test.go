@@ -13,7 +13,7 @@ func TestReRunFailedRequireNoDiffCase(t *testing.T) {
 
 	wasmBin, err := os.ReadFile(binaryPath)
 	if err != nil {
-		t.Fatal(err)
+		t.Skip(err)
 	}
 
 	requireNoDiff(wasmBin, func(err error) { require.NoError(t, err) })

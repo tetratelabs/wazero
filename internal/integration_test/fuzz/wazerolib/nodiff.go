@@ -29,8 +29,6 @@ func require_no_diff(binaryPtr uintptr, binarySize int, watPtr uintptr, watSize 
 		Cap:  watSize,
 	}))
 
-	// Create two runtimes.
-
 	failed := true
 	defer func() {
 		if failed {

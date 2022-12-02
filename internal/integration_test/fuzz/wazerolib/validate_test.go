@@ -11,7 +11,7 @@ func TestReRunFailedValidateCase(t *testing.T) {
 
 	wasmBin, err := os.ReadFile(binaryPath)
 	if err != nil {
-		t.Fatal(err)
+		t.Skip(err)
 	}
 
 	tryCompile(wasmBin)
