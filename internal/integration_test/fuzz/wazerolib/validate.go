@@ -3,13 +3,15 @@ package main
 import "C"
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 )
 
+// validate accepts maybe-invalid Wasm module bytes and ensures that our validation phase works correctly
+// as well as the compiler doesn't panic during compilation!
+//
 //export validate
 func validate(binaryPtr uintptr, binarySize int) {
 	wasmBin := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
@@ -34,7 +36,4 @@ func tryCompile(wasmBin []byte) {
 	ctx := context.Background()
 	compiler := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigCompiler())
 	_, err := compiler.CompileModule(ctx, wasmBin)
-	if err != nil {
-		fmt.Println(err)
-	}
 }
