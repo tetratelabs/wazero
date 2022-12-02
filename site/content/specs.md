@@ -75,6 +75,8 @@ complete the below chart. If you desire something not yet implemented, please
 [raise an issue](https://github.com/tetratelabs/wazero/issues/new) and include
 your use case (ex which language you are using to compile, a.k.a. target Wasm).
 
+Note: C (via clang) supports the maximum WASI functions due to [wasi-libc][16].
+
 <details><summary>Click to see the full list of supported WASI functions</summary>
 <p>
 
@@ -93,15 +95,15 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 | fd_fdstat_get           |   ✅    |          TinyGo |
 | fd_fdstat_set_flags     |   ❌    |                 |
 | fd_fdstat_set_rights    |   💀   |                 |
-| fd_filestat_get         |   ❌    |                 |
+| fd_filestat_get         |   ✅    |             Zig |
 | fd_filestat_set_size    |   ❌    |                 |
 | fd_filestat_set_times   |   ❌    |                 |
-| fd_pread                |   ❌    |                 |
+| fd_pread                |   ✅    |        Rust,Zig |
 | fd_prestat_get          |   ✅    |          TinyGo |
 | fd_prestat_dir_name     |   ✅    |          TinyGo |
 | fd_pwrite               |   ❌    |                 |
 | fd_read                 |   ✅    |          TinyGo |
-| fd_readdir              |   ❌    |                 |
+| fd_readdir              |   ✅    |        Rust,Zig |
 | fd_renumber             |   ❌    |                 |
 | fd_seek                 |   ✅    |          TinyGo |
 | fd_sync                 |   ❌    |                 |
@@ -146,3 +148,4 @@ Note: 💀 means the function was later removed from WASI.
 [13]: https://github.com/WebAssembly/WASI/pull/136
 [14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
 [15]: https://github.com/WebAssembly/WASI/pull/458
+[16]: https://github.com/WebAssembly/wasi-libc
