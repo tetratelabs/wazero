@@ -1464,6 +1464,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(p)
 			}
 		} else if op == OpcodeEnd {
+			if len(controlBlockStack) == 0 {
+				return fmt.Errorf("redundant End instruction at %#x", pc)
+			}
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.endAt = pc
 			controlBlockStack = controlBlockStack[:len(controlBlockStack)-1]
