@@ -24,9 +24,7 @@ func TestWithDWARFBasedStackTrace(t *testing.T) {
 		r    wazero.Runtime
 	}
 
-	tests := []testCase{
-		{name: "interpreter", r: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())},
-	}
+	tests := []testCase{{name: "interpreter", r: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())}}
 
 	if platform.CompilerSupported() {
 		tests = append(tests, testCase{
@@ -42,10 +40,14 @@ func TestWithDWARFBasedStackTrace(t *testing.T) {
 
 			wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-			_, err := r.InstantiateModuleFromBinary(ctx, dwarftestdata.DWARFWasm)
+			compiled, err := r.CompileModule(ctx, dwarftestdata.DWARFWasm)
+			require.NoError(t, err)
+
+			// Use context.Background to ensure that DWARF is a compile-time option.
+			_, err = r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig())
 			require.Error(t, err)
+
 			errStr := err.Error()
-			t.Log(err)
 			require.Contains(t, errStr, "src/runtime/runtime_tinygowasm.go:73:6")
 			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:19:7")
 			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:14:3")
