@@ -14,7 +14,10 @@ import (
 )
 
 func TestWithDWARFBasedStackTrace(t *testing.T) {
-	ctx := experimental.WithDWARFBasedStackTrace(context.Background())
+	ctx := context.Background()
+	require.False(t, experimental.DWARFBasedStackTraceEnabled(ctx))
+	ctx = experimental.WithDWARFBasedStackTrace(ctx)
+	require.True(t, experimental.DWARFBasedStackTraceEnabled(ctx))
 
 	type testCase struct {
 		name string

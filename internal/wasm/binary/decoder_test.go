@@ -1,10 +1,10 @@
 package binary
 
 import (
-	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/testing/dwarftestdata"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
