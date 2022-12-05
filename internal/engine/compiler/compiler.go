@@ -323,4 +323,7 @@ type compiler interface {
 	pushRuntimeValueLocationOnRegister(reg asm.Register, vt runtimeValueType) (ret *runtimeValueLocation)
 	// pushRuntimeValueLocationOnRegister pushes a new vector value's runtimeValueLocation on a register `reg`.
 	pushVectorRuntimeValueLocationOnRegister(reg asm.Register) (lowerBitsLocation *runtimeValueLocation)
+	// compileNOP compiles NOP instruction and returns the corresponding asm.Node in the assembled native code.
+	// This is used to emit DWARF based stack traces.
+	compileNOP() asm.Node
 }

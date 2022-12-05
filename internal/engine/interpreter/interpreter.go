@@ -170,6 +170,7 @@ type callFrame struct {
 }
 
 type code struct {
+	source   *wasm.Module
 	body     []*interpreterOp
 	listener experimental.FunctionListener
 	hostFn   interface{}
@@ -212,11 +213,12 @@ func (c *code) instantiate(f *wasm.FunctionInstance) *function {
 // only relevant when in context of its kind.
 type interpreterOp struct {
 	// kind determines how to interpret the other fields in this struct.
-	kind   wazeroir.OperationKind
-	b1, b2 byte
-	b3     bool
-	us     []uint64
-	rs     []*wazeroir.InclusiveRange
+	kind     wazeroir.OperationKind
+	b1, b2   byte
+	b3       bool
+	us       []uint64
+	rs       []*wazeroir.InclusiveRange
+	sourcePC uint64
 }
 
 // interpreter mode doesn't maintain call frames in the stack, so pass the zero size to the IR.
@@ -242,19 +244,19 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 		// If this is the host function, there's nothing to do as the runtime representation of
 		// host function in interpreter is its Go function itself as opposed to Wasm functions,
 		// which need to be compiled down to wazeroir.
+		var compiled *code
 		if ir.GoFunc != nil {
-			funcs[i] = &code{hostFn: ir.GoFunc, listener: lsn}
-			continue
+			compiled = &code{hostFn: ir.GoFunc, listener: lsn}
 		} else {
-			compiled, err := e.lowerIR(ir)
+			compiled, err = e.lowerIR(ir)
 			if err != nil {
 				def := module.FunctionDefinitionSection[uint32(i)+module.ImportFuncCount()]
 				return fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
 			}
 			compiled.listener = lsn
-			funcs[i] = compiled
 		}
-
+		compiled.source = module
+		funcs[i] = compiled
 	}
 	e.addCodes(module, funcs)
 	return nil
@@ -289,12 +291,16 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 
 // lowerIR lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIR(ir *wazeroir.CompilationResult) (*code, error) {
+	hasSourcePCs := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
 	ops := ir.Operations
 	ret := &code{}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
-	for _, original := range ops {
+	for i, original := range ops {
 		op := &interpreterOp{kind: original.Kind()}
+		if hasSourcePCs {
+			op.sourcePC = ir.IROperationSourceOffsetsInWasmBinary[i]
+		}
 		switch o := original.(type) {
 		case *wazeroir.OperationUnreachable:
 		case *wazeroir.OperationLabel:
@@ -848,7 +854,11 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	for i := 0; i < frameCount; i++ {
 		frame := ce.popFrame()
 		def := frame.f.source.Definition
-		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+		var sourceInfo string
+		if frame.f.body != nil {
+			sourceInfo = wasmdebug.GetSourceInfo(frame.f.parent.source.DWARF, frame.f.body[frame.pc].sourcePC)
+		}
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
 	}
 	err = builder.FromRecovered(v)
 

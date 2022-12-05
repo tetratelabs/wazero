@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sort"
 	"sync"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -263,6 +265,19 @@ type (
 		sourceModule *wasm.Module
 		// listener holds a listener to notify when this function is called.
 		listener experimental.FunctionListener
+
+		sourceOffsetMap *sourceOffsetMap
+	}
+
+	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
+	// offset in the native binary.
+	sourceOffsetMap struct {
+		// irOperationOffsetsInNativeBinary is index-correlated with irOperationSourceOffsetsInWasmBinary,
+		// and maps each index (corresponding to each IR Operation) to the offset in the compiled native code.
+		irOperationOffsetsInNativeBinary []uint64
+		// irOperationSourceOffsetsInWasmBinary is index-correlated with irOperationOffsetsInNativeBinary.
+		// See wazeroir.CompilationResult irOperationOffsetsInNativeBinary.
+		irOperationSourceOffsetsInWasmBinary []uint64
 	}
 )
 
@@ -716,15 +731,26 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		// Unwinds call frames from the values stack, starting from the
 		// current function `ce.fn`, and the current stack base pointer `ce.stackBasePointerInBytes`.
 		fn := ce.fn
+		pc := uint64(ce.returnAddress)
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		for {
-			def := fn.source.Definition
-			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+			source := fn.source
+			def := source.Definition
 
-			callFrameOffset := callFrameOffset(fn.source.Type)
+			var sourceInfo string
+			if p := fn.parent; p.codeSegment != nil {
+				if p.sourceOffsetMap != nil {
+					offset := fn.getSourceOffsetInWasmBinary(pc)
+					sourceInfo = wasmdebug.GetSourceInfo(fn.parent.sourceModule.DWARF, offset)
+				}
+			}
+			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
+
+			callFrameOffset := callFrameOffset(source.Type)
 			if stackBasePointer != 0 {
 				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
 				fn = frame.function
+				pc = uint64(frame.returnAddress)
 				stackBasePointer = int(frame.returnStackBasePointerInBytes >> 3)
 			} else { // base == 0 means that this was the last call frame stacked.
 				break
@@ -737,6 +763,33 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstanceAddress = 0, 0, 0
 	ce.moduleContext.fn = ce.initialFn
 	return
+}
+
+// getSourceOffsetInWasmBinary returns the corresponding offset in the original Wasm binary's code section
+// for the given pc (which is an absolute address in the memory).
+// If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
+func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
+	srcPCMaps := f.parent.sourceOffsetMap
+	n := len(srcPCMaps.irOperationOffsetsInNativeBinary) + 1
+
+	// Calculate the offset in the compiled native binary.
+	pcOffsetInNativeBinary := pc - uint64(f.codeInitialAddress)
+
+	// Then, do the binary search on the list of offsets in the native binary for all the IR operations.
+	// This returns the index of the *next* IR operation of the one corresponding to the origin of this pc.
+	// See sort.Search.
+	index := sort.Search(n, func(i int) bool {
+		if i == n-1 {
+			return true
+		}
+		return srcPCMaps.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
+	})
+
+	if index == n { // This case, somehow pc is not found in the source offset map.
+		return 0
+	} else {
+		return srcPCMaps.irOperationSourceOffsetsInWasmBinary[index-1]
+	}
 }
 
 func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
@@ -983,8 +1036,21 @@ func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult, wit
 		return nil, fmt.Errorf("failed to emit preamble: %w", err)
 	}
 
+	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
+	var irOpBegins []asm.Node
+	if needSourceOffsets {
+		irOpBegins = make([]asm.Node, len(ir.Operations))
+	}
+
 	var skip bool
-	for _, op := range ir.Operations {
+	for i, op := range ir.Operations {
+		if needSourceOffsets {
+			// If this compilation requires source offsets for DWARF based back trace,
+			// we emit a NOP node at the beginning of each IR operation to get the
+			// binary offset of the beginning of the corresponding compiled native code.
+			irOpBegins[i] = compiler.compileNOP()
+		}
+
 		// Compiler determines whether skip the entire label.
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
@@ -1289,5 +1355,16 @@ func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult, wit
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	return &code{codeSegment: c, stackPointerCeil: stackPointerCeil}, nil
+	ret := &code{codeSegment: c, stackPointerCeil: stackPointerCeil}
+	if needSourceOffsets {
+		offsetInNativeBin := make([]uint64, len(irOpBegins))
+		for i, nop := range irOpBegins {
+			offsetInNativeBin[i] = nop.OffsetInBinary()
+		}
+		ret.sourceOffsetMap = &sourceOffsetMap{
+			irOperationSourceOffsetsInWasmBinary: ir.IROperationSourceOffsetsInWasmBinary,
+			irOperationOffsetsInNativeBinary:     offsetInNativeBin,
+		}
+	}
+	return ret, nil
 }

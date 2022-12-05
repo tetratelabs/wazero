@@ -2,6 +2,7 @@ package binary
 
 import (
 	"bytes"
+	"debug/dwarf"
 	"errors"
 	"fmt"
 	"io"
@@ -18,7 +19,7 @@ func DecodeModule(
 	enabledFeatures api.CoreFeatures,
 	memoryLimitPages uint32,
 	memoryCapacityFromMax,
-	storeCustomSections bool,
+	dwarfEnabled, storeCustomSections bool,
 ) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
@@ -36,6 +37,7 @@ func DecodeModule(
 	memorySizer := newMemorySizer(memoryLimitPages, memoryCapacityFromMax)
 
 	m := &wasm.Module{}
+	var info, line, str, abbrev, ranges []byte // For DWARF Data.
 	for {
 		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
 		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%93%AA
@@ -69,19 +71,36 @@ func DecodeModule(
 
 			// Now, either decode the NameSection or CustomSection
 			limit := sectionSize - nameSize
-			if name == "name" {
-				m.NameSection, err = decodeNameSection(r, uint64(limit))
-			} else if storeCustomSections {
-				custom, err := decodeCustomSection(r, name, uint64(limit))
-				if err != nil {
-					return nil, fmt.Errorf("failed to read custom section name[%s]: %w", name, err)
+
+			var c *wasm.CustomSection
+			if name != "name" {
+				if storeCustomSections || dwarfEnabled {
+					c, err = decodeCustomSection(r, name, uint64(limit))
+					if err != nil {
+						return nil, fmt.Errorf("failed to read custom section name[%s]: %w", name, err)
+					}
+					m.CustomSections = append(m.CustomSections, c)
+					if dwarfEnabled {
+						switch name {
+						case ".debug_info":
+							info = c.Data
+						case ".debug_line":
+							line = c.Data
+						case ".debug_str":
+							str = c.Data
+						case ".debug_abbrev":
+							abbrev = c.Data
+						case ".debug_ranges":
+							ranges = c.Data
+						}
+					}
+				} else {
+					if _, err = io.CopyN(io.Discard, r, int64(limit)); err != nil {
+						return nil, fmt.Errorf("failed to skip name[%s]: %w", name, err)
+					}
 				}
-				m.CustomSections = append(m.CustomSections, custom)
 			} else {
-				// Note: Not Seek because it doesn't err when given an offset past EOF. Rather, it leads to undefined state.
-				if _, err = io.CopyN(io.Discard, r, int64(limit)); err != nil {
-					return nil, fmt.Errorf("failed to skip name[%s]: %w", name, err)
-				}
+				m.NameSection, err = decodeNameSection(r, uint64(limit))
 			}
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(enabledFeatures, r)
@@ -129,6 +148,10 @@ func DecodeModule(
 		if err != nil {
 			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID), err)
 		}
+	}
+
+	if dwarfEnabled {
+		m.DWARF, _ = dwarf.New(abbrev, nil, nil, info, line, nil, ranges, str)
 	}
 
 	functionCount, codeCount := m.SectionElementCount(wasm.SectionIDFunction), m.SectionElementCount(wasm.SectionIDCode)

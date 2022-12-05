@@ -66,6 +66,8 @@ build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
+	# Need DWARF sections.
+	tinygo build -o internal/testing/dwarftestdata/testdata/main.wasm -scheduler=none --target=wasi internal/testing/dwarftestdata/testdata/main.go
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
 c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/ls.c

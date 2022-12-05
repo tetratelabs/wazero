@@ -3,6 +3,7 @@ package wasm
 import (
 	"bytes"
 	"crypto/sha256"
+	"debug/dwarf"
 	"errors"
 	"fmt"
 	"io"
@@ -184,6 +185,11 @@ type Module struct {
 
 	// MemoryDefinitionSection is a wazero-specific section built on Validate.
 	MemoryDefinitionSection []*MemoryDefinition
+
+	// DWARF is the DWARF data used for DWARF base stack trace. This is created from the multiple custom sections
+	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not a specified in the Wasm
+	// specification: https://github.com/WebAssembly/debugging/issues/1
+	DWARF *dwarf.Data
 }
 
 // ModuleID represents sha256 hash value uniquely assigned to Module.
@@ -831,6 +837,10 @@ type Code struct {
 	// Note: This has no serialization format, so is not encodable.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
 	GoFunc interface{}
+
+	// BodyOffsetInCodeSection is the offset of the beginning of the body in the code section.
+	// This is used for DWARF based stack trace where a program counter represents an offset in code section.
+	BodyOffsetInCodeSection uint64
 }
 
 type DataSegment struct {
