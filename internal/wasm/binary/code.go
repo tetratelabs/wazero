@@ -10,7 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
+func decodeCode(r *bytes.Reader, codeSectionStart uint64) (*wasm.Code, error) {
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get the size of code: %w", err)
@@ -67,6 +67,7 @@ func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 		}
 	}
 
+	bodyOffsetInCodeSection := codeSectionStart - uint64(r.Len())
 	body := make([]byte, remaining)
 	if _, err = io.ReadFull(r, body); err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
@@ -76,7 +77,7 @@ func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 		return nil, fmt.Errorf("expr not end with OpcodeEnd")
 	}
 
-	return &wasm.Code{Body: body, LocalTypes: localTypes}, nil
+	return &wasm.Code{Body: body, LocalTypes: localTypes, BodyOffsetInCodeSection: bodyOffsetInCodeSection}, nil
 }
 
 // encodeCode returns the wasm.Code encoded in WebAssembly 1.0 (20191205) Binary Format.

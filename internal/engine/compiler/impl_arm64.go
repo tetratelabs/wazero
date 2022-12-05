@@ -91,6 +91,11 @@ func isZeroRegister(r asm.Register) bool {
 	return r == arm64.RegRZR
 }
 
+// compileNOP implements compiler.compileNOP for the arm64 architecture.
+func (c *arm64Compiler) compileNOP() asm.Node {
+	return c.assembler.CompileStandAlone(arm64.NOP)
+}
+
 // compile implements compiler.compile for the arm64 architecture.
 func (c *arm64Compiler) compile() (code []byte, stackPointerCeil uint64, err error) {
 	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all runtimeValueLocationStack(s)
@@ -339,6 +344,25 @@ func (c *arm64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 		// If the status == 0, we use zero register to store zero.
 		c.assembler.CompileRegisterToMemory(arm64.STRW, arm64.RegRZR,
 			arm64ReservedRegisterForCallEngine, callEngineExitContextNativeCallStatusCodeOffset)
+	}
+
+	switch status {
+	case nativeCallStatusCodeReturned:
+	case nativeCallStatusCodeCallGoHostFunction, nativeCallStatusCodeCallBuiltInFunction:
+		// Read the return address, and write it to callEngine.exitContext.returnAddress.
+		c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.RET)
+		c.assembler.CompileRegisterToMemory(
+			arm64.STRD, arm64ReservedRegisterForTemporary,
+			arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
+		)
+	default:
+		// This case, the execution traps, store the instruction address onto callEngine.returnAddress
+		// so that the stack trace can contain the top frame's source position.
+		c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.STRD)
+		c.assembler.CompileRegisterToMemory(
+			arm64.STRD, arm64ReservedRegisterForTemporary,
+			arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
+		)
 	}
 
 	// The return address to the Go code is stored in archContext.compilerReturnAddress which
@@ -2769,13 +2793,6 @@ func (c *arm64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 			arm64ReservedRegisterForCallEngine, callEngineExitContextBuiltinFunctionCallIndexOffset,
 		)
 	}
-
-	// Read the return address, and write it to callEngine.exitContext.returnAddress.
-	c.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.RET)
-	c.assembler.CompileRegisterToMemory(
-		arm64.STRD, arm64ReservedRegisterForTemporary,
-		arm64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset,
-	)
 
 	c.compileExitFromNativeCode(compilerStatus)
 	return nil

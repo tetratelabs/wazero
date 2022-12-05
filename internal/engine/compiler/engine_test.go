@@ -354,18 +354,27 @@ func ptrAsUint64(f *function) uint64 {
 }
 
 func TestCallEngine_deferredOnCall(t *testing.T) {
-	f1 := &function{source: &wasm.FunctionInstance{
-		Definition: newMockFunctionDefinition("1"),
-		Type:       &wasm.FunctionType{ParamNumInUint64: 2},
-	}}
-	f2 := &function{source: &wasm.FunctionInstance{
-		Definition: newMockFunctionDefinition("2"),
-		Type:       &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
-	}}
-	f3 := &function{source: &wasm.FunctionInstance{
-		Definition: newMockFunctionDefinition("3"),
-		Type:       &wasm.FunctionType{ResultNumInUint64: 1},
-	}}
+	f1 := &function{
+		source: &wasm.FunctionInstance{
+			Definition: newMockFunctionDefinition("1"),
+			Type:       &wasm.FunctionType{ParamNumInUint64: 2},
+		},
+		parent: &code{sourceModule: &wasm.Module{}},
+	}
+	f2 := &function{
+		source: &wasm.FunctionInstance{
+			Definition: newMockFunctionDefinition("2"),
+			Type:       &wasm.FunctionType{ParamNumInUint64: 2, ResultNumInUint64: 3},
+		},
+		parent: &code{sourceModule: &wasm.Module{}},
+	}
+	f3 := &function{
+		source: &wasm.FunctionInstance{
+			Definition: newMockFunctionDefinition("3"),
+			Type:       &wasm.FunctionType{ResultNumInUint64: 1},
+		},
+		parent: &code{sourceModule: &wasm.Module{}},
+	}
 
 	ce := &callEngine{
 		stack: []uint64{
@@ -629,4 +638,71 @@ func (m mockListener) Before(ctx context.Context, def api.FunctionDefinition, pa
 
 func (m mockListener) After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
 	m.after(ctx, def, err, resultValues)
+}
+
+func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
+	tests := []struct {
+		name               string
+		pc, exp            uint64
+		codeInitialAddress uintptr
+		srcMap             *sourceOffsetMap
+	}{
+		{name: "source map nil", srcMap: nil}, // This can happen when this code is from compilation cache.
+		{name: "not found", srcMap: &sourceOffsetMap{}},
+		{
+			name:               "first IR",
+			pc:                 4000,
+			codeInitialAddress: 3999,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0 /*4000-3999=1 exists here*/, 5, 8, 15,
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 10,
+		},
+		{
+			name:               "middle",
+			pc:                 100,
+			codeInitialAddress: 90,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0, 5, 8 /*100-90=10 exists here*/, 15,
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 800,
+		},
+		{
+			name:               "last",
+			pc:                 9999,
+			codeInitialAddress: 8999,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0, 5, 8, 15, /*9999-8999=1000 exists here*/
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 12344,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			f := function{
+				parent:             &code{sourceOffsetMap: tc.srcMap},
+				codeInitialAddress: tc.codeInitialAddress,
+			}
+
+			actual := f.getSourceOffsetInWasmBinary(tc.pc)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
 }

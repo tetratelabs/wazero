@@ -77,6 +77,11 @@ func (c *amd64Compiler) String() string {
 	return c.locationStack.String()
 }
 
+// compileNOP implements compiler.compileNOP for the amd64 architecture.
+func (c *amd64Compiler) compileNOP() asm.Node {
+	return c.assembler.CompileStandAlone(amd64.NOP)
+}
+
 type amd64Compiler struct {
 	assembler amd64.Assembler
 	ir        *wazeroir.CompilationResult
@@ -4655,15 +4660,6 @@ func (c *amd64Compiler) compileCallGoFunction(compilerStatus nativeCallStatusCod
 		return err
 	}
 
-	// Read the return address, and write it to callEngine.exitContext.returnAddress.
-	returnAddressReg, ok := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
-	if !ok {
-		panic("BUG: cannot take free register")
-	}
-	c.assembler.CompileReadInstructionAddress(returnAddressReg, amd64.RET)
-	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
-		returnAddressReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
-
 	c.compileExitFromNativeCode(compilerStatus)
 	return nil
 }
@@ -4731,6 +4727,26 @@ func (c *amd64Compiler) compileExitFromNativeCode(status nativeCallStatusCode) {
 	// Write back the cached SP to the actual eng.stackPointer.
 	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp),
 		amd64ReservedRegisterForCallEngine, callEngineStackContextStackPointerOffset)
+
+	switch status {
+	case nativeCallStatusCodeReturned:
+	case nativeCallStatusCodeCallGoHostFunction, nativeCallStatusCodeCallBuiltInFunction:
+		// Read the return address, and write it to callEngine.exitContext.returnAddress.
+		returnAddressReg, ok := c.locationStack.takeFreeRegister(registerTypeGeneralPurpose)
+		if !ok {
+			panic("BUG: cannot take free register")
+		}
+		c.assembler.CompileReadInstructionAddress(returnAddressReg, amd64.RET)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
+			returnAddressReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+	default:
+		// This case, the execution traps, so take tmpReg and store the instruction address onto callEngine.returnAddress
+		// so that the stack trace can contain the top frame's source position.
+		tmpReg := amd64.RegR15
+		c.assembler.CompileReadInstructionAddress(tmpReg, amd64.MOVQ)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ,
+			tmpReg, amd64ReservedRegisterForCallEngine, callEngineExitContextReturnAddressOffset)
+	}
 
 	c.assembler.CompileStandAlone(amd64.RET)
 }

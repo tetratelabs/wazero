@@ -163,8 +163,8 @@ type compiler struct {
 		on    bool
 		depth int
 	}
-	pc     uint64
-	result CompilationResult
+	pc, currentOpPC uint64
+	result          CompilationResult
 
 	// body holds the code for the function's body where Wasm instructions are stored.
 	body []byte
@@ -182,6 +182,11 @@ type compiler struct {
 	funcs []uint32
 	// globals holds the global types for all declard globas in the module where the targe function exists.
 	globals []*wasm.GlobalType
+
+	// needSourceOffset is true if this module requires DWARF based stack trace.
+	needSourceOffset bool
+	// bodyOffsetInCodeSection is the offset of the body of this function in the original Wasm binary's code section.
+	bodyOffsetInCodeSection uint64
 }
 
 //lint:ignore U1000 for debugging only.
@@ -212,6 +217,11 @@ type CompilationResult struct {
 
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
+
+	// IROperationSourceOffsetsInWasmBinary is index-correlated with Operation and maps each operation to the corresponding source instruction's
+	// offset in the original WebAssembly binary.
+	// Non nil only when the given Wasm module has the DWARF section.
+	IROperationSourceOffsetsInWasmBinary []uint64
 
 	// LabelCallers maps Label.String() to the number of callers to that label.
 	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
@@ -249,7 +259,7 @@ type CompilationResult struct {
 	HasElementInstances bool
 }
 
-func CompileFunctions(_ context.Context, enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module) ([]*CompilationResult, error) {
+func CompileFunctions(ctx context.Context, enabledFeatures api.CoreFeatures, callFrameStackSizeInUint64 int, module *wasm.Module) ([]*CompilationResult, error) {
 	functions, globals, mem, tables, err := module.AllDeclarations()
 	if err != nil {
 		return nil, err
@@ -286,7 +296,8 @@ func CompileFunctions(_ context.Context, enabledFeatures api.CoreFeatures, callF
 			}
 			continue
 		}
-		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body, code.LocalTypes, module.TypeSection, functions, globals)
+		r, err := compile(enabledFeatures, callFrameStackSizeInUint64, sig, code.Body,
+			code.LocalTypes, module.TypeSection, functions, globals, code.BodyOffsetInCodeSection, module.DWARF != nil)
 		if err != nil {
 			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
 			return nil, fmt.Errorf("failed to lower func[%s] to wazeroir: %w", def.DebugName(), err)
@@ -316,6 +327,8 @@ func compile(enabledFeatures api.CoreFeatures,
 	localTypes []wasm.ValueType,
 	types []*wasm.FunctionType,
 	functions []uint32, globals []*wasm.GlobalType,
+	bodyOffsetInCodeSection uint64,
+	needSourceOffset bool,
 ) (*CompilationResult, error) {
 	c := compiler{
 		enabledFeatures:            enabledFeatures,
@@ -328,6 +341,8 @@ func compile(enabledFeatures api.CoreFeatures,
 		globals:                    globals,
 		funcs:                      functions,
 		types:                      types,
+		needSourceOffset:           needSourceOffset,
+		bodyOffsetInCodeSection:    bodyOffsetInCodeSection,
 	}
 
 	c.initializeStack()
@@ -360,6 +375,7 @@ func compile(enabledFeatures api.CoreFeatures,
 // and emit the results into c.results.
 func (c *compiler) handleInstruction() error {
 	op := c.body[c.pc]
+	c.currentOpPC = c.pc
 	if false {
 		var instName string
 		if op == wasm.OpcodeVecPrefix {
@@ -3032,6 +3048,10 @@ func (c *compiler) emit(ops ...Operation) {
 				}
 			}
 			c.result.Operations = append(c.result.Operations, op)
+			if c.needSourceOffset {
+				c.result.IROperationSourceOffsetsInWasmBinary = append(c.result.IROperationSourceOffsetsInWasmBinary,
+					c.currentOpPC+c.bodyOffsetInCodeSection)
+			}
 			if false {
 				fmt.Printf("emitting ")
 				formatOperation(os.Stdout, op)
