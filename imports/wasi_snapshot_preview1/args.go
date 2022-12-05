@@ -59,7 +59,7 @@ var argsGet = &wasm.HostFunc{
 func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	argv, argvBuf := uint32(params[0]), uint32(params[1])
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf)
+	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
 }
 
 // argsSizesGet is the WASI function named functionArgsSizesGet that reads
@@ -108,7 +108,8 @@ func argsSizesGetFn(ctx context.Context, mod api.Module, params []uint64) Errno 
 	mem := mod.Memory()
 	resultArgc, resultArgvLen := uint32(params[0]), uint32(params[1])
 
-	// Write the Errno back to the stack
+	// argc and argv_len offsets are not necessarily sequential, so we have to
+	// write them independently.
 	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
 		return ErrnoFault
 	}

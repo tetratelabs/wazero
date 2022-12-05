@@ -215,23 +215,41 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 	exporter.ExportHostFunc(sockShutdown)
 }
 
-func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) Errno {
+// writeOffsetsAndNullTerminatedValues is used to write NUL-terminated values
+// for args or environ, given a pre-defined bytesLen (which includes NUL
+// terminators).
+func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
+	// The caller may not place bytes directly after offsets, so we have to
+	// read them independently.
+	valuesLen := len(values)
+	offsetsLen := uint32(valuesLen * 4) // uint32Le
+	offsetsBuf, ok := mem.Read(ctx, offsets, offsetsLen)
+	if !ok {
+		return ErrnoFault
+	}
+	bytesBuf, ok := mem.Read(ctx, bytes, bytesLen)
+	if !ok {
+		return ErrnoFault
+	}
+
+	// Loop through the values, first writing the location of its data to
+	// offsetsBuf[oI], then its NUL-terminated data at bytesBuf[bI]
+	var oI, bI uint32
 	for _, value := range values {
-		// Write current offset and advance it.
-		if !mem.WriteUint32Le(ctx, offsets, bytes) {
-			return ErrnoFault
-		}
-		offsets += 4 // size of uint32
+		// Go can't guarantee inlining as there's not //go:inline directive.
+		// This inlines uint32 little-endian encoding instead.
+		bytesOffset := bytes + bI
+		offsetsBuf[oI] = byte(bytesOffset)
+		offsetsBuf[oI+1] = byte(bytesOffset >> 8)
+		offsetsBuf[oI+2] = byte(bytesOffset >> 16)
+		offsetsBuf[oI+3] = byte(bytesOffset >> 24)
+		oI += 4 // size of uint32 we just wrote
 
 		// Write the next value to memory with a NUL terminator
-		if !mem.Write(ctx, bytes, []byte(value)) {
-			return ErrnoFault
-		}
-		bytes += uint32(len(value))
-		if !mem.WriteByte(ctx, bytes, 0) {
-			return ErrnoFault
-		}
-		bytes++
+		copy(bytesBuf[bI:], value)
+		bI += uint32(len(value))
+		bytesBuf[bI] = 0 // NUL terminator
+		bI++
 	}
 
 	return ErrnoSuccess

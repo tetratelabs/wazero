@@ -26,10 +26,10 @@ func WriteArgsAndEnviron(ctx context.Context, mod api.Module) (argc, argv uint32
 	argc = uint32(len(args))
 	offset := endOfPageZero
 
-	strPtr := func(val, field string, i int) (ptr uint32) {
+	strPtr := func(val []byte, field string, i int) (ptr uint32) {
 		// TODO: return err and format "%s[%d], field, i"
 		ptr = offset
-		mustWrite(ctx, mem, field, offset, append([]byte(val), 0))
+		mustWrite(ctx, mem, field, offset, append(val, 0))
 		offset += uint32(len(val) + 1)
 		if pad := offset % 8; pad != 0 {
 			offset += 8 - pad

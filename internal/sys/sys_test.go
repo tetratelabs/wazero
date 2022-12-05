@@ -61,7 +61,7 @@ func TestDefaultSysContext(t *testing.T) {
 func TestNewContext_Args(t *testing.T) {
 	tests := []struct {
 		name         string
-		args         []string
+		args         [][]byte
 		maxSize      uint32
 		expectedSize uint32
 		expectedErr  string
@@ -69,25 +69,25 @@ func TestNewContext_Args(t *testing.T) {
 		{
 			name:         "ok",
 			maxSize:      10,
-			args:         []string{"a", "bc"},
+			args:         [][]byte{[]byte("a"), []byte("bc")},
 			expectedSize: 5,
 		},
 		{
 			name:        "exceeds max count",
 			maxSize:     1,
-			args:        []string{"a", "bc"},
+			args:        [][]byte{[]byte("a"), []byte("bc")},
 			expectedErr: "args invalid: exceeds maximum count",
 		},
 		{
 			name:        "exceeds max size",
 			maxSize:     4,
-			args:        []string{"a", "bc"},
+			args:        [][]byte{[]byte("a"), []byte("bc")},
 			expectedErr: "args invalid: exceeds maximum size",
 		},
 		{
 			name:        "null character",
 			maxSize:     10,
-			args:        []string{"a", string([]byte{'b', 0})},
+			args:        [][]byte{[]byte("a"), {'b', 0}},
 			expectedErr: "args invalid: contains NUL character",
 		},
 	}
@@ -123,7 +123,7 @@ func TestNewContext_Args(t *testing.T) {
 func TestNewContext_Environ(t *testing.T) {
 	tests := []struct {
 		name         string
-		environ      []string
+		environ      [][]byte
 		maxSize      uint32
 		expectedSize uint32
 		expectedErr  string
@@ -131,25 +131,25 @@ func TestNewContext_Environ(t *testing.T) {
 		{
 			name:         "ok",
 			maxSize:      10,
-			environ:      []string{"a=b", "c=de"},
+			environ:      [][]byte{[]byte("a=b"), []byte("c=de")},
 			expectedSize: 9,
 		},
 		{
 			name:        "exceeds max count",
 			maxSize:     1,
-			environ:     []string{"a=b", "c=de"},
+			environ:     [][]byte{[]byte("a=b"), []byte("c=de")},
 			expectedErr: "environ invalid: exceeds maximum count",
 		},
 		{
 			name:        "exceeds max size",
 			maxSize:     4,
-			environ:     []string{"a=b", "c=de"},
+			environ:     [][]byte{[]byte("a=b"), []byte("c=de")},
 			expectedErr: "environ invalid: exceeds maximum size",
 		},
 		{
 			name:        "null character",
 			maxSize:     10,
-			environ:     []string{"a=b", string(append([]byte("c=d"), 0))},
+			environ:     [][]byte{[]byte("a=b"), append([]byte("c=d"), 0)},
 			expectedErr: "environ invalid: contains NUL character",
 		},
 	}

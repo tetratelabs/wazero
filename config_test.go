@@ -639,8 +639,8 @@ func requireSysContext(
 ) *internalsys.Context {
 	sysCtx, err := internalsys.NewContext(
 		max,
-		args,
-		environ,
+		toByteSlices(args),
+		toByteSlices(environ),
 		stdin,
 		stdout,
 		stderr,
