@@ -42,7 +42,7 @@ func Test_procExit(t *testing.T) {
 			defer log.Reset()
 
 			// Since procExit panics, any opcodes afterwards cannot be reached.
-			_, err := mod.ExportedFunction(functionProcExit).Call(testCtx, uint64(tc.exitCode))
+			_, err := mod.ExportedFunction(procExitName).Call(testCtx, uint64(tc.exitCode))
 			require.Error(t, err)
 			sysErr, ok := err.(*sys.ExitError)
 			require.True(t, ok, err)
@@ -54,11 +54,11 @@ func Test_procExit(t *testing.T) {
 
 // Test_procRaise only tests it is stubbed for GrainLang per #271
 func Test_procRaise(t *testing.T) {
-	log := requireErrnoNosys(t, functionProcRaise, 0)
+	log := requireErrnoNosys(t, procRaiseName, 0)
 	require.Equal(t, `
 --> proxy.proc_raise(sig=0)
 	--> wasi_snapshot_preview1.proc_raise(sig=0)
 	<-- ENOSYS
-<-- (52)
+<-- 52
 `, log)
 }

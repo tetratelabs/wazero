@@ -40,11 +40,12 @@ func (m *Module) BuildFunctionDefinitions() {
 
 	var moduleName string
 	var functionNames NameMap
-	var localNames IndirectNameMap
+	var localNames, resultNames IndirectNameMap
 	if m.NameSection != nil {
 		moduleName = m.NameSection.ModuleName
 		functionNames = m.NameSection.FunctionNames
 		localNames = m.NameSection.LocalNames
+		resultNames = m.NameSection.ResultNames
 	}
 
 	importCount := m.ImportFuncCount()
@@ -93,6 +94,7 @@ func (m *Module) BuildFunctionDefinitions() {
 		d.name = funcName
 		d.debugName = wasmdebug.FuncName(moduleName, funcName, funcIdx)
 		d.paramNames = paramNames(localNames, funcIdx, len(d.funcType.Params))
+		d.resultNames = paramNames(resultNames, funcIdx, len(d.funcType.Results))
 
 		for _, e := range m.ExportSection {
 			if e.Type == ExternTypeFunc && e.Index == funcIdx {
@@ -113,6 +115,7 @@ type FunctionDefinition struct {
 	importDesc  *[2]string
 	exportNames []string
 	paramNames  []string
+	resultNames []string
 }
 
 // ModuleName implements the same method as documented on api.FunctionDefinition.
@@ -148,14 +151,9 @@ func (f *FunctionDefinition) ExportNames() []string {
 	return f.exportNames
 }
 
-// GoFunc implements the same method as documented on api.FunctionDefinition.
+// GoFunction implements the same method as documented on api.FunctionDefinition.
 func (f *FunctionDefinition) GoFunction() interface{} {
 	return f.goFunc
-}
-
-// ParamNames implements the same method as documented on api.FunctionDefinition.
-func (f *FunctionDefinition) ParamNames() []string {
-	return f.paramNames
 }
 
 // ParamTypes implements api.FunctionDefinition ParamTypes.
@@ -163,7 +161,17 @@ func (f *FunctionDefinition) ParamTypes() []ValueType {
 	return f.funcType.Params
 }
 
+// ParamNames implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionDefinition) ParamNames() []string {
+	return f.paramNames
+}
+
 // ResultTypes implements api.FunctionDefinition ResultTypes.
 func (f *FunctionDefinition) ResultTypes() []ValueType {
 	return f.funcType.Results
+}
+
+// ResultNames implements the same method as documented on api.FunctionDefinition.
+func (f *FunctionDefinition) ResultNames() []string {
+	return f.resultNames
 }

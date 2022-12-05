@@ -27,12 +27,12 @@ func Test_randomGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke randomGet and check the memory side effects!
-	requireErrno(t, ErrnoSuccess, mod, functionRandomGet, uint64(offset), uint64(length))
+	requireErrno(t, ErrnoSuccess, mod, randomGetName, uint64(offset), uint64(length))
 	require.Equal(t, `
 --> proxy.random_get(buf=1,buf_len=5)
 	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, offset+length+1)
@@ -59,7 +59,7 @@ func Test_randomGet_Errors(t *testing.T) {
 --> proxy.random_get(buf=65536,buf_len=1)
 	==> wasi_snapshot_preview1.random_get(buf=65536,buf_len=1)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -70,7 +70,7 @@ func Test_randomGet_Errors(t *testing.T) {
 --> proxy.random_get(buf=0,buf_len=65537)
 	==> wasi_snapshot_preview1.random_get(buf=0,buf_len=65537)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -81,7 +81,7 @@ func Test_randomGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionRandomGet, uint64(tc.offset), uint64(tc.length))
+			requireErrno(t, ErrnoFault, mod, randomGetName, uint64(tc.offset), uint64(tc.length))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -100,7 +100,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 --> proxy.random_get(buf=1,buf_len=5)
 	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
 	<== EIO
-<-- (29)
+<-- 29
 `,
 		},
 		{
@@ -110,7 +110,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 --> proxy.random_get(buf=1,buf_len=5)
 	==> wasi_snapshot_preview1.random_get(buf=1,buf_len=5)
 	<== EIO
-<-- (29)
+<-- 29
 `,
 		},
 	}
@@ -122,7 +122,7 @@ func Test_randomGet_SourceError(t *testing.T) {
 				WithRandSource(tc.randSource))
 			defer r.Close(testCtx)
 
-			requireErrno(t, ErrnoIo, mod, functionRandomGet, uint64(1), uint64(5)) // arbitrary offset and length
+			requireErrno(t, ErrnoIo, mod, randomGetName, uint64(1), uint64(5)) // arbitrary offset and length
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

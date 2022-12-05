@@ -132,8 +132,8 @@ func TestSeed(t *testing.T) {
 	require.Equal(t, `
 --> proxy.seed()
 	==> env.~lib/builtins/seed()
-	<== (4.958153677776298e-175)
-<-- (4.958153677776298e-175)
+	<== rand=4.958153677776298e-175
+<-- 4.958153677776298e-175
 `, "\n"+log.String())
 
 	require.Equal(t, "538c7f96b164bf1b", hex.EncodeToString(u64.LeBytes(ret[0])))
@@ -186,8 +186,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 	noArgsLog := `
 --> proxy.trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
 	==> env.~lib/builtins/trace(message=4,nArgs=0,arg0=0,arg1=0,arg2=0,arg3=0,arg4=0)
-	<== ()
-<-- ()
+	<==
+<--
 `
 
 	tests := []struct {
@@ -228,8 +228,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			expectedLog: `
 --> proxy.trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
 	==> env.~lib/builtins/trace(message=4,nArgs=1,arg0=1,arg1=0,arg2=0,arg3=0,arg4=0)
-	<== ()
-<-- ()
+	<==
+<--
 `,
 		},
 		{
@@ -240,8 +240,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			expectedLog: `
 --> proxy.trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
 	==> env.~lib/builtins/trace(message=4,nArgs=2,arg0=1,arg1=2,arg2=0,arg3=0,arg4=0)
-	<== ()
-<-- ()
+	<==
+<--
 `,
 		},
 		{
@@ -260,8 +260,8 @@ func TestFunctionExporter_Trace(t *testing.T) {
 			expectedLog: `
 --> proxy.trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
 	==> env.~lib/builtins/trace(message=4,nArgs=5,arg0=1,arg1=2,arg2=3.3,arg3=4.4,arg4=5)
-	<== ()
-<-- ()
+	<==
+<--
 `,
 		},
 		{

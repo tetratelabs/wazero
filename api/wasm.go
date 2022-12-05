@@ -278,6 +278,10 @@ type FunctionDefinition interface {
 	//
 	// See ValueType documentation for encoding rules.
 	ResultTypes() []ValueType
+
+	// ResultNames are index-correlated with ResultTypes or nil if not
+	// available for one or more results.
+	ResultNames() []string
 }
 
 // Function is a WebAssembly function exported from an instantiated module

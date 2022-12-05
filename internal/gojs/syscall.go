@@ -16,22 +16,22 @@ import (
 )
 
 const (
-	functionFinalizeRef        = "syscall/js.finalizeRef"
-	functionStringVal          = "syscall/js.stringVal"
-	functionValueGet           = "syscall/js.valueGet"
-	functionValueSet           = "syscall/js.valueSet"
-	functionValueDelete        = "syscall/js.valueDelete" // stubbed
-	functionValueIndex         = "syscall/js.valueIndex"
-	functionValueSetIndex      = "syscall/js.valueSetIndex" // stubbed
-	functionValueCall          = "syscall/js.valueCall"
-	functionValueInvoke        = "syscall/js.valueInvoke" // stubbed
-	functionValueNew           = "syscall/js.valueNew"
-	functionValueLength        = "syscall/js.valueLength"
-	functionValuePrepareString = "syscall/js.valuePrepareString"
-	functionValueLoadString    = "syscall/js.valueLoadString"
-	functionValueInstanceOf    = "syscall/js.valueInstanceOf" // stubbed
-	functionCopyBytesToGo      = "syscall/js.copyBytesToGo"
-	functionCopyBytesToJS      = "syscall/js.copyBytesToJS"
+	finalizeRefName        = "syscall/js.finalizeRef"
+	stringValName          = "syscall/js.stringVal"
+	valueGetName           = "syscall/js.valueGet"
+	valueSetName           = "syscall/js.valueSet"
+	valueDeleteName        = "syscall/js.valueDelete" // stubbed
+	valueIndexName         = "syscall/js.valueIndex"
+	valueSetIndexName      = "syscall/js.valueSetIndex" // stubbed
+	valueCallName          = "syscall/js.valueCall"
+	valueInvokeName        = "syscall/js.valueInvoke" // stubbed
+	valueNewName           = "syscall/js.valueNew"
+	valueLengthName        = "syscall/js.valueLength"
+	valuePrepareStringName = "syscall/js.valuePrepareString"
+	valueLoadStringName    = "syscall/js.valueLoadString"
+	valueInstanceOfName    = "syscall/js.valueInstanceOf" // stubbed
+	copyBytesToGoName      = "syscall/js.copyBytesToGo"
+	copyBytesToJSName      = "syscall/js.copyBytesToJS"
 )
 
 // FinalizeRef implements js.finalizeRef, which is used as a
@@ -39,8 +39,8 @@ const (
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L61
 var FinalizeRef = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionFinalizeRef},
-	Name:        functionFinalizeRef,
+	ExportNames: []string{finalizeRefName},
+	Name:        finalizeRefName,
 	ParamTypes:  []api.ValueType{i32},
 	ParamNames:  []string{"r"},
 	Code: &wasm.Code{
@@ -61,11 +61,12 @@ func finalizeRef(ctx context.Context, stack []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L212
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L305-L308
 var StringVal = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionStringVal},
-	Name:        functionStringVal,
+	ExportNames: []string{stringValName},
+	Name:        stringValName,
 	ParamTypes:  []api.ValueType{i32, i32},
 	ParamNames:  []string{"xAddr", "xLen"},
 	ResultTypes: []api.ValueType{i64},
+	ResultNames: []string{"ref"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(stringVal),
@@ -87,11 +88,12 @@ func stringVal(ctx context.Context, mod api.Module, stack []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L295
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L311-L316
 var ValueGet = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValueGet},
-	Name:        functionValueGet,
+	ExportNames: []string{valueGetName},
+	Name:        valueGetName,
 	ParamTypes:  []api.ValueType{i64, i32, i32},
 	ParamNames:  []string{"v", "pAddr", "pLen"},
 	ResultTypes: []api.ValueType{i64},
+	ResultNames: []string{"ref"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(valueGet),
@@ -132,8 +134,8 @@ func valueGet(ctx context.Context, mod api.Module, stack []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L309
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L318-L322
 var ValueSet = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValueSet},
-	Name:        functionValueSet,
+	ExportNames: []string{valueSetName},
+	Name:        valueSetName,
 	ParamTypes:  []api.ValueType{i64, i32, i32, i64},
 	ParamNames:  []string{"v", "pAddr", "pLen", "x"},
 	Code: &wasm.Code{
@@ -175,7 +177,7 @@ func valueSet(ctx context.Context, mod api.Module, stack []uint64) {
 // ValueDelete is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L321
-var ValueDelete = stubFunction(functionValueDelete)
+var ValueDelete = stubFunction(valueDeleteName)
 
 // ValueIndex implements js.valueIndex, which is used to load a js.Value property
 // by index, e.g. `v.Index(0)`. Notably, this is used by js.handleEvent to read
@@ -184,11 +186,12 @@ var ValueDelete = stubFunction(functionValueDelete)
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L334
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L331-L334
 var ValueIndex = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValueIndex},
-	Name:        functionValueIndex,
+	ExportNames: []string{valueIndexName},
+	Name:        valueIndexName,
 	ParamTypes:  []api.ValueType{i64, i32},
 	ParamNames:  []string{"v", "i"},
 	ResultTypes: []api.ValueType{i64},
+	ResultNames: []string{"ref"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoFunc(valueIndex),
@@ -209,20 +212,20 @@ func valueIndex(ctx context.Context, stack []uint64) {
 // []interface{}, which doesn't appear to occur in Go's source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L348
-var ValueSetIndex = stubFunction(functionValueSetIndex)
+var ValueSetIndex = stubFunction(valueSetIndexName)
 
 // ValueCall implements js.valueCall, which is used to call a js.Value function
 // by name, e.g. `document.Call("createElement", "div")`.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L394
-//
-//	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L343-L358
+// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L343-L358
 var ValueCall = spfunc.MustCallFromSP(true, &wasm.HostFunc{
-	ExportNames: []string{functionValueCall},
-	Name:        functionValueCall,
+	ExportNames: []string{valueCallName},
+	Name:        valueCallName,
 	ParamTypes:  []api.ValueType{i64, i32, i32, i32, i32},
 	ParamNames:  []string{"v", "mAddr", "mLen", "argsArray", "argsLen"},
 	ResultTypes: []api.ValueType{i64, i32, i32},
+	ResultNames: []string{"ref", "ok", "sp"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(valueCall),
@@ -260,7 +263,7 @@ func valueCall(ctx context.Context, mod api.Module, stack []uint64) {
 // ValueInvoke is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L413
-var ValueInvoke = stubFunction(functionValueInvoke)
+var ValueInvoke = stubFunction(valueInvokeName)
 
 // ValueNew implements js.valueNew, which is used to call a js.Value, e.g.
 // `array.New(2)`.
@@ -268,11 +271,12 @@ var ValueInvoke = stubFunction(functionValueInvoke)
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L432
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L380-L391
 var ValueNew = spfunc.MustCallFromSP(true, &wasm.HostFunc{
-	ExportNames: []string{functionValueNew},
-	Name:        functionValueNew,
+	ExportNames: []string{valueNewName},
+	Name:        valueNewName,
 	ParamTypes:  []api.ValueType{i64, i32, i32},
 	ParamNames:  []string{"v", "argsArray", "argsLen"},
 	ResultTypes: []api.ValueType{i64, i32, i32},
+	ResultNames: []string{"ref", "ok", "sp"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(valueNew),
@@ -335,8 +339,8 @@ func valueNew(ctx context.Context, mod api.Module, stack []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L372
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L396-L397
 var ValueLength = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValueLength},
-	Name:        functionValueLength,
+	ExportNames: []string{valueLengthName},
+	Name:        valueLengthName,
 	ParamTypes:  []api.ValueType{i64},
 	ParamNames:  []string{"v"},
 	ResultTypes: []api.ValueType{i32},
@@ -363,11 +367,12 @@ func valueLength(ctx context.Context, stack []uint64) {
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L531
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L402-L405
 var ValuePrepareString = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValuePrepareString},
-	Name:        functionValuePrepareString,
+	ExportNames: []string{valuePrepareStringName},
+	Name:        valuePrepareStringName,
 	ParamTypes:  []api.ValueType{i64},
 	ParamNames:  []string{"v"},
 	ResultTypes: []api.ValueType{i64, i32},
+	ResultNames: []string{"ref", "len"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoFunc(valuePrepareString),
@@ -393,8 +398,8 @@ func valuePrepareString(ctx context.Context, stack []uint64) {
 //
 //	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L410-L412
 var ValueLoadString = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionValueLoadString},
-	Name:        functionValueLoadString,
+	ExportNames: []string{valueLoadStringName},
+	Name:        valueLoadStringName,
 	ParamTypes:  []api.ValueType{i64, i32, i32},
 	ParamNames:  []string{"v", "bAddr", "bLen"},
 	Code: &wasm.Code{
@@ -417,7 +422,7 @@ func valueLoadString(ctx context.Context, mod api.Module, stack []uint64) {
 // ValueInstanceOf is stubbed as it isn't used in Go's main source tree.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L543
-var ValueInstanceOf = stubFunction(functionValueInstanceOf)
+var ValueInstanceOf = stubFunction(valueInstanceOfName)
 
 // CopyBytesToGo copies a JavaScript managed byte array to linear memory.
 // For example, this is used to read an HTTP response body.
@@ -430,11 +435,12 @@ var ValueInstanceOf = stubFunction(functionValueInstanceOf)
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L569
 // and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L424-L433
 var CopyBytesToGo = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionCopyBytesToGo},
-	Name:        functionCopyBytesToGo,
+	ExportNames: []string{copyBytesToGoName},
+	Name:        copyBytesToGoName,
 	ParamTypes:  []api.ValueType{i32, i32, i32, i64},
 	ParamNames:  []string{"dstAddr", "dstLen", "_", "src"},
 	ResultTypes: []api.ValueType{i32, i32},
+	ResultNames: []string{"n", "ok"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(copyBytesToGo),
@@ -468,14 +474,14 @@ func copyBytesToGo(ctx context.Context, mod api.Module, stack []uint64) {
 //   - ok is false if the dst was not a uint8Array.
 //
 // See https://github.com/golang/go/blob/go1.19/src/syscall/js/js.go#L583
-//
-//	https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L438-L448
+// and https://github.com/golang/go/blob/go1.19/misc/wasm/wasm_exec.js#L438-L448
 var CopyBytesToJS = spfunc.MustCallFromSP(false, &wasm.HostFunc{
-	ExportNames: []string{functionCopyBytesToJS},
-	Name:        functionCopyBytesToJS,
+	ExportNames: []string{copyBytesToJSName},
+	Name:        copyBytesToJSName,
 	ParamTypes:  []api.ValueType{i64, i32, i32, i32},
 	ParamNames:  []string{"dst", "srcAddr", "srcLen", "_"},
 	ResultTypes: []api.ValueType{i32, i32},
+	ResultNames: []string{"n", "ok"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc:         api.GoModuleFunc(copyBytesToJS),

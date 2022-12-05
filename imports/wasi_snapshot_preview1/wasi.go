@@ -255,6 +255,18 @@ func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, va
 	return ErrnoSuccess
 }
 
+func newHostFunc(name string, goFunc wasiFunc, paramTypes []api.ValueType, paramNames ...string) *wasm.HostFunc {
+	return &wasm.HostFunc{
+		ExportNames: []string{name},
+		Name:        name,
+		ParamTypes:  paramTypes,
+		ParamNames:  paramNames,
+		ResultTypes: []api.ValueType{i32},
+		ResultNames: []string{"errno"},
+		Code:        &wasm.Code{IsHostFunction: true, GoFunc: goFunc},
+	}
+}
+
 // wasiFunc special cases that all WASI functions return a single Errno
 // result. The returned value will be written back to the stack at index zero.
 type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
@@ -266,13 +278,14 @@ func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 // stubFunction stubs for GrainLang per #271.
-func stubFunction(name string, paramTypes []wasm.ValueType, paramNames []string) *wasm.HostFunc {
+func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		Name:        name,
 		ExportNames: []string{name},
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []wasm.ValueType{i32},
+		ResultNames: []string{"errno"},
 		Code: &wasm.Code{
 			IsHostFunction: true,
 			Body:           []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd},

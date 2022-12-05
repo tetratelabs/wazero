@@ -25,10 +25,10 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 	}
 
 	for _, n := range []string{
-		functionArgsGet,
-		functionArgsSizesGet,
-		functionEnvironGet,
-		functionEnvironSizesGet,
+		argsGetName,
+		argsSizesGetName,
+		environGetName,
+		environSizesGetName,
 	} {
 		n := n
 		fn := mod.ExportedFunction(n)

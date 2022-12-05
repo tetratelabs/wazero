@@ -69,6 +69,7 @@ func Test_callFromSP(t *testing.T) {
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 				ParamNames:  []string{"x"},
 				ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},
+				ResultNames: []string{"y"},
 				Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
 			},
 			expected: &wasm.ProxyFunc{
@@ -97,6 +98,7 @@ func Test_callFromSP(t *testing.T) {
 					ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
 					ParamNames:  []string{"x"},
 					ResultTypes: []wasm.ValueType{wasm.ValueTypeI32},
+					ResultNames: []string{"y"},
 					Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeEnd}},
 				},
 				CallBodyPos: 9,
@@ -110,6 +112,7 @@ func Test_callFromSP(t *testing.T) {
 				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 				ParamNames:  []string{"x", "y"},
 				ResultTypes: []wasm.ValueType{wasm.ValueTypeI64},
+				ResultNames: []string{"z"},
 				Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeEnd}},
 			},
 			expected: &wasm.ProxyFunc{
@@ -140,6 +143,7 @@ func Test_callFromSP(t *testing.T) {
 					ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 					ParamNames:  []string{"x", "y"},
 					ResultTypes: []wasm.ValueType{wasm.ValueTypeI64},
+					ResultNames: []string{"z"},
 					Code:        &wasm.Code{IsHostFunction: true, Body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeEnd}},
 				},
 				CallBodyPos: 17,

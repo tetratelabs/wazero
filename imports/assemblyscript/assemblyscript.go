@@ -272,6 +272,7 @@ var seed = &wasm.HostFunc{
 	ExportNames: []string{functionSeed},
 	Name:        "~lib/builtins/seed",
 	ResultTypes: []api.ValueType{f64},
+	ResultNames: []string{"rand"},
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {

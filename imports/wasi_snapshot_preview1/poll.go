@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const functionPollOneoff = "poll_oneoff"
+const pollOneoffName = "poll_oneoff"
 
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-eventtype-enumu8
 const (
@@ -21,7 +21,7 @@ const (
 	eventTypeFdWrite
 )
 
-// pollOneoff is the WASI function named functionPollOneoff that concurrently
+// pollOneoff is the WASI function named pollOneoffName that concurrently
 // polls for the occurrence of a set of events.
 //
 // # Parameters
@@ -47,17 +47,11 @@ const (
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#poll_oneoff
 // See https://linux.die.net/man/3/poll
-var pollOneoff = &wasm.HostFunc{
-	ExportNames: []string{functionPollOneoff},
-	Name:        functionPollOneoff,
-	ParamTypes:  []api.ValueType{i32, i32, i32, i32},
-	ParamNames:  []string{"in", "out", "nsubscriptions", "result.nevents"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(pollOneoffFn),
-	},
-}
+var pollOneoff = newHostFunc(
+	pollOneoffName, pollOneoffFn,
+	[]api.ValueType{i32, i32, i32, i32},
+	"in", "out", "nsubscriptions", "result.nevents",
+)
 
 func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	in := uint32(params[0])

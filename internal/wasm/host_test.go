@@ -21,13 +21,14 @@ func swap(ctx context.Context, x, y uint32) (uint32, uint32) {
 }
 
 func TestNewHostModule(t *testing.T) {
-	functionArgsSizesGet := "args_sizes_get"
-	functionFdWrite := "fd_write"
-	functionSwap := "swap"
+	argsSizesGetName := "args_sizes_get"
+	fdWriteName := "fd_write"
+	swapName := "swap"
 
 	tests := []struct {
 		name, moduleName string
 		nameToGoFunc     map[string]interface{}
+		funcToNames      map[string]*HostFuncNames
 		expected         *Module
 	}{
 		{
@@ -43,8 +44,20 @@ func TestNewHostModule(t *testing.T) {
 			name:       "funcs",
 			moduleName: "wasi_snapshot_preview1",
 			nameToGoFunc: map[string]interface{}{
-				functionArgsSizesGet: argsSizesGet,
-				functionFdWrite:      fdWrite,
+				argsSizesGetName: argsSizesGet,
+				fdWriteName:      fdWrite,
+			},
+			funcToNames: map[string]*HostFuncNames{
+				argsSizesGetName: {
+					Name:        argsSizesGetName,
+					ParamNames:  []string{"result.argc", "result.argv_len"},
+					ResultNames: []string{"errno"},
+				},
+				fdWriteName: {
+					Name:        fdWriteName,
+					ParamNames:  []string{"fd", "iovs", "iovs_len", "result.size"},
+					ResultNames: []string{"errno"},
+				},
 			},
 			expected: &Module{
 				TypeSection: []*FunctionType{
@@ -63,6 +76,22 @@ func TestNewHostModule(t *testing.T) {
 						{Index: 0, Name: "args_sizes_get"},
 						{Index: 1, Name: "fd_write"},
 					},
+					LocalNames: IndirectNameMap{
+						{Index: 0, NameMap: NameMap{
+							{Index: 0, Name: "result.argc"},
+							{Index: 1, Name: "result.argv_len"},
+						}},
+						{Index: 1, NameMap: NameMap{
+							{Index: 0, Name: "fd"},
+							{Index: 1, Name: "iovs"},
+							{Index: 2, Name: "iovs_len"},
+							{Index: 3, Name: "result.size"},
+						}},
+					},
+					ResultNames: IndirectNameMap{
+						{Index: 0, NameMap: NameMap{{Index: 0, Name: "errno"}}},
+						{Index: 1, NameMap: NameMap{{Index: 0, Name: "errno"}}},
+					},
 				},
 			},
 		},
@@ -70,8 +99,9 @@ func TestNewHostModule(t *testing.T) {
 			name:       "multi-value",
 			moduleName: "swapper",
 			nameToGoFunc: map[string]interface{}{
-				functionSwap: swap,
+				swapName: swap,
 			},
+			funcToNames: map[string]*HostFuncNames{swapName: {}},
 			expected: &Module{
 				TypeSection:     []*FunctionType{{Params: []ValueType{i32, i32}, Results: []ValueType{i32, i32}}},
 				FunctionSection: []Index{0},
@@ -86,8 +116,7 @@ func TestNewHostModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil,
-				api.CoreFeaturesV1|api.CoreFeatureMultiValue)
+			m, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.funcToNames, api.CoreFeaturesV2)
 			require.NoError(t, e)
 			requireHostModuleEquals(t, tc.expected, m)
 		})
@@ -126,16 +155,19 @@ func TestNewHostModule_Errors(t *testing.T) {
 	tests := []struct {
 		name, moduleName string
 		nameToGoFunc     map[string]interface{}
+		funcToNames      map[string]*HostFuncNames
 		expectedErr      string
 	}{
 		{
 			name:         "not a function",
 			nameToGoFunc: map[string]interface{}{"fn": t},
+			funcToNames:  map[string]*HostFuncNames{"fn": {}},
 			expectedErr:  "func[.fn] kind != func: ptr",
 		},
 		{
 			name:         "function has multiple results",
 			nameToGoFunc: map[string]interface{}{"fn": func() (uint32, uint32) { return 0, 0 }},
+			funcToNames:  map[string]*HostFuncNames{"fn": {}},
 			expectedErr:  "func[.fn] multiple result types invalid as feature \"multi-value\" is disabled",
 		},
 	}
@@ -144,7 +176,7 @@ func TestNewHostModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, nil, api.CoreFeaturesV1)
+			_, e := NewHostModule(tc.moduleName, tc.nameToGoFunc, tc.funcToNames, api.CoreFeaturesV1)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

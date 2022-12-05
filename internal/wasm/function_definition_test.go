@@ -9,7 +9,7 @@ import (
 
 func TestModule_BuildFunctionDefinitions(t *testing.T) {
 	nopCode := &Code{Body: []byte{OpcodeEnd}}
-	fn := func() {}
+	fn := func(uint32) uint32 { return 1 }
 	tests := []struct {
 		name            string
 		m               *Module
@@ -33,16 +33,26 @@ func TestModule_BuildFunctionDefinitions(t *testing.T) {
 		{
 			name: "host func go",
 			m: &Module{
-				TypeSection:     []*FunctionType{v_v},
+				TypeSection:     []*FunctionType{i32_i32},
 				FunctionSection: []Index{0},
 				CodeSection:     []*Code{MustParseGoReflectFuncCode(fn)},
+				NameSection: &NameSection{
+					ModuleName:    "m",
+					FunctionNames: NameMap{{Index: Index(0), Name: "fn"}},
+					LocalNames:    IndirectNameMap{{Index: Index(0), NameMap: NameMap{{Index: Index(0), Name: "x"}}}},
+					ResultNames:   IndirectNameMap{{Index: Index(0), NameMap: NameMap{{Index: Index(0), Name: "y"}}}},
+				},
 			},
 			expected: []*FunctionDefinition{
 				{
-					index:     0,
-					debugName: ".$0",
-					goFunc:    MustParseGoReflectFuncCode(fn).GoFunc,
-					funcType:  v_v,
+					index:       0,
+					name:        "fn",
+					moduleName:  "m",
+					debugName:   "m.fn",
+					goFunc:      MustParseGoReflectFuncCode(fn).GoFunc,
+					funcType:    i32_i32,
+					paramNames:  []string{"x"},
+					resultNames: []string{"y"},
 				},
 			},
 			expectedExports: map[string]api.FunctionDefinition{},
