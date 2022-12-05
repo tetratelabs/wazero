@@ -743,7 +743,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			if p := fn.parent; p.codeSegment != nil {
 				if p.sourceOffsetMap != nil {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
-					sourceInfo = wasmdebug.GetSourceInfo(fn.parent.sourceModule.DWARF, offset)
+					sourceInfo = wasmdebug.GetSourceInfo(p.sourceModule.DWARF, offset)
 				}
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
@@ -772,6 +772,9 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 // If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
 func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 	srcMap := f.parent.sourceOffsetMap
+	if srcMap == nil {
+		return 0
+	}
 	n := len(srcMap.irOperationOffsetsInNativeBinary) + 1
 
 	// Calculate the offset in the compiled native binary.

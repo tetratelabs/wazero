@@ -647,6 +647,7 @@ func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
 		codeInitialAddress uintptr
 		srcMap             *sourceOffsetMap
 	}{
+		{name: "source map nil", srcMap: nil}, // This can happen when this code is from compilation cache.
 		{name: "not found", srcMap: &sourceOffsetMap{}},
 		{
 			name:               "first IR",
