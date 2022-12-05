@@ -14,7 +14,7 @@ type enableDWARFBasedStackTraceKey struct{}
 //
 //	wasm stack trace:
 //		.runtime._panic(i32)
-//		.c()
+//		.myFunc()
 //		.main.main()
 //		.runtime.run()
 //		._start()
@@ -24,12 +24,8 @@ type enableDWARFBasedStackTraceKey struct{}
 //	wasm stack trace:
 //		.runtime._panic(i32)
 //		  0x16e2: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_tinygowasm.go:73:6
-//		.c()
+//		.myFunc()
 //		  0x190b: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:19:7
-//		.b()
-//		  0x1901: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:14:3
-//		.a()
-//		  0x18f7: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:9:3
 //		.main.main()
 //		  0x18ed: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:4:3
 //		.runtime.run()
