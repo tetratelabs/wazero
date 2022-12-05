@@ -1451,6 +1451,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeElse {
+			if len(controlBlockStack) == 0 {
+				return fmt.Errorf("redundant Else instruction at %#x", pc)
+			}
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.

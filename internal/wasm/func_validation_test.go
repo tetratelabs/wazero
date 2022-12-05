@@ -3553,3 +3553,14 @@ func TestFunctionValidation_redundantEnd(t *testing.T) {
 	err := m.validateFunction(api.CoreFeaturesV2, 0, nil, nil, nil, nil, nil)
 	require.EqualError(t, err, "redundant End instruction at 0x1")
 }
+
+// TestFunctionValidation_redundantEnd is found in th validation fuzzing.
+func TestFunctionValidation_redundantElse(t *testing.T) {
+	m := &Module{
+		TypeSection:     []*FunctionType{{}},
+		FunctionSection: []Index{0},
+		CodeSection:     []*Code{{Body: []byte{OpcodeEnd, OpcodeElse}}},
+	}
+	err := m.validateFunction(api.CoreFeaturesV2, 0, nil, nil, nil, nil, nil)
+	require.EqualError(t, err, "redundant Else instruction at 0x1")
+}
