@@ -60,7 +60,7 @@ func environGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	environ, environBuf := uint32(params[0]), uint32(params[1])
 
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
+	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf, sysCtx.EnvironSize())
 }
 
 // environSizesGet is the WASI function named functionEnvironSizesGet that
@@ -111,6 +111,8 @@ func environSizesGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	mem := mod.Memory()
 	resultEnvironc, resultEnvironvLen := uint32(params[0]), uint32(params[1])
 
+	// environc and environv_len offsets are not necessarily sequential, so we
+	// have to write them independently.
 	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
 		return ErrnoFault
 	}

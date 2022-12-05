@@ -462,9 +462,9 @@ type moduleConfig struct {
 	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
 	nanosleep          *sys.Nanosleep
-	args               []string
+	args               [][]byte
 	// environ is pair-indexed to retain order similar to os.Environ.
-	environ []string
+	environ [][]byte
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
 	// fs is the file system to open files with
@@ -492,8 +492,19 @@ func (c *moduleConfig) clone() *moduleConfig {
 // WithArgs implements ModuleConfig.WithArgs
 func (c *moduleConfig) WithArgs(args ...string) ModuleConfig {
 	ret := c.clone()
-	ret.args = args
+	ret.args = toByteSlices(args)
 	return ret
+}
+
+func toByteSlices(strings []string) (result [][]byte) {
+	if len(strings) == 0 {
+		return
+	}
+	result = make([][]byte, len(strings))
+	for i, a := range strings {
+		result[i] = []byte(a)
+	}
+	return
 }
 
 // WithEnv implements ModuleConfig.WithEnv
@@ -501,10 +512,10 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 	ret := c.clone()
 	// Check to see if this key already exists and update it.
 	if i, ok := ret.environKeys[key]; ok {
-		ret.environ[i+1] = value // environ is pair-indexed, so the value is 1 after the key.
+		ret.environ[i+1] = []byte(value) // environ is pair-indexed, so the value is 1 after the key.
 	} else {
 		ret.environKeys[key] = len(ret.environ)
-		ret.environ = append(ret.environ, key, value)
+		ret.environ = append(ret.environ, []byte(key), []byte(value))
 	}
 	return ret
 }
@@ -602,21 +613,29 @@ func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 
 // toSysContext creates a baseline wasm.Context configured by ModuleConfig.
 func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
-	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
+	var environ [][]byte // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
 	for i := 0; i < len(c.environ); i += 2 {
 		key, value := c.environ[i], c.environ[i+1]
-		if len(key) == 0 {
+		keyLen := len(key)
+		if keyLen == 0 {
 			err = errors.New("environ invalid: empty key")
 			return
 		}
-		for j := 0; j < len(key); j++ {
-			if key[j] == '=' { // NUL enforced in NewContext
+		valueLen := len(value)
+		result := make([]byte, keyLen+valueLen+1)
+		j := 0
+		for ; j < keyLen; j++ {
+			if k := key[j]; k == '=' { // NUL enforced in NewContext
 				err = errors.New("environ invalid: key contains '=' character")
 				return
+			} else {
+				result[j] = k
 			}
 		}
-		environ = append(environ, key+"="+value)
+		result[j] = '='
+		copy(result[j+1:], value)
+		environ = append(environ, result)
 	}
 
 	return internalsys.NewContext(

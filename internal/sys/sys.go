@@ -15,7 +15,7 @@ import (
 // Context holds module-scoped system resources currently only supported by
 // built-in host functions.
 type Context struct {
-	args, environ         []string
+	args, environ         [][]byte
 	argsSize, environSize uint32
 	stdin                 io.Reader
 	stdout, stderr        io.Writer
@@ -35,7 +35,7 @@ type Context struct {
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithArgs
-func (c *Context) Args() []string {
+func (c *Context) Args() [][]byte {
 	return c.args
 }
 
@@ -52,7 +52,7 @@ func (c *Context) ArgsSize() uint32 {
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithEnv
-func (c *Context) Environ() []string {
+func (c *Context) Environ() [][]byte {
 	return c.environ
 }
 
@@ -150,7 +150,7 @@ var (
 // Note: max is exposed for testing. max is only used for env/args validation.
 func NewContext(
 	max uint32,
-	args, environ []string,
+	args, environ [][]byte,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 	randSource io.Reader,
@@ -239,7 +239,7 @@ func clockResolutionInvalid(resolution sys.ClockResolution) bool {
 
 // nullTerminatedByteCount ensures the count or Nul-terminated length of the elements doesn't exceed max, and that no
 // element includes the nul character.
-func nullTerminatedByteCount(max uint32, elements []string) (uint32, error) {
+func nullTerminatedByteCount(max uint32, elements [][]byte) (uint32, error) {
 	count := uint32(len(elements))
 	if count > max {
 		return 0, errors.New("exceeds maximum count")
