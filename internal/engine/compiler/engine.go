@@ -769,8 +769,8 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 // for the given pc (which is an absolute address in the memory).
 // If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
 func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
-	srcPCMaps := f.parent.sourceOffsetMap
-	n := len(srcPCMaps.irOperationOffsetsInNativeBinary) + 1
+	srcMap := f.parent.sourceOffsetMap
+	n := len(srcMap.irOperationOffsetsInNativeBinary) + 1
 
 	// Calculate the offset in the compiled native binary.
 	pcOffsetInNativeBinary := pc - uint64(f.codeInitialAddress)
@@ -782,13 +782,13 @@ func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
 		if i == n-1 {
 			return true
 		}
-		return srcPCMaps.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
+		return srcMap.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
 	})
 
-	if index == n { // This case, somehow pc is not found in the source offset map.
+	if index == n || index == 0 { // This case, somehow pc is not found in the source offset map.
 		return 0
 	} else {
-		return srcPCMaps.irOperationSourceOffsetsInWasmBinary[index-1]
+		return srcMap.irOperationSourceOffsetsInWasmBinary[index-1]
 	}
 }
 

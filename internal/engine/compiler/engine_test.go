@@ -639,3 +639,69 @@ func (m mockListener) Before(ctx context.Context, def api.FunctionDefinition, pa
 func (m mockListener) After(ctx context.Context, def api.FunctionDefinition, err error, resultValues []uint64) {
 	m.after(ctx, def, err, resultValues)
 }
+
+func TestFunction_getSourceOffsetInWasmBinary(t *testing.T) {
+	tests := []struct {
+		name               string
+		pc, exp            uint64
+		codeInitialAddress uintptr
+		srcMap             *sourceOffsetMap
+	}{
+		{name: "not found", srcMap: &sourceOffsetMap{}},
+		{
+			name:               "first IR",
+			pc:                 4000,
+			codeInitialAddress: 3999,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0 /*4000-3999=1 exists here*/, 5, 8, 15,
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 10,
+		},
+		{
+			name:               "middle",
+			pc:                 100,
+			codeInitialAddress: 90,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0, 5, 8 /*100-90=10 exists here*/, 15,
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 800,
+		},
+		{
+			name:               "last",
+			pc:                 9999,
+			codeInitialAddress: 8999,
+			srcMap: &sourceOffsetMap{
+				irOperationOffsetsInNativeBinary: []uint64{
+					0, 5, 8, 15, /*9999-8999=1000 exists here*/
+				},
+				irOperationSourceOffsetsInWasmBinary: []uint64{
+					10, 100, 800, 12344,
+				},
+			},
+			exp: 12344,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			f := function{
+				parent:             &code{sourceOffsetMap: tc.srcMap},
+				codeInitialAddress: tc.codeInitialAddress,
+			}
+
+			actual := f.getSourceOffsetInWasmBinary(tc.pc)
+			require.Equal(t, tc.exp, actual)
+		})
+	}
+}
