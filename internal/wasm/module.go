@@ -187,7 +187,7 @@ type Module struct {
 	MemoryDefinitionSection []*MemoryDefinition
 
 	// DWARF is the DWARF data used for DWARF base stack trace. This is created from the multiple custom sections
-	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not a specified in the Wasm
+	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not specified in the Wasm
 	// specification: https://github.com/WebAssembly/debugging/issues/1
 	DWARF *dwarf.Data
 }

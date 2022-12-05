@@ -737,6 +737,8 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			source := fn.source
 			def := source.Definition
 
+			// sourceInfo holds the source code information corresponding to the frame.
+			// It is not empty only when the DWARF is enabled.
 			var sourceInfo string
 			if p := fn.parent; p.codeSegment != nil {
 				if p.sourceOffsetMap != nil {
