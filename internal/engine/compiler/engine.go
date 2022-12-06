@@ -282,8 +282,12 @@ type (
 )
 
 // createFunction creates a new function which uses the native code compiled.
-func (c *code) createFunction(f *wasm.FunctionInstance) *function {
-	return &function{
+func (c *code) createFunction(f *wasm.FunctionInstance) function {
+	// This object is only referenced from a slice. Instead of creating a heap object
+	// here and returning a pointer, we return the struct directly, so it can be
+	// stored directly in the slice. This reduces the number of heap objects which
+	// improves GC performance.
+	return function{
 		codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
 		stackPointerCeil:      c.stackPointerCeil,
 		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
@@ -538,10 +542,14 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 		return nil, err
 	}
 
+	// TODO: Ideally we only have one []function slice, instead of a memory store and a slice of pointers.
+	// This will require refactoring in assembly, so for now we simply have two slices.
+	functionsMem := make([]function, len(moduleFunctions))
 	for i, c := range codes {
 		f := moduleFunctions[i]
 		function := c.createFunction(f)
-		me.functions[imported+i] = function
+		functionsMem[i] = function
+		me.functions[imported+i] = &functionsMem[i]
 	}
 	return me, nil
 }
