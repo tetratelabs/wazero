@@ -762,7 +762,7 @@ func TestModule_buildGlobals(t *testing.T) {
 		},
 	}}
 
-	globals := m.buildGlobals(nil)
+	globals := m.buildGlobals(nil, nil)
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},

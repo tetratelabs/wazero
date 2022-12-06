@@ -99,10 +99,6 @@ func TestInterpreter_Engine_NewModuleEngine(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
-func TestInterpreter_Engine_InitializeFuncrefGlobals(t *testing.T) {
-	enginetest.RunTestEngine_InitializeFuncrefGlobals(t, et)
-}
-
 func TestInterpreter_ModuleEngine_LookupFunction(t *testing.T) {
 	enginetest.RunTestModuleEngine_LookupFunction(t, et)
 }

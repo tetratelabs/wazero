@@ -522,7 +522,7 @@ func TestExecuteConstExpression(t *testing.T) {
 					Opcode: OpcodeRefNull,
 					Data:   []byte{RefTypeFuncref},
 				},
-				exp: GlobalInstanceNullFuncRefValue,
+				exp: int64(0),
 			},
 			{
 				name: "ref.func",

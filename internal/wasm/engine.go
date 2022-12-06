@@ -47,9 +47,6 @@ type ModuleEngine interface {
 	// corresponding to the given `indexes`.
 	CreateFuncElementInstance(indexes []*Index) *ElementInstance
 
-	// InitializeFuncrefGlobals initializes the globals of Funcref type as the opaque pointer values of engine specific compiled functions.
-	InitializeFuncrefGlobals(globals []*GlobalInstance)
-
 	// FunctionInstanceReference returns Reference for the given Index for a FunctionInstance. The returned values are used by
 	// the initialization via ElementSegment.
 	FunctionInstanceReference(funcIndex Index) Reference

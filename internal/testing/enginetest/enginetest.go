@@ -73,49 +73,6 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	})
 }
 
-func RunTestEngine_InitializeFuncrefGlobals(t *testing.T, et EngineTester) {
-	e := et.NewEngine(api.CoreFeaturesV2)
-
-	i64 := i64
-	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
-		FunctionSection: []wasm.Index{0, 0, 0},
-		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
-			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}, LocalTypes: []wasm.ValueType{i64}},
-		},
-	}
-	m.BuildFunctionDefinitions()
-	err := e.CompileModule(testCtx, m, nil)
-	require.NoError(t, err)
-
-	// To use the function, we first need to add it to a module.
-	instance := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-	fns := instance.BuildFunctions(m)
-	me, err := e.NewModuleEngine(t.Name(), m, nil, fns)
-	require.NoError(t, err)
-
-	nullRefVal := wasm.GlobalInstanceNullFuncRefValue
-	globals := []*wasm.GlobalInstance{
-		{Val: 10, Type: &wasm.GlobalType{ValType: i32}},
-		{Val: uint64(nullRefVal), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
-		{Val: uint64(2), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
-		{Val: uint64(1), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
-		{Val: uint64(0), Type: &wasm.GlobalType{ValType: wasm.ValueTypeFuncref}},
-	}
-	me.InitializeFuncrefGlobals(globals)
-
-	// Non-funcref values must be intact.
-	require.Equal(t, uint64(10), globals[0].Val)
-	// The second global had wasm.GlobalInstanceNullFuncRefValue, so that value must be translated as null reference (uint64(0)).
-	require.Zero(t, globals[1].Val)
-	// Non GlobalInstanceNullFuncRefValue valued globals must result in having the valid compiled function's pointers.
-	require.Equal(t, et.CompiledFunctionPointerValue(me, 2), globals[2].Val)
-	require.Equal(t, et.CompiledFunctionPointerValue(me, 1), globals[3].Val)
-	require.Equal(t, et.CompiledFunctionPointerValue(me, 0), globals[4].Val)
-}
-
 func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV2)
 

@@ -570,20 +570,6 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	}
 }
 
-// InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
-func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
-	for _, g := range globals {
-		if g.Type.ValType == wasm.ValueTypeFuncref {
-			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
-				g.Val = 0 // Null funcref is expressed as zero.
-			} else {
-				// Lowers the stored function index into the interpreter specific function's opaque pointer.
-				g.Val = uint64(uintptr(unsafe.Pointer(e.functions[g.Val])))
-			}
-		}
-	}
-}
-
 func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
