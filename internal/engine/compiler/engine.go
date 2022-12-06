@@ -22,6 +22,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// NOTE: The offset of many of the struct fields defined here are referenced from
+// assembly using the constants below such as moduleEngineFunctionsOffset.
+// If changing a struct, update the constant and associated tests as needed.
 type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
@@ -36,6 +39,8 @@ type (
 
 	// moduleEngine implements wasm.ModuleEngine
 	moduleEngine struct {
+		// See note at top of file before modifying this struct.
+
 		// name is the name the module was instantiated with used for error handling.
 		name string
 
@@ -51,6 +56,8 @@ type (
 	// callEngine holds context per moduleEngine.Call, and shared across all the
 	// function calls originating from the same moduleEngine.Call execution.
 	callEngine struct {
+		// See note at top of file before modifying this struct.
+
 		// These contexts are read and written by compiled code.
 		// Note: structs are embedded to reduce the costs to access fields inside them. Also, this eases field offset
 		// calculation.
@@ -133,6 +140,8 @@ type (
 
 	// contextStack is a stack of context.Context.
 	contextStack struct {
+		// See note at top of file before modifying this struct.
+
 		self context.Context
 		prev *contextStack
 	}
@@ -140,6 +149,8 @@ type (
 	// moduleContext holds the per-function call specific module information.
 	// This is subject to be manipulated from compiled native code whenever we make function calls.
 	moduleContext struct {
+		// See note at top of file before modifying this struct.
+
 		// fn holds the currently executed *function.
 		fn *function
 
@@ -179,6 +190,8 @@ type (
 
 	// stackContext stores the data to access engine.stack.
 	stackContext struct {
+		// See note at top of file before modifying this struct.
+
 		// stackPointer on .stack field which is accessed by stack[stackBasePointer+stackBasePointerInBytes*8].
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
@@ -206,6 +219,8 @@ type (
 
 	// exitContext will be manipulated whenever compiled native code returns into the Go function.
 	exitContext struct {
+		// See note at top of file before modifying this struct.
+
 		// Where we store the status code of Compiler execution.
 		statusCode nativeCallStatusCode
 
@@ -223,6 +238,8 @@ type (
 	// native program (where the stack is the system stack though), and we retrieve the struct
 	// with unsafe pointer casts.
 	callFrame struct {
+		// See note at top of file before modifying this struct.
+
 		// returnAddress is the return address to which the engine jumps when the callee function returns.
 		returnAddress uintptr
 		// returnStackBasePointerInBytes is the stack base pointer to set on stackContext.stackBasePointerInBytes
@@ -235,6 +252,8 @@ type (
 
 	// Function corresponds to function instance in Wasm, and is created from `code`.
 	function struct {
+		// See note at top of file before modifying this struct.
+
 		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
@@ -253,6 +272,8 @@ type (
 	// code corresponds to a function in a module (not instantiated one). This holds the machine code
 	// compiled by wazero compiler.
 	code struct {
+		// See note at top of file before modifying this struct.
+
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for codeStaticData type.
@@ -272,6 +293,8 @@ type (
 	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
 	// offset in the native binary.
 	sourceOffsetMap struct {
+		// See note at top of file before modifying this struct.
+
 		// irOperationOffsetsInNativeBinary is index-correlated with irOperationSourceOffsetsInWasmBinary,
 		// and maps each index (corresponding to each IR Operation) to the offset in the compiled native code.
 		irOperationOffsetsInNativeBinary []uint64
