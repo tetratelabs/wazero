@@ -568,14 +568,14 @@ func (m *Module) validateDataCountSection() (err error) {
 	return
 }
 
-func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, me ModuleEngine) (globals []*GlobalInstance) {
+func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver func(funcIndex Index) Reference) (globals []*GlobalInstance) {
 	globals = make([]*GlobalInstance, len(m.GlobalSection))
 	for i, gs := range m.GlobalSection {
 		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case uint32:
 			if gs.Type.ValType == ValueTypeFuncref {
-				g.Val = uint64(me.FunctionInstanceReference(v))
+				g.Val = uint64(funcRefResolver(v))
 			} else {
 				g.Val = uint64(v)
 			}

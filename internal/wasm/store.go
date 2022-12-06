@@ -388,7 +388,7 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
-	globals, memory := module.buildGlobals(importedGlobals, m.Engine), module.buildMemory()
+	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
