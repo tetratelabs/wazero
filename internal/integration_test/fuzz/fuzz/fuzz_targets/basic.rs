@@ -19,9 +19,7 @@ fn run(data: &[u8]) -> Result<()> {
     config.memory64_enabled = false;
     // Also, multiple memories are not supported.
     config.max_memories = 1;
-    // TODO: after having CompiledModule.Imports(), enable this with dummy imports.
-    // See https://github.com/bytecodealliance/wasmtime/blob/f242975c49385edafe4f72dfa5f0ff6aae23eda3/crates/fuzzing/src/oracles/dummy.rs#L6-L20
-    config.max_imports = 0;
+    config.max_imports = 10;
     // If we don't set the limit, we will soon reach the OOM and the fuzzing will be killed by OS.
     config.max_memory_pages = 10;
     config.memory_max_size_required = true;
