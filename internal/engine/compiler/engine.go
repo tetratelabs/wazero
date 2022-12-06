@@ -39,9 +39,10 @@ type (
 		// name is the name the module was instantiated with used for error handling.
 		name string
 
-		// NOTE: The offset of the functions field is referenced from assembly, so
-		// adding any fields here will cause failure at runtime. They should be
-		// added to the end of the struct instead.
+		// NOTE: The offset of the functions field is referenced from assembly based on
+		// the constant at
+		// https://github.com/tetratelabs/wazero/blame/29e4f46d4a5bc12ffa157f48cc0675112ed78cbc/internal/engine/compiler/engine.go#L299
+		// If changing the offset, the constant and associated tests need to be updated.
 
 		// functions are the functions in a module instances.
 		// The index is module instance-scoped. We intentionally avoid using map
