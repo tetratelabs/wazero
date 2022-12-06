@@ -39,6 +39,10 @@ type (
 		// name is the name the module was instantiated with used for error handling.
 		name string
 
+		// NOTE: The offset of the functions field is referenced from assembly, so
+		// adding any fields here will cause failure at runtime. They should be
+		// added to the end of the struct instead.
+
 		// functions are the functions in a module instances.
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
