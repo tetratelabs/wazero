@@ -21,26 +21,27 @@ func Test_loggingListener(t *testing.T) {
 	wasiFuncName := "random_get"
 	wasiFuncType := &wasm.FunctionType{
 		Params:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
-		Results: []api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
+		Results: []api.ValueType{api.ValueTypeI32},
 	}
 	wasiParamNames := []string{"buf", "buf_len"}
 	wasiParams := []uint64{0, 8}
+	wasiResultNames := []string{"errno"}
 
 	tests := []struct {
-		name                 string
-		moduleName, funcName string
-		functype             *wasm.FunctionType
-		isHostFunc           bool
-		paramNames           []string
-		params, results      []uint64
-		err                  error
-		expected             string
+		name                    string
+		moduleName, funcName    string
+		functype                *wasm.FunctionType
+		isHostFunc              bool
+		paramNames, resultNames []string
+		params, results         []uint64
+		err                     error
+		expected                string
 	}{
 		{
 			name:     "v_v",
 			functype: &wasm.FunctionType{},
 			expected: `--> test.fn()
-<-- ()
+<--
 `,
 		},
 		{
@@ -56,44 +57,47 @@ func Test_loggingListener(t *testing.T) {
 			functype:   &wasm.FunctionType{},
 			isHostFunc: true,
 			expected: `==> test.fn()
-<== ()
+<==
 `,
 		},
 		{
-			name:       "wasi",
-			functype:   wasiFuncType,
-			moduleName: wasi_snapshot_preview1.ModuleName,
-			funcName:   wasiFuncName,
-			paramNames: wasiParamNames,
-			isHostFunc: true,
-			params:     wasiParams,
-			results:    []uint64{uint64(wasi_snapshot_preview1.ErrnoSuccess)},
+			name:        "wasi",
+			functype:    wasiFuncType,
+			moduleName:  wasi_snapshot_preview1.ModuleName,
+			funcName:    wasiFuncName,
+			paramNames:  wasiParamNames,
+			resultNames: wasiResultNames,
+			isHostFunc:  true,
+			params:      wasiParams,
+			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoSuccess)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== ESUCCESS
 `,
 		},
 		{
-			name:       "wasi errno",
-			functype:   wasiFuncType,
-			moduleName: wasi_snapshot_preview1.ModuleName,
-			funcName:   wasiFuncName,
-			paramNames: wasiParamNames,
-			isHostFunc: true,
-			params:     wasiParams,
-			results:    []uint64{uint64(wasi_snapshot_preview1.ErrnoFault)},
+			name:        "wasi errno",
+			functype:    wasiFuncType,
+			moduleName:  wasi_snapshot_preview1.ModuleName,
+			funcName:    wasiFuncName,
+			paramNames:  wasiParamNames,
+			resultNames: wasiResultNames,
+			isHostFunc:  true,
+			params:      wasiParams,
+			results:     []uint64{uint64(wasi_snapshot_preview1.ErrnoFault)},
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== EFAULT
 `,
 		},
 		{
-			name:       "wasi error",
-			functype:   wasiFuncType,
-			moduleName: wasi_snapshot_preview1.ModuleName,
-			funcName:   wasiFuncName,
-			paramNames: wasiParamNames,
-			isHostFunc: true,
-			params:     wasiParams,
-			err:        io.EOF, // not possible as we coerce errors to numbers, but test anyway!
+			name:        "wasi error",
+			functype:    wasiFuncType,
+			moduleName:  wasi_snapshot_preview1.ModuleName,
+			funcName:    wasiFuncName,
+			paramNames:  wasiParamNames,
+			resultNames: wasiResultNames,
+			isHostFunc:  true,
+			params:      wasiParams,
+			err:         io.EOF, // not possible as we coerce errors to numbers, but test anyway!
 			expected: `==> wasi_snapshot_preview1.random_get(buf=0,buf_len=8)
 <== error: EOF
 `,
@@ -103,7 +107,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI32}},
 			params:   []uint64{math.MaxUint32},
 			expected: `--> test.fn(4294967295)
-<-- ()
+<--
 `,
 		},
 		{
@@ -112,7 +116,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{math.MaxUint32},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=4294967295)
-<-- ()
+<--
 `,
 		},
 		{
@@ -120,7 +124,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI64}},
 			params:   []uint64{math.MaxUint64},
 			expected: `--> test.fn(18446744073709551615)
-<-- ()
+<--
 `,
 		},
 		{
@@ -129,7 +133,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{math.MaxUint64},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=18446744073709551615)
-<-- ()
+<--
 `,
 		},
 		{
@@ -137,7 +141,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF32}},
 			params:   []uint64{api.EncodeF32(math.MaxFloat32)},
 			expected: `--> test.fn(3.4028235e+38)
-<-- ()
+<--
 `,
 		},
 		{
@@ -146,7 +150,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{api.EncodeF32(math.MaxFloat32)},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=3.4028235e+38)
-<-- ()
+<--
 `,
 		},
 		{
@@ -154,7 +158,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeF64}},
 			params:   []uint64{api.EncodeF64(math.MaxFloat64)},
 			expected: `--> test.fn(1.7976931348623157e+308)
-<-- ()
+<--
 `,
 		},
 		{
@@ -163,7 +167,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{api.EncodeF64(math.MaxFloat64)},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=1.7976931348623157e+308)
-<-- ()
+<--
 `,
 		},
 		{
@@ -171,7 +175,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeExternref}},
 			params:   []uint64{0},
 			expected: `--> test.fn(0000000000000000)
-<-- ()
+<--
 `,
 		},
 		{
@@ -180,7 +184,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{0},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=0000000000000000)
-<-- ()
+<--
 `,
 		},
 		{
@@ -188,7 +192,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{0x7b}},
 			params:   []uint64{0, 1},
 			expected: `--> test.fn(00000000000000000000000000000001)
-<-- ()
+<--
 `,
 		},
 		{
@@ -197,7 +201,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{0, 1},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=00000000000000000000000000000001)
-<-- ()
+<--
 `,
 		},
 		{
@@ -205,7 +209,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Params: []api.ValueType{0x70}},
 			params:   []uint64{0},
 			expected: `--> test.fn(0000000000000000)
-<-- ()
+<--
 `,
 		},
 		{
@@ -214,7 +218,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{0},
 			paramNames: []string{"x"},
 			expected: `--> test.fn(x=0000000000000000)
-<-- ()
+<--
 `,
 		},
 		{
@@ -222,7 +226,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Results: []api.ValueType{api.ValueTypeI32}},
 			results:  []uint64{math.MaxUint32},
 			expected: `--> test.fn()
-<-- (4294967295)
+<-- 4294967295
 `,
 		},
 		{
@@ -234,7 +238,7 @@ func Test_loggingListener(t *testing.T) {
 			params:  []uint64{math.MaxUint32},
 			results: []uint64{api.EncodeF32(math.MaxFloat32)},
 			expected: `--> test.fn(4294967295)
-<-- (3.4028235e+38)
+<-- 3.4028235e+38
 `,
 		},
 		{
@@ -283,6 +287,7 @@ func Test_loggingListener(t *testing.T) {
 					ModuleName:    tc.moduleName,
 					FunctionNames: wasm.NameMap{{Name: tc.funcName}},
 					LocalNames:    wasm.IndirectNameMap{{NameMap: toNameMap(tc.paramNames)}},
+					ResultNames:   wasm.IndirectNameMap{{NameMap: toNameMap(tc.resultNames)}},
 				},
 			}
 
@@ -338,7 +343,7 @@ func Test_loggingListener_indentation(t *testing.T) {
 	l1.After(ctx, def1, nil, []uint64{})
 	require.Equal(t, `--> test.fn1()
 	--> test.fn2()
-	<-- ()
-<-- ()
+	<--
+<--
 `, out.String())
 }

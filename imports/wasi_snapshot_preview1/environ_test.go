@@ -27,12 +27,12 @@ func Test_environGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke environGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionEnvironGet, uint64(resultEnviron), uint64(resultEnvironBuf))
+	requireErrno(t, ErrnoSuccess, mod, environGetName, uint64(resultEnviron), uint64(resultEnvironBuf))
 	require.Equal(t, `
 --> proxy.environ_get(environ=11,environ_buf=1)
 	==> wasi_snapshot_preview1.environ_get(environ=11,environ_buf=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -61,7 +61,7 @@ func Test_environGet_Errors(t *testing.T) {
 --> proxy.environ_get(environ=65536,environ_buf=0)
 	==> wasi_snapshot_preview1.environ_get(environ=65536,environ_buf=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -72,7 +72,7 @@ func Test_environGet_Errors(t *testing.T) {
 --> proxy.environ_get(environ=0,environ_buf=65536)
 	==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -84,7 +84,7 @@ func Test_environGet_Errors(t *testing.T) {
 --> proxy.environ_get(environ=65529,environ_buf=0)
 	==> wasi_snapshot_preview1.environ_get(environ=65529,environ_buf=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -96,7 +96,7 @@ func Test_environGet_Errors(t *testing.T) {
 --> proxy.environ_get(environ=0,environ_buf=65527)
 	==> wasi_snapshot_preview1.environ_get(environ=0,environ_buf=65527)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -107,7 +107,7 @@ func Test_environGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionEnvironGet, uint64(tc.environ), uint64(tc.environBuf))
+			requireErrno(t, ErrnoFault, mod, environGetName, uint64(tc.environ), uint64(tc.environBuf))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -131,12 +131,12 @@ func Test_environSizesGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke environSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionEnvironSizesGet, uint64(resultEnvironc), uint64(resultEnvironvLen))
+	requireErrno(t, ErrnoSuccess, mod, environSizesGetName, uint64(resultEnvironc), uint64(resultEnvironvLen))
 	require.Equal(t, `
 --> proxy.environ_sizes_get(result.environc=1,result.environv_len=6)
 	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=1,result.environv_len=6)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -165,7 +165,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 --> proxy.environ_sizes_get(result.environc=65536,result.environv_len=0)
 	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65536,result.environv_len=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -176,7 +176,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 --> proxy.environ_sizes_get(result.environc=0,result.environv_len=65536)
 	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -187,7 +187,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 --> proxy.environ_sizes_get(result.environc=65533,result.environv_len=0)
 	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=65533,result.environv_len=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -198,7 +198,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 --> proxy.environ_sizes_get(result.environc=0,result.environv_len=65533)
 	==> wasi_snapshot_preview1.environ_sizes_get(result.environc=0,result.environv_len=65533)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -209,7 +209,7 @@ func Test_environSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionEnvironSizesGet, uint64(tc.environc), uint64(tc.environLen))
+			requireErrno(t, ErrnoFault, mod, environSizesGetName, uint64(tc.environc), uint64(tc.environLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

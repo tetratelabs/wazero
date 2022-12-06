@@ -121,6 +121,12 @@ type HostFunctionBuilder interface {
 	// Note: When defined, names must be provided for all parameters.
 	WithParameterNames(names ...string) HostFunctionBuilder
 
+	// WithResultNames defines optional result names of the function
+	// signature, e.x. "errno"
+	//
+	// Note: When defined, names must be provided for all results.
+	WithResultNames(names ...string) HostFunctionBuilder
+
 	// Export exports this to the HostModuleBuilder as the given name, e.g.
 	// "random_get"
 	Export(name string) HostModuleBuilder
@@ -206,7 +212,7 @@ type hostModuleBuilder struct {
 	r            *runtime
 	moduleName   string
 	nameToGoFunc map[string]interface{}
-	funcToNames  map[string][]string
+	funcToNames  map[string]*wasm.HostFuncNames
 }
 
 // NewHostModuleBuilder implements Runtime.NewHostModuleBuilder
@@ -215,16 +221,17 @@ func (r *runtime) NewHostModuleBuilder(moduleName string) HostModuleBuilder {
 		r:            r,
 		moduleName:   moduleName,
 		nameToGoFunc: map[string]interface{}{},
-		funcToNames:  map[string][]string{},
+		funcToNames:  map[string]*wasm.HostFuncNames{},
 	}
 }
 
 // hostFunctionBuilder implements HostFunctionBuilder
 type hostFunctionBuilder struct {
-	b          *hostModuleBuilder
-	fn         interface{}
-	name       string
-	paramNames []string
+	b           *hostModuleBuilder
+	fn          interface{}
+	name        string
+	paramNames  []string
+	resultNames []string
 }
 
 // WithGoFunction implements HostFunctionBuilder.WithGoFunction
@@ -265,22 +272,32 @@ func (h *hostFunctionBuilder) WithParameterNames(names ...string) HostFunctionBu
 	return h
 }
 
+// WithResultNames implements HostFunctionBuilder.WithResultNames
+func (h *hostFunctionBuilder) WithResultNames(names ...string) HostFunctionBuilder {
+	h.resultNames = names
+	return h
+}
+
 // Export implements HostFunctionBuilder.Export
 func (h *hostFunctionBuilder) Export(exportName string) HostModuleBuilder {
 	if h.name == "" {
 		h.name = exportName
 	}
+	names := &wasm.HostFuncNames{
+		Name:        h.name,
+		ParamNames:  h.paramNames,
+		ResultNames: h.resultNames,
+	}
 	if fn, ok := h.fn.(*wasm.HostFunc); ok {
 		if fn.Name == "" {
-			fn.Name = h.name
+			fn.Name = names.Name
 		}
-		fn.ParamNames = h.paramNames
+		fn.ParamNames = names.ParamNames
+		fn.ResultNames = names.ResultNames
 		fn.ExportNames = []string{exportName}
 	}
 	h.b.nameToGoFunc[exportName] = h.fn
-	if len(h.paramNames) > 0 {
-		h.b.funcToNames[exportName] = append([]string{h.name}, h.paramNames...)
-	}
+	h.b.funcToNames[exportName] = names
 	return h.b
 }
 

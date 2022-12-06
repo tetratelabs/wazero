@@ -90,6 +90,29 @@ func TestNewHostModuleBuilder_Compile(t *testing.T) {
 			},
 		},
 		{
+			name: "WithFunc WithName WithResultNames",
+			input: func(r Runtime) HostModuleBuilder {
+				return r.NewHostModuleBuilder("").NewFunctionBuilder().
+					WithFunc(uint32_uint32).
+					WithName("get").WithResultNames("x").
+					Export("1")
+			},
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []api.ValueType{i32}, Results: []api.ValueType{i32}},
+				},
+				FunctionSection: []wasm.Index{0},
+				CodeSection:     []*wasm.Code{wasm.MustParseGoReflectFuncCode(uint32_uint32)},
+				ExportSection: []*wasm.Export{
+					{Name: "1", Type: wasm.ExternTypeFunc, Index: 0},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 0, Name: "get"}},
+					ResultNames:   []*wasm.NameMapAssoc{{Index: 0, NameMap: wasm.NameMap{{Index: 0, Name: "x"}}}},
+				},
+			},
+		},
+		{
 			name: "WithFunc overwrites existing",
 			input: func(r Runtime) HostModuleBuilder {
 				return r.NewHostModuleBuilder("").

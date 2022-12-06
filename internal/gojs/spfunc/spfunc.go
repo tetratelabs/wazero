@@ -165,8 +165,9 @@ func callFromSP(expectSP bool, proxied *wasm.HostFunc) (*wasm.ProxyFunc, error) 
 		Proxied: &wasm.HostFunc{
 			Name:        proxied.Name,
 			ParamTypes:  proxied.ParamTypes,
-			ResultTypes: proxied.ResultTypes,
 			ParamNames:  proxied.ParamNames,
+			ResultTypes: proxied.ResultTypes,
+			ResultNames: proxied.ResultNames,
 			Code:        proxied.Code,
 		},
 		CallBodyPos: callFuncPos,

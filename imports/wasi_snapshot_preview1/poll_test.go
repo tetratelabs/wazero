@@ -38,13 +38,13 @@ func Test_pollOneoff(t *testing.T) {
 	maskMemory(t, testCtx, mod, 1024)
 	mod.Memory().Write(testCtx, in, mem)
 
-	requireErrno(t, ErrnoSuccess, mod, functionPollOneoff, uint64(in), uint64(out), uint64(nsubscriptions),
+	requireErrno(t, ErrnoSuccess, mod, pollOneoffName, uint64(in), uint64(out), uint64(nsubscriptions),
 		uint64(resultNevents))
 	require.Equal(t, `
 --> proxy.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
 	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	outMem, ok := mod.Memory().Read(testCtx, out, uint32(len(expectedMem)))
@@ -79,7 +79,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 --> proxy.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
 	==> wasi_snapshot_preview1.poll_oneoff(in=65536,out=128,nsubscriptions=1,result.nevents=512)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -92,7 +92,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 --> proxy.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
 	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=65536,nsubscriptions=1,result.nevents=512)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -104,7 +104,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 --> proxy.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
 	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=0,nsubscriptions=1,result.nevents=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -116,7 +116,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 --> proxy.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
 	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=0,result.nevents=512)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 		{
@@ -141,7 +141,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 --> proxy.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
 	==> wasi_snapshot_preview1.poll_oneoff(in=0,out=128,nsubscriptions=1,result.nevents=512)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `,
 		},
 	}
@@ -157,7 +157,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 				mod.Memory().Write(testCtx, tc.in, tc.mem)
 			}
 
-			requireErrno(t, tc.expectedErrno, mod, functionPollOneoff, uint64(tc.in), uint64(tc.out),
+			requireErrno(t, tc.expectedErrno, mod, pollOneoffName, uint64(tc.in), uint64(tc.out),
 				uint64(tc.nsubscriptions), uint64(tc.resultNevents))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 

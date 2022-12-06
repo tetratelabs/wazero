@@ -47,7 +47,18 @@ func (f *loggingListenerFactory) NewListener(fnd api.FunctionDefinition) experim
 		!exported { // not callable by the host
 		return nil
 	}
-	return &loggingListener{writer: f.writer, fnd: fnd, isWasi: fnd.ModuleName() == "wasi_snapshot_preview1"}
+
+	// special-case formatting of WASI error number until there's a generic way
+	// to stringify parameters or results.
+	wasiErrnoPos := -1
+	if fnd.ModuleName() == "wasi_snapshot_preview1" {
+		for i, n := range fnd.ResultNames() {
+			if n == "errno" {
+				wasiErrnoPos = i
+			}
+		}
+	}
+	return &loggingListener{writer: f.writer, fnd: fnd, wasiErrnoPos: wasiErrnoPos}
 }
 
 // nestLevelKey holds state between logger.Before and loggingListener.After to ensure
@@ -59,7 +70,9 @@ type nestLevelKey struct{}
 type loggingListener struct {
 	writer io.Writer
 	fnd    api.FunctionDefinition
-	isWasi bool
+
+	// wasiErrnoPos is the result index of wasi_snapshot_preview1.Errno or -1.
+	wasiErrnoPos int
 }
 
 // Before logs to stdout the module and function name, prefixed with '-->' and
@@ -96,9 +109,9 @@ func (l *loggingListener) writeIndented(before bool, err error, vals []uint64, i
 		l.writeFuncEnter(&message, vals)
 	} else { // after
 		if l.fnd.GoFunction() != nil {
-			message.WriteString("<== ")
+			message.WriteString("<==")
 		} else {
-			message.WriteString("<-- ")
+			message.WriteString("<--")
 		}
 		l.writeFuncExit(&message, err, vals)
 	}
@@ -125,28 +138,40 @@ func (l *loggingListener) writeFuncEnter(message *strings.Builder, vals []uint64
 
 func (l *loggingListener) writeFuncExit(message *strings.Builder, err error, vals []uint64) {
 	if err != nil {
-		message.WriteString("error: ")
+		message.WriteString(" error: ")
 		message.WriteString(err.Error())
-		return
-	} else if l.isWasi {
-		message.WriteString(wasi_snapshot_preview1.ErrnoName(uint32(vals[0])))
 		return
 	}
 	valLen := len(vals)
-	message.WriteByte('(')
+	if valLen == 0 {
+		return
+	}
+	message.WriteByte(' ')
 	switch valLen {
-	case 0:
+	case 1:
+		l.writeResult(message, 0, vals)
 	default:
+		message.WriteByte('(')
 		i := l.writeResult(message, 0, vals)
 		for i < valLen {
 			message.WriteByte(',')
 			i = l.writeResult(message, i, vals)
 		}
+		message.WriteByte(')')
 	}
-	message.WriteByte(')')
 }
 
 func (l *loggingListener) writeResult(message *strings.Builder, i int, vals []uint64) int {
+	if i == l.wasiErrnoPos {
+		message.WriteString(wasi_snapshot_preview1.ErrnoName(uint32(vals[i])))
+		return i + 1
+	}
+
+	if len(l.fnd.ResultNames()) > 0 {
+		message.WriteString(l.fnd.ResultNames()[i])
+		message.WriteByte('=')
+	}
+
 	return l.writeVal(message, l.fnd.ResultTypes()[i], i, vals)
 }
 

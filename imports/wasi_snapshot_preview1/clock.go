@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	functionClockResGet  = "clock_res_get"
-	functionClockTimeGet = "clock_time_get"
+	clockResGetName  = "clock_res_get"
+	clockTimeGetName = "clock_time_get"
 )
 
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clockid-enumu32
@@ -23,7 +23,7 @@ const (
 	// WASI maintainers: https://github.com/WebAssembly/wasi-libc/pull/294
 )
 
-// clockResGet is the WASI function named functionClockResGet that returns the
+// clockResGet is the WASI function named clockResGetName that returns the
 // resolution of time values returned by clockTimeGet.
 //
 // # Parameters
@@ -51,17 +51,7 @@ const (
 // Note: This is similar to `clock_getres` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 // See https://linux.die.net/man/3/clock_getres
-var clockResGet = &wasm.HostFunc{
-	ExportNames: []string{functionClockResGet},
-	Name:        functionClockResGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"id", "result.resolution"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(clockResGetFn),
-	},
-}
+var clockResGet = newHostFunc(clockResGetName, clockResGetFn, []api.ValueType{i32, i32}, "id", "result.resolution")
 
 func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -83,7 +73,7 @@ func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// clockTimeGet is the WASI function named functionClockTimeGet that returns
+// clockTimeGet is the WASI function named clockTimeGetName that returns
 // the time value of a name (time.Now).
 //
 // # Parameters
@@ -114,17 +104,7 @@ func clockResGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 // Note: This is similar to `clock_gettime` in POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 // See https://linux.die.net/man/3/clock_gettime
-var clockTimeGet = &wasm.HostFunc{
-	ExportNames: []string{functionClockTimeGet},
-	Name:        functionClockTimeGet,
-	ParamTypes:  []api.ValueType{i32, i64, i32},
-	ParamNames:  []string{"id", "precision", "result.timestamp"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(clockTimeGetFn),
-	},
-}
+var clockTimeGet = newHostFunc(clockTimeGetName, clockTimeGetFn, []api.ValueType{i32, i64, i32}, "id", "precision", "result.timestamp")
 
 func clockTimeGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

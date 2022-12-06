@@ -94,45 +94,45 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 	//	<== DivByZero
 	require.Equal(t, `
 --> imported.div_by.wasm(1)
-<-- (1)
+<-- 1
 --> imported.div_by.wasm(1)
-<-- (1)
+<-- 1
 --> imported.div_by.wasm(0)
 --> imported.div_by.wasm(1)
-<-- (1)
+<-- 1
 --> imported.call->div_by.go(4294967295)
 	==> host.div_by.go(4294967295)
 --> imported.call->div_by.go(1)
 	==> host.div_by.go(1)
-	<== (1)
-<-- (1)
+	<== 1
+<-- 1
 --> importing.call_import->call->div_by.go(0)
 	--> imported.call->div_by.go(0)
 		==> host.div_by.go(0)
 --> importing.call_import->call->div_by.go(1)
 	--> imported.call->div_by.go(1)
 		==> host.div_by.go(1)
-		<== (1)
-	<-- (1)
-<-- (1)
+		<== 1
+	<-- 1
+<-- 1
 --> importing.call_import->call->div_by.go(4294967295)
 	--> imported.call->div_by.go(4294967295)
 		==> host.div_by.go(4294967295)
 --> importing.call_import->call->div_by.go(1)
 	--> imported.call->div_by.go(1)
 		==> host.div_by.go(1)
-		<== (1)
-	<-- (1)
-<-- (1)
+		<== 1
+	<-- 1
+<-- 1
 --> importing.call_import->call->div_by.go(0)
 	--> imported.call->div_by.go(0)
 		==> host.div_by.go(0)
 --> importing.call_import->call->div_by.go(1)
 	--> imported.call->div_by.go(1)
 		==> host.div_by.go(1)
-		<== (1)
-	<-- (1)
-<-- (1)
+		<== 1
+	<-- 1
+<-- 1
 `, "\n"+functionLog.String())
 }
 
@@ -254,7 +254,7 @@ func TestCompiler_SliceAllocatedOnHeap(t *testing.T) {
 		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
-	}}, nil, enabledFeatures)
+	}}, map[string]*wasm.HostFuncNames{hostFnName: {}}, enabledFeatures)
 	require.NoError(t, err)
 
 	err = s.Engine.CompileModule(testCtx, hm, nil)

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	functionArgsGet      = "args_get"
-	functionArgsSizesGet = "args_sizes_get"
+	argsGetName      = "args_get"
+	argsSizesGetName = "args_sizes_get"
 )
 
-// argsGet is the WASI function named functionArgsGet that reads command-line
+// argsGet is the WASI function named argsGetName that reads command-line
 // argument data.
 //
 // # Parameters
@@ -44,17 +44,7 @@ const (
 // See argsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsGet = &wasm.HostFunc{
-	ExportNames: []string{functionArgsGet},
-	Name:        functionArgsGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"argv", "argv_buf"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(argsGetFn),
-	},
-}
+var argsGet = newHostFunc(argsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
 
 func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
@@ -62,7 +52,7 @@ func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
 }
 
-// argsSizesGet is the WASI function named functionArgsSizesGet that reads
+// argsSizesGet is the WASI function named argsSizesGetName that reads
 // command-line argument sizes.
 //
 // # Parameters
@@ -91,17 +81,7 @@ func argsGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsSizesGet = &wasm.HostFunc{
-	ExportNames: []string{functionArgsSizesGet},
-	Name:        functionArgsSizesGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"result.argc", "result.argv_len"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(argsSizesGetFn),
-	},
-}
+var argsSizesGet = newHostFunc(argsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
 
 func argsSizesGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys

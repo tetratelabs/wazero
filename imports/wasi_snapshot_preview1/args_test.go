@@ -25,12 +25,12 @@ func Test_argsGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke argsGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionArgsGet, uint64(argv), uint64(argvBuf))
+	requireErrno(t, ErrnoSuccess, mod, argsGetName, uint64(argv), uint64(argvBuf))
 	require.Equal(t, `
 --> proxy.args_get(argv=7,argv_buf=1)
 	==> wasi_snapshot_preview1.args_get(argv=7,argv_buf=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -58,7 +58,7 @@ func Test_argsGet_Errors(t *testing.T) {
 --> proxy.args_get(argv=65536,argv_buf=0)
 	==> wasi_snapshot_preview1.args_get(argv=65536,argv_buf=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -69,7 +69,7 @@ func Test_argsGet_Errors(t *testing.T) {
 --> proxy.args_get(argv=0,argv_buf=65536)
 	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -81,7 +81,7 @@ func Test_argsGet_Errors(t *testing.T) {
 --> proxy.args_get(argv=65529,argv_buf=0)
 	==> wasi_snapshot_preview1.args_get(argv=65529,argv_buf=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -93,7 +93,7 @@ func Test_argsGet_Errors(t *testing.T) {
 --> proxy.args_get(argv=0,argv_buf=65532)
 	==> wasi_snapshot_preview1.args_get(argv=0,argv_buf=65532)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -104,7 +104,7 @@ func Test_argsGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
+			requireErrno(t, ErrnoFault, mod, argsGetName, uint64(tc.argv), uint64(tc.argvBuf))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -127,12 +127,12 @@ func Test_argsSizesGet(t *testing.T) {
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	// Invoke argsSizesGet and check the memory side effects.
-	requireErrno(t, ErrnoSuccess, mod, functionArgsSizesGet, uint64(resultArgc), uint64(resultArgvLen))
+	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
 	require.Equal(t, `
 --> proxy.args_sizes_get(result.argc=1,result.argv_len=6)
 	==> wasi_snapshot_preview1.args_sizes_get(result.argc=1,result.argv_len=6)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `, "\n"+log.String())
 
 	actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(expectedMemory)))
@@ -160,7 +160,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 --> proxy.args_sizes_get(result.argc=65536,result.argv_len=0)
 	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65536,result.argv_len=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -171,7 +171,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 --> proxy.args_sizes_get(result.argc=0,result.argv_len=65536)
 	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -182,7 +182,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 --> proxy.args_sizes_get(result.argc=65533,result.argv_len=0)
 	==> wasi_snapshot_preview1.args_sizes_get(result.argc=65533,result.argv_len=0)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -193,7 +193,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 --> proxy.args_sizes_get(result.argc=0,result.argv_len=65533)
 	==> wasi_snapshot_preview1.args_sizes_get(result.argc=0,result.argv_len=65533)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -204,7 +204,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionArgsSizesGet, uint64(tc.argc), uint64(tc.argvLen))
+			requireErrno(t, ErrnoFault, mod, argsSizesGetName, uint64(tc.argc), uint64(tc.argvLen))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

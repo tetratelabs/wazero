@@ -38,7 +38,7 @@ func Test_clockResGet(t *testing.T) {
 --> proxy.clock_res_get(id=0,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `,
 		},
 		{
@@ -49,7 +49,7 @@ func Test_clockResGet(t *testing.T) {
 --> proxy.clock_res_get(id=1,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `,
 		},
 	}
@@ -63,7 +63,7 @@ func Test_clockResGet(t *testing.T) {
 			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 			resultResolution := uint32(1) // arbitrary offset
-			requireErrno(t, ErrnoSuccess, mod, functionClockResGet, uint64(tc.clockID), uint64(resultResolution))
+			requireErrno(t, ErrnoSuccess, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
@@ -91,7 +91,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 --> proxy.clock_res_get(id=2,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 		{
@@ -102,7 +102,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 --> proxy.clock_res_get(id=3,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 		{
@@ -113,7 +113,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 --> proxy.clock_res_get(id=100,result.resolution=1)
 	==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 	}
@@ -125,7 +125,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			defer log.Reset()
 
 			resultResolution := uint32(1) // arbitrary offset
-			requireErrno(t, tc.expectedErrno, mod, functionClockResGet, uint64(tc.clockID), uint64(resultResolution))
+			requireErrno(t, tc.expectedErrno, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -153,7 +153,7 @@ func Test_clockTimeGet(t *testing.T) {
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `,
 		},
 		{
@@ -168,7 +168,7 @@ func Test_clockTimeGet(t *testing.T) {
 --> proxy.clock_time_get(id=1,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=1)
 	<== ESUCCESS
-<-- (0)
+<-- 0
 `,
 		},
 	}
@@ -181,7 +181,7 @@ func Test_clockTimeGet(t *testing.T) {
 			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 			resultTimestamp := uint32(1) // arbitrary offset
-			requireErrno(t, ErrnoSuccess, mod, functionClockTimeGet, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
+			requireErrno(t, ErrnoSuccess, mod, clockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
@@ -209,7 +209,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 --> proxy.clock_time_get(id=2,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 		{
@@ -220,7 +220,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 --> proxy.clock_time_get(id=3,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 		{
@@ -231,7 +231,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 --> proxy.clock_time_get(id=100,precision=0,result.timestamp=1)
 	==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
 	<== EINVAL
-<-- (28)
+<-- 28
 `,
 		},
 	}
@@ -244,7 +244,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 
 			resultTimestamp := uint32(1) // arbitrary offset
 
-			requireErrno(t, tc.expectedErrno, mod, functionClockTimeGet, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
+			requireErrno(t, tc.expectedErrno, mod, clockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -268,7 +268,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65536)
 	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 		{
@@ -278,7 +278,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65533)
 	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
 	<== EFAULT
-<-- (21)
+<-- 21
 `,
 		},
 	}
@@ -289,7 +289,7 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, ErrnoFault, mod, functionClockTimeGet, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
+			requireErrno(t, ErrnoFault, mod, clockTimeGetName, uint64(0) /* TODO: id */, uint64(0) /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}

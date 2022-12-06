@@ -890,6 +890,9 @@ type NameSection struct {
 	// Note: LocalNames are only used for debugging. At runtime, locals are called based on raw numeric index.
 	// Note: This can be nil for any reason including configuration.
 	LocalNames IndirectNameMap
+
+	// ResultNames is a wazero-specific mechanism to store result names.
+	ResultNames IndirectNameMap
 }
 
 // CustomSection contains the name and raw data of a custom section.

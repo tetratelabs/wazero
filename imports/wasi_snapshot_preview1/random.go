@@ -8,9 +8,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const functionRandomGet = "random_get"
+const randomGetName = "random_get"
 
-// randomGet is the WASI function named functionRandomGet which writes random
+// randomGet is the WASI function named randomGetName which writes random
 // data to a buffer.
 //
 // # Parameters
@@ -34,17 +34,7 @@ const functionRandomGet = "random_get"
 //	    buf --^
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-var randomGet = &wasm.HostFunc{
-	ExportNames: []string{functionRandomGet},
-	Name:        functionRandomGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"buf", "buf_len"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         wasiFunc(randomGetFn),
-	},
-}
+var randomGet = newHostFunc(randomGetName, randomGetFn, []api.ValueType{i32, i32}, "buf", "buf_len")
 
 func randomGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
