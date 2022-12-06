@@ -40,8 +40,7 @@ type (
 		name string
 
 		// NOTE: The offset of the functions field is referenced from assembly based on
-		// the constant at
-		// https://github.com/tetratelabs/wazero/blame/29e4f46d4a5bc12ffa157f48cc0675112ed78cbc/internal/engine/compiler/engine.go#L299
+		// the constant moduleEngineFunctionsOffset.
 		// If changing the offset, the constant and associated tests need to be updated.
 
 		// functions are the functions in a module instances.
