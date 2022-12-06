@@ -9,6 +9,8 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/testing/require"
+	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
 )
 
 var ctx = context.Background()
@@ -340,6 +342,41 @@ func Test873(t *testing.T) {
 func Test874(t *testing.T) {
 	run(t, func(t *testing.T, r wazero.Runtime) {
 		_, err := r.InstantiateModuleFromBinary(ctx, getWasmBinary(t, 874))
+		require.NoError(t, err)
+	})
+}
+
+func Test888(t *testing.T) {
+	// This tests that importing FuncRef type globals and using it as an initialization of the locally-defined
+	// FuncRef global works fine.
+	run(t, func(t *testing.T, r wazero.Runtime) {
+		imported := binary.EncodeModule(&wasm.Module{
+			MemorySection: &wasm.Memory{Min: 0, Max: 5, IsMaxEncoded: true},
+			GlobalSection: []*wasm.Global{
+				{
+					Type: &wasm.GlobalType{
+						ValType: wasm.ValueTypeFuncref,
+						Mutable: false,
+					},
+					Init: &wasm.ConstantExpression{
+						Opcode: wasm.OpcodeRefNull,
+						Data:   []byte{wasm.ValueTypeFuncref},
+					},
+				},
+			},
+			ExportSection: []*wasm.Export{
+				{Name: "", Type: wasm.ExternTypeGlobal, Index: 0},
+				{Name: "s", Type: wasm.ExternTypeMemory, Index: 0},
+			},
+		})
+
+		_, err := r.InstantiateModuleFromBinary(ctx, imported)
+		require.NoError(t, err)
+
+		compiled, err := r.CompileModule(ctx, getWasmBinary(t, 888))
+		require.NoError(t, err)
+
+		_, err = r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("test"))
 		require.NoError(t, err)
 	})
 }

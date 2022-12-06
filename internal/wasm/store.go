@@ -378,10 +378,17 @@ func (s *Store) instantiate(
 	if err != nil {
 		return nil, err
 	}
-	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
 	functions := m.BuildFunctions(module)
+
+	// Plus, we are ready to compile functions.
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions)
+	if err != nil {
+		return nil, err
+	}
+
+	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
@@ -395,15 +402,8 @@ func (s *Store) instantiate(
 		}
 	}
 
-	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions)
-	if err != nil {
-		return nil, err
-	}
-
 	// After engine creation, we can create the funcref element instances and initialize funcref type globals.
 	m.buildElementInstances(module.ElementSection)
-	m.Engine.InitializeFuncrefGlobals(globals)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	if err = m.applyData(module.DataSection); err != nil {
@@ -579,15 +579,13 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 			v = api.DecodeF64(g.Val)
 		case ValueTypeV128:
 			v = [2]uint64{g.Val, g.ValHi}
+		case ValueTypeFuncref, ValueTypeExternref:
+			v = int64(g.Val)
 		}
 	case OpcodeRefNull:
 		switch expr.Data[0] {
-		case ValueTypeExternref:
-			v = int64(0) // Extern reference types are opaque 64bit pointer at runtime.
-		case ValueTypeFuncref:
-			// For funcref types, the pointer value will be set by Engines, so
-			// here we set the "invalid function index" (-1) to indicate that this should be null reference.
-			v = GlobalInstanceNullFuncRefValue
+		case ValueTypeExternref, ValueTypeFuncref:
+			v = int64(0) // Reference types are opaque 64bit pointer at runtime.
 		}
 	case OpcodeRefFunc:
 		// For ref.func const expression, we temporarily store the index as value,
@@ -599,9 +597,6 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 	}
 	return
 }
-
-// GlobalInstanceNullFuncRefValue is the temporary value for ValueTypeFuncref globals which are initialized via ref.null.
-const GlobalInstanceNullFuncRefValue int64 = -1
 
 func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
 	ret := make([]FunctionTypeID, len(ts))

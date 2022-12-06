@@ -727,6 +727,8 @@ func TestModule_validateExports(t *testing.T) {
 }
 
 func TestModule_buildGlobals(t *testing.T) {
+	const localFuncRefInstructionIndex = uint32(0xffff)
+
 	minusOne := int32(-1)
 	m := Module{GlobalSection: []*Global{
 		{
@@ -760,15 +762,48 @@ func TestModule_buildGlobals(t *testing.T) {
 				},
 			},
 		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeExternref},
+			Init: &ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeExternref}},
+		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: &ConstantExpression{Opcode: OpcodeRefNull, Data: []byte{ValueTypeFuncref}},
+		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: &ConstantExpression{Opcode: OpcodeRefFunc, Data: leb128.EncodeUint32(localFuncRefInstructionIndex)},
+		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeExternref},
+			Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{0}},
+		},
+		{
+			Type: &GlobalType{Mutable: false, ValType: ValueTypeFuncref},
+			Init: &ConstantExpression{Opcode: OpcodeGlobalGet, Data: []byte{1}},
+		},
 	}}
 
-	globals := m.buildGlobals(nil)
+	imported := []*GlobalInstance{
+		{Type: &GlobalType{ValType: ValueTypeExternref}, Val: 0x54321},
+		{Type: &GlobalType{ValType: ValueTypeFuncref}, Val: 0x12345},
+	}
+
+	globals := m.buildGlobals(imported, func(funcIndex Index) Reference {
+		require.Equal(t, localFuncRefInstructionIndex, funcIndex)
+		return 0x99999
+	})
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: api.EncodeF64(math.MaxFloat64)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(int32(math.MaxInt32))},
 		// Higher bits are must be zeroed for i32 globals, not signed-extended. See #656.
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(uint32(minusOne))},
 		{Type: &GlobalType{ValType: ValueTypeV128, Mutable: false}, Val: 0x1, ValHi: 0x2},
+		{Type: &GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0},
+		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0},
+		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x99999},
+		{Type: &GlobalType{ValType: ValueTypeExternref, Mutable: false}, Val: 0x54321},
+		{Type: &GlobalType{ValType: ValueTypeFuncref, Mutable: false}, Val: 0x12345},
 	}
 	require.Equal(t, expectedGlobals, globals)
 }

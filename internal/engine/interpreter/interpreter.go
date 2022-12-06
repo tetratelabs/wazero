@@ -752,20 +752,6 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	}
 }
 
-// InitializeFuncrefGlobals implements the same method as documented on wasm.ModuleEngine.
-func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
-	for _, g := range globals {
-		if g.Type.ValType == wasm.ValueTypeFuncref {
-			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
-				g.Val = 0 // Null funcref is expressed as zero.
-			} else {
-				// Lowers the stored function index into the interpreter specific function's opaque pointer.
-				g.Val = uint64(uintptr(unsafe.Pointer(e.functions[g.Val])))
-			}
-		}
-	}
-}
-
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
 	return uintptr(unsafe.Pointer(e.functions[funcIndex]))

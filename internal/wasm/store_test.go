@@ -522,7 +522,7 @@ func TestExecuteConstExpression(t *testing.T) {
 					Opcode: OpcodeRefNull,
 					Data:   []byte{RefTypeFuncref},
 				},
-				exp: GlobalInstanceNullFuncRefValue,
+				exp: int64(0),
 			},
 			{
 				name: "ref.func",
@@ -560,6 +560,8 @@ func TestExecuteConstExpression(t *testing.T) {
 			{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
 			{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
 			{valueType: ValueTypeV128, val: 0x1, valHi: 0x2},
+			{valueType: ValueTypeExternref, val: 0x12345},
+			{valueType: ValueTypeFuncref, val: 0x54321},
 		}
 
 		for _, tt := range tests {
@@ -594,6 +596,10 @@ func TestExecuteConstExpression(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, uint64(0x1), vector[0])
 					require.Equal(t, uint64(0x2), vector[1])
+				case ValueTypeFuncref, ValueTypeExternref:
+					actual, ok := val.(int64)
+					require.True(t, ok)
+					require.Equal(t, int64(tc.val), actual)
 				}
 			})
 		}
