@@ -606,11 +606,17 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver
 //     enginetest.go.
 func (m *ModuleInstance) BuildFunctions(mod *Module) (fns []*FunctionInstance) {
 	importCount := mod.ImportFuncCount()
+	// TODO: Ideally we only have one []FunctionInstance slice, instead of a memory store and a slice of pointers.
+	// This will require refactoring in assembly, so for now we simply have two slices.
+	fnsMem := make([]FunctionInstance, len(mod.FunctionSection))
 	fns = make([]*FunctionInstance, len(mod.FunctionSection))
 	for i, section := range mod.FunctionSection {
 		code := mod.CodeSection[i]
 		d := mod.FunctionDefinitionSection[uint32(i)+importCount]
-		f := &FunctionInstance{
+		// This object is only referenced from a slice. Instead of creating a heap object
+		// here and storing a pointer, we store the struct directly in the slice. This
+		// reduces the number of heap objects which improves GC performance.
+		fnsMem[i] = FunctionInstance{
 			IsHostFunction: code.IsHostFunction,
 			LocalTypes:     code.LocalTypes,
 			Body:           code.Body,
@@ -621,7 +627,7 @@ func (m *ModuleInstance) BuildFunctions(mod *Module) (fns []*FunctionInstance) {
 			Type:           d.funcType,
 			Definition:     d,
 		}
-		fns[i] = f
+		fns[i] = &fnsMem[i]
 	}
 	return
 }
