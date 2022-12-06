@@ -22,6 +22,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// NOTE: The offset of many of the struct fields defined here are referenced from
+// assembly using the constants below such as moduleEngineFunctionsOffset.
+// If changing a struct, update the constant and associated tests as needed.
 type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
@@ -38,10 +41,6 @@ type (
 	moduleEngine struct {
 		// name is the name the module was instantiated with used for error handling.
 		name string
-
-		// NOTE: The offset of the functions field is referenced from assembly based on
-		// the constant moduleEngineFunctionsOffset.
-		// If changing the offset, the constant and associated tests need to be updated.
 
 		// functions are the functions in a module instances.
 		// The index is module instance-scoped. We intentionally avoid using map
