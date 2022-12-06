@@ -114,6 +114,7 @@ func requireNoDiff(wasmBin []byte, requireNoError func(err error)) {
 	}
 }
 
+// ensureDummyImports instantiates the modules which are required imports by `origin` *wasm.Module.
 func ensureDummyImports(r wazero.Runtime, origin *wasm.Module, requireNoError func(err error)) (skip bool) {
 	impMods := make(map[string][]*wasm.Import)
 	for _, imp := range origin.ImportSection {
