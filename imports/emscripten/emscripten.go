@@ -336,7 +336,7 @@ func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 //
 //   - ctx: the propagated go context.
 //   - callCtx: the incoming context of the `invoke_` function.
-//   - typeID: ........ TODO
+//   - typeID: used to type check on indirect calls.
 //   - tableOffset: position in the module's only table
 //   - params: parameters to the funcref
 func callDynamic(ctx context.Context, callCtx *wasm.CallContext, typeID wasm.FunctionTypeID, tableOffset wasm.Index, params []uint64) (results []uint64, err error) {

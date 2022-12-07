@@ -90,6 +90,16 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
+func TestNewStore(t *testing.T) {
+	s, _ := NewStore(api.CoreFeaturesV1, &mockEngine{shouldCompileFail: false, callFailIndex: -1})
+	// Ensures that a newly created store has the pre allocated type IDs.
+	for k, v := range preAllocatedTypeIDs {
+		actual, ok := s.typeIDs[k]
+		require.True(t, ok)
+		require.Equal(t, v, actual)
+	}
+}
+
 func TestStore_Instantiate(t *testing.T) {
 	s, ns := newStore()
 	m, err := NewHostModule("", map[string]interface{}{"fn": func() {}}, map[string]*HostFuncNames{"fn": {}}, api.CoreFeaturesV1)
