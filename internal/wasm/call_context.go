@@ -127,11 +127,12 @@ func (m *CallContext) Memory() api.Memory {
 
 // ExportedMemory implements the same method as documented on api.Module.
 func (m *CallContext) ExportedMemory(name string) api.Memory {
-	exp, err := m.module.getExport(name, ExternTypeMemory)
+	_, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
-	return exp.Memory
+	// We Assume that we have at most one memory.
+	return m.memory
 }
 
 // ExportedFunction implements the same method as documented on api.Module.
@@ -141,7 +142,7 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 		return nil
 	}
 
-	return m.function(exp.Function)
+	return m.function(&m.module.Functions[exp.Index])
 }
 
 // Module is exposed for emscripten.
@@ -218,19 +219,20 @@ func (m *CallContext) ExportedGlobal(name string) api.Global {
 	if err != nil {
 		return nil
 	}
-	if exp.Global.Type.Mutable {
-		return &mutableGlobal{exp.Global}
+	g := m.module.Globals[exp.Index]
+	if g.Type.Mutable {
+		return &mutableGlobal{g}
 	}
-	valType := exp.Global.Type.ValType
+	valType := g.Type.ValType
 	switch valType {
 	case ValueTypeI32:
-		return globalI32(exp.Global.Val)
+		return globalI32(g.Val)
 	case ValueTypeI64:
-		return globalI64(exp.Global.Val)
+		return globalI64(g.Val)
 	case ValueTypeF32:
-		return globalF32(exp.Global.Val)
+		return globalF32(g.Val)
 	case ValueTypeF64:
-		return globalF64(exp.Global.Val)
+		return globalF64(g.Val)
 	default:
 		panic(fmt.Errorf("BUG: unknown value type %X", valType))
 	}

@@ -122,7 +122,8 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 }
 
 func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
-	f := m.Exports[name].Function
+	exp := m.Exports[name]
+	f := &m.Functions[exp.Index]
 	if f == nil {
 		err = fmt.Errorf("%s not found", name)
 		return
@@ -187,9 +188,9 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	host := &wasm.ModuleInstance{Name: "host", TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	goFn := host.Exports["go"].Function
-	goReflectFn := host.Exports["go-reflect"].Function
-	wasnFn := host.Exports["wasm"].Function
+	goFn := &host.Functions[host.Exports["go"].Index]
+	goReflectFn := &host.Functions[host.Exports["go-reflect"].Index]
+	wasnFn := &host.Functions[host.Exports["wasm"].Index]
 
 	err := eng.CompileModule(testCtx, hostModule, nil)
 	requireNoError(err)
