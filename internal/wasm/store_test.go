@@ -380,7 +380,7 @@ func (e *mockEngine) CompiledModuleCount() uint32 { return 0 }
 func (e *mockEngine) DeleteCompiledModule(*Module) {}
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _, _ []*FunctionInstance) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *Module, _ []FunctionInstance) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some engine creation error")
 	}
@@ -862,7 +862,7 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 	})
 	t.Run("funcref", func(t *testing.T) {
 		e := &mockEngine{}
-		me, err := e.NewModuleEngine("", nil, nil, nil)
+		me, err := e.NewModuleEngine("", nil, nil)
 		me.(*mockModuleEngine).functionRefs = map[Index]Reference{0: 0xa, 1: 0xaa, 2: 0xaaa, 3: 0xaaaa}
 		require.NoError(t, err)
 		m := &ModuleInstance{Engine: me}

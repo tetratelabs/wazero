@@ -664,6 +664,6 @@ func (e *mockEngine) DeleteCompiledModule(module *wasm.Module) {
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _, _ []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _ *wasm.Module, _ []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	return nil, nil
 }

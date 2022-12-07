@@ -59,7 +59,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("error before instantiation", func(t *testing.T) {
-		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil, nil)
+		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil)
 		require.EqualError(t, err, "source module for mymod must be compiled before instantiation")
 	})
 
@@ -67,7 +67,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 		m := &wasm.Module{}
 		err := e.CompileModule(testCtx, m, nil)
 		require.NoError(t, err)
-		me, err := e.NewModuleEngine(t.Name(), m, nil, nil)
+		me, err := e.NewModuleEngine(t.Name(), m, nil)
 		require.NoError(t, err)
 		require.Equal(t, t.Name(), me.Name())
 	})
@@ -100,10 +100,10 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// To use the function, we first need to add it to a module.
 	module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-	module.Functions = module.BuildFunctions(m)
+	module.Functions = module.BuildFunctions(m, nil)
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions)
+	me, err := e.NewModuleEngine(module.Name, m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
@@ -156,9 +156,9 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeExternref},
 		{Min: 10, References: make([]wasm.Reference, 10), Type: wasm.RefTypeFuncref},
 	}
-	m.Functions = m.BuildFunctions(mod)
+	m.Functions = m.BuildFunctions(mod, nil)
 
-	me, err := e.NewModuleEngine(m.Name, mod, nil, m.Functions)
+	me, err := e.NewModuleEngine(m.Name, mod, m.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(m, me)
 
@@ -474,12 +474,12 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	var memory api.Memory = module.Memory
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
-	module.Functions = module.BuildFunctions(m)
+	module.Functions = module.BuildFunctions(m, nil)
 	module.BuildExports(m.ExportSection)
 	grow, init := &module.Functions[0], &module.Functions[1]
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions)
+	me, err := e.NewModuleEngine(module.Name, m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
@@ -606,11 +606,11 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	err := e.CompileModule(testCtx, hostModule, lns)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule)
+	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
 	hostFn := host.Exports[divByGoName].Function
 
-	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions)
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -642,13 +642,13 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importedFunctions := imported.BuildFunctions(importedModule)
-	imported.Functions = append([]wasm.FunctionInstance{*hostFn}, importedFunctions...)
+	importedFunctions := imported.BuildFunctions(importedModule, []*wasm.FunctionInstance{hostFn})
+	imported.Functions = importedFunctions
 	imported.BuildExports(importedModule.ExportSection)
 	callHostFn := imported.Exports[callDivByGoName].Function
 
 	// Compile the imported module
-	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, []*wasm.FunctionInstance{hostFn}, importedFunctions)
+	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, importedFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
@@ -676,12 +676,12 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule)
-	importing.Functions = append([]wasm.FunctionInstance{*callHostFn}, importingFunctions...)
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{callHostFn})
+	importing.Functions = importingFunctions
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{callHostFn}, importingFunctions)
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importingFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 
@@ -724,12 +724,12 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	err := e.CompileModule(testCtx, hostModule, nil)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule)
+	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
 	readMemFn := host.Exports[readMemName].Function
 	callReadMemFn := host.Exports[callReadMemName].Function
 
-	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions)
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -766,13 +766,13 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule)
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{readMemFn, callReadMemFn})
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
-	importing.Functions = append([]wasm.FunctionInstance{*callReadMemFn, *readMemFn}, importingFunctions...)
+	importing.Functions = importingFunctions
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{readMemFn, callReadMemFn}, importingFunctions)
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importingFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 

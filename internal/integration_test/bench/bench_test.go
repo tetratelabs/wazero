@@ -91,7 +91,7 @@ func BenchmarkCompilation(b *testing.B) {
 }
 
 func runCompilation(b *testing.B, r wazero.Runtime) wazero.CompiledModule {
-	compiled, err := r.CompileModule(testCtx, inita)
+	compiled, err := r.CompileModule(testCtx, caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}
