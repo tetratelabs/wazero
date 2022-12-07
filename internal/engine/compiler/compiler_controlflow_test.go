@@ -651,7 +651,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		// and the typeID matches the table[targetOffset]'s type ID.
 		env.module().TypeIDs = make([]wasm.FunctionTypeID, 100)
 		env.module().TypeIDs[operation.TypeIndex] = targetTypeID
-		env.module().Engine = &moduleEngine{functions: []*function{}}
+		env.module().Engine = &moduleEngine{functions: []function{}}
 
 		me := env.moduleEngine()
 		for i := 0; i < len(table); i++ {
@@ -679,7 +679,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
-			f := &function{
+			f := function{
 				parent:                &code{codeSegment: c},
 				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 				moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
@@ -688,7 +688,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				},
 			}
 			me.functions = append(me.functions, f)
-			table[i] = uintptr(unsafe.Pointer(f))
+			table[i] = uintptr(unsafe.Pointer(&f))
 		}
 
 		// Test to ensure that we can call all the functions stored in the table.
@@ -746,7 +746,7 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 	operation := &wazeroir.OperationCallIndirect{TypeIndex: typeIndex}
 	env.module().TypeIDs = make([]wasm.FunctionTypeID, typeIndex+1)
 	env.module().TypeIDs[typeIndex] = typeID
-	env.module().Engine = &moduleEngine{functions: []*function{}}
+	env.module().Engine = &moduleEngine{functions: []function{}}
 
 	types := make([]*wasm.FunctionType, typeIndex+1)
 	types[typeIndex] = &wasm.FunctionType{}
@@ -762,14 +762,14 @@ func TestCompiler_callIndirect_largeTypeIndex(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		f := &function{
+		f := function{
 			parent:                &code{codeSegment: c},
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 			source:                &wasm.FunctionInstance{TypeID: 0},
 		}
 		me.functions = append(me.functions, f)
-		table[0] = uintptr(unsafe.Pointer(f))
+		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
@@ -835,7 +835,7 @@ func TestCompiler_compileCall(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 		index := wasm.Index(i)
-		me.functions = append(me.functions, &function{
+		me.functions = append(me.functions, function{
 			parent:                &code{codeSegment: c},
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),

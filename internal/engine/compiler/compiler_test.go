@@ -68,6 +68,7 @@ func init() {
 	requireEqual(int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), functionCodeInitialAddressOffset, "functionCodeInitialAddressOffset")
 	requireEqual(int(unsafe.Offsetof(compiledFunc.source)), functionSourceOffset, "functionSourceOffset")
 	requireEqual(int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), functionModuleInstanceAddressOffset, "functionModuleInstanceAddressOffset")
+	requireEqual(int(unsafe.Sizeof(compiledFunc)), functionSize, "functionModuleInstanceAddressOffset")
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance

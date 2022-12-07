@@ -49,7 +49,7 @@ func (e *engineTester) NewEngine(enabledFeatures api.CoreFeatures) wasm.Engine {
 // CompiledFunctionPointerValue implements the same method as documented on enginetest.EngineTester.
 func (e engineTester) CompiledFunctionPointerValue(me wasm.ModuleEngine, funcIndex wasm.Index) uint64 {
 	internal := me.(*moduleEngine)
-	return uint64(uintptr(unsafe.Pointer(internal.functions[funcIndex])))
+	return uint64(uintptr(unsafe.Pointer(&internal.functions[funcIndex])))
 }
 
 func TestCompiler_Engine_NewModuleEngine(t *testing.T) {

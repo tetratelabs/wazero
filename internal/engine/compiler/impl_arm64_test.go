@@ -21,7 +21,7 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 	// and the typeID  matches the table[targetOffset]'s type ID.
 	operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 	env.module().TypeIDs = []wasm.FunctionTypeID{0}
-	env.module().Engine = &moduleEngine{functions: []*function{}}
+	env.module().Engine = &moduleEngine{functions: []function{}}
 
 	me := env.moduleEngine()
 	{ // Compiling call target.
@@ -34,14 +34,14 @@ func TestArm64Compiler_indirectCallWithTargetOnCallingConvReg(t *testing.T) {
 		c, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		f := &function{
+		f := function{
 			parent:                &code{codeSegment: c},
 			codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 			source:                &wasm.FunctionInstance{TypeID: 0},
 		}
 		me.functions = append(me.functions, f)
-		table[0] = uintptr(unsafe.Pointer(f))
+		table[0] = uintptr(unsafe.Pointer(&f))
 	}
 
 	compiler := env.requireNewCompiler(t, newCompiler, &wazeroir.CompilationResult{
