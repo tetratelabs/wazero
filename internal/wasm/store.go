@@ -69,8 +69,7 @@ type (
 
 		// TypeIDs is index-correlated with types and holds typeIDs which is uniquely assigned to a type by store.
 		// This is necessary to achieve fast runtime type checking for indirect function calls at runtime.
-		TypeIDs     []FunctionTypeID
-		TypeIDIndex map[string]FunctionTypeID
+		TypeIDs []FunctionTypeID
 
 		// DataInstances holds data segments bytes of the module.
 		// This is only used by bulk memory operations.
@@ -157,13 +156,7 @@ type (
 const maximumFunctionTypes = 1 << 27
 
 // addSections adds section elements to the ModuleInstance
-func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
-	types []*FunctionType,
-) {
-	m.TypeIDIndex = make(map[string]FunctionTypeID, len(types))
-	for i, t := range types {
-		m.TypeIDIndex[t.string] = m.TypeIDs[i]
-	}
+func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance) {
 	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables
 
@@ -272,11 +265,16 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (ExportInstance, 
 
 func NewStore(enabledFeatures api.CoreFeatures, engine Engine) (*Store, *Namespace) {
 	ns := newNamespace()
+
+	typeIDs := make(map[string]FunctionTypeID, len(PreAllocatedTypeIDs))
+	for k, v := range PreAllocatedTypeIDs {
+		typeIDs[k] = v
+	}
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		namespaces:       []*Namespace{ns},
-		typeIDs:          map[string]FunctionTypeID{},
+		typeIDs:          typeIDs,
 		functionMaxTypes: maximumFunctionTypes,
 	}, ns
 }
@@ -371,7 +369,7 @@ func (s *Store) instantiate(
 	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	m.addSections(module, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
+	m.addSections(module, importedGlobals, globals, tables, importedMemory, memory)
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -588,6 +586,19 @@ func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error)
 		ret[i] = inst
 	}
 	return ret, nil
+}
+
+var PreAllocatedTypeIDs = map[string]FunctionTypeID{
+	"i32i32i32i32_v":   0,
+	"i32i32i32_v":      1,
+	"i32i32_v":         2,
+	"i32_v":            3,
+	"v_v":              4,
+	"i32i32i32i32_i32": 5,
+	"i32i32i32_i32":    6,
+	"i32i32_i32":       7,
+	"i32_i32":          8,
+	"v_i32":            9,
 }
 
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
