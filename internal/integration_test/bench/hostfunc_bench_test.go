@@ -229,7 +229,7 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 
 	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
 	importingFunctions := importing.BuildFunctions(importingModule)
-	importing.Functions = append([]*wasm.FunctionInstance{goFn, wasnFn}, importingFunctions...)
+	importing.Functions = append([]wasm.FunctionInstance{*goFn, *wasnFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
 	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{goFn, goReflectFn, wasnFn}, importingFunctions)

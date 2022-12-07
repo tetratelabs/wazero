@@ -51,7 +51,7 @@ func BenchmarkInitialization(b *testing.B) {
 		runInitializationConcurrentBench(b, r)
 	})
 
-	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" {
+	if platform.CompilerSupported() {
 		b.Run("compiler", func(b *testing.B) {
 			r := createRuntime(b, wazero.NewRuntimeConfigCompiler())
 			runInitializationBench(b, r)

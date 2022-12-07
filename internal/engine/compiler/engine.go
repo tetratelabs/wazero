@@ -545,7 +545,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions []*wasm.FunctionInstance, moduleFunctions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
 	me := &moduleEngine{
 		name:                  name,
@@ -569,7 +569,7 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	// This will require refactoring in assembly, so for now we simply have two slices.
 	functionsMem := make([]function, len(moduleFunctions))
 	for i, c := range codes {
-		f := moduleFunctions[i]
+		f := &moduleFunctions[i]
 		function := c.createFunction(f)
 		functionsMem[i] = function
 		me.functions[imported+i] = &functionsMem[i]

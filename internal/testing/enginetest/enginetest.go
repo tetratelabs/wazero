@@ -108,7 +108,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
-	fn := module.Functions[0]
+	fn := &module.Functions[0]
 
 	ce, err := me.NewCallEngine(module.CallCtx, fn)
 	require.NoError(t, err)
@@ -476,7 +476,7 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
 	module.Functions = module.BuildFunctions(m)
 	module.BuildExports(m.ExportSection)
-	grow, init := module.Functions[0], module.Functions[1]
+	grow, init := &module.Functions[0], &module.Functions[1]
 
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions)
@@ -643,7 +643,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 
 	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	importedFunctions := imported.BuildFunctions(importedModule)
-	imported.Functions = append([]*wasm.FunctionInstance{hostFn}, importedFunctions...)
+	imported.Functions = append([]wasm.FunctionInstance{*hostFn}, importedFunctions...)
 	imported.BuildExports(importedModule.ExportSection)
 	callHostFn := imported.Exports[callDivByGoName].Function
 
@@ -677,7 +677,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	importingFunctions := importing.BuildFunctions(importingModule)
-	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importingFunctions...)
+	importing.Functions = append([]wasm.FunctionInstance{*callHostFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
@@ -768,7 +768,7 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	importingFunctions := importing.BuildFunctions(importingModule)
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
-	importing.Functions = append([]*wasm.FunctionInstance{callReadMemFn, readMemFn}, importingFunctions...)
+	importing.Functions = append([]wasm.FunctionInstance{*callReadMemFn, *readMemFn}, importingFunctions...)
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module

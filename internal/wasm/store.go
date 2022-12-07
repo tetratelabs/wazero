@@ -55,7 +55,7 @@ type (
 	ModuleInstance struct {
 		Name      string
 		Exports   map[string]*ExportInstance
-		Functions []*FunctionInstance
+		Functions []FunctionInstance
 		Globals   []*GlobalInstance
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		Memory *MemoryInstance
@@ -161,7 +161,7 @@ type (
 const maximumFunctionTypes = 1 << 27
 
 // addSections adds section elements to the ModuleInstance
-func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
+func (m *ModuleInstance) addSections(module *Module, importedFunctions []*FunctionInstance, functions []FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
 	types []*FunctionType,
 ) {
@@ -170,7 +170,9 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	for i, t := range types {
 		m.TypeIDIndex[t.string] = m.TypeIDs[i]
 	}
-	m.Functions = append(importedFunctions, functions...)
+	for i, f := range importedFunctions {
+		m.Functions[i] = *f
+	}
 	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables
 
@@ -231,7 +233,7 @@ func (m *ModuleInstance) BuildExports(exports []*Export) {
 		var ei *ExportInstance
 		switch exp.Type {
 		case ExternTypeFunc:
-			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
+			ei = &ExportInstance{Type: exp.Type, Function: &m.Functions[index]}
 		case ExternTypeGlobal:
 			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
 		case ExternTypeMemory:
@@ -419,7 +421,7 @@ func (s *Store) instantiate(
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		f := m.Functions[funcIdx]
+		f := &m.Functions[funcIdx]
 
 		ce, err := f.Module.Engine.NewCallEngine(callCtx, f)
 		if err != nil {

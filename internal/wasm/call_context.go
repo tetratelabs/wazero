@@ -153,7 +153,7 @@ func (m *CallContext) Function(funcIdx Index) api.Function {
 	if uint32(len(m.module.Functions)) < funcIdx {
 		return nil
 	}
-	return m.function(m.module.Functions[funcIdx])
+	return m.function(&m.module.Functions[funcIdx])
 }
 
 func (m *CallContext) function(f *FunctionInstance) api.Function {

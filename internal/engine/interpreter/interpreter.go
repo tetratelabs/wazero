@@ -263,7 +263,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions []*wasm.FunctionInstance, moduleFunctions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                  name,
@@ -282,9 +282,9 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for i, c := range codes {
-		f := moduleFunctions[i]
-		insntantiatedcode := c.instantiate(f)
-		me.functions = append(me.functions, insntantiatedcode)
+		f := &moduleFunctions[i]
+		inst := c.instantiate(f)
+		me.functions = append(me.functions, inst)
 	}
 	return me, nil
 }
