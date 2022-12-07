@@ -225,12 +225,12 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 	}{
 		{
 			name:     callImportReadMemName,
-			fn:       importing.Exports[callImportReadMemName].Function,
+			fn:       &importing.Functions[importing.Exports[callImportReadMemName].Index],
 			expected: importingMemoryVal,
 		},
 		{
 			name:     callImportCallReadMemName,
-			fn:       importing.Exports[callImportCallReadMemName].Function,
+			fn:       &importing.Functions[importing.Exports[callImportCallReadMemName].Index],
 			expected: importingMemoryVal,
 		},
 	}
@@ -274,17 +274,17 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 		{
 			name:   divByWasmName,
 			module: imported.CallCtx,
-			fn:     imported.Exports[divByWasmName].Function,
+			fn:     &imported.Functions[imported.Exports[divByWasmName].Index],
 		},
 		{
 			name:   callDivByGoName,
 			module: imported.CallCtx,
-			fn:     imported.Exports[callDivByGoName].Function,
+			fn:     &imported.Functions[imported.Exports[callDivByGoName].Index],
 		},
 		{
 			name:   callImportCallDivByGoName,
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 		},
 	}
 	for _, tt := range tests {
@@ -329,21 +329,21 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 			name:        "wasm function not enough parameters",
 			input:       []uint64{},
 			module:      imported.CallCtx,
-			fn:          imported.Exports[divByWasmName].Function,
+			fn:          &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "wasm function too many parameters",
 			input:       []uint64{1, 2},
 			module:      imported.CallCtx,
-			fn:          imported.Exports[divByWasmName].Function,
+			fn:          &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
 			name:   "wasm function panics with wasmruntime.Error",
 			input:  []uint64{0},
 			module: imported.CallCtx,
-			fn:     imported.Exports[divByWasmName].Function,
+			fn:     &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `wasm error: integer divide by zero
 wasm stack trace:
 	imported.div_by.wasm(i32) i32`,
@@ -352,7 +352,7 @@ wasm stack trace:
 			name:   "wasm calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: imported.CallCtx,
-			fn:     imported.Exports[callDivByGoName].Function,
+			fn:     &imported.Functions[imported.Exports[callDivByGoName].Index],
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -362,7 +362,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -373,7 +373,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -384,7 +384,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -608,7 +608,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	hostFn := host.Exports[divByGoName].Function
+	hostFn := &host.Functions[host.Exports[divByGoName].Index]
 
 	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
@@ -645,7 +645,7 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	importedFunctions := imported.BuildFunctions(importedModule, []*wasm.FunctionInstance{hostFn})
 	imported.Functions = importedFunctions
 	imported.BuildExports(importedModule.ExportSection)
-	callHostFn := imported.Exports[callDivByGoName].Function
+	callHostFn := &imported.Functions[imported.Exports[callDivByGoName].Index]
 
 	// Compile the imported module
 	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, importedFunctions)
@@ -726,8 +726,8 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
 	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	readMemFn := host.Exports[readMemName].Function
-	callReadMemFn := host.Exports[callReadMemName].Function
+	readMemFn := &host.Functions[host.Exports[readMemName].Index]
+	callReadMemFn := &host.Functions[host.Exports[callReadMemName].Index]
 
 	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
