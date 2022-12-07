@@ -21,10 +21,11 @@ func Test_resolveImports_table(t *testing.T) {
 		max := uint32(10)
 		tableInst := &TableInstance{Max: &max}
 		modules := map[string]*ModuleInstance{
-			moduleName: {Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: tableInst,
-			}}, Name: moduleName},
+			moduleName: {
+				Tables:  []*TableInstance{tableInst},
+				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable, Index: 0}},
+				Name:    moduleName,
+			},
 		}
 		_, _, tables, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}}, modules)
 		require.NoError(t, err)
@@ -34,10 +35,11 @@ func Test_resolveImports_table(t *testing.T) {
 	t.Run("minimum size mismatch", func(t *testing.T) {
 		importTableType := &Table{Min: 2}
 		modules := map[string]*ModuleInstance{
-			moduleName: {Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Min - 1},
-			}}, Name: moduleName},
+			moduleName: {
+				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
+				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
+				Name:    moduleName,
+			},
 		}
 		_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, modules)
 		require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
@@ -46,10 +48,11 @@ func Test_resolveImports_table(t *testing.T) {
 		max := uint32(10)
 		importTableType := &Table{Max: &max}
 		modules := map[string]*ModuleInstance{
-			moduleName: {Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Min - 1},
-			}}, Name: moduleName},
+			moduleName: {
+				Tables:  []*TableInstance{{Min: importTableType.Min - 1}},
+				Exports: map[string]ExportInstance{name: {Type: ExternTypeTable}},
+				Name:    moduleName,
+			},
 		}
 		_, _, _, _, err := resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}}, modules)
 		require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")

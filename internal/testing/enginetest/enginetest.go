@@ -59,7 +59,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	e := et.NewEngine(api.CoreFeaturesV1)
 
 	t.Run("error before instantiation", func(t *testing.T) {
-		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil, nil)
+		_, err := e.NewModuleEngine("mymod", &wasm.Module{}, nil)
 		require.EqualError(t, err, "source module for mymod must be compiled before instantiation")
 	})
 
@@ -67,7 +67,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 		m := &wasm.Module{}
 		err := e.CompileModule(testCtx, m, nil)
 		require.NoError(t, err)
-		me, err := e.NewModuleEngine(t.Name(), m, nil, nil)
+		me, err := e.NewModuleEngine(t.Name(), m, nil)
 		require.NoError(t, err)
 		require.Equal(t, t.Name(), me.Name())
 	})
@@ -100,15 +100,15 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 
 	// To use the function, we first need to add it to a module.
 	module := &wasm.ModuleInstance{Name: t.Name(), TypeIDs: []wasm.FunctionTypeID{0}}
-	module.Functions = module.BuildFunctions(m)
+	module.Functions = module.BuildFunctions(m, nil)
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions)
+	me, err := e.NewModuleEngine(module.Name, m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
 	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
-	fn := module.Functions[0]
+	fn := &module.Functions[0]
 
 	ce, err := me.NewCallEngine(module.CallCtx, fn)
 	require.NoError(t, err)
@@ -156,9 +156,9 @@ func RunTestModuleEngine_LookupFunction(t *testing.T, et EngineTester) {
 		{Min: 2, References: make([]wasm.Reference, 2), Type: wasm.RefTypeExternref},
 		{Min: 10, References: make([]wasm.Reference, 10), Type: wasm.RefTypeFuncref},
 	}
-	m.Functions = m.BuildFunctions(mod)
+	m.Functions = m.BuildFunctions(mod, nil)
 
-	me, err := e.NewModuleEngine(m.Name, mod, nil, m.Functions)
+	me, err := e.NewModuleEngine(m.Name, mod, m.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(m, me)
 
@@ -225,12 +225,12 @@ func runTestModuleEngine_Call_HostFn_Mem(t *testing.T, et EngineTester, readMem 
 	}{
 		{
 			name:     callImportReadMemName,
-			fn:       importing.Exports[callImportReadMemName].Function,
+			fn:       &importing.Functions[importing.Exports[callImportReadMemName].Index],
 			expected: importingMemoryVal,
 		},
 		{
 			name:     callImportCallReadMemName,
-			fn:       importing.Exports[callImportCallReadMemName].Function,
+			fn:       &importing.Functions[importing.Exports[callImportCallReadMemName].Index],
 			expected: importingMemoryVal,
 		},
 	}
@@ -274,17 +274,17 @@ func runTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester, hostDivBy *w
 		{
 			name:   divByWasmName,
 			module: imported.CallCtx,
-			fn:     imported.Exports[divByWasmName].Function,
+			fn:     &imported.Functions[imported.Exports[divByWasmName].Index],
 		},
 		{
 			name:   callDivByGoName,
 			module: imported.CallCtx,
-			fn:     imported.Exports[callDivByGoName].Function,
+			fn:     &imported.Functions[imported.Exports[callDivByGoName].Index],
 		},
 		{
 			name:   callImportCallDivByGoName,
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 		},
 	}
 	for _, tt := range tests {
@@ -329,21 +329,21 @@ func RunTestModuleEngine_Call_Errors(t *testing.T, et EngineTester) {
 			name:        "wasm function not enough parameters",
 			input:       []uint64{},
 			module:      imported.CallCtx,
-			fn:          imported.Exports[divByWasmName].Function,
+			fn:          &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `expected 1 params, but passed 0`,
 		},
 		{
 			name:        "wasm function too many parameters",
 			input:       []uint64{1, 2},
 			module:      imported.CallCtx,
-			fn:          imported.Exports[divByWasmName].Function,
+			fn:          &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `expected 1 params, but passed 2`,
 		},
 		{
 			name:   "wasm function panics with wasmruntime.Error",
 			input:  []uint64{0},
 			module: imported.CallCtx,
-			fn:     imported.Exports[divByWasmName].Function,
+			fn:     &imported.Functions[imported.Exports[divByWasmName].Index],
 			expectedErr: `wasm error: integer divide by zero
 wasm stack trace:
 	imported.div_by.wasm(i32) i32`,
@@ -352,7 +352,7 @@ wasm stack trace:
 			name:   "wasm calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: imported.CallCtx,
-			fn:     imported.Exports[callDivByGoName].Function,
+			fn:     &imported.Functions[imported.Exports[callDivByGoName].Index],
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -362,7 +362,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -373,7 +373,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm that calls host function that panics",
 			input:  []uint64{math.MaxUint32},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `host-function panic (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -384,7 +384,7 @@ wasm stack trace:
 			name:   "wasm calls imported wasm calls host function panics with runtime.Error",
 			input:  []uint64{0},
 			module: importing.CallCtx,
-			fn:     importing.Exports[callImportCallDivByGoName].Function,
+			fn:     &importing.Functions[importing.Exports[callImportCallDivByGoName].Index],
 			expectedErr: `runtime error: integer divide by zero (recovered by wazero)
 wasm stack trace:
 	host.div_by.go(i32) i32
@@ -474,12 +474,12 @@ func RunTestModuleEngine_Memory(t *testing.T, et EngineTester) {
 	var memory api.Memory = module.Memory
 
 	// To use functions, we need to instantiate them (associate them with a ModuleInstance).
-	module.Functions = module.BuildFunctions(m)
+	module.Functions = module.BuildFunctions(m, nil)
 	module.BuildExports(m.ExportSection)
-	grow, init := module.Functions[0], module.Functions[1]
+	grow, init := &module.Functions[0], &module.Functions[1]
 
 	// Compile the module
-	me, err := e.NewModuleEngine(module.Name, m, nil, module.Functions)
+	me, err := e.NewModuleEngine(module.Name, m, module.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(module, me)
 
@@ -606,11 +606,11 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	err := e.CompileModule(testCtx, hostModule, lns)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule)
+	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	hostFn := host.Exports[divByGoName].Function
+	hostFn := &host.Functions[host.Exports[divByGoName].Index]
 
-	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions)
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -642,13 +642,13 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 	require.NoError(t, err)
 
 	imported := &wasm.ModuleInstance{Name: importedModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importedFunctions := imported.BuildFunctions(importedModule)
-	imported.Functions = append([]*wasm.FunctionInstance{hostFn}, importedFunctions...)
+	importedFunctions := imported.BuildFunctions(importedModule, []*wasm.FunctionInstance{hostFn})
+	imported.Functions = importedFunctions
 	imported.BuildExports(importedModule.ExportSection)
-	callHostFn := imported.Exports[callDivByGoName].Function
+	callHostFn := &imported.Functions[imported.Exports[callDivByGoName].Index]
 
 	// Compile the imported module
-	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, []*wasm.FunctionInstance{hostFn}, importedFunctions)
+	importedMe, err := e.NewModuleEngine(imported.Name, importedModule, importedFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(imported, importedMe)
 
@@ -676,12 +676,12 @@ func setupCallTests(t *testing.T, e wasm.Engine, divBy *wasm.Code, fnlf experime
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule)
-	importing.Functions = append([]*wasm.FunctionInstance{callHostFn}, importingFunctions...)
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{callHostFn})
+	importing.Functions = importingFunctions
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{callHostFn}, importingFunctions)
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importingFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 
@@ -724,12 +724,12 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 	err := e.CompileModule(testCtx, hostModule, nil)
 	require.NoError(t, err)
 	host := &wasm.ModuleInstance{Name: hostModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule)
+	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	readMemFn := host.Exports[readMemName].Function
-	callReadMemFn := host.Exports[callReadMemName].Function
+	readMemFn := &host.Functions[host.Exports[readMemName].Index]
+	callReadMemFn := &host.Functions[host.Exports[callReadMemName].Index]
 
-	hostME, err := e.NewModuleEngine(host.Name, hostModule, nil, host.Functions)
+	hostME, err := e.NewModuleEngine(host.Name, hostModule, host.Functions)
 	require.NoError(t, err)
 	linkModuleToEngine(host, hostME)
 
@@ -766,13 +766,13 @@ func setupCallMemTests(t *testing.T, e wasm.Engine, readMem *wasm.Code, fnlf exp
 
 	// Add the exported function.
 	importing := &wasm.ModuleInstance{Name: importingModule.NameSection.ModuleName, TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule)
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{readMemFn, callReadMemFn})
 	// Note: adds imported functions readMemFn and callReadMemFn at index 0 and 1.
-	importing.Functions = append([]*wasm.FunctionInstance{callReadMemFn, readMemFn}, importingFunctions...)
+	importing.Functions = importingFunctions
 	importing.BuildExports(importingModule.ExportSection)
 
 	// Compile the importing module
-	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{readMemFn, callReadMemFn}, importingFunctions)
+	importingMe, err := e.NewModuleEngine(importing.Name, importingModule, importingFunctions)
 	require.NoError(t, err)
 	linkModuleToEngine(importing, importingMe)
 

@@ -495,8 +495,7 @@ func TestInterpreter_Compile(t *testing.T) {
 		e := et.NewEngine(api.CoreFeaturesV1).(*engine)
 		_, err := e.NewModuleEngine("foo",
 			&wasm.Module{},
-			nil, // imports
-			nil, // moduleFunctions
+			nil, // functions
 		)
 		require.EqualError(t, err, "source module for foo must be compiled before instantiation")
 	})

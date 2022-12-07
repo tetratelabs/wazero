@@ -78,8 +78,7 @@ type moduleEngine struct {
 	functions []*function
 
 	// parentEngine holds *engine from which this module engine is created from.
-	parentEngine          *engine
-	importedFunctionCount uint32
+	parentEngine *engine
 }
 
 // callEngine holds context per moduleEngine.Call, and shared across all the
@@ -263,17 +262,17 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
-	imported := uint32(len(importedFunctions))
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		name:                  name,
-		parentEngine:          e,
-		importedFunctionCount: imported,
+		name:         name,
+		parentEngine: e,
+		functions:    make([]*function, len(functions)),
 	}
 
-	for _, f := range importedFunctions {
+	imported := int(module.ImportFuncCount())
+	for i, f := range functions[:imported] {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
-		me.functions = append(me.functions, cf)
+		me.functions[i] = cf
 	}
 
 	codes, ok := e.getCodes(module)
@@ -282,9 +281,10 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for i, c := range codes {
-		f := moduleFunctions[i]
-		insntantiatedcode := c.instantiate(f)
-		me.functions = append(me.functions, insntantiatedcode)
+		offset := i + imported
+		f := &functions[offset]
+		inst := c.instantiate(f)
+		me.functions[offset] = inst
 	}
 	return me, nil
 }

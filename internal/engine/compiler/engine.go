@@ -49,8 +49,6 @@ type (
 		// as the underlying memory region is accessed by assembly directly by using
 		// codesElement0Address.
 		functions []*function
-
-		importedFunctionCount uint32
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -545,15 +543,14 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
-	imported := len(importedFunctions)
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		name:                  name,
-		functions:             make([]*function, imported+len(moduleFunctions)),
-		importedFunctionCount: uint32(imported),
+		name:      name,
+		functions: make([]*function, len(functions)),
 	}
 
-	for i, f := range importedFunctions {
+	imported := int(module.ImportFuncCount())
+	for i, f := range functions[:imported] {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
 		me.functions[i] = cf
 	}
@@ -567,12 +564,12 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 
 	// TODO: Ideally we only have one []function slice, instead of a memory store and a slice of pointers.
 	// This will require refactoring in assembly, so for now we simply have two slices.
-	functionsMem := make([]function, len(moduleFunctions))
+	functionsMem := make([]function, len(functions[imported:]))
 	for i, c := range codes {
-		f := moduleFunctions[i]
-		function := c.createFunction(f)
-		functionsMem[i] = function
-		me.functions[imported+i] = &functionsMem[i]
+		offset := imported + i
+		f := &functions[offset]
+		functionsMem[i] = c.createFunction(f)
+		me.functions[offset] = &functionsMem[i]
 	}
 	return me, nil
 }

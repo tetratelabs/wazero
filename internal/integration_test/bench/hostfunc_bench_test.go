@@ -122,7 +122,8 @@ func TestBenchmarkFunctionCall(t *testing.T) {
 }
 
 func getCallEngine(m *wasm.ModuleInstance, name string) (ce wasm.CallEngine, err error) {
-	f := m.Exports[name].Function
+	exp := m.Exports[name]
+	f := &m.Functions[exp.Index]
 	if f == nil {
 		err = fmt.Errorf("%s not found", name)
 		return
@@ -185,16 +186,16 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	hostModule.BuildFunctionDefinitions()
 
 	host := &wasm.ModuleInstance{Name: "host", TypeIDs: []wasm.FunctionTypeID{0}}
-	host.Functions = host.BuildFunctions(hostModule)
+	host.Functions = host.BuildFunctions(hostModule, nil)
 	host.BuildExports(hostModule.ExportSection)
-	goFn := host.Exports["go"].Function
-	goReflectFn := host.Exports["go-reflect"].Function
-	wasnFn := host.Exports["wasm"].Function
+	goFn := &host.Functions[host.Exports["go"].Index]
+	goReflectFn := &host.Functions[host.Exports["go-reflect"].Index]
+	wasnFn := &host.Functions[host.Exports["wasm"].Index]
 
 	err := eng.CompileModule(testCtx, hostModule, nil)
 	requireNoError(err)
 
-	hostME, err := eng.NewModuleEngine(host.Name, hostModule, nil, host.Functions)
+	hostME, err := eng.NewModuleEngine(host.Name, hostModule, host.Functions)
 	requireNoError(err)
 	linkModuleToEngine(host, hostME)
 
@@ -209,9 +210,9 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 		},
 		FunctionSection: []wasm.Index{0, 0, 0},
 		ExportSection: []*wasm.Export{
-			{Name: callGoHostName, Type: wasm.ExternTypeFunc, Index: 2},
-			{Name: callGoReflectHostName, Type: wasm.ExternTypeFunc, Index: 3},
-			{Name: callWasmHostName, Type: wasm.ExternTypeFunc, Index: 4},
+			{Name: callGoHostName, Type: wasm.ExternTypeFunc, Index: 3},
+			{Name: callGoReflectHostName, Type: wasm.ExternTypeFunc, Index: 4},
+			{Name: callWasmHostName, Type: wasm.ExternTypeFunc, Index: 5},
 		},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeCall, 0, wasm.OpcodeEnd}}, // Calling the index 0 = host.go.
@@ -228,11 +229,10 @@ func setupHostCallBench(requireNoError func(error)) *wasm.ModuleInstance {
 	requireNoError(err)
 
 	importing := &wasm.ModuleInstance{TypeIDs: []wasm.FunctionTypeID{0}}
-	importingFunctions := importing.BuildFunctions(importingModule)
-	importing.Functions = append([]*wasm.FunctionInstance{goFn, wasnFn}, importingFunctions...)
+	importingFunctions := importing.BuildFunctions(importingModule, []*wasm.FunctionInstance{goFn, goReflectFn, wasnFn})
 	importing.BuildExports(importingModule.ExportSection)
 
-	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, []*wasm.FunctionInstance{goFn, goReflectFn, wasnFn}, importingFunctions)
+	importingMe, err := eng.NewModuleEngine(importing.Name, importingModule, importingFunctions)
 	requireNoError(err)
 	linkModuleToEngine(importing, importingMe)
 

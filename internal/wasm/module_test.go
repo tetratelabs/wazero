@@ -827,9 +827,9 @@ func TestModule_buildFunctions(t *testing.T) {
 
 	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
 	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
-	instance.BuildFunctions(m)
-	for i, f := range instance.Functions {
-		require.Equal(t, i, f.Definition.Index())
+	instance.BuildFunctions(m, nil)
+	for i, f := range instance.Functions[1:] {
+		require.Equal(t, uint32(i+1), f.Definition.Index())
 		require.Equal(t, nopCode.Body, f.Body)
 	}
 }

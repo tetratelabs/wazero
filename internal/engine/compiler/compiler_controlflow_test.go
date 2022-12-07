@@ -841,7 +841,7 @@ func TestCompiler_compileCall(t *testing.T) {
 			moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 		})
 		env.module().Functions = append(env.module().Functions,
-			&wasm.FunctionInstance{Type: targetFunctionType, Idx: index})
+			wasm.FunctionInstance{Type: targetFunctionType, Idx: index})
 	}
 
 	// Now we start building the caller's code.
