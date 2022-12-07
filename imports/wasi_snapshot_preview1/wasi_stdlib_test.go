@@ -1,3 +1,5 @@
+// package wasi_snapshot_preview1 ensures that the behavior we've implemented
+// not only matches the wasi spec, but also at least two compilers use of sdks.
 package wasi_snapshot_preview1
 
 import (
@@ -14,22 +16,20 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// lsWasmCargoWasi was compiled from testdata/cargo-wasi/ls.rs
+// wasmCargoWasi was compiled from testdata/cargo-wasi/wasi.rs
 //
-//go:embed testdata/cargo-wasi/ls.wasm
-var lsWasmCargoWasi []byte
+//go:embed testdata/cargo-wasi/wasi.wasm
+var wasmCargoWasi []byte
 
-// lsZigCc was compiled from testdata/zig-cc/ls.c
+// wasmZigCc was compiled from testdata/zig-cc/wasi.c
 //
-//go:embed testdata/zig-cc/ls.wasm
-var lsZigCc []byte
+//go:embed testdata/zig-cc/wasi.wasm
+var wasmZigCc []byte
 
-// Test_fdReaddir_ls ensures that the behavior we've implemented not only
-// matches the wasi spec, but also at least two compilers use of sdks.
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
-		"cargo-wasi": lsWasmCargoWasi,
-		"zig-cc":     lsZigCc,
+		"cargo-wasi": wasmCargoWasi,
+		"zig-cc":     wasmZigCc,
 	} {
 		toolchain := toolchain
 		bin := bin
@@ -40,16 +40,17 @@ func Test_fdReaddir_ls(t *testing.T) {
 }
 
 func testFdReaddirLs(t *testing.T, bin []byte) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "ls")
+
 	t.Run("empty directory", func(t *testing.T) {
-		stdout, stderr := compileAndRun(t, wazero.NewModuleConfig().
-			WithFS(fstest.MapFS{}), bin)
+		stdout, stderr := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
 		require.Zero(t, stderr)
 		require.Zero(t, stdout)
 	})
 
 	t.Run("directory with entries", func(t *testing.T) {
-		stdout, stderr := compileAndRun(t, wazero.NewModuleConfig().
+		stdout, stderr := compileAndRun(t, moduleConfig.
 			WithFS(fstest.MapFS{
 				"-":   {},
 				"a-":  {Mode: fs.ModeDir},
@@ -57,10 +58,11 @@ func testFdReaddirLs(t *testing.T, bin []byte) {
 			}), bin)
 
 		require.Zero(t, stderr)
-		require.Equal(t, `./-
+		require.Equal(t, `
+./-
 ./a-
 ./ab-
-`, stdout)
+`, "\n"+stdout)
 	})
 
 	t.Run("directory with tons of entries", func(t *testing.T) {
@@ -69,13 +71,39 @@ func testFdReaddirLs(t *testing.T, bin []byte) {
 		for i := 0; i < count; i++ {
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
-		stdout, stderr := compileAndRun(t, wazero.NewModuleConfig().
-			WithFS(testFS), bin)
+		stdout, stderr := compileAndRun(t, moduleConfig.WithFS(testFS), bin)
 
 		require.Zero(t, stderr)
 		lines := strings.Split(stdout, "\n")
 		require.Equal(t, count+1 /* trailing newline */, len(lines))
 	})
+}
+
+func Test_fdReaddir_stat(t *testing.T) {
+	for toolchain, bin := range map[string][]byte{
+		"cargo-wasi": wasmCargoWasi,
+		"zig-cc":     wasmZigCc,
+	} {
+		toolchain := toolchain
+		bin := bin
+		t.Run(toolchain, func(t *testing.T) {
+			testFdReaddirStat(t, bin)
+		})
+	}
+}
+
+func testFdReaddirStat(t *testing.T, bin []byte) {
+	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
+
+	stdout, stderr := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
+
+	require.Zero(t, stderr)
+	require.Equal(t, `
+stdin isatty: true
+stdout isatty: true
+stderr isatty: true
+/ isatty: false
+`, "\n"+stdout)
 }
 
 func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (stdout, stderr string) {
@@ -92,7 +120,7 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (stdout
 
 	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf))
 	if exitErr, ok := err.(*sys.ExitError); ok {
-		require.Zero(t, exitErr.ExitCode())
+		require.Zero(t, exitErr.ExitCode(), stderrBuf.String())
 	} else {
 		require.NoError(t, err)
 	}

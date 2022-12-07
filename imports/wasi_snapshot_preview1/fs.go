@@ -288,6 +288,12 @@ type wasiFiletype uint8
 const (
 	wasiFiletypeUnknown wasiFiletype = iota
 	wasiFiletypeBlockDevice
+	// wasiFiletypeCharacterDevice is set when the FD is a character device.
+	//
+	// Note: wazero currently returns this for stdio descriptors even if the
+	// actual file is not a TTY, to ensure python can work. This avoids
+	// dependencies needed to be more precise.
+	// See https://github.com/mattn/go-isatty.
 	wasiFiletypeCharacterDevice
 	wasiFiletypeDirectory
 	wasiFiletypeRegularFile
