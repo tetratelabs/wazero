@@ -898,9 +898,9 @@ func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		arm64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
 		targetFunctionAddressReg)
 
-	c.assembler.CompileMemoryToRegister(
-		arm64.LDRD,
-		targetFunctionAddressReg, int64(o.FunctionIndex)*8, // * 8 because the size of *function equals 8 bytes.
+	c.assembler.CompileConstToRegister(
+		arm64.ADD,
+		int64(o.FunctionIndex)*functionSize, // * 8 because the size of *function equals 8 bytes.
 		targetFunctionAddressReg)
 
 	return c.compileCallImpl(targetFunctionAddressReg, tp)
@@ -3577,13 +3577,12 @@ func (c *arm64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 	//                                   = &moduleEngine.functions[0]
 	c.assembler.CompileMemoryToRegister(arm64.LDRD,
 		arm64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
-		arm64ReservedRegisterForTemporary)
+		ref)
 
-	// ref = [arm64ReservedRegisterForTemporary +  int64(o.FunctionIndex)*8]
-	//     = [&moduleEngine.functions[0] + sizeOf(*function) * index]
-	//     = moduleEngine.functions[index]
-	c.assembler.CompileMemoryToRegister(arm64.LDRD,
-		arm64ReservedRegisterForTemporary, int64(o.FunctionIndex)*8, // * 8 because the size of *code equals 8 bytes.
+	// ref = ref + int64(o.FunctionIndex)*sizeOf(function)
+	//     = &moduleEngine.functions[index]
+	c.assembler.CompileConstToRegister(arm64.ADD,
+		int64(o.FunctionIndex)*functionSize,
 		ref,
 	)
 

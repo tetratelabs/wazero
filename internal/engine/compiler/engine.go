@@ -48,7 +48,7 @@ type (
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
 		// codesElement0Address.
-		functions []*function
+		functions []function
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -302,21 +302,6 @@ type (
 	}
 )
 
-// createFunction creates a new function which uses the native code compiled.
-func (c *code) createFunction(f *wasm.FunctionInstance) function {
-	// This object is only referenced from a slice. Instead of creating a heap object
-	// here and returning a pointer, we return the struct directly, so it can be
-	// stored directly in the slice. This reduces the number of heap objects which
-	// improves GC performance.
-	return function{
-		codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
-		stackPointerCeil:      c.stackPointerCeil,
-		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-		source:                f,
-		parent:                c,
-	}
-}
-
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
 const (
@@ -351,6 +336,7 @@ const (
 	functionCodeInitialAddressOffset    = 0
 	functionSourceOffset                = 16
 	functionModuleInstanceAddressOffset = 24
+	functionSize                        = 40
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 48
@@ -546,7 +532,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
 		name:      name,
-		functions: make([]*function, len(functions)),
+		functions: make([]function, len(functions)),
 	}
 
 	imported := int(module.ImportFuncCount())
@@ -562,14 +548,16 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []w
 		return nil, err
 	}
 
-	// TODO: Ideally we only have one []function slice, instead of a memory store and a slice of pointers.
-	// This will require refactoring in assembly, so for now we simply have two slices.
-	functionsMem := make([]function, len(functions[imported:]))
 	for i, c := range codes {
 		offset := imported + i
 		f := &functions[offset]
-		functionsMem[i] = c.createFunction(f)
-		me.functions[offset] = &functionsMem[i]
+		me.functions[offset] = function{
+			codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
+			stackPointerCeil:      c.stackPointerCeil,
+			moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+			source:                f,
+			parent:                c,
+		}
 	}
 	return me, nil
 }
@@ -581,7 +569,7 @@ func (e *moduleEngine) Name() string {
 
 // FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
-	return uintptr(unsafe.Pointer(e.functions[funcIndex]))
+	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
 }
 
 // CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
@@ -589,7 +577,7 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = uintptr(unsafe.Pointer(e.functions[*index]))
+			refs[i] = uintptr(unsafe.Pointer(&e.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
@@ -598,16 +586,10 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	}
 }
 
-func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := e.functions[f.Idx]
-	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = callCtx.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
-		}
-		return
-	}
+	compiled := &e.functions[f.Idx]
 
 	initStackSize := initialStackSize
 	if initialStackSize < compiled.stackPointerCeil {

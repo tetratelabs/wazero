@@ -696,19 +696,13 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		return err
 	}
 
-	// First, we read the address of the first item of callEngine.functions slice (= &callEngine.functions[0])
-	// into tmpRegister.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ, amd64ReservedRegisterForCallEngine,
-		callEngineModuleContextFunctionsElement0AddressOffset, targetAddressRegister)
+	// First, push the index to the callEngine.functionsElement0Address into the target register.
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.FunctionIndex)*functionSize, targetAddressRegister)
 
-	// next, read the address of the target function (= &callEngine.codes[offset])
-	// into targetAddressRegister.
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
-		// Note: FunctionIndex is limited up to 2^27 so this offset never exceeds 32-bit integer.
-		// *8 because the size of *code equals 8 bytes.
-		targetAddressRegister, int64(o.FunctionIndex)*8,
-		targetAddressRegister,
-	)
+	// Next, we add the address of the first item of callEngine.functions slice (= &callEngine.functions[0])
+	// to the target register.
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ, amd64ReservedRegisterForCallEngine,
+		callEngineModuleContextFunctionsElement0AddressOffset, targetAddressRegister)
 
 	if err := c.compileCallFunctionImpl(targetAddressRegister, targetType); err != nil {
 		return err
@@ -4231,20 +4225,15 @@ func (c *amd64Compiler) compileRefFunc(o *wazeroir.OperationRefFunc) error {
 		return err
 	}
 
-	// ref = [amd64ReservedRegisterForCallEngine + callEngineModuleContextFunctionsElement0AddressOffset]
-	//     = &moduleEngine.functions[0]
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.FunctionIndex)*functionSize, ref)
+
+	// ref = [amd64ReservedRegisterForCallEngine + callEngineModuleContextFunctionsElement0AddressOffset + int64(o.FunctionIndex)*functionSize]
+	//     = &moduleEngine.functions[index]
 	c.assembler.CompileMemoryToRegister(
-		amd64.MOVQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
+		amd64.ADDQ, amd64ReservedRegisterForCallEngine, callEngineModuleContextFunctionsElement0AddressOffset,
 		ref,
 	)
 
-	// ref = [ref +  int64(o.FunctionIndex)*8]
-	//     = [&moduleEngine.functions[0] + sizeOf(*function) * index]
-	//     = moduleEngine.functions[index]
-	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
-		ref, int64(o.FunctionIndex)*8, // * 8 because the size of *code equals 8 bytes.
-		ref,
-	)
 	c.pushRuntimeValueLocationOnRegister(ref, runtimeValueTypeI64)
 	return nil
 }

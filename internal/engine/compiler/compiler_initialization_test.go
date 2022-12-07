@@ -120,7 +120,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 				ir.Globals = append(ir.Globals, g.Type)
 			}
 			compiler := env.requireNewCompiler(t, newCompiler, ir)
-			me := &moduleEngine{functions: make([]*function, 10)}
+			me := &moduleEngine{functions: make([]function, 10)}
 			tc.moduleInstance.Engine = me
 
 			err := compiler.compileModuleContextInitialization()

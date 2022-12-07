@@ -949,7 +949,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 	me := env.moduleEngine()
 	const numFuncs = 20
 	for i := 0; i < numFuncs; i++ {
-		me.functions = append(me.functions, &function{source: &wasm.FunctionInstance{}})
+		me.functions = append(me.functions, function{source: &wasm.FunctionInstance{}})
 	}
 
 	for i := 0; i < numFuncs; i++ {
@@ -974,7 +974,7 @@ func TestCompiler_compileRefFunc(t *testing.T) {
 
 			require.Equal(t, nativeCallStatusCodeReturned, env.compilerStatus())
 			require.Equal(t, uint64(1), env.stackPointer())
-			require.Equal(t, uintptr(unsafe.Pointer(me.functions[i])), uintptr(env.stackTopAsUint64()))
+			require.Equal(t, uintptr(unsafe.Pointer(&me.functions[i])), uintptr(env.stackTopAsUint64()))
 		})
 	}
 }
