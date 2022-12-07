@@ -910,3 +910,13 @@ func TestModuleInstance_applyTableInits(t *testing.T) {
 			tables[0].References)
 	})
 }
+
+// TestPreAllocatedTypeIDs ensures that PreAllocatedTypeIDs has no duplication on the values (FunctionTypeID).
+func TestPreAllocatedTypeIDs(t *testing.T) {
+	exists := make(map[FunctionTypeID]struct{}, len(preAllocatedTypeIDs))
+	for _, v := range preAllocatedTypeIDs {
+		_, ok := exists[v]
+		require.False(t, ok)
+		exists[v] = struct{}{}
+	}
+}

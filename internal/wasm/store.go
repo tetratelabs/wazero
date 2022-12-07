@@ -266,8 +266,8 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (ExportInstance, 
 func NewStore(enabledFeatures api.CoreFeatures, engine Engine) (*Store, *Namespace) {
 	ns := newNamespace()
 
-	typeIDs := make(map[string]FunctionTypeID, len(PreAllocatedTypeIDs))
-	for k, v := range PreAllocatedTypeIDs {
+	typeIDs := make(map[string]FunctionTypeID, len(preAllocatedTypeIDs))
+	for k, v := range preAllocatedTypeIDs {
 		typeIDs[k] = v
 	}
 	return &Store{
@@ -588,18 +588,44 @@ func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error)
 	return ret, nil
 }
 
-var PreAllocatedTypeIDs = map[string]FunctionTypeID{
-	"i32i32i32i32_v":   0,
-	"i32i32i32_v":      1,
-	"i32i32_v":         2,
-	"i32_v":            3,
-	"v_v":              4,
-	"i32i32i32i32_i32": 5,
-	"i32i32i32_i32":    6,
-	"i32i32_i32":       7,
-	"i32_i32":          8,
-	"v_i32":            9,
+// preAllocatedTypeIDs maps several "well-known" FunctionType strings to the pre allocated FunctionID.
+// This is used by emscripten integration, but it is harmless to have this all the time as it's only
+// used during Store creation.
+var preAllocatedTypeIDs = map[string]FunctionTypeID{
+	"i32i32i32i32_v":   PreAllocatedTypeID_i32i32i32i32_v,
+	"i32i32i32_v":      PreAllocatedTypeID_i32i32i32_v,
+	"i32i32_v":         PreAllocatedTypeID_i32i32_v,
+	"i32_v":            PreAllocatedTypeID_i32_v,
+	"v_v":              PreAllocatedTypeID_v_v,
+	"i32i32i32i32_i32": PreAllocatedTypeID_i32i32i32i32_i32,
+	"i32i32i32_i32":    PreAllocatedTypeID_i32i32i32_i32,
+	"i32i32_i32":       PreAllocatedTypeID_i32i32_i32,
+	"i32_i32":          PreAllocatedTypeID_i32_i32,
+	"v_i32":            PreAllocatedTypeID_v_i32,
 }
+
+const (
+	// PreAllocatedTypeID_i32i32i32i32_v is FunctionTypeID for i32i32i32i32_v.
+	PreAllocatedTypeID_i32i32i32i32_v FunctionTypeID = iota
+	// PreAllocatedTypeID_i32i32i32_v is FunctionTypeID for i32i32i32_v
+	PreAllocatedTypeID_i32i32i32_v
+	// PreAllocatedTypeID_i32i32_v is FunctionTypeID for i32i32_v
+	PreAllocatedTypeID_i32i32_v
+	// PreAllocatedTypeID_i32_v is FunctionTypeID for i32_v
+	PreAllocatedTypeID_i32_v
+	// PreAllocatedTypeID_v_v is FunctionTypeID for v_v
+	PreAllocatedTypeID_v_v
+	// PreAllocatedTypeID_i32i32i32i32_i32 is FunctionTypeID for i32i32i32i32_i32
+	PreAllocatedTypeID_i32i32i32i32_i32
+	// PreAllocatedTypeID_i32i32i32_i32 is FunctionTypeID for i32i32i32_i32
+	PreAllocatedTypeID_i32i32i32_i32
+	// PreAllocatedTypeID_i32i32_i32 is FunctionTypeID for i32i32_i32
+	PreAllocatedTypeID_i32i32_i32
+	// PreAllocatedTypeID_i32_i32 is FunctionTypeID for i32_i32
+	PreAllocatedTypeID_i32_i32
+	// PreAllocatedTypeID_v_i32 is FunctionTypeID for v_i32
+	PreAllocatedTypeID_v_i32
+)
 
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
 	key := t.key()

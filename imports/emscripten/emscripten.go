@@ -147,7 +147,7 @@ var invokeI = &wasm.HostFunc{
 }
 
 func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["v_i32"], wasm.Index(stack[0]), nil)
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_v_i32, wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +167,7 @@ var invokeIi = &wasm.HostFunc{
 }
 
 func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32_i32"], wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +187,7 @@ var invokeIii = &wasm.HostFunc{
 }
 
 func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32_i32"], wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -207,7 +207,7 @@ var invokeIiii = &wasm.HostFunc{
 }
 
 func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32i32_i32"], wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -227,7 +227,7 @@ var invokeIiiii = &wasm.HostFunc{
 }
 
 func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32i32i32_i32"], wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -247,7 +247,7 @@ var invokeV = &wasm.HostFunc{
 }
 
 func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["v_v"], wasm.Index(stack[0]), nil)
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_v_v, wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -266,7 +266,7 @@ var invokeVi = &wasm.HostFunc{
 }
 
 func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32_v"], wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -285,7 +285,7 @@ var invokeVii = &wasm.HostFunc{
 }
 
 func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32_v"], wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -304,7 +304,7 @@ var invokeViii = &wasm.HostFunc{
 }
 
 func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32i32_v"], wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -323,7 +323,7 @@ var invokeViiii = &wasm.HostFunc{
 }
 
 func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeIDs["i32i32i32i32_v"], wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
