@@ -358,8 +358,8 @@ const (
 	moduleInstanceTablesOffset           = 80
 	moduleInstanceEngineOffset           = 112
 	moduleInstanceTypeIDsOffset          = 128
-	moduleInstanceDataInstancesOffset    = 160
-	moduleInstanceElementInstancesOffset = 184
+	moduleInstanceDataInstancesOffset    = 152
+	moduleInstanceElementInstancesOffset = 176
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0

@@ -18,7 +18,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
 // MustInstantiate calls Instantiate or panics on error.
@@ -148,7 +147,7 @@ var invokeI = &wasm.HostFunc{
 }
 
 func invokeIFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_i32", wasm.Index(stack[0]), nil)
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_v_i32, wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +167,7 @@ var invokeIi = &wasm.HostFunc{
 }
 
 func invokeIiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_i32", wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -188,7 +187,7 @@ var invokeIii = &wasm.HostFunc{
 }
 
 func invokeIiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_i32", wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -208,7 +207,7 @@ var invokeIiii = &wasm.HostFunc{
 }
 
 func invokeIiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_i32", wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -228,7 +227,7 @@ var invokeIiiii = &wasm.HostFunc{
 }
 
 func invokeIiiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_i32", wasm.Index(stack[0]), stack[1:])
+	ret, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32i32_i32, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -248,7 +247,7 @@ var invokeV = &wasm.HostFunc{
 }
 
 func invokeVFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "v_v", wasm.Index(stack[0]), nil)
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_v_v, wasm.Index(stack[0]), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -267,7 +266,7 @@ var invokeVi = &wasm.HostFunc{
 }
 
 func invokeViFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32_v", wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -286,7 +285,7 @@ var invokeVii = &wasm.HostFunc{
 }
 
 func invokeViiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32_v", wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -305,7 +304,7 @@ var invokeViii = &wasm.HostFunc{
 }
 
 func invokeViiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32_v", wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -324,7 +323,7 @@ var invokeViiii = &wasm.HostFunc{
 }
 
 func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
-	_, err := callDynamic(ctx, mod.(*wasm.CallContext), "i32i32i32i32_v", wasm.Index(stack[0]), stack[1:])
+	_, err := callDynamic(ctx, mod.(*wasm.CallContext), wasm.PreAllocatedTypeID_i32i32i32i32_v, wasm.Index(stack[0]), stack[1:])
 	if err != nil {
 		panic(err)
 	}
@@ -337,18 +336,14 @@ func invokeViiiiFn(ctx context.Context, mod api.Module, stack []uint64) {
 //
 //   - ctx: the propagated go context.
 //   - callCtx: the incoming context of the `invoke_` function.
-//   - typeName: used to look up the function type. ex "i32i32_i32" or "v_i32"
+//   - typeID: used to type check on indirect calls.
 //   - tableOffset: position in the module's only table
 //   - params: parameters to the funcref
-func callDynamic(ctx context.Context, callCtx *wasm.CallContext, typeName string, tableOffset wasm.Index, params []uint64) (results []uint64, err error) {
+func callDynamic(ctx context.Context, callCtx *wasm.CallContext, typeID wasm.FunctionTypeID, tableOffset wasm.Index, params []uint64) (results []uint64, err error) {
 	m := callCtx.Module()
-	typeId, ok := m.TypeIDIndex[typeName]
-	if !ok {
-		return nil, wasmruntime.ErrRuntimeIndirectCallTypeMismatch
-	}
 
 	t := m.Tables[0] // Emscripten doesn't use multiple tables
-	idx, err := m.Engine.LookupFunction(t, typeId, tableOffset)
+	idx, err := m.Engine.LookupFunction(t, typeID, tableOffset)
 	if err != nil {
 		return nil, err
 	}
