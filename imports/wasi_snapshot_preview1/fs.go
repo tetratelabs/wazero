@@ -293,7 +293,7 @@ const (
 	// Note: wazero currently returns this for stdio descriptors even if the
 	// actual file is not a TTY, to ensure python can work. This avoids
 	// dependencies needed to be more precise.
-	// See https://github.com/mattn/go-isatty.
+	// See https://github.com/mattn/go-isatty
 	wasiFiletypeCharacterDevice
 	wasiFiletypeDirectory
 	wasiFiletypeRegularFile
