@@ -190,7 +190,7 @@ func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 
 type wasiFdflags = byte // actually 16-bit, but there aren't that many.
 const (
-	wasiFdflagsNone wasiFdflags = iota
+	wasiFdflagsNone wasiFdflags = 1<<iota - 1
 	wasiFdflagsAppend
 	wasiFdflagsDsync
 	wasiFdflagsNonblock
