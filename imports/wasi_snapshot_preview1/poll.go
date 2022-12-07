@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"encoding/binary"
 
 	"github.com/tetratelabs/wazero/api"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -104,7 +103,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		copy(outBuf, inBuf[inOffset:inOffset+8]) // userdata
 		outBuf[outOffset+8] = byte(errno)        // uint16, but safe as < 255
 		outBuf[outOffset+9] = 0
-		binary.LittleEndian.PutUint32(outBuf[outOffset+10:], uint32(eventType))
+		le.PutUint32(outBuf[outOffset+10:], uint32(eventType))
 		// TODO: When FD events are supported, write outOffset+16
 	}
 	return ErrnoSuccess
@@ -113,10 +112,10 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 // processClockEvent supports only relative name events, as that's what's used
 // to implement sleep in various compilers including Rust, Zig and TinyGo.
 func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno {
-	_ /* ID */ = binary.LittleEndian.Uint32(inBuf[0:8])          // See below
-	timeout := binary.LittleEndian.Uint64(inBuf[8:16])           // nanos if relative
-	_ /* precision */ = binary.LittleEndian.Uint64(inBuf[16:24]) // Unused
-	flags := binary.LittleEndian.Uint16(inBuf[24:32])
+	_ /* ID */ = le.Uint32(inBuf[0:8])          // See below
+	timeout := le.Uint64(inBuf[8:16])           // nanos if relative
+	_ /* precision */ = le.Uint64(inBuf[16:24]) // Unused
+	flags := le.Uint16(inBuf[24:32])
 
 	// subclockflags has only one flag defined:  subscription_clock_abstime
 	switch flags {
@@ -139,7 +138,7 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 // processFDEvent returns a validation error or ErrnoNotsup as file or socket
 // subscriptions are not yet supported.
 func processFDEvent(ctx context.Context, mod api.Module, eventType byte, inBuf []byte) Errno {
-	fd := binary.LittleEndian.Uint32(inBuf)
+	fd := le.Uint32(inBuf)
 	sysCtx := mod.(*wasm.CallContext).Sys
 
 	// Choose the best error, which falls back to unsupported, until we support

@@ -100,7 +100,7 @@ func Test_fdDatasync(t *testing.T) {
 
 func Test_fdFdstatGet(t *testing.T) {
 	file, dir := "a", "b"
-	testFS := fstest.MapFS{file: {Data: make([]byte, 0)}, dir: {Mode: fs.ModeDir}}
+	testFS := fstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
@@ -116,16 +116,85 @@ func Test_fdFdstatGet(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name           string
-		fd, resultStat uint32
-		// TODO: expectedMem
-		expectedErrno Errno
-		expectedLog   string
+		name             string
+		fd, resultFdstat uint32
+		expectedMemory   []byte
+		expectedErrno    Errno
+		expectedLog      string
 	}{
+		{
+			name: "stdin",
+			fd:   internalsys.FdStdin,
+			expectedMemory: []byte{
+				2, 0, // fs_filetype
+				0, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+--> proxy.fd_fdstat_get(fd=0,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=0,result.stat=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "stdout",
+			fd:   internalsys.FdStdout,
+			expectedMemory: []byte{
+				2, 0, // fs_filetype
+				1, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+--> proxy.fd_fdstat_get(fd=1,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=1,result.stat=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "stderr",
+			fd:   internalsys.FdStderr,
+			expectedMemory: []byte{
+				2, 0, // fs_filetype
+				1, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+--> proxy.fd_fdstat_get(fd=2,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=2,result.stat=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "root",
+			fd:   internalsys.FdStderr + 1,
+			expectedMemory: []byte{
+				3, 0, // fs_filetype
+				0, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
+			expectedLog: `
+--> proxy.fd_fdstat_get(fd=3,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=3,result.stat=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
 		{
 			name: "file",
 			fd:   fileFd,
-			// TODO: expectedMem for a file
+			expectedMemory: []byte{
+				4, 0, // fs_filetype
+				0, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
 			expectedLog: `
 --> proxy.fd_fdstat_get(fd=4,result.stat=0)
 	==> wasi_snapshot_preview1.fd_fdstat_get(fd=4,result.stat=0)
@@ -136,7 +205,12 @@ func Test_fdFdstatGet(t *testing.T) {
 		{
 			name: "dir",
 			fd:   dirFd,
-			// TODO: expectedMem for a dir
+			expectedMemory: []byte{
+				3, 0, // fs_filetype
+				0, 0, 0, 0, 0, 0, // fs_flags
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+				0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+			},
 			expectedLog: `
 --> proxy.fd_fdstat_get(fd=5,result.stat=0)
 	==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=0)
@@ -156,15 +230,15 @@ func Test_fdFdstatGet(t *testing.T) {
 `,
 		},
 		{
-			name:       "resultStat exceeds the maximum valid address by 1",
-			fd:         dirFd,
-			resultStat: memorySize - 24 + 1,
-			// TODO: ErrnoFault
+			name:          "resultFdstat exceeds the maximum valid address by 1",
+			fd:            dirFd,
+			resultFdstat:  memorySize - 24 + 1,
+			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_fdstat_get(fd=5,result.stat=65513)
 	==> wasi_snapshot_preview1.fd_fdstat_get(fd=5,result.stat=65513)
-	<== ESUCCESS
-<-- 0
+	<== EFAULT
+<-- 21
 `,
 		},
 	}
@@ -175,8 +249,14 @@ func Test_fdFdstatGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			requireErrno(t, tc.expectedErrno, mod, fdFdstatGetName, uint64(tc.fd), uint64(tc.resultStat))
+			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+
+			requireErrno(t, tc.expectedErrno, mod, fdFdstatGetName, uint64(tc.fd), uint64(tc.resultFdstat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
+
+			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, tc.expectedMemory, actual)
 		})
 	}
 }
@@ -228,13 +308,93 @@ func Test_fdFilestatGet(t *testing.T) {
 		expectedLog        string
 	}{
 		{
+			name: "stdin",
+			fd:   internalsys.FdStdin,
+			expectedMemory: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0, 0, 0, 0, 0, 0, 0, 0, // atim
+				0, 0, 0, 0, 0, 0, 0, 0, // mtim
+				0, 0, 0, 0, 0, 0, 0, 0, // ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=0,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=0,result.buf=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "stdout",
+			fd:   internalsys.FdStdout,
+			expectedMemory: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0, 0, 0, 0, 0, 0, 0, 0, // atim
+				0, 0, 0, 0, 0, 0, 0, 0, // mtim
+				0, 0, 0, 0, 0, 0, 0, 0, // ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=1,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=1,result.buf=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "stderr",
+			fd:   internalsys.FdStderr,
+			expectedMemory: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				2, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // size
+				0, 0, 0, 0, 0, 0, 0, 0, // atim
+				0, 0, 0, 0, 0, 0, 0, 0, // mtim
+				0, 0, 0, 0, 0, 0, 0, 0, // ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=2,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=2,result.buf=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
+			name: "root",
+			fd:   internalsys.FdStderr + 1,
+			expectedMemory: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // TODO: size
+				0, 0, 0, 0, 0, 0, 0, 0, // TODO: atim
+				0, 0, 0, 0, 0, 0, 0, 0, // TODO: mtim
+				0, 0, 0, 0, 0, 0, 0, 0, // TODO: ctim
+			},
+			expectedLog: `
+--> proxy.fd_filestat_get(fd=3,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=3,result.buf=0)
+	<== ESUCCESS
+<-- 0
+`,
+		},
+		{
 			name: "file",
 			fd:   fileFd,
 			expectedMemory: []byte{
-				'?', '?', '?', '?', '?', '?', '?', '?', // dev
-				'?', '?', '?', '?', '?', '?', '?', '?', // ino
-				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
-				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				10, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
@@ -251,10 +411,10 @@ func Test_fdFilestatGet(t *testing.T) {
 			name: "dir",
 			fd:   dirFd,
 			expectedMemory: []byte{
-				'?', '?', '?', '?', '?', '?', '?', '?', // dev
-				'?', '?', '?', '?', '?', '?', '?', '?', // ino
-				3, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
-				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
@@ -2167,10 +2327,10 @@ func Test_pathFilestatGet(t *testing.T) {
 			resultFilestat: 2,
 			expectedMemory: append(
 				initialMemoryFile,
-				'?', '?', '?', '?', '?', '?', '?', '?', // dev
-				'?', '?', '?', '?', '?', '?', '?', '?', // ino
-				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
-				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				10, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
@@ -2191,10 +2351,10 @@ func Test_pathFilestatGet(t *testing.T) {
 			resultFilestat: 2,
 			expectedMemory: append(
 				initialMemoryFile,
-				'?', '?', '?', '?', '?', '?', '?', '?', // dev
-				'?', '?', '?', '?', '?', '?', '?', '?', // ino
-				4, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
-				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				4, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				20, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
@@ -2215,10 +2375,10 @@ func Test_pathFilestatGet(t *testing.T) {
 			resultFilestat: 2,
 			expectedMemory: append(
 				initialMemoryDir,
-				'?', '?', '?', '?', '?', '?', '?', '?', // dev
-				'?', '?', '?', '?', '?', '?', '?', '?', // ino
-				3, '?', '?', '?', '?', '?', '?', '?', // filetype + padding
-				'?', '?', '?', '?', '?', '?', '?', '?', // nlink
+				0, 0, 0, 0, 0, 0, 0, 0, // dev
+				0, 0, 0, 0, 0, 0, 0, 0, // ino
+				3, 0, 0, 0, 0, 0, 0, 0, // filetype + padding
+				1, 0, 0, 0, 0, 0, 0, 0, // nlink
 				0, 0, 0, 0, 0, 0, 0, 0, // size
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // atim
 				0x0, 0x82, 0x13, 0x80, 0x6b, 0x16, 0x24, 0x17, // mtim
