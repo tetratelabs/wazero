@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"io"
 	"io/fs"
@@ -50,7 +49,7 @@ const (
 	pathUnlinkFileName       = "path_unlink_file"
 )
 
-// fdAdvise is the WASI function named functionFdAdvise which provides file
+// fdAdvise is the WASI function named fdAdviseName which provides file
 // advisory information on a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_advisefd-fd-offset-filesize-len-filesize-advice-advice---errno
@@ -60,7 +59,7 @@ var fdAdvise = stubFunction(
 	"fd", "offset", "len", "result.advice",
 )
 
-// fdAllocate is the WASI function named functionFdAllocate which forces the
+// fdAllocate is the WASI function named fdAllocateName which forces the
 // allocation of space in a file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_allocatefd-fd-offset-filesize-len-filesize---errno
@@ -70,7 +69,7 @@ var fdAllocate = stubFunction(
 	"fd", "offset", "len",
 )
 
-// fdClose is the WASI function named functionFdClose which closes a file
+// fdClose is the WASI function named fdCloseName which closes a file
 // descriptor.
 //
 // # Parameters
@@ -97,13 +96,13 @@ func fdCloseFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// fdDatasync is the WASI function named functionFdDatasync which synchronizes
+// fdDatasync is the WASI function named fdDatasyncName which synchronizes
 // the data of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_datasyncfd-fd---errno
 var fdDatasync = stubFunction(fdDatasyncName, []wasm.ValueType{i32}, "fd")
 
-// fdFdstatGet is the WASI function named functionFdFdstatGet which returns the
+// fdFdstatGet is the WASI function named fdFdstatGetName which returns the
 // attributes of a file descriptor.
 //
 // # Parameters
@@ -143,17 +142,84 @@ var fdDatasync = stubFunction(fdDatasyncName, []wasm.ValueType{i32}, "fd")
 var fdFdstatGet = newHostFunc(fdFdstatGetName, fdFdstatGetFn, []api.ValueType{i32, i32}, "fd", "result.stat")
 
 func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	// TODO: actually write the fdstat!
-	fd, _ := uint32(params[0]), uint32(params[1])
+	fd, resultFdstat := uint32(params[0]), uint32(params[1])
 
-	if _, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
+	// Ensure we can write the fdstat
+	buf, ok := mod.Memory().Read(ctx, resultFdstat, 24)
+	if !ok {
+		return ErrnoFault
+	}
+
+	// Special-case the stdio character devices
+	if fd <= internalsys.FdStderr {
+		switch fd {
+		case internalsys.FdStdin:
+			copy(buf, charFdstat)
+		case internalsys.FdStdout, internalsys.FdStderr:
+			copy(buf, charOutFdstat)
+		}
+		return ErrnoSuccess
+	}
+
+	// Otherwise, look up the file corresponding to the file descriptor.
+	sysCtx := mod.(*wasm.CallContext).Sys
+	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	if !ok {
 		return ErrnoBadf
 	}
+
+	// see if the file is writable
+	fdflags := wasiFdflagsNone
+	filetype := wasiFiletypeDirectory // root
+	if f := file.File; f != nil {     // not root
+		if _, ok := f.(io.Writer); ok {
+			fdflags = wasiFdflagsAppend
+		}
+
+		if fdstat, err := f.Stat(); err != nil {
+			return ErrnoIo
+		} else {
+			filetype = getWasiFiletype(fdstat.Mode())
+		}
+	}
+
+	writeFdstat(buf, filetype, fdflags)
+
 	return ErrnoSuccess
 }
 
-// fdFdstatSetFlags is the WASI function named functionFdFdstatSetFlags which
+type wasiFdflags = byte // actually 16-bit, but there aren't that many.
+const (
+	wasiFdflagsNone wasiFdflags = iota
+	wasiFdflagsAppend
+	wasiFdflagsDsync
+	wasiFdflagsNonblock
+	wasiFdflagsRsync
+	wasiFdflagsSync
+)
+
+var charFdstat = []byte{
+	byte(wasiFiletypeCharacterDevice), 0, // filetype
+	0, 0, 0, 0, 0, 0, // fdflags
+	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+}
+
+var charOutFdstat = []byte{
+	byte(wasiFiletypeCharacterDevice), 0, // filetype
+	wasiFdflagsAppend, 0, 0, 0, 0, 0, // fdflags
+	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_base
+	0, 0, 0, 0, 0, 0, 0, 0, // fs_rights_inheriting
+}
+
+func writeFdstat(buf []byte, filetype wasiFiletype, fdflags wasiFdflags) {
+	// memory is re-used, so ensure the result is defaulted.
+	copy(buf, charFdstat)
+	buf[0] = uint8(filetype)
+	buf[2] = fdflags
+}
+
+// fdFdstatSetFlags is the WASI function named fdFdstatSetFlagsName which
 // adjusts the flags associated with a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_fdstat_set_flagsfd-fd-flags-fdflags---errnoand is stubbed for GrainLang per #271
@@ -168,7 +234,7 @@ var fdFdstatSetRights = stubFunction(
 	"fd", "fs_rights_base", "fs_rights_inheriting",
 )
 
-// fdFilestatGet is the WASI function named functionFdFilestatGet which returns
+// fdFilestatGet is the WASI function named fdFilestatGetName which returns
 // the stat attributes of an open file.
 //
 // # Parameters
@@ -208,7 +274,7 @@ var fdFdstatSetRights = stubFunction(
 // The following properties of filestat are not implemented:
 //   - dev: not supported by Golang FS
 //   - ino: not supported by Golang FS
-//   - nlink: not supported by Golang FS
+//   - nlink: not supported by Golang FS, we use 1
 //   - atime: not supported by Golang FS, we use mtim for this
 //   - ctim: not supported by Golang FS, we use mtim for this
 //
@@ -222,6 +288,12 @@ type wasiFiletype uint8
 const (
 	wasiFiletypeUnknown wasiFiletype = iota
 	wasiFiletypeBlockDevice
+	// wasiFiletypeCharacterDevice is set when the FD is a character device.
+	//
+	// Note: wazero currently returns this for stdio descriptors even if the
+	// actual file is not a TTY, to ensure python can work. This avoids
+	// dependencies needed to be more precise.
+	// See https://github.com/mattn/go-isatty
 	wasiFiletypeCharacterDevice
 	wasiFiletypeDirectory
 	wasiFiletypeRegularFile
@@ -235,49 +307,85 @@ func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno
 }
 
 func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) Errno {
+	// Ensure we can write the filestat
+	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
+	if !ok {
+		return ErrnoFault
+	}
+
+	// Special-case the stdio character devices
+	switch fd {
+	case internalsys.FdStdin, internalsys.FdStdout, internalsys.FdStderr:
+		copy(buf, charFilestat)
+		return ErrnoSuccess
+	}
+
+	// Otherwise, look up the file corresponding to the file descriptor.
 	sysCtx := mod.(*wasm.CallContext).Sys
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
 
-	fileStat, err := file.File.Stat()
-	if err != nil {
-		return ErrnoIo
+	var filetype wasiFiletype
+	var filesize uint64
+	var mtim int64
+	if f := file.File; f != nil { // not root
+		if stat, err := f.Stat(); err != nil {
+			return ErrnoIo
+		} else {
+			filetype = getWasiFiletype(stat.Mode())
+			filesize = uint64(stat.Size())
+			mtim = stat.ModTime().UnixNano()
+		}
+	} else { // root
+		filetype = wasiFiletypeDirectory
+		// TODO: support filesize and mtime when root
 	}
 
-	fileMode := fileStat.Mode()
-
-	wasiFileMode := wasiFiletypeUnknown
-	if fileMode&fs.ModeDevice != 0 {
-		wasiFileMode = wasiFiletypeBlockDevice
-	} else if fileMode&fs.ModeCharDevice != 0 {
-		wasiFileMode = wasiFiletypeCharacterDevice
-	} else if fileMode&fs.ModeDir != 0 {
-		wasiFileMode = wasiFiletypeDirectory
-	} else if fileMode&fs.ModeType == 0 {
-		wasiFileMode = wasiFiletypeRegularFile
-	} else if fileMode&fs.ModeSymlink != 0 {
-		wasiFileMode = wasiFiletypeSymbolicLink
-	}
-
-	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
-	if !ok {
-		return ErrnoFault
-	}
-
-	buf[16] = uint8(wasiFileMode)
-	size := uint64(fileStat.Size())
-	binary.LittleEndian.PutUint64(buf[32:], size)
-	mtim := uint64(fileStat.ModTime().UnixNano())
-	binary.LittleEndian.PutUint64(buf[40:], mtim)
-	binary.LittleEndian.PutUint64(buf[48:], mtim)
-	binary.LittleEndian.PutUint64(buf[56:], mtim)
+	writeFilestat(buf, filetype, filesize, mtim)
 
 	return ErrnoSuccess
 }
 
-// fdFilestatSetSize is the WASI function named functionFdFilestatSetSize which
+func getWasiFiletype(fileMode fs.FileMode) wasiFiletype {
+	wasiFileType := wasiFiletypeUnknown
+	if fileMode&fs.ModeDevice != 0 {
+		wasiFileType = wasiFiletypeBlockDevice
+	} else if fileMode&fs.ModeCharDevice != 0 {
+		wasiFileType = wasiFiletypeCharacterDevice
+	} else if fileMode&fs.ModeDir != 0 {
+		wasiFileType = wasiFiletypeDirectory
+	} else if fileMode&fs.ModeType == 0 {
+		wasiFileType = wasiFiletypeRegularFile
+	} else if fileMode&fs.ModeSymlink != 0 {
+		wasiFileType = wasiFiletypeSymbolicLink
+	}
+	return wasiFileType
+}
+
+var charFilestat = []byte{
+	0, 0, 0, 0, 0, 0, 0, 0, // device
+	0, 0, 0, 0, 0, 0, 0, 0, // inode
+	byte(wasiFiletypeCharacterDevice), 0, 0, 0, 0, 0, 0, 0, // filetype
+	1, 0, 0, 0, 0, 0, 0, 0, // nlink
+	0, 0, 0, 0, 0, 0, 0, 0, // filesize
+	0, 0, 0, 0, 0, 0, 0, 0, // atim
+	0, 0, 0, 0, 0, 0, 0, 0, // mtim
+	0, 0, 0, 0, 0, 0, 0, 0, // ctim
+}
+
+func writeFilestat(buf []byte, filetype wasiFiletype, filesize uint64, mtim int64) {
+	// memory is re-used, so ensure the result is defaulted.
+	copy(buf, charFilestat[:32])
+	buf[16] = uint8(filetype)
+	le.PutUint64(buf[32:], filesize)     // filesize
+	le.PutUint64(buf[40:], uint64(mtim)) // atim
+	le.PutUint64(buf[48:], uint64(mtim)) // mtim
+	le.PutUint64(buf[56:], uint64(mtim)) // ctim
+}
+
+// fdFilestatSetSize is the WASI function named fdFilestatSetSizeName which
 // adjusts the size of an open file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_filestat_set_sizefd-fd-size-filesize---errno
@@ -293,7 +401,7 @@ var fdFilestatSetTimes = stubFunction(
 	"fd", "atim", "mtim", "fst_flags",
 )
 
-// fdPread is the WASI function named functionFdPread which reads from a file
+// fdPread is the WASI function named fdPreadName which reads from a file
 // descriptor, without using and updating the file descriptor's offset.
 //
 // Except for handling offset, this implementation is identical to fdRead.
@@ -309,7 +417,7 @@ func fdPreadFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return fdReadOrPread(ctx, mod, params, true)
 }
 
-// fdPrestatGet is the WASI function named functionFdPrestatGet which returns
+// fdPrestatGet is the WASI function named fdPrestatGetName which returns
 // the prestat data of a file descriptor.
 //
 // # Parameters
@@ -363,7 +471,7 @@ func fdPrestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno 
 	return ErrnoSuccess
 }
 
-// fdPrestatDirName is the WASI function named functionFdPrestatDirName which
+// fdPrestatDirName is the WASI function named fdPrestatDirNameName which
 // returns the path of the pre-opened directory of a file descriptor.
 //
 // # Parameters
@@ -421,7 +529,7 @@ func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Er
 	return ErrnoSuccess
 }
 
-// fdPwrite is the WASI function named functionFdPwrite which writes to a file
+// fdPwrite is the WASI function named fdPwriteName which writes to a file
 // descriptor, without using and updating the file descriptor's offset.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_pwritefd-fd-iovs-ciovec_array-offset-filesize---errno-size
@@ -431,7 +539,7 @@ var fdPwrite = stubFunction(
 	"fd", "iovs", "iovs_len", "offset", "result.nwritten",
 )
 
-// fdRead is the WASI function named functionFdRead which reads from a file
+// fdRead is the WASI function named fdReadName which reads from a file
 // descriptor.
 //
 // # Parameters
@@ -571,7 +679,7 @@ func fdRead_shouldContinueRead(n, l uint32, err error) (bool, Errno) {
 	return n == l && n != 0, ErrnoSuccess
 }
 
-// fdReaddir is the WASI function named functionFdReaddir which reads directory
+// fdReaddir is the WASI function named fdReaddirName which reads directory
 // entries from a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_readdirfd-fd-buf-pointeru8-buf_len-size-cookie-dircookie---errno-size
@@ -806,15 +914,15 @@ func writeDirents(
 
 // writeDirent writes direntSize bytes
 func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
-	binary.LittleEndian.PutUint64(buf, dNext)        // d_next
-	binary.LittleEndian.PutUint64(buf[8:], 0)        // no d_ino
-	binary.LittleEndian.PutUint32(buf[16:], dNamlen) // d_namlen
+	le.PutUint64(buf, dNext)        // d_next
+	le.PutUint64(buf[8:], 0)        // no d_ino
+	le.PutUint32(buf[16:], dNamlen) // d_namlen
 
 	filetype := wasiFiletypeRegularFile
 	if dType {
 		filetype = wasiFiletypeDirectory
 	}
-	binary.LittleEndian.PutUint32(buf[20:], uint32(filetype)) //  d_type
+	le.PutUint32(buf[20:], uint32(filetype)) //  d_type
 }
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
@@ -832,13 +940,13 @@ func openedDir(ctx context.Context, mod api.Module, fd uint32) (fs.ReadDirFile, 
 	}
 }
 
-// fdRenumber is the WASI function named functionFdRenumber which atomically
+// fdRenumber is the WASI function named fdRenumberName which atomically
 // replaces a file descriptor by renumbering another file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
 var fdRenumber = stubFunction(fdRenumberName, []wasm.ValueType{i32, i32}, "fd", "to")
 
-// fdSeek is the WASI function named functionFdSeek which moves the offset of a
+// fdSeek is the WASI function named fdSeekName which moves the offset of a
 // file descriptor.
 //
 // # Parameters
@@ -911,19 +1019,19 @@ func fdSeekFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// fdSync is the WASI function named functionFdSync which synchronizes the data
+// fdSync is the WASI function named fdSyncName which synchronizes the data
 // and metadata of a file to disk.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_syncfd-fd---errno
 var fdSync = stubFunction(fdSyncName, []wasm.ValueType{i32}, "fd")
 
-// fdTell is the WASI function named functionFdTell which returns the current
+// fdTell is the WASI function named fdTellName which returns the current
 // offset of a file descriptor.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_tellfd-fd---errno-filesize
 var fdTell = stubFunction(fdTellName, []wasm.ValueType{i32, i32}, "fd", "result.offset")
 
-// fdWrite is the WASI function named functionFdWrite which writes to a file
+// fdWrite is the WASI function named fdWriteName which writes to a file
 // descriptor.
 //
 // # Parameters
@@ -1034,7 +1142,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// pathCreateDirectory is the WASI function named functionPathCreateDirectory
+// pathCreateDirectory is the WASI function named pathCreateDirectoryName
 // which creates a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_create_directoryfd-fd-path-string---errno
@@ -1044,7 +1152,7 @@ var pathCreateDirectory = stubFunction(
 	"fd", "path", "path_len",
 )
 
-// pathFilestatGet is the WASI function named functionPathFilestatGet which
+// pathFilestatGet is the WASI function named pathFilestatGetName which
 // returns the stat attributes of a file or directory.
 //
 // # Parameters
@@ -1119,7 +1227,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	return fdFilestatGetFunc(ctx, mod, pathFd, resultBuf)
 }
 
-// pathFilestatSetTimes is the WASI function named functionPathFilestatSetTimes
+// pathFilestatSetTimes is the WASI function named pathFilestatSetTimesName
 // which adjusts the timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_filestat_set_timesfd-fd-flags-lookupflags-path-string-atim-timestamp-mtim-timestamp-fst_flags-fstflags---errno
@@ -1129,7 +1237,7 @@ var pathFilestatSetTimes = stubFunction(
 	"fd", "flags", "path", "path_len", "atim", "mtim", "fst_flags",
 )
 
-// pathLink is the WASI function named functionPathLink which adjusts the
+// pathLink is the WASI function named pathLinkName which adjusts the
 // timestamps of a file or directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_link
@@ -1139,7 +1247,7 @@ var pathLink = stubFunction(
 	"old_fd", "old_flags", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
 
-// pathOpen is the WASI function named functionPathOpen which opens a file or
+// pathOpen is the WASI function named pathOpenName which opens a file or
 // directory. This returns ErrnoBadf if the fd is invalid.
 //
 // # Parameters
@@ -1233,7 +1341,7 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	return ErrnoSuccess
 }
 
-// pathReadlink is the WASI function named functionPathReadlink that reads the
+// pathReadlink is the WASI function named pathReadlinkName that reads the
 // contents of a symbolic link.
 //
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_readlinkfd-fd-path-string-buf-pointeru8-buf_len-size---errno-size
@@ -1243,7 +1351,7 @@ var pathReadlink = stubFunction(
 	"fd", "path", "path_len", "buf", "buf_len", "result.bufused",
 )
 
-// pathRemoveDirectory is the WASI function named functionPathRemoveDirectory
+// pathRemoveDirectory is the WASI function named pathRemoveDirectoryName
 // which removes a directory.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_remove_directoryfd-fd-path-string---errno
@@ -1253,7 +1361,7 @@ var pathRemoveDirectory = stubFunction(
 	"fd", "path", "path_len",
 )
 
-// pathRename is the WASI function named functionPathRename which renames a
+// pathRename is the WASI function named pathRenameName which renames a
 // file or directory.
 var pathRename = stubFunction(
 	pathRenameName,
@@ -1261,7 +1369,7 @@ var pathRename = stubFunction(
 	"fd", "old_path", "old_path_len", "new_fd", "new_path", "new_path_len",
 )
 
-// pathSymlink is the WASI function named functionPathSymlink which creates a
+// pathSymlink is the WASI function named pathSymlinkName which creates a
 // symbolic link.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_symlink
@@ -1271,7 +1379,7 @@ var pathSymlink = stubFunction(
 	"old_path", "old_path_len", "fd", "new_path", "new_path_len",
 )
 
-// pathUnlinkFile is the WASI function named functionPathUnlinkFile which
+// pathUnlinkFile is the WASI function named pathUnlinkFileName which
 // unlinks a file.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_unlink_filefd-fd-path-string---errno

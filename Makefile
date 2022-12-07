@@ -70,7 +70,7 @@ build.examples.tinygo: $(tinygo_sources)
 	tinygo build -o internal/testing/dwarftestdata/testdata/main.wasm -scheduler=none --target=wasi internal/testing/dwarftestdata/testdata/main.go
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
-c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/ls.c
+c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/wasi.c
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
 	@for f in $^; do \
@@ -105,10 +105,10 @@ build.examples.emscripten: $(emscripten_sources)
 
 %/greet.wasm : cargo_target := wasm32-unknown-unknown
 %/cat.wasm : cargo_target := wasm32-wasi
-%/ls.wasm : cargo_target := wasm32-wasi
+%/wasi.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/ls.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs

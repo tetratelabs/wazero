@@ -18,6 +18,7 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"encoding/binary"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -31,6 +32,8 @@ const (
 	ModuleName = "wasi_snapshot_preview1"
 	i32, i64   = wasm.ValueTypeI32, wasm.ValueTypeI64
 )
+
+var le = binary.LittleEndian
 
 // MustInstantiate calls Instantiate or panics on error.
 //
