@@ -78,8 +78,7 @@ type moduleEngine struct {
 	functions []*function
 
 	// parentEngine holds *engine from which this module engine is created from.
-	parentEngine          *engine
-	importedFunctionCount uint32
+	parentEngine *engine
 }
 
 // callEngine holds context per moduleEngine.Call, and shared across all the

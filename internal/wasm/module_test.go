@@ -825,6 +825,7 @@ func TestModule_buildFunctions(t *testing.T) {
 		},
 	}
 
+	// Note: This only returns module-defined functions, not imported ones. That's why the index starts with 1, not 0.
 	instance := &ModuleInstance{Name: "counter", TypeIDs: []FunctionTypeID{0}}
 	instance.BuildFunctions(m, nil)
 	for i, f := range instance.Functions[1:] {
