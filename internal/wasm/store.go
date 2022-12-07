@@ -161,17 +161,13 @@ type (
 const maximumFunctionTypes = 1 << 27
 
 // addSections adds section elements to the ModuleInstance
-func (m *ModuleInstance) addSections(module *Module, importedFunctions []*FunctionInstance, functions []FunctionInstance,
-	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
+func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
 	types []*FunctionType,
 ) {
 	m.Types = types
 	m.TypeIDIndex = make(map[string]FunctionTypeID, len(types))
 	for i, t := range types {
 		m.TypeIDIndex[t.string] = m.TypeIDs[i]
-	}
-	for i, f := range importedFunctions {
-		m.Functions[i] = *f
 	}
 	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables
@@ -382,10 +378,10 @@ func (s *Store) instantiate(
 	}
 
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module)
+	functions := m.BuildFunctions(module, importedFunctions)
 
 	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions)
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, functions)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +389,7 @@ func (s *Store) instantiate(
 	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
+	m.addSections(module, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.

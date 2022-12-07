@@ -24,12 +24,11 @@ type Engine interface {
 	//
 	// * name is the name the module was instantiated with used for error handling.
 	// * module is the source module from which moduleFunctions are instantiated. This is used for caching.
-	// * importedFunctions: functions this module imports, already compiled in this engine.
-	// * moduleFunctions: functions declared in this module that must be compiled.
+	// * functions: the list of FunctionInstance which exists in this module, including the imported ones.
 	//
 	// Note: Input parameters must be pre-validated with wasm.Module Validate, to ensure no fields are invalid
 	// due to reasons such as out-of-bounds.
-	NewModuleEngine(name string, module *Module, importedFunctions []*FunctionInstance, moduleFunctions []FunctionInstance) (ModuleEngine, error)
+	NewModuleEngine(name string, module *Module, functions []FunctionInstance) (ModuleEngine, error)
 }
 
 // ModuleEngine implements function calls for a given module.
