@@ -60,7 +60,6 @@ type (
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		Memory *MemoryInstance
 		Tables []*TableInstance
-		Types  []*FunctionType
 
 		// CallCtx holds default function call context from this function instance.
 		CallCtx *CallContext
@@ -165,7 +164,6 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
 	types []*FunctionType,
 ) {
-	m.Types = types
 	m.TypeIDIndex = make(map[string]FunctionTypeID, len(types))
 	for i, t := range types {
 		m.TypeIDIndex[t.string] = m.TypeIDs[i]
