@@ -679,16 +679,15 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 
 			// Now that we've generated the code for this function,
 			// add it to the module engine and assign its pointer to the table index.
-			f := function{
+			me.functions = append(me.functions, function{
 				parent:                &code{codeSegment: c},
 				codeInitialAddress:    uintptr(unsafe.Pointer(&c[0])),
 				moduleInstanceAddress: uintptr(unsafe.Pointer(env.moduleInstance)),
 				source: &wasm.FunctionInstance{
 					TypeID: targetTypeID,
 				},
-			}
-			me.functions = append(me.functions, f)
-			table[i] = uintptr(unsafe.Pointer(&f))
+			})
+			table[i] = uintptr(unsafe.Pointer(&me.functions[len(me.functions)-1]))
 		}
 
 		// Test to ensure that we can call all the functions stored in the table.
