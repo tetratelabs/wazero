@@ -51,7 +51,7 @@ func TestNamespace_setModule(t *testing.T) {
 	})
 
 	t.Run("error on closed", func(t *testing.T) {
-		ns.CloseWithExitCode(context.Background(), 0) //
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 		require.Error(t, ns.setModule(m1))
 	})
 }
@@ -80,7 +80,7 @@ func TestNamespace_deleteModule(t *testing.T) {
 	})
 
 	t.Run("noop on closed", func(t *testing.T) {
-		ns.CloseWithExitCode(context.Background(), 0)
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 		ns.deleteModule(m1.Name)
 
 		require.Zero(t, len(ns.nameToNode))
@@ -100,7 +100,7 @@ func TestNamespace_module(t *testing.T) {
 	})
 
 	t.Run("namespace closed", func(t *testing.T) {
-		ns.CloseWithExitCode(context.Background(), 0)
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 		require.Nil(t, ns.module(m1.Name))
 	})
 }
