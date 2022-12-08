@@ -183,14 +183,18 @@ func (l *loggingListener) writeParam(message *strings.Builder, i int, vals []uin
 	return l.writeVal(message, l.fnd.ParamTypes()[i], i, vals)
 }
 
+// writeVal formats integers as signed even though the call site determines
+// if it is signed or not. This presents a better experience for values that
+// are often signed, such as seek offset. This concedes the rare intentional
+// unsigned value at the end of its range will show up as negative.
 func (l *loggingListener) writeVal(message *strings.Builder, t api.ValueType, i int, vals []uint64) int {
 	v := vals[i]
 	i++
 	switch t {
 	case api.ValueTypeI32:
-		message.WriteString(strconv.FormatUint(uint64(uint32(v)), 10))
+		message.WriteString(strconv.FormatInt(int64(int32(v)), 10))
 	case api.ValueTypeI64:
-		message.WriteString(strconv.FormatUint(v, 10))
+		message.WriteString(strconv.FormatInt(int64(v), 10))
 	case api.ValueTypeF32:
 		message.WriteString(strconv.FormatFloat(float64(api.DecodeF32(v)), 'g', -1, 32))
 	case api.ValueTypeF64:
