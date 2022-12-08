@@ -173,8 +173,10 @@ func proxyResultParams(goFunc *wasm.HostFunc, exportName string) *wasm.ProxyFunc
 	}
 
 	// Finally, add the success error code to the stack.
-	body = append(body, wasm.OpcodeI32Const, success) // stack: [success]
-	body = append(body, wasm.OpcodeEnd)
+	body = append(body,
+		wasm.OpcodeI32Const, success, // stack: [success]
+		wasm.OpcodeEnd,
+	)
 
 	// Assign the wasm generated as the proxy's body
 	proxy.Code.Body = body
@@ -183,22 +185,23 @@ func proxyResultParams(goFunc *wasm.HostFunc, exportName string) *wasm.ProxyFunc
 
 // compileMustErrnoSuccess returns the stack top value if it isn't
 // ErrnoSuccess.
-func compileMustErrnoSuccess(localI32Temp byte) (body []byte) {
+func compileMustErrnoSuccess(localI32Temp byte) []byte {
 	// copy the errno to a local, so we can return it later if needed
-	body = append(body, wasm.OpcodeLocalTee, localI32Temp) // stack: [errno]
-	body = append(body, wasm.OpcodeI32Const, success)      // stack: [errno, success]
+	return []byte{
+		wasm.OpcodeLocalTee, localI32Temp, // stack: [errno]
+		wasm.OpcodeI32Const, success, // stack: [errno, success]
 
-	// If the result wasn't success, return errno.
-	body = append(body, wasm.OpcodeI32Ne, wasm.OpcodeIf, nilType) // stack: []
-	body = append(body, wasm.OpcodeLocalGet, localI32Temp)        // stack: [errno]
-	body = append(body, wasm.OpcodeReturn, wasm.OpcodeEnd)        // stack: []
-	return body
+		// If the result wasn't success, return errno.
+		wasm.OpcodeI32Ne, wasm.OpcodeIf, nilType, // stack: []
+		wasm.OpcodeLocalGet, localI32Temp, // stack: [errno]
+		wasm.OpcodeReturn, wasm.OpcodeEnd, // stack: []
+	}
 }
 
 // compileMustValidMemOffset returns ErrnoFault if params[paramIdx]+4
 // exceeds available memory (without growing). The stack top value must be
 // memories[0] size in bytes.
-func compileMustValidMemOffset(paramIdx int, outType api.ValueType) (body []byte) {
+func compileMustValidMemOffset(paramIdx int, outType api.ValueType) []byte {
 	byteLength := 4
 	switch outType {
 	case i32:
@@ -207,28 +210,30 @@ func compileMustValidMemOffset(paramIdx int, outType api.ValueType) (body []byte
 	default:
 		panic(fmt.Errorf("TODO: unsupported outType: %v", outType))
 	}
-	body = append(body, wasm.OpcodeI32Const, byte(byteLength), wasm.OpcodeI32Sub) // stack: [memBytes-byteLength]
-	body = append(body, wasm.OpcodeLocalGet, byte(paramIdx))                      // stack: [memBytes-byteLength, $0]
-	body = append(body, wasm.OpcodeI32LtU, wasm.OpcodeIf, nilType)                // stack: []
-	body = append(body, wasm.OpcodeI32Const, fault)                               // stack: [efault]
-	body = append(body, wasm.OpcodeReturn, wasm.OpcodeEnd)                        // stack: []
-	return body
+	return []byte{
+		wasm.OpcodeI32Const, byte(byteLength), wasm.OpcodeI32Sub, // stack: [memBytes-byteLength]
+		wasm.OpcodeLocalGet, byte(paramIdx), // stack: [memBytes-byteLength, $0]
+		wasm.OpcodeI32LtU, wasm.OpcodeIf, nilType, // stack: []
+		wasm.OpcodeI32Const, fault, // stack: [efault]
+		wasm.OpcodeReturn, wasm.OpcodeEnd, // stack: []
+	}
 }
 
 // compileStore stores stack top stack value to the memory offset in
 // locals[localIdx]. This can't exceed available memory due to previous
 // validation in compileMustValidMemOffset.
-func compileStore(localOffsetIdx, localValIdx byte, outType api.ValueType) (body []byte) {
-	body = append(body, wasm.OpcodeLocalSet, localValIdx)    // stack: []
-	body = append(body, wasm.OpcodeLocalGet, localOffsetIdx) // stack: [offset]
-	body = append(body, wasm.OpcodeLocalGet, localValIdx)    // stack: [offset, v]
+func compileStore(localOffsetIdx, localValIdx byte, outType api.ValueType) []byte {
+	body := []byte{
+		wasm.OpcodeLocalSet, localValIdx, // stack: []
+		wasm.OpcodeLocalGet, localOffsetIdx, // stack: [offset]
+		wasm.OpcodeLocalGet, localValIdx, // stack: [offset, v]
+	}
 	switch outType {
 	case i32:
-		body = append(body, wasm.OpcodeI32Store, 0x2, 0x0) // stack: []
+		return append(body, wasm.OpcodeI32Store, 0x2, 0x0) // stack: []
 	case i64:
-		body = append(body, wasm.OpcodeI64Store, 0x3, 0x0) // stack: []
+		return append(body, wasm.OpcodeI64Store, 0x3, 0x0) // stack: []
 	default:
 		panic(fmt.Errorf("TODO: unsupported outType: %v", outType))
 	}
-	return body
 }
