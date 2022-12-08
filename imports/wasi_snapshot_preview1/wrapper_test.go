@@ -1,7 +1,6 @@
 package wasi_snapshot_preview1
 
 import (
-	"context"
 	_ "embed"
 	"testing"
 
@@ -253,47 +252,4 @@ func Test_proxyResultParams(t *testing.T) {
 			require.Equal(t, tc.expected, proxy)
 		})
 	}
-}
-
-var spMem = []byte{
-	0, 0, 0, 0, 0, 0, 0, 0,
-	1, 0, 0, 0, 0, 0, 0, 0,
-	2, 0, 0, 0, 0, 0, 0, 0,
-	3, 0, 0, 0, 0, 0, 0, 0,
-	4, 0, 0, 0, 0, 0, 0, 0,
-	5, 0, 0, 0, 0, 0, 0, 0,
-	6, 0, 0, 0, 0, 0, 0, 0,
-	7, 0, 0, 0, 0, 0, 0, 0,
-	8, 0, 0, 0, 0, 0, 0, 0,
-	9, 0, 0, 0, 0, 0, 0, 0,
-	10, 0, 0, 0, 0, 0, 0, 0,
-}
-
-func i64i32i32i32i32_i64i32_withSP(_ context.Context, stack []uint64) {
-	vRef := stack[0]
-	mAddr := uint32(stack[1])
-	mLen := uint32(stack[2])
-	argsArray := uint32(stack[3])
-	argsLen := uint32(stack[4])
-
-	if vRef != 1 {
-		panic("vRef")
-	}
-	if mAddr != 2 {
-		panic("mAddr")
-	}
-	if mLen != 3 {
-		panic("mLen")
-	}
-	if argsArray != 4 {
-		panic("argsArray")
-	}
-	if argsLen != 5 {
-		panic("argsLen")
-	}
-
-	// set results
-	stack[0] = 10
-	stack[1] = 20
-	stack[2] = 8
 }
