@@ -22,7 +22,6 @@ concurrency:
   group: ${{ github.head_ref }}
   cancel-in-progress: true
 
-
 jobs:
   test_amd64:
     name: ${{ matrix.spec-version }} - linux/amd64, Go-${{ matrix.go-version }}
