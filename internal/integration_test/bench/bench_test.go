@@ -125,10 +125,11 @@ func runInitializationConcurrentBench(b *testing.B, r wazero.Runtime) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		go func(name string) {
-			_, err := r.InstantiateModule(testCtx, compiled, config.WithName(name))
+			m, err := r.InstantiateModule(testCtx, compiled, config.WithName(name))
 			if err != nil {
 				b.Error(err)
 			}
+			m.Close(testCtx)
 			wg.Done()
 		}(strconv.Itoa(i))
 	}
