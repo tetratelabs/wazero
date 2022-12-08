@@ -39,11 +39,9 @@ pub fn _greet(name: []const u8) !void {
 pub export fn greet(message: [*]const u8, size: u32) void {
     const name = _greeting(message[0..size]) catch |err| @panic(switch (err) {
         error.OutOfMemory => "out of memory",
-        else => "unexpected error",
     });
     _greet(name) catch |err| @panic(switch (err) {
         error.OutOfMemory => "out of memory",
-        else => "unexpected error",
     });
 }
 
