@@ -410,7 +410,7 @@ var fdFilestatSetTimes = stubFunction(
 var fdPread = newHostFunc(
 	fdPreadName, fdPreadFn,
 	[]api.ValueType{i32, i32, i32, i64, i32},
-	"fd", "iovs", "iovs_len", "offset", "result.size",
+	"fd", "iovs", "iovs_len", "offset", "result.nread",
 )
 
 func fdPreadFn(ctx context.Context, mod api.Module, params []uint64) Errno {
@@ -550,13 +550,13 @@ var fdPwrite = stubFunction(
 //   - Both offset and length are encoded as uint32le
 //   - iovsCount: count of memory offset, size pairs to read sequentially
 //     starting at iovs
-//   - resultSize: offset in api.Memory to write the number of bytes read
+//   - resultNread: offset in api.Memory to write the number of bytes read
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
 //   - ErrnoBadf: `fd` is invalid
-//   - ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
+//   - ErrnoFault: `iovs` or `resultNread` point to an offset out of memory
 //   - ErrnoIo: a file system error
 //
 // For example, this function needs to first read `iovs` to determine where
@@ -574,7 +574,7 @@ var fdPwrite = stubFunction(
 //	 offset --+   length --+   offset --+  length --+
 //
 // If the contents of the `fd` parameter was "wazero" (6 bytes) and parameter
-// resultSize=26, this function writes the below to api.Memory:
+// resultNread=26, this function writes the below to api.Memory:
 //
 //	                    iovs[0].length        iovs[1].length
 //	                   +--------------+       +----+       uint32le
@@ -582,7 +582,7 @@ var fdPwrite = stubFunction(
 //	[]byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
 //	  iovs[0].offset --^                      ^           ^
 //	                         iovs[1].offset --+           |
-//	                                         resultSize --+
+//	                                        resultNread --+
 //
 // Note: This is similar to `readv` in POSIX. https://linux.die.net/man/3/readv
 //
@@ -591,7 +591,7 @@ var fdPwrite = stubFunction(
 var fdRead = newHostFunc(
 	fdReadName, fdReadFn,
 	[]api.ValueType{i32, i32, i32, i32},
-	"fd", "iovs", "iovs_len", "result.size",
+	"fd", "iovs", "iovs_len", "result.nread",
 )
 
 func fdReadFn(ctx context.Context, mod api.Module, params []uint64) Errno {
@@ -606,12 +606,12 @@ func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread
 	iovsCount := uint32(params[2])
 
 	var offset int64
-	var resultSize uint32
+	var resultNread uint32
 	if isPread {
 		offset = int64(params[3])
-		resultSize = uint32(params[4])
+		resultNread = uint32(params[4])
 	} else {
-		resultSize = uint32(params[3])
+		resultNread = uint32(params[3])
 	}
 
 	r := internalsys.FdReader(ctx, sysCtx, fd)
@@ -655,7 +655,7 @@ func fdReadOrPread(ctx context.Context, mod api.Module, params []uint64, isPread
 			break
 		}
 	}
-	if !mem.WriteUint32Le(ctx, resultSize, nread) {
+	if !mem.WriteUint32Le(ctx, resultNread, nread) {
 		return ErrnoFault
 	} else {
 		return ErrnoSuccess
@@ -1042,13 +1042,14 @@ var fdTell = stubFunction(fdTellName, []wasm.ValueType{i32, i32}, "fd", "result.
 //   - Both offset and length are encoded as uint32le.
 //   - iovsCount: count of memory offset, size pairs to read sequentially
 //     starting at iovs
-//   - resultSize: offset in api.Memory to write the number of bytes written
+//   - resultNwritten: offset in api.Memory to write the number of bytes
+//     written
 //
 // Result (Errno)
 //
 // The return value is ErrnoSuccess except the following error conditions:
 //   - ErrnoBadf: `fd` is invalid
-//   - ErrnoFault: `iovs` or `resultSize` point to an offset out of memory
+//   - ErrnoFault: `iovs` or `resultNwritten` point to an offset out of memory
 //   - ErrnoIo: a file system error
 //
 // For example, this function needs to first read `iovs` to determine what to
@@ -1074,14 +1075,14 @@ var fdTell = stubFunction(fdTellName, []wasm.ValueType{i32, i32}, "fd", "result.
 //	  iovs[0].offset --^                      ^
 //	                         iovs[1].offset --+
 //
-// Since "wazero" was written, if parameter resultSize=26, this function writes
-// the below to api.Memory:
+// Since "wazero" was written, if parameter resultNwritten=26, this function
+// writes the below to api.Memory:
 //
 //	                   uint32le
 //	                  +--------+
 //	                  |        |
 //	[]byte{ 0..24, ?, 6, 0, 0, 0', ? }
-//	     resultSize --^
+//	 resultNwritten --^
 //
 // Note: This is similar to `writev` in POSIX. https://linux.die.net/man/3/writev
 //
@@ -1091,14 +1092,14 @@ var fdTell = stubFunction(fdTellName, []wasm.ValueType{i32, i32}, "fd", "result.
 var fdWrite = newHostFunc(
 	fdWriteName, fdWriteFn,
 	[]api.ValueType{i32, i32, i32, i32},
-	"fd", "iovs", "iovs_len", "result.size",
+	"fd", "iovs", "iovs_len", "result.nwritten",
 )
 
 func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	fd := uint32(params[0])
 	iovs := uint32(params[1])
 	iovsCount := uint32(params[2])
-	resultSize := uint32(params[3])
+	resultNwritten := uint32(params[3])
 
 	sysCtx := mod.(*wasm.CallContext).Sys
 	writer := internalsys.FdWriter(ctx, sysCtx, fd)
@@ -1136,7 +1137,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 		}
 		nwritten += uint32(n)
 	}
-	if !mod.Memory().WriteUint32Le(ctx, resultSize, nwritten) {
+	if !mod.Memory().WriteUint32Le(ctx, resultNwritten, nwritten) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess

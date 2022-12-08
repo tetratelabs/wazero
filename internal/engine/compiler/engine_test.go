@@ -85,7 +85,7 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 	// TODO: Currently, the listener doesn't get notified on errors as they are
 	// implemented with panic. This means the end hooks aren't make resulting
 	// in dangling logs like this:
-	//	==> host.host_div_by(4294967295)
+	//	==> host.host_div_by(-1)
 	// instead of seeing a return like
 	//	<== DivByZero
 	require.Equal(t, `
@@ -96,8 +96,8 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 --> imported.div_by.wasm(0)
 --> imported.div_by.wasm(1)
 <-- 1
---> imported.call->div_by.go(4294967295)
-	==> host.div_by.go(4294967295)
+--> imported.call->div_by.go(-1)
+	==> host.div_by.go(-1)
 --> imported.call->div_by.go(1)
 	==> host.div_by.go(1)
 	<== 1
@@ -111,9 +111,9 @@ func TestCompiler_ModuleEngine_Call_Errors(t *testing.T) {
 		<== 1
 	<-- 1
 <-- 1
---> importing.call_import->call->div_by.go(4294967295)
-	--> imported.call->div_by.go(4294967295)
-		==> host.div_by.go(4294967295)
+--> importing.call_import->call->div_by.go(-1)
+	--> imported.call->div_by.go(-1)
+		==> host.div_by.go(-1)
 --> importing.call_import->call->div_by.go(1)
 	--> imported.call->div_by.go(1)
 		==> host.div_by.go(1)

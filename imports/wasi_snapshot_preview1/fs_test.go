@@ -223,8 +223,8 @@ func Test_fdFdstatGet(t *testing.T) {
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_fdstat_get(fd=4294967295,result.stat=0)
-	==> wasi_snapshot_preview1.fd_fdstat_get(fd=4294967295,result.stat=0)
+--> proxy.fd_fdstat_get(fd=-1,result.stat=0)
+	==> wasi_snapshot_preview1.fd_fdstat_get(fd=-1,result.stat=0)
 	<== EBADF
 <-- 8
 `,
@@ -432,8 +432,8 @@ func Test_fdFilestatGet(t *testing.T) {
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_filestat_get(fd=4294967295,result.buf=0)
-	==> wasi_snapshot_preview1.fd_filestat_get(fd=4294967295,result.buf=0)
+--> proxy.fd_filestat_get(fd=-1,result.buf=0)
+	==> wasi_snapshot_preview1.fd_filestat_get(fd=-1,result.buf=0)
 	<== EBADF
 <-- 8
 `,
@@ -506,8 +506,8 @@ func Test_fdPread(t *testing.T) {
 		'?',
 	}
 
-	iovsCount := uint32(2)   // The count of iovs
-	resultSize := uint32(26) // arbitrary offset
+	iovsCount := uint32(2)    // The count of iovs
+	resultNread := uint32(26) // arbitrary offset
 
 	tests := []struct {
 		name           string
@@ -523,13 +523,13 @@ func Test_fdPread(t *testing.T) {
 				'w', 'a', 'z', 'e', // iovs[0].length bytes
 				'?',      // iovs[1].offset is after this
 				'r', 'o', // iovs[1].length bytes
-				'?',        // resultSize is after this
+				'?',        // resultNread is after this
 				6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 				'?',
 			),
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.size=26)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.size=26)
+--> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.nread=26)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.nread=26)
 	<== ESUCCESS
 <-- 0
 `,
@@ -540,13 +540,13 @@ func Test_fdPread(t *testing.T) {
 			expectedMemory: append(
 				initialMemory,
 				'z', 'e', 'r', 'o', // iovs[0].length bytes
-				'?', '?', '?', '?', // resultSize is after this
+				'?', '?', '?', '?', // resultNread is after this
 				4, 0, 0, 0, // sum(iovs[...].length) == length of "zero"
 				'?',
 			),
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.size=26)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.size=26)
+--> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.nread=26)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.nread=26)
 	<== ESUCCESS
 <-- 0
 `,
@@ -563,7 +563,7 @@ func Test_fdPread(t *testing.T) {
 			ok := mod.Memory().Write(testCtx, 0, initialMemory)
 			require.True(t, ok)
 
-			requireErrno(t, ErrnoSuccess, mod, fdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultSize))
+			requireErrno(t, ErrnoSuccess, mod, fdPreadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(tc.offset), uint64(resultNread))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
@@ -579,20 +579,20 @@ func Test_fdPread_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	tests := []struct {
-		name                            string
-		fd, iovs, iovsCount, resultSize uint32
-		offset                          int64
-		memory                          []byte
-		expectedErrno                   Errno
-		expectedLog                     string
+		name                             string
+		fd, iovs, iovsCount, resultNread uint32
+		offset                           int64
+		memory                           []byte
+		expectedErrno                    Errno
+		expectedLog                      string
 	}{
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.size=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.size=65536)
+--> proxy.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.nread=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.nread=65536)
 	<== EBADF
 <-- 8
 `,
@@ -603,8 +603,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			offset:        int64(len(contents) + 1),
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.size=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.size=65536)
+--> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.nread=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.nread=65536)
 	<== EFAULT
 <-- 21
 `,
@@ -616,8 +616,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			memory:        []byte{'?'},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.size=65535)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.size=65535)
+--> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.nread=65535)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.nread=65535)
 	<== EFAULT
 <-- 21
 `,
@@ -632,8 +632,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.size=65531)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.size=65531)
+--> proxy.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.nread=65531)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.nread=65531)
 	<== EFAULT
 <-- 21
 `,
@@ -649,8 +649,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.size=65527)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.size=65527)
+--> proxy.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.nread=65527)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.nread=65527)
 	<== EFAULT
 <-- 21
 `,
@@ -667,17 +667,17 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65526)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65526)
+--> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65526)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65526)
 	<== EFAULT
 <-- 21
 `,
 		},
 		{
-			name: "resultSize offset is outside memory",
+			name: "resultNread offset is outside memory",
 			fd:   fd,
 			iovs: 1, iovsCount: 1,
-			resultSize: 10, // 1 past memory
+			resultNread: 10, // 1 past memory
 			memory: []byte{
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
@@ -686,8 +686,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.size=65536)
+--> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65536)
+	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65536)
 	<== EFAULT
 <-- 21
 `,
@@ -704,7 +704,7 @@ func Test_fdPread_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(testCtx, offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, fdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultSize+offset))
+			requireErrno(t, tc.expectedErrno, mod, fdPreadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -928,14 +928,14 @@ func Test_fdRead(t *testing.T) {
 		2, 0, 0, 0, // = iovs[1].length
 		'?',
 	}
-	iovsCount := uint32(2)   // The count of iovs
-	resultSize := uint32(26) // arbitrary offset
+	iovsCount := uint32(2)    // The count of iovs
+	resultNread := uint32(26) // arbitrary offset
 	expectedMemory := append(
 		initialMemory,
 		'w', 'a', 'z', 'e', // iovs[0].length bytes
 		'?',      // iovs[1].offset is after this
 		'r', 'o', // iovs[1].length bytes
-		'?',        // resultSize is after this
+		'?',        // resultNread is after this
 		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
 		'?',
 	)
@@ -945,10 +945,10 @@ func Test_fdRead(t *testing.T) {
 	ok := mod.Memory().Write(testCtx, 0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, fdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+	requireErrno(t, ErrnoSuccess, mod, fdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
---> proxy.fd_read(fd=4,iovs=1,iovs_len=2,result.size=26)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.size=26)
+--> proxy.fd_read(fd=4,iovs=1,iovs_len=2,result.nread=26)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.nread=26)
 	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
@@ -963,19 +963,19 @@ func Test_fdRead_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	tests := []struct {
-		name                            string
-		fd, iovs, iovsCount, resultSize uint32
-		memory                          []byte
-		expectedErrno                   Errno
-		expectedLog                     string
+		name                             string
+		fd, iovs, iovsCount, resultNread uint32
+		memory                           []byte
+		expectedErrno                    Errno
+		expectedLog                      string
 	}{
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
-	==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.size=65536)
+--> proxy.fd_read(fd=42,iovs=65536,iovs_len=65536,result.nread=65536)
+	==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.nread=65536)
 	<== EBADF
 <-- 8
 `,
@@ -987,8 +987,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			memory:        []byte{'?'},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.size=65535)
+--> proxy.fd_read(fd=4,iovs=65536,iovs_len=65535,result.nread=65535)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.nread=65535)
 	<== EFAULT
 <-- 21
 `,
@@ -1003,8 +1003,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.size=65531)
+--> proxy.fd_read(fd=4,iovs=65532,iovs_len=65532,result.nread=65531)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.nread=65531)
 	<== EFAULT
 <-- 21
 `,
@@ -1020,8 +1020,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.size=65527)
+--> proxy.fd_read(fd=4,iovs=65528,iovs_len=65528,result.nread=65527)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.nread=65527)
 	<== EFAULT
 <-- 21
 `,
@@ -1038,17 +1038,17 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65526)
+--> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65526)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65526)
 	<== EFAULT
 <-- 21
 `,
 		},
 		{
-			name: "resultSize offset is outside memory",
+			name: "resultNread offset is outside memory",
 			fd:   fd,
 			iovs: 1, iovsCount: 1,
-			resultSize: 10, // 1 past memory
+			resultNread: 10, // 1 past memory
 			memory: []byte{
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
@@ -1057,8 +1057,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.size=65536)
+--> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65536)
+	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65536)
 	<== EFAULT
 <-- 21
 `,
@@ -1075,7 +1075,7 @@ func Test_fdRead_Errors(t *testing.T) {
 			memoryWriteOK := mod.Memory().Write(testCtx, offset, tc.memory)
 			require.True(t, memoryWriteOK)
 
-			requireErrno(t, tc.expectedErrno, mod, fdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultSize+offset))
+			requireErrno(t, tc.expectedErrno, mod, fdReadName, uint64(tc.fd), uint64(tc.iovs+offset), uint64(tc.iovsCount+offset), uint64(tc.resultNread+offset))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -1621,8 +1621,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			resultBufused: 2000,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=18446744073709551615,result.bufused=2000)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=18446744073709551615,result.bufused=2000)
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
+	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
 	<== EINVAL
 <-- 28
 `,
@@ -1944,8 +1944,8 @@ func Test_fdSeek(t *testing.T) {
 				'?',
 			},
 			expectedLog: `
---> proxy.fd_seek(fd=4,offset=18446744073709551615,whence=2,result.newoffset=1)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=18446744073709551615,whence=2,result.newoffset=1)
+--> proxy.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
+	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
 	<== ESUCCESS
 <-- 0
 `,
@@ -2087,8 +2087,8 @@ func Test_fdWrite(t *testing.T) {
 		'r', 'o', // iovs[1].length bytes
 		'?',
 	}
-	iovsCount := uint32(2)   // The count of iovs
-	resultSize := uint32(26) // arbitrary offset
+	iovsCount := uint32(2)       // The count of iovs
+	resultNwritten := uint32(26) // arbitrary offset
 	expectedMemory := append(
 		initialMemory,
 		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
@@ -2099,10 +2099,10 @@ func Test_fdWrite(t *testing.T) {
 	ok := mod.Memory().Write(testCtx, 0, initialMemory)
 	require.True(t, ok)
 
-	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
---> proxy.fd_write(fd=4,iovs=1,iovs_len=2,result.size=26)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.size=26)
+--> proxy.fd_write(fd=4,iovs=1,iovs_len=2,result.nwritten=26)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.nwritten=26)
 	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
@@ -2139,8 +2139,8 @@ func Test_fdWrite_discard(t *testing.T) {
 		'r', 'o', // iovs[1].length bytes
 		'?',
 	}
-	iovsCount := uint32(2)   // The count of iovs
-	resultSize := uint32(26) // arbitrary offset
+	iovsCount := uint32(2)       // The count of iovs
+	resultNwritten := uint32(26) // arbitrary offset
 	expectedMemory := append(
 		initialMemory,
 		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
@@ -2152,10 +2152,10 @@ func Test_fdWrite_discard(t *testing.T) {
 	require.True(t, ok)
 
 	fd := 1 // stdout
-	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
---> proxy.fd_write(fd=1,iovs=1,iovs_len=2,result.size=26)
-	==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2,result.size=26)
+--> proxy.fd_write(fd=1,iovs=1,iovs_len=2,result.nwritten=26)
+	==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2,result.nwritten=26)
 	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
@@ -2180,19 +2180,19 @@ func Test_fdWrite_Errors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		fd, resultSize uint32
-		memory         []byte
-		expectedErrno  Errno
-		expectedLog    string
+		name               string
+		fd, resultNwritten uint32
+		memory             []byte
+		expectedErrno      Errno
+		expectedLog        string
 	}{
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_write(fd=42,iovs=0,iovs_len=1,result.size=0)
-	==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.size=0)
+--> proxy.fd_write(fd=42,iovs=0,iovs_len=1,result.nwritten=0)
+	==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.nwritten=0)
 	<== EBADF
 <-- 8
 `,
@@ -2203,8 +2203,8 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        []byte{},
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
 	<== EFAULT
 <-- 21
 `,
@@ -2215,8 +2215,8 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:4], // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mod.Memory()!
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
 	<== EFAULT
 <-- 21
 `,
@@ -2227,8 +2227,8 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:8], // iovs[0].offset (where to read "hi") is outside memory.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
 	<== EFAULT
 <-- 21
 `,
@@ -2239,21 +2239,21 @@ func Test_fdWrite_Errors(t *testing.T) {
 			memory:        memory[0:9], // iovs[0].offset (where to read "hi") is in memory, but truncated.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=0)
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
 	<== EFAULT
 <-- 21
 `,
 		},
 		{
-			name:          "resultSize offset is outside memory",
-			fd:            fd,
-			memory:        memory,
-			resultSize:    uint32(len(memory)), // read was ok, but there wasn't enough memory to write the result.
-			expectedErrno: ErrnoFault,
+			name:           "resultNwritten offset is outside memory",
+			fd:             fd,
+			memory:         memory,
+			resultNwritten: uint32(len(memory)), // read was ok, but there wasn't enough memory to write the result.
+			expectedErrno:  ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.size=10)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.size=10)
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=10)
+	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=10)
 	<== EFAULT
 <-- 21
 `,
@@ -2268,7 +2268,7 @@ func Test_fdWrite_Errors(t *testing.T) {
 			mod.Memory().(*wasm.MemoryInstance).Buffer = tc.memory
 
 			requireErrno(t, tc.expectedErrno, mod, fdWriteName, uint64(tc.fd), uint64(iovs), uint64(iovsCount),
-				uint64(tc.resultSize))
+				uint64(tc.resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
 	}
@@ -2396,8 +2396,8 @@ func Test_pathFilestatGet(t *testing.T) {
 			fd:            math.MaxUint32,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.path_filestat_get(fd=4294967295,flags=0,path=1,path_len=0,result.buf=0)
-	==> wasi_snapshot_preview1.path_filestat_get(fd=4294967295,flags=0,path=1,path_len=0,result.buf=0)
+--> proxy.path_filestat_get(fd=-1,flags=0,path=1,path_len=0,result.buf=0)
+	==> wasi_snapshot_preview1.path_filestat_get(fd=-1,flags=0,path=1,path_len=0,result.buf=0)
 	<== EBADF
 <-- 8
 `,

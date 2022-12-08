@@ -106,7 +106,7 @@ func Test_loggingListener(t *testing.T) {
 			name:     "i32",
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI32}},
 			params:   []uint64{math.MaxUint32},
-			expected: `--> test.fn(4294967295)
+			expected: `--> test.fn(-1)
 <--
 `,
 		},
@@ -115,7 +115,7 @@ func Test_loggingListener(t *testing.T) {
 			functype:   &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI32}},
 			params:     []uint64{math.MaxUint32},
 			paramNames: []string{"x"},
-			expected: `--> test.fn(x=4294967295)
+			expected: `--> test.fn(x=-1)
 <--
 `,
 		},
@@ -123,7 +123,7 @@ func Test_loggingListener(t *testing.T) {
 			name:     "i64",
 			functype: &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI64}},
 			params:   []uint64{math.MaxUint64},
-			expected: `--> test.fn(18446744073709551615)
+			expected: `--> test.fn(-1)
 <--
 `,
 		},
@@ -132,7 +132,7 @@ func Test_loggingListener(t *testing.T) {
 			functype:   &wasm.FunctionType{Params: []api.ValueType{api.ValueTypeI64}},
 			params:     []uint64{math.MaxUint64},
 			paramNames: []string{"x"},
-			expected: `--> test.fn(x=18446744073709551615)
+			expected: `--> test.fn(x=-1)
 <--
 `,
 		},
@@ -226,7 +226,7 @@ func Test_loggingListener(t *testing.T) {
 			functype: &wasm.FunctionType{Results: []api.ValueType{api.ValueTypeI32}},
 			results:  []uint64{math.MaxUint32},
 			expected: `--> test.fn()
-<-- 4294967295
+<-- -1
 `,
 		},
 		{
@@ -237,7 +237,7 @@ func Test_loggingListener(t *testing.T) {
 			},
 			params:  []uint64{math.MaxUint32},
 			results: []uint64{api.EncodeF32(math.MaxFloat32)},
-			expected: `--> test.fn(4294967295)
+			expected: `--> test.fn(-1)
 <-- 3.4028235e+38
 `,
 		},
@@ -249,7 +249,7 @@ func Test_loggingListener(t *testing.T) {
 			},
 			params:  []uint64{math.MaxUint32, math.MaxUint64},
 			results: []uint64{api.EncodeF32(math.MaxFloat32), api.EncodeF64(math.MaxFloat64)},
-			expected: `--> test.fn(4294967295,18446744073709551615)
+			expected: `--> test.fn(-1,-1)
 <-- (3.4028235e+38,1.7976931348623157e+308)
 `,
 		},
@@ -262,7 +262,7 @@ func Test_loggingListener(t *testing.T) {
 			params:     []uint64{math.MaxUint32, math.MaxUint64},
 			paramNames: []string{"x", "y"},
 			results:    []uint64{api.EncodeF32(math.MaxFloat32), api.EncodeF64(math.MaxFloat64)},
-			expected: `--> test.fn(x=4294967295,y=18446744073709551615)
+			expected: `--> test.fn(x=-1,y=-1)
 <-- (3.4028235e+38,1.7976931348623157e+308)
 `,
 		},
