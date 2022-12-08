@@ -327,7 +327,10 @@ func (s *Store) Instantiate(
 	} else {
 		// Now that the instantiation is complete without error, add it.
 		// This makes the module visible for import, and ensures it is closed when the namespace is.
-		ns.addModule(callCtx.module)
+		if err := ns.setModule(callCtx.module); err != nil {
+			callCtx.Close(ctx)
+			return nil, err
+		}
 		return callCtx, nil
 	}
 }
