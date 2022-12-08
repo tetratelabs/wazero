@@ -20,6 +20,11 @@ env:
   TINYGO_VERSION: "0.26.0"
   ZIG_VERSION: "0.11.0-dev.618+096d3efae"
 
+concurrency:
+  # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-concurrency-to-cancel-any-in-progress-job-or-run
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   # Not all toolchains are idempotent when generating wasm, so we don't check
   # in %.wasm as a part of this job.
