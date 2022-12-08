@@ -18,7 +18,7 @@ on:
 env:
   EMSDK_VERSION: "3.1.24"
   TINYGO_VERSION: "0.26.0"
-  ZIG_VERSION: "0.10.0"
+  ZIG_VERSION: "0.11.0-dev.526+9e74e4c1f"
 
 jobs:
   # Not all toolchains are idempotent when generating wasm, so we don't check
@@ -51,7 +51,7 @@ jobs:
       - name: Install Zig
         run: |
           sudo apt install xz-utils
-          sudo sh -c 'wget -c https://ziglang.org/download/0.10.0/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
+          sudo sh -c 'wget -c https://ziglang.org/builds/zig-linux-x86_64-${{ env.ZIG_VERSION }}.tar.xz -O - | tar -xJ --strip-components=1 -C /usr/local/bin'
 
       - name: Cache Emscripten
         id: cache-emsdk

@@ -26,6 +26,11 @@ var wasmCargoWasi []byte
 //go:embed testdata/zig-cc/wasi.wasm
 var wasmZigCc []byte
 
+// wasmZig was compiled from testdata/zig/wasi.c
+//
+//go:embed testdata/zig/wasi.wasm
+var wasmZig []byte
+
 func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
