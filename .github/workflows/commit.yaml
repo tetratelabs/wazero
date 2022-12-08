@@ -25,6 +25,7 @@ concurrency:
   group: ${{ github.head_ref }}
   cancel-in-progress: true
 
+
 jobs:
   check:
     name: Pre-commit check, Go-${{ matrix.go-version }}
