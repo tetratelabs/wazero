@@ -154,15 +154,15 @@ func TestDecodeModule(t *testing.T) {
 	})
 
 	t.Run("DWARF enabled", func(t *testing.T) {
-		m, err := DecodeModule(dwarftestdata.DWARFWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, true)
+		m, err := DecodeModule(dwarftestdata.TinyGoWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, true)
 		require.NoError(t, err)
-		require.NotNil(t, m.DWARF)
+		require.NotNil(t, m.DWARFLines)
 	})
 
 	t.Run("DWARF disabled", func(t *testing.T) {
-		m, err := DecodeModule(dwarftestdata.DWARFWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, true)
+		m, err := DecodeModule(dwarftestdata.TinyGoWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, false, true)
 		require.NoError(t, err)
-		require.Nil(t, m.DWARF)
+		require.Nil(t, m.DWARFLines)
 	})
 
 	t.Run("data count section disabled", func(t *testing.T) {

@@ -40,22 +40,50 @@ func TestWithDWARFBasedStackTrace(t *testing.T) {
 
 			wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
-			compiled, err := r.CompileModule(ctx, dwarftestdata.DWARFWasm)
-			require.NoError(t, err)
+			for _, lang := range []struct {
+				name string
+				bin  []byte
+				exps []string
+			}{
+				{
+					name: "tinygo",
+					bin:  dwarftestdata.TinyGoWasm,
+					exps: []string{
+						"src/runtime/runtime_tinygowasm.go:73:6",
+						"wazero/internal/testing/dwarftestdata/testdata/main.go:19:7",
+						"wazero/internal/testing/dwarftestdata/testdata/main.go:14:3",
+						"wazero/internal/testing/dwarftestdata/testdata/main.go:9:3",
+						"wazero/internal/testing/dwarftestdata/testdata/main.go:4:3",
+						"wazero/internal/testing/dwarftestdata/testdata/main.go:4:3",
+						"src/runtime/scheduler_none.go:26:10",
+						"src/runtime/runtime_wasm_wasi.go:22:5",
+					},
+				},
+				{
+					name: "zig",
+					bin:  dwarftestdata.ZigWasm,
+					exps: []string{
+						"lib/std/os.zig:552:9",
+						"lib/std/builtin.zig:787:25",
+						"main.zig:1:23",
+						"lib/std/start.zig:614:37",
+					},
+				},
+			} {
+				t.Run(lang.name, func(t *testing.T) {
+					compiled, err := r.CompileModule(ctx, lang.bin)
+					require.NoError(t, err)
 
-			// Use context.Background to ensure that DWARF is a compile-time option.
-			_, err = r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig())
-			require.Error(t, err)
+					// Use context.Background to ensure that DWARF is a compile-time option.
+					_, err = r.InstantiateModule(context.Background(), compiled, wazero.NewModuleConfig())
+					require.Error(t, err)
 
-			errStr := err.Error()
-			require.Contains(t, errStr, "src/runtime/runtime_tinygowasm.go:73:6")
-			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:19:7")
-			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:14:3")
-			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:9:3")
-			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:4:3")
-			require.Contains(t, errStr, "wazero/internal/testing/dwarftestdata/testdata/main.go:4:3")
-			require.Contains(t, errStr, "src/runtime/scheduler_none.go:26:10")
-			require.Contains(t, errStr, "src/runtime/runtime_wasm_wasi.go:22:5")
+					errStr := err.Error()
+					for _, exp := range lang.exps {
+						require.Contains(t, errStr, exp)
+					}
+				})
+			}
 		})
 	}
 }

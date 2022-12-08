@@ -842,7 +842,7 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 		def := frame.f.source.Definition
 		var sourceInfo string
 		if frame.f.body != nil {
-			sourceInfo = wasmdebug.GetSourceInfo(frame.f.parent.source.DWARF, frame.f.body[frame.pc].sourcePC)
+			sourceInfo = frame.f.parent.source.DWARFLines.Line(frame.f.body[frame.pc].sourcePC)
 		}
 		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
 	}

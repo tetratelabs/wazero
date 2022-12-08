@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	"github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
@@ -151,7 +152,8 @@ func DecodeModule(
 	}
 
 	if dwarfEnabled {
-		m.DWARF, _ = dwarf.New(abbrev, nil, nil, info, line, nil, ranges, str)
+		d, _ := dwarf.New(abbrev, nil, nil, info, line, nil, ranges, str)
+		m.DWARFLines = wasmdebug.NewDWARFLines(d)
 	}
 
 	functionCount, codeCount := m.SectionElementCount(wasm.SectionIDFunction), m.SectionElementCount(wasm.SectionIDCode)

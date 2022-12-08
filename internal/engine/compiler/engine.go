@@ -739,7 +739,7 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 			if p := fn.parent; p.codeSegment != nil {
 				if p.sourceOffsetMap != nil {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
-					sourceInfo = wasmdebug.GetSourceInfo(p.sourceModule.DWARF, offset)
+					sourceInfo = p.sourceModule.DWARFLines.Line(offset)
 				}
 			}
 			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)

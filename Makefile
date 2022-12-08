@@ -57,6 +57,7 @@ build.examples.as:
 
 .PHONY: build.examples.zig
 build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm imports/wasi_snapshot_preview1/testdata/zig/wasi.wasm
+	@cd internal/testing/dwarftestdata/testdata/zig; zig build; mv zig-out/*/main.wasm ./ # Need DWARF custom sections.
 
 tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
@@ -65,7 +66,7 @@ build.examples.tinygo: $(tinygo_sources)
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
 	# Need DWARF sections.
-	tinygo build -o internal/testing/dwarftestdata/testdata/main.wasm -scheduler=none --target=wasi internal/testing/dwarftestdata/testdata/main.go
+	tinygo build -o internal/testing/dwarftestdata/testdata/tinygo/main.wasm -scheduler=none --target=wasi internal/testing/dwarftestdata/testdata/tinygo/main.go
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
 c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/wasi.c
