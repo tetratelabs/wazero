@@ -47,8 +47,8 @@ func TestNamespace_deleteModule(t *testing.T) {
 
 		// Leaves the other module alone
 		require.Equal(t, map[string]*ModuleInstance{m1.Name: m1}, ns.modules)
-		require.Equal(t, map[string]struct{}{m1.Name: {}}, ns.moduleNamesSet)
-		require.Equal(t, []string{m1.Name}, ns.moduleNamesList)
+		require.Equal(t, map[string]*nameListNode{m1.Name: {name: m1.Name}}, ns.moduleNamesSet)
+		require.Equal(t, &nameListNode{name: m1.Name}, ns.moduleNamesList)
 	})
 
 	t.Run("ok if missing", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestNamespace_deleteModule(t *testing.T) {
 
 		require.Zero(t, len(ns.modules))
 		require.Zero(t, len(ns.moduleNamesSet))
-		require.Zero(t, len(ns.moduleNamesList))
+		require.Nil(t, ns.moduleNamesList)
 	})
 }
 
@@ -93,24 +93,27 @@ func TestNamespace_requireModules(t *testing.T) {
 }
 
 func TestNamespace_requireModuleName(t *testing.T) {
-	ns := &Namespace{moduleNamesSet: map[string]struct{}{}}
+	ns := &Namespace{moduleNamesSet: map[string]*nameListNode{}}
 
 	t.Run("first", func(t *testing.T) {
 		err := ns.requireModuleName("m1")
 		require.NoError(t, err)
 
 		// Ensure it adds the module name, and doesn't impact the module list.
-		require.Equal(t, []string{"m1"}, ns.moduleNamesList)
-		require.Equal(t, map[string]struct{}{"m1": {}}, ns.moduleNamesSet)
+		require.Equal(t, &nameListNode{name: "m1"}, ns.moduleNamesList)
+		require.Equal(t, map[string]*nameListNode{"m1": {name: "m1"}}, ns.moduleNamesSet)
 		require.Zero(t, len(ns.modules))
 	})
 	t.Run("second", func(t *testing.T) {
 		err := ns.requireModuleName("m2")
 		require.NoError(t, err)
+		m2Node := &nameListNode{name: "m2"}
+		m1Node := &nameListNode{name: "m1", prev: m2Node}
+		m2Node.next = m1Node
 
 		// Appends in order.
-		require.Equal(t, []string{"m1", "m2"}, ns.moduleNamesList)
-		require.Equal(t, map[string]struct{}{"m1": {}, "m2": {}}, ns.moduleNamesSet)
+		require.Equal(t, m2Node, ns.moduleNamesList)
+		require.Equal(t, map[string]*nameListNode{"m1": m1Node, "m2": m2Node}, ns.moduleNamesSet)
 	})
 	t.Run("existing", func(t *testing.T) {
 		err := ns.requireModuleName("m2")
@@ -165,7 +168,7 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 			// Namespace state zeroed
 			require.Zero(t, len(ns.modules))
 			require.Zero(t, len(ns.moduleNamesSet))
-			require.Zero(t, len(ns.moduleNamesList))
+			require.Nil(t, ns.moduleNamesList)
 		})
 	}
 
@@ -191,7 +194,7 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 		// Namespace state zeroed
 		require.Zero(t, len(ns.modules))
 		require.Zero(t, len(ns.moduleNamesSet))
-		require.Zero(t, len(ns.moduleNamesList))
+		require.Nil(t, ns.moduleNamesList)
 	})
 }
 
@@ -217,7 +220,9 @@ func newTestNamespace() (*Namespace, *ModuleInstance, *ModuleInstance) {
 	m2.CallCtx = NewCallContext(ns, m2, nil)
 
 	ns.modules = map[string]*ModuleInstance{m1.Name: m1, m2.Name: m2}
-	ns.moduleNamesSet = map[string]struct{}{m1.Name: {}, m2.Name: {}}
-	ns.moduleNamesList = []string{m1.Name, m2.Name}
+	node1 := &nameListNode{name: m1.Name}
+	node2 := &nameListNode{name: m2.Name, next: node1}
+	ns.moduleNamesSet = map[string]*nameListNode{m1.Name: node1, m2.Name: node2}
+	ns.moduleNamesList = node2
 	return ns, m1, m2
 }

@@ -8,13 +8,19 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+// nameListNode is a node in a doubly linked list of names.
+type nameListNode struct {
+	name       string
+	next, prev *nameListNode
+}
+
 // Namespace is a collection of instantiated modules which cannot conflict on name.
 type Namespace struct {
 	// moduleNamesList ensures modules are closed in reverse initialization order.
-	moduleNamesList []string // guarded by mux
+	moduleNamesList *nameListNode // guarded by mux
 
 	// moduleNamesSet ensures no race conditions instantiating two modules of the same name
-	moduleNamesSet map[string]struct{} // guarded by mux
+	moduleNamesSet map[string]*nameListNode // guarded by mux
 
 	// modules holds the instantiated Wasm modules by module name from Instantiate.
 	modules map[string]*ModuleInstance // guarded by mux
@@ -27,7 +33,7 @@ type Namespace struct {
 func newNamespace() *Namespace {
 	return &Namespace{
 		moduleNamesList: nil,
-		moduleNamesSet:  map[string]struct{}{},
+		moduleNamesSet:  map[string]*nameListNode{},
 		modules:         map[string]*ModuleInstance{},
 	}
 }
@@ -43,15 +49,23 @@ func (ns *Namespace) addModule(m *ModuleInstance) {
 func (ns *Namespace) deleteModule(moduleName string) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
+	node, ok := ns.moduleNamesSet[moduleName]
+	if !ok {
+		return
+	}
+
+	// remove this module name
+	if node.prev == nil {
+		ns.moduleNamesList = node.next
+	} else {
+		node.prev.next = node.next
+	}
+	if node.next != nil {
+		node.next.prev = node.prev
+	}
+
 	delete(ns.modules, moduleName)
 	delete(ns.moduleNamesSet, moduleName)
-	// remove this module name
-	for i, n := range ns.moduleNamesList {
-		if n == moduleName {
-			ns.moduleNamesList = append(ns.moduleNamesList[:i], ns.moduleNamesList[i+1:]...)
-			break
-		}
-	}
 }
 
 // module returns the module of the given name or nil if not in this namespace
@@ -86,8 +100,17 @@ func (ns *Namespace) requireModuleName(moduleName string) error {
 	if _, ok := ns.moduleNamesSet[moduleName]; ok {
 		return fmt.Errorf("module[%s] has already been instantiated", moduleName)
 	}
-	ns.moduleNamesSet[moduleName] = struct{}{}
-	ns.moduleNamesList = append(ns.moduleNamesList, moduleName)
+
+	// add the newest node to the moduleNamesList as the head.
+	node := &nameListNode{
+		name: moduleName,
+		next: ns.moduleNamesList,
+	}
+	if node.next != nil {
+		node.next.prev = node
+	}
+	ns.moduleNamesList = node
+	ns.moduleNamesSet[moduleName] = node
 	return nil
 }
 
@@ -103,16 +126,16 @@ func (ns *Namespace) CloseWithExitCode(ctx context.Context, exitCode uint32) (er
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	// Close modules in reverse initialization order.
-	for i := len(ns.moduleNamesList) - 1; i >= 0; i-- {
+	for node := ns.moduleNamesList; node != nil; node = node.next {
 		// If closing this module errs, proceed anyway to close the others.
-		if m, ok := ns.modules[ns.moduleNamesList[i]]; ok {
+		if m, ok := ns.modules[node.name]; ok {
 			if _, e := m.CallCtx.close(ctx, exitCode); e != nil && err == nil {
 				err = e // first error
 			}
 		}
 	}
 	ns.moduleNamesList = nil
-	ns.moduleNamesSet = map[string]struct{}{}
+	ns.moduleNamesSet = map[string]*nameListNode{}
 	ns.modules = map[string]*ModuleInstance{}
 	return
 }
