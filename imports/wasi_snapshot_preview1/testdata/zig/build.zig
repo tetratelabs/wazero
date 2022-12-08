@@ -7,7 +7,7 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("wasi", "wasi.zig");
-    exe.linkLibC();
+    exe.linkLibC(); // Temporarily force libc usage due to the std.os.isatty bug.
     exe.setTarget(CrossTarget{ .cpu_arch = .wasm32, .os_tag = .wasi });
     exe.setBuildMode(mode);
     exe.install();
