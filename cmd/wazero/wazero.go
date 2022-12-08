@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"github.com/tetratelabs/wazero/experimental"
 	"io"
 	"io/fs"
 	"os"
@@ -142,7 +143,7 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := context.Background()
+	ctx := experimental.WithDWARFBasedStackTrace(context.Background())
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
