@@ -54,7 +54,7 @@ build.examples.as:
 # Use -fstage1 to avoid bugs in the new compiler
 # https://github.com/ziglang/zig/wiki/Self-Hosted-Compiler-Upgrade-Guide#is-it-time-to-upgrade
 %.wasm: %.zig
-	@(cd $(@D); zig build -fstage1 -Drelease-small=true)
+	@(cd $(@D); zig build -Drelease-small=true)
 	@mv $(@D)/zig-out/*/$(@F) $(@D)
 
 .PHONY: build.examples.zig
