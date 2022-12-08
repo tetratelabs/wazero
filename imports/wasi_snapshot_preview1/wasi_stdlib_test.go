@@ -35,6 +35,7 @@ func Test_fdReaddir_ls(t *testing.T) {
 	for toolchain, bin := range map[string][]byte{
 		"cargo-wasi": wasmCargoWasi,
 		"zig-cc":     wasmZigCc,
+		"zig":        wasmZig,
 	} {
 		toolchain := toolchain
 		bin := bin

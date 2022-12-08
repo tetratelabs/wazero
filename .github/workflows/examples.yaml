@@ -18,7 +18,7 @@ on:
 env:
   EMSDK_VERSION: "3.1.24"
   TINYGO_VERSION: "0.26.0"
-  ZIG_VERSION: "0.11.0-dev.526+9e74e4c1f"
+  ZIG_VERSION: "0.11.0-dev.618+096d3efae"
 
 jobs:
   # Not all toolchains are idempotent when generating wasm, so we don't check
