@@ -150,7 +150,7 @@ func proxyResultParams(goFunc *wasm.HostFunc, exportName string) *wasm.ProxyFunc
 	for i := range goFunc.ParamTypes {
 		body = append(body, wasm.OpcodeLocalGet, byte(i)) // stack: [p1, p2...]
 	}
-	body = append(body, wasm.OpcodeCall, fakeFuncIdx) // stack: [r1, r2... errno]
+	body = append(body, wasm.OpcodeCall, fakeFuncIdx) //     stack: [r1, r2... errno]
 	// Capture the position in the wasm ProxyFunc rewrites with a real index.
 	fakeFuncIdxPos := len(body) - 1
 
@@ -189,12 +189,12 @@ func compileMustErrnoSuccess(localI32Temp byte) []byte {
 	// copy the errno to a local, so we can return it later if needed
 	return []byte{
 		wasm.OpcodeLocalTee, localI32Temp, // stack: [errno]
-		wasm.OpcodeI32Const, success, // stack: [errno, success]
+		wasm.OpcodeI32Const, success, //      stack: [errno, success]
 
 		// If the result wasn't success, return errno.
 		wasm.OpcodeI32Ne, wasm.OpcodeIf, nilType, // stack: []
-		wasm.OpcodeLocalGet, localI32Temp, // stack: [errno]
-		wasm.OpcodeReturn, wasm.OpcodeEnd, // stack: []
+		wasm.OpcodeLocalGet, localI32Temp, //        stack: [errno]
+		wasm.OpcodeReturn, wasm.OpcodeEnd, //        stack: []
 	}
 }
 
@@ -212,10 +212,10 @@ func compileMustValidMemOffset(paramIdx int, outType api.ValueType) []byte {
 	}
 	return []byte{
 		wasm.OpcodeI32Const, byte(byteLength), wasm.OpcodeI32Sub, // stack: [memBytes-byteLength]
-		wasm.OpcodeLocalGet, byte(paramIdx), // stack: [memBytes-byteLength, $0]
+		wasm.OpcodeLocalGet, byte(paramIdx), //       stack: [memBytes-byteLength, $0]
 		wasm.OpcodeI32LtU, wasm.OpcodeIf, nilType, // stack: []
-		wasm.OpcodeI32Const, fault, // stack: [efault]
-		wasm.OpcodeReturn, wasm.OpcodeEnd, // stack: []
+		wasm.OpcodeI32Const, fault, //                stack: [efault]
+		wasm.OpcodeReturn, wasm.OpcodeEnd, //         stack: []
 	}
 }
 
@@ -224,9 +224,9 @@ func compileMustValidMemOffset(paramIdx int, outType api.ValueType) []byte {
 // validation in compileMustValidMemOffset.
 func compileStore(localOffsetIdx, localValIdx byte, outType api.ValueType) []byte {
 	body := []byte{
-		wasm.OpcodeLocalSet, localValIdx, // stack: []
+		wasm.OpcodeLocalSet, localValIdx, //    stack: []
 		wasm.OpcodeLocalGet, localOffsetIdx, // stack: [offset]
-		wasm.OpcodeLocalGet, localValIdx, // stack: [offset, v]
+		wasm.OpcodeLocalGet, localValIdx, //    stack: [offset, v]
 	}
 	switch outType {
 	case i32:
