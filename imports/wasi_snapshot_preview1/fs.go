@@ -1114,18 +1114,15 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 
 	var err error
 	var nwritten uint32
+	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount*8)
+	if !ok {
+		return 0, ErrnoFault
+	}
 	for i := uint32(0); i < iovsCount; i++ {
-		iov := iovs + i*8
-		offset, ok := mod.Memory().ReadUint32Le(ctx, iov)
-		if !ok {
-			return 0, ErrnoFault
-		}
-		// Note: emscripten has been known to write zero length iovec. However,
-		// it is not common in other compilers, so we don't optimize for it.
-		l, ok := mod.Memory().ReadUint32Le(ctx, iov+4)
-		if !ok {
-			return 0, ErrnoFault
-		}
+		iovsPos := i * 8
+
+		offset := le.Uint32(iovsBuf[iovsPos:])
+		l := le.Uint32(iovsBuf[iovsPos+4:])
 
 		var n int
 		if writer == io.Discard { // special-case default
