@@ -14,6 +14,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/require"
 	"github.com/tetratelabs/wazero/internal/wasm"
@@ -23,8 +24,8 @@ import (
 func Test_fdAdvise(t *testing.T) {
 	log := requireErrnoNosys(t, fdAdviseName, 0, 0, 0, 0)
 	require.Equal(t, `
---> proxy.fd_advise(fd=0,offset=0,len=0,result.advice=0)
-	--> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,result.advice=0)
+--> proxy.fd_advise(fd=0,offset=0,len=0,advice=0)
+	--> wasi_snapshot_preview1.fd_advise(fd=0,offset=0,len=0,advice=0)
 	<-- ENOSYS
 <-- 52
 `, log)
@@ -529,8 +530,10 @@ func Test_fdPread(t *testing.T) {
 			),
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.nread=26)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.nread=26)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=0,result.nread=26)
+		==> wasi_snapshot_preview1.fdPread(fd=4,iovs=1,iovs_len=2,offset=0)
+		<== (nread=6,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -546,8 +549,10 @@ func Test_fdPread(t *testing.T) {
 			),
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.nread=26)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.nread=26)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=1,iovs_len=2,offset=2,result.nread=26)
+		==> wasi_snapshot_preview1.fdPread(fd=4,iovs=1,iovs_len=2,offset=2)
+		<== (nread=4,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -588,12 +593,15 @@ func Test_fdPread_Errors(t *testing.T) {
 	}{
 		{
 			name:          "invalid fd",
-			fd:            42, // arbitrary invalid fd
+			fd:            42,                         // arbitrary invalid fd
+			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.nread=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65536,iovs_len=65536,offset=0,result.nread=65536)
-	<== EBADF
+--> proxy.fd_pread(fd=42,iovs=65532,iovs_len=65532,offset=0,result.nread=65532)
+	--> wasi_snapshot_preview1.fd_pread(fd=42,iovs=65532,iovs_len=65532,offset=0,result.nread=65532)
+		==> wasi_snapshot_preview1.fdPread(fd=42,iovs=65532,iovs_len=65532,offset=0)
+		<== (nread=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -604,8 +612,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.nread=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.nread=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65536,offset=7,result.nread=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -617,8 +625,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.nread=65535)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.nread=65535)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65536,iovs_len=65535,offset=0,result.nread=65535)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -633,8 +641,10 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.nread=65531)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.nread=65531)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65532,iovs_len=65532,offset=0,result.nread=65531)
+		==> wasi_snapshot_preview1.fdPread(fd=4,iovs=65532,iovs_len=65532,offset=0)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -650,8 +660,10 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.nread=65527)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.nread=65527)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65528,iovs_len=65528,offset=0,result.nread=65527)
+		==> wasi_snapshot_preview1.fdPread(fd=4,iovs=65528,iovs_len=65528,offset=0)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -668,8 +680,10 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65526)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65526)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65526)
+		==> wasi_snapshot_preview1.fdPread(fd=4,iovs=65527,iovs_len=65527,offset=0)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -687,8 +701,8 @@ func Test_fdPread_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65536)
-	==> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_pread(fd=4,iovs=65527,iovs_len=65527,offset=0,result.nread=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -730,8 +744,10 @@ func Test_fdPrestatGet(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, fdPrestatGetName, uint64(fd), uint64(resultPrestat))
 	require.Equal(t, `
 --> proxy.fd_prestat_get(fd=4,result.prestat=1)
-	==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=1)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=1)
+		==> wasi_snapshot_preview1.fdPrestatGet(fd=4)
+		<== (prestat=17179869184,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -760,8 +776,10 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.fd_prestat_get(fd=42,result.prestat=0)
-	==> wasi_snapshot_preview1.fd_prestat_get(fd=42,result.prestat=0)
-	<== EBADF
+	--> wasi_snapshot_preview1.fd_prestat_get(fd=42,result.prestat=0)
+		==> wasi_snapshot_preview1.fdPrestatGet(fd=42)
+		<== (prestat=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -772,8 +790,8 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_prestat_get(fd=4,result.prestat=65536)
-	==> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -948,8 +966,10 @@ func Test_fdRead(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, fdReadName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNread))
 	require.Equal(t, `
 --> proxy.fd_read(fd=4,iovs=1,iovs_len=2,result.nread=26)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.nread=26)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=1,iovs_len=2,result.nread=26)
+		==> wasi_snapshot_preview1.fdRead(fd=4,iovs=1,iovs_len=2)
+		<== (nread=6,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -971,12 +991,15 @@ func Test_fdRead_Errors(t *testing.T) {
 	}{
 		{
 			name:          "invalid fd",
-			fd:            42, // arbitrary invalid fd
+			fd:            42,                         // arbitrary invalid fd
+			memory:        []byte{'?', '?', '?', '?'}, // pass result.nread validation
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_read(fd=42,iovs=65536,iovs_len=65536,result.nread=65536)
-	==> wasi_snapshot_preview1.fd_read(fd=42,iovs=65536,iovs_len=65536,result.nread=65536)
-	<== EBADF
+--> proxy.fd_read(fd=42,iovs=65532,iovs_len=65532,result.nread=65532)
+	--> wasi_snapshot_preview1.fd_read(fd=42,iovs=65532,iovs_len=65532,result.nread=65532)
+		==> wasi_snapshot_preview1.fdRead(fd=42,iovs=65532,iovs_len=65532)
+		<== (nread=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -988,8 +1011,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_read(fd=4,iovs=65536,iovs_len=65535,result.nread=65535)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.nread=65535)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=65536,iovs_len=65535,result.nread=65535)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1004,8 +1027,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_read(fd=4,iovs=65532,iovs_len=65532,result.nread=65531)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.nread=65531)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=65532,iovs_len=65532,result.nread=65531)
+		==> wasi_snapshot_preview1.fdRead(fd=4,iovs=65532,iovs_len=65532)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1021,8 +1046,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_read(fd=4,iovs=65528,iovs_len=65528,result.nread=65527)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.nread=65527)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=65528,iovs_len=65528,result.nread=65527)
+		==> wasi_snapshot_preview1.fdRead(fd=4,iovs=65528,iovs_len=65528)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1039,8 +1066,10 @@ func Test_fdRead_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65526)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65526)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65526)
+		==> wasi_snapshot_preview1.fdRead(fd=4,iovs=65527,iovs_len=65527)
+		<== (nread=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1058,8 +1087,8 @@ func Test_fdRead_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65536)
-	==> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_read(fd=4,iovs=65527,iovs_len=65527,result.nread=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1532,8 +1561,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=65536,buf_len=1000,cookie=0)
+		<== (bufused=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1543,8 +1574,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	==> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	<== EBADF
+	--> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
+		==> wasi_snapshot_preview1.fdReaddir(fd=42,buf=0,buf_len=0,cookie=0)
+		<== (bufused=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -1554,8 +1587,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoNotdir,
 			expectedLog: `
 --> proxy.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	==> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	<== ENOTDIR
+	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
+		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=0,cookie=0)
+		<== (bufused=0,ENOTDIR)
+	<-- ENOTDIR
 <-- 54
 `,
 		},
@@ -1567,8 +1602,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65536,buf_len=1000,cookie=0,result.bufused=0)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=65536,buf_len=1000,cookie=0)
+		<== (bufused=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1580,8 +1617,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=65535,buf_len=1000,cookie=0,result.bufused=0)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=65535,buf_len=1000,cookie=0)
+		<== (bufused=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1593,8 +1632,8 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -1607,8 +1646,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
-	<== EINVAL
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1000,cookie=1)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -1622,8 +1663,10 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
-	==> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
-	<== EINVAL
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=-1,result.bufused=2000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1000,cookie=-1)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -1911,8 +1954,10 @@ func Test_fdSeek(t *testing.T) {
 			},
 			expectedLog: `
 --> proxy.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_seek(fd=4,offset=4,whence=0,result.newoffset=1)
+		==> wasi_snapshot_preview1.fdSeek(fd=4,offset=4,whence=0)
+		<== (newoffset=4,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -1928,8 +1973,10 @@ func Test_fdSeek(t *testing.T) {
 			},
 			expectedLog: `
 --> proxy.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_seek(fd=4,offset=1,whence=1,result.newoffset=1)
+		==> wasi_snapshot_preview1.fdSeek(fd=4,offset=1,whence=1)
+		<== (newoffset=2,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -1945,8 +1992,10 @@ func Test_fdSeek(t *testing.T) {
 			},
 			expectedLog: `
 --> proxy.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_seek(fd=4,offset=-1,whence=2,result.newoffset=1)
+		==> wasi_snapshot_preview1.fdSeek(fd=4,offset=-1,whence=2)
+		<== (newoffset=5,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -2004,8 +2053,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
-	==> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
-	<== EBADF
+	--> wasi_snapshot_preview1.fd_seek(fd=42,offset=0,whence=0,result.newoffset=0)
+		==> wasi_snapshot_preview1.fdSeek(fd=42,offset=0,whence=0)
+		<== (newoffset=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -2016,8 +2067,10 @@ func Test_fdSeek_Errors(t *testing.T) {
 			expectedErrno: ErrnoInval,
 			expectedLog: `
 --> proxy.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
-	<== EINVAL
+	--> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=3,result.newoffset=0)
+		==> wasi_snapshot_preview1.fdSeek(fd=4,offset=0,whence=3)
+		<== (newoffset=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -2028,8 +2081,8 @@ func Test_fdSeek_Errors(t *testing.T) {
 			expectedErrno:   ErrnoFault,
 			expectedLog: `
 --> proxy.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
-	==> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.fd_seek(fd=4,offset=0,whence=0,result.newoffset=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -2102,8 +2155,10 @@ func Test_fdWrite(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 --> proxy.fd_write(fd=4,iovs=1,iovs_len=2,result.nwritten=26)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.nwritten=26)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=1,iovs_len=2,result.nwritten=26)
+		==> wasi_snapshot_preview1.fdWrite(fd=4,iovs=1,iovs_len=2)
+		<== (nwritten=6,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -2155,8 +2210,10 @@ func Test_fdWrite_discard(t *testing.T) {
 	requireErrno(t, ErrnoSuccess, mod, fdWriteName, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultNwritten))
 	require.Equal(t, `
 --> proxy.fd_write(fd=1,iovs=1,iovs_len=2,result.nwritten=26)
-	==> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2,result.nwritten=26)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.fd_write(fd=1,iovs=1,iovs_len=2,result.nwritten=26)
+		==> wasi_snapshot_preview1.fdWrite(fd=1,iovs=1,iovs_len=2)
+		<== (nwritten=6,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -2172,19 +2229,14 @@ func Test_fdWrite_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// Setup valid test memory
-	iovs, iovsCount := uint32(0), uint32(1)
-	memory := []byte{
-		8, 0, 0, 0, // = iovs[0].offset (where the data "hi" begins)
-		2, 0, 0, 0, // = iovs[0].length (how many bytes are in "hi")
-		'h', 'i', // iovs[0].length bytes
-	}
+	iovsCount := uint32(1)
+	memSize := mod.Memory().Size(testCtx)
 
 	tests := []struct {
-		name               string
-		fd, resultNwritten uint32
-		memory             []byte
-		expectedErrno      Errno
-		expectedLog        string
+		name                     string
+		fd, iovs, resultNwritten uint32
+		expectedErrno            Errno
+		expectedLog              string
 	}{
 		{
 			name:          "invalid fd",
@@ -2192,69 +2244,78 @@ func Test_fdWrite_Errors(t *testing.T) {
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.fd_write(fd=42,iovs=0,iovs_len=1,result.nwritten=0)
-	==> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.nwritten=0)
-	<== EBADF
+	--> wasi_snapshot_preview1.fd_write(fd=42,iovs=0,iovs_len=1,result.nwritten=0)
+		==> wasi_snapshot_preview1.fdWrite(fd=42,iovs=0,iovs_len=1)
+		<== (nwritten=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
 		{
 			name:          "out-of-memory reading iovs[0].offset",
 			fd:            fd,
-			memory:        []byte{},
+			iovs:          memSize - 2,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	<== EFAULT
+--> proxy.fd_write(fd=4,iovs=65534,iovs_len=1,result.nwritten=0)
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=65534,iovs_len=1,result.nwritten=0)
+		==> wasi_snapshot_preview1.fdWrite(fd=4,iovs=65534,iovs_len=1)
+		<== (nwritten=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
 		{
 			name:          "out-of-memory reading iovs[0].length",
 			fd:            fd,
-			memory:        memory[0:4], // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mod.Memory()!
+			iovs:          memSize - 4, // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mod.Memory()!
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	<== EFAULT
+--> proxy.fd_write(fd=4,iovs=65532,iovs_len=1,result.nwritten=0)
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=65532,iovs_len=1,result.nwritten=0)
+		==> wasi_snapshot_preview1.fdWrite(fd=4,iovs=65532,iovs_len=1)
+		<== (nwritten=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
 		{
 			name:          "iovs[0].offset is outside memory",
 			fd:            fd,
-			memory:        memory[0:8], // iovs[0].offset (where to read "hi") is outside memory.
+			iovs:          memSize - 5, // iovs[0].offset (where to read "hi") is outside memory.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	<== EFAULT
+--> proxy.fd_write(fd=4,iovs=65531,iovs_len=1,result.nwritten=0)
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=65531,iovs_len=1,result.nwritten=0)
+		==> wasi_snapshot_preview1.fdWrite(fd=4,iovs=65531,iovs_len=1)
+		<== (nwritten=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
 		{
 			name:          "length to read exceeds memory by 1",
 			fd:            fd,
-			memory:        memory[0:9], // iovs[0].offset (where to read "hi") is in memory, but truncated.
+			iovs:          memSize - 9, // iovs[0].offset (where to read "hi") is in memory, but truncated.
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=0)
-	<== EFAULT
+--> proxy.fd_write(fd=4,iovs=65527,iovs_len=1,result.nwritten=0)
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=65527,iovs_len=1,result.nwritten=0)
+		==> wasi_snapshot_preview1.fdWrite(fd=4,iovs=65527,iovs_len=1)
+		<== (nwritten=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
 		{
 			name:           "resultNwritten offset is outside memory",
 			fd:             fd,
-			memory:         memory,
-			resultNwritten: uint32(len(memory)), // read was ok, but there wasn't enough memory to write the result.
+			resultNwritten: memSize, // read was ok, but there wasn't enough memory to write the result.
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
---> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=10)
-	==> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=10)
-	<== EFAULT
+--> proxy.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=65536)
+	--> wasi_snapshot_preview1.fd_write(fd=4,iovs=0,iovs_len=1,result.nwritten=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -2265,9 +2326,14 @@ func Test_fdWrite_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			mod.Memory().(*wasm.MemoryInstance).Buffer = tc.memory
+			mod.Memory().Write(testCtx, tc.iovs, append(
+				leb128.EncodeUint32(tc.iovs+8), // = iovs[0].offset (where the data "hi" begins)
+				// = iovs[0].length (how many bytes are in "hi")
+				2, 0, 0, 0,
+				'h', 'i', // iovs[0].length bytes
+			))
 
-			requireErrno(t, tc.expectedErrno, mod, fdWriteName, uint64(tc.fd), uint64(iovs), uint64(iovsCount),
+			requireErrno(t, tc.expectedErrno, mod, fdWriteName, uint64(tc.fd), uint64(tc.iovs), uint64(iovsCount),
 				uint64(tc.resultNwritten))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -2563,8 +2629,10 @@ func Test_pathOpen(t *testing.T) {
 		uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdflags), uint64(resultOpenedFd))
 	require.Equal(t, `
 --> proxy.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
-	<== ESUCCESS
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0,result.opened_fd=8)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=1,path_len=6,oflags=0,fs_rights_base=1,fs_rights_inheriting=2,fdflags=0)
+		<== (opened_fd=4,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
 
@@ -2601,8 +2669,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	==> wasi_snapshot_preview1.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	<== EBADF
+	--> wasi_snapshot_preview1.path_open(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=42,dirflags=0,path=0,path_len=0,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=0,EBADF)
+	<-- EBADF
 <-- 8
 `,
 		},
@@ -2614,8 +2684,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	<== EFAULT
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=65536,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -2628,8 +2700,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno: ErrnoNoent,
 			expectedLog: `
 --> proxy.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	<== ENOENT
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=0,ENOENT)
+	<-- ENOENT
 <-- 44
 `,
 		},
@@ -2641,8 +2715,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno: ErrnoFault,
 			expectedLog: `
 --> proxy.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	<== EFAULT
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=0,path_len=65537,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=0,EFAULT)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -2655,8 +2731,10 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno: ErrnoNoent,
 			expectedLog: `
 --> proxy.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
-	<== ENOENT
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=0,path_len=5,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=0,ENOENT)
+	<-- ENOENT
 <-- 44
 `,
 		},
@@ -2670,8 +2748,8 @@ func Test_pathOpen_Errors(t *testing.T) {
 			expectedErrno:  ErrnoFault,
 			expectedLog: `
 --> proxy.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
-	==> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},

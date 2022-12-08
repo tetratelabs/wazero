@@ -35,9 +35,11 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDRealtime,
 			expectedMemory: expectedMemoryMicro,
 			expectedLog: `
---> proxy.clock_res_get(id=0,result.resolution=1)
-	==> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=1)
-	<== ESUCCESS
+--> proxy.clock_res_get(id=0,result.resolution=16)
+	--> wasi_snapshot_preview1.clock_res_get(id=0,result.resolution=16)
+		==> wasi_snapshot_preview1.clockResGet(id=0)
+		<== (resolution=1000,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -46,9 +48,11 @@ func Test_clockResGet(t *testing.T) {
 			clockID:        clockIDMonotonic,
 			expectedMemory: expectedMemoryNano,
 			expectedLog: `
---> proxy.clock_res_get(id=1,result.resolution=1)
-	==> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=1)
-	<== ESUCCESS
+--> proxy.clock_res_get(id=1,result.resolution=16)
+	--> wasi_snapshot_preview1.clock_res_get(id=1,result.resolution=16)
+		==> wasi_snapshot_preview1.clockResGet(id=1)
+		<== (resolution=1,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -60,13 +64,13 @@ func Test_clockResGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+			resultResolution := 16 // arbitrary offset
+			maskMemory(t, testCtx, mod, resultResolution+len(tc.expectedMemory))
 
-			resultResolution := uint32(1) // arbitrary offset
 			requireErrno(t, ErrnoSuccess, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(testCtx, uint32(resultResolution-1), uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -88,9 +92,11 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=2,result.resolution=1)
-	==> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=1)
-	<== EINVAL
+--> proxy.clock_res_get(id=2,result.resolution=16)
+	--> wasi_snapshot_preview1.clock_res_get(id=2,result.resolution=16)
+		==> wasi_snapshot_preview1.clockResGet(id=2)
+		<== (resolution=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -99,9 +105,11 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=3,result.resolution=1)
-	==> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=1)
-	<== EINVAL
+--> proxy.clock_res_get(id=3,result.resolution=16)
+	--> wasi_snapshot_preview1.clock_res_get(id=3,result.resolution=16)
+		==> wasi_snapshot_preview1.clockResGet(id=3)
+		<== (resolution=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -110,9 +118,11 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_res_get(id=100,result.resolution=1)
-	==> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=1)
-	<== EINVAL
+--> proxy.clock_res_get(id=100,result.resolution=16)
+	--> wasi_snapshot_preview1.clock_res_get(id=100,result.resolution=16)
+		==> wasi_snapshot_preview1.clockResGet(id=100)
+		<== (resolution=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -124,7 +134,7 @@ func Test_clockResGet_Unsupported(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			resultResolution := uint32(1) // arbitrary offset
+			resultResolution := 16 // arbitrary offset
 			requireErrno(t, tc.expectedErrno, mod, clockResGetName, uint64(tc.clockID), uint64(resultResolution))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -150,9 +160,11 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
---> proxy.clock_time_get(id=0,precision=0,result.timestamp=1)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=1)
-	<== ESUCCESS
+--> proxy.clock_time_get(id=0,precision=0,result.timestamp=16)
+	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=16)
+		==> wasi_snapshot_preview1.clockTimeGet(id=0,precision=0)
+		<== (timestamp=1640995200000000000,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -165,9 +177,11 @@ func Test_clockTimeGet(t *testing.T) {
 				'?', // stopped after encoding
 			},
 			expectedLog: `
---> proxy.clock_time_get(id=1,precision=0,result.timestamp=1)
-	==> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=1)
-	<== ESUCCESS
+--> proxy.clock_time_get(id=1,precision=0,result.timestamp=16)
+	--> wasi_snapshot_preview1.clock_time_get(id=1,precision=0,result.timestamp=16)
+		==> wasi_snapshot_preview1.clockTimeGet(id=1,precision=0)
+		<== (timestamp=0,ESUCCESS)
+	<-- ESUCCESS
 <-- 0
 `,
 		},
@@ -178,13 +192,13 @@ func Test_clockTimeGet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
+			resultTimestamp := 16 // arbitrary offset
+			maskMemory(t, testCtx, mod, resultTimestamp+len(tc.expectedMemory))
 
-			resultTimestamp := uint32(1) // arbitrary offset
 			requireErrno(t, ErrnoSuccess, mod, clockTimeGetName, uint64(tc.clockID), 0 /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
-			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))
+			actual, ok := mod.Memory().Read(testCtx, uint32(resultTimestamp-1), uint32(len(tc.expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, tc.expectedMemory, actual)
 		})
@@ -206,9 +220,11 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       2,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=2,precision=0,result.timestamp=1)
-	==> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=1)
-	<== EINVAL
+--> proxy.clock_time_get(id=2,precision=0,result.timestamp=16)
+	--> wasi_snapshot_preview1.clock_time_get(id=2,precision=0,result.timestamp=16)
+		==> wasi_snapshot_preview1.clockTimeGet(id=2,precision=0)
+		<== (timestamp=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -217,9 +233,11 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       3,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=3,precision=0,result.timestamp=1)
-	==> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=1)
-	<== EINVAL
+--> proxy.clock_time_get(id=3,precision=0,result.timestamp=16)
+	--> wasi_snapshot_preview1.clock_time_get(id=3,precision=0,result.timestamp=16)
+		==> wasi_snapshot_preview1.clockTimeGet(id=3,precision=0)
+		<== (timestamp=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -228,9 +246,11 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 			clockID:       100,
 			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.clock_time_get(id=100,precision=0,result.timestamp=1)
-	==> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=1)
-	<== EINVAL
+--> proxy.clock_time_get(id=100,precision=0,result.timestamp=16)
+	--> wasi_snapshot_preview1.clock_time_get(id=100,precision=0,result.timestamp=16)
+		==> wasi_snapshot_preview1.clockTimeGet(id=100,precision=0)
+		<== (timestamp=0,EINVAL)
+	<-- EINVAL
 <-- 28
 `,
 		},
@@ -242,8 +262,7 @@ func Test_clockTimeGet_Unsupported(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer log.Reset()
 
-			resultTimestamp := uint32(1) // arbitrary offset
-
+			resultTimestamp := 16 // arbitrary offset
 			requireErrno(t, tc.expectedErrno, mod, clockTimeGetName, uint64(tc.clockID), uint64(0) /* TODO: precision */, uint64(resultTimestamp))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 		})
@@ -266,8 +285,8 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			resultTimestamp: memorySize,
 			expectedLog: `
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
-	<== EFAULT
+	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65536)
+	<-- EFAULT
 <-- 21
 `,
 		},
@@ -276,8 +295,8 @@ func Test_clockTimeGet_Errors(t *testing.T) {
 			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			expectedLog: `
 --> proxy.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	==> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
-	<== EFAULT
+	--> wasi_snapshot_preview1.clock_time_get(id=0,precision=0,result.timestamp=65533)
+	<-- EFAULT
 <-- 21
 `,
 		},
