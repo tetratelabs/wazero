@@ -44,10 +44,7 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				errno := Errno(results[0])
-				if errno != 0 {
-					b.Fatal(ErrnoName(errno))
-				}
+				requireEsuccess(b, results)
 			}
 		})
 	}
@@ -114,10 +111,7 @@ func Benchmark_fdRead(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				errno := Errno(results[0])
-				if errno != 0 {
-					b.Fatal(ErrnoName(errno))
-				}
+				requireEsuccess(b, results)
 			}
 		})
 	}
@@ -135,14 +129,30 @@ func Benchmark_fdReaddir(b *testing.B) {
 	benches := []struct {
 		name string
 		fs   fs.FS
+		// continued is true to test performance on a follow-up call. The
+		// preceding will call fd_read with 24 bytes, which is enough to read
+		// the initial entry's size, but not enough to read its name. This
+		// ensures the next fd_read is allowed to pass a cookie, because it
+		// read fd_next, while ensuring it will write all the entries.
+		continued bool
 	}{
 		{
 			name: "embed.FS",
 			fs:   embedFS,
 		},
 		{
+			name:      "embed.FS - continued",
+			fs:        embedFS,
+			continued: true,
+		},
+		{
 			name: "os.DirFS",
 			fs:   os.DirFS("testdata"),
+		},
+		{
+			name:      "os.DirFS - continued",
+			fs:        os.DirFS("testdata"),
+			continued: true,
 		},
 	}
 
@@ -176,6 +186,12 @@ func Benchmark_fdReaddir(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
+
+				cookie := 0        // where to begin (last read d_next)
+				resultBufused := 0 // where to write the amount used out of bufLen
+				buf := 8           // where to start the dirents
+				bufLen := 8096     // allow up to 8KB buffer usage
+
 				// Recreate the file under the file-descriptor
 				if err = f.File.Close(); err != nil {
 					b.Fatal(err)
@@ -184,19 +200,34 @@ func Benchmark_fdReaddir(b *testing.B) {
 					b.Fatal(err)
 				}
 				f.ReadDir = nil
-				b.StartTimer()
 
-				// Execute the benchmark, allowing up to 8KB buffer usage
-				results, err := fn.Call(testCtx, uint64(fd), uint64(0), uint64(8096), uint64(0), uint64(16192))
+				// Make an initial call to build the state of an unread directory
+				if bc.continued {
+					results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(24), uint64(cookie), uint64(resultBufused))
+					if err != nil {
+						b.Fatal(err)
+					}
+					requireEsuccess(b, results)
+					cookie = 1 // WASI doesn't document this, but we write the first d_next as 1
+				}
+
+				// Time the call to write the dirents
+				b.StartTimer()
+				results, err := fn.Call(testCtx, uint64(fd), uint64(buf), uint64(bufLen), uint64(cookie), uint64(resultBufused))
 				if err != nil {
 					b.Fatal(err)
 				}
+				b.StopTimer()
 
-				if errno := Errno(results[0]); errno != 0 {
-					b.Fatal(ErrnoName(errno))
-				}
+				requireEsuccess(b, results)
 			}
 		})
+	}
+}
+
+func requireEsuccess(b *testing.B, results []uint64) {
+	if errno := Errno(results[0]); errno != 0 {
+		b.Fatal(ErrnoName(errno))
 	}
 }
 
@@ -260,10 +291,7 @@ func Benchmark_fdWrite(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				errno := Errno(results[0])
-				if errno != 0 {
-					b.Fatal(ErrnoName(errno))
-				}
+				requireEsuccess(b, results)
 			}
 		})
 	}
