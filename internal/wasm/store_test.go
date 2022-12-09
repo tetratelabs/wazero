@@ -111,8 +111,8 @@ func TestStore_Instantiate(t *testing.T) {
 	defer mod.Close(testCtx)
 
 	t.Run("CallContext defaults", func(t *testing.T) {
-		require.Equal(t, ns.modules[""], mod.module)
-		require.Equal(t, ns.modules[""].Memory, mod.memory)
+		require.Equal(t, ns.nameToNode[""].module, mod.module)
+		require.Equal(t, ns.nameToNode[""].module.Memory, mod.memory)
 		require.Equal(t, ns, mod.ns)
 		require.Equal(t, sysCtx, mod.Sys)
 	})
@@ -168,7 +168,7 @@ func TestStore_CloseWithExitCode(t *testing.T) {
 			require.NoError(t, err)
 
 			// If Namespace.CloseWithExitCode was dispatched properly, modules should be empty
-			require.Zero(t, len(ns.modules))
+			require.Nil(t, ns.moduleList)
 
 			// Store state zeroed
 			require.Zero(t, len(s.namespaces))
@@ -187,7 +187,7 @@ func TestStore_hammer(t *testing.T) {
 	imported, err := s.Instantiate(testCtx, ns, m, importedModuleName, nil)
 	require.NoError(t, err)
 
-	_, ok := ns.modules[imported.Name()]
+	_, ok := ns.nameToNode[imported.Name()]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -227,7 +227,7 @@ func TestStore_hammer(t *testing.T) {
 	require.NoError(t, imported.Close(testCtx))
 
 	// All instances are freed.
-	require.Zero(t, len(ns.modules))
+	require.Nil(t, ns.moduleList)
 }
 
 func TestStore_Instantiate_Errors(t *testing.T) {
@@ -252,7 +252,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.modules[importedModuleName]
+		hm := ns.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(testCtx, ns, &Module{
@@ -273,7 +273,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.modules[importedModuleName]
+		hm := ns.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
 		engine := s.Engine.(*mockEngine)
@@ -304,7 +304,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(testCtx, ns, m, importedModuleName, nil)
 		require.NoError(t, err)
 
-		hm := ns.modules[importedModuleName]
+		hm := ns.nameToNode[importedModuleName]
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)
