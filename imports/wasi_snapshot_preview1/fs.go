@@ -613,6 +613,7 @@ func fdReadFn(ctx context.Context, mod api.Module, stack []uint64) (nread uint32
 func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
+
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])
 	iovsCount := uint32(stack[2])
@@ -638,16 +639,16 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 	}
 
 	var nread uint32
-	for i := uint32(0); i < iovsCount; i++ {
-		iov := iovs + i*8
-		offset, ok := mem.ReadUint32Le(ctx, iov)
-		if !ok {
-			return 0, ErrnoFault
-		}
-		l, ok := mem.ReadUint32Le(ctx, iov+4)
-		if !ok {
-			return 0, ErrnoFault
-		}
+	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsBuf, ok := mem.Read(ctx, iovs, iovsStop)
+	if !ok {
+		return 0, ErrnoFault
+	}
+
+	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
+		offset := le.Uint32(iovsBuf[iovsPos:])
+		l := le.Uint32(iovsBuf[iovsPos+4:])
+
 		b, ok := mem.Read(ctx, offset, l)
 		if !ok {
 			return 0, ErrnoFault
@@ -1102,11 +1103,13 @@ var fdWrite = proxyResultParams(&wasm.HostFunc{
 }, fdWriteName)
 
 func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+	sysCtx := mod.(*wasm.CallContext).Sys
+	mem := mod.Memory()
+
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])
 	iovsCount := uint32(stack[2])
 
-	sysCtx := mod.(*wasm.CallContext).Sys
 	writer := internalsys.FdWriter(ctx, sysCtx, fd)
 	if writer == nil {
 		return 0, ErrnoBadf
@@ -1114,11 +1117,13 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 
 	var err error
 	var nwritten uint32
-	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount<<3)
+	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsBuf, ok := mem.Read(ctx, iovs, iovsStop)
 	if !ok {
 		return 0, ErrnoFault
 	}
-	for iovsPos := uint32(0); iovsPos < (iovsCount << 3); iovsPos += 8 {
+
+	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
@@ -1126,7 +1131,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 		if writer == io.Discard { // special-case default
 			n = int(l)
 		} else {
-			b, ok := mod.Memory().Read(ctx, offset, l)
+			b, ok := mem.Read(ctx, offset, l)
 			if !ok {
 				return 0, ErrnoFault
 			}
