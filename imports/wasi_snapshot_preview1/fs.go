@@ -638,12 +638,13 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 	}
 
 	var nread uint32
-	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount<<3)
+	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsStop)
 	if !ok {
 		return 0, ErrnoFault
 	}
 
-	for iovsPos := uint32(0); iovsPos < (iovsCount << 3); iovsPos += 8 {
+	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
@@ -1113,11 +1114,13 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 
 	var err error
 	var nwritten uint32
-	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount<<3)
+	iovsStop := iovsCount << 3 // iovsCount * 8
+	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsStop)
 	if !ok {
 		return 0, ErrnoFault
 	}
-	for iovsPos := uint32(0); iovsPos < (iovsCount << 3); iovsPos += 8 {
+
+	for iovsPos := uint32(0); iovsPos < iovsStop; iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
