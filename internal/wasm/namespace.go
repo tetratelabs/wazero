@@ -62,15 +62,15 @@ func (ns *Namespace) setModule(m *ModuleInstance) error {
 }
 
 // deleteModule makes the moduleName available for instantiation again.
-func (ns *Namespace) deleteModule(moduleName string) {
+func (ns *Namespace) deleteModule(moduleName string) error {
 	if atomic.LoadUint32(ns.closed) != 0 {
-		return
+		return fmt.Errorf("module[%s] deleted from closed namespace", moduleName)
 	}
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	node, ok := ns.nameToNode[moduleName]
 	if !ok {
-		return
+		return nil
 	}
 
 	// remove this module name
@@ -83,20 +83,26 @@ func (ns *Namespace) deleteModule(moduleName string) {
 		node.next.prev = node.prev
 	}
 	delete(ns.nameToNode, moduleName)
+	return nil
 }
 
-// module returns the module of the given name or nil if not in this namespace
-func (ns *Namespace) module(moduleName string) *ModuleInstance {
+// module returns the module of the given name or error if not in this namespace
+func (ns *Namespace) module(moduleName string) (*ModuleInstance, error) {
 	if atomic.LoadUint32(ns.closed) != 0 {
-		return nil
+		return nil, fmt.Errorf("module[%s] requested from closed namespace", moduleName)
 	}
 	ns.mux.RLock()
 	defer ns.mux.RUnlock()
 	node, ok := ns.nameToNode[moduleName]
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("module[%s] not in namespace", moduleName)
 	}
-	return node.module
+
+	if node.module == nil {
+		return nil, fmt.Errorf("module[%s] not set in namespace", moduleName)
+	}
+
+	return node.module, nil
 }
 
 // requireModules returns all instantiated modules whose names equal the keys in the input, or errs if any are missing.
@@ -147,13 +153,14 @@ func (ns *Namespace) requireModuleName(moduleName string) error {
 // AliasModule aliases the instantiated module named `src` as `dst`.
 //
 // Note: This is only used for spectests.
-func (ns *Namespace) AliasModule(src, dst string) {
+func (ns *Namespace) AliasModule(src, dst string) error {
 	if atomic.LoadUint32(ns.closed) != 0 {
-		return
+		return fmt.Errorf("module[%s] alias created on closed namespace", src)
 	}
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	ns.nameToNode[dst] = ns.nameToNode[src]
+	return nil
 }
 
 // CloseWithExitCode implements the same method as documented on wazero.Namespace.
@@ -179,9 +186,9 @@ func (ns *Namespace) CloseWithExitCode(ctx context.Context, exitCode uint32) (er
 
 // Module implements wazero.Namespace Module
 func (ns *Namespace) Module(moduleName string) api.Module {
-	if m := ns.module(moduleName); m != nil {
-		return m.CallCtx
-	} else {
+	m, err := ns.module(moduleName)
+	if err != nil {
 		return nil
 	}
+	return m.CallCtx
 }

@@ -95,7 +95,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) er
 	if !closed {
 		return nil
 	}
-	m.ns.deleteModule(m.Name())
+	_ = m.ns.deleteModule(m.Name())
 	if m.CodeCloser == nil {
 		return err
 	}

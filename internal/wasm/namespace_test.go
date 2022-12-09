@@ -60,7 +60,7 @@ func TestNamespace_deleteModule(t *testing.T) {
 	ns, m1, m2 := newTestNamespace()
 
 	t.Run("delete one module", func(t *testing.T) {
-		ns.deleteModule(m2.Name)
+		require.NoError(t, ns.deleteModule(m2.Name))
 
 		// Leaves the other module alone
 		m1Node := &moduleListNode{name: m1.Name, module: m1}
@@ -69,19 +69,19 @@ func TestNamespace_deleteModule(t *testing.T) {
 	})
 
 	t.Run("ok if missing", func(t *testing.T) {
-		ns.deleteModule(m2.Name)
+		require.NoError(t, ns.deleteModule(m2.Name))
 	})
 
 	t.Run("delete last module", func(t *testing.T) {
-		ns.deleteModule(m1.Name)
+		require.NoError(t, ns.deleteModule(m1.Name))
 
 		require.Zero(t, len(ns.nameToNode))
 		require.Nil(t, ns.moduleList)
 	})
 
-	t.Run("noop on closed", func(t *testing.T) {
+	t.Run("error on closed", func(t *testing.T) {
 		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
-		ns.deleteModule(m1.Name)
+		require.Error(t, ns.deleteModule(m1.Name))
 
 		require.Zero(t, len(ns.nameToNode))
 		require.Nil(t, ns.moduleList)
@@ -92,16 +92,29 @@ func TestNamespace_module(t *testing.T) {
 	ns, m1, _ := newTestNamespace()
 
 	t.Run("ok", func(t *testing.T) {
-		require.Equal(t, m1, ns.module(m1.Name))
+		got, err := ns.module(m1.Name)
+		require.NoError(t, err)
+		require.Equal(t, m1, got)
 	})
 
 	t.Run("unknown", func(t *testing.T) {
-		require.Nil(t, ns.module("unknown"))
+		got, err := ns.module("unknown")
+		require.Error(t, err)
+		require.Nil(t, got)
+	})
+
+	t.Run("not set", func(t *testing.T) {
+		ns.nameToNode["not set"] = &moduleListNode{name: "not set"}
+		got, err := ns.module("not set")
+		require.Error(t, err)
+		require.Nil(t, got)
 	})
 
 	t.Run("namespace closed", func(t *testing.T) {
 		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
-		require.Nil(t, ns.module(m1.Name))
+		got, err := ns.module(m1.Name)
+		require.Error(t, err)
+		require.Nil(t, got)
 	})
 }
 
@@ -166,7 +179,7 @@ func TestNamespace_AliasModule(t *testing.T) {
 	ns.nameToNode[m1.Name] = &moduleListNode{name: m1.Name, module: m1}
 
 	t.Run("alias module", func(t *testing.T) {
-		ns.AliasModule("m1", "m2")
+		require.NoError(t, ns.AliasModule("m1", "m2"))
 		m1node := &moduleListNode{name: "m1", module: m1}
 		require.Equal(t, map[string]*moduleListNode{"m1": m1node, "m2": m1node}, ns.nameToNode)
 		// Doesn't affect module names
@@ -174,7 +187,7 @@ func TestNamespace_AliasModule(t *testing.T) {
 	})
 	t.Run("namespace closed", func(t *testing.T) {
 		ns.CloseWithExitCode(context.Background(), 0)
-		ns.AliasModule("m3", "m4")
+		require.Error(t, ns.AliasModule("m3", "m4"))
 		require.Nil(t, ns.nameToNode)
 		require.Nil(t, ns.moduleList)
 	})

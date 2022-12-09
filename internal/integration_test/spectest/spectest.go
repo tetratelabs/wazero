@@ -444,7 +444,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 						if src == "" {
 							src = lastInstantiatedModuleName
 						}
-						ns.AliasModule(src, c.As)
+						require.NoError(t, ns.AliasModule(src, c.As))
 						lastInstantiatedModuleName = c.As
 					case "assert_return", "action":
 						moduleName := lastInstantiatedModuleName
