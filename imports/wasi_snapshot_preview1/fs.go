@@ -1118,9 +1118,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 	if !ok {
 		return 0, ErrnoFault
 	}
-	for i := uint32(0); i < iovsCount; i++ {
-		iovsPos := i * 8
-
+	for iovsPos := uint32(0); iovsPos < (iovsCount << 3); iovsPos += 8 {
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
