@@ -1114,7 +1114,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 
 	var err error
 	var nwritten uint32
-	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount*8)
+	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount<<3)
 	if !ok {
 		return 0, ErrnoFault
 	}
