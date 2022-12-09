@@ -134,7 +134,7 @@ func TestNamespace_requireModules(t *testing.T) {
 	})
 	t.Run("namespace closed", func(t *testing.T) {
 		ns, _, _ := newTestNamespace()
-		ns.CloseWithExitCode(context.Background(), 0)
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 
 		_, err := ns.requireModules(map[string]struct{}{"unknown": {}})
 		require.Error(t, err)
@@ -168,7 +168,7 @@ func TestNamespace_requireModuleName(t *testing.T) {
 		require.EqualError(t, err, "module[m2] has already been instantiated")
 	})
 	t.Run("namespace closed", func(t *testing.T) {
-		ns.CloseWithExitCode(context.Background(), 0)
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 		require.Error(t, ns.requireModuleName("m3"))
 	})
 }
@@ -186,7 +186,7 @@ func TestNamespace_AliasModule(t *testing.T) {
 		require.Nil(t, ns.moduleList)
 	})
 	t.Run("namespace closed", func(t *testing.T) {
-		ns.CloseWithExitCode(context.Background(), 0)
+		require.NoError(t, ns.CloseWithExitCode(context.Background(), 0))
 		require.Error(t, ns.AliasModule("m3", "m4"))
 		require.Nil(t, ns.nameToNode)
 		require.Nil(t, ns.moduleList)
