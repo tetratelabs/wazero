@@ -2,7 +2,6 @@ package wasi_snapshot_preview1
 
 import (
 	"embed"
-	"github.com/tetratelabs/wazero/internal/wasm"
 	"io/fs"
 	"os"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/testing/proxy"
+	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // configArgsEnviron ensures the result data are the same between args and ENV.
