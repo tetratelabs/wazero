@@ -1,6 +1,10 @@
 package wasi_snapshot_preview1
 
 import (
+	"embed"
+	"github.com/tetratelabs/wazero/internal/wasm"
+	"io/fs"
+	"os"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -112,6 +116,83 @@ func Benchmark_fdRead(b *testing.B) {
 				}
 				errno := Errno(results[0])
 				if errno != 0 {
+					b.Fatal(ErrnoName(errno))
+				}
+			}
+		})
+	}
+}
+
+//go:embed testdata
+var testdata embed.FS
+
+func Benchmark_fdReaddir(b *testing.B) {
+	embedFS, err := fs.Sub(testdata, "testdata")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	benches := []struct {
+		name string
+		fs   fs.FS
+	}{
+		{
+			name: "embed.FS",
+			fs:   embedFS,
+		},
+		{
+			name: "os.DirFS",
+			fs:   os.DirFS("testdata"),
+		},
+	}
+
+	for _, bb := range benches {
+		bc := bb
+
+		b.ReportAllocs()
+		b.Run(bc.name, func(b *testing.B) {
+			r := wazero.NewRuntime(testCtx)
+			defer r.Close(testCtx)
+
+			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFS(bc.fs))
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			fn := mod.ExportedFunction(fdReaddirName)
+
+			// Open the root directory as a file-descriptor.
+			fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+			fd, err := fsc.OpenFile(testCtx, ".")
+			if err != nil {
+				b.Fatal(err)
+			}
+			f, ok := fsc.OpenedFile(testCtx, fd)
+			if !ok {
+				b.Fatal("couldn't open fd ", fd)
+			}
+			defer fsc.CloseFile(testCtx, fd)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				// Recreate the file under the file-descriptor
+				if err = f.File.Close(); err != nil {
+					b.Fatal(err)
+				}
+				if f.File, err = bc.fs.Open("."); err != nil {
+					b.Fatal(err)
+				}
+				f.ReadDir = nil
+				b.StartTimer()
+
+				// Execute the benchmark, allowing up to 8KB buffer usage
+				results, err := fn.Call(testCtx, uint64(fd), uint64(0), uint64(8096), uint64(0), uint64(16192))
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				if errno := Errno(results[0]); errno != 0 {
 					b.Fatal(ErrnoName(errno))
 				}
 			}
