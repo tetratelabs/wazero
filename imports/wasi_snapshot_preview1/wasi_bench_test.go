@@ -159,7 +159,6 @@ func Benchmark_fdReaddir(b *testing.B) {
 	for _, bb := range benches {
 		bc := bb
 
-		b.ReportAllocs()
 		b.Run(bc.name, func(b *testing.B) {
 			r := wazero.NewRuntime(testCtx)
 			defer r.Close(testCtx)
@@ -184,6 +183,7 @@ func Benchmark_fdReaddir(b *testing.B) {
 			defer fsc.CloseFile(testCtx, fd)
 
 			b.ResetTimer()
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
 
