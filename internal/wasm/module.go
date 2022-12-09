@@ -3,7 +3,6 @@ package wasm
 import (
 	"bytes"
 	"crypto/sha256"
-	"debug/dwarf"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // DecodeModule parses the WebAssembly Binary Format (%.wasm) into a Module. This function returns when the input is
@@ -186,10 +186,10 @@ type Module struct {
 	// MemoryDefinitionSection is a wazero-specific section built on Validate.
 	MemoryDefinitionSection []*MemoryDefinition
 
-	// DWARF is the DWARF data used for DWARF base stack trace. This is created from the multiple custom sections
+	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections
 	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not specified in the Wasm
 	// specification: https://github.com/WebAssembly/debugging/issues/1
-	DWARF *dwarf.Data
+	DWARFLines *wasmdebug.DWARFLines
 }
 
 // ModuleID represents sha256 hash value uniquely assigned to Module.
