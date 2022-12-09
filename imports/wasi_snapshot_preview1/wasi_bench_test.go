@@ -49,8 +49,79 @@ func Benchmark_ArgsEnviron(b *testing.B) {
 	}
 }
 
+type money struct{}
+
+// Read implements io.Reader by returning endless '$'.
+func (money) Read(b []byte) (n int, err error) {
+	for i := range b {
+		b[i] = '$'
+	}
+
+	return len(b), nil
+}
+
+func Benchmark_fdRead(b *testing.B) {
+	r := wazero.NewRuntime(testCtx)
+	defer r.Close(testCtx)
+
+	mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithStdin(money{}))
+	if err != nil {
+		b.Fatal(err)
+	}
+	fn := mod.ExportedFunction(fdReadName)
+
+	mod.Memory().Write(testCtx, 0, []byte{
+		32, 0, 0, 0, // = iovs[0].offset
+		8, 0, 0, 0, // = iovs[0].length
+		40, 0, 0, 0, // = iovs[1].offset
+		8, 0, 0, 0, // = iovs[1].length
+		48, 0, 0, 0, // = iovs[2].offset
+		16, 0, 0, 0, // = iovs[2].length
+		64, 0, 0, 0, // = iovs[3].offset
+		16, 0, 0, 0, // = iovs[3].length
+	})
+
+	benches := []struct {
+		name      string
+		iovs      uint32
+		iovsCount uint32
+	}{
+		{
+			name:      "1x8",
+			iovs:      0,
+			iovsCount: 1,
+		},
+		{
+			name:      "2x16",
+			iovs:      16,
+			iovsCount: 2,
+		},
+	}
+
+	for _, bb := range benches {
+		bc := bb
+
+		b.ReportAllocs()
+		b.Run(bc.name, func(b *testing.B) {
+			resultNread := uint32(128) // arbitrary offset
+
+			for i := 0; i < b.N; i++ {
+				results, err := fn.Call(testCtx, uint64(0), uint64(bc.iovs), uint64(bc.iovsCount), uint64(resultNread))
+				if err != nil {
+					b.Fatal(err)
+				}
+				errno := Errno(results[0])
+				if errno != 0 {
+					b.Fatal(ErrnoName(errno))
+				}
+			}
+		})
+	}
+}
+
 type writerFunc func(p []byte) (n int, err error)
 
+// Write implements io.Writer by calling writerFunc.
 func (f writerFunc) Write(p []byte) (n int, err error) {
 	return f(p)
 }

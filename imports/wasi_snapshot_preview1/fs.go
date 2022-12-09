@@ -638,16 +638,15 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 	}
 
 	var nread uint32
-	for i := uint32(0); i < iovsCount; i++ {
-		iov := iovs + i*8
-		offset, ok := mem.ReadUint32Le(ctx, iov)
-		if !ok {
-			return 0, ErrnoFault
-		}
-		l, ok := mem.ReadUint32Le(ctx, iov+4)
-		if !ok {
-			return 0, ErrnoFault
-		}
+	iovsBuf, ok := mod.Memory().Read(ctx, iovs, iovsCount<<3)
+	if !ok {
+		return 0, ErrnoFault
+	}
+
+	for iovsPos := uint32(0); iovsPos < (iovsCount << 3); iovsPos += 8 {
+		offset := le.Uint32(iovsBuf[iovsPos:])
+		l := le.Uint32(iovsBuf[iovsPos+4:])
+
 		b, ok := mem.Read(ctx, offset, l)
 		if !ok {
 			return 0, ErrnoFault
