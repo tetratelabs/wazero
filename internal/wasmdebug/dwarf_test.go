@@ -3,6 +3,7 @@ package wasmdebug_test
 import (
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero/api"
@@ -44,8 +45,19 @@ func TestDWARFLines_Line_TinyGO(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.exp, func(t *testing.T) {
-			actual := mod.DWARFLines.Line(tc.offset)
-			require.Contains(t, actual, tc.exp)
+			// Ensures that DWARFLines.Line is goroutine-safe.
+			const concurrent = 100
+			var wg sync.WaitGroup
+			wg.Add(concurrent)
+
+			for i := 0; i < concurrent; i++ {
+				go func() {
+					defer wg.Done()
+					actual := mod.DWARFLines.Line(tc.offset)
+					require.Contains(t, actual, tc.exp)
+				}()
+			}
+			wg.Wait()
 		})
 	}
 }

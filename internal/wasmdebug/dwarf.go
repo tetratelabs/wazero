@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 )
 
 // DWARFLines is used to retrieve source code line information from the DWARF data.
@@ -15,6 +16,7 @@ type DWARFLines struct {
 	// linesPerEntry maps dwarf.Offset for dwarf.Entry to the list of lines contained by the entry.
 	// The value is sorted in the increasing order by the address.
 	linesPerEntry map[dwarf.Offset][]line
+	mux           sync.Mutex
 }
 
 type line struct {
@@ -36,6 +38,12 @@ func (d *DWARFLines) Line(instructionOffset uint64) string {
 	if d == nil {
 		return ""
 	}
+
+	// DWARFLines is created per Wasm binary, so there's a possibility that multiple instances
+	// created from a same binary face runtime error at the same time, and that results in
+	// concurrent access to this function.
+	d.mux.Lock()
+	defer d.mux.Unlock()
 
 	r := d.d.Reader()
 
