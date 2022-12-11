@@ -1263,7 +1263,7 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			bufLen:          1,
+			bufLen:          direntSize,
 			cookie:          0,
 			expectedBufused: 0,
 			expectedMem:     []byte{},
@@ -1284,23 +1284,6 @@ func Test_fdReaddir(t *testing.T) {
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
-			},
-		},
-		{
-			name: "can't read",
-			dir: func() *internalsys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
-				require.NoError(t, err)
-
-				return &internalsys.FileEntry{File: dir}
-			},
-			bufLen:          23, // length is too short for header
-			cookie:          0,
-			expectedBufused: 23, // == bufLen which is the size of the dirent
-			expectedMem:     nil,
-			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 2,
-				Entries:   testDirEntries[:2],
 			},
 		},
 		{
@@ -1569,26 +1552,30 @@ func Test_fdReaddir_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "invalid fd",
-			fd:            42, // arbitrary invalid fd
+			name: "invalid fd",
+			fd:   42,                    // arbitrary invalid fd
+			buf:  0, bufLen: direntSize, // enough to read the dirent
+			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	--> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-		==> wasi_snapshot_preview1.fdReaddir(fd=42,buf=0,buf_len=0,cookie=0)
+--> proxy.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=42,buf=0,buf_len=24,cookie=0)
 		<== (bufused=0,EBADF)
 	<-- EBADF
 <-- 8
 `,
 		},
 		{
-			name:          "not a dir",
-			fd:            fileFD,
+			name: "not a dir",
+			fd:   fileFD,
+			buf:  0, bufLen: direntSize, // enough to read the dirent
+			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoNotdir,
 			expectedLog: `
---> proxy.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=0,cookie=0)
+--> proxy.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=24,cookie=0)
 		<== (bufused=0,ENOTDIR)
 	<-- ENOTDIR
 <-- 54
@@ -1625,16 +1612,34 @@ func Test_fdReaddir_Errors(t *testing.T) {
 `,
 		},
 		{
-			name: "resultBufused is outside memory",
+			name: "bufLen must be enough to write a struct",
 			fd:   dirFD,
 			buf:  0, bufLen: 1,
-			resultBufused: memLen,
-			expectedErrno: ErrnoFault,
+			resultBufused: 1000,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	<-- EFAULT
-<-- 21
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1,cookie=0)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
+<-- 28
+`,
+		},
+		{
+			name: "cookie invalid when no prior state",
+			fd:   dirFD,
+			buf:  0, bufLen: 1000,
+			cookie:        1,
+			resultBufused: 2000,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1000,cookie=1)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
+<-- 28
 `,
 		},
 		{

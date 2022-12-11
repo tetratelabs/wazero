@@ -709,6 +709,12 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 	// it in such a way that becomes negative.
 	cookie := int64(stack[3])
 
+	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
+	// read what the next cookie is.
+	if bufLen < direntSize {
+		return 0, ErrnoInval
+	}
+
 	// Validate the FD is a directory
 	rd, dir, errno := openedDir(ctx, fsc, fd)
 	if errno != ErrnoSuccess {
@@ -716,13 +722,8 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 	}
 
 	// expect a cookie only if we are continuing a read.
-	if cookie == 0 {
-		// TODO: When bufLen < 8 we can't ever pass a cookie > 0 later, as the
-		// first d_next can't be read. It may be assumed in wasi that bufLen is
-		// always >=8 or 24. We may want to fail if below that.
-		if dir.CountRead > 0 {
-			return 0, ErrnoInval // invalid as a cookie is minimally one.
-		}
+	if cookie == 0 && dir.CountRead > 0 {
+		return 0, ErrnoInval // cookie is minimally one.
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
