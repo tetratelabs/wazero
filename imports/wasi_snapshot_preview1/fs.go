@@ -611,8 +611,8 @@ func fdReadFn(ctx context.Context, mod api.Module, stack []uint64) (nread uint32
 }
 
 func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
+	sysCtx := mod.(*wasm.CallContext).Sys
 
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])
@@ -698,6 +698,9 @@ var fdReaddir = proxyResultParams(&wasm.HostFunc{
 }, fdReaddirName)
 
 func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+	mem := mod.Memory()
+	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
+
 	fd := uint32(stack[0])
 	buf := uint32(stack[1])
 	bufLen := uint32(stack[2])
@@ -706,15 +709,21 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 	// it in such a way that becomes negative.
 	cookie := int64(stack[3])
 
+	// The bufLen must be enough to write a dirent. Otherwise, the caller can't
+	// read what the next cookie is.
+	if bufLen < direntSize {
+		return 0, ErrnoInval
+	}
+
 	// Validate the FD is a directory
-	rd, dir, errno := openedDir(ctx, mod, fd)
+	rd, dir, errno := openedDir(ctx, fsc, fd)
 	if errno != ErrnoSuccess {
 		return 0, errno
 	}
 
 	// expect a cookie only if we are continuing a read.
 	if cookie == 0 && dir.CountRead > 0 {
-		return 0, ErrnoInval // invalid as a cookie is minimally one.
+		return 0, ErrnoInval // cookie is minimally one.
 	}
 
 	// First, determine the maximum directory entries that can be encoded as
@@ -749,8 +758,6 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 			dir.Entries = entries
 		}
 	}
-
-	mem := mod.Memory()
 
 	// Determine how many dirents we can write, excluding a potentially
 	// truncated entry.
@@ -930,8 +937,7 @@ func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
 }
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
-func openedDir(ctx context.Context, mod api.Module, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
+func openedDir(ctx context.Context, fsc *internalsys.FSContext, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
 	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return nil, nil, ErrnoBadf
 	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
@@ -1103,8 +1109,8 @@ var fdWrite = proxyResultParams(&wasm.HostFunc{
 }, fdWriteName)
 
 func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
+	sysCtx := mod.(*wasm.CallContext).Sys
 
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])

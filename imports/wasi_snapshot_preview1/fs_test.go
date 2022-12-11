@@ -1248,7 +1248,7 @@ func Test_fdReaddir(t *testing.T) {
 	tests := []struct {
 		name            string
 		dir             func() *internalsys.FileEntry
-		buf, bufLen     uint32
+		bufLen          uint32
 		cookie          int64
 		expectedMem     []byte
 		expectedMemSize int
@@ -1263,7 +1263,7 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 1,
+			bufLen:          direntSize,
 			cookie:          0,
 			expectedBufused: 0,
 			expectedMem:     []byte{},
@@ -1277,30 +1277,13 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 4096,
+			bufLen:          4096,
 			cookie:          0,
 			expectedBufused: 78, // length of all entries
 			expectedMem:     append(append(dirent1, dirent2...), dirent3...),
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
 				Entries:   testDirEntries,
-			},
-		},
-		{
-			name: "can't read",
-			dir: func() *internalsys.FileEntry {
-				dir, err := fdReadDirFs.Open("dir")
-				require.NoError(t, err)
-
-				return &internalsys.FileEntry{File: dir}
-			},
-			buf: 0, bufLen: 23, // length is too short for header
-			cookie:          0,
-			expectedBufused: 23, // == bufLen which is the size of the dirent
-			expectedMem:     nil,
-			expectedReadDir: &internalsys.ReadDir{
-				CountRead: 2,
-				Entries:   testDirEntries[:2],
 			},
 		},
 		{
@@ -1311,7 +1294,7 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 24, // length is long enough for first, but not the name.
+			bufLen:          24, // length is long enough for first, but not the name.
 			cookie:          0,
 			expectedBufused: 24,           // == bufLen which is the size of the dirent
 			expectedMem:     dirent1[:24], // header without name
@@ -1328,7 +1311,7 @@ func Test_fdReaddir(t *testing.T) {
 
 				return &internalsys.FileEntry{File: dir}
 			},
-			buf: 0, bufLen: 25, // length is long enough for first + the name, but not more.
+			bufLen:          25, // length is long enough for first + the name, but not more.
 			cookie:          0,
 			expectedBufused: 25, // length to read exactly first.
 			expectedMem:     dirent1,
@@ -1353,7 +1336,7 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 26, // length is long enough for exactly second.
+			bufLen:          26, // length is long enough for exactly second.
 			cookie:          1,  // d_next of first
 			expectedBufused: 26, // length to read exactly second.
 			expectedMem:     dirent2,
@@ -1378,7 +1361,7 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 30, // length is longer than the second entry, but not long enough for a header.
+			bufLen:          30, // length is longer than the second entry, but not long enough for a header.
 			cookie:          1,  // d_next of first
 			expectedBufused: 30, // length to read some more, but not enough for a header, so buf was exhausted.
 			expectedMem:     dirent2,
@@ -1404,7 +1387,7 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 50, // length is longer than the second entry + enough for the header of third.
+			bufLen:          50, // length is longer than the second entry + enough for the header of third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 50, // length to read exactly second and the header of third.
 			expectedMem:     append(dirent2, dirent3[0:24]...),
@@ -1429,7 +1412,7 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 53, // length is long enough for second and third.
+			bufLen:          53, // length is long enough for second and third.
 			cookie:          1,  // d_next of first
 			expectedBufused: 53, // length to read exactly one second and third.
 			expectedMem:     append(dirent2, dirent3...),
@@ -1454,7 +1437,7 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 27, // length is long enough for exactly third.
+			bufLen:          27, // length is long enough for exactly third.
 			cookie:          2,  // d_next of second.
 			expectedBufused: 27, // length to read exactly third.
 			expectedMem:     dirent3,
@@ -1479,9 +1462,9 @@ func Test_fdReaddir(t *testing.T) {
 					},
 				}
 			},
-			buf: 0, bufLen: 100, // length is long enough for third and more, but there is nothing more.
-			cookie:          2,  // d_next of second.
-			expectedBufused: 27, // length to read exactly third.
+			bufLen:          100, // length is long enough for third and more, but there is nothing more.
+			cookie:          2,   // d_next of second.
+			expectedBufused: 27,  // length to read exactly third.
 			expectedMem:     dirent3,
 			expectedReadDir: &internalsys.ReadDir{
 				CountRead: 3,
@@ -1506,17 +1489,17 @@ func Test_fdReaddir(t *testing.T) {
 
 			maskMemory(t, testCtx, mod, int(tc.bufLen))
 
-			// use an arbitrarily high value for the buf used position.
-			resultBufused := uint32(16192)
+			resultBufused := uint32(0) // where to write the amount used out of bufLen
+			buf := uint32(8)           // where to start the dirents
 			requireErrno(t, ErrnoSuccess, mod, fdReaddirName,
-				uint64(fd), uint64(tc.buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
+				uint64(fd), uint64(buf), uint64(tc.bufLen), uint64(tc.cookie), uint64(resultBufused))
 
 			// read back the bufused and compare memory against it
 			bufUsed, ok := mod.Memory().ReadUint32Le(testCtx, resultBufused)
 			require.True(t, ok)
 			require.Equal(t, tc.expectedBufused, bufUsed)
 
-			mem, ok := mod.Memory().Read(testCtx, tc.buf, bufUsed)
+			mem, ok := mod.Memory().Read(testCtx, buf, bufUsed)
 			require.True(t, ok)
 
 			if tc.expectedMem != nil {
@@ -1569,26 +1552,30 @@ func Test_fdReaddir_Errors(t *testing.T) {
 `,
 		},
 		{
-			name:          "invalid fd",
-			fd:            42, // arbitrary invalid fd
+			name: "invalid fd",
+			fd:   42,                    // arbitrary invalid fd
+			buf:  0, bufLen: direntSize, // enough to read the dirent
+			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	--> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=0,cookie=0,result.bufused=0)
-		==> wasi_snapshot_preview1.fdReaddir(fd=42,buf=0,buf_len=0,cookie=0)
+--> proxy.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=42,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=42,buf=0,buf_len=24,cookie=0)
 		<== (bufused=0,EBADF)
 	<-- EBADF
 <-- 8
 `,
 		},
 		{
-			name:          "not a dir",
-			fd:            fileFD,
+			name: "not a dir",
+			fd:   fileFD,
+			buf:  0, bufLen: direntSize, // enough to read the dirent
+			resultBufused: 1000, // arbitrary
 			expectedErrno: ErrnoNotdir,
 			expectedLog: `
---> proxy.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=0,cookie=0,result.bufused=0)
-		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=0,cookie=0)
+--> proxy.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=24,cookie=0)
 		<== (bufused=0,ENOTDIR)
 	<-- ENOTDIR
 <-- 54
@@ -1625,16 +1612,34 @@ func Test_fdReaddir_Errors(t *testing.T) {
 `,
 		},
 		{
-			name: "resultBufused is outside memory",
+			name: "bufLen must be enough to write a struct",
 			fd:   dirFD,
 			buf:  0, bufLen: 1,
-			resultBufused: memLen,
-			expectedErrno: ErrnoFault,
+			resultBufused: 1000,
+			expectedErrno: ErrnoInval,
 			expectedLog: `
---> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=65536)
-	<-- EFAULT
-<-- 21
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=1000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1,cookie=0,result.bufused=1000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1,cookie=0)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
+<-- 28
+`,
+		},
+		{
+			name: "cookie invalid when no prior state",
+			fd:   dirFD,
+			buf:  0, bufLen: 1000,
+			cookie:        1,
+			resultBufused: 2000,
+			expectedErrno: ErrnoInval,
+			expectedLog: `
+--> proxy.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+	--> wasi_snapshot_preview1.fd_readdir(fd=4,buf=0,buf_len=1000,cookie=1,result.bufused=2000)
+		==> wasi_snapshot_preview1.fdReaddir(fd=4,buf=0,buf_len=1000,cookie=1)
+		<== (bufused=0,EINVAL)
+	<-- EINVAL
+<-- 28
 `,
 		},
 		{
