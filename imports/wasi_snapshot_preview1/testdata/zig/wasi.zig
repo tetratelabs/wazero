@@ -1,4 +1,5 @@
 const std = @import("std");
+const os = std.os;
 const allocator = std.heap.page_allocator;
 const preopensAlloc = std.fs.wasi.preopensAlloc;
 const stdout = std.io.getStdOut().writer();
@@ -17,10 +18,9 @@ pub fn main() !void {
             try stdout.print("./{s}\n", .{entry.name});
         }
     } else if (std.mem.eql(u8, args[1], "stat")) {
-        try stdout.print("stdin isatty: {}\n", .{std.c.isatty(0) != 0});
-        try stdout.print("stdout isatty: {}\n", .{std.c.isatty(1) != 0});
-        try stdout.print("stderr isatty: {}\n", .{std.c.isatty(2) != 0});
-        // TODO: use std.os.isatty and remove the dependency on libc after it's fixed to work on WASI target.
-        try stdout.print("/ isatty: {}\n", .{std.c.isatty(3) != 0});
+        try stdout.print("stdin isatty: {}\n", .{os.isatty(0)});
+        try stdout.print("stdout isatty: {}\n", .{os.isatty(1)});
+        try stdout.print("stderr isatty: {}\n", .{os.isatty(2)});
+        try stdout.print("/ isatty: {}\n", .{os.isatty(3)});
     }
 }
