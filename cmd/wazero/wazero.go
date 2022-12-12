@@ -17,6 +17,8 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+var ctx = experimental.WithDWARFBasedStackTrace(context.Background())
+
 func main() {
 	doMain(os.Stdout, os.Stderr, os.Exit)
 }
@@ -143,7 +145,6 @@ func doRun(args []string, stdOut io.Writer, stdErr io.Writer, exit func(code int
 
 	wasmExe := filepath.Base(wasmPath)
 
-	ctx := experimental.WithDWARFBasedStackTrace(context.Background())
 	rt := wazero.NewRuntime(ctx)
 	defer rt.Close(ctx)
 
