@@ -2567,7 +2567,8 @@ func Test_pathFilestatGet(t *testing.T) {
 			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 			mod.Memory().Write(testCtx, 0, tc.memory)
 
-			requireErrno(t, tc.expectedErrno, mod, pathFilestatGetName, uint64(tc.fd), uint64(0), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
+			flags := uint32(0)
+			requireErrno(t, tc.expectedErrno, mod, pathFilestatGetName, uint64(tc.fd), uint64(flags), uint64(1), uint64(tc.pathLen), uint64(tc.resultFilestat))
 			require.Equal(t, tc.expectedLog, "\n"+log.String())
 
 			actual, ok := mod.Memory().Read(testCtx, 0, uint32(len(tc.expectedMemory)))

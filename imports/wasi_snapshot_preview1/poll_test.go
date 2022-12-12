@@ -133,7 +133,7 @@ func Test_pollOneoff_Errors(t *testing.T) {
 			mem: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // userdata
 				eventTypeFdRead, 0x0, 0x0, 0x0,
-				internalsys.FdStdin, 0x0, 0x0, 0x0, // valid readable FD
+				byte(internalsys.FdStdin), 0x0, 0x0, 0x0, // valid readable FD
 				'?', // stopped after encoding
 			},
 			expectedErrno: ErrnoSuccess,
