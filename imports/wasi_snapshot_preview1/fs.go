@@ -949,7 +949,13 @@ func openedDir(ctx context.Context, fsc *internalsys.FSContext, fd uint32) (fs.R
 	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return nil, nil, ErrnoBadf
 	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
-		return nil, nil, ErrnoNotdir
+		// fd_readdir docs don't indicate whether to return ErrnoNotdir or
+		// ErrnoBadf. It has been noticed that rust will crash on ErrnoNotdir,
+		// and POSIX C ref seems to not return this, so we don't either.
+		//
+		// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_readdir
+		// and https://en.wikibooks.org/wiki/C_Programming/POSIX_Reference/dirent.h
+		return nil, nil, ErrnoBadf
 	} else {
 		if f.ReadDir == nil {
 			f.ReadDir = &internalsys.ReadDir{}
@@ -1336,6 +1342,21 @@ var pathOpen = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(pathOpenFn)},
 }, pathOpenName)
 
+// wasiOflags are open flags used by pathOpen
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
+type wasiOflags = byte // actually 16-bit, but there aren't that many.
+const (
+	wasiOflagsNone wasiFdflags = 1<<iota - 1 // nolint
+	// wasiOflagsCreat creates a file if it does not exist.
+	wasiOflagsCreat // nolint
+	// wasiOflagsDirectory fails if not a directory.
+	wasiOflagsDirectory
+	// wasiOflagsExcl fails if file already exists.
+	wasiOflagsExcl // nolint
+	// wasiOflagsTrunc truncates the file to size 0.
+	wasiOflagsTrunc // nolint
+)
+
 func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, Errno) {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fsc := sysCtx.FS(ctx)
@@ -1349,7 +1370,10 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
-	_ /* oflags */ = uint32(params[4])
+	// oflags are currently not something we can pass to the filesystem to
+	// enforce, because fs.FS has no flags parameter. So, we have to validate
+	// them externally, in worst case after the file was already allocated.
+	oflags := wasiOflags(uint32(params[4]))
 
 	// rights aren't used
 	_, _ = params[5], params[6]
@@ -1371,7 +1395,23 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 		return 0, errnoResult
 	}
 
+	// Check any flags that require the file to evaluate.
+	if oflags&wasiOflagsDirectory != 0 {
+		return newFD, failIfNotDirectory(ctx, fsc, newFD)
+	}
+
 	return newFD, ErrnoSuccess
+}
+
+func failIfNotDirectory(ctx context.Context, fsc *internalsys.FSContext, fd uint32) Errno {
+	// Lookup the previous file
+	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+		return ErrnoBadf
+	} else if _, ok := f.File.(fs.ReadDirFile); !ok {
+		_ = fsc.CloseFile(ctx, fd)
+		return ErrnoNotdir
+	}
+	return ErrnoSuccess
 }
 
 // pathReadlink is the WASI function named pathReadlinkName that reads the

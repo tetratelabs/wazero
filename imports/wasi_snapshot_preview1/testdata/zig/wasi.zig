@@ -12,7 +12,16 @@ pub fn main() !void {
     if (std.mem.eql(u8, args[1], "ls")) {
         _ = try preopensAlloc(allocator);
 
-        var dir = try std.fs.cwd().openIterableDir(".", .{});
+        var dir = std.fs.cwd().openIterableDir(args[2], .{}) catch |err| switch (err) {
+            error.NotDir => {
+                try stdout.print("ENOTDIR\n", .{});
+                return;
+            },
+            else => {
+                try stdout.print("./{}\n", .{err});
+                return;
+            },
+        };
         var iter = dir.iterate();
         while (try iter.next()) |entry| {
             try stdout.print("./{s}\n", .{entry.name});
