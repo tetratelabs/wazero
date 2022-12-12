@@ -735,14 +735,14 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 
 			// sourceInfo holds the source code information corresponding to the frame.
 			// It is not empty only when the DWARF is enabled.
-			var sourceInfo string
+			var sources []string
 			if p := fn.parent; p.codeSegment != nil {
 				if p.sourceOffsetMap != nil {
 					offset := fn.getSourceOffsetInWasmBinary(pc)
-					sourceInfo = p.sourceModule.DWARFLines.Line(offset)
+					sources = p.sourceModule.DWARFLines.Line(offset)
 				}
 			}
-			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
+			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 
 			callFrameOffset := callFrameOffset(source.Type)
 			if stackBasePointer != 0 {

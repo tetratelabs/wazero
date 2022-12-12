@@ -35,9 +35,9 @@ func NewDWARFLines(d *dwarf.Data) *DWARFLines {
 
 // Line returns the line information for the given instructionOffset which is an offset in
 // the code section of the original Wasm binary. Returns empty string if the info is not found.
-func (d *DWARFLines) Line(instructionOffset uint64) string {
+func (d *DWARFLines) Line(instructionOffset uint64) (ret []string) {
 	if d == nil {
-		return ""
+		return
 	}
 
 	// DWARFLines is created per Wasm binary, so there's a possibility that multiple instances
@@ -48,15 +48,23 @@ func (d *DWARFLines) Line(instructionOffset uint64) string {
 
 	r := d.d.Reader()
 
-	var ents []*dwarf.Entry
+	var inlinedRoutines []*dwarf.Entry
+	var cu *dwarf.Entry
+	var inlinedDone bool
+entry:
 	for {
 		ent, err := r.Next()
 		if err != nil || ent == nil {
 			break
 		}
 
+		// If we already found the compilation unit and relevant inlined routines, we can stop searching entries.
+		if cu != nil && inlinedDone {
+			break
+		}
+
 		switch ent.Tag {
-		case dwarf.TagInlinedSubroutine, dwarf.TagCompileUnit:
+		case dwarf.TagCompileUnit, dwarf.TagInlinedSubroutine:
 		default:
 			continue
 		}
@@ -67,76 +75,104 @@ func (d *DWARFLines) Line(instructionOffset uint64) string {
 		}
 		for _, pcs := range ranges {
 			if pcs[0] <= instructionOffset && instructionOffset < pcs[1] {
-				ents = append(ents, ent)
-			}
-		}
-	}
-
-	var strs []string
-	var files []*dwarf.LineFile
-	for _, entry := range ents {
-		lineReader, err := d.d.LineReader(entry)
-		if err != nil {
-			return ""
-		} else if lineReader != nil {
-			files = lineReader.Files()
-
-			var lines []line
-			var ok bool
-			var le dwarf.LineEntry
-			// Get the lines inside the entry.
-			if lines, ok = d.linesPerEntry[entry.Offset]; !ok {
-				// If not found, we create the list of lines by reading all the LineEntries in the Entry.
-				//
-				// Note that the dwarf.LineEntry.SeekPC API shouldn't be used because the Go's dwarf package assumes that
-				// all the line entries in an Entry are sorted in increasing order which *might not* be true
-				// for some languages. Such order requirement is not a part of DWARF specification,
-				// and in fact Zig language tends to emit interleaved line information.
-				//
-				// Thus, here we read all line entries here, and sort them in the increasing order wrt addresses.
-				for {
-					pos := lineReader.Tell()
-					err = lineReader.Next(&le)
-					if errors.Is(err, io.EOF) {
-						break
-					} else if err != nil {
-						return ""
-					}
-					lines = append(lines, line{addr: le.Address, pos: pos})
+				switch ent.Tag {
+				case dwarf.TagCompileUnit:
+					cu = ent
+				case dwarf.TagInlinedSubroutine:
+					inlinedRoutines = append(inlinedRoutines, ent)
+					// Search inlined subroutines until all the children
+					inlinedDone = !ent.Children
 				}
-				sort.Slice(lines, func(i, j int) bool { return lines[i].addr < lines[j].addr })
-				d.linesPerEntry[entry.Offset] = lines // Caches for the future inquiries for the same Entry.
+				continue entry
 			}
-
-			// Now we have the lines for this entry. We can find the corresponding source line for instructionOffset
-			// via binary search on the list.
-			n := len(lines)
-			index := sort.Search(n, func(i int) bool { return lines[i].addr >= instructionOffset })
-
-			if index == n { // This case the address is not found. See the doc sort.Search.
-				return ""
-			}
-
-			// Advance the line reader for the found position.
-			lineReader.Seek(lines[index].pos)
-			err = lineReader.Next(&le)
-
-			if err != nil {
-				// If we reach this block, that means there's a bug in the []line creation logic above.
-				panic("BUG: stored dwarf.LineReaderPos is invalid")
-			}
-
-			strs = append(strs, fmt.Sprintf("%#x: %s:%d:%d", le.Address, le.File.Name, le.Line, le.Column))
-		} else {
-			strs = append(strs,
-				fmt.Sprintf("\t%s:%d:%d",
-					files[entry.Val(dwarf.AttrCallFile).(int64)].Name,
-					entry.Val(dwarf.AttrCallLine),
-					entry.Val(dwarf.AttrCallColumn),
-				),
-			)
 		}
 	}
 
-	return strings.Join(strs, "\n")
+	// If the relevant compilation unit is not found, nothing we can do with this DWARF info.
+	if cu == nil {
+		return
+	}
+
+	lineReader, err := d.d.LineReader(cu)
+	if err != nil || lineReader == nil {
+		return
+	}
+	var lines []line
+	var ok bool
+	var le dwarf.LineEntry
+	// Get the lines inside the entry.
+	if lines, ok = d.linesPerEntry[cu.Offset]; !ok {
+		// If not found, we create the list of lines by reading all the LineEntries in the Entry.
+		//
+		// Note that the dwarf.LineEntry.SeekPC API shouldn't be used because the Go's dwarf package assumes that
+		// all the line entries in an Entry are sorted in increasing order which *might not* be true
+		// for some languages. Such order requirement is not a part of DWARF specification,
+		// and in fact Zig language tends to emit interleaved line information.
+		//
+		// Thus, here we read all line entries here, and sort them in the increasing order wrt addresses.
+		for {
+			pos := lineReader.Tell()
+			err = lineReader.Next(&le)
+			if errors.Is(err, io.EOF) {
+				break
+			} else if err != nil {
+				return
+			}
+			lines = append(lines, line{addr: le.Address, pos: pos})
+		}
+		sort.Slice(lines, func(i, j int) bool { return lines[i].addr < lines[j].addr })
+		d.linesPerEntry[cu.Offset] = lines // Caches for the future inquiries for the same Entry.
+	}
+
+	// Now we have the lines for this entry. We can find the corresponding source line for instructionOffset
+	// via binary search on the list.
+	n := len(lines)
+	index := sort.Search(n, func(i int) bool { return lines[i].addr >= instructionOffset })
+
+	if index == n { // This case the address is not found. See the doc sort.Search.
+		return
+	}
+
+	// Advance the line reader for the found position.
+	lineReader.Seek(lines[index].pos)
+	err = lineReader.Next(&le)
+
+	if err != nil {
+		// If we reach this block, that means there's a bug in the []line creation logic above.
+		panic("BUG: stored dwarf.LineReaderPos is invalid")
+	}
+
+	if len(inlinedRoutines) == 0 {
+		// Do early return for non-inlined case.
+		ret = []string{fmt.Sprintf("%#x: %s:%d:%d", le.Address, le.File.Name, le.Line, le.Column)}
+		return
+	}
+
+	// In the inlined case, the line info is the innermost inlined function call.
+	addr := fmt.Sprintf("%#x: ", le.Address)
+	ret = append(ret, fmt.Sprintf("%s%s:%d:%d (inlined)", addr, le.File.Name, le.Line, le.Column))
+
+	files := lineReader.Files()
+	// inlinedRoutines contain the inlined call information in the reverse order (children is higher than parent),
+	// so we traverse the reverse order and emit the inlined calls.
+	for i := len(inlinedRoutines) - 1; i >= 0; i-- {
+		inlined := inlinedRoutines[i]
+		fileIndex, ok := inlined.Val(dwarf.AttrCallFile).(int64)
+		if !ok {
+			return
+		}
+		if fileIndex >= int64(len(files)) {
+			// This in theory shouldn't happen according to the spec, but guard against ill-formed DWARF info.
+			return
+		}
+		fileName := files[fileIndex]
+		line, col := inlined.Val(dwarf.AttrCallLine), inlined.Val(dwarf.AttrCallColumn)
+		if i == 0 {
+			// Last one is the origin of the inlined function calls.
+			ret = append(ret, fmt.Sprintf("%s%s:%d:%d", strings.Repeat(" ", len(addr)), fileName.Name, line, col))
+		} else {
+			ret = append(ret, fmt.Sprintf("%s%s:%d:%d (inlined)", strings.Repeat(" ", len(addr)), fileName.Name, line, col))
+		}
+	}
+	return
 }

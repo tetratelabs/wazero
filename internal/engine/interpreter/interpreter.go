@@ -840,11 +840,11 @@ func (ce *callEngine) recoverOnCall(v interface{}) (err error) {
 	for i := 0; i < frameCount; i++ {
 		frame := ce.popFrame()
 		def := frame.f.source.Definition
-		var sourceInfo string
+		var sources []string
 		if frame.f.body != nil {
-			sourceInfo = frame.f.parent.source.DWARFLines.Line(frame.f.body[frame.pc].sourcePC)
+			sources = frame.f.parent.source.DWARFLines.Line(frame.f.body[frame.pc].sourcePC)
 		}
-		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sourceInfo)
+		builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
 	}
 	err = builder.FromRecovered(v)
 

@@ -79,7 +79,7 @@ func TestErrorBuilder(t *testing.T) {
 		{
 			name: "one",
 			build: func(builder ErrorBuilder) error {
-				builder.AddFrame("x.y", nil, nil, "")
+				builder.AddFrame("x.y", nil, nil, nil)
 				return builder.FromRecovered(argErr)
 			},
 			expectedErr: `invalid argument (recovered by wazero)
@@ -90,8 +90,8 @@ wasm stack trace:
 		{
 			name: "two",
 			build: func(builder ErrorBuilder) error {
-				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, "")
-				builder.AddFrame("x.y", nil, nil, "")
+				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, nil)
+				builder.AddFrame("x.y", nil, nil, nil)
 				return builder.FromRecovered(argErr)
 			},
 			expectedErr: `invalid argument (recovered by wazero)
@@ -103,8 +103,8 @@ wasm stack trace:
 		{
 			name: "runtime.Error",
 			build: func(builder ErrorBuilder) error {
-				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, "")
-				builder.AddFrame("x.y", nil, nil, "")
+				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, nil)
+				builder.AddFrame("x.y", nil, nil, nil)
 				return builder.FromRecovered(rteErr)
 			},
 			expectedErr: `index out of bounds (recovered by wazero)
@@ -116,8 +116,9 @@ wasm stack trace:
 		{
 			name: "wasmruntime.Error",
 			build: func(builder ErrorBuilder) error {
-				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32}, "/opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_tinygowasm.go:73:6")
-				builder.AddFrame("x.y", nil, nil, "")
+				builder.AddFrame("wasi_snapshot_preview1.fd_write", i32i32i32i32, []api.ValueType{i32},
+					[]string{"/opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_tinygowasm.go:73:6"})
+				builder.AddFrame("x.y", nil, nil, nil)
 				return builder.FromRecovered(wasmruntime.ErrRuntimeStackOverflow)
 			},
 			expectedErr: `wasm error: stack overflow
