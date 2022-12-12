@@ -66,9 +66,11 @@ entry:
 		switch ent.Tag {
 		case dwarf.TagCompileUnit, dwarf.TagInlinedSubroutine:
 		default:
+			// Only CompileUnit and InlinedSubroutines are relevant.
 			continue
 		}
 
+		// Check if the entry spans the range which contains the target instruction.
 		ranges, err := d.d.Ranges(ent)
 		if err != nil {
 			continue
@@ -80,8 +82,10 @@ entry:
 					cu = ent
 				case dwarf.TagInlinedSubroutine:
 					inlinedRoutines = append(inlinedRoutines, ent)
-					// Search inlined subroutines until all the children
+					// Search inlined subroutines until all the children.
 					inlinedDone = !ent.Children
+					// Not that "children" in the DWARF spec is defined as the next entry to this entry.
+					// See "2.3 Relationship of Debugging Information Entries" in https://dwarfstd.org/doc/DWARF4.pdf
 				}
 				continue entry
 			}
@@ -160,13 +164,11 @@ entry:
 		fileIndex, ok := inlined.Val(dwarf.AttrCallFile).(int64)
 		if !ok {
 			return
-		}
-		if fileIndex >= int64(len(files)) {
+		} else if fileIndex >= int64(len(files)) {
 			// This in theory shouldn't happen according to the spec, but guard against ill-formed DWARF info.
 			return
 		}
-		fileName := files[fileIndex]
-		line, col := inlined.Val(dwarf.AttrCallLine), inlined.Val(dwarf.AttrCallColumn)
+		fileName, line, col := files[fileIndex], inlined.Val(dwarf.AttrCallLine), inlined.Val(dwarf.AttrCallColumn)
 		if i == 0 {
 			// Last one is the origin of the inlined function calls.
 			ret = append(ret, fmt.Sprintf("%s%s:%d:%d", strings.Repeat(" ", len(addr)), fileName.Name, line, col))

@@ -95,7 +95,7 @@ wasm stack trace:
 
 					errStr := err.Error()
 
-					// Stack traces change where it's compiled, so we sanitize each line
+					// Since stack traces change where the binary is compiled, we sanitize each line
 					// so that it doesn't contain any file system dependent info.
 					scanner := bufio.NewScanner(strings.NewReader(errStr))
 					scanner.Split(bufio.ScanLines)
