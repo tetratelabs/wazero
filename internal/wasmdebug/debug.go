@@ -95,10 +95,10 @@ type ErrorBuilder interface {
 	// * funcName should be from FuncName
 	// * paramTypes should be from wasm.FunctionType
 	// * resultTypes should be from wasm.FunctionType
-	// * sourceInfo is the source code information for this frame and can be empty.
+	// * sources is the source code information for this frame and can be empty.
 	//
 	// Note: paramTypes and resultTypes are present because signature misunderstanding, mismatch or overflow are common.
-	AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sourceInfo string)
+	AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string)
 
 	// FromRecovered returns an error with the wasm stack trace appended to it.
 	FromRecovered(recovered interface{}) error
@@ -143,11 +143,11 @@ func (s *stackTrace) FromRecovered(recovered interface{}) error {
 	}
 }
 
-// AddFrame implements ErrorBuilder.Format
-func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sourceInfo string) {
+// AddFrame implements ErrorBuilder.AddFrame
+func (s *stackTrace) AddFrame(funcName string, paramTypes, resultTypes []api.ValueType, sources []string) {
 	sig := signature(funcName, paramTypes, resultTypes)
 	s.frames = append(s.frames, sig)
-	if sourceInfo != "" {
-		s.frames = append(s.frames, "\t"+sourceInfo)
+	for _, source := range sources {
+		s.frames = append(s.frames, "\t"+source)
 	}
 }
