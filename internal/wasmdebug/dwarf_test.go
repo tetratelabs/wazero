@@ -69,7 +69,7 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 
 	// codeSecStart is the beginning of the first code entry in the Wasm binary.
 	// If dwarftestdata.ZigWasm has been changed, we need to inspect by `wasm-tools dump`.
-	const codeSecStart = 0x0109
+	const codeSecStart = 0x108
 
 	// These cases are crafted by matching the stack trace result from wasmtime. To verify, run:
 	//
@@ -84,20 +84,24 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/os.zig:552:9
 	//           1:  0x18e - builtin.default_panic
 	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/builtin.zig:787:25
-	//           2:  0x12d - main.main
-	//                           at ././main.zig:1:23
+	//           2:  0x12d - main.inlined_b
+	//                           at ././main.zig:10:5              - main.inlined_a
+	//                           at ././main.zig:6:5              - main.main
+	//                           at ././main.zig:2:5
 	//           3:  0x2ce - start.callMain
-	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/start.zig:614:37
-	//                     - _start
+	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/start.zig:614:37              - _start
 	//                           at /Users/mathetake/zig-macos-aarch64-0.11.0-dev.618+096d3efae/lib/std/start.zig:240:42
+	//    2: wasm trap: wasm `unreachable` instruction executed
 	for _, tc := range []struct {
 		offset uint64
 		exp    string
 	}{
-		{offset: 0x2bb - codeSecStart, exp: "lib/std/os.zig:552:9"},
-		{offset: 0x18e - codeSecStart, exp: "lib/std/builtin.zig:787:25"},
+		//{offset: 0x2bb - codeSecStart, exp: "lib/std/os.zig:552:9"},
+		//{offset: 0x18e - codeSecStart, exp: "lib/std/builtin.zig:787:25"},
 		{offset: 0x12d - codeSecStart, exp: "main.zig:1:23"},
-		{offset: 0x2ce - codeSecStart, exp: "lib/std/start.zig:614:37"},
+		//{offset: 0x2ce - codeSecStart, exp: "lib/std/start.zig:614:37"},
+		//// Inlined function cal should be included.
+		//{offset: 0x2ce - codeSecStart, exp: "lib/std/start.zig:240:42"},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {

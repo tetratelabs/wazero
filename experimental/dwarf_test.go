@@ -79,6 +79,7 @@ func TestWithDWARFBasedStackTrace(t *testing.T) {
 					require.Error(t, err)
 
 					errStr := err.Error()
+					t.Log(errStr)
 					for _, exp := range lang.exps {
 						require.Contains(t, errStr, exp)
 					}
