@@ -1370,6 +1370,9 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
 
+	// oflags are currently not something we can pass to the filesystem to
+	// enforce, because fs.FS has no flags parameter. So, we have to validate
+	// them externally, in worst case after the file was already allocated.
 	oflags := wasiOflags(uint32(params[4]))
 
 	// rights aren't used
