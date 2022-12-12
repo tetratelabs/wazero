@@ -1571,14 +1571,14 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			fd:   fileFD,
 			buf:  0, bufLen: direntSize, // enough to read the dirent
 			resultBufused: 1000, // arbitrary
-			expectedErrno: ErrnoNotdir,
+			expectedErrno: ErrnoBadf,
 			expectedLog: `
 --> proxy.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
 	--> wasi_snapshot_preview1.fd_readdir(fd=5,buf=0,buf_len=24,cookie=0,result.bufused=1000)
 		==> wasi_snapshot_preview1.fdReaddir(fd=5,buf=0,buf_len=24,cookie=0)
-		<== (bufused=0,ENOTDIR)
-	<-- ENOTDIR
-<-- 54
+		<== (bufused=0,EBADF)
+	<-- EBADF
+<-- 8
 `,
 		},
 		{
@@ -2655,13 +2655,17 @@ func Test_pathOpen(t *testing.T) {
 
 func Test_pathOpen_Errors(t *testing.T) {
 	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	pathName := "wazero"
-	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
+	dirName := "wazero"
+	fileName := "notdir" // name length as wazero
+	testFS := fstest.MapFS{
+		dirName:  &fstest.MapFile{Mode: os.ModeDir},
+		fileName: &fstest.MapFile{},
+	}
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
 
 	validPath := uint32(0)    // arbitrary offset
-	validPathLen := uint32(6) // the length of "wazero"
+	validPathLen := uint32(6) // the length of dirName
 
 	tests := []struct {
 		name, pathName                            string
@@ -2731,7 +2735,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:          "no such file exists",
 			fd:            validFD,
-			pathName:      pathName,
+			pathName:      dirName,
 			path:          validPath,
 			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
 			expectedErrno: ErrnoNoent,
@@ -2747,7 +2751,7 @@ func Test_pathOpen_Errors(t *testing.T) {
 		{
 			name:           "out-of-memory writing resultOpenedFd",
 			fd:             validFD,
-			pathName:       pathName,
+			pathName:       dirName,
 			path:           validPath,
 			pathLen:        validPathLen,
 			resultOpenedFd: mod.Memory().Size(testCtx), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
@@ -2757,6 +2761,23 @@ func Test_pathOpen_Errors(t *testing.T) {
 	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=0,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=65536)
 	<-- EFAULT
 <-- 21
+`,
+		},
+		{
+			name:          "oflags=directory, but not a directory",
+			oflags:        uint32(wasiOflagsDirectory),
+			fd:            validFD,
+			pathName:      fileName,
+			path:          validPath,
+			pathLen:       validPathLen,
+			expectedErrno: ErrnoNotdir,
+			expectedLog: `
+--> proxy.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=3,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+	--> wasi_snapshot_preview1.path_open(fd=3,dirflags=0,path=0,path_len=6,oflags=3,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0,result.opened_fd=0)
+		==> wasi_snapshot_preview1.pathOpen(fd=3,dirflags=0,path=0,path_len=6,oflags=3,fs_rights_base=0,fs_rights_inheriting=0,fdflags=0)
+		<== (opened_fd=4,ENOTDIR)
+	<-- ENOTDIR
+<-- 54
 `,
 		},
 	}

@@ -46,29 +46,35 @@ func Test_fdReaddir_ls(t *testing.T) {
 }
 
 func testFdReaddirLs(t *testing.T, bin []byte) {
-	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "ls")
+	moduleConfig := wazero.NewModuleConfig().
+		WithFS(fstest.MapFS{
+			"-":   {},
+			"a-":  {Mode: fs.ModeDir},
+			"ab-": {},
+		})
 
 	t.Run("empty directory", func(t *testing.T) {
-		stdout, stderr := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
+		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "./a-"), bin)
 
-		require.Zero(t, stderr)
-		require.Zero(t, stdout)
+		require.Zero(t, console)
+	})
+
+	t.Run("not a directory", func(t *testing.T) {
+		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "-"), bin)
+
+		require.Equal(t, `
+ENOTDIR
+`, "\n"+console)
 	})
 
 	t.Run("directory with entries", func(t *testing.T) {
-		stdout, stderr := compileAndRun(t, moduleConfig.
-			WithFS(fstest.MapFS{
-				"-":   {},
-				"a-":  {Mode: fs.ModeDir},
-				"ab-": {},
-			}), bin)
+		console := compileAndRun(t, moduleConfig.WithArgs("wasi", "ls", "."), bin)
 
-		require.Zero(t, stderr)
 		require.Equal(t, `
 ./-
 ./a-
 ./ab-
-`, "\n"+stdout)
+`, "\n"+console)
 	})
 
 	t.Run("directory with tons of entries", func(t *testing.T) {
@@ -77,10 +83,10 @@ func testFdReaddirLs(t *testing.T, bin []byte) {
 		for i := 0; i < count; i++ {
 			testFS[strconv.Itoa(i)] = &fstest.MapFile{}
 		}
-		stdout, stderr := compileAndRun(t, moduleConfig.WithFS(testFS), bin)
+		config := wazero.NewModuleConfig().WithFS(testFS).WithArgs("wasi", "ls", ".")
+		console := compileAndRun(t, config, bin)
 
-		require.Zero(t, stderr)
-		lines := strings.Split(stdout, "\n")
+		lines := strings.Split(console, "\n")
 		require.Equal(t, count+1 /* trailing newline */, len(lines))
 	})
 }
@@ -102,19 +108,19 @@ func Test_fdReaddir_stat(t *testing.T) {
 func testFdReaddirStat(t *testing.T, bin []byte) {
 	moduleConfig := wazero.NewModuleConfig().WithArgs("wasi", "stat")
 
-	stdout, stderr := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
+	console := compileAndRun(t, moduleConfig.WithFS(fstest.MapFS{}), bin)
 
-	require.Zero(t, stderr)
 	require.Equal(t, `
 stdin isatty: true
 stdout isatty: true
 stderr isatty: true
 / isatty: false
-`, "\n"+stdout)
+`, "\n"+console)
 }
 
-func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (stdout, stderr string) {
-	var stdoutBuf, stderrBuf bytes.Buffer
+func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (console string) {
+	// same for console and stderr as sometimes the stack trace is in one or the other.
+	var consoleBuf bytes.Buffer
 
 	r := wazero.NewRuntime(testCtx)
 	defer r.Close(testCtx)
@@ -125,14 +131,13 @@ func compileAndRun(t *testing.T, config wazero.ModuleConfig, bin []byte) (stdout
 	compiled, err := r.CompileModule(testCtx, bin)
 	require.NoError(t, err)
 
-	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&stdoutBuf).WithStderr(&stderrBuf))
+	_, err = r.InstantiateModule(testCtx, compiled, config.WithStdout(&consoleBuf).WithStderr(&consoleBuf))
 	if exitErr, ok := err.(*sys.ExitError); ok {
-		require.Zero(t, exitErr.ExitCode(), stderrBuf.String())
+		require.Zero(t, exitErr.ExitCode(), consoleBuf.String())
 	} else {
-		require.NoError(t, err)
+		require.NoError(t, err, consoleBuf.String())
 	}
 
-	stdout = stdoutBuf.String()
-	stderr = stderrBuf.String()
+	console = consoleBuf.String()
 	return
 }
