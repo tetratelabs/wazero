@@ -225,6 +225,96 @@ func Benchmark_fdReaddir(b *testing.B) {
 	}
 }
 
+func Benchmark_pathFilestat(b *testing.B) {
+	embedFS, err := fs.Sub(testdata, "testdata")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	benches := []struct {
+		name string
+		fs   fs.FS
+		path string
+		fd   uint32
+	}{
+		{
+			name: "embed.FS fd=root",
+			fs:   embedFS,
+			path: "zig",
+			fd:   sys.FdRoot,
+		},
+		{
+			name: "embed.FS fd=directory",
+			fs:   embedFS,
+			path:/* zig */ "wasi.zig",
+		},
+		{
+			name: "os.DirFS fd=root",
+			fs:   os.DirFS("testdata"),
+			path: "zig",
+			fd:   sys.FdRoot,
+		},
+		{
+			name: "os.DirFS fd=directory",
+			fs:   os.DirFS("testdata"),
+			path:/* zig */ "wasi.zig",
+		},
+	}
+
+	for _, bb := range benches {
+		bc := bb
+
+		b.Run(bc.name, func(b *testing.B) {
+			r := wazero.NewRuntime(testCtx)
+			defer r.Close(testCtx)
+
+			mod, err := instantiateProxyModule(r, wazero.NewModuleConfig().WithFS(bc.fs))
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			// If the benchmark's file descriptor isn't root, open the file
+			// under a pre-determined directory: zig
+			fd := sys.FdRoot
+			if bc.fd != sys.FdRoot {
+				fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+				fd, err = fsc.OpenFile(testCtx, "zig")
+				if err != nil {
+					b.Fatal(err)
+				}
+				defer fsc.CloseFile(testCtx, fd)
+			}
+
+			fn := mod.ExportedFunction(pathFilestatGetName)
+
+			b.ResetTimer()
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+
+				flags := uint32(0)
+				path := uint32(0)
+				pathLen := len(bc.path)
+				resultFilestat := 1024 // where to write the stat
+
+				if !mod.Memory().WriteString(testCtx, path, bc.path) {
+					b.Fatal("could not write path")
+				}
+
+				// Time the call to write the stat
+				b.StartTimer()
+				results, err := fn.Call(testCtx, uint64(fd), uint64(flags), uint64(path), uint64(pathLen), uint64(resultFilestat))
+				if err != nil {
+					b.Fatal(err)
+				}
+				b.StopTimer()
+
+				requireEsuccess(b, results)
+			}
+		})
+	}
+}
+
 func requireEsuccess(b *testing.B, results []uint64) {
 	if errno := Errno(results[0]); errno != 0 {
 		b.Fatal(ErrnoName(errno))

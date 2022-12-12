@@ -310,6 +310,18 @@ func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno
 	return fdFilestatGetFunc(ctx, mod, uint32(params[0]), uint32(params[1]))
 }
 
+// TODO: support filesize and mtime when root
+var rootFilestat = []byte{
+	0, 0, 0, 0, 0, 0, 0, 0, // device
+	0, 0, 0, 0, 0, 0, 0, 0, // inode
+	byte(wasiFiletypeDirectory), 0, 0, 0, 0, 0, 0, 0, // filetype
+	1, 0, 0, 0, 0, 0, 0, 0, // nlink
+	0, 0, 0, 0, 0, 0, 0, 0, // filesize
+	0, 0, 0, 0, 0, 0, 0, 0, // atim
+	0, 0, 0, 0, 0, 0, 0, 0, // mtim
+	0, 0, 0, 0, 0, 0, 0, 0, // ctim
+}
+
 func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) Errno {
 	// Ensure we can write the filestat
 	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
@@ -329,25 +341,17 @@ func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
+	} else if fd == internalsys.FdRoot {
+		copy(buf, rootFilestat)
+		return ErrnoSuccess
 	}
 
-	var filetype wasiFiletype
-	var filesize uint64
-	var mtim int64
-	if f := file.File; f != nil { // not root
-		if stat, err := f.Stat(); err != nil {
-			return ErrnoIo
-		} else {
-			filetype = getWasiFiletype(stat.Mode())
-			filesize = uint64(stat.Size())
-			mtim = stat.ModTime().UnixNano()
-		}
-	} else { // root
-		filetype = wasiFiletypeDirectory
-		// TODO: support filesize and mtime when root
+	stat, err := file.File.Stat()
+	if err != nil {
+		return ErrnoIo
 	}
 
-	writeFilestat(buf, filetype, filesize, mtim)
+	writeFilestat(buf, stat)
 
 	return ErrnoSuccess
 }
@@ -379,7 +383,11 @@ var charFilestat = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, // ctim
 }
 
-func writeFilestat(buf []byte, filetype wasiFiletype, filesize uint64, mtim int64) {
+func writeFilestat(buf []byte, stat fs.FileInfo) {
+	filetype := getWasiFiletype(stat.Mode())
+	filesize := uint64(stat.Size())
+	mtim := stat.ModTime().UnixNano()
+
 	// memory is re-used, so ensure the result is defaulted.
 	copy(buf, charFilestat[:32])
 	buf[16] = uint8(filetype)
@@ -1203,11 +1211,13 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 
 	fd := uint32(params[0])
 
-	// TODO: implement flags?
-	// flags := uint32(params[1])
+	// TODO: flags is a lookupflags and it only has one bit: symlink_follow
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
+	_ /* flags */ = uint32(params[1])
 
 	pathOffset := uint32(params[2])
 	pathLen := uint32(params[3])
+
 	resultBuf := uint32(params[4])
 
 	// open_at isn't supported in fs.FS, so we check the path can't escape,
@@ -1218,6 +1228,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	}
 	pathName := string(b)
 
+	// Prepend the path if necessary.
 	if dir, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return ErrnoBadf
 	} else if dir.File == nil { // root
@@ -1227,15 +1238,20 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 		pathName = path.Join(dir.Path, pathName)
 	}
 
-	// Sadly, we need to open the file to stat it.
-	pathFd, errnoResult := openFile(ctx, fsc, pathName)
+	// Stat the file without allocating a file descriptor
+	stat, errnoResult := statFile(ctx, fsc, pathName)
 	if errnoResult != ErrnoSuccess {
 		return errnoResult
 	}
 
-	// Close it when the function returns.
-	defer fsc.CloseFile(ctx, pathFd)
-	return fdFilestatGetFunc(ctx, mod, pathFd, resultBuf)
+	// Write the stat result to memory
+	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
+	if !ok {
+		return ErrnoFault
+	}
+	writeFilestat(buf, stat)
+
+	return ErrnoSuccess
 }
 
 // pathFilestatSetTimes is the WASI function named pathFilestatSetTimesName
@@ -1325,13 +1341,21 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	fsc := sysCtx.FS(ctx)
 
 	fd := uint32(params[0])
+
+	// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
 	_ /* dirflags */ = uint32(params[1])
+
 	path := uint32(params[2])
 	pathLen := uint32(params[3])
+
 	_ /* oflags */ = uint32(params[4])
+
 	// rights aren't used
 	_, _ = params[5], params[6]
-	_ /* fdflags */ = uint32(params[7])
+
+	// TODO: only notable fdflag for opening is wasiFdflagsAppend
+	_ /* fdflags */ = wasiFdflags(uint32(params[7]))
 
 	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
 		return 0, ErrnoBadf
@@ -1399,11 +1423,7 @@ var pathUnlinkFile = stubFunction(
 )
 
 // openFile attempts to open the file at the given path. Errors coerce to WASI
-// Errno, returned as a slice to avoid allocation per-error.
-//
-// Note: Coercion isn't centralized in internalsys.FSContext because ABI use
-// different error codes. For example, wasi-filesystem and GOOS=js don't map to
-// these Errno.
+// Errno.
 func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) {
 	newFD, err := fsc.OpenFile(ctx, name)
 	if err == nil {
@@ -1411,20 +1431,42 @@ func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd 
 		errno = ErrnoSuccess
 		return
 	}
+	errno = toErrno(err)
+	return
+}
+
+// statFile attempts to stat the file at the given path. Errors coerce to WASI
+// Errno.
+func statFile(ctx context.Context, fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno Errno) {
+	s, err := fsc.StatFile(ctx, name)
+	if err == nil {
+		stat = s
+		errno = ErrnoSuccess
+		return
+	}
+	errno = toErrno(err)
+	return
+}
+
+// toErrno coerces the error to a WASI Errno.
+//
+// Note: Coercion isn't centralized in sys.FSContext because ABI use different
+// error codes. For example, wasi-filesystem and GOOS=js don't map to these
+// Errno.
+func toErrno(err error) Errno {
 	// handle all the cases of FS.Open or internal to FSContext.OpenFile
 	switch {
 	case errors.Is(err, fs.ErrInvalid):
-		errno = ErrnoInval
+		return ErrnoInval
 	case errors.Is(err, fs.ErrNotExist):
 		// fs.FS is allowed to return this instead of ErrInvalid on an invalid path
-		errno = ErrnoNoent
+		return ErrnoNoent
 	case errors.Is(err, fs.ErrExist):
-		errno = ErrnoExist
+		return ErrnoExist
 	case errors.Is(err, syscall.EBADF):
 		// fsc.OpenFile currently returns this on out of file descriptors
-		errno = ErrnoBadf
+		return ErrnoBadf
 	default:
-		errno = ErrnoIo
+		return ErrnoIo
 	}
-	return
 }

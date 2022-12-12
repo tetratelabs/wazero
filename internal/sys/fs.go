@@ -11,9 +11,22 @@ import (
 )
 
 const (
-	FdStdin = iota
+	FdStdin uint32 = iota
 	FdStdout
 	FdStderr
+
+	// FdRoot is the file descriptor of the root ("/") filesystem.
+	//
+	// # Why file descriptor 3?
+	//
+	// While not specified, the most common WASI implementation, wasi-libc, expects
+	// POSIX style file descriptor allocation, where the lowest available number is
+	// used to open the next file. Since 1 and 2 are taken by stdout and stderr,
+	// `root` is assigned 3.
+	//   - https://github.com/WebAssembly/WASI/issues/122
+	//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
+	//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
+	FdRoot
 )
 
 // FSKey is a context.Context Value key. It allows overriding fs.FS for WASI.
@@ -42,7 +55,7 @@ type FileEntry struct {
 	// Path was the argument to FSContext.OpenFile
 	Path string
 
-	// File when nil this is the root "/" (fd=3)
+	// File when nil this is the root "/" (fd=FdRoot)
 	File fs.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
@@ -65,7 +78,8 @@ type FSContext struct {
 	// fs is the root ("/") mount.
 	fs fs.FS
 
-	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
+	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
+	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles map[uint32]*FileEntry
 
@@ -84,18 +98,8 @@ var emptyFSContext = &FSContext{
 
 // NewFSContext creates a FSContext, using the `root` parameter for any paths
 // beginning at "/". If the input is EmptyFS, there is no root filesystem.
-// Otherwise, `root` is assigned file descriptor 3 and the returned context
-// can open files in that file system.
-//
-// Why file descriptor 3?
-//
-// While not specified, the most common WASI implementation, wasi-libc, expects
-// POSIX style file descriptor allocation, where the lowest available number is
-// used to open the next file. Since 1 and 2 are taken by stdout and stderr,
-// `root` is assigned 3.
-//   - https://github.com/WebAssembly/WASI/issues/122
-//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
-//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
+// Otherwise, `root` is assigned file descriptor FdRoot and the returned
+// context can open files in that file system.
 func NewFSContext(root fs.FS) *FSContext {
 	if root == EmptyFS {
 		return emptyFSContext
@@ -103,9 +107,9 @@ func NewFSContext(root fs.FS) *FSContext {
 	return &FSContext{
 		fs: root,
 		openedFiles: map[uint32]*FileEntry{
-			3: {Path: "/"},
+			FdRoot: {Path: "/"},
 		},
-		lastFD: 3,
+		lastFD: FdRoot,
 	}
 }
 
@@ -131,14 +135,7 @@ func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) 
 // e.g. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
 // See #390
 func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, perm int */) (uint32, error) {
-	// fs.ValidFile cannot be rooted (start with '/')
-	fsOpenPath := name
-	if name[0] == '/' {
-		fsOpenPath = name[1:]
-	}
-	fsOpenPath = path.Clean(fsOpenPath) // e.g. "sub/." -> "sub"
-
-	f, err := c.fs.Open(fsOpenPath)
+	f, err := c.openFile(name)
 	if err != nil {
 		return 0, err
 	}
@@ -150,6 +147,26 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 	}
 	c.openedFiles[newFD] = &FileEntry{Path: name, File: f}
 	return newFD, nil
+}
+
+func (c *FSContext) StatFile(_ context.Context, name string) (fs.FileInfo, error) {
+	f, err := c.openFile(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Stat()
+}
+
+func (c *FSContext) openFile(name string) (fs.File, error) {
+	// fs.ValidFile cannot be rooted (start with '/')
+	fsOpenPath := name
+	if name[0] == '/' {
+		fsOpenPath = name[1:]
+	}
+	fsOpenPath = path.Clean(fsOpenPath) // e.g. "sub/." -> "sub"
+
+	return c.fs.Open(fsOpenPath)
 }
 
 // CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
