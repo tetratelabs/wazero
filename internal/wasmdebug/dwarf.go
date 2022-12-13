@@ -155,12 +155,12 @@ entry:
 		panic("BUG: stored dwarf.LineReaderPos is invalid")
 	}
 
+	// In the inlined case, the line info is the innermost inlined function call.
+	inlined := len(inlinedRoutines) != 0
 	prefix := fmt.Sprintf("%#x: ", instructionOffset)
-	ret = append(ret, formatLine(prefix, le.File.Name, int64(le.Line), int64(le.Column),
-		// In the inlined case, the line info is the innermost inlined function call.
-		len(inlinedRoutines) != 0))
+	ret = append(ret, formatLine(prefix, le.File.Name, int64(le.Line), int64(le.Column), inlined))
 
-	if len(inlinedRoutines) >= 0 {
+	if inlined {
 		prefix = strings.Repeat(" ", len(prefix))
 		files := lineReader.Files()
 		// inlinedRoutines contain the inlined call information in the reverse order (children is higher than parent),
