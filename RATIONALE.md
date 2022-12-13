@@ -534,7 +534,8 @@ Compilers that target wasm act differently with regard to the working
 directory. For example, while `GOOS=js` uses host functions to track the
 working directory, WASI host functions do not. wasi-libc, used by TinyGo,
 tracks working directory changes in compiled wasm instead: initially "/" until
-code calls `chdir`.
+code calls `chdir`. Zig assumes the first pre-opened file descriptor is the
+working directory.
 
 The only place wazero can standardize a layered concern is via a host function.
 Since WASI doesn't use host functions to track the working directory, we can't
@@ -548,6 +549,7 @@ use absolute paths in configuration.
 See
 * https://github.com/golang/go/blob/go1.19rc2/src/syscall/fs_js.go#L324
 * https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
+* https://github.com/ziglang/zig/blob/53a9ee699a35a3d245ab6d1dac1f0687a4dcb42c/src/main.zig#L32
 
 ### Why ignore the error returned by io.Reader when n > 1?
 
@@ -592,8 +594,9 @@ not used again after initialization.
 wazero currently supports only one pre-opened file, "/" and so that is the name
 returned by `fd_prestat_dir_name` for file descriptor 3 (STDERR+1).
 
-See https://github.com/WebAssembly/wasi-libc/blob/a02298043ff551ce1157bc2ee7ab74c3bffe7144/libc-bottom-half/sources/preopens.c
-See https://github.com/ziglang/zig/blob/master/lib/std/fs/wasi.zig#L50-L53
+See
+ * https://github.com/WebAssembly/wasi-libc/blob/a02298043ff551ce1157bc2ee7ab74c3bffe7144/libc-bottom-half/sources/preopens.c
+ * https://github.com/ziglang/zig/blob/master/lib/std/fs/wasi.zig#L50-L53
 
 ### fd_prestat_dir_name
 
