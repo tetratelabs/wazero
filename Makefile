@@ -107,7 +107,11 @@ build.examples.emscripten: $(emscripten_sources)
 %/wasi.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm internal/testing/dwarftestdata/testdata/rust/main.wasm
+
+internal/testing/dwarftestdata/testdata/rust/main.wasm:
+	@cd $(@D) && cargo wasi build
+	@mv $(@D)/target/wasm32-wasi/debug/$(@F) $(@D)
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs

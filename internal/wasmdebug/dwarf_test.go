@@ -3,6 +3,7 @@ package wasmdebug_test
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 
@@ -39,9 +40,9 @@ func TestDWARFLines_Line_TinyGo(t *testing.T) {
 		// Unknown offset returns empty string.
 		{offset: math.MaxUint64},
 		// The first instruction should point to the first line of each function in internal/testing/dwarftestdata/testdata/tinygo.go
-		{offset: a, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/main.go:9:3"}},
-		{offset: b, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/main.go:14:3"}},
-		{offset: c, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/main.go:19:7"}},
+		{offset: a, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:9:3"}},
+		{offset: b, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:14:3"}},
+		{offset: c, exp: []string{"wazero/internal/testing/dwarftestdata/testdata/tinygo/main.go:19:7"}},
 	}
 
 	for _, tc := range tests {
@@ -75,10 +76,11 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 	// codeSecStart is the beginning of the first code entry in the Wasm binary.
 	// If dwarftestdata.ZigWasm has been changed, we need to inspect by `wasm-tools dump`.
 	const codeSecStart = 0x108
+	// 0x12d-0x108
 
 	// These cases are crafted by matching the stack trace result from wasmtime. To verify, run:
 	//
-	// 	WASMTIME_BACKTRACE_DETAILS=1 wasmtime run internal/testing/dwarftestdata/testdata/zig.wasm
+	// 	WASMTIME_BACKTRACE_DETAILS=1 wasmtime run internal/testing/dwarftestdata/testdata/zig/main.wasm
 	//
 	// And this should produce the output as:
 	//
@@ -118,6 +120,53 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 			actual := mod.DWARFLines.Line(tc.offset)
 
 			t.Log(actual)
+
+			require.Equal(t, len(tc.exp), len(actual))
+			for i := range tc.exp {
+				require.Contains(t, actual[i], tc.exp[i])
+			}
+		})
+	}
+}
+
+func TestDWARFLines_Line_Rust(t *testing.T) {
+	mod, err := binary.DecodeModule(dwarftestdata.RustWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, false)
+	require.NoError(t, err)
+	require.NotNil(t, mod.DWARFLines)
+
+	const codeSecStart = 0x309
+
+	for _, tc := range []struct {
+		offset uint64
+		exp    []string
+	}{
+		{offset: 0xc77d - codeSecStart, exp: []string{
+			"/library/core/src/slice/index.rs:286:39",
+			"/library/core/src/ptr/const_ptr.rs:870:18",
+			"/library/core/src/slice/index.rs:286:39",
+			"/library/core/src/slice/mod.rs:1630:46",
+			"/library/core/src/slice/mod.rs:405:20",
+			"/library/core/src/slice/mod.rs:1630:46",
+			"/library/core/src/slice/mod.rs:1548:18",
+			"/library/core/src/slice/iter.rs:1478:30",
+			"/library/core/src/str/count.rs:74:18",
+		}},
+		{offset: 0xc06a - codeSecStart, exp: []string{"/library/core/src/fmt/mod.rs"}},
+		{offset: 0xc6e7 - codeSecStart, exp: []string{
+			"/library/core/src/iter/traits/iterator.rs:2414:21",
+			"/library/core/src/iter/adapters/map.rs:124:9",
+			"/library/core/src/iter/traits/accum.rs:42:17",
+			"/library/core/src/iter/traits/iterator.rs:3347:9",
+			"/library/core/src/str/count.rs:135:5",
+			"/library/core/src/str/count.rs:135:5",
+			"/library/core/src/str/count.rs:71:21",
+		}},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%#x/%s", tc.offset, tc.exp), func(t *testing.T) {
+			actual := mod.DWARFLines.Line(tc.offset)
+
+			fmt.Println(strings.Join(actual, "\n"))
 
 			require.Equal(t, len(tc.exp), len(actual))
 			for i := range tc.exp {
