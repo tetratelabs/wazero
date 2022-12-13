@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	_ "embed"
+	"fmt"
 	"os/exec"
 )
 
@@ -40,7 +41,8 @@ func init() {
 		out := bytes.NewBuffer(nil)
 		cmd.Stdout = out
 		if err = cmd.Run(); err != nil {
-			panic(err)
+			fmt.Printf("Skipping DWARF tests for rusts as xz command failed: %v", err)
+			return
 		}
 		RustWasm = out.Bytes()
 	}

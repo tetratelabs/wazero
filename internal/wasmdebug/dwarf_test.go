@@ -129,6 +129,9 @@ func TestDWARFLines_Line_Zig(t *testing.T) {
 }
 
 func TestDWARFLines_Line_Rust(t *testing.T) {
+	if len(dwarftestdata.RustWasm) == 0 {
+		t.Skip()
+	}
 	mod, err := binary.DecodeModule(dwarftestdata.RustWasm, api.CoreFeaturesV2, wasm.MemoryLimitPages, false, true, false)
 	require.NoError(t, err)
 	require.NotNil(t, mod.DWARFLines)

@@ -161,6 +161,9 @@ wasm stack trace:
 				},
 			} {
 				t.Run(lang.name, func(t *testing.T) {
+					if len(lang.bin) == 0 {
+						t.Skip()
+					}
 					compiled, err := r.CompileModule(ctx, lang.bin)
 					require.NoError(t, err)
 
