@@ -28,7 +28,7 @@ func TestWithFS(t *testing.T) {
 
 	entry, ok := fsCtx.OpenedFile(ctx, 3)
 	require.True(t, ok)
-	require.Equal(t, "/", entry.Path)
+	require.Equal(t, "/", entry.Name)
 
 	// Override to nil context, ex to block file access
 	ctx, closer, err = experimental.WithFS(ctx, nil)

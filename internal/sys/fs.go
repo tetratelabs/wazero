@@ -75,11 +75,13 @@ func (emptyRootDir) Sys() interface{}   { return nil }
 
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
-	// Path was the argument to FSContext.OpenFile
-	// TODO: we may need an additional field which is the full path.
-	Path string
+	// Name is the basename of the file, at the time it was opened. When the
+	// file is root "/" (fd = FdRoot), this is "/".
+	//
+	// Note: This must match fs.FileInfo.
+	Name string
 
-	// File is always non-nil, even when root "/" (fd=FdRoot)
+	// File is always non-nil, even when root "/" (fd = FdRoot).
 	File fs.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
@@ -159,7 +161,7 @@ func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
 	return &FSContext{
 		fs: root,
 		openedFiles: map[uint32]*FileEntry{
-			FdRoot: {Path: "/", File: rootDir},
+			FdRoot: {Name: "/", File: rootDir},
 		},
 		lastFD: FdRoot,
 	}, nil
@@ -197,7 +199,7 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 		_ = f.Close()
 		return 0, syscall.EBADF
 	}
-	c.openedFiles[newFD] = &FileEntry{Path: name, File: f}
+	c.openedFiles[newFD] = &FileEntry{Name: path.Base(name), File: f}
 	return newFD, nil
 }
 

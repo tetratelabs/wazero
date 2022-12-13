@@ -462,6 +462,11 @@ func fdPrestatGetFn(ctx context.Context, mod api.Module, stack []uint64) (presta
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd := uint32(stack[0])
 
+	// Currently, we only pre-open the root file descriptor.
+	if fd != internalsys.FdRoot {
+		return 0, ErrnoBadf
+	}
+
 	entry, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return 0, ErrnoBadf
@@ -469,7 +474,7 @@ func fdPrestatGetFn(ctx context.Context, mod api.Module, stack []uint64) (presta
 
 	// Upper 32-bits are zero because...
 	// * Zero-value 8-bit tag, and 3-byte zero-value padding
-	prestat = uint64(len(entry.Path) << 32)
+	prestat = uint64(len(entry.Name) << 32)
 	errno = ErrnoSuccess
 	return
 }
@@ -514,19 +519,22 @@ func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Er
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
 
+	// Currently, we only pre-open the root file descriptor.
+	if fd != internalsys.FdRoot {
+		return ErrnoBadf
+	}
+
 	f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
 	}
 
 	// Some runtimes may have another semantics. See /RATIONALE.md
-	if uint32(len(f.Path)) < pathLen {
+	if uint32(len(f.Name)) < pathLen {
 		return ErrnoNametoolong
 	}
 
-	// TODO: fdPrestatDirName may have to return ErrnoNotdir if the type of the
-	// prestat data of `fd` is not a PrestatDir.
-	if !mod.Memory().Write(ctx, path, []byte(f.Path)[:pathLen]) {
+	if !mod.Memory().Write(ctx, path, []byte(f.Name)[:pathLen]) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -1231,7 +1239,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 		return ErrnoNotdir // TODO: cache filetype instead of poking.
 	} else {
 		// TODO: consolidate "at" logic with path_open as same issues occur.
-		pathName = path.Join(dir.Path, pathName)
+		pathName = path.Join(dir.Name, pathName)
 	}
 
 	// Stat the file without allocating a file descriptor
