@@ -16,11 +16,16 @@ import (
 func TestContext_FS(t *testing.T) {
 	sysCtx := DefaultContext(testfs.FS{})
 
-	require.Equal(t, NewFSContext(testfs.FS{}), sysCtx.FS(testCtx))
+	fsc1, err := NewFSContext(testfs.FS{})
+	require.NoError(t, err)
+
+	require.Equal(t, fsc1, sysCtx.FS(testCtx))
+
+	fsc2, err := NewFSContext(testfs.FS{"foo": &testfs.File{}})
+	require.NoError(t, err)
 
 	// can override to something else
-	fsc := NewFSContext(testfs.FS{"foo": &testfs.File{}})
-	require.Equal(t, fsc, sysCtx.FS(context.WithValue(testCtx, FSKey{}, fsc)))
+	require.Equal(t, fsc2, sysCtx.FS(context.WithValue(testCtx, FSKey{}, fsc2)))
 }
 
 func TestDefaultSysContext(t *testing.T) {
@@ -55,7 +60,8 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
-	require.Equal(t, NewFSContext(testfs.FS{}), sysCtx.FS(testCtx))
+	expectedFS, _ := NewFSContext(testfs.FS{})
+	require.Equal(t, expectedFS, sysCtx.FS(testCtx))
 }
 
 func TestNewContext_Args(t *testing.T) {

@@ -173,7 +173,7 @@ func Test_fdFdstatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   internalsys.FdStderr + 1,
+			fd:   internalsys.FdRoot,
 			expectedMemory: []byte{
 				3, 0, // fs_filetype
 				0, 0, 0, 0, 0, 0, // fs_flags
@@ -286,7 +286,11 @@ func Test_fdFdstatSetRights(t *testing.T) {
 
 func Test_fdFilestatGet(t *testing.T) {
 	file, dir := "a", "b"
-	testFS := fstest.MapFS{file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)}, dir: {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)}}
+	testFS := fstest.MapFS{
+		".":  {Mode: 0o755 | fs.ModeDir, ModTime: time.Unix(0, 0)},
+		file: {Data: make([]byte, 10), ModTime: time.Unix(1667482413, 0)},
+		dir:  {Mode: fs.ModeDir, ModTime: time.Unix(1667482413, 0)},
+	}
 
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
 	defer r.Close(testCtx)
@@ -370,7 +374,7 @@ func Test_fdFilestatGet(t *testing.T) {
 		},
 		{
 			name: "root",
-			fd:   internalsys.FdStderr + 1,
+			fd:   internalsys.FdRoot,
 			expectedMemory: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // dev
 				0, 0, 0, 0, 0, 0, 0, 0, // ino
