@@ -113,7 +113,7 @@ build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_s
 internal/testing/dwarftestdata/testdata/rust/main.wasm.xz:
 	cd $(@D) && cargo wasi build
 	mv $(@D)/target/wasm32-wasi/debug/main.wasm $(@D)
-	cd $(@D) && xz -k -f ./main.wasm # Rust's DWARF section is huge, so compress as gzip.
+	cd $(@D) && xz -k -f ./main.wasm # Rust's DWARF section is huge, so compress it.
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs
