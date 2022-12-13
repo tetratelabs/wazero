@@ -140,6 +140,9 @@ entry:
 	ln := lines[index]
 	if ln.addr != instructionOffset {
 		// If the address doesn't match exactly, the previous entry is the one that contains the instruction.
+		// That can happen anytime as the DWARF spec allows it, and other tools can handle it in this way conventionally
+		// https://github.com/gimli-rs/addr2line/blob/3a2dbaf84551a06a429f26e9c96071bb409b371f/src/lib.rs#L236-L242
+		// https://github.com/kateinoigakukun/wasminspect/blob/f29f052f1b03104da9f702508ac0c1bbc3530ae4/crates/debugger/src/dwarf/mod.rs#L453-L459
 		if index-1 < 0 {
 			return
 		}
