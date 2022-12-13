@@ -41,8 +41,10 @@ func TestNewFSContext(t *testing.T) {
 			fs:   embedFS,
 		},
 		{
-			name:         "os.DirFS",
-			fs:           os.DirFS("testdata"),
+			name: "os.DirFS",
+			// Don't use "testdata" because it may not be present in
+			// cross-architecture (a.k.a. scratch) build containers.
+			fs:           os.DirFS("."),
 			expectOsFile: true,
 		},
 		{
