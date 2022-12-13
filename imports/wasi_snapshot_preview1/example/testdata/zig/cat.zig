@@ -10,8 +10,6 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    _ = try std.fs.wasi.preopensAlloc(allocator);
-
     // loop on the args, skipping the filename (args[0])
     for (args[1..args.len]) |arg| {
 
