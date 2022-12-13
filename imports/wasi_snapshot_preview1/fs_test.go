@@ -729,9 +729,9 @@ func Test_fdPread_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatGet(t *testing.T) {
-	pathName := "/tmp"
-	mod, fd, log, r := requireOpenFile(t, pathName, nil)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
+	fd := internalsys.FdRoot // only pre-opened directory currently supported.
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
@@ -739,7 +739,7 @@ func Test_fdPrestatGet(t *testing.T) {
 		0,       // 8-bit tag indicating `prestat_dir`, the only available tag
 		0, 0, 0, // 3-byte padding
 		// the result path length field after this
-		byte(len(pathName)), 0, 0, 0, // = in little endian encoding
+		1, 0, 0, 0, // = in little endian encoding
 		'?',
 	}
 
@@ -747,10 +747,10 @@ func Test_fdPrestatGet(t *testing.T) {
 
 	requireErrno(t, ErrnoSuccess, mod, fdPrestatGetName, uint64(fd), uint64(resultPrestat))
 	require.Equal(t, `
---> proxy.fd_prestat_get(fd=4,result.prestat=1)
-	--> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=1)
-		==> wasi_snapshot_preview1.fdPrestatGet(fd=4)
-		<== (prestat=17179869184,ESUCCESS)
+--> proxy.fd_prestat_get(fd=3,result.prestat=1)
+	--> wasi_snapshot_preview1.fd_prestat_get(fd=3,result.prestat=1)
+		==> wasi_snapshot_preview1.fdPrestatGet(fd=3)
+		<== (prestat=4294967296,ESUCCESS)
 	<-- ESUCCESS
 <-- 0
 `, "\n"+log.String())
@@ -761,9 +761,9 @@ func Test_fdPrestatGet(t *testing.T) {
 }
 
 func Test_fdPrestatGet_Errors(t *testing.T) {
-	pathName := "/tmp"
-	mod, fd, log, r := requireOpenFile(t, pathName, nil)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
+	fd := internalsys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size(testCtx)
 	tests := []struct {
@@ -793,8 +793,8 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 			resultPrestat: memorySize,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_prestat_get(fd=4,result.prestat=65536)
-	--> wasi_snapshot_preview1.fd_prestat_get(fd=4,result.prestat=65536)
+--> proxy.fd_prestat_get(fd=3,result.prestat=65536)
+	--> wasi_snapshot_preview1.fd_prestat_get(fd=3,result.prestat=65536)
 	<-- EFAULT
 <-- 21
 `,
@@ -815,24 +815,22 @@ func Test_fdPrestatGet_Errors(t *testing.T) {
 }
 
 func Test_fdPrestatDirName(t *testing.T) {
-	pathName := "/tmp"
-	mod, fd, log, r := requireOpenFile(t, pathName, nil)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
+	fd := internalsys.FdRoot // only pre-opened directory currently supported.
 
 	path := uint32(1)    // arbitrary offset
-	pathLen := uint32(3) // shorter than len("/tmp") to test the path is written for the length of pathLen
+	pathLen := uint32(0) // shorter than len("/") to prove truncation is ok
 	expectedMemory := []byte{
-		'?',
-		'/', 't', 'm',
-		'?', '?', '?',
+		'?', '?', '?', '?',
 	}
 
 	maskMemory(t, testCtx, mod, len(expectedMemory))
 
 	requireErrno(t, ErrnoSuccess, mod, fdPrestatDirNameName, uint64(fd), uint64(path), uint64(pathLen))
 	require.Equal(t, `
---> proxy.fd_prestat_dir_name(fd=4,path=1,path_len=3)
-	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=1,path_len=3)
+--> proxy.fd_prestat_dir_name(fd=3,path=1,path_len=0)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=1,path_len=0)
 	<== ESUCCESS
 <-- 0
 `, "\n"+log.String())
@@ -843,13 +841,13 @@ func Test_fdPrestatDirName(t *testing.T) {
 }
 
 func Test_fdPrestatDirName_Errors(t *testing.T) {
-	pathName := "/tmp"
-	mod, fd, log, r := requireOpenFile(t, pathName, nil)
+	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fstest.MapFS{}))
 	defer r.Close(testCtx)
+	fd := internalsys.FdRoot // only pre-opened directory currently supported.
 
 	memorySize := mod.Memory().Size(testCtx)
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
-	pathLen := uint32(len("/tmp"))
+	pathLen := uint32(len("/"))
 
 	tests := []struct {
 		name          string
@@ -866,8 +864,8 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
-	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65536,path_len=4)
+--> proxy.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
 	<== EFAULT
 <-- 21
 `,
@@ -879,8 +877,8 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoFault,
 			expectedLog: `
---> proxy.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
-	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=65533,path_len=4)
+--> proxy.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=65536,path_len=1)
 	<== EFAULT
 <-- 21
 `,
@@ -892,8 +890,8 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen + 1,
 			expectedErrno: ErrnoNametoolong,
 			expectedLog: `
---> proxy.fd_prestat_dir_name(fd=4,path=0,path_len=5)
-	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=4,path=0,path_len=5)
+--> proxy.fd_prestat_dir_name(fd=3,path=0,path_len=2)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=3,path=0,path_len=2)
 	<== ENAMETOOLONG
 <-- 37
 `,
@@ -905,8 +903,8 @@ func Test_fdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: ErrnoBadf,
 			expectedLog: `
---> proxy.fd_prestat_dir_name(fd=42,path=0,path_len=4)
-	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=4)
+--> proxy.fd_prestat_dir_name(fd=42,path=0,path_len=1)
+	==> wasi_snapshot_preview1.fd_prestat_dir_name(fd=42,path=0,path_len=1)
 	<== EBADF
 <-- 8
 `,
@@ -2654,7 +2652,7 @@ func Test_pathOpen(t *testing.T) {
 	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
 	f, ok := fsc.OpenedFile(testCtx, expectedFD)
 	require.True(t, ok)
-	require.Equal(t, pathName, f.Path)
+	require.Equal(t, pathName, f.Name)
 }
 
 func Test_pathOpen_Errors(t *testing.T) {

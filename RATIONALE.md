@@ -534,7 +534,8 @@ Compilers that target wasm act differently with regard to the working
 directory. For example, while `GOOS=js` uses host functions to track the
 working directory, WASI host functions do not. wasi-libc, used by TinyGo,
 tracks working directory changes in compiled wasm instead: initially "/" until
-code calls `chdir`.
+code calls `chdir`. Zig assumes the first pre-opened file descriptor is the
+working directory.
 
 The only place wazero can standardize a layered concern is via a host function.
 Since WASI doesn't use host functions to track the working directory, we can't
@@ -548,6 +549,7 @@ use absolute paths in configuration.
 See
 * https://github.com/golang/go/blob/go1.19rc2/src/syscall/fs_js.go#L324
 * https://github.com/WebAssembly/wasi-libc/pull/214#issue-673090117
+* https://github.com/ziglang/zig/blob/53a9ee699a35a3d245ab6d1dac1f0687a4dcb42c/src/main.zig#L32
 
 ### Why ignore the error returned by io.Reader when n > 1?
 
@@ -579,22 +581,43 @@ operation will err if it needs to. This helps reduce the complexity of the code
 in wazero and also accommodates the scenario where the bytes read are enough to
 satisfy its processor.
 
-### FdPrestatDirName
+### Pre-opened files
 
-`FdPrestatDirName` is a WASI function to return the path of the pre-opened directory of a file descriptor.
-It has the following three parameters, and the third `pathLen` has ambiguous semantics.
+WASI includes `fd_prestat_get` and `fd_prestat_dir_name` functions used to
+learn any directory paths for file descriptors open at initialization time.
 
-- `fd` - a file descriptor
-- `path` - the offset for the result path
-- `pathLen` - In wazero, `FdPrestatDirName` writes the result path string to `path` offset for the exact length of `pathLen`.
+For example, `__wasilibc_register_preopened_fd` scans any file descriptors past
+STDERR (1) and invokes `fd_prestat_dir_name` to learn any path prefixes they
+correspond to. Zig's `preopensAlloc` does similar. These pre-open functions are
+not used again after initialization.
 
-Wasmer considers `pathLen` to be the maximum length instead of the exact length that should be written.
+wazero currently supports only one pre-opened file, "/" and so that is the name
+returned by `fd_prestat_dir_name` for file descriptor 3 (STDERR+1).
+
+See
+ * https://github.com/WebAssembly/wasi-libc/blob/a02298043ff551ce1157bc2ee7ab74c3bffe7144/libc-bottom-half/sources/preopens.c
+ * https://github.com/ziglang/zig/blob/9cb06f3b8bf9ea6b5e5307711bc97328762d6a1d/lib/std/fs/wasi.zig#L50-L53
+
+### fd_prestat_dir_name
+
+`fd_prestat_dir_name` is a WASI function to return the path of the pre-opened
+directory of a file descriptor. It has the following three parameters, and the
+third `path_len` has ambiguous semantics.
+
+* `fd`: a file descriptor
+* `path`: the offset for the result path
+* `path_len`: In wazero, `FdPrestatDirName` writes the result path string to
+  `path` offset for the exact length of `path_len`.
+
+Wasmer considers `path_len` to be the maximum length instead of the exact
+length  that should be written.
 See https://github.com/wasmerio/wasmer/blob/3463c51268ed551933392a4063bd4f8e7498b0f6/lib/wasi/src/syscalls/mod.rs#L764
 
 The semantics in wazero follows that of wasmtime.
 See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6ab543e8c3f3b238/crates/wasi-common/src/snapshots/preview_1.rs#L578-L582
 
-Their semantics match when `pathLen` == the length of `path`, so in practice this difference won't matter match.
+Their semantics match when `path_len` == the length of `path`, so in practice
+this difference won't matter match.
 
 ## sys.Walltime and Nanotime
 

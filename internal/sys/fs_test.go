@@ -4,8 +4,10 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
+	"path"
 	"testing"
 	"testing/fstest"
 
@@ -18,13 +20,6 @@ var testCtx = context.WithValue(context.Background(), struct{}{}, "arbitrary")
 
 //go:embed testdata
 var testdata embed.FS
-
-var testFS = fstest.MapFS{
-	"empty.txt":    {},
-	"test.txt":     {Data: []byte("animals\n")},
-	"sub":          {Mode: fs.ModeDir},
-	"sub/test.txt": {Data: []byte("greet sub dir\n")},
-}
 
 func TestNewFSContext(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
@@ -49,11 +44,7 @@ func TestNewFSContext(t *testing.T) {
 		},
 		{
 			name: "fstest.MapFS",
-			fs:   testFS,
-		},
-		{
-			name: "fstest.MapFS",
-			fs:   testFS,
+			fs:   fstest.MapFS{},
 		},
 	}
 
@@ -66,7 +57,7 @@ func TestNewFSContext(t *testing.T) {
 			defer fsc.Close(testCtx)
 
 			require.Equal(t, tc.fs, fsc.fs)
-			require.Equal(t, "/", fsc.openedFiles[FdRoot].Path)
+			require.Equal(t, "/", fsc.openedFiles[FdRoot].Name)
 			rootFile := fsc.openedFiles[FdRoot].File
 			require.NotNil(t, rootFile)
 
@@ -116,6 +107,65 @@ func TestEmptyFSContext(t *testing.T) {
 		// Ensure this didn't modify state
 		require.Equal(t, expected, testFS)
 	})
+}
+
+func TestContext_File(t *testing.T) {
+	embedFS, err := fs.Sub(testdata, "testdata")
+	require.NoError(t, err)
+
+	fsc, err := NewFSContext(embedFS)
+	require.NoError(t, err)
+	defer fsc.Close(testCtx)
+
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{
+			name: "empty.txt",
+		},
+		{
+			name:     "test.txt",
+			expected: "animals\n",
+		},
+		{
+			name:     "sub/test.txt",
+			expected: "greet sub dir\n",
+		},
+		{
+			name:     "sub/sub/test.txt",
+			expected: "greet sub sub dir\n",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(b *testing.T) {
+			fd, err := fsc.OpenFile(testCtx, tc.name)
+			require.NoError(t, err)
+			defer fsc.CloseFile(testCtx, fd)
+
+			f, ok := fsc.OpenedFile(testCtx, fd)
+			require.True(t, ok)
+
+			stat, err := f.File.Stat()
+			require.NoError(t, err)
+
+			// Ensure the name is the basename and matches the stat name.
+			require.Equal(t, path.Base(tc.name), f.Name)
+			require.Equal(t, f.Name, stat.Name())
+
+			buf := make([]byte, stat.Size())
+			size, err := f.File.Read(buf)
+			if err != nil {
+				require.Equal(t, io.EOF, err)
+			}
+			require.Equal(t, stat.Size(), int64(size))
+
+			require.Equal(t, tc.expected, string(buf[:size]))
+		})
+	}
 }
 
 func TestContext_Close(t *testing.T) {
