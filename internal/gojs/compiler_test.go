@@ -48,7 +48,7 @@ var (
 	testCtx context.Context
 	testFS  = fstest.MapFS{
 		"empty.txt":    {},
-		"test.txt":     {Data: []byte("animals")},
+		"test.txt":     {Data: []byte("animals\n")},
 		"sub":          {Mode: fs.ModeDir},
 		"sub/test.txt": {Data: []byte("greet sub dir\n")},
 	}

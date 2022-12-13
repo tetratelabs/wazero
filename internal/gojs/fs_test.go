@@ -20,6 +20,7 @@ Not a directory
 /test.txt ok
 test.txt ok
 contents: animals
+
 empty: 
 `, stdout)
 }
