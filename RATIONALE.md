@@ -607,10 +607,10 @@ third `path_len` has ambiguous semantics.
 * `fd`: a file descriptor
 * `path`: the offset for the result path
 * `path_len`: In wazero, `FdPrestatDirName` writes the result path string to
-  `path` offset for the exact length of `pathLen`.
+  `path` offset for the exact length of `path_len`.
 
-Wasmer considers `pathLen` to be the maximum length instead of the exact length
-that should be written.
+Wasmer considers `path_len` to be the maximum length instead of the exact
+length  that should be written.
 See https://github.com/wasmerio/wasmer/blob/3463c51268ed551933392a4063bd4f8e7498b0f6/lib/wasi/src/syscalls/mod.rs#L764
 
 The semantics in wazero follows that of wasmtime.
