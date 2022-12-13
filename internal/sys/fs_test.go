@@ -55,18 +55,20 @@ func TestEmptyFSContext(t *testing.T) {
 }
 
 func TestContext_Close(t *testing.T) {
-	fsc := NewFSContext(testfs.FS{"foo": &testfs.File{}})
-	_, err := fsc.OpenFile(testCtx, "/foo")
+	fsc, err := NewFSContext(testfs.FS{"foo": &testfs.File{}})
 	require.NoError(t, err)
-
 	// Verify base case
-	require.True(t, len(fsc.openedFiles) > 0, "fsc.openedFiles was empty")
+	require.Equal(t, 1, len(fsc.openedFiles))
+
+	_, err = fsc.OpenFile(testCtx, "foo")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(fsc.openedFiles))
 
 	// Closing should not err.
 	require.NoError(t, fsc.Close(testCtx))
 
 	// Verify our intended side-effect
-	require.Zero(t, len(fsc.openedFiles), "expected no opened files")
+	require.Zero(t, len(fsc.openedFiles))
 
 	// Verify no error closing again.
 	require.NoError(t, fsc.Close(testCtx))
@@ -74,8 +76,11 @@ func TestContext_Close(t *testing.T) {
 
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
-	fsc := NewFSContext(testfs.FS{"foo": file})
-	_, err := fsc.OpenFile(testCtx, "/foo")
+	fsc, err := NewFSContext(testfs.FS{"foo": file})
+	require.NoError(t, err)
+
+	// open another file
+	_, err = fsc.OpenFile(testCtx, "foo")
 	require.NoError(t, err)
 
 	require.EqualError(t, fsc.Close(testCtx), "error closing")

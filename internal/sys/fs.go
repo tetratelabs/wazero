@@ -2,12 +2,14 @@ package sys
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"math"
 	"path"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 const (
@@ -50,12 +52,34 @@ func (f *emptyFS) Open(name string) (fs.File, error) {
 	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 }
 
+// An emptyRootDir is a fake "/" directory.
+type emptyRootDir struct{}
+
+var _ fs.ReadDirFile = emptyRootDir{}
+
+func (emptyRootDir) Stat() (fs.FileInfo, error) { return emptyRootDir{}, nil }
+func (emptyRootDir) Read([]byte) (int, error) {
+	return 0, &fs.PathError{Op: "read", Path: "/", Err: errors.New("is a directory")}
+}
+func (emptyRootDir) Close() error                       { return nil }
+func (emptyRootDir) ReadDir(int) ([]fs.DirEntry, error) { return nil, nil }
+
+var _ fs.FileInfo = emptyRootDir{}
+
+func (emptyRootDir) Name() string       { return "/" }
+func (emptyRootDir) Size() int64        { return 0 }
+func (emptyRootDir) Mode() fs.FileMode  { return fs.ModeDir | 0o555 }
+func (emptyRootDir) ModTime() time.Time { return time.Unix(0, 0) }
+func (emptyRootDir) IsDir() bool        { return true }
+func (emptyRootDir) Sys() interface{}   { return nil }
+
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
 	// Path was the argument to FSContext.OpenFile
+	// TODO: we may need an additional field which is the full path.
 	Path string
 
-	// File when nil this is the root "/" (fd=FdRoot)
+	// File is always non-nil, even when root "/" (fd=FdRoot)
 	File fs.File
 
 	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
@@ -100,17 +124,33 @@ var emptyFSContext = &FSContext{
 // beginning at "/". If the input is EmptyFS, there is no root filesystem.
 // Otherwise, `root` is assigned file descriptor FdRoot and the returned
 // context can open files in that file system.
-func NewFSContext(root fs.FS) *FSContext {
+//
+// If root is a fs.ReadDirFS, any error on opening "." is returned.
+func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
 	if root == EmptyFS {
-		return emptyFSContext
+		fsc = emptyFSContext
+		return
 	}
+
+	// Open the root directory by using "." as "/" is not relevant in fs.FS.
+	// This not only validates the file system, but also allows us to test if
+	// this is a real file or not. ex. `file.(*os.File)`.
+	var rootDir fs.File
+	if rdFS, ok := root.(fs.ReadDirFS); ok {
+		if rootDir, err = rdFS.Open("."); err != nil {
+			return
+		}
+	} else { // we can't list the root directory, fake it.
+		rootDir = emptyRootDir{}
+	}
+
 	return &FSContext{
 		fs: root,
 		openedFiles: map[uint32]*FileEntry{
-			FdRoot: {Path: "/"},
+			FdRoot: {Path: "/", File: rootDir},
 		},
 		lastFD: FdRoot,
-	}
+	}, nil
 }
 
 // nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
@@ -177,9 +217,6 @@ func (c *FSContext) CloseFile(_ context.Context, fd uint32) bool {
 	}
 	delete(c.openedFiles, fd)
 
-	if f.File == nil { // The root entry
-		return true
-	}
 	if err := f.File.Close(); err != nil {
 		return false
 	}
@@ -191,10 +228,8 @@ func (c *FSContext) Close(context.Context) (err error) {
 	// Close any files opened in this context
 	for fd, entry := range c.openedFiles {
 		delete(c.openedFiles, fd)
-		if entry.File != nil { // File is nil for the root filesystem
-			if e := entry.File.Close(); e != nil {
-				err = e // This means err returned == the last non-nil error.
-			}
+		if e := entry.File.Close(); e != nil {
+			err = e // This means err returned == the last non-nil error.
 		}
 	}
 	return
@@ -207,9 +242,11 @@ func FdWriter(ctx context.Context, sysCtx *Context, fd uint32) io.Writer {
 		return sysCtx.Stdout()
 	case FdStderr:
 		return sysCtx.Stderr()
+	case FdRoot:
+		return nil // directory, not a writeable file.
 	default:
 		// Check to see if the file descriptor is available
-		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
+		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
 			return nil
 		} else if writer, ok := f.File.(io.Writer); !ok {
 			// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
@@ -224,6 +261,8 @@ func FdWriter(ctx context.Context, sysCtx *Context, fd uint32) io.Writer {
 func FdReader(ctx context.Context, sysCtx *Context, fd uint32) io.Reader {
 	if fd == FdStdin {
 		return sysCtx.Stdin()
+	} else if fd == FdRoot {
+		return nil // directory, not a readable file.
 	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
 		return nil
 	} else {

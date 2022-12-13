@@ -224,9 +224,9 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc = NewFSContext(fs)
+		sysCtx.fsc, err = NewFSContext(fs)
 	} else {
-		sysCtx.fsc = NewFSContext(EmptyFS)
+		sysCtx.fsc, err = NewFSContext(EmptyFS)
 	}
 
 	return

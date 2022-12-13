@@ -35,9 +35,12 @@ func Example_withFS() {
 		log.Panicln(err)
 	}
 
-	// Setup the filesystem overlay, noting that it can fail if the directory is
-	// invalid and must be closed.
-	ctx, closer := experimental.WithFS(ctx, os.DirFS("."))
+	// Configure the filesystem overlay, noting that it can fail if the
+	// directory is invalid. The closer must be closed.
+	ctx, closer, err := experimental.WithFS(ctx, os.DirFS("."))
+	if err != nil {
+		log.Panicln(err)
+	}
 	defer closer.Close(ctx)
 
 	fdPrestatDirName := mod.ExportedFunction("fd_prestat_dir_name")

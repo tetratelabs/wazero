@@ -17,7 +17,8 @@ func TestWithFS(t *testing.T) {
 	mapfs := fstest.MapFS{fileName: &fstest.MapFile{Data: []byte(`animals`)}}
 
 	// Set context to one that has experimental fs config
-	ctx, closer := experimental.WithFS(context.Background(), mapfs)
+	ctx, closer, err := experimental.WithFS(context.Background(), mapfs)
+	require.NoError(t, err)
 	defer closer.Close(ctx)
 
 	v := ctx.Value(sys.FSKey{})
@@ -30,7 +31,8 @@ func TestWithFS(t *testing.T) {
 	require.Equal(t, "/", entry.Path)
 
 	// Override to nil context, ex to block file access
-	ctx, closer = experimental.WithFS(ctx, nil)
+	ctx, closer, err = experimental.WithFS(ctx, nil)
+	require.NoError(t, err)
 	defer closer.Close(ctx)
 
 	v = ctx.Value(sys.FSKey{})

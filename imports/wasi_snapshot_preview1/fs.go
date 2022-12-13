@@ -171,18 +171,19 @@ func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	}
 
 	// see if the file is writable
-	fdflags := wasiFdflagsNone
-	filetype := wasiFiletypeDirectory // root
-	if f := file.File; f != nil {     // not root
-		if _, ok := f.(io.Writer); ok {
-			fdflags = wasiFdflagsAppend
-		}
+	f := file.File
+	var filetype wasiFiletype
+	var fdflags wasiFdflags
+	if _, ok := f.(io.Writer); ok {
+		// TODO: maybe cache flags to open instead
+		fdflags = wasiFdflagsAppend
+	}
 
-		if fdstat, err := f.Stat(); err != nil {
-			return ErrnoIo
-		} else {
-			filetype = getWasiFiletype(fdstat.Mode())
-		}
+	if fdstat, err := f.Stat(); err != nil {
+		return ErrnoIo
+	} else {
+		// TODO: maybe cache file type instead
+		filetype = getWasiFiletype(fdstat.Mode())
 	}
 
 	writeFdstat(buf, filetype, fdflags)
@@ -310,18 +311,6 @@ func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno
 	return fdFilestatGetFunc(ctx, mod, uint32(params[0]), uint32(params[1]))
 }
 
-// TODO: support filesize and mtime when root
-var rootFilestat = []byte{
-	0, 0, 0, 0, 0, 0, 0, 0, // device
-	0, 0, 0, 0, 0, 0, 0, 0, // inode
-	byte(wasiFiletypeDirectory), 0, 0, 0, 0, 0, 0, 0, // filetype
-	1, 0, 0, 0, 0, 0, 0, 0, // nlink
-	0, 0, 0, 0, 0, 0, 0, 0, // filesize
-	0, 0, 0, 0, 0, 0, 0, 0, // atim
-	0, 0, 0, 0, 0, 0, 0, 0, // mtim
-	0, 0, 0, 0, 0, 0, 0, 0, // ctim
-}
-
 func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) Errno {
 	// Ensure we can write the filestat
 	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
@@ -341,9 +330,6 @@ func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32
 	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
 	if !ok {
 		return ErrnoBadf
-	} else if fd == internalsys.FdRoot {
-		copy(buf, rootFilestat)
-		return ErrnoSuccess
 	}
 
 	stat, err := file.File.Stat()
@@ -1022,9 +1008,13 @@ func fdSeekFn(ctx context.Context, mod api.Module, stack []uint64) (int64, Errno
 	offset := stack[1]
 	whence := uint32(stack[2])
 
+	if fd == internalsys.FdRoot {
+		return 0, ErrnoBadf // cannot seek a directory
+	}
+
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
-	if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
+	if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
 		return 0, ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
@@ -1215,7 +1205,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fsc := sysCtx.FS(ctx)
 
-	fd := uint32(params[0])
+	dirfd := uint32(params[0])
 
 	// TODO: flags is a lookupflags and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -1235,12 +1225,12 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	pathName := string(b)
 
 	// Prepend the path if necessary.
-	if dir, ok := fsc.OpenedFile(ctx, fd); !ok {
+	if dir, ok := fsc.OpenedFile(ctx, dirfd); !ok {
 		return ErrnoBadf
-	} else if dir.File == nil { // root
 	} else if _, ok := dir.File.(fs.ReadDirFile); !ok {
-		return ErrnoNotdir
+		return ErrnoNotdir // TODO: cache filetype instead of poking.
 	} else {
+		// TODO: consolidate "at" logic with path_open as same issues occur.
 		pathName = path.Join(dir.Path, pathName)
 	}
 
@@ -1361,7 +1351,7 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	sysCtx := mod.(*wasm.CallContext).Sys
 	fsc := sysCtx.FS(ctx)
 
-	fd := uint32(params[0])
+	dirfd := uint32(params[0])
 
 	// TODO: dirflags is a lookupflags and it only has one bit: symlink_follow
 	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#lookupflags
@@ -1381,7 +1371,12 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	// TODO: only notable fdflag for opening is wasiFdflagsAppend
 	_ /* fdflags */ = wasiFdflags(uint32(params[7]))
 
-	if _, ok := fsc.OpenedFile(ctx, fd); !ok {
+	// Note: We don't handle AT_FDCWD, as that's resolved in the compiler.
+	// There's no working directory function in WASI, so CWD cannot be handled
+	// here in any way except assuming it is "/".
+	//
+	// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
+	if _, ok := fsc.OpenedFile(ctx, dirfd); !ok {
 		return 0, ErrnoBadf
 	}
 
@@ -1390,6 +1385,12 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 		return 0, ErrnoFault
 	}
 
+	// TODO: path is not precise here, as it should be a path relative to the
+	// FD, which isn't always rootFD (3). This means the path for Open may need
+	// to be built up. For example, if dirfd represents "/tmp/foo" and
+	// path="bar", this should open "/tmp/foo/bar" not "/bar".
+	//
+	// See https://linux.die.net/man/2/openat
 	newFD, errnoResult := openFile(ctx, fsc, string(b))
 	if errnoResult != ErrnoSuccess {
 		return 0, errnoResult
