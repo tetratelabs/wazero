@@ -120,12 +120,13 @@ var emptyFSContext = &FSContext{
 	lastFD:      2,
 }
 
+var errNotDir = errors.New("not a directory")
+
 // NewFSContext creates a FSContext, using the `root` parameter for any paths
 // beginning at "/". If the input is EmptyFS, there is no root filesystem.
 // Otherwise, `root` is assigned file descriptor FdRoot and the returned
-// context can open files in that file system.
-//
-// If root is a fs.ReadDirFS, any error on opening "." is returned.
+// context can open files in that file system. Any error on opening "." is
+// returned.
 func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
 	if root == EmptyFS {
 		fsc = emptyFSContext
@@ -135,13 +136,24 @@ func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
 	// Open the root directory by using "." as "/" is not relevant in fs.FS.
 	// This not only validates the file system, but also allows us to test if
 	// this is a real file or not. ex. `file.(*os.File)`.
-	var rootDir fs.File
-	if rdFS, ok := root.(fs.ReadDirFS); ok {
-		if rootDir, err = rdFS.Open("."); err != nil {
-			return
-		}
-	} else { // we can't list the root directory, fake it.
+	//
+	// Note: We don't use fs.ReadDirFS as this isn't implemented by os.DirFS.
+	rootDir, err := root.Open(".")
+	if err != nil {
+		// This could fail because someone made a special-purpose file system,
+		// which only passes certain filenames and not ".".
 		rootDir = emptyRootDir{}
+		err = nil
+	}
+
+	// Verify the directory existed and was a directory at the time the context
+	// was created.
+	var stat fs.FileInfo
+	if stat, err = rootDir.Stat(); err != nil {
+		return // err if we couldn't determine if the root was a directory.
+	} else if !stat.IsDir() {
+		err = &fs.PathError{Op: "ReadDir", Path: stat.Name(), Err: errNotDir}
+		return
 	}
 
 	return &FSContext{
