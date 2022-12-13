@@ -596,7 +596,7 @@ returned by `fd_prestat_dir_name` for file descriptor 3 (STDERR+1).
 
 See
  * https://github.com/WebAssembly/wasi-libc/blob/a02298043ff551ce1157bc2ee7ab74c3bffe7144/libc-bottom-half/sources/preopens.c
- * https://github.com/ziglang/zig/blob/master/lib/std/fs/wasi.zig#L50-L53
+ * https://github.com/ziglang/zig/blob/9cb06f3b8bf9ea6b5e5307711bc97328762d6a1d/lib/std/fs/wasi.zig#L50-L53
 
 ### fd_prestat_dir_name
 
