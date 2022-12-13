@@ -586,12 +586,14 @@ learn any directory paths for file descriptors open at initialization time.
 
 For example, `__wasilibc_register_preopened_fd` scans any file descriptors past
 STDERR (1) and invokes `fd_prestat_dir_name` to learn any path prefixes they
-correspond to.
+correspond to. Zig's `preopensAlloc` does similar. These pre-open functions are
+not used again after initialization.
 
 wazero currently supports only one pre-opened file, "/" and so that is the name
 returned by `fd_prestat_dir_name` for file descriptor 3 (STDERR+1).
 
 See https://github.com/WebAssembly/wasi-libc/blob/a02298043ff551ce1157bc2ee7ab74c3bffe7144/libc-bottom-half/sources/preopens.c
+See https://github.com/ziglang/zig/blob/master/lib/std/fs/wasi.zig#L50-L53
 
 ### fd_prestat_dir_name
 
