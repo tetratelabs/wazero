@@ -107,13 +107,13 @@ build.examples.emscripten: $(emscripten_sources)
 %/wasi.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm internal/testing/dwarftestdata/testdata/rust/main.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm internal/testing/dwarftestdata/testdata/rust/main.wasm.xz
 
 # Normally, we build release because it is smaller. Testing dwarf requires the debug build.
-internal/testing/dwarftestdata/testdata/rust/main.wasm:
-	@cd $(@D) && cargo wasi build
-	@mv $(@D)/target/wasm32-wasi/debug/$(@F) $(@D)
-	@xz -f $(@) # Rust's DWARF section is huge, so compress as gzip.
+internal/testing/dwarftestdata/testdata/rust/main.wasm.xz:
+	cd $(@D) && cargo wasi build
+	mv $(@D)/target/wasm32-wasi/debug/main.wasm $(@D)
+	cd $(@D) && xz -k -f ./main.wasm # Rust's DWARF section is huge, so compress as gzip.
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs
