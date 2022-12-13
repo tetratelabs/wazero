@@ -137,8 +137,20 @@ entry:
 		return
 	}
 
+	ln := lines[index]
+	if ln.addr != instructionOffset {
+		// If the address doesn't match exactly, the previous entry is the one that contains the instruction.
+		// That can happen anytime as the DWARF spec allows it, and other tools can handle it in this way conventionally
+		// https://github.com/gimli-rs/addr2line/blob/3a2dbaf84551a06a429f26e9c96071bb409b371f/src/lib.rs#L236-L242
+		// https://github.com/kateinoigakukun/wasminspect/blob/f29f052f1b03104da9f702508ac0c1bbc3530ae4/crates/debugger/src/dwarf/mod.rs#L453-L459
+		if index-1 < 0 {
+			return
+		}
+		ln = lines[index-1]
+	}
+
 	// Advance the line reader for the found position.
-	lineReader.Seek(lines[index].pos)
+	lineReader.Seek(ln.pos)
 	err = lineReader.Next(&le)
 
 	if err != nil {
@@ -146,35 +158,50 @@ entry:
 		panic("BUG: stored dwarf.LineReaderPos is invalid")
 	}
 
-	if len(inlinedRoutines) == 0 {
-		// Do early return for non-inlined case.
-		ret = []string{fmt.Sprintf("%#x: %s:%d:%d", le.Address, le.File.Name, le.Line, le.Column)}
-		return
-	}
-
 	// In the inlined case, the line info is the innermost inlined function call.
-	addr := fmt.Sprintf("%#x: ", le.Address)
-	ret = append(ret, fmt.Sprintf("%s%s:%d:%d (inlined)", addr, le.File.Name, le.Line, le.Column))
+	inlined := len(inlinedRoutines) != 0
+	prefix := fmt.Sprintf("%#x: ", instructionOffset)
+	ret = append(ret, formatLine(prefix, le.File.Name, int64(le.Line), int64(le.Column), inlined))
 
-	files := lineReader.Files()
-	// inlinedRoutines contain the inlined call information in the reverse order (children is higher than parent),
-	// so we traverse the reverse order and emit the inlined calls.
-	for i := len(inlinedRoutines) - 1; i >= 0; i-- {
-		inlined := inlinedRoutines[i]
-		fileIndex, ok := inlined.Val(dwarf.AttrCallFile).(int64)
-		if !ok {
-			return
-		} else if fileIndex >= int64(len(files)) {
-			// This in theory shouldn't happen according to the spec, but guard against ill-formed DWARF info.
-			return
-		}
-		fileName, line, col := files[fileIndex], inlined.Val(dwarf.AttrCallLine), inlined.Val(dwarf.AttrCallColumn)
-		if i == 0 {
-			// Last one is the origin of the inlined function calls.
-			ret = append(ret, fmt.Sprintf("%s%s:%d:%d", strings.Repeat(" ", len(addr)), fileName.Name, line, col))
-		} else {
-			ret = append(ret, fmt.Sprintf("%s%s:%d:%d (inlined)", strings.Repeat(" ", len(addr)), fileName.Name, line, col))
+	if inlined {
+		prefix = strings.Repeat(" ", len(prefix))
+		files := lineReader.Files()
+		// inlinedRoutines contain the inlined call information in the reverse order (children is higher than parent),
+		// so we traverse the reverse order and emit the inlined calls.
+		for i := len(inlinedRoutines) - 1; i >= 0; i-- {
+			inlined := inlinedRoutines[i]
+			fileIndex, ok := inlined.Val(dwarf.AttrCallFile).(int64)
+			if !ok {
+				return
+			} else if fileIndex >= int64(len(files)) {
+				// This in theory shouldn't happen according to the spec, but guard against ill-formed DWARF info.
+				return
+			}
+			fileName := files[fileIndex]
+			line, _ := inlined.Val(dwarf.AttrCallLine).(int64)
+			col, _ := inlined.Val(dwarf.AttrCallColumn).(int64)
+			ret = append(ret, formatLine(prefix, fileName.Name, line, col,
+				// Last one is the origin of the inlined function calls.
+				i != 0))
 		}
 	}
 	return
+}
+
+func formatLine(prefix, fileName string, line, col int64, inlined bool) string {
+	builder := strings.Builder{}
+	builder.WriteString(prefix)
+	builder.WriteString(fileName)
+
+	if line != 0 {
+		builder.WriteString(fmt.Sprintf(":%d", line))
+		if col != 0 {
+			builder.WriteString(fmt.Sprintf(":%d", col))
+		}
+	}
+
+	if inlined {
+		builder.WriteString(" (inlined)")
+	}
+	return builder.String()
 }
