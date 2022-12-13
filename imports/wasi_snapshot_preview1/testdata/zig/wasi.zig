@@ -1,7 +1,6 @@
 const std = @import("std");
 const os = std.os;
 const allocator = std.heap.page_allocator;
-const preopensAlloc = std.fs.wasi.preopensAlloc;
 const stdout = std.io.getStdOut().writer();
 
 pub fn main() !void {
@@ -10,8 +9,6 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (std.mem.eql(u8, args[1], "ls")) {
-        _ = try preopensAlloc(allocator);
-
         var dir = std.fs.cwd().openIterableDir(args[2], .{}) catch |err| switch (err) {
             error.NotDir => {
                 try stdout.print("ENOTDIR\n", .{});
