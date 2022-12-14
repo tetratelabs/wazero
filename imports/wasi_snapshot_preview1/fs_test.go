@@ -51,12 +51,12 @@ func Test_fdClose(t *testing.T) {
 	defer r.Close(testCtx)
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fdToClose, err := fsc.OpenFile(testCtx, path1)
+	fdToClose, err := fsc.OpenFile(path1)
 	require.NoError(t, err)
 
-	fdToKeep, err := fsc.OpenFile(testCtx, path2)
+	fdToKeep, err := fsc.OpenFile(path2)
 	require.NoError(t, err)
 
 	// Close
@@ -69,11 +69,11 @@ func Test_fdClose(t *testing.T) {
 `, "\n"+log.String())
 
 	// Verify fdToClose is closed and removed from the opened FDs.
-	_, ok := fsc.OpenedFile(testCtx, fdToClose)
+	_, ok := fsc.OpenedFile(fdToClose)
 	require.False(t, ok)
 
 	// Verify fdToKeep is not closed
-	_, ok = fsc.OpenedFile(testCtx, fdToKeep)
+	_, ok = fsc.OpenedFile(fdToKeep)
 	require.True(t, ok)
 
 	log.Reset()
@@ -108,12 +108,12 @@ func Test_fdFdstatGet(t *testing.T) {
 	memorySize := mod.Memory().Size(testCtx)
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fileFd, err := fsc.OpenFile(testCtx, file)
+	fileFd, err := fsc.OpenFile(file)
 	require.NoError(t, err)
 
-	dirFd, err := fsc.OpenFile(testCtx, dir)
+	dirFd, err := fsc.OpenFile(dir)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -297,12 +297,12 @@ func Test_fdFilestatGet(t *testing.T) {
 	memorySize := mod.Memory().Size(testCtx)
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fileFd, err := fsc.OpenFile(testCtx, file)
+	fileFd, err := fsc.OpenFile(file)
 	require.NoError(t, err)
 
-	dirFd, err := fsc.OpenFile(testCtx, dir)
+	dirFd, err := fsc.OpenFile(dir)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1242,9 +1242,9 @@ func Test_fdReaddir(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(fdReadDirFs))
 	defer r.Close(testCtx)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	fd, err := fsc.OpenFile(testCtx, "dir")
+	fd, err := fsc.OpenFile("dir")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1481,7 +1481,7 @@ func Test_fdReaddir(t *testing.T) {
 			defer log.Reset()
 
 			// Assign the state we are testing
-			file, ok := fsc.OpenedFile(testCtx, fd)
+			file, ok := fsc.OpenedFile(fd)
 			require.True(t, ok)
 			dir := tc.dir()
 			defer dir.File.Close()
@@ -1521,12 +1521,12 @@ func Test_fdReaddir_Errors(t *testing.T) {
 	defer r.Close(testCtx)
 	memLen := mod.Memory().Size(testCtx)
 
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
-	dirFD, err := fsc.OpenFile(testCtx, "dir")
+	dirFD, err := fsc.OpenFile("dir")
 	require.NoError(t, err)
 
-	fileFD, err := fsc.OpenFile(testCtx, "notdir")
+	fileFD, err := fsc.OpenFile("notdir")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1685,7 +1685,7 @@ func Test_fdReaddir_Errors(t *testing.T) {
 			defer log.Reset()
 
 			// Reset the directory so that tests don't taint each other.
-			if file, ok := fsc.OpenedFile(testCtx, tc.fd); ok && tc.fd == dirFD {
+			if file, ok := fsc.OpenedFile(tc.fd); ok && tc.fd == dirFD {
 				dir, err := fdReadDirFs.Open("dir")
 				require.NoError(t, err)
 				defer dir.Close()
@@ -2016,8 +2016,8 @@ func Test_fdSeek(t *testing.T) {
 			maskMemory(t, testCtx, mod, len(tc.expectedMemory))
 
 			// Since we initialized this file, we know it is a seeker (because it is a MapFile)
-			fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-			f, ok := fsc.OpenedFile(testCtx, fd)
+			fsc := mod.(*wasm.CallContext).Sys.FS()
+			f, ok := fsc.OpenedFile(fd)
 			require.True(t, ok)
 			seeker := f.File.(io.Seeker)
 
@@ -2375,14 +2375,14 @@ func Test_pathFilestatGet(t *testing.T) {
 	memorySize := mod.Memory().Size(testCtx)
 
 	// open both paths without using WASI
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	rootFd := uint32(3) // after stderr
 
-	fileFd, err := fsc.OpenFile(testCtx, file)
+	fileFd, err := fsc.OpenFile(file)
 	require.NoError(t, err)
 
-	dirFd, err := fsc.OpenFile(testCtx, dir)
+	dirFd, err := fsc.OpenFile(dir)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -2649,8 +2649,8 @@ func Test_pathOpen(t *testing.T) {
 	require.Equal(t, expectedMemory, actual)
 
 	// verify the file was actually opened
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-	f, ok := fsc.OpenedFile(testCtx, expectedFD)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	f, ok := fsc.OpenedFile(expectedFD)
 	require.True(t, ok)
 	require.Equal(t, pathName, f.Name)
 }
@@ -2860,8 +2860,8 @@ func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, ui
 	}
 	testFS := fstest.MapFS{pathName[1:]: mapFile} // strip the leading slash
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-	fd, err := fsc.OpenFile(testCtx, pathName)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd, err := fsc.OpenFile(pathName)
 	require.NoError(t, err)
 	return mod, fd, log, r
 }
@@ -2870,12 +2870,12 @@ func requireOpenFile(t *testing.T, pathName string, data []byte) (api.Module, ui
 func requireOpenWritableFile(t *testing.T, tmpDir string, pathName string) (api.Module, uint32, *bytes.Buffer, api.Closer) {
 	writeable, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithFS(testFS))
-	fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-	fd, err := fsc.OpenFile(testCtx, pathName)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	fd, err := fsc.OpenFile(pathName)
 	require.NoError(t, err)
 
 	// Swap the read-only file with a writeable one until #390
-	f, ok := fsc.OpenedFile(testCtx, fd)
+	f, ok := fsc.OpenedFile(fd)
 	require.True(t, ok)
 	f.File.Close()
 	f.File = writeable

@@ -171,16 +171,16 @@ func Benchmark_fdReaddir(b *testing.B) {
 			fn := mod.ExportedFunction(fdReaddirName)
 
 			// Open the root directory as a file-descriptor.
-			fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-			fd, err := fsc.OpenFile(testCtx, ".")
+			fsc := mod.(*wasm.CallContext).Sys.FS()
+			fd, err := fsc.OpenFile(".")
 			if err != nil {
 				b.Fatal(err)
 			}
-			f, ok := fsc.OpenedFile(testCtx, fd)
+			f, ok := fsc.OpenedFile(fd)
 			if !ok {
 				b.Fatal("couldn't open fd ", fd)
 			}
-			defer fsc.CloseFile(testCtx, fd)
+			defer fsc.CloseFile(fd)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -277,12 +277,12 @@ func Benchmark_pathFilestat(b *testing.B) {
 			// under a pre-determined directory: zig
 			fd := sys.FdRoot
 			if bc.fd != sys.FdRoot {
-				fsc := mod.(*wasm.CallContext).Sys.FS(testCtx)
-				fd, err = fsc.OpenFile(testCtx, "zig")
+				fsc := mod.(*wasm.CallContext).Sys.FS()
+				fd, err = fsc.OpenFile("zig")
 				if err != nil {
 					b.Fatal(err)
 				}
-				defer fsc.CloseFile(testCtx, fd)
+				defer fsc.CloseFile(fd)
 			}
 
 			fn := mod.ExportedFunction(pathFilestatGetName)

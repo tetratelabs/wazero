@@ -3,7 +3,6 @@ package gojs
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/gojs/spfunc"
@@ -60,17 +59,12 @@ var WasmWrite = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 })
 
 func wasmWrite(ctx context.Context, mod api.Module, stack []uint64) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	fd, p, n := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
 
-	var writer io.Writer
-
-	switch fd {
-	case 1:
-		writer = mod.(*wasm.CallContext).Sys.Stdout()
-	case 2:
-		writer = mod.(*wasm.CallContext).Sys.Stderr()
-	default:
-		// Keep things simple by expecting nothing past 2
+	writer := fsc.FdWriter(fd)
+	if writer == nil {
 		panic(fmt.Errorf("unexpected fd %d", fd))
 	}
 

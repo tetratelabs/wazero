@@ -31,11 +31,6 @@ const (
 	FdRoot
 )
 
-// FSKey is a context.Context Value key. It allows overriding fs.FS for WASI.
-//
-// See https://github.com/tetratelabs/wazero/issues/491
-type FSKey struct{}
-
 // EmptyFS is exported to special-case an empty file system.
 var EmptyFS = &emptyFS{}
 
@@ -104,6 +99,9 @@ type FSContext struct {
 	// fs is the root ("/") mount.
 	fs fs.FS
 
+	stdin          io.Reader
+	stdout, stderr io.Writer
+
 	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
@@ -113,15 +111,6 @@ type FSContext struct {
 	lastFD uint32
 }
 
-// emptyFSContext is the context associated with EmptyFS.
-//
-// Note: This is not mutable as operations functions do not affect field state.
-var emptyFSContext = &FSContext{
-	fs:          EmptyFS,
-	openedFiles: map[uint32]*FileEntry{},
-	lastFD:      2,
-}
-
 var errNotDir = errors.New("not a directory")
 
 // NewFSContext creates a FSContext, using the `root` parameter for any paths
@@ -129,10 +118,30 @@ var errNotDir = errors.New("not a directory")
 // Otherwise, `root` is assigned file descriptor FdRoot and the returned
 // context can open files in that file system. Any error on opening "." is
 // returned.
-func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
+func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *FSContext, err error) {
+	if stdin == nil {
+		stdin = eofReader{}
+	}
+
+	if stdout == nil {
+		stdout = io.Discard
+	}
+
+	if stderr == nil {
+		stderr = io.Discard
+	}
+
+	fsc = &FSContext{
+		stdin:       stdin,
+		stdout:      stdout,
+		stderr:      stderr,
+		fs:          root,
+		openedFiles: map[uint32]*FileEntry{},
+		lastFD:      FdStderr,
+	}
+
 	if root == EmptyFS {
-		fsc = emptyFSContext
-		return
+		return fsc, nil
 	}
 
 	// Open the root directory by using "." as "/" is not relevant in fs.FS.
@@ -158,13 +167,10 @@ func NewFSContext(root fs.FS) (fsc *FSContext, err error) {
 		return
 	}
 
-	return &FSContext{
-		fs: root,
-		openedFiles: map[uint32]*FileEntry{
-			FdRoot: {Name: "/", File: rootDir},
-		},
-		lastFD: FdRoot,
-	}, nil
+	fsc.openedFiles[FdRoot] = &FileEntry{Name: "/", File: rootDir}
+	fsc.lastFD = FdRoot
+
+	return fsc, nil
 }
 
 // nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
@@ -178,7 +184,7 @@ func (c *FSContext) nextFD() uint32 {
 }
 
 // OpenedFile returns a file and true if it was opened or nil and false, if syscall.EBADF.
-func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) {
+func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
 	f, ok := c.openedFiles[fd]
 	return f, ok
 }
@@ -188,7 +194,7 @@ func (c *FSContext) OpenedFile(_ context.Context, fd uint32) (*FileEntry, bool) 
 // TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
 // e.g. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
 // See #390
-func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, perm int */) (uint32, error) {
+func (c *FSContext) OpenFile(name string /* TODO: flags int, perm int */) (uint32, error) {
 	f, err := c.openFile(name)
 	if err != nil {
 		return 0, err
@@ -203,7 +209,7 @@ func (c *FSContext) OpenFile(_ context.Context, name string /* TODO: flags int, 
 	return newFD, nil
 }
 
-func (c *FSContext) StatFile(_ context.Context, name string) (fs.FileInfo, error) {
+func (c *FSContext) StatFile(name string) (fs.FileInfo, error) {
 	f, err := c.openFile(name)
 	if err != nil {
 		return nil, err
@@ -223,8 +229,43 @@ func (c *FSContext) openFile(name string) (fs.File, error) {
 	return c.fs.Open(fsOpenPath)
 }
 
+// FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
+func (c *FSContext) FdWriter(fd uint32) io.Writer {
+	switch fd {
+	case FdStdout:
+		return c.stdout
+	case FdStderr:
+		return c.stderr
+	case FdRoot:
+		return nil // directory, not a writeable file.
+	default:
+		// Check to see if the file descriptor is available
+		if f, ok := c.openedFiles[fd]; !ok {
+			return nil
+		} else if writer, ok := f.File.(io.Writer); !ok {
+			// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
+			return nil
+		} else {
+			return writer
+		}
+	}
+}
+
+// FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
+func (c *FSContext) FdReader(fd uint32) io.Reader {
+	if fd == FdStdin {
+		return c.stdin
+	} else if fd == FdRoot {
+		return nil // directory, not a readable file.
+	} else if f, ok := c.openedFiles[fd]; !ok {
+		return nil
+	} else {
+		return f.File
+	}
+}
+
 // CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
-func (c *FSContext) CloseFile(_ context.Context, fd uint32) bool {
+func (c *FSContext) CloseFile(fd uint32) bool {
 	f, ok := c.openedFiles[fd]
 	if !ok {
 		return false
@@ -237,7 +278,7 @@ func (c *FSContext) CloseFile(_ context.Context, fd uint32) bool {
 	return true
 }
 
-// Close implements io.Closer
+// Close implements api.Closer
 func (c *FSContext) Close(context.Context) (err error) {
 	// Close any files opened in this context
 	for fd, entry := range c.openedFiles {
@@ -247,39 +288,4 @@ func (c *FSContext) Close(context.Context) (err error) {
 		}
 	}
 	return
-}
-
-// FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
-func FdWriter(ctx context.Context, sysCtx *Context, fd uint32) io.Writer {
-	switch fd {
-	case FdStdout:
-		return sysCtx.Stdout()
-	case FdStderr:
-		return sysCtx.Stderr()
-	case FdRoot:
-		return nil // directory, not a writeable file.
-	default:
-		// Check to see if the file descriptor is available
-		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
-			return nil
-		} else if writer, ok := f.File.(io.Writer); !ok {
-			// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
-			return nil
-		} else {
-			return writer
-		}
-	}
-}
-
-// FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
-func FdReader(ctx context.Context, sysCtx *Context, fd uint32) io.Reader {
-	if fd == FdStdin {
-		return sysCtx.Stdin()
-	} else if fd == FdRoot {
-		return nil // directory, not a readable file.
-	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
-		return nil
-	} else {
-		return f.File
-	}
 }

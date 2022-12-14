@@ -52,7 +52,7 @@ func TestNewFSContext(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(b *testing.T) {
-			fsc, err := NewFSContext(tc.fs)
+			fsc, err := NewFSContext(nil, nil, nil, tc.fs)
 			require.NoError(t, err)
 			defer fsc.Close(testCtx)
 
@@ -84,15 +84,20 @@ func TestEmptyFS(t *testing.T) {
 }
 
 func TestEmptyFSContext(t *testing.T) {
-	testFS := emptyFSContext
+	testFS, err := NewFSContext(nil, nil, nil, EmptyFS)
+	require.NoError(t, err)
+
 	expected := &FSContext{
+		stdin:       eofReader{},
+		stdout:      io.Discard,
+		stderr:      io.Discard,
 		fs:          EmptyFS,
 		openedFiles: map[uint32]*FileEntry{},
 		lastFD:      2,
 	}
 
 	t.Run("OpenFile doesn't affect state", func(t *testing.T) {
-		fd, err := testFS.OpenFile(testCtx, "foo.txt")
+		fd, err := testFS.OpenFile("foo.txt")
 		require.Zero(t, fd)
 		require.EqualError(t, err, "open foo.txt: file does not exist")
 
@@ -113,7 +118,7 @@ func TestContext_File(t *testing.T) {
 	embedFS, err := fs.Sub(testdata, "testdata")
 	require.NoError(t, err)
 
-	fsc, err := NewFSContext(embedFS)
+	fsc, err := NewFSContext(nil, nil, nil, embedFS)
 	require.NoError(t, err)
 	defer fsc.Close(testCtx)
 
@@ -142,11 +147,11 @@ func TestContext_File(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(b *testing.T) {
-			fd, err := fsc.OpenFile(testCtx, tc.name)
+			fd, err := fsc.OpenFile(tc.name)
 			require.NoError(t, err)
-			defer fsc.CloseFile(testCtx, fd)
+			defer fsc.CloseFile(fd)
 
-			f, ok := fsc.OpenedFile(testCtx, fd)
+			f, ok := fsc.OpenedFile(fd)
 			require.True(t, ok)
 
 			stat, err := f.File.Stat()
@@ -169,12 +174,12 @@ func TestContext_File(t *testing.T) {
 }
 
 func TestContext_Close(t *testing.T) {
-	fsc, err := NewFSContext(testfs.FS{"foo": &testfs.File{}})
+	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{"foo": &testfs.File{}})
 	require.NoError(t, err)
 	// Verify base case
 	require.Equal(t, 1, len(fsc.openedFiles))
 
-	_, err = fsc.OpenFile(testCtx, "foo")
+	_, err = fsc.OpenFile("foo")
 	require.NoError(t, err)
 	require.Equal(t, 2, len(fsc.openedFiles))
 
@@ -190,11 +195,11 @@ func TestContext_Close(t *testing.T) {
 
 func TestContext_Close_Error(t *testing.T) {
 	file := &testfs.File{CloseErr: errors.New("error closing")}
-	fsc, err := NewFSContext(testfs.FS{"foo": file})
+	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{"foo": file})
 	require.NoError(t, err)
 
 	// open another file
-	_, err = fsc.OpenFile(testCtx, "foo")
+	_, err = fsc.OpenFile("foo")
 	require.NoError(t, err)
 
 	require.EqualError(t, fsc.Close(testCtx), "error closing")

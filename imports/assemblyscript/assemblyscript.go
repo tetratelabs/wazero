@@ -35,6 +35,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -155,16 +156,19 @@ var abortMessageDisabled = abortMessageEnabled.WithGoModuleFunc(abort)
 
 // abortWithMessage implements functionAbort
 func abortWithMessage(ctx context.Context, mod api.Module, stack []uint64) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	mem := mod.Memory()
+
 	message := uint32(stack[0])
 	fileName := uint32(stack[1])
 	lineNumber := uint32(stack[2])
 	columnNumber := uint32(stack[3])
-	sysCtx := mod.(*wasm.CallContext).Sys
-	mem := mod.Memory()
+
 	// Don't panic if there was a problem reading the message
+	stderr := fsc.FdWriter(internalsys.FdStderr)
 	if msg, msgOk := readAssemblyScriptString(ctx, mem, message); msgOk {
 		if fn, fnOk := readAssemblyScriptString(ctx, mem, fileName); fnOk {
-			_, _ = fmt.Fprintf(sysCtx.Stderr(), "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
+			_, _ = fmt.Fprintf(stderr, "%s at %s:%d:%d\n", msg, fn, lineNumber, columnNumber)
 		}
 	}
 	abort(ctx, mod, stack)
@@ -195,14 +199,18 @@ var traceStdout = &wasm.HostFunc{
 	Code: &wasm.Code{
 		IsHostFunction: true,
 		GoFunc: api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			traceTo(ctx, mod, stack, mod.(*wasm.CallContext).Sys.Stdout())
+			fsc := mod.(*wasm.CallContext).Sys.FS()
+			stdout := fsc.FdWriter(internalsys.FdStdout)
+			traceTo(ctx, mod, stack, stdout)
 		}),
 	},
 }
 
 // traceStderr implements trace to the configured Stderr.
 var traceStderr = traceStdout.WithGoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-	traceTo(ctx, mod, stack, mod.(*wasm.CallContext).Sys.Stderr())
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	stderr := fsc.FdWriter(internalsys.FdStderr)
+	traceTo(ctx, mod, stack, stderr)
 })
 
 // traceTo implements the function "trace" in AssemblyScript. e.g.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"net/http"
 	"syscall"
@@ -565,49 +564,9 @@ func mapJSError(err error) *syscallErr {
 }
 
 // syscallOpen is like syscall.Open
-func syscallOpen(ctx context.Context, mod api.Module, name string, flags, perm uint32) (uint32, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	return fsc.OpenFile(ctx, name)
-}
-
-const (
-	fdStdin = iota
-	fdStdout
-	fdStderr
-)
-
-// fdReader returns a valid reader for the given file descriptor or nil if ErrnoBadf.
-func fdReader(ctx context.Context, mod api.Module, fd uint32) io.Reader {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	if fd == fdStdin {
-		return sysCtx.Stdin()
-	} else if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
-		return nil
-	} else {
-		return f.File
-	}
-}
-
-// fdWriter returns a valid writer for the given file descriptor or nil if ErrnoBadf.
-func fdWriter(ctx context.Context, mod api.Module, fd uint32) io.Writer {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	switch fd {
-	case fdStdout:
-		return sysCtx.Stdout()
-	case fdStderr:
-		return sysCtx.Stderr()
-	default:
-		// Check to see if the file descriptor is available
-		if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok || f.File == nil {
-			return nil
-			// fs.FS doesn't declare io.Writer, but implementations such as
-			// os.File implement it.
-		} else if writer, ok := f.File.(io.Writer); !ok {
-			return nil
-		} else {
-			return writer
-		}
-	}
+func syscallOpen(mod api.Module, name string, flags, perm uint32) (uint32, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	return fsc.OpenFile(name)
 }
 
 // funcWrapper is the result of go's js.FuncOf ("_makeFuncWrapper" here).

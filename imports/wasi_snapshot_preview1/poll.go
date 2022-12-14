@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -133,16 +132,16 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 
 // processFDEvent returns a validation error or ErrnoNotsup as file or socket
 // subscriptions are not yet supported.
-func processFDEvent(ctx context.Context, mod api.Module, eventType byte, inBuf []byte) Errno {
+func processFDEvent(_ context.Context, mod api.Module, eventType byte, inBuf []byte) Errno {
 	fd := le.Uint32(inBuf)
-	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
 	errno := ErrnoNotsup
-	if eventType == eventTypeFdRead && internalsys.FdReader(ctx, sysCtx, fd) == nil {
+	if eventType == eventTypeFdRead && fsc.FdReader(fd) == nil {
 		errno = ErrnoBadf
-	} else if eventType == eventTypeFdWrite && internalsys.FdWriter(ctx, sysCtx, fd) == nil {
+	} else if eventType == eventTypeFdWrite && fsc.FdWriter(fd) == nil {
 		errno = ErrnoBadf
 	}
 

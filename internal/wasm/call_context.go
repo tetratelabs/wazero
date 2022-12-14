@@ -115,7 +115,7 @@ func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err e
 	}
 	c = true
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
-		err = sysCtx.FS(ctx).Close(ctx)
+		err = sysCtx.FS().Close(ctx)
 	}
 	return
 }
