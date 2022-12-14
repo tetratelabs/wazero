@@ -86,11 +86,11 @@ var fdAllocate = stubFunction(
 // and https://linux.die.net/man/3/close
 var fdClose = newHostFunc(fdCloseName, fdCloseFn, []api.ValueType{i32}, "fd")
 
-func fdCloseFn(ctx context.Context, mod api.Module, params []uint64) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
+func fdCloseFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(params[0])
 
-	if ok := sysCtx.FS(ctx).CloseFile(ctx, fd); !ok {
+	if ok := fsc.CloseFile(fd); !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
@@ -164,8 +164,8 @@ func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
 	}
 
 	// Otherwise, look up the file corresponding to the file descriptor.
-	sysCtx := mod.(*wasm.CallContext).Sys
-	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	file, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -326,8 +326,8 @@ func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32
 	}
 
 	// Otherwise, look up the file corresponding to the file descriptor.
-	sysCtx := mod.(*wasm.CallContext).Sys
-	file, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	file, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -458,8 +458,8 @@ var fdPrestatGet = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u64ResultParam(fdPrestatGetFn)},
 }, fdPrestatGetName)
 
-func fdPrestatGetFn(ctx context.Context, mod api.Module, stack []uint64) (prestat uint64, errno Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
+func fdPrestatGetFn(_ context.Context, mod api.Module, stack []uint64) (prestat uint64, errno Errno) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(stack[0])
 
 	// Currently, we only pre-open the root file descriptor.
@@ -467,7 +467,7 @@ func fdPrestatGetFn(ctx context.Context, mod api.Module, stack []uint64) (presta
 		return 0, ErrnoBadf
 	}
 
-	entry, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	entry, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return 0, ErrnoBadf
 	}
@@ -516,7 +516,7 @@ var fdPrestatDirName = newHostFunc(
 )
 
 func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
 
 	// Currently, we only pre-open the root file descriptor.
@@ -524,7 +524,7 @@ func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Er
 		return ErrnoBadf
 	}
 
-	f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd)
+	f, ok := fsc.OpenedFile(fd)
 	if !ok {
 		return ErrnoBadf
 	}
@@ -614,7 +614,7 @@ func fdReadFn(ctx context.Context, mod api.Module, stack []uint64) (nread uint32
 
 func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
 	mem := mod.Memory()
-	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])
@@ -625,7 +625,7 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 		offset = int64(stack[3])
 	}
 
-	r := internalsys.FdReader(ctx, sysCtx, fd)
+	r := fsc.FdReader(fd)
 	if r == nil {
 		return 0, ErrnoBadf
 	}
@@ -701,7 +701,7 @@ var fdReaddir = proxyResultParams(&wasm.HostFunc{
 
 func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
 	mem := mod.Memory()
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(stack[0])
 	buf := uint32(stack[1])
@@ -940,7 +940,7 @@ func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
 func openedDir(ctx context.Context, fsc *internalsys.FSContext, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
-	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+	if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, nil, ErrnoBadf
 	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
 		// fd_readdir docs don't indicate whether to return ErrnoNotdir or
@@ -1011,7 +1011,7 @@ var fdSeek = proxyResultParams(&wasm.HostFunc{
 }, fdSeekName)
 
 func fdSeekFn(ctx context.Context, mod api.Module, stack []uint64) (int64, Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(stack[0])
 	offset := stack[1]
 	whence := uint32(stack[2])
@@ -1022,7 +1022,7 @@ func fdSeekFn(ctx context.Context, mod api.Module, stack []uint64) (int64, Errno
 
 	var seeker io.Seeker
 	// Check to see if the file descriptor is available
-	if f, ok := sysCtx.FS(ctx).OpenedFile(ctx, fd); !ok {
+	if f, ok := fsc.OpenedFile(fd); !ok {
 		return 0, ErrnoBadf
 		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
 	} else if seeker, ok = f.File.(io.Seeker); !ok {
@@ -1122,13 +1122,13 @@ var fdWrite = proxyResultParams(&wasm.HostFunc{
 
 func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
 	mem := mod.Memory()
-	sysCtx := mod.(*wasm.CallContext).Sys
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd := uint32(stack[0])
 	iovs := uint32(stack[1])
 	iovsCount := uint32(stack[2])
 
-	writer := internalsys.FdWriter(ctx, sysCtx, fd)
+	writer := fsc.FdWriter(fd)
 	if writer == nil {
 		return 0, ErrnoBadf
 	}
@@ -1210,8 +1210,7 @@ var pathFilestatGet = newHostFunc(
 // pathFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
 func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	fsc := sysCtx.FS(ctx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	dirfd := uint32(params[0])
 
@@ -1233,7 +1232,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	pathName := string(b)
 
 	// Prepend the path if necessary.
-	if dir, ok := fsc.OpenedFile(ctx, dirfd); !ok {
+	if dir, ok := fsc.OpenedFile(dirfd); !ok {
 		return ErrnoBadf
 	} else if _, ok := dir.File.(fs.ReadDirFile); !ok {
 		return ErrnoNotdir // TODO: cache filetype instead of poking.
@@ -1243,7 +1242,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	}
 
 	// Stat the file without allocating a file descriptor
-	stat, errnoResult := statFile(ctx, fsc, pathName)
+	stat, errnoResult := statFile(fsc, pathName)
 	if errnoResult != ErrnoSuccess {
 		return errnoResult
 	}
@@ -1356,8 +1355,7 @@ const (
 )
 
 func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, Errno) {
-	sysCtx := mod.(*wasm.CallContext).Sys
-	fsc := sysCtx.FS(ctx)
+	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	dirfd := uint32(params[0])
 
@@ -1384,7 +1382,7 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	// here in any way except assuming it is "/".
 	//
 	// See https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/at_fdcwd.c#L24-L26
-	if _, ok := fsc.OpenedFile(ctx, dirfd); !ok {
+	if _, ok := fsc.OpenedFile(dirfd); !ok {
 		return 0, ErrnoBadf
 	}
 
@@ -1399,25 +1397,25 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 	// path="bar", this should open "/tmp/foo/bar" not "/bar".
 	//
 	// See https://linux.die.net/man/2/openat
-	newFD, errnoResult := openFile(ctx, fsc, string(b))
+	newFD, errnoResult := openFile(fsc, string(b))
 	if errnoResult != ErrnoSuccess {
 		return 0, errnoResult
 	}
 
 	// Check any flags that require the file to evaluate.
 	if oflags&wasiOflagsDirectory != 0 {
-		return newFD, failIfNotDirectory(ctx, fsc, newFD)
+		return newFD, failIfNotDirectory(fsc, newFD)
 	}
 
 	return newFD, ErrnoSuccess
 }
 
-func failIfNotDirectory(ctx context.Context, fsc *internalsys.FSContext, fd uint32) Errno {
+func failIfNotDirectory(fsc *internalsys.FSContext, fd uint32) Errno {
 	// Lookup the previous file
-	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+	if f, ok := fsc.OpenedFile(fd); !ok {
 		return ErrnoBadf
 	} else if _, ok := f.File.(fs.ReadDirFile); !ok {
-		_ = fsc.CloseFile(ctx, fd)
+		_ = fsc.CloseFile(fd)
 		return ErrnoNotdir
 	}
 	return ErrnoSuccess
@@ -1473,8 +1471,8 @@ var pathUnlinkFile = stubFunction(
 
 // openFile attempts to open the file at the given path. Errors coerce to WASI
 // Errno.
-func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) {
-	newFD, err := fsc.OpenFile(ctx, name)
+func openFile(fsc *internalsys.FSContext, name string) (fd uint32, errno Errno) {
+	newFD, err := fsc.OpenFile(name)
 	if err == nil {
 		fd = newFD
 		errno = ErrnoSuccess
@@ -1486,8 +1484,8 @@ func openFile(ctx context.Context, fsc *internalsys.FSContext, name string) (fd 
 
 // statFile attempts to stat the file at the given path. Errors coerce to WASI
 // Errno.
-func statFile(ctx context.Context, fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno Errno) {
-	s, err := fsc.StatFile(ctx, name)
+func statFile(fsc *internalsys.FSContext, name string) (stat fs.FileInfo, errno Errno) {
+	s, err := fsc.StatFile(name)
 	if err == nil {
 		stat = s
 		errno = ErrnoSuccess

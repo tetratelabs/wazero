@@ -16,16 +16,10 @@ import (
 func TestContext_FS(t *testing.T) {
 	sysCtx := DefaultContext(testfs.FS{})
 
-	fsc1, err := NewFSContext(testfs.FS{})
+	fsc, err := NewFSContext(nil, nil, nil, testfs.FS{})
 	require.NoError(t, err)
 
-	require.Equal(t, fsc1, sysCtx.FS(testCtx))
-
-	fsc2, err := NewFSContext(testfs.FS{"foo": &testfs.File{}})
-	require.NoError(t, err)
-
-	// can override to something else
-	require.Equal(t, fsc2, sysCtx.FS(context.WithValue(testCtx, FSKey{}, fsc2)))
+	require.Equal(t, fsc, sysCtx.FS())
 }
 
 func TestDefaultSysContext(t *testing.T) {
@@ -48,9 +42,6 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Zero(t, sysCtx.ArgsSize())
 	require.Nil(t, sysCtx.Environ())
 	require.Zero(t, sysCtx.EnvironSize())
-	require.Equal(t, eofReader{}, sysCtx.Stdin())
-	require.Equal(t, io.Discard, sysCtx.Stdout())
-	require.Equal(t, io.Discard, sysCtx.Stderr())
 	// To compare functions, we can only compare pointers, but the pointer will
 	// change. Hence, we have to compare the results instead.
 	sec, _ := sysCtx.Walltime(testCtx)
@@ -60,8 +51,12 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
-	expectedFS, _ := NewFSContext(testfs.FS{})
-	require.Equal(t, expectedFS, sysCtx.FS(testCtx))
+
+	expectedFS, _ := NewFSContext(nil, nil, nil, testfs.FS{})
+	require.Equal(t, eofReader{}, expectedFS.stdin)
+	require.Equal(t, io.Discard, expectedFS.stdout)
+	require.Equal(t, io.Discard, expectedFS.stderr)
+	require.Equal(t, expectedFS, sysCtx.FS())
 }
 
 func TestNewContext_Args(t *testing.T) {

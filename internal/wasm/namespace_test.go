@@ -235,9 +235,9 @@ func TestNamespace_CloseWithExitCode(t *testing.T) {
 		// Right now, the only way to err closing the sys context is if a File.Close erred.
 		testFS := testfs.FS{"foo": &testfs.File{CloseErr: errors.New("error closing")}}
 		sysCtx := sys.DefaultContext(testFS)
-		fsCtx := sysCtx.FS(testCtx)
+		fsCtx := sysCtx.FS()
 
-		_, err := fsCtx.OpenFile(testCtx, "/foo")
+		_, err := fsCtx.OpenFile("/foo")
 		require.NoError(t, err)
 
 		ns, m1, m2 := newTestNamespace()

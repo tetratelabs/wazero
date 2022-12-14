@@ -17,8 +17,6 @@ import (
 type Context struct {
 	args, environ         [][]byte
 	argsSize, environSize uint32
-	stdin                 io.Reader
-	stdout, stderr        io.Writer
 
 	// Note: Using function pointers here keeps them stable for tests.
 
@@ -65,24 +63,6 @@ func (c *Context) EnvironSize() uint32 {
 	return c.environSize
 }
 
-// Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
-// See wazero.ModuleConfig WithStdin
-func (c *Context) Stdin() io.Reader {
-	return c.stdin
-}
-
-// Stdout is like exec.Cmd Stdout and defaults to io.Discard.
-// See wazero.ModuleConfig WithStdout
-func (c *Context) Stdout() io.Writer {
-	return c.stdout
-}
-
-// Stderr is like exec.Cmd Stderr and defaults to io.Discard.
-// See wazero.ModuleConfig WithStderr
-func (c *Context) Stderr() io.Writer {
-	return c.stderr
-}
-
 // Walltime implements sys.Walltime.
 func (c *Context) Walltime(ctx context.Context) (sec int64, nsec int32) {
 	return (*(c.walltime))(ctx)
@@ -108,12 +88,8 @@ func (c *Context) Nanosleep(ctx context.Context, ns int64) {
 	(*(c.nanosleep))(ctx, ns)
 }
 
-// FS returns a possibly nil file system context.
-func (c *Context) FS(ctx context.Context) *FSContext {
-	// Override Context when it is passed via context
-	if fsValue := ctx.Value(FSKey{}); fsValue != nil {
-		return fsValue.(*FSContext)
-	}
+// FS returns the possibly empty (EmptyFS) file system context.
+func (c *Context) FS() *FSContext {
 	return c.fsc
 }
 
@@ -171,24 +147,6 @@ func NewContext(
 		return nil, fmt.Errorf("environ invalid: %w", err)
 	}
 
-	if stdin == nil {
-		sysCtx.stdin = eofReader{}
-	} else {
-		sysCtx.stdin = stdin
-	}
-
-	if stdout == nil {
-		sysCtx.stdout = io.Discard
-	} else {
-		sysCtx.stdout = stdout
-	}
-
-	if stderr == nil {
-		sysCtx.stderr = io.Discard
-	} else {
-		sysCtx.stderr = stderr
-	}
-
 	if randSource == nil {
 		sysCtx.randSource = platform.NewFakeRandSource()
 	} else {
@@ -224,9 +182,9 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(fs)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, fs)
 	} else {
-		sysCtx.fsc, err = NewFSContext(EmptyFS)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, EmptyFS)
 	}
 
 	return

@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/tetratelabs/wazero/api"
+	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
@@ -91,7 +92,7 @@ func (*jsfsOpen) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	perm := toUint32(args[2])
 	callback := args[3].(funcWrapper)
 
-	fd, err := syscallOpen(ctx, mod, name, flags, perm)
+	fd, err := syscallOpen(mod, name, flags, perm)
 	return callback.invoke(ctx, mod, refJsfs, err, fd) // note: error first
 }
 
@@ -105,18 +106,18 @@ func (*jsfsStat) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	name := args[0].(string)
 	callback := args[1].(funcWrapper)
 
-	stat, err := syscallStat(ctx, mod, name)
+	stat, err := syscallStat(mod, name)
 	return callback.invoke(ctx, mod, refJsfs, err, stat) // note: error first
 }
 
 // syscallStat is like syscall.Stat
-func syscallStat(ctx context.Context, mod api.Module, name string) (*jsSt, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	if fd, err := fsc.OpenFile(ctx, name); err != nil {
+func syscallStat(mod api.Module, name string) (*jsSt, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+	if fd, err := fsc.OpenFile(name); err != nil {
 		return nil, err
 	} else {
-		defer fsc.CloseFile(ctx, fd)
-		return syscallFstat(ctx, mod, fd)
+		defer fsc.CloseFile(fd)
+		return syscallFstat(fsc, fd)
 	}
 }
 
@@ -127,17 +128,18 @@ type jsfsFstat struct{}
 
 // invoke implements jsFn.invoke
 func (*jsfsFstat) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	fd := toUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	fstat, err := syscallFstat(ctx, mod, fd)
+	fstat, err := syscallFstat(fsc, fd)
 	return callback.invoke(ctx, mod, refJsfs, err, fstat) // note: error first
 }
 
 // syscallFstat is like syscall.Fstat
-func syscallFstat(ctx context.Context, mod api.Module, fd uint32) (*jsSt, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+func syscallFstat(fsc *internalsys.FSContext, fd uint32) (*jsSt, error) {
+	if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, syscall.EBADF
 	} else if stat, err := f.File.Stat(); err != nil {
 		return nil, err
@@ -159,17 +161,18 @@ type jsfsClose struct{}
 
 // invoke implements jsFn.invoke
 func (*jsfsClose) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	fd := toUint32(args[0])
 	callback := args[1].(funcWrapper)
 
-	err := syscallClose(ctx, mod, fd)
+	err := syscallClose(fsc, fd)
 	return callback.invoke(ctx, mod, refJsfs, err, true) // note: error first
 }
 
 // syscallClose is like syscall.Close
-func syscallClose(ctx context.Context, mod api.Module, fd uint32) (err error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	if ok := fsc.CloseFile(ctx, fd); !ok {
+func syscallClose(fsc *internalsys.FSContext, fd uint32) (err error) {
+	if ok := fsc.CloseFile(fd); !ok {
 		err = syscall.EBADF // already closed
 	}
 	return
@@ -193,13 +196,15 @@ func (*jsfsRead) invoke(ctx context.Context, mod api.Module, args ...interface{}
 	fOffset := args[4] // nil unless Pread
 	callback := args[5].(funcWrapper)
 
-	n, err := syscallRead(ctx, mod, fd, fOffset, buf.slice[offset:offset+byteCount])
+	n, err := syscallRead(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
 	return callback.invoke(ctx, mod, refJsfs, err, n) // note: error first
 }
 
 // syscallRead is like syscall.Read
-func syscallRead(ctx context.Context, mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
-	r := fdReader(ctx, mod, fd)
+func syscallRead(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	r := fsc.FdReader(fd)
 	if r == nil {
 		err = syscall.EBADF
 	}
@@ -244,15 +249,17 @@ func (*jsfsWrite) invoke(ctx context.Context, mod api.Module, args ...interface{
 	callback := args[5].(funcWrapper)
 
 	if byteCount > 0 { // empty is possible on EOF
-		n, err := syscallWrite(ctx, mod, fd, fOffset, buf.slice[offset:offset+byteCount])
+		n, err := syscallWrite(mod, fd, fOffset, buf.slice[offset:offset+byteCount])
 		return callback.invoke(ctx, mod, refJsfs, err, n) // note: error first
 	}
 	return callback.invoke(ctx, mod, refJsfs, nil, refValueZero)
 }
 
 // syscallWrite is like syscall.Write
-func syscallWrite(ctx context.Context, mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
-	if writer := fdWriter(ctx, mod, fd); writer == nil {
+func syscallWrite(mod api.Module, fd uint32, offset interface{}, p []byte) (n uint32, err error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	if writer := fsc.FdWriter(fd); writer == nil {
 		err = syscall.EBADF
 	} else if nWritten, e := writer.Write(p); e == nil || e == io.EOF {
 		// fs_js.go cannot parse io.EOF so coerce it to nil.
@@ -279,15 +286,16 @@ func (*jsfsReaddir) invoke(ctx context.Context, mod api.Module, args ...interfac
 	return callback.invoke(ctx, mod, refJsfs, err, stat) // note: error first
 }
 
-func syscallReaddir(ctx context.Context, mod api.Module, name string) (*objectArray, error) {
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	fd, err := fsc.OpenFile(ctx, name)
+func syscallReaddir(_ context.Context, mod api.Module, name string) (*objectArray, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
+	fd, err := fsc.OpenFile(name)
 	if err != nil {
 		return nil, err
 	}
-	defer fsc.CloseFile(ctx, fd)
+	defer fsc.CloseFile(fd)
 
-	if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+	if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, syscall.EBADF
 	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
 		return nil, syscall.ENOTDIR
@@ -312,14 +320,14 @@ func (*returnZero) invoke(ctx context.Context, mod api.Module, args ...interface
 type returnSliceOfZero struct{}
 
 // invoke implements jsFn.invoke
-func (*returnSliceOfZero) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (*returnSliceOfZero) invoke(context.Context, api.Module, ...interface{}) (interface{}, error) {
 	return &objectArray{slice: []interface{}{refValueZero}}, nil
 }
 
 type returnArg0 struct{}
 
 // invoke implements jsFn.invoke
-func (*returnArg0) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (*returnArg0) invoke(_ context.Context, _ api.Module, args ...interface{}) (interface{}, error) {
 	return args[0], nil
 }
 
@@ -327,7 +335,7 @@ func (*returnArg0) invoke(ctx context.Context, mod api.Module, args ...interface
 type cwd struct{}
 
 // invoke implements jsFn.invoke
-func (*cwd) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+func (*cwd) invoke(ctx context.Context, _ api.Module, _ ...interface{}) (interface{}, error) {
 	return getState(ctx).cwd, nil
 }
 
@@ -336,19 +344,20 @@ type chdir struct{}
 
 // invoke implements jsFn.invoke
 func (*chdir) invoke(ctx context.Context, mod api.Module, args ...interface{}) (interface{}, error) {
+	fsc := mod.(*wasm.CallContext).Sys.FS()
+
 	path := args[0].(string)
 
 	// TODO: refactor so that sys has path-based ops, also needed in WASI.
-	fsc := mod.(*wasm.CallContext).Sys.FS(ctx)
-	if fd, err := fsc.OpenFile(ctx, path); err != nil {
+	if fd, err := fsc.OpenFile(path); err != nil {
 		return nil, syscall.ENOENT
-	} else if f, ok := fsc.OpenedFile(ctx, fd); !ok {
+	} else if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, syscall.ENOENT
 	} else if s, err := f.File.Stat(); err != nil {
-		fsc.CloseFile(ctx, fd)
+		fsc.CloseFile(fd)
 		return nil, syscall.ENOENT
 	} else if !s.IsDir() {
-		fsc.CloseFile(ctx, fd)
+		fsc.CloseFile(fd)
 		return nil, syscall.ENOTDIR
 	} else {
 		getState(ctx).cwd = path
