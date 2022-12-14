@@ -248,7 +248,7 @@ func TestMustCallFromSP(t *testing.T) {
 	mod, err := r.InstantiateModuleFromBinary(testCtx, bin)
 	require.NoError(t, err)
 
-	memView, ok := mod.Memory().Read(testCtx, 0, uint32(len(spMem)))
+	memView, ok := mod.Memory().Read(0, uint32(len(spMem)))
 	require.True(t, ok)
 	copy(memView, spMem)
 

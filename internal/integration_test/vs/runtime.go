@@ -40,7 +40,7 @@ type Module interface {
 	CallI32_V(ctx context.Context, funcName string, param uint32) error
 	CallV_V(ctx context.Context, funcName string) error
 	CallI64_I64(ctx context.Context, funcName string, param uint64) (uint64, error)
-	WriteMemory(ctx context.Context, offset uint32, bytes []byte) error
+	WriteMemory(offset uint32, bytes []byte) error
 	Memory() []byte
 	Close(context.Context) error
 }
@@ -79,10 +79,10 @@ func (m *wazeroModule) Memory() []byte {
 	return m.mod.Memory().(*wasm.MemoryInstance).Buffer
 }
 
-func (r *wazeroRuntime) log(ctx context.Context, mod api.Module, stack []uint64) {
+func (r *wazeroRuntime) log(_ context.Context, mod api.Module, stack []uint64) {
 	offset, byteCount := uint32(stack[0]), uint32(stack[1])
 
-	buf, ok := mod.Memory().Read(ctx, offset, byteCount)
+	buf, ok := mod.Memory().Read(offset, byteCount)
 	if !ok {
 		panic("out of memory reading log buffer")
 	}
@@ -197,8 +197,8 @@ func (m *wazeroModule) CallI64_I64(ctx context.Context, funcName string, param u
 	return 0, nil
 }
 
-func (m *wazeroModule) WriteMemory(ctx context.Context, offset uint32, bytes []byte) error {
-	if !m.mod.Memory().Write(ctx, offset, bytes) {
+func (m *wazeroModule) WriteMemory(offset uint32, bytes []byte) error {
+	if !m.mod.Memory().Write(offset, bytes) {
 		return errors.New("out of memory writing name")
 	}
 	return nil

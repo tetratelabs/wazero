@@ -143,11 +143,11 @@ var fdFdstatGet = newHostFunc(fdFdstatGetName, fdFdstatGetFn, []api.ValueType{i3
 
 // fdFdstatGetFn cannot currently use proxyResultParams because fdstat is larger
 // than api.ValueTypeI64 (i64 == 8 bytes, but fdstat is 24).
-func fdFdstatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func fdFdstatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fd, resultFdstat := uint32(params[0]), uint32(params[1])
 
 	// Ensure we can write the fdstat
-	buf, ok := mod.Memory().Read(ctx, resultFdstat, 24)
+	buf, ok := mod.Memory().Read(resultFdstat, 24)
 	if !ok {
 		return ErrnoFault
 	}
@@ -307,13 +307,13 @@ const (
 
 // fdFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
-func fdFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
-	return fdFilestatGetFunc(ctx, mod, uint32(params[0]), uint32(params[1]))
+func fdFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
+	return fdFilestatGetFunc(mod, uint32(params[0]), uint32(params[1]))
 }
 
-func fdFilestatGetFunc(ctx context.Context, mod api.Module, fd, resultBuf uint32) Errno {
+func fdFilestatGetFunc(mod api.Module, fd, resultBuf uint32) Errno {
 	// Ensure we can write the filestat
-	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
+	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
 		return ErrnoFault
 	}
@@ -414,8 +414,8 @@ var fdPread = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdPreadFn)},
 }, fdPreadName)
 
-func fdPreadFn(ctx context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
-	return fdReadOrPread(ctx, mod, stack, true)
+func fdPreadFn(_ context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
+	return fdReadOrPread(mod, stack, true)
 }
 
 // fdPrestatGet is the WASI function named fdPrestatGetName which returns
@@ -515,7 +515,7 @@ var fdPrestatDirName = newHostFunc(
 	"fd", "path", "path_len",
 )
 
-func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func fdPrestatDirNameFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd, path, pathLen := uint32(params[0]), uint32(params[1]), uint32(params[2])
 
@@ -534,7 +534,7 @@ func fdPrestatDirNameFn(ctx context.Context, mod api.Module, params []uint64) Er
 		return ErrnoNametoolong
 	}
 
-	if !mod.Memory().Write(ctx, path, []byte(f.Name)[:pathLen]) {
+	if !mod.Memory().Write(path, []byte(f.Name)[:pathLen]) {
 		return ErrnoFault
 	}
 	return ErrnoSuccess
@@ -608,11 +608,11 @@ var fdRead = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdReadFn)},
 }, fdReadName)
 
-func fdReadFn(ctx context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
-	return fdReadOrPread(ctx, mod, stack, false)
+func fdReadFn(_ context.Context, mod api.Module, stack []uint64) (nread uint32, errno Errno) {
+	return fdReadOrPread(mod, stack, false)
 }
 
-func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
+func fdReadOrPread(mod api.Module, stack []uint64, isPread bool) (uint32, Errno) {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
@@ -642,7 +642,7 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 
 	var nread uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
-	iovsBuf, ok := mem.Read(ctx, iovs, iovsStop)
+	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
 		return 0, ErrnoFault
 	}
@@ -651,7 +651,7 @@ func fdReadOrPread(ctx context.Context, mod api.Module, stack []uint64, isPread 
 		offset := le.Uint32(iovsBuf[iovsPos:])
 		l := le.Uint32(iovsBuf[iovsPos+4:])
 
-		b, ok := mem.Read(ctx, offset, l)
+		b, ok := mem.Read(offset, l)
 		if !ok {
 			return 0, ErrnoFault
 		}
@@ -699,7 +699,7 @@ var fdReaddir = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdReaddirFn)},
 }, fdReaddirName)
 
-func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+func fdReaddirFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
@@ -718,7 +718,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 	}
 
 	// Validate the FD is a directory
-	rd, dir, errno := openedDir(ctx, fsc, fd)
+	rd, dir, errno := openedDir(fsc, fd)
 	if errno != ErrnoSuccess {
 		return 0, errno
 	}
@@ -774,7 +774,7 @@ func fdReaddirFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, E
 		// ^^ yes this can overflow to negative, which means our implementation
 		// doesn't support writing greater than max int64 entries.
 
-		dirents, ok := mem.Read(ctx, buf, bufused)
+		dirents, ok := mem.Read(buf, bufused)
 		if !ok {
 			return 0, ErrnoFault
 		}
@@ -939,7 +939,7 @@ func writeDirent(buf []byte, dNext uint64, dNamlen uint32, dType bool) {
 }
 
 // openedDir returns the directory and ErrnoSuccess if the fd points to a readable directory.
-func openedDir(ctx context.Context, fsc *internalsys.FSContext, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
+func openedDir(fsc *internalsys.FSContext, fd uint32) (fs.ReadDirFile, *internalsys.ReadDir, Errno) {
 	if f, ok := fsc.OpenedFile(fd); !ok {
 		return nil, nil, ErrnoBadf
 	} else if d, ok := f.File.(fs.ReadDirFile); !ok {
@@ -1010,7 +1010,7 @@ var fdSeek = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: i64ResultParam(fdSeekFn)},
 }, fdSeekName)
 
-func fdSeekFn(ctx context.Context, mod api.Module, stack []uint64) (int64, Errno) {
+func fdSeekFn(_ context.Context, mod api.Module, stack []uint64) (int64, Errno) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 	fd := uint32(stack[0])
 	offset := stack[1]
@@ -1120,7 +1120,7 @@ var fdWrite = proxyResultParams(&wasm.HostFunc{
 	Code:        &wasm.Code{IsHostFunction: true, GoFunc: u32ResultParam(fdWriteFn)},
 }, fdWriteName)
 
-func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
+func fdWriteFn(_ context.Context, mod api.Module, stack []uint64) (uint32, Errno) {
 	mem := mod.Memory()
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
@@ -1136,7 +1136,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 	var err error
 	var nwritten uint32
 	iovsStop := iovsCount << 3 // iovsCount * 8
-	iovsBuf, ok := mem.Read(ctx, iovs, iovsStop)
+	iovsBuf, ok := mem.Read(iovs, iovsStop)
 	if !ok {
 		return 0, ErrnoFault
 	}
@@ -1149,7 +1149,7 @@ func fdWriteFn(ctx context.Context, mod api.Module, stack []uint64) (uint32, Err
 		if writer == io.Discard { // special-case default
 			n = int(l)
 		} else {
-			b, ok := mem.Read(ctx, offset, l)
+			b, ok := mem.Read(offset, l)
 			if !ok {
 				return 0, ErrnoFault
 			}
@@ -1209,7 +1209,7 @@ var pathFilestatGet = newHostFunc(
 
 // pathFilestatGetFn cannot currently use proxyResultParams because filestat is
 // larger than api.ValueTypeI64 (i64 == 8 bytes, but filestat is 64).
-func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Errno {
+func pathFilestatGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	dirfd := uint32(params[0])
@@ -1225,7 +1225,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 
 	// open_at isn't supported in fs.FS, so we check the path can't escape,
 	// then join it with its parent
-	b, ok := mod.Memory().Read(ctx, pathOffset, pathLen)
+	b, ok := mod.Memory().Read(pathOffset, pathLen)
 	if !ok {
 		return ErrnoNametoolong
 	}
@@ -1248,7 +1248,7 @@ func pathFilestatGetFn(ctx context.Context, mod api.Module, params []uint64) Err
 	}
 
 	// Write the stat result to memory
-	buf, ok := mod.Memory().Read(ctx, resultBuf, 64)
+	buf, ok := mod.Memory().Read(resultBuf, 64)
 	if !ok {
 		return ErrnoFault
 	}
@@ -1354,7 +1354,7 @@ const (
 	wasiOflagsTrunc // nolint
 )
 
-func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, Errno) {
+func pathOpenFn(_ context.Context, mod api.Module, params []uint64) (uint32, Errno) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	dirfd := uint32(params[0])
@@ -1386,7 +1386,7 @@ func pathOpenFn(ctx context.Context, mod api.Module, params []uint64) (uint32, E
 		return 0, ErrnoBadf
 	}
 
-	b, ok := mod.Memory().Read(ctx, path, pathLen)
+	b, ok := mod.Memory().Read(path, pathLen)
 	if !ok {
 		return 0, ErrnoFault
 	}

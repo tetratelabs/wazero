@@ -211,7 +211,7 @@ func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 func testHostFuncMemory(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(ctx context.Context, m api.Module, offset uint32, val uint64) uint32 {
-		if !m.Memory().WriteUint64Le(ctx, offset, val) {
+		if !m.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
 		// sneak a reference to the memory, so we can check it later
@@ -571,7 +571,7 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	results, err := sizeFn.Call(testCtx)
 	require.NoError(t, err)
 	require.Zero(t, results[0])
-	require.Zero(t, memory.Size(testCtx))
+	require.Zero(t, memory.Size())
 
 	// Any offset should be out of bounds error even when it is less than memory capacity(=memoryCapacityPages).
 	_, err = storeFn.Call(testCtx, wasm.MemoryPagesToBytesNum(memoryCapacityPages)-8)
@@ -589,8 +589,8 @@ func testMemOps(t *testing.T, r wazero.Runtime) {
 	// Check the size command works!
 	results, err = sizeFn.Call(testCtx)
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), results[0])               // 1 page
-	require.Equal(t, uint32(65536), memory.Size(testCtx)) // 64KB
+	require.Equal(t, uint64(1), results[0])        // 1 page
+	require.Equal(t, uint32(65536), memory.Size()) // 64KB
 
 	// Grow again so that the memory size matches memory capacity.
 	results, err = growFn.Call(testCtx, 1)
@@ -633,7 +633,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		defer module.Close(testCtx)
 
 		// Ensure that compilation cache doesn't cause race on memory instance.
-		before, ok := module.Memory().ReadUint64Le(testCtx, 1)
+		before, ok := module.Memory().ReadUint64Le(1)
 		require.True(t, ok)
 		// Value must be zero as the memory must not be affected by the previously instantiated modules.
 		require.Zero(t, before)
@@ -645,7 +645,7 @@ func testMultipleInstantiation(t *testing.T, r wazero.Runtime) {
 		require.NoError(t, err)
 
 		// After the call, the value must be set properly.
-		after, ok := module.Memory().ReadUint64Le(testCtx, 1)
+		after, ok := module.Memory().ReadUint64Le(1)
 		require.True(t, ok)
 		require.Equal(t, uint64(1000), after)
 	}

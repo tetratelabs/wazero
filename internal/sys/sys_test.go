@@ -2,7 +2,6 @@ package sys
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"testing"
 	"time"
@@ -44,10 +43,10 @@ func TestDefaultSysContext(t *testing.T) {
 	require.Zero(t, sysCtx.EnvironSize())
 	// To compare functions, we can only compare pointers, but the pointer will
 	// change. Hence, we have to compare the results instead.
-	sec, _ := sysCtx.Walltime(testCtx)
+	sec, _ := sysCtx.Walltime()
 	require.Equal(t, platform.FakeEpochNanos/time.Second.Nanoseconds(), sec)
 	require.Equal(t, sys.ClockResolution(1_000), sysCtx.WalltimeResolution())
-	require.Zero(t, sysCtx.Nanotime(testCtx)) // See above on functions.
+	require.Zero(t, sysCtx.Nanotime()) // See above on functions.
 	require.Equal(t, sys.ClockResolution(1), sysCtx.NanotimeResolution())
 	require.Equal(t, &ns, sysCtx.nanosleep)
 	require.Equal(t, platform.NewFakeRandSource(), sysCtx.RandSource())
@@ -311,8 +310,7 @@ func Test_clockResolutionInvalid(t *testing.T) {
 }
 
 func TestNewContext_Nanosleep(t *testing.T) {
-	var aNs sys.Nanosleep = func(context.Context, int64) {
-	}
+	var aNs sys.Nanosleep = func(int64) {}
 	sysCtx, err := NewContext(
 		0,   // max
 		nil, // args

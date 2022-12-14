@@ -187,7 +187,7 @@ func (m *wasmtimeModule) CallI64_I64(_ context.Context, funcName string, param u
 	}
 }
 
-func (m *wasmtimeModule) WriteMemory(_ context.Context, offset uint32, bytes []byte) error {
+func (m *wasmtimeModule) WriteMemory(offset uint32, bytes []byte) error {
 	unsafeSlice := m.mem.UnsafeData(m.store)
 	copy(unsafeSlice[offset:], bytes)
 	return nil

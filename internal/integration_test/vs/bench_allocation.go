@@ -46,7 +46,7 @@ func allocationCall(m Module, _ int) error {
 	}
 
 	// The pointer is a linear memory offset, which is where we write the name.
-	if err = m.WriteMemory(testCtx, namePtr, []byte(allocationParam)); err != nil {
+	if err = m.WriteMemory(namePtr, []byte(allocationParam)); err != nil {
 		return err
 	}
 

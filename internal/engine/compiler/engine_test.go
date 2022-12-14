@@ -339,7 +339,7 @@ func TestCallEngine_builtinFunctionTableGrow(t *testing.T) {
 	}
 
 	table := &wasm.TableInstance{References: []wasm.Reference{}, Min: 10}
-	ce.builtinFunctionTableGrow(context.Background(), []*wasm.TableInstance{table})
+	ce.builtinFunctionTableGrow([]*wasm.TableInstance{table})
 
 	require.Equal(t, 1, len(table.References))
 	require.Equal(t, uintptr(0xff), table.References[0])

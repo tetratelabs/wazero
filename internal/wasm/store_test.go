@@ -82,7 +82,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 
 			mem := instance.ExportedMemory("memory")
 			if tc.expected {
-				require.Equal(t, tc.expectedLen, mem.Size(testCtx))
+				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
 				require.Nil(t, mem)
 			}

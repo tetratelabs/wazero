@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -340,7 +339,7 @@ func (m *Module) verifyImportGlobalI32(sectionID SectionID, sectionIdx Index, id
 // Returns -1 if the operation is not valid, otherwise the old length of the table.
 //
 // https://www.w3.org/TR/2022/WD-wasm-core-2-20220419/exec/instructions.html#xref-syntax-instructions-syntax-instr-table-mathsf-table-grow-x
-func (t *TableInstance) Grow(_ context.Context, delta uint32, initialRef Reference) (currentLen uint32) {
+func (t *TableInstance) Grow(delta uint32, initialRef Reference) (currentLen uint32) {
 	// We take write-lock here as the following might result in a new slice
 	t.mux.Lock()
 	defer t.mux.Unlock()

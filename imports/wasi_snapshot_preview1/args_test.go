@@ -22,7 +22,7 @@ func Test_argsGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	maskMemory(t, testCtx, mod, len(expectedMemory)+int(argvBuf))
+	maskMemory(t, mod, len(expectedMemory)+int(argvBuf))
 
 	// Invoke argsGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, argsGetName, uint64(argv), uint64(argvBuf))
@@ -33,7 +33,7 @@ func Test_argsGet(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(testCtx, argvBuf-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(argvBuf-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -42,7 +42,7 @@ func Test_argsGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size(testCtx)
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary
 
 	tests := []struct {
@@ -124,7 +124,7 @@ func Test_argsSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	maskMemory(t, testCtx, mod, int(resultArgc)+len(expectedMemory))
+	maskMemory(t, mod, int(resultArgc)+len(expectedMemory))
 
 	// Invoke argsSizesGet and check the memory side effects.
 	requireErrno(t, ErrnoSuccess, mod, argsSizesGetName, uint64(resultArgc), uint64(resultArgvLen))
@@ -137,7 +137,7 @@ func Test_argsSizesGet(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(testCtx, resultArgc-1, uint32(len(expectedMemory)))
+	actual, ok := mod.Memory().Read(resultArgc-1, uint32(len(expectedMemory)))
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -146,7 +146,7 @@ func Test_argsSizesGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig().WithArgs("a", "bc"))
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size(testCtx)
+	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {

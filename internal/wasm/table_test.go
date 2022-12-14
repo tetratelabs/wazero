@@ -1080,7 +1080,7 @@ func TestTableInstance_Grow(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			table := &TableInstance{References: make([]uintptr, tc.currentLen), Max: tc.max}
-			actual := table.Grow(testCtx, tc.delta, 0)
+			actual := table.Grow(tc.delta, 0)
 			require.Equal(t, tc.exp, actual)
 		})
 	}

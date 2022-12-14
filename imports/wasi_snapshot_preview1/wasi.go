@@ -221,16 +221,16 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 // writeOffsetsAndNullTerminatedValues is used to write NUL-terminated values
 // for args or environ, given a pre-defined bytesLen (which includes NUL
 // terminators).
-func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
+func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
 	// The caller may not place bytes directly after offsets, so we have to
 	// read them independently.
 	valuesLen := len(values)
 	offsetsLen := uint32(valuesLen * 4) // uint32Le
-	offsetsBuf, ok := mem.Read(ctx, offsets, offsetsLen)
+	offsetsBuf, ok := mem.Read(offsets, offsetsLen)
 	if !ok {
 		return ErrnoFault
 	}
-	bytesBuf, ok := mem.Read(ctx, bytes, bytesLen)
+	bytesBuf, ok := mem.Read(bytes, bytesLen)
 	if !ok {
 		return ErrnoFault
 	}

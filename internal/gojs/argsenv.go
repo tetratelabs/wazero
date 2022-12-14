@@ -1,7 +1,6 @@
 package gojs
 
 import (
-	"context"
 	"errors"
 
 	"github.com/tetratelabs/wazero/api"
@@ -17,7 +16,7 @@ const (
 
 // WriteArgsAndEnviron writes arguments and environment variables to memory, so
 // they can be read by main, Go compiles as the function export "run".
-func WriteArgsAndEnviron(ctx context.Context, mod api.Module) (argc, argv uint32, err error) {
+func WriteArgsAndEnviron(mod api.Module) (argc, argv uint32, err error) {
 	mem := mod.Memory()
 	sysCtx := mod.(*wasm.CallContext).Sys
 	args := sysCtx.Args()
@@ -29,7 +28,7 @@ func WriteArgsAndEnviron(ctx context.Context, mod api.Module) (argc, argv uint32
 	strPtr := func(val []byte, field string, i int) (ptr uint32) {
 		// TODO: return err and format "%s[%d], field, i"
 		ptr = offset
-		mustWrite(ctx, mem, field, offset, append(val, 0))
+		mustWrite(mem, field, offset, append(val, 0))
 		offset += uint32(len(val) + 1)
 		if pad := offset % 8; pad != 0 {
 			offset += 8 - pad
@@ -50,7 +49,7 @@ func WriteArgsAndEnviron(ctx context.Context, mod api.Module) (argc, argv uint32
 	argv = offset
 	for _, ptr := range argvPtrs {
 		// TODO: return err and format "argvPtrs[%d], i"
-		mustWriteUint64Le(ctx, mem, "argvPtrs[i]", offset, uint64(ptr))
+		mustWriteUint64Le(mem, "argvPtrs[i]", offset, uint64(ptr))
 		offset += 8
 	}
 

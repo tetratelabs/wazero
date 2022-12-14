@@ -58,7 +58,7 @@ var WasmWrite = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func wasmWrite(ctx context.Context, mod api.Module, stack []uint64) {
+func wasmWrite(_ context.Context, mod api.Module, stack []uint64) {
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 
 	fd, p, n := uint32(stack[0]), uint32(stack[1]), uint32(stack[2])
@@ -68,7 +68,7 @@ func wasmWrite(ctx context.Context, mod api.Module, stack []uint64) {
 		panic(fmt.Errorf("unexpected fd %d", fd))
 	}
 
-	if _, err := writer.Write(mustRead(ctx, mod.Memory(), "p", p, n)); err != nil {
+	if _, err := writer.Write(mustRead(mod.Memory(), "p", p, n)); err != nil {
 		panic(fmt.Errorf("error writing p: %w", err))
 	}
 }
@@ -99,8 +99,8 @@ var Nanotime1 = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func nanotime1(ctx context.Context, mod api.Module, stack []uint64) {
-	time := mod.(*wasm.CallContext).Sys.Nanotime(ctx)
+func nanotime1(_ context.Context, mod api.Module, stack []uint64) {
+	time := mod.(*wasm.CallContext).Sys.Nanotime()
 	stack[0] = api.EncodeI64(time)
 }
 
@@ -118,8 +118,8 @@ var Walltime = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func walltime(ctx context.Context, mod api.Module, stack []uint64) {
-	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime(ctx)
+func walltime(_ context.Context, mod api.Module, stack []uint64) {
+	sec, nsec := mod.(*wasm.CallContext).Sys.Walltime()
 	stack[0] = api.EncodeI64(sec)
 	stack[1] = api.EncodeI32(nsec)
 }
@@ -158,11 +158,11 @@ var GetRandomData = spfunc.MustCallFromSP(false, &wasm.HostFunc{
 	},
 })
 
-func getRandomData(ctx context.Context, mod api.Module, stack []uint64) {
+func getRandomData(_ context.Context, mod api.Module, stack []uint64) {
 	randSource := mod.(*wasm.CallContext).Sys.RandSource()
 	buf, bufLen := uint32(stack[0]), uint32(stack[1])
 
-	r := mustRead(ctx, mod.Memory(), "r", buf, bufLen)
+	r := mustRead(mod.Memory(), "r", buf, bufLen)
 
 	if n, err := randSource.Read(r); err != nil {
 		panic(fmt.Errorf("RandSource.Read(r /* len=%d */) failed: %w", bufLen, err))

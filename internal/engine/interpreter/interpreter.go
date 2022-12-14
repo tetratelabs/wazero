@@ -1009,13 +1009,13 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			offset := ce.popMemoryOffset(op)
 			switch wazeroir.UnsignedType(op.b1) {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-				if val, ok := memoryInst.ReadUint32Le(ctx, offset); !ok {
+				if val, ok := memoryInst.ReadUint32Le(offset); !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				} else {
 					ce.pushValue(uint64(val))
 				}
 			case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-				if val, ok := memoryInst.ReadUint64Le(ctx, offset); !ok {
+				if val, ok := memoryInst.ReadUint64Le(offset); !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				} else {
 					ce.pushValue(val)
@@ -1023,7 +1023,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindLoad8:
-			val, ok := memoryInst.ReadByte(ctx, ce.popMemoryOffset(op))
+			val, ok := memoryInst.ReadByte(ce.popMemoryOffset(op))
 			if !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
@@ -1039,7 +1039,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			frame.pc++
 		case wazeroir.OperationKindLoad16:
 
-			val, ok := memoryInst.ReadUint16Le(ctx, ce.popMemoryOffset(op))
+			val, ok := memoryInst.ReadUint16Le(ce.popMemoryOffset(op))
 			if !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
@@ -1054,7 +1054,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			}
 			frame.pc++
 		case wazeroir.OperationKindLoad32:
-			val, ok := memoryInst.ReadUint32Le(ctx, ce.popMemoryOffset(op))
+			val, ok := memoryInst.ReadUint32Le(ce.popMemoryOffset(op))
 			if !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
@@ -1070,11 +1070,11 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			offset := ce.popMemoryOffset(op)
 			switch wazeroir.UnsignedType(op.b1) {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-				if !memoryInst.WriteUint32Le(ctx, offset, uint32(val)) {
+				if !memoryInst.WriteUint32Le(offset, uint32(val)) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 			case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-				if !memoryInst.WriteUint64Le(ctx, offset, val) {
+				if !memoryInst.WriteUint64Le(offset, val) {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 			}
@@ -1082,30 +1082,30 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindStore8:
 			val := byte(ce.popValue())
 			offset := ce.popMemoryOffset(op)
-			if !memoryInst.WriteByte(ctx, offset, val) {
+			if !memoryInst.WriteByte(offset, val) {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			frame.pc++
 		case wazeroir.OperationKindStore16:
 			val := uint16(ce.popValue())
 			offset := ce.popMemoryOffset(op)
-			if !memoryInst.WriteUint16Le(ctx, offset, val) {
+			if !memoryInst.WriteUint16Le(offset, val) {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			frame.pc++
 		case wazeroir.OperationKindStore32:
 			val := uint32(ce.popValue())
 			offset := ce.popMemoryOffset(op)
-			if !memoryInst.WriteUint32Le(ctx, offset, val) {
+			if !memoryInst.WriteUint32Le(offset, val) {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			frame.pc++
 		case wazeroir.OperationKindMemorySize:
-			ce.pushValue(uint64(memoryInst.PageSize(ctx)))
+			ce.pushValue(uint64(memoryInst.PageSize()))
 			frame.pc++
 		case wazeroir.OperationKindMemoryGrow:
 			n := ce.popValue()
-			if res, ok := memoryInst.Grow(ctx, uint32(n)); !ok {
+			if res, ok := memoryInst.Grow(uint32(n)); !ok {
 				ce.pushValue(uint64(0xffffffff)) // = -1 in signed 32-bit integer.
 			} else {
 				ce.pushValue(uint64(res))
@@ -1969,7 +1969,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindTableGrow:
 			table := tables[op.us[0]]
 			num, ref := ce.popValue(), ce.popValue()
-			ret := table.Grow(ctx, uint32(num), uintptr(ref))
+			ret := table.Grow(uint32(num), uintptr(ref))
 			ce.pushValue(uint64(ret))
 			frame.pc++
 		case wazeroir.OperationKindTableFill:
@@ -2086,18 +2086,18 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			offset := ce.popMemoryOffset(op)
 			switch op.b1 {
 			case wazeroir.V128LoadType128:
-				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				lo, ok := memoryInst.ReadUint64Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(lo)
-				hi, ok := memoryInst.ReadUint64Le(ctx, offset+8)
+				hi, ok := memoryInst.ReadUint64Le(offset + 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(hi)
 			case wazeroir.V128LoadType8x8s:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2108,7 +2108,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					uint64(uint16(int8(data[7])))<<48 | uint64(uint16(int8(data[6])))<<32 | uint64(uint16(int8(data[5])))<<16 | uint64(uint16(int8(data[4]))),
 				)
 			case wazeroir.V128LoadType8x8u:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2119,7 +2119,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					uint64(data[7])<<48 | uint64(data[6])<<32 | uint64(data[5])<<16 | uint64(data[4]),
 				)
 			case wazeroir.V128LoadType16x4s:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2132,7 +2132,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 						uint64(uint32(int16(binary.LittleEndian.Uint16(data[4:])))),
 				)
 			case wazeroir.V128LoadType16x4u:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2143,21 +2143,21 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					uint64(binary.LittleEndian.Uint16(data[6:]))<<32 | uint64(binary.LittleEndian.Uint16(data[4:])),
 				)
 			case wazeroir.V128LoadType32x2s:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(uint64(int32(binary.LittleEndian.Uint32(data))))
 				ce.pushValue(uint64(int32(binary.LittleEndian.Uint32(data[4:]))))
 			case wazeroir.V128LoadType32x2u:
-				data, ok := memoryInst.Read(ctx, offset, 8)
+				data, ok := memoryInst.Read(offset, 8)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(uint64(binary.LittleEndian.Uint32(data)))
 				ce.pushValue(uint64(binary.LittleEndian.Uint32(data[4:])))
 			case wazeroir.V128LoadType8Splat:
-				v, ok := memoryInst.ReadByte(ctx, offset)
+				v, ok := memoryInst.ReadByte(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2166,7 +2166,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(v8)
 				ce.pushValue(v8)
 			case wazeroir.V128LoadType16Splat:
-				v, ok := memoryInst.ReadUint16Le(ctx, offset)
+				v, ok := memoryInst.ReadUint16Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2174,7 +2174,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(v4)
 				ce.pushValue(v4)
 			case wazeroir.V128LoadType32Splat:
-				v, ok := memoryInst.ReadUint32Le(ctx, offset)
+				v, ok := memoryInst.ReadUint32Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2182,21 +2182,21 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 				ce.pushValue(vv)
 				ce.pushValue(vv)
 			case wazeroir.V128LoadType64Splat:
-				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				lo, ok := memoryInst.ReadUint64Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(lo)
 				ce.pushValue(lo)
 			case wazeroir.V128LoadType32zero:
-				lo, ok := memoryInst.ReadUint32Le(ctx, offset)
+				lo, ok := memoryInst.ReadUint32Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				ce.pushValue(uint64(lo))
 				ce.pushValue(0)
 			case wazeroir.V128LoadType64zero:
-				lo, ok := memoryInst.ReadUint64Le(ctx, offset)
+				lo, ok := memoryInst.ReadUint64Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2209,7 +2209,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			offset := ce.popMemoryOffset(op)
 			switch op.b1 {
 			case 8:
-				b, ok := memoryInst.ReadByte(ctx, offset)
+				b, ok := memoryInst.ReadByte(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2221,7 +2221,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					hi = (hi & ^(0xff << s)) | uint64(b)<<s
 				}
 			case 16:
-				b, ok := memoryInst.ReadUint16Le(ctx, offset)
+				b, ok := memoryInst.ReadUint16Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2233,7 +2233,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					hi = (hi & ^(0xff_ff << s)) | uint64(b)<<s
 				}
 			case 32:
-				b, ok := memoryInst.ReadUint32Le(ctx, offset)
+				b, ok := memoryInst.ReadUint32Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2245,7 +2245,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 					hi = (hi & ^(0xff_ff_ff_ff << s)) | uint64(b)<<s
 				}
 			case 64:
-				b, ok := memoryInst.ReadUint64Le(ctx, offset)
+				b, ok := memoryInst.ReadUint64Le(offset)
 				if !ok {
 					panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -2261,10 +2261,10 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 		case wazeroir.OperationKindV128Store:
 			hi, lo := ce.popValue(), ce.popValue()
 			offset := ce.popMemoryOffset(op)
-			if ok := memoryInst.WriteUint64Le(ctx, offset, lo); !ok {
+			if ok := memoryInst.WriteUint64Le(offset, lo); !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
-			if ok := memoryInst.WriteUint64Le(ctx, offset+8, hi); !ok {
+			if ok := memoryInst.WriteUint64Le(offset+8, hi); !ok {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			}
 			frame.pc++
@@ -2275,27 +2275,27 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, callCtx *wasm.CallCont
 			switch op.b1 {
 			case 8:
 				if op.b2 < 8 {
-					ok = memoryInst.WriteByte(ctx, offset, byte(lo>>(op.b2*8)))
+					ok = memoryInst.WriteByte(offset, byte(lo>>(op.b2*8)))
 				} else {
-					ok = memoryInst.WriteByte(ctx, offset, byte(hi>>((op.b2-8)*8)))
+					ok = memoryInst.WriteByte(offset, byte(hi>>((op.b2-8)*8)))
 				}
 			case 16:
 				if op.b2 < 4 {
-					ok = memoryInst.WriteUint16Le(ctx, offset, uint16(lo>>(op.b2*16)))
+					ok = memoryInst.WriteUint16Le(offset, uint16(lo>>(op.b2*16)))
 				} else {
-					ok = memoryInst.WriteUint16Le(ctx, offset, uint16(hi>>((op.b2-4)*16)))
+					ok = memoryInst.WriteUint16Le(offset, uint16(hi>>((op.b2-4)*16)))
 				}
 			case 32:
 				if op.b2 < 2 {
-					ok = memoryInst.WriteUint32Le(ctx, offset, uint32(lo>>(op.b2*32)))
+					ok = memoryInst.WriteUint32Le(offset, uint32(lo>>(op.b2*32)))
 				} else {
-					ok = memoryInst.WriteUint32Le(ctx, offset, uint32(hi>>((op.b2-2)*32)))
+					ok = memoryInst.WriteUint32Le(offset, uint32(hi>>((op.b2-2)*32)))
 				}
 			case 64:
 				if op.b2 == 0 {
-					ok = memoryInst.WriteUint64Le(ctx, offset, lo)
+					ok = memoryInst.WriteUint64Le(offset, lo)
 				} else {
-					ok = memoryInst.WriteUint64Le(ctx, offset, hi)
+					ok = memoryInst.WriteUint64Le(offset, hi)
 				}
 			}
 			if !ok {

@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"context"
 	"sync/atomic"
 	"time"
 
@@ -19,7 +18,7 @@ const (
 func NewFakeWalltime() *sys.Walltime {
 	// AddInt64 returns the new value. Adjust so the first reading will be FakeEpochNanos
 	t := FakeEpochNanos - ms
-	var wt sys.Walltime = func(context.Context) (sec int64, nsec int32) {
+	var wt sys.Walltime = func() (sec int64, nsec int32) {
 		wt := atomic.AddInt64(&t, ms)
 		return wt / 1e9, int32(wt % 1e9)
 	}
@@ -31,15 +30,14 @@ func NewFakeWalltime() *sys.Walltime {
 func NewFakeNanotime() *sys.Nanotime {
 	// AddInt64 returns the new value. Adjust so the first reading will be zero.
 	t := int64(0) - ms
-	var nt sys.Nanotime = func(context.Context) int64 {
+	var nt sys.Nanotime = func() int64 {
 		return atomic.AddInt64(&t, ms)
 	}
 	return &nt
 }
 
 // FakeNanosleep implements sys.Nanosleep by returning without sleeping.
-func FakeNanosleep(context.Context, int64) {
-}
+func FakeNanosleep(int64) {}
 
 // Walltime implements sys.Walltime with time.Now.
 //
@@ -48,7 +46,7 @@ func FakeNanosleep(context.Context, int64) {
 // time.Since is used. This doubles the performance impact. However, wall time
 // is likely to be read less frequently than Nanotime. Also, doubling the cost
 // matters less on fast platforms that can return both in <=100ns.
-func Walltime(context.Context) (sec int64, nsec int32) {
+func Walltime() (sec int64, nsec int32) {
 	t := time.Now()
 	return t.Unix(), int32(t.Nanosecond())
 }
@@ -67,11 +65,11 @@ func nanotimePortable() int64 {
 
 // Nanotime implements sys.Nanotime with runtime.nanotime() if CGO is available
 // and time.Since if not.
-func Nanotime(context.Context) int64 {
+func Nanotime() int64 {
 	return nanotime()
 }
 
 // Nanosleep implements sys.Nanosleep with time.Sleep.
-func Nanosleep(_ context.Context, ns int64) {
+func Nanosleep(ns int64) {
 	time.Sleep(time.Duration(ns))
 }

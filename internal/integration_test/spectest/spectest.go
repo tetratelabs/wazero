@@ -492,7 +492,7 @@ func Run(t *testing.T, testDataFS embed.FS, ctx context.Context, newEngine func(
 								expType = wasm.ValueTypeF64
 							}
 							require.Equal(t, expType, global.Type(), msg)
-							require.Equal(t, exps[0], global.Get(ctx), msg)
+							require.Equal(t, exps[0], global.Get(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

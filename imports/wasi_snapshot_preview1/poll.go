@@ -66,11 +66,11 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents
 	mem := mod.Memory()
 
 	// Ensure capacity prior to the read loop to reduce error handling.
-	inBuf, ok := mem.Read(ctx, in, nsubscriptions*48)
+	inBuf, ok := mem.Read(in, nsubscriptions*48)
 	if !ok {
 		return 0, ErrnoFault
 	}
-	outBuf, ok := mem.Read(ctx, out, nsubscriptions*32)
+	outBuf, ok := mem.Read(out, nsubscriptions*32)
 	if !ok {
 		return 0, ErrnoFault
 	}
@@ -88,7 +88,7 @@ func pollOneoffFn(ctx context.Context, mod api.Module, params []uint64) (nevents
 			errno = processClockEvent(ctx, mod, inBuf[inOffset+8+8:])
 		case eventTypeFdRead, eventTypeFdWrite:
 			// +8 past userdata +4 FD alignment
-			errno = processFDEvent(ctx, mod, eventType, inBuf[inOffset+8+4:])
+			errno = processFDEvent(mod, eventType, inBuf[inOffset+8+4:])
 		default:
 			return 0, ErrnoInval
 		}
@@ -126,13 +126,13 @@ func processClockEvent(ctx context.Context, mod api.Module, inBuf []byte) Errno 
 	// skip name ID validation and use a single sleep function.
 
 	sysCtx := mod.(*wasm.CallContext).Sys
-	sysCtx.Nanosleep(ctx, int64(timeout))
+	sysCtx.Nanosleep(int64(timeout))
 	return ErrnoSuccess
 }
 
 // processFDEvent returns a validation error or ErrnoNotsup as file or socket
 // subscriptions are not yet supported.
-func processFDEvent(_ context.Context, mod api.Module, eventType byte, inBuf []byte) Errno {
+func processFDEvent(mod api.Module, eventType byte, inBuf []byte) Errno {
 	fd := le.Uint32(inBuf)
 	fsc := mod.(*wasm.CallContext).Sys.FS()
 

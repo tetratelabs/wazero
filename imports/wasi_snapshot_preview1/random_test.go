@@ -24,7 +24,7 @@ func Test_randomGet(t *testing.T) {
 	length := uint32(5) // arbitrary length,
 	offset := uint32(1) // offset,
 
-	maskMemory(t, testCtx, mod, len(expectedMemory))
+	maskMemory(t, mod, len(expectedMemory))
 
 	// Invoke randomGet and check the memory side effects!
 	requireErrno(t, ErrnoSuccess, mod, randomGetName, uint64(offset), uint64(length))
@@ -35,7 +35,7 @@ func Test_randomGet(t *testing.T) {
 <-- 0
 `, "\n"+log.String())
 
-	actual, ok := mod.Memory().Read(testCtx, 0, offset+length+1)
+	actual, ok := mod.Memory().Read(0, offset+length+1)
 	require.True(t, ok)
 	require.Equal(t, expectedMemory, actual)
 }
@@ -44,7 +44,7 @@ func Test_randomGet_Errors(t *testing.T) {
 	mod, r, log := requireProxyModule(t, wazero.NewModuleConfig())
 	defer r.Close(testCtx)
 
-	memorySize := mod.Memory().Size(testCtx)
+	memorySize := mod.Memory().Size()
 
 	tests := []struct {
 		name           string

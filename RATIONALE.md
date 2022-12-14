@@ -117,6 +117,17 @@ Besides security, this practice prevents other bugs and allows centralization of
 
 ## API Design
 
+### Why is `context.Context` inconsistent?
+
+It may seem strange that only certain API have an initial `context.Context`
+parameter. We originally had a `context.Context` for anything that might be
+traced, but it turned out to be only useful for lifecycle and host functions.
+
+For instruction-scoped aspects like memory updates, a context parameter is too
+fine-grained and also invisible in practice. For example, most users will use
+the compiler engine, and its memory, global or table access will never use go's
+context.
+
 ### Why does `api.ValueType` map to uint64?
 
 WebAssembly allows functions to be defined either by the guest or the host,

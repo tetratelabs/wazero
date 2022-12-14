@@ -244,11 +244,11 @@ func createRuntime(b *testing.B, config wazero.RuntimeConfig) wazero.Runtime {
 		}
 
 		offset := uint32(results[0])
-		m.Memory().WriteUint32Le(ctx, retBufPtr, offset)
-		m.Memory().WriteUint32Le(ctx, retBufSize, 10)
+		m.Memory().WriteUint32Le(retBufPtr, offset)
+		m.Memory().WriteUint32Le(retBufSize, 10)
 		b := make([]byte, 10)
 		_, _ = rand.Read(b)
-		m.Memory().Write(ctx, offset, b)
+		m.Memory().Write(offset, b)
 	}
 
 	r := wazero.NewRuntimeWithConfig(testCtx, config)
